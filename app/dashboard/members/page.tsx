@@ -200,6 +200,11 @@ export default function MembersPage() {
       email: (r.email ?? '').trim(),
       phone: (r.phone ?? '').trim(),
       address: (r.address ?? '').trim(),
+      prefecture: (r.prefecture ?? '').trim(),
+      region: (r.region ?? '').trim(),
+      village: (r.village ?? '').trim(),
+      canton: (r.canton ?? '').trim(),
+      photo_url: null,
     }))
     setImportPreview(preview)
   }
