@@ -1,5 +1,6 @@
 'use client'
 
+import { Logo } from '@/components/shared/logo'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
@@ -8,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Eye, EyeOff, Leaf } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '@/app/context/auth-context'
 import { Spinner } from '@/components/shared/loading'
 import { errorMessage } from '@/lib/utils/errors'
@@ -76,8 +77,7 @@ export default function SignupPage() {
     <div className="min-h-screen grid md:grid-cols-2 bg-background">
       <div className="hidden md:flex flex-col justify-between bg-gradient-to-br from-primary/10 to-accent/10 border-r border-border p-8">
         <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-          <Leaf className="h-8 w-8 text-primary" />
-          <span className="text-2xl font-bold text-foreground">FaîtiereHub</span>
+          <Logo size="lg" />
         </Link>
 
         <div className="space-y-6">

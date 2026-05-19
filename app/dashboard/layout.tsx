@@ -9,7 +9,6 @@ import {
   Users,
   Settings,
   LogOut,
-  Leaf,
   Menu,
   X,
   Home,
@@ -18,6 +17,7 @@ import {
   Shield,
 } from 'lucide-react'
 import { useState } from 'react'
+import { Logo } from '@/components/shared/logo'
 import { useAuth } from '@/app/context/auth-context'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { ProtectedRoute } from '@/app/components/protected-route'
@@ -49,10 +49,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="min-h-screen flex flex-col md:flex-row bg-background">
         {/* Mobile header */}
         <div className="md:hidden sticky top-0 z-50 flex items-center justify-between border-b border-border bg-background p-4">
-          <div className="flex items-center gap-2">
-            <Leaf className="h-6 w-6 text-primary" />
-            <span className="font-bold text-foreground">FaîtiereHub</span>
-          </div>
+          <Logo size="sm" />
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-muted-foreground hover:text-foreground">
             {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
@@ -61,8 +58,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Sidebar */}
         <aside className={`${sidebarOpen ? 'block' : 'hidden'} md:flex md:flex-col md:sticky md:top-0 w-full md:w-64 h-screen border-r border-border bg-card overflow-y-auto`}>
           <div className="hidden md:flex items-center gap-2 p-6 border-b border-border">
-            <Leaf className="h-7 w-7 text-primary" />
-            <span className="text-xl font-bold text-foreground">FaîtiereHub</span>
+            <Logo size="md" />
           </div>
 
           {/* User info */}

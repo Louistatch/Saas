@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, Leaf, Users, TrendingUp, BarChart3 } from 'lucide-react'
+import { ArrowRight, Users, TrendingUp, BarChart3, Zap } from 'lucide-react'
 import { HomeClient } from '@/app/components/home-client'
+import { Logo } from '@/components/shared/logo'
 
 export default function Home() {
   return (
@@ -11,8 +12,7 @@ export default function Home() {
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2">
-            <Leaf className="h-7 w-7 text-primary" />
-            <span className="text-xl font-bold text-foreground">FaîtiereHub</span>
+            <Logo size="md" />
           </div>
           
           <div className="hidden md:flex items-center gap-8">
@@ -125,7 +125,7 @@ export default function Home() {
                 description: "Get insights into member activity, sales, and growth metrics in real-time"
               },
               {
-                icon: Leaf,
+                icon: Zap,
                 title: "Data Integration",
                 description: "Sync member data from KoboToolbox and other sources automatically"
               }
@@ -203,8 +203,7 @@ export default function Home() {
           <div className="grid gap-8 md:grid-cols-4">
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <Leaf className="h-6 w-6 text-primary" />
-                <span className="font-bold text-foreground">FaîtiereHub</span>
+                <Logo size="sm" />
               </div>
               <p className="text-sm text-muted-foreground">
                 Empowering agricultural cooperatives with digital tools.

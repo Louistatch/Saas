@@ -8,7 +8,6 @@ import {
   Users, 
   Settings, 
   LogOut,
-  Leaf,
   Menu,
   X,
   Building2,
@@ -16,6 +15,7 @@ import {
   LayoutDashboard,
 } from 'lucide-react'
 import { useState } from 'react'
+import { Logo } from '@/components/shared/logo'
 import { useAuth } from '@/app/context/auth-context'
 import { ProtectedRoute } from '@/app/components/protected-route'
 
@@ -50,8 +50,7 @@ export default function AdminLayout({
           sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}>
           <div className="p-6 flex items-center gap-3 border-b border-sidebar-border">
-            <Leaf className="h-8 w-8 text-sidebar-primary" />
-            <h1 className="text-xl font-bold text-sidebar-foreground">Admin</h1>
+            <Logo size="lg" textClassName="text-sidebar-foreground" />
           </div>
 
           <nav className="space-y-2 p-4 flex-1">
@@ -101,7 +100,7 @@ export default function AdminLayout({
         <main className="flex-1 overflow-auto">
           <div className="md:hidden p-4 border-b border-border flex items-center justify-between bg-card">
             <div className="flex items-center gap-3">
-              <Leaf className="h-6 w-6 text-primary" />
+              <Logo size="sm" showText={false} />
               <span className="font-semibold text-foreground">Admin Panel</span>
             </div>
             <Button
