@@ -79,7 +79,7 @@ export default function CardsPage() {
     setIsLoading(true)
     const { data, error } = await supabase
       .from('member_cards')
-      .select('*, member:members(first_name, last_name, email)')
+      .select('*, member:members(first_name, last_name, email, phone, photo_url, prefecture, region, village, canton, faitiere)')
       .eq('cooperative_id', currentCooperative.id)
       .order('created_at', { ascending: false })
     if (error) {
@@ -275,6 +275,7 @@ export default function CardsPage() {
         card,
         template,
         cooperativeName: currentCooperative?.name,
+        faitiereName: currentCooperative?.faitiereName,
         qrPayload: card.qr_data || buildQrPayload(card.member_id, card.card_number),
       })
       toast({ title: 'Card downloaded' })
@@ -303,6 +304,7 @@ export default function CardsPage() {
           card,
           template,
           cooperativeName: currentCooperative?.name,
+          faitiereName: currentCooperative?.faitiereName,
           qrPayload: card.qr_data || buildQrPayload(card.member_id, card.card_number),
         })
         // Small delay so browsers don't merge downloads

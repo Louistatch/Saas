@@ -32,6 +32,10 @@ type MemberFormState = {
   email: string
   phone: string
   address: string
+  prefecture: string
+  region: string
+  village: string
+  canton: string
 }
 
 const emptyForm: MemberFormState = {
@@ -40,6 +44,10 @@ const emptyForm: MemberFormState = {
   email: '',
   phone: '',
   address: '',
+  prefecture: '',
+  region: '',
+  village: '',
+  canton: '',
 }
 
 export default function MembersPage() {
@@ -119,6 +127,10 @@ export default function MembersPage() {
       email: parsed.data.email || null,
       phone: parsed.data.phone || null,
       address: parsed.data.address || null,
+      prefecture: form.prefecture || null,
+      region: form.region || null,
+      village: form.village || null,
+      canton: form.canton || null,
     })
     setSaving(false)
     if (error) {
@@ -511,6 +523,34 @@ export default function MembersPage() {
               placeholder="123 Rue de la Ferme"
               error={formErrors.address}
             />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                label="Village"
+                value={form.village}
+                onChange={(v) => setForm((f) => ({ ...f, village: v }))}
+                placeholder="Kpalimé"
+              />
+              <FormField
+                label="Canton"
+                value={form.canton}
+                onChange={(v) => setForm((f) => ({ ...f, canton: v }))}
+                placeholder="Canton Nord"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                label="Préfecture"
+                value={form.prefecture}
+                onChange={(v) => setForm((f) => ({ ...f, prefecture: v }))}
+                placeholder="Préfecture de Kloto"
+              />
+              <FormField
+                label="Région"
+                value={form.region}
+                onChange={(v) => setForm((f) => ({ ...f, region: v }))}
+                placeholder="Plateaux"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddDialog(false)} disabled={saving}>

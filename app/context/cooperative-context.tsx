@@ -29,6 +29,7 @@ function rowToCooperative(c: CooperativeRow): Cooperative {
     description: c.description ?? undefined,
     logo: c.logo_url ?? undefined,
     primaryColor: c.primary_color ?? undefined,
+    faitiereName: c.faitiere_name ?? undefined,
   }
 }
 
@@ -51,7 +52,7 @@ export function CooperativeProvider({ children }: { children: React.ReactNode })
       setIsLoading(true)
       let query = supabase
         .from('cooperatives')
-        .select('id, name, description, logo_url, primary_color, created_at')
+        .select('id, name, description, logo_url, primary_color, faitiere_name, created_at')
 
       if (user.role !== 'super_admin' && user.cooperativeId) {
         query = query.eq('id', user.cooperativeId)

@@ -46,6 +46,7 @@ export interface Cooperative {
   description?: string
   logo?: string
   primaryColor?: string
+  faitiereName?: string
   memberCount?: number
   exploitationCount?: number
 }
@@ -56,6 +57,7 @@ export interface CooperativeRow {
   description: string | null
   primary_color: string | null
   logo_url: string | null
+  faitiere_name: string | null
   created_at: string
 }
 
@@ -67,6 +69,12 @@ export interface Member {
   email: string | null
   phone: string | null
   address: string | null
+  photo_url: string | null
+  prefecture: string | null
+  region: string | null
+  village: string | null
+  canton: string | null
+  faitiere: string | null
   status: MemberStatus
   created_at: string
 }
@@ -93,7 +101,7 @@ export interface MemberCard {
   expiry_date: string | null
   qr_data: string | null
   created_at: string
-  member?: Pick<Member, 'first_name' | 'last_name' | 'email'> | null
+  member?: Pick<Member, 'first_name' | 'last_name' | 'email' | 'phone' | 'photo_url' | 'prefecture' | 'region' | 'village' | 'canton' | 'faitiere'> | null
 }
 
 export interface CardTemplate {
