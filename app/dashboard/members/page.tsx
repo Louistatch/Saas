@@ -18,6 +18,7 @@ import { MemberStatusBadge } from '@/components/shared/status-badge'
 import { PageHeader } from '@/components/shared/page-header'
 import { PaginationBar } from '@/components/shared/pagination'
 import { useConfirm } from '@/components/shared/confirm-dialog'
+import { PhotoUpload } from '@/components/shared/photo-upload'
 import { downloadCsv, parseCsvWithHeaders, toCsv } from '@/lib/utils/csv'
 import { errorMessage } from '@/lib/utils/errors'
 import { memberSchema, flattenZodErrors } from '@/lib/validators/schemas'
@@ -36,6 +37,7 @@ type MemberFormState = {
   region: string
   village: string
   canton: string
+  photo_url: string | null
 }
 
 const emptyForm: MemberFormState = {
@@ -48,6 +50,7 @@ const emptyForm: MemberFormState = {
   region: '',
   village: '',
   canton: '',
+  photo_url: null,
 }
 
 export default function MembersPage() {
@@ -131,6 +134,7 @@ export default function MembersPage() {
       region: form.region || null,
       village: form.village || null,
       canton: form.canton || null,
+      photo_url: form.photo_url || null,
     })
     setSaving(false)
     if (error) {
@@ -483,23 +487,33 @@ export default function MembersPage() {
             <DialogDescription>Members will be created with status &quot;active&quot;.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                label="First Name"
-                required
-                value={form.first_name}
-                onChange={(v) => setForm((f) => ({ ...f, first_name: v }))}
-                placeholder="Jean"
-                error={formErrors.first_name}
+            <div className="flex gap-4">
+              <PhotoUpload
+                value={form.photo_url}
+                onChange={(url) => setForm((f) => ({ ...f, photo_url: url }))}
+                folder={currentCooperative?.id ?? 'default'}
+                size="md"
               />
-              <FormField
-                label="Last Name"
-                required
-                value={form.last_name}
-                onChange={(v) => setForm((f) => ({ ...f, last_name: v }))}
-                placeholder="Dupont"
-                error={formErrors.last_name}
-              />
+              <div className="flex-1 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    label="First Name"
+                    required
+                    value={form.first_name}
+                    onChange={(v) => setForm((f) => ({ ...f, first_name: v }))}
+                    placeholder="Jean"
+                    error={formErrors.first_name}
+                  />
+                  <FormField
+                    label="Last Name"
+                    required
+                    value={form.last_name}
+                    onChange={(v) => setForm((f) => ({ ...f, last_name: v }))}
+                    placeholder="Dupont"
+                    error={formErrors.last_name}
+                  />
+                </div>
+              </div>
             </div>
             <FormField
               label="Email"
