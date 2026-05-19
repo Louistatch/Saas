@@ -530,29 +530,71 @@ export default function CardsPage() {
         <TabsContent value="template" className="space-y-6 mt-6">
           <Card className="border-border">
             <CardHeader>
-              <CardTitle className="text-foreground">Card Template Preview</CardTitle>
-              <CardDescription>Customize how your member cards look</CardDescription>
+              <CardTitle className="text-foreground">Card Design Preview</CardTitle>
+              <CardDescription>Premium member identity pass — WAOO design</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Premium card preview */}
               <div className="flex justify-center">
                 <div
-                  className="w-80 h-48 rounded-xl shadow-lg p-6 flex flex-col justify-between relative overflow-hidden"
-                  style={{ backgroundColor: template.bgColor, color: template.textColor }}
+                  className="w-full max-w-lg aspect-[16/10] rounded-2xl shadow-2xl relative overflow-hidden"
+                  style={{
+                    background: `linear-gradient(135deg, ${template.bgColor}, #0E8C49, #163D2B)`,
+                    color: template.textColor,
+                  }}
                   aria-label="Card preview"
                 >
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12" />
-                  <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full -ml-16 -mb-16" />
-                  <div className="relative z-10">
-                    <h3 className="text-2xl font-bold leading-tight">{template.title || ' '}</h3>
-                    <p className="text-sm opacity-90">{template.subtitle || ' '}</p>
+                  {/* Organic shapes */}
+                  <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -mr-16 -mt-16" />
+                  <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full -ml-20 -mb-20" />
+                  <div className="absolute top-1/2 right-1/4 w-24 h-24 bg-white/3 rounded-full" />
+
+                  {/* Header */}
+                  <div className="absolute top-3 left-4 right-4 flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 border border-white/10 backdrop-blur-sm">
+                    <span className="text-[10px] font-medium opacity-60">FaîtiereHub</span>
+                    <span className="text-[9px] tracking-wider opacity-70">MEMBER IDENTITY PASS</span>
+                    <span className="text-[9px] font-medium text-green-300 bg-green-500/20 px-2 py-0.5 rounded-full">✓ VERIFIED</span>
                   </div>
-                  <div className="relative z-10 flex items-end justify-between">
-                    <div className="space-y-1">
-                      <p className="text-xs opacity-75">MEMBER ID</p>
-                      <p className="text-base font-mono font-bold">COOP-12345</p>
+
+                  {/* Hero: Photo + Name */}
+                  <div className="absolute top-16 left-5 flex items-center gap-3">
+                    <div className="w-14 h-14 rounded-full bg-white/10 border-2 border-white/20 flex items-center justify-center">
+                      <span className="text-lg opacity-40">👤</span>
                     </div>
-                    <div className="bg-white p-1 rounded-md">
-                      <QrImage value={previewQr} size={56} margin={1} />
+                    <div>
+                      <p className="text-lg font-bold leading-tight">{template.title || 'Nom Membre'}</p>
+                      <p className="text-[10px] opacity-60">{currentCooperative?.name ?? 'Coopérative'}</p>
+                      <p className="text-[9px] font-mono text-green-300 mt-0.5">COOP-12345</p>
+                    </div>
+                  </div>
+
+                  {/* Info blocks */}
+                  <div className="absolute bottom-16 left-4 right-4 grid grid-cols-2 gap-2">
+                    {[
+                      { icon: '📍', label: 'Localité', value: 'Village, Préfecture' },
+                      { icon: '📞', label: 'Téléphone', value: '+228 90 XX XX XX' },
+                      { icon: '🏢', label: 'Coopérative', value: currentCooperative?.name ?? 'Coop' },
+                      { icon: '🌿', label: 'Faîtière', value: currentCooperative?.faitiereName ?? 'Faîtière' },
+                    ].map((b, i) => (
+                      <div key={i} className="px-2 py-1.5 rounded-lg bg-white/5 border border-white/10">
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px]">{b.icon}</span>
+                          <span className="text-[8px] uppercase opacity-50">{b.label}</span>
+                        </div>
+                        <p className="text-[9px] font-medium truncate mt-0.5">{b.value}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* QR + Footer */}
+                  <div className="absolute bottom-2 left-4 right-4 flex items-end justify-between px-2 py-1.5 rounded-lg bg-white/5 border border-white/10">
+                    <div>
+                      <p className="text-[8px] opacity-50">VALID UNTIL</p>
+                      <p className="text-[10px] font-semibold">19 MAY 2027</p>
+                    </div>
+                    <div className="text-[7px] opacity-40">{template.subtitle}</div>
+                    <div className="bg-white rounded-md p-1">
+                      <QrImage value={previewQr} size={32} margin={0} />
                     </div>
                   </div>
                 </div>
