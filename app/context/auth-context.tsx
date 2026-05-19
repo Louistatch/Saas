@@ -62,7 +62,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('id', userId)
         .single<ProfileRow>()
       if (error) {
-        log.error('Failed to load profile', { code: error.code })
+        // Common cases: no profile row yet (trigger hasn't fired), or RLS policy issue.
+        // This is not a crash-worthy error — the user simply isn't fully onboarded yet.
+        log.debug('Profile not available', { code: error.code })
         return null
       }
       return data ? profileToAuthUser(data) : null
@@ -81,7 +83,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (mounted && profile) setUser(profile)
         }
       } catch (error) {
-        log.error('Init error', error)
+        // No session or network issue — not an error for unauthenticated visitors
+        log.debug('No active session', error)
       } finally {
         if (mounted) setIsLoading(false)
       }
@@ -99,6 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           const profile = await fetchProfile(session.user.id)
           if (mounted && profile) setUser(profile)
+          // If profile is null, user stays null — they'll be treated as unauthenticated
         }
       },
     )

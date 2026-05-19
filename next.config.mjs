@@ -17,6 +17,11 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  turbopack: {
+    // Prevents Turbopack from scanning parent directories looking for configs.
+    // Without this, it walks up to C:\Users\HP which is extremely slow.
+    root: '.',
+  },
   async headers() {
     return [
       {
