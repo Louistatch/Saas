@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { ArrowRight, Users, TrendingUp, BarChart3, Zap } from 'lucide-react'
 import { HomeClient } from '@/app/components/home-client'
 import { Logo } from '@/components/shared/logo'
+import { DashboardPreview } from '@/components/shared/dashboard-preview'
 
 export default function Home() {
   return (
@@ -86,12 +87,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="relative h-96 sm:h-[500px] bg-gradient-to-br from-primary/10 to-accent/10 rounded-2xl border border-border flex items-center justify-center">
-            <div className="text-center space-y-4 px-8">
-              <BarChart3 className="h-20 w-20 text-primary mx-auto opacity-20" />
-              <p className="text-muted-foreground">Dashboard Preview</p>
-            </div>
-          </div>
+          <DashboardPreview />
         </div>
       </section>
 

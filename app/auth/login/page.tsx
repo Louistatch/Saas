@@ -51,6 +51,12 @@ function LoginInner() {
     setSubmitting(true)
     try {
       await login(parsed.data.email, parsed.data.password)
+      // Login succeeded — onAuthStateChange will trigger profile fetch + redirect.
+      // If redirect doesn't happen within 8s, something went wrong with profile loading.
+      setTimeout(() => {
+        setSubmitting(false)
+        setError('Login succeeded but profile could not be loaded. Please try again.')
+      }, 8000)
     } catch (err) {
       setError(errorMessage(err))
       setSubmitting(false)

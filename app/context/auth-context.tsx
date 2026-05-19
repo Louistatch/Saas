@@ -56,18 +56,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = useCallback(
     async (userId: string): Promise<AuthUser | null> => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, email, first_name, last_name, role, cooperative_id')
-        .eq('id', userId)
-        .single<ProfileRow>()
-      if (error) {
-        // Common cases: no profile row yet (trigger hasn't fired), or RLS policy issue.
-        // This is not a crash-worthy error — the user simply isn't fully onboarded yet.
-        log.debug('Profile not available', { code: error.code })
-        return null
+      // Try up to 2 times (the profile trigger may not have fired yet on first login)
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, email, first_name, last_name, role, cooperative_id')
+          .eq('id', userId)
+          .single<ProfileRow>()
+        if (!error && data) {
+          return profileToAuthUser(data)
+        }
+        if (attempt === 0) {
+          // Wait 1s and retry — gives the trigger time to create the profile
+          await new Promise((r) => setTimeout(r, 1000))
+        } else {
+          log.debug('Profile not available after retry', { code: error?.code })
+        }
       }
-      return data ? profileToAuthUser(data) : null
+      return null
     },
     [supabase],
   )
