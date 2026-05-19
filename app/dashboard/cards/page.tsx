@@ -1,0 +1,877 @@
+'use client'
+
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Plus, Download, QrCode, Trash2, RefreshCw, Users, CheckCircle2, Search } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Checkbox } from '@/components/ui/checkbox'
+import { createClient } from '@/lib/supabase/client'
+import { useCooperative } from '@/app/context/cooperative-context'
+import { useToast } from '@/hooks/use-toast'
+import { useDebounced } from '@/hooks/use-debounced'
+import { LoadingBlock, Spinner } from '@/components/shared/loading'
+import { EmptyState } from '@/components/shared/empty-state'
+import { CardStatusBadge } from '@/components/shared/status-badge'
+import { PageHeader } from '@/components/shared/page-header'
+import { PaginationBar } from '@/components/shared/pagination'
+import { useConfirm } from '@/components/shared/confirm-dialog'
+import { QrImage } from '@/components/shared/qr-image'
+import { errorMessage } from '@/lib/utils/errors'
+import { cardSettingsSchema, cardTemplateSchema, flattenZodErrors } from '@/lib/validators/schemas'
+import { downloadCardImage, renderCardImage } from '@/lib/utils/card-image'
+import {
+  DEFAULT_CARD_SETTINGS,
+  DEFAULT_CARD_TEMPLATE,
+  type CardSettings,
+  type CardTemplate,
+  type Member,
+  type MemberCard,
+} from '@/types/domain'
+
+const PAGE_SIZE = 20
+
+interface SettingsRow {
+  cooperative_id: string
+  card_template: CardTemplate | null
+  card_settings: CardSettings | null
+}
+
+export default function CardsPage() {
+  const { currentCooperative } = useCooperative()
+  const { toast } = useToast()
+  const { confirm, confirmNode } = useConfirm()
+  const supabase = useMemo(() => createClient(), [])
+
+  // Cards/members state
+  const [cards, setCards] = useState<MemberCard[]>([])
+  const [members, setMembers] = useState<Pick<Member, 'id' | 'first_name' | 'last_name'>[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounced(search, 200)
+  const [page, setPage] = useState(1)
+
+  // Dialogs
+  const [showGenerate, setShowGenerate] = useState(false)
+  const [showBulk, setShowBulk] = useState(false)
+  const [selectedMemberId, setSelectedMemberId] = useState('')
+  const [bulkSelectedIds, setBulkSelectedIds] = useState<string[]>([])
+  const [bulkSearch, setBulkSearch] = useState('')
+  const [validityDays, setValidityDays] = useState(365)
+
+  // Saving states
+  const [saving, setSaving] = useState(false)
+  const [savingTemplate, setSavingTemplate] = useState(false)
+  const [savingSettings, setSavingSettings] = useState(false)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [downloadingAll, setDownloadingAll] = useState(false)
+
+  // Persisted settings
+  const [template, setTemplate] = useState<CardTemplate>(DEFAULT_CARD_TEMPLATE)
+  const [settings, setSettings] = useState<CardSettings>(DEFAULT_CARD_SETTINGS)
+  const [templateErrors, setTemplateErrors] = useState<Record<string, string>>({})
+
+  const fetchCards = useCallback(async () => {
+    if (!currentCooperative) return
+    setIsLoading(true)
+    const { data, error } = await supabase
+      .from('member_cards')
+      .select('*, member:members(first_name, last_name, email)')
+      .eq('cooperative_id', currentCooperative.id)
+      .order('created_at', { ascending: false })
+    if (error) {
+      toast({ title: 'Error', description: errorMessage(error), variant: 'destructive' })
+    } else {
+      setCards((data ?? []) as MemberCard[])
+    }
+    setIsLoading(false)
+  }, [currentCooperative, supabase, toast])
+
+  const fetchMembers = useCallback(async () => {
+    if (!currentCooperative) return
+    const { data, error } = await supabase
+      .from('members')
+      .select('id, first_name, last_name')
+      .eq('cooperative_id', currentCooperative.id)
+      .eq('status', 'active')
+      .order('last_name')
+    if (!error) setMembers(data ?? [])
+  }, [currentCooperative, supabase])
+
+  const loadCooperativeSettings = useCallback(async () => {
+    if (!currentCooperative) return
+    const { data } = await supabase
+      .from('cooperative_settings')
+      .select('cooperative_id, card_template, card_settings')
+      .eq('cooperative_id', currentCooperative.id)
+      .maybeSingle<SettingsRow>()
+    if (data?.card_template) setTemplate(data.card_template)
+    if (data?.card_settings) {
+      setSettings(data.card_settings)
+      setValidityDays(data.card_settings.defaultValidityDays)
+    }
+  }, [currentCooperative, supabase])
+
+  useEffect(() => {
+    fetchCards()
+    fetchMembers()
+    loadCooperativeSettings()
+  }, [fetchCards, fetchMembers, loadCooperativeSettings])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch])
+
+  const filteredCards = useMemo(() => {
+    const q = debouncedSearch.toLowerCase().trim()
+    if (!q) return cards
+    return cards.filter((c) => {
+      const name = c.member ? `${c.member.first_name} ${c.member.last_name}` : ''
+      return `${name} ${c.card_number}`.toLowerCase().includes(q)
+    })
+  }, [cards, debouncedSearch])
+
+  const pagedCards = useMemo(
+    () => filteredCards.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filteredCards, page],
+  )
+
+  const filteredBulkMembers = useMemo(() => {
+    const q = bulkSearch.toLowerCase().trim()
+    if (!q) return members
+    return members.filter((m) => `${m.first_name} ${m.last_name}`.toLowerCase().includes(q))
+  }, [members, bulkSearch])
+
+  // -- helpers --
+
+  const generateCardNumber = useCallback(() => {
+    const prefix = currentCooperative?.name?.slice(0, 3).toUpperCase().replace(/\s+/g, '') || 'COP'
+    const num = Math.floor(Math.random() * 90000) + 10000
+    return `${prefix}-${num}`
+  }, [currentCooperative])
+
+  const buildQrPayload = useCallback(
+    (memberId: string, cardNumber: string) => {
+      const payload: Record<string, string> = {}
+      if (settings.qrCodeIncludes.cardNumber) payload.card_number = cardNumber
+      if (settings.qrCodeIncludes.memberId) payload.member_id = memberId
+      if (settings.qrCodeIncludes.cooperativeId && currentCooperative) {
+        payload.cooperative_id = currentCooperative.id
+      }
+      return JSON.stringify(payload)
+    },
+    [settings, currentCooperative],
+  )
+
+  // -- single generation --
+
+  const handleGenerate = async () => {
+    if (!currentCooperative || !selectedMemberId) {
+      toast({ title: 'Select a member', variant: 'destructive' })
+      return
+    }
+    setSaving(true)
+    const expiry = new Date()
+    expiry.setDate(expiry.getDate() + validityDays)
+    const cardNumber = generateCardNumber()
+
+    // Revoke any existing active card for this member
+    await supabase
+      .from('member_cards')
+      .update({ status: 'revoked' })
+      .eq('member_id', selectedMemberId)
+      .eq('status', 'active')
+
+    const { error } = await supabase.from('member_cards').insert({
+      cooperative_id: currentCooperative.id,
+      member_id: selectedMemberId,
+      card_number: cardNumber,
+      status: 'active',
+      expiry_date: expiry.toISOString().split('T')[0],
+      qr_data: buildQrPayload(selectedMemberId, cardNumber),
+    })
+
+    setSaving(false)
+    if (error) {
+      toast({ title: 'Could not generate card', description: errorMessage(error), variant: 'destructive' })
+      return
+    }
+    toast({ title: 'Card generated', description: cardNumber })
+    setShowGenerate(false)
+    setSelectedMemberId('')
+    fetchCards()
+  }
+
+  const handleBulkGenerate = async () => {
+    if (!currentCooperative || bulkSelectedIds.length === 0) {
+      toast({ title: 'Select at least one member', variant: 'destructive' })
+      return
+    }
+    setSaving(true)
+    const expiry = new Date()
+    expiry.setDate(expiry.getDate() + validityDays)
+    const expiryStr = expiry.toISOString().split('T')[0]
+
+    await supabase
+      .from('member_cards')
+      .update({ status: 'revoked' })
+      .in('member_id', bulkSelectedIds)
+      .eq('status', 'active')
+
+    const inserts = bulkSelectedIds.map((memberId) => {
+      const cardNumber = generateCardNumber()
+      return {
+        cooperative_id: currentCooperative.id,
+        member_id: memberId,
+        card_number: cardNumber,
+        status: 'active' as const,
+        expiry_date: expiryStr,
+        qr_data: buildQrPayload(memberId, cardNumber),
+      }
+    })
+
+    const { error } = await supabase.from('member_cards').insert(inserts)
+    setSaving(false)
+    if (error) {
+      toast({ title: 'Bulk generation failed', description: errorMessage(error), variant: 'destructive' })
+      return
+    }
+    toast({
+      title: `${bulkSelectedIds.length} card${bulkSelectedIds.length === 1 ? '' : 's'} generated`,
+    })
+    setShowBulk(false)
+    setBulkSelectedIds([])
+    setBulkSearch('')
+    fetchCards()
+  }
+
+  const handleRevoke = async (card: MemberCard) => {
+    const ok = await confirm({
+      title: 'Revoke card?',
+      description: 'The member will lose marketplace access until a new card is issued.',
+      destructive: true,
+      confirmLabel: 'Revoke',
+    })
+    if (!ok) return
+    const { error } = await supabase
+      .from('member_cards')
+      .update({ status: 'revoked' })
+      .eq('id', card.id)
+    if (error) {
+      toast({ title: 'Revoke failed', description: errorMessage(error), variant: 'destructive' })
+      return
+    }
+    toast({ title: 'Card revoked' })
+    fetchCards()
+  }
+
+  const handleDownload = async (card: MemberCard) => {
+    setDownloadingId(card.id)
+    try {
+      await downloadCardImage({
+        card,
+        template,
+        cooperativeName: currentCooperative?.name,
+        qrPayload: card.qr_data || buildQrPayload(card.member_id, card.card_number),
+      })
+      toast({ title: 'Card downloaded' })
+    } catch (e) {
+      toast({ title: 'Download failed', description: errorMessage(e), variant: 'destructive' })
+    } finally {
+      setDownloadingId(null)
+    }
+  }
+
+  const handleDownloadAll = async () => {
+    const active = cards.filter((c) => c.status === 'active')
+    if (active.length === 0) return
+    if (active.length > 25) {
+      const ok = await confirm({
+        title: `Download ${active.length} cards?`,
+        description: 'This will trigger one download per card. Your browser may ask to allow multiple downloads.',
+        confirmLabel: 'Download',
+      })
+      if (!ok) return
+    }
+    setDownloadingAll(true)
+    try {
+      for (const card of active) {
+        await downloadCardImage({
+          card,
+          template,
+          cooperativeName: currentCooperative?.name,
+          qrPayload: card.qr_data || buildQrPayload(card.member_id, card.card_number),
+        })
+        // Small delay so browsers don't merge downloads
+        await new Promise((r) => setTimeout(r, 150))
+      }
+      toast({ title: `Downloaded ${active.length} cards` })
+    } catch (e) {
+      toast({ title: 'Download failed', description: errorMessage(e), variant: 'destructive' })
+    } finally {
+      setDownloadingAll(false)
+    }
+  }
+
+  // -- template/settings persistence --
+
+  const handleSaveTemplate = async () => {
+    if (!currentCooperative) return
+    const parsed = cardTemplateSchema.safeParse(template)
+    if (!parsed.success) {
+      setTemplateErrors(flattenZodErrors(parsed.error))
+      return
+    }
+    setTemplateErrors({})
+    setSavingTemplate(true)
+    const { error } = await supabase.from('cooperative_settings').upsert(
+      { cooperative_id: currentCooperative.id, card_template: parsed.data },
+      { onConflict: 'cooperative_id' },
+    )
+    setSavingTemplate(false)
+    if (error) {
+      toast({ title: 'Could not save template', description: errorMessage(error), variant: 'destructive' })
+      return
+    }
+    toast({ title: 'Template saved' })
+  }
+
+  const handleSaveSettings = async () => {
+    if (!currentCooperative) return
+    const parsed = cardSettingsSchema.safeParse(settings)
+    if (!parsed.success) {
+      toast({ title: 'Invalid settings', description: parsed.error.issues[0]?.message, variant: 'destructive' })
+      return
+    }
+    setSavingSettings(true)
+    const { error } = await supabase.from('cooperative_settings').upsert(
+      { cooperative_id: currentCooperative.id, card_settings: parsed.data },
+      { onConflict: 'cooperative_id' },
+    )
+    setSavingSettings(false)
+    if (error) {
+      toast({ title: 'Could not save settings', description: errorMessage(error), variant: 'destructive' })
+      return
+    }
+    toast({ title: 'Settings saved' })
+  }
+
+  // Preview QR payload (so the preview reflects current settings choices)
+  const previewQr = useMemo(() => {
+    const sample: Record<string, string> = {}
+    if (settings.qrCodeIncludes.cardNumber) sample.card_number = 'COOP-12345'
+    if (settings.qrCodeIncludes.memberId) sample.member_id = 'preview'
+    if (settings.qrCodeIncludes.cooperativeId && currentCooperative)
+      sample.cooperative_id = currentCooperative.id
+    return JSON.stringify(sample)
+  }, [settings, currentCooperative])
+
+  const activeCount = cards.filter((c) => c.status === 'active').length
+
+  return (
+    <div className="space-y-8">
+      <PageHeader
+        title="Member Cards"
+        description="Generate and manage digital member cards with QR codes"
+      />
+
+      <Tabs defaultValue="generated" className="w-full">
+        <TabsList className="grid w-full max-w-lg grid-cols-3 border-b border-border bg-transparent">
+          <TabsTrigger value="generated" className="border-b-2 border-transparent data-[state=active]:border-primary">
+            Cards ({cards.length})
+          </TabsTrigger>
+          <TabsTrigger value="template" className="border-b-2 border-transparent data-[state=active]:border-primary">
+            Template
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="border-b-2 border-transparent data-[state=active]:border-primary">
+            Settings
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="generated" className="space-y-6 mt-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-0.5">
+              <h2 className="text-lg font-semibold text-foreground">Generated Cards</h2>
+              <p className="text-sm text-muted-foreground">{activeCount} active card{activeCount === 1 ? '' : 's'}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" className="gap-2 border-border" onClick={fetchCards} aria-label="Refresh">
+                <RefreshCw className="h-4 w-4" />
+                Refresh
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-2 border-border"
+                onClick={handleDownloadAll}
+                disabled={downloadingAll || activeCount === 0}
+              >
+                {downloadingAll ? <Spinner className="h-4 w-4" /> : <Download className="h-4 w-4" />}
+                Download All
+              </Button>
+              <Button variant="outline" className="gap-2 border-border" onClick={() => setShowBulk(true)}>
+                <Users className="h-4 w-4" />
+                Bulk Generate
+              </Button>
+              <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setShowGenerate(true)}>
+                <Plus className="h-4 w-4" />
+                Generate Card
+              </Button>
+            </div>
+          </div>
+
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              className="pl-10"
+              placeholder="Search by name or card number…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search cards"
+            />
+          </div>
+
+          <Card className="border-border">
+            <CardHeader>
+              <CardTitle className="text-foreground">Member Cards</CardTitle>
+              <CardDescription>All generated cards for marketplace access</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <LoadingBlock />
+              ) : filteredCards.length === 0 ? (
+                <EmptyState
+                  icon={QrCode}
+                  title={search ? 'No cards match your search' : 'No cards generated yet'}
+                  description={
+                    search
+                      ? 'Try a different name or card number'
+                      : 'Generate cards for your members to enable marketplace access'
+                  }
+                  action={
+                    !search ? (
+                      <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setShowGenerate(true)}>
+                        <Plus className="h-4 w-4" />
+                        Generate First Card
+                      </Button>
+                    ) : null
+                  }
+                />
+              ) : (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left py-3 px-4 font-semibold text-foreground">Member</th>
+                          <th className="text-left py-3 px-4 font-semibold text-foreground">Card Number</th>
+                          <th className="text-left py-3 px-4 font-semibold text-foreground">Expiry</th>
+                          <th className="text-center py-3 px-4 font-semibold text-foreground">Status</th>
+                          <th className="text-right py-3 px-4 font-semibold text-foreground">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pagedCards.map((card) => (
+                          <tr key={card.id} className="border-b border-border hover:bg-accent/5 transition-colors">
+                            <td className="py-3 px-4 text-foreground font-medium">
+                              {card.member ? `${card.member.first_name} ${card.member.last_name}` : '—'}
+                            </td>
+                            <td className="py-3 px-4 text-muted-foreground font-mono text-sm">{card.card_number}</td>
+                            <td className="py-3 px-4 text-muted-foreground">{card.expiry_date || '—'}</td>
+                            <td className="py-3 px-4 text-center">
+                              <CardStatusBadge status={card.status} />
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                              <div className="flex gap-2 justify-end">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-border"
+                                  onClick={() => handleDownload(card)}
+                                  disabled={downloadingId === card.id}
+                                  aria-label={`Download ${card.card_number}`}
+                                >
+                                  {downloadingId === card.id ? <Spinner className="h-4 w-4" /> : <Download className="h-4 w-4" />}
+                                </Button>
+                                {card.status === 'active' ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-border text-destructive hover:bg-destructive/10"
+                                    onClick={() => handleRevoke(card)}
+                                    aria-label={`Revoke ${card.card_number}`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                ) : null}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <PaginationBar
+                    page={page}
+                    pageSize={PAGE_SIZE}
+                    total={filteredCards.length}
+                    onPageChange={setPage}
+                  />
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="template" className="space-y-6 mt-6">
+          <Card className="border-border">
+            <CardHeader>
+              <CardTitle className="text-foreground">Card Template Preview</CardTitle>
+              <CardDescription>Customize how your member cards look</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex justify-center">
+                <div
+                  className="w-80 h-48 rounded-xl shadow-lg p-6 flex flex-col justify-between relative overflow-hidden"
+                  style={{ backgroundColor: template.bgColor, color: template.textColor }}
+                  aria-label="Card preview"
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12" />
+                  <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full -ml-16 -mb-16" />
+                  <div className="relative z-10">
+                    <h3 className="text-2xl font-bold leading-tight">{template.title || ' '}</h3>
+                    <p className="text-sm opacity-90">{template.subtitle || ' '}</p>
+                  </div>
+                  <div className="relative z-10 flex items-end justify-between">
+                    <div className="space-y-1">
+                      <p className="text-xs opacity-75">MEMBER ID</p>
+                      <p className="text-base font-mono font-bold">COOP-12345</p>
+                    </div>
+                    <div className="bg-white p-1 rounded-md">
+                      <QrImage value={previewQr} size={56} margin={1} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <FieldText
+                  label="Card Title"
+                  value={template.title}
+                  onChange={(v) => setTemplate((t) => ({ ...t, title: v }))}
+                  error={templateErrors.title}
+                />
+                <FieldText
+                  label="Card Subtitle"
+                  value={template.subtitle}
+                  onChange={(v) => setTemplate((t) => ({ ...t, subtitle: v }))}
+                  error={templateErrors.subtitle}
+                />
+                <FieldColor
+                  label="Background Color"
+                  value={template.bgColor}
+                  onChange={(v) => setTemplate((t) => ({ ...t, bgColor: v }))}
+                  error={templateErrors.bgColor}
+                />
+                <FieldColor
+                  label="Text Color"
+                  value={template.textColor}
+                  onChange={(v) => setTemplate((t) => ({ ...t, textColor: v }))}
+                  error={templateErrors.textColor}
+                />
+              </div>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setTemplate(DEFAULT_CARD_TEMPLATE)
+                    setTemplateErrors({})
+                  }}
+                >
+                  Reset to defaults
+                </Button>
+                <Button
+                  className="bg-primary hover:bg-primary/90 gap-2"
+                  onClick={handleSaveTemplate}
+                  disabled={savingTemplate}
+                >
+                  {savingTemplate ? <Spinner className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                  Save Template
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-6 mt-6">
+          <Card className="border-border">
+            <CardHeader>
+              <CardTitle className="text-foreground">Card Settings</CardTitle>
+              <CardDescription>Configure card generation and expiry settings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label>Default Validity Period (days)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={3650}
+                  value={settings.defaultValidityDays}
+                  onChange={(e) =>
+                    setSettings((s) => ({
+                      ...s,
+                      defaultValidityDays: Math.max(1, Math.min(3650, parseInt(e.target.value) || 1)),
+                    }))
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Cards will expire after this many days from generation.
+                </p>
+              </div>
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-medium">QR code contents</legend>
+                {(
+                  [
+                    ['cardNumber', 'Card number'],
+                    ['memberId', 'Member ID'],
+                    ['cooperativeId', 'Cooperative ID'],
+                  ] as const
+                ).map(([key, label]) => (
+                  <label key={key} className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={settings.qrCodeIncludes[key]}
+                      onCheckedChange={(v) =>
+                        setSettings((s) => ({
+                          ...s,
+                          qrCodeIncludes: { ...s.qrCodeIncludes, [key]: !!v },
+                        }))
+                      }
+                    />
+                    <span className="text-sm text-foreground">{label}</span>
+                  </label>
+                ))}
+              </fieldset>
+              <Button
+                className="w-full bg-primary hover:bg-primary/90 gap-2"
+                onClick={handleSaveSettings}
+                disabled={savingSettings}
+              >
+                {savingSettings ? <Spinner className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                Save Settings
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Generate single card */}
+      <Dialog open={showGenerate} onOpenChange={setShowGenerate}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Generate Member Card</DialogTitle>
+            <DialogDescription>Create a new digital member card with QR code.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Member <span className="text-destructive">*</span></Label>
+              <select
+                className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
+                value={selectedMemberId}
+                onChange={(e) => setSelectedMemberId(e.target.value)}
+              >
+                <option value="">Choose a member…</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.first_name} {m.last_name}
+                  </option>
+                ))}
+              </select>
+              {members.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No active members yet. Add members first.
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Validity (days)</Label>
+              <Input
+                type="number"
+                min={1}
+                max={3650}
+                value={validityDays}
+                onChange={(e) => setValidityDays(Math.max(1, parseInt(e.target.value) || 1))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowGenerate(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-primary hover:bg-primary/90"
+              onClick={handleGenerate}
+              disabled={saving || !selectedMemberId}
+            >
+              {saving ? <Spinner className="h-4 w-4 mr-2" /> : null}
+              Generate Card
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk generate */}
+      <Dialog open={showBulk} onOpenChange={setShowBulk}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Bulk Generate Member Cards</DialogTitle>
+            <DialogDescription>
+              Issuing a new card revokes any existing active card for the selected members.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <Label>
+                Selected: <strong>{bulkSelectedIds.length}</strong> / {members.length}
+              </Label>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setBulkSelectedIds(filteredBulkMembers.map((m) => m.id))}
+                  disabled={filteredBulkMembers.length === 0}
+                >
+                  Select shown
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setBulkSelectedIds([])}
+                  disabled={bulkSelectedIds.length === 0}
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="pl-10"
+                placeholder="Filter members…"
+                value={bulkSearch}
+                onChange={(e) => setBulkSearch(e.target.value)}
+              />
+            </div>
+            <div className="border border-border rounded-md p-2 max-h-72 overflow-y-auto">
+              {filteredBulkMembers.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  {members.length === 0 ? 'No active members yet' : 'No members match the filter'}
+                </p>
+              ) : (
+                <ul className="space-y-1">
+                  {filteredBulkMembers.map((m) => {
+                    const checked = bulkSelectedIds.includes(m.id)
+                    return (
+                      <li key={m.id}>
+                        <label className="flex items-center gap-2 cursor-pointer hover:bg-accent/5 rounded p-2">
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(v) =>
+                              setBulkSelectedIds((prev) =>
+                                v ? [...prev, m.id] : prev.filter((id) => id !== m.id),
+                              )
+                            }
+                          />
+                          <span className="text-sm text-foreground">
+                            {m.first_name} {m.last_name}
+                          </span>
+                        </label>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Validity (days)</Label>
+              <Input
+                type="number"
+                min={1}
+                max={3650}
+                value={validityDays}
+                onChange={(e) => setValidityDays(Math.max(1, parseInt(e.target.value) || 1))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulk(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-primary hover:bg-primary/90"
+              onClick={handleBulkGenerate}
+              disabled={saving || bulkSelectedIds.length === 0}
+            >
+              {saving ? <Spinner className="h-4 w-4 mr-2" /> : null}
+              Generate {bulkSelectedIds.length || ''} Card{bulkSelectedIds.length === 1 ? '' : 's'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {confirmNode}
+    </div>
+  )
+}
+
+function FieldText({
+  label,
+  value,
+  onChange,
+  error,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  error?: string
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Input value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={!!error} />
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+    </div>
+  )
+}
+
+function FieldColor({
+  label,
+  value,
+  onChange,
+  error,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  error?: string
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <div className="flex gap-2 items-center">
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-10 w-16 border border-border rounded-md cursor-pointer"
+          aria-label={`${label} picker`}
+        />
+        <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="#16a34a" className="font-mono" />
+      </div>
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+    </div>
+  )
+}
+
+// Suppress unused import warning for `renderCardImage` (kept for future server-side render route).
+void renderCardImage

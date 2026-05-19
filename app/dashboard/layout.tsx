@@ -1,0 +1,161 @@
+'use client'
+
+import Link from 'next/link'
+import { useRouter, usePathname } from 'next/navigation'
+import { Button } from '@/components/ui/button'
+import {
+  BarChart3,
+  ShoppingCart,
+  Users,
+  Settings,
+  LogOut,
+  Leaf,
+  Menu,
+  X,
+  Home,
+  FileText,
+  Zap,
+  Shield,
+} from 'lucide-react'
+import { useState } from 'react'
+import { useAuth } from '@/app/context/auth-context'
+import { useCooperative } from '@/app/context/cooperative-context'
+import { ProtectedRoute } from '@/app/components/protected-route'
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { user, logout } = useAuth()
+  const { currentCooperative, cooperatives, switchCooperative } = useCooperative()
+
+  const handleLogout = async () => {
+    await logout()
+    router.push('/')
+  }
+
+  // Navigation items filtered by role
+  const navigationItems = [
+    { href: '/dashboard', label: 'Overview', icon: Home, roles: ['super_admin', 'cooperative_admin', 'member', 'guest'] },
+    { href: '/dashboard/marketplace', label: 'Marketplace', icon: ShoppingCart, roles: ['super_admin', 'cooperative_admin', 'member', 'guest'] },
+    { href: '/dashboard/members', label: 'Members', icon: Users, roles: ['super_admin', 'cooperative_admin', 'member'] },
+    { href: '/dashboard/cards', label: 'Member Cards', icon: FileText, roles: ['super_admin', 'cooperative_admin', 'member'] },
+    { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3, roles: ['super_admin', 'cooperative_admin'] },
+    { href: '/dashboard/integrations', label: 'Integrations', icon: Zap, roles: ['super_admin', 'cooperative_admin'] },
+  ].filter(item => user?.role && item.roles.includes(user.role))
+
+  return (
+    <ProtectedRoute>
+      <div className="min-h-screen flex flex-col md:flex-row bg-background">
+        {/* Mobile header */}
+        <div className="md:hidden sticky top-0 z-50 flex items-center justify-between border-b border-border bg-background p-4">
+          <div className="flex items-center gap-2">
+            <Leaf className="h-6 w-6 text-primary" />
+            <span className="font-bold text-foreground">FaîtiereHub</span>
+          </div>
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-muted-foreground hover:text-foreground">
+            {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
+        </div>
+
+        {/* Sidebar */}
+        <aside className={`${sidebarOpen ? 'block' : 'hidden'} md:flex md:flex-col md:sticky md:top-0 w-full md:w-64 h-screen border-r border-border bg-card overflow-y-auto`}>
+          <div className="hidden md:flex items-center gap-2 p-6 border-b border-border">
+            <Leaf className="h-7 w-7 text-primary" />
+            <span className="text-xl font-bold text-foreground">FaîtiereHub</span>
+          </div>
+
+          {/* User info */}
+          <div className="px-4 py-3 border-b border-border">
+            <p className="text-sm font-medium text-foreground">{user?.firstName} {user?.lastName}</p>
+            <p className="text-xs text-muted-foreground capitalize">{user?.role?.replace('_', ' ')}</p>
+            {currentCooperative && (
+              <p className="text-xs text-primary mt-0.5 truncate">{currentCooperative.name}</p>
+            )}
+          </div>
+
+          <nav className="flex-1 px-4 py-4 space-y-1">
+            {navigationItems.map((item) => {
+              const isActive = pathname === item.href
+              const Icon = item.icon
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setSidebarOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${
+                    isActive
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-accent/10 hover:text-foreground'
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span className="font-medium">{item.label}</span>
+                </Link>
+              )
+            })}
+          </nav>
+
+          <div className="border-t border-border p-4 space-y-2">
+            {/* Settings — only for admins */}
+            {(user?.role === 'super_admin' || user?.role === 'cooperative_admin') && (
+              <Link href="/dashboard/settings">
+                <Button variant="outline" className="w-full justify-start gap-3 border-border text-foreground hover:bg-accent/10">
+                  <Settings className="h-4 w-4" />
+                  Settings
+                </Button>
+              </Link>
+            )}
+            {/* Admin panel shortcut for super_admin */}
+            {user?.role === 'super_admin' && (
+              <Link href="/admin">
+                <Button variant="outline" className="w-full justify-start gap-3 border-border text-purple-600 hover:bg-purple-50">
+                  <Shield className="h-4 w-4" />
+                  Admin Panel
+                </Button>
+              </Link>
+            )}
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-3 border-border text-foreground hover:bg-accent/10"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-4 w-4" />
+              Sign Out
+            </Button>
+          </div>
+        </aside>
+
+        {/* Main content */}
+        <main className="flex-1 overflow-auto">
+          {/* Top bar */}
+          <div className="hidden md:flex items-center justify-between border-b border-border bg-background px-6 py-3 sticky top-0 z-40">
+            <div>
+              <h1 className="text-base font-semibold text-foreground">
+                {currentCooperative?.name || 'Dashboard'}
+              </h1>
+            </div>
+            <div className="flex items-center gap-3">
+              {/* Cooperative switcher for super_admin */}
+              {user?.role === 'super_admin' && cooperatives.length > 1 && (
+                <select
+                  className="text-sm border border-border rounded-md px-3 py-1.5 bg-background text-foreground"
+                  value={currentCooperative?.id || ''}
+                  onChange={e => switchCooperative(e.target.value)}
+                >
+                  {cooperatives.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          </div>
+
+          <div className="p-4 md:p-6 lg:p-8">
+            {children}
+          </div>
+        </main>
+      </div>
+    </ProtectedRoute>
+  )
+}

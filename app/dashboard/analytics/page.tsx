@@ -1,0 +1,282 @@
+'use client'
+
+import { useEffect, useState, useCallback, useMemo } from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { BarChart3, Users, ShoppingCart, CreditCard, TrendingUp } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { useCooperative } from '@/app/context/cooperative-context'
+import { LoadingBlock } from '@/components/shared/loading'
+import { PageHeader } from '@/components/shared/page-header'
+
+interface Stats {
+  totalMembers: number
+  activeMembers: number
+  totalExploitations: number
+  activeExploitations: number
+  totalCards: number
+  activeCards: number
+}
+
+const initial: Stats = {
+  totalMembers: 0,
+  activeMembers: 0,
+  totalExploitations: 0,
+  activeExploitations: 0,
+  totalCards: 0,
+  activeCards: 0,
+}
+
+export default function AnalyticsPage() {
+  const { currentCooperative } = useCooperative()
+  const supabase = useMemo(() => createClient(), [])
+  const [stats, setStats] = useState<Stats>(initial)
+  const [isLoading, setIsLoading] = useState(true)
+
+  const fetchStats = useCallback(async () => {
+    if (!currentCooperative) return
+    setIsLoading(true)
+    const coopId = currentCooperative.id
+
+    const [membersRes, exploitationsRes, cardsRes] = await Promise.all([
+      supabase.from('members').select('status').eq('cooperative_id', coopId),
+      supabase.from('exploitations').select('active').eq('cooperative_id', coopId),
+      supabase.from('member_cards').select('status').eq('cooperative_id', coopId),
+    ])
+
+    const members = (membersRes.data ?? []) as { status: string }[]
+    const exploitations = (exploitationsRes.data ?? []) as { active: boolean }[]
+    const cards = (cardsRes.data ?? []) as { status: string }[]
+
+    setStats({
+      totalMembers: members.length,
+      activeMembers: members.filter((m) => m.status === 'active').length,
+      totalExploitations: exploitations.length,
+      activeExploitations: exploitations.filter((e) => e.active).length,
+      totalCards: cards.length,
+      activeCards: cards.filter((c) => c.status === 'active').length,
+    })
+    setIsLoading(false)
+  }, [currentCooperative, supabase])
+
+  useEffect(() => {
+    fetchStats()
+  }, [fetchStats])
+
+  const statCards = [
+    {
+      label: 'Total Members',
+      value: stats.totalMembers,
+      sub: `${stats.activeMembers} active`,
+      icon: Users,
+      color: 'text-blue-600',
+      bg: 'bg-blue-50',
+    },
+    {
+      label: 'Exploitations',
+      value: stats.totalExploitations,
+      sub: `${stats.activeExploitations} published`,
+      icon: ShoppingCart,
+      color: 'text-green-600',
+      bg: 'bg-green-50',
+    },
+    {
+      label: 'Member Cards',
+      value: stats.totalCards,
+      sub: `${stats.activeCards} active`,
+      icon: CreditCard,
+      color: 'text-purple-600',
+      bg: 'bg-purple-50',
+    },
+    {
+      label: 'Engagement Rate',
+      value:
+        stats.totalMembers > 0
+          ? `${Math.round((stats.activeMembers / stats.totalMembers) * 100)}%`
+          : '—',
+      sub: 'Active members ratio',
+      icon: TrendingUp,
+      color: 'text-orange-600',
+      bg: 'bg-orange-50',
+    },
+  ]
+
+  return (
+    <div className="space-y-8">
+      <PageHeader
+        title="Analytics"
+        description={`Monitor member activity and cooperative growth for ${
+          currentCooperative?.name ?? 'your cooperative'
+        }`}
+      />
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {statCards.map((stat, i) => {
+          const Icon = stat.icon
+          return (
+            <Card key={i} className="border-border">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {stat.label}
+                </CardTitle>
+                <div className={`p-2 rounded-lg ${stat.bg}`}>
+                  <Icon className={`h-4 w-4 ${stat.color}`} aria-hidden />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-foreground">
+                  {isLoading ? '—' : stat.value}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{stat.sub}</p>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card className="border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <Users className="h-5 w-5" aria-hidden />
+              Member Status Breakdown
+            </CardTitle>
+            <CardDescription>Distribution of member statuses</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <LoadingBlock />
+            ) : stats.totalMembers === 0 ? (
+              <p className="py-8 text-center text-muted-foreground">No members yet</p>
+            ) : (
+              <BreakdownBars
+                total={stats.totalMembers}
+                items={[
+                  { label: 'Active', value: stats.activeMembers, color: 'bg-green-500' },
+                  {
+                    label: 'Inactive',
+                    value: stats.totalMembers - stats.activeMembers,
+                    color: 'bg-gray-300',
+                  },
+                ]}
+              />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <ShoppingCart className="h-5 w-5" aria-hidden />
+              Marketplace Overview
+            </CardTitle>
+            <CardDescription>Exploitation publication status</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <LoadingBlock />
+            ) : stats.totalExploitations === 0 ? (
+              <p className="py-8 text-center text-muted-foreground">No exploitations yet</p>
+            ) : (
+              <BreakdownBars
+                total={stats.totalExploitations}
+                items={[
+                  { label: 'Published', value: stats.activeExploitations, color: 'bg-green-500' },
+                  {
+                    label: 'Draft',
+                    value: stats.totalExploitations - stats.activeExploitations,
+                    color: 'bg-gray-300',
+                  },
+                ]}
+              />
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="border-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-foreground">
+            <BarChart3 className="h-5 w-5" aria-hidden />
+            Summary
+          </CardTitle>
+          <CardDescription>Key metrics at a glance</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-3">
+            <SummaryCell
+              label="Cards per Member"
+              value={
+                stats.totalMembers > 0
+                  ? (stats.totalCards / stats.totalMembers).toFixed(1)
+                  : '—'
+              }
+            />
+            <SummaryCell
+              label="Card Activation Rate"
+              value={
+                stats.totalCards > 0
+                  ? `${Math.round((stats.activeCards / stats.totalCards) * 100)}%`
+                  : '—'
+              }
+            />
+            <SummaryCell
+              label="Marketplace Coverage"
+              value={
+                stats.totalExploitations > 0
+                  ? `${stats.activeExploitations}/${stats.totalExploitations}`
+                  : '—'
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function BreakdownBars({
+  total,
+  items,
+}: {
+  total: number
+  items: { label: string; value: number; color: string }[]
+}) {
+  return (
+    <div className="space-y-3">
+      {items.map((item, i) => {
+        const pct = total > 0 ? (item.value / total) * 100 : 0
+        return (
+          <div key={i} className="space-y-1">
+            <div className="flex justify-between text-sm">
+              <span className="text-foreground">{item.label}</span>
+              <span className="text-muted-foreground">
+                {item.value} ({Math.round(pct)}%)
+              </span>
+            </div>
+            <div
+              className="h-2 bg-secondary rounded-full overflow-hidden"
+              role="progressbar"
+              aria-valuenow={pct}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              <div
+                className={`h-full ${item.color} rounded-full transition-all`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function SummaryCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="p-4 rounded-lg bg-secondary/30 space-y-1">
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="text-2xl font-bold text-foreground">{value}</p>
+    </div>
+  )
+}
