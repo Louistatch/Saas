@@ -5,16 +5,6 @@ import { createLogger } from '@/lib/utils/logger'
 
 const log = createLogger('embed')
 
-const CATEGORY_EMOJI: Record<string, string> = {
-  Vegetables: '🥬',
-  Dairy: '🥛',
-  Grains: '🌾',
-  Fruits: '🍎',
-  Seeds: '🌱',
-  Equipment: '🚜',
-  Services: '🤝',
-}
-
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
@@ -69,18 +59,18 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
 
-    const [coopRes, exploitationsRes] = await Promise.all([
+    const [coopRes, fichesRes] = await Promise.all([
       supabase
         .from('cooperatives')
         .select('id, name, description, primary_color')
         .eq('id', cooperativeId)
         .single<CoopRow>(),
       supabase
-        .from('exploitations')
-        .select('id, name, description, category, price, unit, producer')
+        .from('fiches_techniques')
+        .select('id, title, description, culture, type_agriculture, price_non_member')
         .eq('cooperative_id', cooperativeId)
-        .eq('active', true)
-        .order('name')
+        .eq('status', 'published')
+        .order('title')
         .limit(100),
     ])
 
@@ -89,7 +79,7 @@ export async function GET(request: NextRequest) {
     }
 
     const coop = coopRes.data
-    const exploitations = (exploitationsRes.data ?? []) as ExploitationRow[]
+    const fiches = fichesRes.data ?? []
     const primaryColor = isHexColor(coop.primary_color) ? coop.primary_color : '#16a34a'
 
     const isDark = theme === 'dark'
@@ -99,33 +89,22 @@ export async function GET(request: NextRequest) {
     const borderColor = isDark ? '#3a3a3a' : '#e0e0e0'
     const placeholderBg = isDark ? '#333' : '#f0f0f0'
 
-    const exploitationCards =
-      exploitations.length === 0
-        ? `<div style="text-align:center;padding:40px;color:#888;">No products available yet</div>`
-        : exploitations
-            .map((e) => {
-              const category = e.category ?? 'Product'
-              const emoji = CATEGORY_EMOJI[category] ?? '🌿'
-              const price =
-                e.price != null
-                  ? `${primaryColor}` // sentinel; replaced below
-                  : ''
-              const priceText =
-                e.price != null
-                  ? `€${Number(e.price).toFixed(2)}/${escapeHtml(e.unit ?? 'unit')}`
-                  : 'Price on request'
-              return `
+    const ficheCards =
+      fiches.length === 0
+        ? `<div style="text-align:center;padding:40px;color:#888;">Aucune fiche technique disponible</div>`
+        : fiches
+            .map((f: any) => `
         <div class="card">
-          <div class="card-image">${emoji}</div>
+          <div class="card-image">📄</div>
           <div class="card-content">
-            <div class="card-category">${escapeHtml(category)}</div>
-            <div class="card-name">${escapeHtml(e.name)}</div>
-            <div class="card-producer">${escapeHtml(e.producer ?? '')}</div>
-            <div class="card-footer"><span class="card-price">${priceText}</span></div>
+            <div class="card-category">${escapeHtml(f.culture ?? 'Culture')}</div>
+            <div class="card-name">${escapeHtml(f.title)}</div>
+            <div class="card-producer">${escapeHtml(f.type_agriculture ?? '')}</div>
+            <div class="card-footer">
+              <span class="card-price">${f.price_non_member} FCFA</span>
+            </div>
           </div>
-        </div>`
-            })
-            .join('')
+        </div>`).join('')
 
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -159,7 +138,7 @@ export async function GET(request: NextRequest) {
       <h1>${escapeHtml(coop.name)}</h1>
       ${coop.description ? `<p>${escapeHtml(coop.description)}</p>` : ''}
     </div>
-    <div class="grid">${exploitationCards}</div>
+    <div class="grid">${ficheCards}</div>
     <div class="footer">Powered by FaîtiereHub</div>
   </div>
 </body>

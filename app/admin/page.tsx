@@ -73,7 +73,7 @@ export default function AdminOverview() {
       const [c, m, e, k] = await Promise.all([
         supabase.from('cooperatives').select('id', { count: 'exact', head: true }),
         supabase.from('members').select('id', { count: 'exact', head: true }),
-        supabase.from('exploitations').select('id', { count: 'exact', head: true }),
+        supabase.from('fiches_techniques').select('id', { count: 'exact', head: true }).eq('status', 'published'),
         supabase.from('member_cards').select('id', { count: 'exact', head: true }).eq('status', 'active'),
       ])
       setStats({
@@ -114,7 +114,7 @@ export default function AdminOverview() {
   const statCards = [
     { title: 'Total Cooperatives', value: stats.totalCooperatives, icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50', href: '/admin/cooperatives' },
     { title: 'Total Members', value: stats.totalMembers, icon: Users, color: 'text-green-600', bg: 'bg-green-50', href: '/admin/users' },
-    { title: 'Exploitations', value: stats.totalExploitations, icon: ShoppingCart, color: 'text-purple-600', bg: 'bg-purple-50', href: '/admin/analytics' },
+    { title: 'Fiches techniques', value: stats.totalExploitations, icon: ShoppingCart, color: 'text-purple-600', bg: 'bg-purple-50', href: '/admin/analytics' },
     { title: 'Active Cards', value: stats.totalCards, icon: CreditCard, color: 'text-orange-600', bg: 'bg-orange-50', href: '/admin/analytics' },
   ]
 

@@ -37,21 +37,21 @@ export default function AnalyticsPage() {
     setIsLoading(true)
     const coopId = currentCooperative.id
 
-    const [membersRes, exploitationsRes, cardsRes] = await Promise.all([
+    const [membersRes, fichesRes, cardsRes] = await Promise.all([
       supabase.from('members').select('status').eq('cooperative_id', coopId),
-      supabase.from('exploitations').select('active').eq('cooperative_id', coopId),
+      supabase.from('fiches_techniques').select('status').eq('cooperative_id', coopId),
       supabase.from('member_cards').select('status').eq('cooperative_id', coopId),
     ])
 
     const members = (membersRes.data ?? []) as { status: string }[]
-    const exploitations = (exploitationsRes.data ?? []) as { active: boolean }[]
+    const fiches = (fichesRes.data ?? []) as { status: string }[]
     const cards = (cardsRes.data ?? []) as { status: string }[]
 
     setStats({
       totalMembers: members.length,
       activeMembers: members.filter((m) => m.status === 'active').length,
-      totalExploitations: exploitations.length,
-      activeExploitations: exploitations.filter((e) => e.active).length,
+      totalExploitations: fiches.length,
+      activeExploitations: fiches.filter((e) => e.status === 'published').length,
       totalCards: cards.length,
       activeCards: cards.filter((c) => c.status === 'active').length,
     })
@@ -72,9 +72,9 @@ export default function AnalyticsPage() {
       bg: 'bg-blue-50',
     },
     {
-      label: 'Exploitations',
+      label: 'Fiches techniques',
       value: stats.totalExploitations,
-      sub: `${stats.activeExploitations} published`,
+      sub: `${stats.activeExploitations} publiées`,
       icon: ShoppingCart,
       color: 'text-green-600',
       bg: 'bg-green-50',
@@ -169,20 +169,20 @@ export default function AnalyticsPage() {
               <ShoppingCart className="h-5 w-5" aria-hidden />
               Marketplace Overview
             </CardTitle>
-            <CardDescription>Exploitation publication status</CardDescription>
+            <CardDescription>Fiches techniques publiées vs brouillons</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <LoadingBlock />
             ) : stats.totalExploitations === 0 ? (
-              <p className="py-8 text-center text-muted-foreground">No exploitations yet</p>
+              <p className="py-8 text-center text-muted-foreground">Aucune fiche technique</p>
             ) : (
               <BreakdownBars
                 total={stats.totalExploitations}
                 items={[
-                  { label: 'Published', value: stats.activeExploitations, color: 'bg-green-500' },
+                  { label: 'Publiées', value: stats.activeExploitations, color: 'bg-green-500' },
                   {
-                    label: 'Draft',
+                    label: 'Brouillons',
                     value: stats.totalExploitations - stats.activeExploitations,
                     color: 'bg-gray-300',
                   },

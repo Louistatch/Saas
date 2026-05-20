@@ -12,16 +12,6 @@ interface CoopRow {
   primary_color: string | null
 }
 
-interface ExploitationRow {
-  id: string
-  name: string
-  description: string | null
-  category: string | null
-  price: number | null
-  unit: string | null
-  producer: string | null
-}
-
 export async function GET(request: NextRequest) {
   const limit = rateLimit(
     `widget-api:${clientKeyFromHeaders(request.headers)}`,
@@ -44,18 +34,18 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
 
-    const [coopRes, exploitationsRes] = await Promise.all([
+    const [coopRes, fichesRes] = await Promise.all([
       supabase
         .from('cooperatives')
         .select('id, name, description, primary_color')
         .eq('id', cooperativeId)
         .single<CoopRow>(),
       supabase
-        .from('exploitations')
-        .select('id, name, description, category, price, unit, producer')
+        .from('fiches_techniques')
+        .select('id, title, description, culture, type_agriculture, price_non_member')
         .eq('cooperative_id', cooperativeId)
-        .eq('active', true)
-        .order('name')
+        .eq('status', 'published')
+        .order('title')
         .limit(100),
     ])
 
@@ -69,7 +59,7 @@ export async function GET(request: NextRequest) {
         name: coopRes.data.name,
         description: coopRes.data.description,
         primaryColor: coopRes.data.primary_color,
-        exploitations: (exploitationsRes.data ?? []) as ExploitationRow[],
+        fiches: (fichesRes.data ?? []),
       },
       {
         headers: {

@@ -47,24 +47,25 @@ export function buildMembersQuery(
 }
 
 /**
- * Build a paginated exploitations query.
+ * Build a paginated fiches_techniques query.
  */
-export function buildExploitationsQuery(
+export function buildFichesQuery(
   supabase: ReturnType<typeof import('@/lib/supabase/client').createClient>,
   cooperativeId: string,
   opts: QueryOptions = {},
 ) {
-  const { page = 1, pageSize = 20, search, orderBy = 'name', ascending = true } = opts
+  const { page = 1, pageSize = 20, search, orderBy = 'created_at', ascending = false } = opts
 
   let query = supabase
-    .from('exploitations')
+    .from('fiches_techniques')
     .select('*', { count: 'exact' })
     .eq('cooperative_id', cooperativeId)
+    .eq('status', 'published')
     .order(orderBy, { ascending })
 
   if (search && search.trim()) {
     const term = `%${search.trim()}%`
-    query = query.or(`name.ilike.${term},producer.ilike.${term},category.ilike.${term}`)
+    query = query.or(`title.ilike.${term},culture.ilike.${term}`)
   }
 
   const from = (page - 1) * pageSize

@@ -62,7 +62,7 @@ export default function AnalyticsAdminPage() {
       const [coopsRes, membersRes, exploitationsRes, cardsRes] = await Promise.all([
         supabase.from('cooperatives').select('id, name').order('name'),
         supabase.from('members').select('id', { count: 'exact', head: true }),
-        supabase.from('exploitations').select('id', { count: 'exact', head: true }),
+        supabase.from('fiches_techniques').select('id', { count: 'exact', head: true }).eq('status', 'published'),
         supabase
           .from('member_cards')
           .select('id', { count: 'exact', head: true })
@@ -86,7 +86,7 @@ export default function AnalyticsAdminPage() {
   const metrics = [
     { title: 'Total Cooperatives', value: totals.cooperatives, icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50' },
     { title: 'Total Members', value: totals.members, icon: Users, color: 'text-green-600', bg: 'bg-green-50' },
-    { title: 'Total Exploitations', value: totals.exploitations, icon: ShoppingCart, color: 'text-purple-600', bg: 'bg-purple-50' },
+    { title: 'Fiches techniques', value: totals.exploitations, icon: ShoppingCart, color: 'text-purple-600', bg: 'bg-purple-50' },
     { title: 'Active Cards', value: totals.cards, icon: CreditCard, color: 'text-orange-600', bg: 'bg-orange-50' },
   ]
 
