@@ -27,18 +27,13 @@ function LoginInner() {
 
   const redirectTo = searchParams?.get('redirect')
 
-  // Only auto-redirect if the user navigated here directly (not after a logout)
-  // If they came from signout or typed the URL, don't auto-redirect
+  // Only redirect AFTER a successful login (not on page load)
+  // This prevents the redirect loop when cookies are stale
+  const [hasJustLoggedIn, setHasJustLoggedIn] = useState(false)
+
   useEffect(() => {
-    if (!isAuthenticated || isLoading) return
+    if (!hasJustLoggedIn || !isAuthenticated || isLoading) return
     
-    // Check if user just logged out (came from signout page or has a fresh page load)
-    const isPostLogout = document.referrer.includes('/auth/signout') || 
-                         document.referrer.includes('/auth/login') ||
-                         !document.referrer
-    if (isPostLogout) return // Don't auto-redirect after logout
-    
-    // User is genuinely authenticated and navigated here — redirect them
     if (redirectTo && redirectTo.startsWith('/')) {
       router.push(redirectTo)
     } else if (user?.role === 'super_admin') {
@@ -46,7 +41,7 @@ function LoginInner() {
     } else {
       router.push('/dashboard')
     }
-  }, [isAuthenticated, isLoading, user, router, redirectTo])
+  }, [hasJustLoggedIn, isAuthenticated, isLoading, user, router, redirectTo])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -60,8 +55,8 @@ function LoginInner() {
     setSubmitting(true)
     try {
       await login(parsed.data.email, parsed.data.password)
-      // Login succeeded — onAuthStateChange will trigger profile fetch + redirect.
-      // If redirect doesn't happen within 8s, something went wrong with profile loading.
+      // Login succeeded — trigger redirect via hasJustLoggedIn
+      setHasJustLoggedIn(true)
       setTimeout(() => {
         setSubmitting(false)
         setError('Connexion réussie mais le profil n\'a pas pu être chargé. Veuillez réessayer.')
