@@ -30,7 +30,7 @@ export async function POST(
     // Get the fiche
     const { data: fiche, error: ficheError } = await supabase
       .from('fiches_techniques')
-      .select('id, title, culture, files, cooperative_id, is_free_for_members, price_non_member')
+      .select('id, title, culture, files, cooperative_id, is_free_for_members, price_non_member, download_count')
       .eq('id', ficheId)
       .eq('status', 'published')
       .single()
