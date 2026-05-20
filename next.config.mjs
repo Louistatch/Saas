@@ -1,3 +1,5 @@
+import { withSentryConfig } from '@sentry/nextjs'
+
 /** @type {import('next').NextConfig} */
 const securityHeaders = [
   { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
@@ -18,8 +20,6 @@ const nextConfig = {
     unoptimized: true,
   },
   turbopack: {
-    // Prevents Turbopack from scanning parent directories looking for configs.
-    // Without this, it walks up to C:\Users\HP which is extremely slow.
     root: '.',
   },
   async headers() {
@@ -28,7 +28,6 @@ const nextConfig = {
         source: '/((?!embed|api/widget).*)',
         headers: securityHeaders,
       },
-      // Public widget surfaces deliberately allow framing.
       {
         source: '/embed',
         headers: [
@@ -40,4 +39,21 @@ const nextConfig = {
   },
 }
 
-export default nextConfig
+// Sentry wraps the config for source maps upload + error tracking
+// If SENTRY_DSN is not set, it gracefully does nothing.
+export default withSentryConfig(nextConfig, {
+  // Suppresses source maps uploading logs during build
+  silent: true,
+  
+  // Upload source maps for better stack traces
+  widenClientFileUpload: true,
+  
+  // Routes browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers
+  tunnelRoute: '/monitoring',
+  
+  // Hides source maps from generated client bundles
+  hideSourceMaps: true,
+  
+  // Automatically tree-shake Sentry logger statements to reduce bundle size
+  disableLogger: true,
+})
