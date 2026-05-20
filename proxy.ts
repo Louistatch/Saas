@@ -1,7 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
+/**
+ * Optimized proxy (Next 16 convention, replaces middleware.ts).
+ * Only calls getUser() on protected routes to avoid unnecessary latency.
+ */
 export async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+
+  // Fast path: skip auth check for public routes
+  const isProtected = pathname.startsWith('/dashboard') || pathname.startsWith('/admin')
+  const isAuthPage = pathname.startsWith('/auth/login') || pathname.startsWith('/auth/signup')
+
+  // If neither protected nor auth page, just pass through (no DB call)
+  if (!isProtected && !isAuthPage) {
+    return NextResponse.next({ request })
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -25,16 +40,14 @@ export async function proxy(request: NextRequest) {
 
   // Refresh session — keeps JWT alive
   const { data: { user } } = await supabase.auth.getUser()
-  const pathname = request.nextUrl.pathname
 
-  // Resolve role for admin-area gating. We trust the JWT app_metadata first,
-  // then fall back to the user_metadata claim, then null.
+  // Resolve role from JWT for admin-area gating
   const role: string | undefined =
     (user?.app_metadata as { role?: string } | undefined)?.role ??
     (user?.user_metadata as { role?: string } | undefined)?.role
 
-  // Protected app surfaces
-  if (!user && (pathname.startsWith('/dashboard') || pathname.startsWith('/admin'))) {
+  // Protected routes: redirect unauthenticated users
+  if (isProtected && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
     url.searchParams.set('redirect', pathname)
@@ -47,7 +60,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Authed users away from auth pages
-  if (user && (pathname.startsWith('/auth/login') || pathname.startsWith('/auth/signup'))) {
+  if (user && isAuthPage) {
     if (role === 'super_admin') {
       return NextResponse.redirect(new URL('/admin', request.url))
     }
@@ -59,6 +72,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 }
