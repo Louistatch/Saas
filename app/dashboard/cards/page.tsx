@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Download, QrCode, Trash2, RefreshCw, Users, CheckCircle2, Search } from 'lucide-react'
+import { Plus, Download, QrCode, Trash2, RefreshCw, Users, CheckCircle2, Search, Printer } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -430,6 +431,12 @@ export default function CardsPage() {
                 {downloadingAll ? <Spinner className="h-4 w-4" /> : <Download className="h-4 w-4" />}
                 Tout télécharger
               </Button>
+              <Link href="/dashboard/cards/print">
+                <Button variant="outline" className="gap-2 border-border">
+                  <Printer className="h-4 w-4" />
+                  Imprimer A4
+                </Button>
+              </Link>
               <Button variant="outline" className="gap-2 border-border" onClick={() => setShowBulk(true)}>
                 <Users className="h-4 w-4" />
                 Génération en masse

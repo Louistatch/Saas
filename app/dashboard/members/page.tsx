@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Upload, Search, Trash2, Mail, Download, FileText, AlertCircle } from 'lucide-react'
+import { Plus, Upload, Search, Trash2, Mail, Download, FileText, AlertCircle, Edit2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -20,6 +20,7 @@ import { PageHeader } from '@/components/shared/page-header'
 import { PaginationBar } from '@/components/shared/pagination'
 import { useConfirm } from '@/components/shared/confirm-dialog'
 import { PhotoUpload } from '@/components/shared/photo-upload'
+import { LocationPicker } from '@/components/shared/location-picker'
 import { downloadCsv, parseCsvWithHeaders, toCsv } from '@/lib/utils/csv'
 import { errorMessage } from '@/lib/utils/errors'
 import { memberSchema, flattenZodErrors } from '@/lib/validators/schemas'
@@ -29,6 +30,7 @@ const PAGE_SIZE = 20
 const CSV_HEADERS = ['first_name', 'last_name', 'email', 'phone', 'address'] as const
 
 type MemberFormState = {
+  cooperative_id: string
   first_name: string
   last_name: string
   email: string
@@ -38,10 +40,15 @@ type MemberFormState = {
   region: string
   village: string
   canton: string
+  region_id: string
+  prefecture_id: string
+  canton_id: string
+  village_id: string
   photo_url: string | null
 }
 
 const emptyForm: MemberFormState = {
+  cooperative_id: '',
   first_name: '',
   last_name: '',
   email: '',
@@ -51,11 +58,15 @@ const emptyForm: MemberFormState = {
   region: '',
   village: '',
   canton: '',
+  region_id: '',
+  prefecture_id: '',
+  canton_id: '',
+  village_id: '',
   photo_url: null,
 }
 
 export default function MembersPage() {
-  const { currentCooperative } = useCooperative()
+  const { currentCooperative, cooperatives } = useCooperative()
   const { user } = useAuth()
   const { toast } = useToast()
   const { confirm, confirmNode } = useConfirm()
@@ -71,7 +82,7 @@ export default function MembersPage() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<MemberFormState>(emptyForm)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
-
+  const [editingMember, setEditingMember] = useState<Member | null>(null)
   // Import state
   const [importPreview, setImportPreview] = useState<MemberFormState[] | null>(null)
   const [importMissing, setImportMissing] = useState<string[]>([])
@@ -118,7 +129,7 @@ export default function MembersPage() {
   )
 
   const handleAdd = async () => {
-    if (!currentCooperative) return
+    if (!currentCooperative && !form.cooperative_id) return
     const parsed = memberSchema.safeParse(form)
     if (!parsed.success) {
       setFormErrors(flattenZodErrors(parsed.error))
@@ -126,28 +137,80 @@ export default function MembersPage() {
     }
     setFormErrors({})
     setSaving(true)
-    const { error } = await supabase.from('members').insert({
-      cooperative_id: currentCooperative.id,
-      first_name: parsed.data.first_name,
-      last_name: parsed.data.last_name,
-      email: parsed.data.email || null,
-      phone: parsed.data.phone || null,
-      address: parsed.data.address || null,
-      prefecture: form.prefecture || null,
-      region: form.region || null,
-      village: form.village || null,
-      canton: form.canton || null,
-      photo_url: form.photo_url || null,
-    })
-    setSaving(false)
-    if (error) {
-      toast({ title: 'Impossible d\'ajouter le membre', description: errorMessage(error), variant: 'destructive' })
-      return
+
+    const cooperativeId = form.cooperative_id || currentCooperative?.id
+
+    if (editingMember) {
+      // UPDATE existing member
+      const { error } = await supabase.from('members').update({
+        cooperative_id: cooperativeId,
+        first_name: parsed.data.first_name,
+        last_name: parsed.data.last_name,
+        email: parsed.data.email || null,
+        phone: parsed.data.phone || null,
+        address: parsed.data.address || null,
+        prefecture: form.prefecture || null,
+        region: form.region || null,
+        village: form.village || null,
+        canton: form.canton || null,
+        photo_url: form.photo_url || null,
+      }).eq('id', editingMember.id)
+      setSaving(false)
+      if (error) {
+        toast({ title: 'Impossible de modifier le membre', description: errorMessage(error), variant: 'destructive' })
+        return
+      }
+      toast({ title: 'Membre modifié', description: `${parsed.data.first_name} ${parsed.data.last_name}` })
+    } else {
+      // INSERT new member
+      const { error } = await supabase.from('members').insert({
+        cooperative_id: cooperativeId,
+        first_name: parsed.data.first_name,
+        last_name: parsed.data.last_name,
+        email: parsed.data.email || null,
+        phone: parsed.data.phone || null,
+        address: parsed.data.address || null,
+        prefecture: form.prefecture || null,
+        region: form.region || null,
+        village: form.village || null,
+        canton: form.canton || null,
+        photo_url: form.photo_url || null,
+      })
+      setSaving(false)
+      if (error) {
+        toast({ title: 'Impossible d\'ajouter le membre', description: errorMessage(error), variant: 'destructive' })
+        return
+      }
+      toast({ title: 'Membre ajouté', description: `${parsed.data.first_name} ${parsed.data.last_name}` })
     }
-    toast({ title: 'Membre ajouté', description: `${parsed.data.first_name} ${parsed.data.last_name}` })
+
     setShowAddDialog(false)
     setForm(emptyForm)
+    setEditingMember(null)
     fetchMembers()
+  }
+
+  const openEdit = (member: Member) => {
+    setEditingMember(member)
+    setForm({
+      cooperative_id: member.cooperative_id ?? '',
+      first_name: member.first_name,
+      last_name: member.last_name,
+      email: member.email ?? '',
+      phone: member.phone ?? '',
+      address: member.address ?? '',
+      prefecture: member.prefecture ?? '',
+      region: member.region ?? '',
+      village: member.village ?? '',
+      canton: member.canton ?? '',
+      region_id: '',
+      prefecture_id: '',
+      canton_id: '',
+      village_id: '',
+      photo_url: member.photo_url ?? null,
+    })
+    setFormErrors({})
+    setShowAddDialog(true)
   }
 
   const handleDelete = async (member: Member) => {
@@ -198,6 +261,7 @@ export default function MembersPage() {
       return
     }
     const preview: MemberFormState[] = rows.map((r) => ({
+      cooperative_id: currentCooperative?.id ?? '',
       first_name: (r.first_name ?? '').trim(),
       last_name: (r.last_name ?? '').trim(),
       email: (r.email ?? '').trim(),
@@ -207,6 +271,10 @@ export default function MembersPage() {
       region: (r.region ?? '').trim(),
       village: (r.village ?? '').trim(),
       canton: (r.canton ?? '').trim(),
+      region_id: '',
+      prefecture_id: '',
+      canton_id: '',
+      village_id: '',
       photo_url: null,
     }))
     setImportPreview(preview)
@@ -276,7 +344,12 @@ export default function MembersPage() {
                 <Download className="h-4 w-4" />
                 Exporter
               </Button>
-              <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setShowAddDialog(true)}>
+              <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => {
+                setEditingMember(null)
+                setForm({ ...emptyForm, cooperative_id: currentCooperative?.id ?? '' })
+                setFormErrors({})
+                setShowAddDialog(true)
+              }}>
                 <Plus className="h-4 w-4" />
                 Ajouter un membre
               </Button>
@@ -305,7 +378,12 @@ export default function MembersPage() {
                     !searchTerm ? (
                       <Button
                         className="gap-2 bg-primary hover:bg-primary/90"
-                        onClick={() => setShowAddDialog(true)}
+                        onClick={() => {
+                          setEditingMember(null)
+                          setForm({ ...emptyForm, cooperative_id: currentCooperative?.id ?? '' })
+                          setFormErrors({})
+                          setShowAddDialog(true)
+                        }}
                       >
                         <Plus className="h-4 w-4" />
                         Ajouter le premier membre
@@ -352,6 +430,15 @@ export default function MembersPage() {
                                     </a>
                                   </Button>
                                 ) : null}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-border"
+                                  onClick={() => openEdit(member)}
+                                  aria-label={`Modifier ${member.first_name}`}
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -487,13 +574,39 @@ export default function MembersPage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+      <Dialog open={showAddDialog} onOpenChange={(open) => {
+        setShowAddDialog(open)
+        if (!open) {
+          setEditingMember(null)
+          setForm(emptyForm)
+          setFormErrors({})
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Ajouter un nouveau membre</DialogTitle>
-            <DialogDescription>Les membres seront créés avec le statut &quot;actif&quot;.</DialogDescription>
+            <DialogTitle>{editingMember ? 'Modifier le membre' : 'Ajouter un nouveau membre'}</DialogTitle>
+            <DialogDescription>
+              {editingMember
+                ? 'Modifiez les informations du membre ci-dessous.'
+                : 'Les membres seront créés avec le statut "actif".'}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {user?.role === 'super_admin' && (
+              <div className="space-y-2">
+                <Label>Coopérative <span className="text-destructive">*</span></Label>
+                <select
+                  className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
+                  value={form.cooperative_id}
+                  onChange={(e) => setForm((f) => ({ ...f, cooperative_id: e.target.value }))}
+                >
+                  <option value="">— Choisir —</option>
+                  {cooperatives.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="flex gap-4">
               <PhotoUpload
                 value={form.photo_url}
@@ -544,32 +657,31 @@ export default function MembersPage() {
               placeholder="123 Rue de la Ferme"
               error={formErrors.address}
             />
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                label="Village"
-                value={form.village}
-                onChange={(v) => setForm((f) => ({ ...f, village: v }))}
-                placeholder="Kpalimé"
-              />
-              <FormField
-                label="Canton"
-                value={form.canton}
-                onChange={(v) => setForm((f) => ({ ...f, canton: v }))}
-                placeholder="Canton Nord"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                label="Préfecture"
-                value={form.prefecture}
-                onChange={(v) => setForm((f) => ({ ...f, prefecture: v }))}
-                placeholder="Préfecture de Kloto"
-              />
-              <FormField
-                label="Région"
-                value={form.region}
-                onChange={(v) => setForm((f) => ({ ...f, region: v }))}
-                placeholder="Plateaux"
+            <div className="space-y-2">
+              <Label>Localisation</Label>
+              <LocationPicker
+                value={{
+                  region_id: form.region_id || undefined,
+                  prefecture_id: form.prefecture_id || undefined,
+                  canton_id: form.canton_id || undefined,
+                  village_id: form.village_id || undefined,
+                  region: form.region || undefined,
+                  prefecture: form.prefecture || undefined,
+                  canton: form.canton || undefined,
+                  village: form.village || undefined,
+                }}
+                onChange={(loc) => setForm((f) => ({
+                  ...f,
+                  region_id: loc.region_id ?? '',
+                  prefecture_id: loc.prefecture_id ?? '',
+                  canton_id: loc.canton_id ?? '',
+                  village_id: loc.village_id ?? '',
+                  region: loc.region ?? '',
+                  prefecture: loc.prefecture ?? '',
+                  canton: loc.canton ?? '',
+                  village: loc.village ?? '',
+                }))}
+                compact
               />
             </div>
           </div>
@@ -583,7 +695,7 @@ export default function MembersPage() {
               disabled={saving}
             >
               {saving ? <Spinner className="h-4 w-4 mr-2" /> : null}
-              Ajouter le membre
+              {editingMember ? 'Enregistrer' : 'Ajouter le membre'}
             </Button>
           </DialogFooter>
         </DialogContent>
