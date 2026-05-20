@@ -112,7 +112,7 @@ export default function Home() {
               },
               {
                 icon: TrendingUp,
-                title: "Marketplace",
+                title: "Place de marché",
                 description: "Connectez les membres aux exploitations et facilitez les transactions directes au sein de la coopérative"
               },
               {

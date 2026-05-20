@@ -121,7 +121,7 @@ export default function IntegrationsPage() {
       toast({ title: 'Update failed', description: errorMessage(error), variant: 'destructive' })
       return
     }
-    toast({ title: newStatus === 'connected' ? 'Connected' : 'Disconnected', description: def.name })
+    toast({ title: newStatus === 'connected' ? 'Connecté' : 'Déconnecté', description: def.name })
     await loadStatuses()
   }
 
@@ -145,7 +145,7 @@ export default function IntegrationsPage() {
                   {!integration.available ? (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-secondary/40 text-muted-foreground">
                       <Lock className="h-3 w-3" />
-                      Coming soon
+                      Bientôt disponible
                     </span>
                   ) : null}
                 </div>
@@ -159,7 +159,7 @@ export default function IntegrationsPage() {
             </div>
             <div className="flex flex-col items-end gap-2 shrink-0">
               <span className={`text-xs font-medium ${isConnected ? 'text-green-600' : 'text-muted-foreground'}`}>
-                {isConnected ? 'Connected' : 'Not Connected'}
+                {isConnected ? 'Connecté' : 'Non connecté'}
               </span>
               <div className="flex gap-2">
                 {integration.setupHref ? (
@@ -186,9 +186,9 @@ export default function IntegrationsPage() {
                   {toggling === integration.key ? (
                     <Spinner className="h-3.5 w-3.5" />
                   ) : isConnected ? (
-                    'Disconnect'
+                    'Déconnecter'
                   ) : (
-                    'Connect'
+                    'Connecter'
                   )}
                 </Button>
               </div>
@@ -202,14 +202,14 @@ export default function IntegrationsPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Integrations"
-        description="Connect external tools and services to enhance your cooperative"
+        title="Intégrations"
+        description="Connectez des outils et services externes pour renforcer votre coopérative"
       />
 
       <Tabs defaultValue="installed" className="w-full">
         <TabsList className="grid w-full max-w-sm grid-cols-2 border-b border-border bg-transparent">
           <TabsTrigger value="installed" className="border-b-2 border-transparent data-[state=active]:border-primary">
-            Installed ({connected.length})
+            Installées ({connected.length})
           </TabsTrigger>
           <TabsTrigger value="available" className="border-b-2 border-transparent data-[state=active]:border-primary">
             Available ({INTEGRATION_CATALOG.length})
@@ -224,8 +224,8 @@ export default function IntegrationsPage() {
               <CardContent className="py-12">
                 <EmptyState
                   icon={Zap}
-                  title="No integrations connected"
-                  description="Browse the Available tab to connect your tools"
+                  title="Aucune intégration connectée"
+                  description="Parcourez l'onglet Disponibles pour connecter vos outils"
                 />
               </CardContent>
             </Card>
@@ -247,14 +247,13 @@ export default function IntegrationsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-foreground">
             <Zap className="h-5 w-5" />
-            Custom Integrations
+            Intégrations personnalisées
           </CardTitle>
-          <CardDescription>Need something custom?</CardDescription>
+          <CardDescription>Besoin d'une intégration sur mesure ?</CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground mb-4 text-sm">
-            We support webhooks and API access for custom integrations. Use the widget API to embed
-            your marketplace anywhere.
+            Nous supportons les webhooks et l'accès API pour les intégrations personnalisées. Utilisez l'API widget pour intégrer votre marketplace partout.
           </p>
           <div className="flex gap-3">
             <Link href="/widget">
