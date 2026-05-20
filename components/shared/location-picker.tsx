@@ -91,9 +91,9 @@ export function LocationPicker({ value, onChange, disabled, compact }: LocationP
       })
   }, [value.prefecture_id, supabase])
 
-  // Load cantons when commune changes
+  // Load cantons when prefecture changes (cantons link to prefectures in Togo)
   useEffect(() => {
-    if (!value.commune_id) {
+    if (!value.prefecture_id) {
       setCantons([])
       return
     }
@@ -101,13 +101,13 @@ export function LocationPicker({ value, onChange, disabled, compact }: LocationP
     supabase
       .from('cantons')
       .select('id, name')
-      .eq('commune_id', value.commune_id)
+      .eq('prefecture_id', value.prefecture_id)
       .order('name')
       .then(({ data }) => {
         setCantons(data ?? [])
         setLoading(null)
       })
-  }, [value.commune_id, supabase])
+  }, [value.prefecture_id, supabase])
 
   // Load villages when canton changes
   useEffect(() => {
