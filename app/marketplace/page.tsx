@@ -98,7 +98,7 @@ export default function PublicMarketplacePage() {
     query = query.range(from, from + PAGE_SIZE - 1)
 
     const { data, count } = await query
-    setFiches((data ?? []) as Fiche[])
+    setFiches((data ?? []) as unknown as Fiche[])
     setTotal(count ?? 0)
     setIsLoading(false)
   }, [supabase, debouncedSearch, filterCulture, filterPrefecture, page])
