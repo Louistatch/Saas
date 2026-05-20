@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -179,7 +179,7 @@ export default function AnalyticsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-foreground">
               <ShoppingCart className="h-5 w-5" aria-hidden />
-              Vue d'ensemble du marketplace
+              Vue d&apos;ensemble des comptes d&apos;exploitation
             </CardTitle>
             <CardDescription>Fiches techniques publiées vs brouillons</CardDescription>
           </CardHeader>
@@ -209,13 +209,13 @@ export default function AnalyticsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-foreground">
             <BarChart3 className="h-5 w-5" aria-hidden />
-            Summary
+            Résumé
           </CardTitle>
           <CardDescription>Indicateurs clés en un coup d&apos;œil</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
-            <SummaryCell
+            <RésuméCell
               label="Cartes par membre"
               value={
                 stats.totalMembers > 0
@@ -223,7 +223,7 @@ export default function AnalyticsPage() {
                   : '—'
               }
             />
-            <SummaryCell
+            <RésuméCell
               label="Taux d'activation des cartes"
               value={
                 stats.totalCards > 0
@@ -231,8 +231,8 @@ export default function AnalyticsPage() {
                   : '—'
               }
             />
-            <SummaryCell
-              label="Couverture marketplace"
+            <RésuméCell
+              label="Couverture exploitations"
               value={
                 stats.totalExploitations > 0
                   ? `${stats.activeExploitations}/${stats.totalExploitations}`
@@ -284,7 +284,7 @@ function BreakdownBars({
   )
 }
 
-function SummaryCell({ label, value }: { label: string; value: string }) {
+function RésuméCell({ label, value }: { label: string; value: string }) {
   return (
     <div className="p-4 rounded-lg bg-secondary/30 space-y-1">
       <p className="text-sm text-muted-foreground">{label}</p>

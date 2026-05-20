@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
@@ -351,7 +351,7 @@ export default function CardsPage() {
   const handleRevoke = async (card: MemberCard) => {
     const ok = await confirm({
       title: 'Révoquer la carte ?',
-      description: 'Le membre perdra l\'accès au marketplace jusqu\'à l\'émission d\'une nouvelle carte.',
+      description: 'Le membre perdra l\'accès aux comptes d\'exploitation jusqu\'à l\'émission d\'une nouvelle carte.',
       destructive: true,
       confirmLabel: 'Révoquer',
     })
@@ -558,7 +558,7 @@ export default function CardsPage() {
           <Card className="border-border">
             <CardHeader>
               <CardTitle className="text-foreground">Cartes membres</CardTitle>
-              <CardDescription>Toutes les cartes générées pour l'accès au marketplace</CardDescription>
+              <CardDescription>Toutes les cartes générées pour l&apos;accès aux comptes d&apos;exploitation</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -570,7 +570,7 @@ export default function CardsPage() {
                   description={
                     search
                       ? 'Essayez un autre nom ou numéro de carte'
-                      : 'Générez des cartes pour vos membres afin d\'activer l\'accès au marketplace'
+                      : 'Générez des cartes pour vos membres afin d\'activer l\'accès aux comptes d\'exploitation'
                   }
                   action={
                     !search ? (

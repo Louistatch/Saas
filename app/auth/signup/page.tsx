@@ -33,9 +33,9 @@ export default function SignupPage() {
 
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
-      router.push(user?.role === 'super_admin' ? '/admin' : '/dashboard')
+      window.location.replace(user?.role === 'super_admin' ? '/admin' : '/dashboard')
     }
-  }, [isAuthenticated, isLoading, user, router])
+  }, [isAuthenticated, isLoading, user])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target
