@@ -35,11 +35,11 @@ export default function AdminLayout({
   }
 
   const adminLinks = [
-    { href: '/admin', label: 'Overview', icon: TrendingUp },
-    { href: '/admin/cooperatives', label: 'Cooperatives', icon: Building2 },
-    { href: '/admin/users', label: 'Users', icon: Users },
-    { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
-    { href: '/admin/settings', label: 'Settings', icon: Settings },
+    { href: '/admin', label: 'Vue d\'ensemble', icon: TrendingUp },
+    { href: '/admin/cooperatives', label: 'Coopératives', icon: Building2 },
+    { href: '/admin/users', label: 'Utilisateurs', icon: Users },
+    { href: '/admin/analytics', label: 'Statistiques', icon: BarChart3 },
+    { href: '/admin/settings', label: 'Paramètres', icon: Settings },
   ]
 
   return (
@@ -82,7 +82,7 @@ export default function AdminLayout({
                 className="w-full justify-start gap-3 border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent/10"
               >
                 <LayoutDashboard className="h-4 w-4" />
-                Dashboard
+                Tableau de bord
               </Button>
             </Link>
             <Button
@@ -91,7 +91,7 @@ export default function AdminLayout({
               onClick={handleLogout}
             >
               <LogOut className="h-4 w-4" />
-              Sign Out
+              Déconnexion
             </Button>
           </div>
         </div>
@@ -101,7 +101,7 @@ export default function AdminLayout({
           <div className="md:hidden p-4 border-b border-border flex items-center justify-between bg-card">
             <div className="flex items-center gap-3">
               <Logo size="sm" showText={false} />
-              <span className="font-semibold text-foreground">Admin Panel</span>
+              <span className="font-semibold text-foreground">Panneau admin</span>
             </div>
             <Button
               size="icon"

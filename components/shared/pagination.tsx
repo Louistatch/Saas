@@ -29,7 +29,7 @@ export function PaginationBar({
       className={`flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-t border-border pt-4 mt-2 ${className ?? ''}`}
     >
       <p className="text-xs text-muted-foreground">
-        Showing <strong className="text-foreground">{start}-{end}</strong> of{' '}
+        Affichage de <strong className="text-foreground">{start}-{end}</strong> sur{' '}
         <strong className="text-foreground">{total}</strong>
       </p>
       <div className="flex items-center gap-2">
@@ -39,7 +39,7 @@ export function PaginationBar({
           className="border-border"
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
-          aria-label="Previous page"
+          aria-label="Page précédente"
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -52,7 +52,7 @@ export function PaginationBar({
           className="border-border"
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
-          aria-label="Next page"
+          aria-label="Page suivante"
         >
           <ChevronRight className="h-4 w-4" />
         </Button>

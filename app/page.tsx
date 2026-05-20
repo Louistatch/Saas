@@ -18,31 +18,31 @@ export default function Home() {
           
           <div className="hidden md:flex items-center gap-8">
             <Link href="/features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Features
+              Fonctionnalités
             </Link>
             <Link href="/#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              How it works
+              Comment ça marche
             </Link>
             <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Pricing
+              Tarifs
             </Link>
             <Link href="/setup" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Setup
+              Installation
             </Link>
             <Link href="/demo" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Demo
+              Démo
             </Link>
           </div>
 
           <div className="flex items-center gap-3">
             <Link href="/auth/login">
               <Button variant="outline" size="sm">
-                Sign In
+                Se connecter
               </Button>
             </Link>
             <Link href="/auth/signup">
               <Button size="sm" className="bg-primary hover:bg-primary/90">
-                Get Started
+                Commencer
               </Button>
             </Link>
           </div>
@@ -55,22 +55,22 @@ export default function Home() {
           <div className="space-y-6">
             <div>
               <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-                Empower Your Agricultural Cooperative
+                Donnez du pouvoir à votre coopérative agricole
               </h1>
               <p className="mt-4 text-lg text-muted-foreground max-w-lg">
-                Connect members, manage exploitations, and grow together with our all-in-one digital platform built for faîtières agricoles.
+                Connectez vos membres, gérez les exploitations et grandissez ensemble grâce à notre plateforme numérique tout-en-un conçue pour les faîtières agricoles.
               </p>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
               <Link href="/auth/signup">
                 <Button size="lg" className="gap-2 bg-primary hover:bg-primary/90 w-full sm:w-auto">
-                  Start Free Trial <ArrowRight className="h-4 w-4" />
+                  Essai gratuit <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
               <Link href="/demo">
                 <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                  View Demo Credentials
+                  Voir les identifiants démo
                 </Button>
               </Link>
             </div>
@@ -78,11 +78,11 @@ export default function Home() {
             <div className="flex gap-6 pt-4">
               <div className="flex items-center gap-2">
                 <div className="flex h-2 w-2 rounded-full bg-primary"></div>
-                <span className="text-sm text-muted-foreground">30-day free trial</span>
+                <span className="text-sm text-muted-foreground">Essai gratuit de 30 jours</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="flex h-2 w-2 rounded-full bg-accent"></div>
-                <span className="text-sm text-muted-foreground">No credit card</span>
+                <span className="text-sm text-muted-foreground">Sans carte bancaire</span>
               </div>
             </div>
           </div>
@@ -96,10 +96,10 @@ export default function Home() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center space-y-4 mb-16">
             <h2 className="text-3xl font-bold text-foreground sm:text-4xl">
-              Built for Agricultural Cooperatives
+              Conçu pour les coopératives agricoles
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Everything you need to manage members, exploitations, and growth in one place
+              Tout ce dont vous avez besoin pour gérer vos membres, exploitations et croissance en un seul endroit
             </p>
           </div>
 
@@ -107,23 +107,23 @@ export default function Home() {
             {[
               {
                 icon: Users,
-                title: "Member Management",
-                description: "Track and engage cooperative members with digital member cards and access control"
+                title: "Gestion des membres",
+                description: "Suivez et engagez les membres de la coopérative avec des cartes numériques et un contrôle d'accès"
               },
               {
                 icon: TrendingUp,
                 title: "Marketplace",
-                description: "Connect members with exploitations and enable direct transactions within the cooperative"
+                description: "Connectez les membres aux exploitations et facilitez les transactions directes au sein de la coopérative"
               },
               {
                 icon: BarChart3,
-                title: "Analytics",
-                description: "Get insights into member activity, sales, and growth metrics in real-time"
+                title: "Statistiques",
+                description: "Obtenez des informations sur l'activité des membres, les ventes et les indicateurs de croissance en temps réel"
               },
               {
                 icon: Zap,
-                title: "Data Integration",
-                description: "Sync member data from KoboToolbox and other sources automatically"
+                title: "Intégration de données",
+                description: "Synchronisez automatiquement les données des membres depuis KoboToolbox et d'autres sources"
               }
             ].map((feature, i) => (
               <div key={i} className="rounded-lg border border-border bg-background p-6 space-y-3">
@@ -140,25 +140,25 @@ export default function Home() {
       <section id="how-it-works" className="py-20 sm:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold text-foreground text-center sm:text-4xl mb-16">
-            How FaîtiereHub Works
+            Comment fonctionne FaîtiereHub
           </h2>
 
           <div className="grid gap-8 md:grid-cols-3">
             {[
               {
                 step: "1",
-                title: "Setup Your Cooperative",
-                description: "Create your cooperative account and configure your marketplace with branding and settings"
+                title: "Configurez votre coopérative",
+                description: "Créez votre compte coopératif et configurez votre marketplace avec votre image de marque et vos paramètres"
               },
               {
                 step: "2",
-                title: "Add Members & Data",
-                description: "Import member lists and exploitation data, then issue digital member cards with QR codes"
+                title: "Ajoutez membres et données",
+                description: "Importez les listes de membres et les données d'exploitation, puis émettez des cartes numériques avec codes QR"
               },
               {
                 step: "3",
-                title: "Enable Transactions",
-                description: "Members browse the marketplace, make purchases, and access benefits with their cards"
+                title: "Activez les transactions",
+                description: "Les membres parcourent le marketplace, effectuent des achats et accèdent aux avantages avec leurs cartes"
               }
             ].map((item, i) => (
               <div key={i} className="relative space-y-4">
@@ -180,14 +180,14 @@ export default function Home() {
       <section className="border-t border-border bg-card/50 py-20 sm:py-28">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold text-foreground sm:text-4xl">
-            Ready to Transform Your Cooperative?
+            Prêt à transformer votre coopérative ?
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Join agricultural cooperatives across the region using FaîtiereHub to connect members and grow together.
+            Rejoignez les coopératives agricoles de la région qui utilisent FaîtiereHub pour connecter leurs membres et grandir ensemble.
           </p>
           <Link href="/auth/signup" className="mt-8 inline-block">
             <Button size="lg" className="gap-2 bg-primary hover:bg-primary/90">
-              Start Your Free Trial <ArrowRight className="h-4 w-4" />
+              Commencer votre essai gratuit <ArrowRight className="h-4 w-4" />
             </Button>
           </Link>
         </div>
@@ -202,40 +202,40 @@ export default function Home() {
                 <Logo size="sm" />
               </div>
               <p className="text-sm text-muted-foreground">
-                Empowering agricultural cooperatives with digital tools.
+                Au service des coopératives agricoles avec des outils numériques.
               </p>
             </div>
             <div>
-              <h4 className="font-semibold text-foreground mb-4">Product</h4>
+              <h4 className="font-semibold text-foreground mb-4">Produit</h4>
               <ul className="space-y-2">
-                <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</Link></li>
-                <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</Link></li>
-                <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Security</Link></li>
+                <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Fonctionnalités</Link></li>
+                <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Tarifs</Link></li>
+                <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Sécurité</Link></li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold text-foreground mb-4">Company</h4>
+              <h4 className="font-semibold text-foreground mb-4">Entreprise</h4>
               <ul className="space-y-2">
-                <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">About</Link></li>
+                <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">À propos</Link></li>
                 <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Blog</Link></li>
                 <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Contact</Link></li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold text-foreground mb-4">Legal</h4>
+              <h4 className="font-semibold text-foreground mb-4">Légal</h4>
               <ul className="space-y-2">
-                <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Privacy</Link></li>
-                <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Terms</Link></li>
+                <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Confidentialité</Link></li>
+                <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Conditions</Link></li>
                 <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Cookies</Link></li>
               </ul>
             </div>
           </div>
           <div className="border-t border-border mt-8 pt-8 flex flex-col sm:flex-row justify-between items-center">
             <p className="text-sm text-muted-foreground">
-              © 2026 FaîtiereHub. All rights reserved.
+              © 2026 FaîtiereHub. Tous droits réservés.
             </p>
             <p className="text-sm text-muted-foreground">
-              Made with <span className="text-primary">♦</span> for agricultural cooperatives
+              Fait avec <span className="text-primary">♦</span> pour les coopératives agricoles
             </p>
           </div>
         </div>

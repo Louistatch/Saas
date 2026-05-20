@@ -30,8 +30,8 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   description,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel = 'Confirmer',
+  cancelLabel = 'Annuler',
   destructive = false,
   loading = false,
   onConfirm,
@@ -57,7 +57,7 @@ export function ConfirmDialog({
               destructive && 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
             )}
           >
-            {loading ? 'Working…' : confirmLabel}
+            {loading ? 'En cours…' : confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

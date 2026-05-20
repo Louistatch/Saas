@@ -39,14 +39,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Navigation items filtered by role
   const navigationItems = [
-    { href: '/dashboard', label: 'Overview', icon: Home, roles: ['super_admin', 'cooperative_admin', 'member', 'guest'] },
+    { href: '/dashboard', label: 'Vue d\'ensemble', icon: Home, roles: ['super_admin', 'cooperative_admin', 'member', 'guest'] },
     { href: '/dashboard/marketplace', label: 'Marketplace', icon: ShoppingCart, roles: ['super_admin', 'cooperative_admin', 'member', 'guest'] },
-    { href: '/dashboard/templates', label: 'Templates', icon: FolderOpen, roles: ['super_admin', 'cooperative_admin'] },
-    { href: '/dashboard/members', label: 'Members', icon: Users, roles: ['super_admin', 'cooperative_admin', 'member'] },
+    { href: '/dashboard/templates', label: 'Modèles', icon: FolderOpen, roles: ['super_admin', 'cooperative_admin'] },
+    { href: '/dashboard/members', label: 'Membres', icon: Users, roles: ['super_admin', 'cooperative_admin', 'member'] },
     { href: '/dashboard/cotisations', label: 'Cotisations', icon: Banknote, roles: ['super_admin', 'cooperative_admin'] },
-    { href: '/dashboard/cards', label: 'Member Cards', icon: FileText, roles: ['super_admin', 'cooperative_admin', 'member'] },
-    { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3, roles: ['super_admin', 'cooperative_admin'] },
-    { href: '/dashboard/integrations', label: 'Integrations', icon: Zap, roles: ['super_admin', 'cooperative_admin'] },
+    { href: '/dashboard/cards', label: 'Cartes membres', icon: FileText, roles: ['super_admin', 'cooperative_admin', 'member'] },
+    { href: '/dashboard/analytics', label: 'Statistiques', icon: BarChart3, roles: ['super_admin', 'cooperative_admin'] },
+    { href: '/dashboard/integrations', label: 'Intégrations', icon: Zap, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/kobo-setup', label: 'KoboCollect', icon: Smartphone, roles: ['super_admin', 'cooperative_admin'] },
   ].filter(item => user?.role && item.roles.includes(user.role))
 
@@ -104,7 +104,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Link href="/dashboard/settings">
                 <Button variant="outline" className="w-full justify-start gap-3 border-border text-foreground hover:bg-accent/10">
                   <Settings className="h-4 w-4" />
-                  Settings
+                  Paramètres
                 </Button>
               </Link>
             )}
@@ -113,7 +113,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Link href="/admin">
                 <Button variant="outline" className="w-full justify-start gap-3 border-border text-purple-600 hover:bg-purple-50">
                   <Shield className="h-4 w-4" />
-                  Admin Panel
+                  Panneau admin
                 </Button>
               </Link>
             )}
@@ -123,7 +123,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               onClick={handleLogout}
             >
               <LogOut className="h-4 w-4" />
-              Sign Out
+              Déconnexion
             </Button>
           </div>
         </aside>
@@ -134,7 +134,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="hidden md:flex items-center justify-between border-b border-border bg-background px-6 py-3 sticky top-0 z-40">
             <div>
               <h1 className="text-base font-semibold text-foreground">
-                {currentCooperative?.name || 'Dashboard'}
+                {currentCooperative?.name || 'Tableau de bord'}
               </h1>
             </div>
             <div className="flex items-center gap-3">

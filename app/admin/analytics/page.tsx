@@ -84,15 +84,15 @@ export default function AnalyticsAdminPage() {
   }, [fetchData])
 
   const metrics = [
-    { title: 'Total Cooperatives', value: totals.cooperatives, icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { title: 'Total Members', value: totals.members, icon: Users, color: 'text-green-600', bg: 'bg-green-50' },
+    { title: 'Total coopératives', value: totals.cooperatives, icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { title: 'Total membres', value: totals.members, icon: Users, color: 'text-green-600', bg: 'bg-green-50' },
     { title: 'Fiches techniques', value: totals.exploitations, icon: ShoppingCart, color: 'text-purple-600', bg: 'bg-purple-50' },
-    { title: 'Active Cards', value: totals.cards, icon: CreditCard, color: 'text-orange-600', bg: 'bg-orange-50' },
+    { title: 'Cartes actives', value: totals.cards, icon: CreditCard, color: 'text-orange-600', bg: 'bg-orange-50' },
   ]
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Analytics" description="Platform-wide analytics and reporting" />
+      <PageHeader title="Statistiques" description="Statistiques et rapports de la plateforme" />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {metrics.map((metric, i) => {
@@ -119,25 +119,25 @@ export default function AnalyticsAdminPage() {
 
       <Card className="border-border">
         <CardHeader>
-          <CardTitle className="text-foreground">Cooperative Performance</CardTitle>
-          <CardDescription>All cooperatives ranked by member count</CardDescription>
+          <CardTitle className="text-foreground">Performance des coopératives</CardTitle>
+          <CardDescription>Toutes les coopératives classées par nombre de membres</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <LoadingBlock />
           ) : coopStats.length === 0 ? (
-            <EmptyState title="No cooperatives yet" />
+            <EmptyState title="Aucune coopérative pour le moment" />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
                     <th className="text-left py-3 px-4 font-semibold text-foreground">#</th>
-                    <th className="text-left py-3 px-4 font-semibold text-foreground">Cooperative</th>
-                    <th className="text-right py-3 px-4 font-semibold text-foreground">Members</th>
+                    <th className="text-left py-3 px-4 font-semibold text-foreground">Coopérative</th>
+                    <th className="text-right py-3 px-4 font-semibold text-foreground">Membres</th>
                     <th className="text-right py-3 px-4 font-semibold text-foreground">Exploitations</th>
-                    <th className="text-right py-3 px-4 font-semibold text-foreground">Active Cards</th>
-                    <th className="text-right py-3 px-4 font-semibold text-foreground">Card Rate</th>
+                    <th className="text-right py-3 px-4 font-semibold text-foreground">Cartes actives</th>
+                    <th className="text-right py-3 px-4 font-semibold text-foreground">Taux cartes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -178,19 +178,19 @@ export default function AnalyticsAdminPage() {
       <div className="grid gap-6 md:grid-cols-3">
         {[
           {
-            label: 'Avg Members / Cooperative',
+            label: 'Moy. membres / Coopérative',
             value:
               totals.cooperatives > 0 ? (totals.members / totals.cooperatives).toFixed(1) : '—',
           },
           {
-            label: 'Avg Exploitations / Cooperative',
+            label: 'Moy. exploitations / Coopérative',
             value:
               totals.cooperatives > 0
                 ? (totals.exploitations / totals.cooperatives).toFixed(1)
                 : '—',
           },
           {
-            label: 'Overall Card Coverage',
+            label: 'Couverture cartes globale',
             value:
               totals.members > 0 ? `${Math.round((totals.cards / totals.members) * 100)}%` : '—',
           },

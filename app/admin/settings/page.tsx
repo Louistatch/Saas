@@ -97,10 +97,10 @@ export default function AdminSettingsPage() {
     const { error } = await supabase.from('platform_settings').upsert(rows, { onConflict: 'key' })
     setSaving(null)
     if (error) {
-      toast({ title: 'Save failed', description: errorMessage(error), variant: 'destructive' })
+      toast({ title: 'Échec de la sauvegarde', description: errorMessage(error), variant: 'destructive' })
       return
     }
-    toast({ title: 'Settings saved' })
+    toast({ title: 'Paramètres enregistrés' })
   }
 
   const Toggle = ({
@@ -141,17 +141,17 @@ export default function AdminSettingsPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Platform Settings"
-        description="Platform configuration and administration"
+        title="Paramètres de la plateforme"
+        description="Configuration et administration de la plateforme"
       />
 
       <Tabs defaultValue="general" className="w-full">
         <TabsList className="grid w-full max-w-md grid-cols-3 border-b border-border bg-transparent">
           <TabsTrigger value="general" className="border-b-2 border-transparent data-[state=active]:border-primary">
-            General
+            Général
           </TabsTrigger>
           <TabsTrigger value="security" className="border-b-2 border-transparent data-[state=active]:border-primary">
-            Security
+            Sécurité
           </TabsTrigger>
           <TabsTrigger value="info" className="border-b-2 border-transparent data-[state=active]:border-primary">
             Info
@@ -161,12 +161,12 @@ export default function AdminSettingsPage() {
         <TabsContent value="general" className="space-y-6 mt-6">
           <Card className="border-border">
             <CardHeader>
-              <CardTitle className="text-foreground">General Settings</CardTitle>
-              <CardDescription>Basic platform configuration</CardDescription>
+              <CardTitle className="text-foreground">Paramètres généraux</CardTitle>
+              <CardDescription>Configuration de base de la plateforme</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label>Platform Name</Label>
+                <Label>Nom de la plateforme</Label>
                 <Input
                   value={platform.platform_name}
                   onChange={(e) =>
@@ -175,7 +175,7 @@ export default function AdminSettingsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Support Email</Label>
+                <Label>Email de support</Label>
                 <Input
                   type="email"
                   value={platform.support_email}
@@ -185,8 +185,8 @@ export default function AdminSettingsPage() {
                 />
               </div>
               <Toggle
-                label="Maintenance Mode"
-                description="Disable platform access for non-admin users"
+                label="Mode maintenance"
+                description="Désactiver l'accès à la plateforme pour les utilisateurs non-admin"
                 value={platform.maintenance_mode}
                 onChange={(v) => setPlatform((s) => ({ ...s, maintenance_mode: v }))}
               />
@@ -196,7 +196,7 @@ export default function AdminSettingsPage() {
                 disabled={loading || saving !== null}
               >
                 {saving === 'platform' ? <Spinner className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
-                Save Settings
+                Enregistrer les paramètres
               </Button>
             </CardContent>
           </Card>
@@ -205,16 +205,16 @@ export default function AdminSettingsPage() {
         <TabsContent value="security" className="space-y-6 mt-6">
           <Card className="border-border">
             <CardHeader>
-              <CardTitle className="text-foreground">Security Settings</CardTitle>
-              <CardDescription>Manage platform security features</CardDescription>
+              <CardTitle className="text-foreground">Paramètres de sécurité</CardTitle>
+              <CardDescription>Gérer les fonctionnalités de sécurité de la plateforme</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {(
                 [
-                  ['force_https', 'Force HTTPS', 'Block traffic on plain HTTP'],
-                  ['two_fa_admins', '2FA for Admins', 'Require two-factor authentication for admins'],
-                  ['ip_whitelisting', 'IP Whitelisting', 'Allow only specified IPs for the admin area'],
-                  ['rate_limiting', 'API Rate Limiting', 'Throttle API/widget requests per IP'],
+                  ['force_https', 'Forcer HTTPS', 'Bloquer le trafic HTTP non sécurisé'],
+                  ['two_fa_admins', '2FA pour les admins', 'Exiger l\'authentification à deux facteurs pour les administrateurs'],
+                  ['ip_whitelisting', 'Liste blanche IP', 'Autoriser uniquement les IP spécifiées pour la zone admin'],
+                  ['rate_limiting', 'Limitation de débit API', 'Limiter les requêtes API/widget par IP'],
                 ] as const
               ).map(([key, label, description]) => (
                 <Toggle
@@ -231,7 +231,7 @@ export default function AdminSettingsPage() {
                 disabled={loading || saving !== null}
               >
                 {saving === 'security' ? <Spinner className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
-                Save Settings
+                Enregistrer les paramètres
               </Button>
             </CardContent>
           </Card>
@@ -242,19 +242,19 @@ export default function AdminSettingsPage() {
             <CardHeader>
               <CardTitle className="text-foreground flex items-center gap-2">
                 <Info className="h-5 w-5" />
-                Backup &amp; Email
+                Sauvegarde &amp; Email
               </CardTitle>
-              <CardDescription>Where to manage these settings</CardDescription>
+              <CardDescription>Où gérer ces paramètres</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                Database backups are managed by your Supabase project. Configure retention and
-                point-in-time recovery in the Supabase dashboard under{' '}
+                Les sauvegardes de la base de données sont gérées par votre projet Supabase. Configurez la rétention et
+                la récupération ponctuelle dans le tableau de bord Supabase sous{' '}
                 <strong>Settings → Database → Backups</strong>.
               </p>
               <p className="text-sm text-muted-foreground">
-                Transactional email (signup confirmation, password reset) is delivered through
-                Supabase Auth. Customize templates under{' '}
+                Les emails transactionnels (confirmation d'inscription, réinitialisation de mot de passe) sont envoyés via
+                Supabase Auth. Personnalisez les modèles sous{' '}
                 <strong>Authentication → Email Templates</strong>.
               </p>
               <a
@@ -264,7 +264,7 @@ export default function AdminSettingsPage() {
                 className="inline-block"
               >
                 <Button variant="outline" size="sm" className="border-border">
-                  Open Supabase docs
+                  Ouvrir la doc Supabase
                 </Button>
               </a>
             </CardContent>
@@ -276,16 +276,16 @@ export default function AdminSettingsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-destructive">
             <AlertCircle className="h-5 w-5" />
-            Danger Zone
+            Zone de danger
           </CardTitle>
           <CardDescription className="text-destructive/80">
-            Operations that may affect every cooperative on the platform.
+            Opérations pouvant affecter toutes les coopératives de la plateforme.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            Destructive maintenance (purge, restore, schema migrations) is performed via the
-            Supabase project console rather than from this UI.
+            La maintenance destructive (purge, restauration, migrations de schéma) est effectuée via la
+            console du projet Supabase plutôt que depuis cette interface.
           </p>
         </CardContent>
       </Card>

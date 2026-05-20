@@ -67,12 +67,12 @@ export default function SettingsPage() {
         logo: currentCooperative.logo,
       })
       toast({
-        title: 'Saved',
-        description: part === 'general' ? 'Cooperative information updated.' : 'Branding updated.',
+        title: 'Enregistré',
+        description: part === 'general' ? 'Informations de la coopérative mises à jour.' : 'Image de marque mise à jour.',
       })
       refreshCooperatives()
     } catch (e) {
-      toast({ title: 'Save failed', description: errorMessage(e), variant: 'destructive' })
+      toast({ title: 'Échec de la sauvegarde', description: errorMessage(e), variant: 'destructive' })
     } finally {
       setSaving(false)
       setSavingPart(null)
@@ -82,27 +82,27 @@ export default function SettingsPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Settings"
-        description="Manage your cooperative account and preferences"
+        title="Paramètres"
+        description="Gérer votre compte coopératif et vos préférences"
       />
 
       <Tabs defaultValue="general" className="w-full">
         <TabsList className="grid w-full max-w-md grid-cols-3 border-b border-border bg-transparent">
-          <TabsTrigger value="general" className="border-b-2 border-transparent data-[state=active]:border-primary">General</TabsTrigger>
-          <TabsTrigger value="branding" className="border-b-2 border-transparent data-[state=active]:border-primary">Branding</TabsTrigger>
-          <TabsTrigger value="billing" className="border-b-2 border-transparent data-[state=active]:border-primary">Billing</TabsTrigger>
+          <TabsTrigger value="general" className="border-b-2 border-transparent data-[state=active]:border-primary">Général</TabsTrigger>
+          <TabsTrigger value="branding" className="border-b-2 border-transparent data-[state=active]:border-primary">Image de marque</TabsTrigger>
+          <TabsTrigger value="billing" className="border-b-2 border-transparent data-[state=active]:border-primary">Facturation</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="space-y-6 mt-6">
           <Card className="border-border">
             <CardHeader>
-              <CardTitle className="text-foreground">Cooperative Information</CardTitle>
-              <CardDescription>Update your cooperative details</CardDescription>
+              <CardTitle className="text-foreground">Informations de la coopérative</CardTitle>
+              <CardDescription>Mettre à jour les détails de votre coopérative</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label className="text-foreground">Cooperative Name</Label>
+                  <Label className="text-foreground">Nom de la coopérative</Label>
                   <Input
                     value={coopForm.name}
                     onChange={(e) => setCoopForm((f) => ({ ...f, name: e.target.value }))}
@@ -112,7 +112,7 @@ export default function SettingsPage() {
                   {errors.name ? <p className="text-xs text-destructive">{errors.name}</p> : null}
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-foreground">Cooperative ID</Label>
+                  <Label className="text-foreground">ID de la coopérative</Label>
                   <Input
                     value={currentCooperative?.id ?? ''}
                     disabled
@@ -125,14 +125,14 @@ export default function SettingsPage() {
                 <textarea
                   value={coopForm.description}
                   onChange={(e) => setCoopForm((f) => ({ ...f, description: e.target.value }))}
-                  placeholder="Tell members about your cooperative…"
+                  placeholder="Décrivez votre coopérative…"
                   className="border border-border rounded-lg px-3 py-2 bg-background text-foreground w-full min-h-24 text-sm"
                   rows={4}
                 />
               </div>
               {memberCount != null ? (
                 <div className="p-3 bg-secondary/30 rounded-lg flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Current members</span>
+                  <span className="text-sm text-muted-foreground">Membres actuels</span>
                   <span className="font-bold text-foreground">{memberCount}</span>
                 </div>
               ) : null}
@@ -142,24 +142,24 @@ export default function SettingsPage() {
                 disabled={saving}
               >
                 {savingPart === 'general' ? <Spinner className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
-                Save Changes
+                Enregistrer
               </Button>
             </CardContent>
           </Card>
 
           <Card className="border-border">
             <CardHeader>
-              <CardTitle className="text-foreground">Your Profile</CardTitle>
-              <CardDescription>Your personal account information</CardDescription>
+              <CardTitle className="text-foreground">Votre profil</CardTitle>
+              <CardDescription>Vos informations personnelles</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>First Name</Label>
+                  <Label>Prénom</Label>
                   <Input value={user?.firstName ?? ''} disabled className="opacity-70" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Last Name</Label>
+                  <Label>Nom</Label>
                   <Input value={user?.lastName ?? ''} disabled className="opacity-70" />
                 </div>
               </div>
@@ -168,7 +168,7 @@ export default function SettingsPage() {
                 <Input value={user?.email ?? ''} disabled className="opacity-70" />
               </div>
               <div className="space-y-2">
-                <Label>Role</Label>
+                <Label>Rôle</Label>
                 <Input value={user?.role ? roleLabel(user.role) : ''} disabled className="opacity-70" />
               </div>
             </CardContent>
@@ -178,12 +178,12 @@ export default function SettingsPage() {
         <TabsContent value="branding" className="space-y-6 mt-6">
           <Card className="border-border">
             <CardHeader>
-              <CardTitle className="text-foreground">Brand Customization</CardTitle>
-              <CardDescription>Customize the look and feel of your cooperative marketplace</CardDescription>
+              <CardTitle className="text-foreground">Personnalisation de la marque</CardTitle>
+              <CardDescription>Personnalisez l'apparence du marketplace de votre coopérative</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label>Primary Color</Label>
+                <Label>Couleur principale</Label>
                 <div className="flex gap-3 items-center">
                   <input
                     type="color"
@@ -206,7 +206,7 @@ export default function SettingsPage() {
                 ) : null}
               </div>
               <div className="bg-secondary/30 p-4 rounded-lg space-y-2">
-                <Label className="text-xs uppercase tracking-wide opacity-70">Preview</Label>
+                <Label className="text-xs uppercase tracking-wide opacity-70">Aperçu</Label>
                 <div className="flex items-center gap-3">
                   <div
                     className="h-10 w-10 rounded-lg flex items-center justify-center text-white font-bold"
@@ -215,8 +215,8 @@ export default function SettingsPage() {
                     {coopForm.name?.charAt(0).toUpperCase() || 'C'}
                   </div>
                   <div>
-                    <p className="font-semibold text-foreground">{coopForm.name || 'Your Cooperative'}</p>
-                    <p className="text-xs text-muted-foreground">{coopForm.description || 'Description preview'}</p>
+                    <p className="font-semibold text-foreground">{coopForm.name || 'Votre coopérative'}</p>
+                    <p className="text-xs text-muted-foreground">{coopForm.description || 'Aperçu de la description'}</p>
                   </div>
                 </div>
               </div>
@@ -226,7 +226,7 @@ export default function SettingsPage() {
                 disabled={saving}
               >
                 {savingPart === 'branding' ? <Spinner className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
-                Save Changes
+                Enregistrer
               </Button>
             </CardContent>
           </Card>
@@ -235,21 +235,21 @@ export default function SettingsPage() {
         <TabsContent value="billing" className="space-y-6 mt-6">
           <Card className="border-border">
             <CardHeader>
-              <CardTitle className="text-foreground">Billing &amp; Subscription</CardTitle>
-              <CardDescription>Manage your subscription and billing information</CardDescription>
+              <CardTitle className="text-foreground">Facturation &amp; Abonnement</CardTitle>
+              <CardDescription>Gérer votre abonnement et vos informations de facturation</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-lg border border-border p-4 space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-foreground font-medium">Current Plan</span>
-                  <span className="text-primary font-medium">Starter (Free)</span>
+                  <span className="text-foreground font-medium">Plan actuel</span>
+                  <span className="text-primary font-medium">Starter (Gratuit)</span>
                 </div>
-                <p className="text-sm text-muted-foreground">30-day free trial. Upgrade anytime.</p>
+                <p className="text-sm text-muted-foreground">Essai gratuit de 30 jours. Passez à un plan supérieur à tout moment.</p>
               </div>
               {memberCount != null ? (
                 <div className="rounded-lg border border-border p-4 space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Members used</span>
+                    <span className="text-muted-foreground">Membres utilisés</span>
                     <span className="text-foreground font-medium">{memberCount} / 500</span>
                   </div>
                   <div className="h-2 bg-secondary rounded-full overflow-hidden">
@@ -261,7 +261,7 @@ export default function SettingsPage() {
                 </div>
               ) : null}
               <Button variant="outline" className="w-full border-border" disabled>
-                Upgrade Plan (coming soon)
+                Passer au plan supérieur (bientôt disponible)
               </Button>
             </CardContent>
           </Card>

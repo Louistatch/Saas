@@ -47,7 +47,7 @@ export default function SignupPage() {
     setError('')
 
     if (!acceptTerms) {
-      setError('Please accept the Terms of Service to continue.')
+      setError('Veuillez accepter les Conditions d\'utilisation pour continuer.')
       return
     }
 
@@ -83,18 +83,18 @@ export default function SignupPage() {
         <div className="space-y-6">
           <div>
             <h2 className="text-3xl font-bold text-foreground mb-2">
-              Start Growing Your Cooperative
+              Développez votre coopérative
             </h2>
             <p className="text-muted-foreground">
-              Get your cooperative online in minutes with our platform.
+              Mettez votre coopérative en ligne en quelques minutes avec notre plateforme.
             </p>
           </div>
 
           <ul className="space-y-4">
             {[
-              '30-day free trial, no credit card needed',
-              'Setup takes less than 5 minutes',
-              'Dedicated support team',
+              'Essai gratuit de 30 jours, sans carte bancaire',
+              'Configuration en moins de 5 minutes',
+              'Équipe de support dédiée',
             ].map((benefit, i) => (
               <li key={i} className="flex gap-3">
                 <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20">
@@ -107,15 +107,15 @@ export default function SignupPage() {
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Join agricultural cooperatives using FaîtiereHub.
+          Rejoignez les coopératives agricoles utilisant FaîtiereHub.
         </p>
       </div>
 
       <div className="flex items-center justify-center p-4 sm:p-8">
         <Card className="w-full max-w-sm border-border">
           <CardHeader className="space-y-2">
-            <CardTitle className="text-2xl">Create Your Account</CardTitle>
-            <CardDescription>Get started with FaîtiereHub today</CardDescription>
+            <CardTitle className="text-2xl">Créer votre compte</CardTitle>
+            <CardDescription>Commencez avec FaîtiereHub dès aujourd'hui</CardDescription>
           </CardHeader>
 
           <CardContent>
@@ -130,16 +130,16 @@ export default function SignupPage() {
               )}
 
               <div className="grid grid-cols-2 gap-3">
-                <Field id="firstName" label="First Name" value={formData.firstName} onChange={handleChange} placeholder="Jean" error={fieldErrors.firstName} required />
-                <Field id="lastName" label="Last Name" value={formData.lastName} onChange={handleChange} placeholder="Dupont" error={fieldErrors.lastName} required />
+                <Field id="firstName" label="Prénom" value={formData.firstName} onChange={handleChange} placeholder="Jean" error={fieldErrors.firstName} required />
+                <Field id="lastName" label="Nom" value={formData.lastName} onChange={handleChange} placeholder="Dupont" error={fieldErrors.lastName} required />
               </div>
 
-              <Field id="cooperative" label="Cooperative Name" value={formData.cooperative} onChange={handleChange} placeholder="Your Cooperative" error={fieldErrors.cooperative} required />
+              <Field id="cooperative" label="Nom de la coopérative" value={formData.cooperative} onChange={handleChange} placeholder="Votre coopérative" error={fieldErrors.cooperative} required />
 
-              <Field id="email" type="email" label="Email Address" value={formData.email} onChange={handleChange} placeholder="you@cooperative.com" error={fieldErrors.email} required autoComplete="email" />
+              <Field id="email" type="email" label="Adresse email" value={formData.email} onChange={handleChange} placeholder="vous@cooperative.com" error={fieldErrors.email} required autoComplete="email" />
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">Mot de passe</Label>
                 <div className="relative">
                   <Input
                     id="password"
@@ -156,7 +156,7 @@ export default function SignupPage() {
                     type="button"
                     onClick={() => setShowPassword((s) => !s)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -165,7 +165,7 @@ export default function SignupPage() {
                   <p className="text-xs text-destructive">{fieldErrors.password}</p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    At least 8 characters with letters and numbers.
+                    Au moins 8 caractères avec des lettres et des chiffres.
                   </p>
                 )}
               </div>
@@ -173,10 +173,10 @@ export default function SignupPage() {
               <div className="flex items-start gap-2 pt-2">
                 <Checkbox id="terms" className="mt-1" checked={acceptTerms} onCheckedChange={(v) => setAcceptTerms(!!v)} />
                 <label htmlFor="terms" className="text-sm text-muted-foreground leading-relaxed cursor-pointer">
-                  I agree to the{' '}
-                  <Link href="#" className="text-primary hover:underline">Terms of Service</Link>
-                  {' '}and{' '}
-                  <Link href="#" className="text-primary hover:underline">Privacy Policy</Link>
+                  J&apos;accepte les{' '}
+                  <Link href="#" className="text-primary hover:underline">Conditions d&apos;utilisation</Link>
+                  {' '}et la{' '}
+                  <Link href="#" className="text-primary hover:underline">Politique de confidentialité</Link>
                 </label>
               </div>
 
@@ -186,14 +186,14 @@ export default function SignupPage() {
                 disabled={isLoading || submitting}
               >
                 {isLoading || submitting ? <Spinner className="h-4 w-4" /> : null}
-                {isLoading || submitting ? 'Creating Account…' : 'Create Account'}
+                {isLoading || submitting ? 'Création du compte…' : 'Créer un compte'}
               </Button>
             </form>
 
             <p className="mt-6 text-center text-sm text-muted-foreground">
-              Already have an account?{' '}
+              Vous avez déjà un compte ?{' '}
               <Link href="/auth/login" className="text-primary hover:underline font-medium">
-                Sign in
+                Se connecter
               </Link>
             </p>
           </CardContent>

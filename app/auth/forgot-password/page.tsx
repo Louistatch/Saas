@@ -19,7 +19,7 @@ export default function ForgotPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (!email) { setError('Email is required'); return }
+    if (!email) { setError('L\'email est requis'); return }
     setLoading(true)
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth/reset-password`,
@@ -42,23 +42,23 @@ export default function ForgotPasswordPage() {
 
         <Card className="border-border">
           <CardHeader className="space-y-2">
-            <CardTitle className="text-2xl">Reset Password</CardTitle>
+            <CardTitle className="text-2xl">Réinitialiser le mot de passe</CardTitle>
             <CardDescription>
-              Enter your email and we'll send you a reset link
+              Entrez votre email et nous vous enverrons un lien de réinitialisation
             </CardDescription>
           </CardHeader>
           <CardContent>
             {sent ? (
               <div className="space-y-4 text-center py-4">
                 <CheckCircle className="h-12 w-12 text-green-600 mx-auto" />
-                <p className="font-medium text-foreground">Check your email</p>
+                <p className="font-medium text-foreground">Vérifiez votre email</p>
                 <p className="text-sm text-muted-foreground">
-                  We sent a password reset link to <strong>{email}</strong>
+                  Nous avons envoyé un lien de réinitialisation à <strong>{email}</strong>
                 </p>
                 <Link href="/auth/login">
                   <Button variant="outline" className="w-full border-border gap-2">
                     <ArrowLeft className="h-4 w-4" />
-                    Back to Login
+                    Retour à la connexion
                   </Button>
                 </Link>
               </div>
@@ -70,7 +70,7 @@ export default function ForgotPasswordPage() {
                   </div>
                 )}
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
+                  <Label htmlFor="email">Adresse email</Label>
                   <Input
                     id="email"
                     type="email"
@@ -82,12 +82,12 @@ export default function ForgotPasswordPage() {
                   />
                 </div>
                 <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={loading}>
-                  {loading ? 'Sending...' : 'Send Reset Link'}
+                  {loading ? 'Envoi en cours...' : 'Envoyer le lien de réinitialisation'}
                 </Button>
                 <Link href="/auth/login">
                   <Button variant="outline" className="w-full border-border gap-2">
                     <ArrowLeft className="h-4 w-4" />
-                    Back to Login
+                    Retour à la connexion
                   </Button>
                 </Link>
               </form>

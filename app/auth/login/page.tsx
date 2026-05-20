@@ -55,7 +55,7 @@ function LoginInner() {
       // If redirect doesn't happen within 8s, something went wrong with profile loading.
       setTimeout(() => {
         setSubmitting(false)
-        setError('Login succeeded but profile could not be loaded. Please try again.')
+        setError('Connexion réussie mais le profil n\'a pas pu être chargé. Veuillez réessayer.')
       }, 8000)
     } catch (err) {
       setError(errorMessage(err))
@@ -73,18 +73,18 @@ function LoginInner() {
         <div className="space-y-6">
           <div>
             <h2 className="text-3xl font-bold text-foreground mb-2">
-              Connect Your Cooperative
+              Connectez votre coopérative
             </h2>
             <p className="text-muted-foreground">
-              Manage members, marketplace, and growth all in one place.
+              Gérez vos membres, le marketplace et la croissance en un seul endroit.
             </p>
           </div>
 
           <ul className="space-y-4">
             {[
-              'Manage member data and digital cards',
-              'Operate a cooperative marketplace',
-              'Track sales and member engagement',
+              'Gérer les données des membres et les cartes numériques',
+              'Exploiter un marketplace coopératif',
+              'Suivre les ventes et l\'engagement des membres',
             ].map((benefit, i) => (
               <li key={i} className="flex gap-3">
                 <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20">
@@ -97,15 +97,15 @@ function LoginInner() {
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Empowering agricultural cooperatives.
+          Au service des coopératives agricoles.
         </p>
       </div>
 
       <div className="flex items-center justify-center p-4 sm:p-8">
         <Card className="w-full max-w-sm border-border">
           <CardHeader className="space-y-2">
-            <CardTitle className="text-2xl">Welcome Back</CardTitle>
-            <CardDescription>Sign in to your cooperative account</CardDescription>
+            <CardTitle className="text-2xl">Bon retour</CardTitle>
+            <CardDescription>Connectez-vous à votre compte coopératif</CardDescription>
           </CardHeader>
 
           <CardContent>
@@ -120,7 +120,7 @@ function LoginInner() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
+                <Label htmlFor="email">Adresse email</Label>
                 <Input
                   id="email"
                   type="email"
@@ -138,9 +138,9 @@ function LoginInner() {
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password">Mot de passe</Label>
                   <Link href="/auth/forgot-password" className="text-xs text-primary hover:underline">
-                    Forgot password?
+                    Mot de passe oublié ?
                   </Link>
                 </div>
                 <div className="relative">
@@ -159,7 +159,7 @@ function LoginInner() {
                     type="button"
                     onClick={() => setShowPassword((s) => !s)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -175,14 +175,14 @@ function LoginInner() {
                 disabled={isLoading || submitting}
               >
                 {isLoading || submitting ? <Spinner className="h-4 w-4" /> : null}
-                {isLoading || submitting ? 'Signing In…' : 'Sign In'}
+                {isLoading || submitting ? 'Connexion en cours…' : 'Se connecter'}
               </Button>
             </form>
 
             <p className="mt-6 text-center text-sm text-muted-foreground">
-              Don&apos;t have an account?{' '}
+              Vous n&apos;avez pas de compte ?{' '}
               <Link href="/auth/signup" className="text-primary hover:underline font-medium">
-                Sign up
+                S&apos;inscrire
               </Link>
             </p>
           </CardContent>

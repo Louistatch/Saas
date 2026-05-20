@@ -112,15 +112,15 @@ export default function AdminOverview() {
   }, [fetchStats])
 
   const statCards = [
-    { title: 'Total Cooperatives', value: stats.totalCooperatives, icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50', href: '/admin/cooperatives' },
-    { title: 'Total Members', value: stats.totalMembers, icon: Users, color: 'text-green-600', bg: 'bg-green-50', href: '/admin/users' },
+    { title: 'Total coopératives', value: stats.totalCooperatives, icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50', href: '/admin/cooperatives' },
+    { title: 'Total membres', value: stats.totalMembers, icon: Users, color: 'text-green-600', bg: 'bg-green-50', href: '/admin/users' },
     { title: 'Fiches techniques', value: stats.totalExploitations, icon: ShoppingCart, color: 'text-purple-600', bg: 'bg-purple-50', href: '/admin/analytics' },
-    { title: 'Active Cards', value: stats.totalCards, icon: CreditCard, color: 'text-orange-600', bg: 'bg-orange-50', href: '/admin/analytics' },
+    { title: 'Cartes actives', value: stats.totalCards, icon: CreditCard, color: 'text-orange-600', bg: 'bg-orange-50', href: '/admin/analytics' },
   ]
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Admin Dashboard" description="Platform overview and management" />
+      <PageHeader title="Tableau de bord admin" description="Vue d'ensemble et gestion de la plateforme" />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat, i) => {
@@ -150,14 +150,14 @@ export default function AdminOverview() {
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="border-border">
           <CardHeader>
-            <CardTitle className="text-foreground">Recent Cooperatives</CardTitle>
-            <CardDescription>Newest registered cooperatives</CardDescription>
+            <CardTitle className="text-foreground">Coopératives récentes</CardTitle>
+            <CardDescription>Dernières coopératives enregistrées</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <LoadingBlock />
             ) : coops.length === 0 ? (
-              <p className="text-center py-8 text-muted-foreground text-sm">No cooperatives yet</p>
+              <p className="text-center py-8 text-muted-foreground text-sm">Aucune coopérative pour le moment</p>
             ) : (
               <div className="space-y-0">
                 {coops.map((coop) => (
@@ -165,13 +165,13 @@ export default function AdminOverview() {
                     <div className="min-w-0">
                       <p className="font-medium text-foreground truncate">{coop.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {coop.member_count} member{coop.member_count === 1 ? '' : 's'} ·{' '}
+                        {coop.member_count} membre{coop.member_count === 1 ? '' : 's'} ·{' '}
                         {coop.exploitation_count} exploitation{coop.exploitation_count === 1 ? '' : 's'} ·{' '}
                         {timeAgo(coop.created_at)}
                       </p>
                     </div>
                     <span className="px-2 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full ml-3 shrink-0">
-                      Active
+                      Actif
                     </span>
                   </div>
                 ))}
@@ -179,7 +179,7 @@ export default function AdminOverview() {
             )}
             <Link href="/admin/cooperatives" className="block mt-4">
               <Button variant="outline" size="sm" className="w-full border-border">
-                View All Cooperatives
+                Voir toutes les coopératives
               </Button>
             </Link>
           </CardContent>
@@ -187,34 +187,32 @@ export default function AdminOverview() {
 
         <Card className="border-border">
           <CardHeader>
-            <CardTitle className="text-foreground">Platform Health</CardTitle>
-            <CardDescription>Key platform metrics</CardDescription>
+            <CardTitle className="text-foreground">Santé de la plateforme</CardTitle>
+            <CardDescription>Indicateurs clés de la plateforme</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-0">
               {[
-                {
-                  label: 'Avg Members / Cooperative',
-                  value:
+                { label: 'Moy. membres / Coopérative', value:
                     stats.totalCooperatives > 0
                       ? (stats.totalMembers / stats.totalCooperatives).toFixed(1)
                       : '—',
                 },
                 {
-                  label: 'Avg Exploitations / Cooperative',
+                  label: 'Moy. exploitations / Coopérative',
                   value:
                     stats.totalCooperatives > 0
                       ? (stats.totalExploitations / stats.totalCooperatives).toFixed(1)
                       : '—',
                 },
                 {
-                  label: 'Card Coverage',
+                  label: 'Couverture cartes',
                   value:
                     stats.totalMembers > 0
                       ? `${Math.round((stats.totalCards / stats.totalMembers) * 100)}%`
                       : '—',
                 },
-                { label: 'Total Platform Users', value: stats.totalMembers },
+                { label: 'Total utilisateurs plateforme', value: stats.totalMembers },
               ].map((item, i) => (
                 <div
                   key={i}
@@ -227,7 +225,7 @@ export default function AdminOverview() {
             </div>
             <Link href="/admin/analytics" className="block mt-4">
               <Button variant="outline" size="sm" className="w-full border-border">
-                View Full Analytics
+                Voir toutes les statistiques
               </Button>
             </Link>
           </CardContent>

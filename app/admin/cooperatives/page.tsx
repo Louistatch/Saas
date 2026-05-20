@@ -154,77 +154,77 @@ export default function CooperativesAdminPage() {
       : await supabase.from('cooperatives').insert(payload)
     setSaving(false)
     if (error) {
-      toast({ title: 'Save failed', description: errorMessage(error), variant: 'destructive' })
+      toast({ title: 'Échec de la sauvegarde', description: errorMessage(error), variant: 'destructive' })
       return
     }
-    toast({ title: editId ? 'Cooperative updated' : 'Cooperative created' })
+    toast({ title: editId ? 'Coopérative mise à jour' : 'Coopérative créée' })
     setShowDialog(false)
     fetchCooperatives()
   }
 
   const handleDelete = async (item: CooperativeAdminRow) => {
     const ok = await confirm({
-      title: `Delete "${item.name}"?`,
+      title: `Supprimer "${item.name}" ?`,
       description:
-        'This permanently removes the cooperative along with all members, exploitations, cards, and integrations.',
+        'Cela supprime définitivement la coopérative ainsi que tous les membres, exploitations, cartes et intégrations.',
       destructive: true,
-      confirmLabel: 'Delete cooperative',
+      confirmLabel: 'Supprimer la coopérative',
     })
     if (!ok) return
     const { error } = await supabase.from('cooperatives').delete().eq('id', item.id)
     if (error) {
-      toast({ title: 'Delete failed', description: errorMessage(error), variant: 'destructive' })
+      toast({ title: 'Échec de la suppression', description: errorMessage(error), variant: 'destructive' })
       return
     }
-    toast({ title: 'Cooperative deleted' })
+    toast({ title: 'Coopérative supprimée' })
     fetchCooperatives()
   }
 
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Cooperatives"
-        description="Manage all registered agricultural cooperatives"
+        title="Coopératives"
+        description="Gérer toutes les coopératives agricoles enregistrées"
       />
 
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search cooperatives…"
+            placeholder="Rechercher des coopératives…"
             className="pl-10 border-border bg-background text-foreground"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            aria-label="Search cooperatives"
+            aria-label="Rechercher des coopératives"
           />
         </div>
         <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={openAdd}>
           <Plus className="h-4 w-4" />
-          Add Cooperative
+          Ajouter une coopérative
         </Button>
       </div>
 
       <Card className="border-border">
         <CardHeader>
-          <CardTitle className="text-foreground">All Cooperatives</CardTitle>
-          <CardDescription>Complete list of registered cooperatives ({filtered.length})</CardDescription>
+          <CardTitle className="text-foreground">Toutes les coopératives</CardTitle>
+          <CardDescription>Liste complète des coopératives enregistrées ({filtered.length})</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <LoadingBlock />
           ) : filtered.length === 0 ? (
-            <EmptyState title={search ? 'No cooperatives found' : 'No cooperatives yet'} />
+            <EmptyState title={search ? 'Aucune coopérative trouvée' : 'Aucune coopérative pour le moment'} />
           ) : (
             <>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-left py-3 px-4 font-semibold text-foreground">Name</th>
+                      <th className="text-left py-3 px-4 font-semibold text-foreground">Nom</th>
                       <th className="text-left py-3 px-4 font-semibold text-foreground">Description</th>
-                      <th className="text-left py-3 px-4 font-semibold text-foreground">Members</th>
-                      <th className="text-left py-3 px-4 font-semibold text-foreground">Color</th>
-                      <th className="text-left py-3 px-4 font-semibold text-foreground">Created</th>
+                      <th className="text-left py-3 px-4 font-semibold text-foreground">Membres</th>
+                      <th className="text-left py-3 px-4 font-semibold text-foreground">Couleur</th>
+                      <th className="text-left py-3 px-4 font-semibold text-foreground">Créé le</th>
                       <th className="text-right py-3 px-4 font-semibold text-foreground">Actions</th>
                     </tr>
                   </thead>
@@ -292,11 +292,11 @@ export default function CooperativesAdminPage() {
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editId ? 'Edit Cooperative' : 'Add Cooperative'}</DialogTitle>
+            <DialogTitle>{editId ? 'Modifier la coopérative' : 'Ajouter une coopérative'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Name <span className="text-destructive">*</span></Label>
+              <Label>Nom <span className="text-destructive">*</span></Label>
               <Input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
@@ -314,14 +314,14 @@ export default function CooperativesAdminPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Primary Color</Label>
+              <Label>Couleur principale</Label>
               <div className="flex gap-2 items-center">
                 <input
                   type="color"
                   value={form.primary_color}
                   onChange={(e) => setForm((f) => ({ ...f, primary_color: e.target.value }))}
                   className="h-10 w-16 border border-border rounded-md cursor-pointer"
-                  aria-label="Primary color"
+                  aria-label="Couleur principale"
                 />
                 <Input
                   value={form.primary_color}
@@ -338,11 +338,11 @@ export default function CooperativesAdminPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDialog(false)} disabled={saving}>
-              Cancel
+              Annuler
             </Button>
             <Button className="bg-primary hover:bg-primary/90" onClick={handleSave} disabled={saving}>
               {saving ? <Spinner className="h-4 w-4 mr-2" /> : null}
-              {editId ? 'Save Changes' : 'Add Cooperative'}
+              {editId ? 'Enregistrer' : 'Ajouter la coopérative'}
             </Button>
           </DialogFooter>
         </DialogContent>

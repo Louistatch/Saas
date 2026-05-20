@@ -64,9 +64,9 @@ export default function AnalyticsPage() {
 
   const statCards = [
     {
-      label: 'Total Members',
+      label: 'Total membres',
       value: stats.totalMembers,
-      sub: `${stats.activeMembers} active`,
+      sub: `${stats.activeMembers} actif${stats.activeMembers === 1 ? '' : 's'}`,
       icon: Users,
       color: 'text-blue-600',
       bg: 'bg-blue-50',
@@ -80,20 +80,20 @@ export default function AnalyticsPage() {
       bg: 'bg-green-50',
     },
     {
-      label: 'Member Cards',
+      label: 'Cartes membres',
       value: stats.totalCards,
-      sub: `${stats.activeCards} active`,
+      sub: `${stats.activeCards} active${stats.activeCards === 1 ? '' : 's'}`,
       icon: CreditCard,
       color: 'text-purple-600',
       bg: 'bg-purple-50',
     },
     {
-      label: 'Engagement Rate',
+      label: 'Taux d\'engagement',
       value:
         stats.totalMembers > 0
           ? `${Math.round((stats.activeMembers / stats.totalMembers) * 100)}%`
           : '—',
-      sub: 'Active members ratio',
+      sub: 'Ratio de membres actifs',
       icon: TrendingUp,
       color: 'text-orange-600',
       bg: 'bg-orange-50',
@@ -103,9 +103,9 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Analytics"
-        description={`Monitor member activity and cooperative growth for ${
-          currentCooperative?.name ?? 'your cooperative'
+        title="Statistiques"
+        description={`Suivre l'activité des membres et la croissance de ${
+          currentCooperative?.name ?? 'votre coopérative'
         }`}
       />
 
@@ -138,22 +138,22 @@ export default function AnalyticsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-foreground">
               <Users className="h-5 w-5" aria-hidden />
-              Member Status Breakdown
+              Répartition des statuts membres
             </CardTitle>
-            <CardDescription>Distribution of member statuses</CardDescription>
+            <CardDescription>Distribution des statuts des membres</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <LoadingBlock />
             ) : stats.totalMembers === 0 ? (
-              <p className="py-8 text-center text-muted-foreground">No members yet</p>
+              <p className="py-8 text-center text-muted-foreground">Aucun membre pour le moment</p>
             ) : (
               <BreakdownBars
                 total={stats.totalMembers}
                 items={[
-                  { label: 'Active', value: stats.activeMembers, color: 'bg-green-500' },
+                  { label: 'Actifs', value: stats.activeMembers, color: 'bg-green-500' },
                   {
-                    label: 'Inactive',
+                    label: 'Inactifs',
                     value: stats.totalMembers - stats.activeMembers,
                     color: 'bg-gray-300',
                   },
@@ -167,7 +167,7 @@ export default function AnalyticsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-foreground">
               <ShoppingCart className="h-5 w-5" aria-hidden />
-              Marketplace Overview
+              Vue d'ensemble du marketplace
             </CardTitle>
             <CardDescription>Fiches techniques publiées vs brouillons</CardDescription>
           </CardHeader>
@@ -199,12 +199,12 @@ export default function AnalyticsPage() {
             <BarChart3 className="h-5 w-5" aria-hidden />
             Summary
           </CardTitle>
-          <CardDescription>Key metrics at a glance</CardDescription>
+          <CardDescription>Indicateurs clés en un coup d&apos;œil</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
             <SummaryCell
-              label="Cards per Member"
+              label="Cartes par membre"
               value={
                 stats.totalMembers > 0
                   ? (stats.totalCards / stats.totalMembers).toFixed(1)
@@ -212,7 +212,7 @@ export default function AnalyticsPage() {
               }
             />
             <SummaryCell
-              label="Card Activation Rate"
+              label="Taux d'activation des cartes"
               value={
                 stats.totalCards > 0
                   ? `${Math.round((stats.activeCards / stats.totalCards) * 100)}%`
@@ -220,7 +220,7 @@ export default function AnalyticsPage() {
               }
             />
             <SummaryCell
-              label="Marketplace Coverage"
+              label="Couverture marketplace"
               value={
                 stats.totalExploitations > 0
                   ? `${stats.activeExploitations}/${stats.totalExploitations}`

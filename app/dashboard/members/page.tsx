@@ -138,10 +138,10 @@ export default function MembersPage() {
     })
     setSaving(false)
     if (error) {
-      toast({ title: 'Could not add member', description: errorMessage(error), variant: 'destructive' })
+      toast({ title: 'Impossible d\'ajouter le membre', description: errorMessage(error), variant: 'destructive' })
       return
     }
-    toast({ title: 'Member added', description: `${parsed.data.first_name} ${parsed.data.last_name}` })
+    toast({ title: 'Membre ajouté', description: `${parsed.data.first_name} ${parsed.data.last_name}` })
     setShowAddDialog(false)
     setForm(emptyForm)
     fetchMembers()
@@ -149,24 +149,24 @@ export default function MembersPage() {
 
   const handleDelete = async (member: Member) => {
     const ok = await confirm({
-      title: 'Delete member',
-      description: `This will permanently delete ${member.first_name} ${member.last_name} and revoke any associated cards.`,
+      title: 'Supprimer le membre',
+      description: `Cela supprimera définitivement ${member.first_name} ${member.last_name} et révoquera toutes les cartes associées.`,
       destructive: true,
-      confirmLabel: 'Delete',
+      confirmLabel: 'Supprimer',
     })
     if (!ok) return
     const { error } = await supabase.from('members').delete().eq('id', member.id)
     if (error) {
-      toast({ title: 'Delete failed', description: errorMessage(error), variant: 'destructive' })
+      toast({ title: 'Échec de la suppression', description: errorMessage(error), variant: 'destructive' })
       return
     }
-    toast({ title: 'Member deleted' })
+    toast({ title: 'Membre supprimé' })
     fetchMembers()
   }
 
   const handleExport = () => {
     if (members.length === 0) {
-      toast({ title: 'Nothing to export', description: 'Add a member first.' })
+      toast({ title: 'Rien à exporter', description: 'Ajoutez d\'abord un membre.' })
       return
     }
     const csv = toCsv(
@@ -214,7 +214,7 @@ export default function MembersPage() {
     setImporting(true)
     const valid = importPreview.filter((r) => r.first_name && r.last_name)
     if (valid.length === 0) {
-      toast({ title: 'No valid rows to import', variant: 'destructive' })
+      toast({ title: 'Aucune ligne valide à importer', variant: 'destructive' })
       setImporting(false)
       return
     }
@@ -230,10 +230,10 @@ export default function MembersPage() {
     )
     setImporting(false)
     if (error) {
-      toast({ title: 'Import failed', description: errorMessage(error), variant: 'destructive' })
+      toast({ title: 'Échec de l\'import', description: errorMessage(error), variant: 'destructive' })
       return
     }
-    toast({ title: `Imported ${valid.length} member${valid.length === 1 ? '' : 's'}` })
+    toast({ title: `${valid.length} membre${valid.length === 1 ? '' : 's'} importé${valid.length === 1 ? '' : 's'}` })
     setImportPreview(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
     fetchMembers()
@@ -242,14 +242,14 @@ export default function MembersPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Members"
-        description="Manage cooperative members and issue digital member cards"
+        title="Membres"
+        description="Gérer les membres de la coopérative et émettre des cartes numériques"
       />
 
       <Tabs defaultValue="list" className="w-full">
         <TabsList className="grid w-full max-w-xs grid-cols-2 border-b border-border bg-transparent">
           <TabsTrigger value="list" className="border-b-2 border-transparent data-[state=active]:border-primary">
-            Members ({members.length})
+            Membres ({members.length})
           </TabsTrigger>
           <TabsTrigger value="import" className="border-b-2 border-transparent data-[state=active]:border-primary">
             Import / Export
@@ -261,30 +261,30 @@ export default function MembersPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search members by name or email…"
+                placeholder="Rechercher des membres par nom ou email…"
                 className="pl-10 border-border bg-background text-foreground"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                aria-label="Search members"
+                aria-label="Rechercher des membres"
               />
             </div>
             <div className="flex gap-2">
               <Button variant="outline" className="gap-2 border-border" onClick={handleExport}>
                 <Download className="h-4 w-4" />
-                Export
+                Exporter
               </Button>
               <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setShowAddDialog(true)}>
                 <Plus className="h-4 w-4" />
-                Add Member
+                Ajouter un membre
               </Button>
             </div>
           </div>
 
           <Card className="border-border">
             <CardHeader>
-              <CardTitle className="text-foreground">Members List</CardTitle>
+              <CardTitle className="text-foreground">Liste des membres</CardTitle>
               <CardDescription>
-                All members in {currentCooperative?.name ?? 'your cooperative'}
+                Tous les membres de {currentCooperative?.name ?? 'votre coopérative'}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -292,11 +292,11 @@ export default function MembersPage() {
                 <LoadingBlock />
               ) : filtered.length === 0 ? (
                 <EmptyState
-                  title={searchTerm ? 'No members found' : 'No members yet'}
+                  title={searchTerm ? 'Aucun membre trouvé' : 'Aucun membre pour le moment'}
                   description={
                     searchTerm
-                      ? 'Try a different search term'
-                      : 'Add your first member or import from CSV'
+                      ? 'Essayez un autre terme de recherche'
+                      : 'Ajoutez votre premier membre ou importez depuis un CSV'
                   }
                   action={
                     !searchTerm ? (
@@ -305,7 +305,7 @@ export default function MembersPage() {
                         onClick={() => setShowAddDialog(true)}
                       >
                         <Plus className="h-4 w-4" />
-                        Add First Member
+                        Ajouter le premier membre
                       </Button>
                     ) : null
                   }
@@ -316,10 +316,10 @@ export default function MembersPage() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-border">
-                          <th className="text-left py-3 px-4 font-semibold text-foreground">Name</th>
+                          <th className="text-left py-3 px-4 font-semibold text-foreground">Nom</th>
                           <th className="text-left py-3 px-4 font-semibold text-foreground">Email</th>
-                          <th className="text-left py-3 px-4 font-semibold text-foreground">Phone</th>
-                          <th className="text-left py-3 px-4 font-semibold text-foreground">Status</th>
+                          <th className="text-left py-3 px-4 font-semibold text-foreground">Téléphone</th>
+                          <th className="text-left py-3 px-4 font-semibold text-foreground">Statut</th>
                           <th className="text-right py-3 px-4 font-semibold text-foreground">Actions</th>
                         </tr>
                       </thead>
@@ -380,8 +380,8 @@ export default function MembersPage() {
         <TabsContent value="import" className="space-y-6 mt-6">
           <Card className="border-border">
             <CardHeader>
-              <CardTitle className="text-foreground">Import Members</CardTitle>
-              <CardDescription>Bulk import members from a CSV file</CardDescription>
+              <CardTitle className="text-foreground">Importer des membres</CardTitle>
+              <CardDescription>Importer des membres en masse depuis un fichier CSV</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <button
@@ -390,10 +390,10 @@ export default function MembersPage() {
                 className="block w-full border-2 border-dashed border-border rounded-lg p-12 text-center cursor-pointer hover:border-primary hover:bg-accent/5 transition-colors focus-visible:outline-2 focus-visible:outline-primary"
               >
                 <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" aria-hidden />
-                <p className="text-foreground text-lg font-medium mb-1">Drop your CSV file here</p>
-                <p className="text-muted-foreground text-sm mb-4">or click to select a file</p>
+                <p className="text-foreground text-lg font-medium mb-1">Déposez votre fichier CSV ici</p>
+                <p className="text-muted-foreground text-sm mb-4">ou cliquez pour sélectionner un fichier</p>
                 <span className="inline-flex items-center px-3 py-1.5 border border-border rounded-md text-sm">
-                  Choose File
+                  Choisir un fichier
                 </span>
               </button>
               <input
@@ -409,13 +409,13 @@ export default function MembersPage() {
               <div className="space-y-2">
                 <h3 className="font-semibold text-foreground flex items-center gap-2">
                   <FileText className="h-4 w-4" />
-                  CSV Format
+                  Format CSV
                 </h3>
                 <div className="bg-secondary/30 rounded-lg border border-border p-4 text-sm font-mono text-foreground overflow-x-auto">
                   {CSV_HEADERS.join(',')}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Only <code>first_name</code> and <code>last_name</code> are required.
+                  Seuls <code>first_name</code> et <code>last_name</code> sont obligatoires.
                 </p>
               </div>
 
@@ -423,7 +423,7 @@ export default function MembersPage() {
                 <div className="flex gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
                   <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
                   <p className="text-sm text-destructive">
-                    Missing required column{importMissing.length > 1 ? 's' : ''}:{' '}
+                    Colonne{importMissing.length > 1 ? 's' : ''} obligatoire{importMissing.length > 1 ? 's' : ''} manquante{importMissing.length > 1 ? 's' : ''} :{' '}
                     <strong>{importMissing.join(', ')}</strong>
                   </p>
                 </div>
@@ -433,12 +433,11 @@ export default function MembersPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-foreground">
-                      Preview: <strong>{importPreview.length}</strong> row
-                      {importPreview.length === 1 ? '' : 's'} ready to import
+                      Aperçu : <strong>{importPreview.length}</strong> ligne{importPreview.length === 1 ? '' : 's'} prête{importPreview.length === 1 ? '' : 's'} à importer
                     </p>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" onClick={() => setImportPreview(null)}>
-                        Cancel
+                        Annuler
                       </Button>
                       <Button
                         size="sm"
@@ -447,7 +446,7 @@ export default function MembersPage() {
                         disabled={importing}
                       >
                         {importing ? <Spinner className="h-4 w-4" /> : <Upload className="h-4 w-4" />}
-                        Import
+                        Importer
                       </Button>
                     </div>
                   </div>
@@ -475,7 +474,7 @@ export default function MembersPage() {
                   </div>
                   {importPreview.length > 50 && (
                     <p className="text-xs text-muted-foreground text-center">
-                      Showing first 50 rows of {importPreview.length}
+                      Affichage des 50 premières lignes sur {importPreview.length}
                     </p>
                   )}
                 </div>
@@ -488,8 +487,8 @@ export default function MembersPage() {
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add New Member</DialogTitle>
-            <DialogDescription>Members will be created with status &quot;active&quot;.</DialogDescription>
+            <DialogTitle>Ajouter un nouveau membre</DialogTitle>
+            <DialogDescription>Les membres seront créés avec le statut &quot;actif&quot;.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="flex gap-4">
@@ -502,7 +501,7 @@ export default function MembersPage() {
               <div className="flex-1 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
-                    label="First Name"
+                    label="Prénom"
                     required
                     value={form.first_name}
                     onChange={(v) => setForm((f) => ({ ...f, first_name: v }))}
@@ -510,7 +509,7 @@ export default function MembersPage() {
                     error={formErrors.first_name}
                   />
                   <FormField
-                    label="Last Name"
+                    label="Nom"
                     required
                     value={form.last_name}
                     onChange={(v) => setForm((f) => ({ ...f, last_name: v }))}
@@ -529,14 +528,14 @@ export default function MembersPage() {
               error={formErrors.email}
             />
             <FormField
-              label="Phone"
+              label="Téléphone"
               value={form.phone}
               onChange={(v) => setForm((f) => ({ ...f, phone: v }))}
-              placeholder="+33 6 12 34 56 78"
+              placeholder="+228 90 12 34 56"
               error={formErrors.phone}
             />
             <FormField
-              label="Address"
+              label="Adresse"
               value={form.address}
               onChange={(v) => setForm((f) => ({ ...f, address: v }))}
               placeholder="123 Rue de la Ferme"
@@ -573,7 +572,7 @@ export default function MembersPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddDialog(false)} disabled={saving}>
-              Cancel
+              Annuler
             </Button>
             <Button
               className="bg-primary hover:bg-primary/90"
@@ -581,7 +580,7 @@ export default function MembersPage() {
               disabled={saving}
             >
               {saving ? <Spinner className="h-4 w-4 mr-2" /> : null}
-              Add Member
+              Ajouter le membre
             </Button>
           </DialogFooter>
         </DialogContent>

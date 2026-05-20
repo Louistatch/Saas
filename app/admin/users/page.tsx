@@ -44,7 +44,7 @@ export default function UsersAdminPage() {
       .select('id, email, first_name, last_name, role, cooperative_id, created_at, cooperative:cooperatives(name)')
       .order('created_at', { ascending: false })
     if (error) {
-      toast({ title: 'Error', description: errorMessage(error), variant: 'destructive' })
+      toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })
     } else {
       setUsers((data ?? []) as unknown as Profile[])
     }
@@ -94,7 +94,7 @@ export default function UsersAdminPage() {
     })
     if (!parsed.success) {
       toast({
-        title: 'Invalid input',
+        title: 'Entrée invalide',
         description: parsed.error.issues[0]?.message,
         variant: 'destructive',
       })
@@ -110,34 +110,34 @@ export default function UsersAdminPage() {
       .eq('id', editUser.id)
     setSaving(false)
     if (error) {
-      toast({ title: 'Update failed', description: errorMessage(error), variant: 'destructive' })
+      toast({ title: 'Échec de la mise à jour', description: errorMessage(error), variant: 'destructive' })
       return
     }
-    toast({ title: 'User updated', description: editUser.email })
+    toast({ title: 'Utilisateur mis à jour', description: editUser.email })
     setEditUser(null)
     fetchUsers()
   }
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Users" description="Manage platform users and their permissions" />
+      <PageHeader title="Utilisateurs" description="Gérer les utilisateurs de la plateforme et leurs permissions" />
 
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search users…"
+          placeholder="Rechercher des utilisateurs…"
           className="pl-10 border-border bg-background text-foreground"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          aria-label="Search users"
+          aria-label="Rechercher des utilisateurs"
         />
       </div>
 
       <Card className="border-border">
         <CardHeader>
-          <CardTitle className="text-foreground">Users List</CardTitle>
+          <CardTitle className="text-foreground">Liste des utilisateurs</CardTitle>
           <CardDescription>
-            All registered users across cooperatives ({filtered.length})
+            Tous les utilisateurs enregistrés sur les coopératives ({filtered.length})
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -145,8 +145,8 @@ export default function UsersAdminPage() {
             <LoadingBlock />
           ) : filtered.length === 0 ? (
             <EmptyState
-              title={search ? 'No users match your search' : 'No users yet'}
-              description={search ? 'Try a different search term' : 'Users appear here once they sign up.'}
+              title={search ? 'Aucun utilisateur ne correspond à votre recherche' : 'Aucun utilisateur pour le moment'}
+              description={search ? 'Essayez un autre terme de recherche' : 'Les utilisateurs apparaîtront ici une fois inscrits.'}
             />
           ) : (
             <>
@@ -154,11 +154,11 @@ export default function UsersAdminPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-left py-3 px-4 font-semibold text-foreground">Name</th>
+                      <th className="text-left py-3 px-4 font-semibold text-foreground">Nom</th>
                       <th className="text-left py-3 px-4 font-semibold text-foreground">Email</th>
-                      <th className="text-left py-3 px-4 font-semibold text-foreground">Cooperative</th>
-                      <th className="text-left py-3 px-4 font-semibold text-foreground">Role</th>
-                      <th className="text-left py-3 px-4 font-semibold text-foreground">Joined</th>
+                      <th className="text-left py-3 px-4 font-semibold text-foreground">Coopérative</th>
+                      <th className="text-left py-3 px-4 font-semibold text-foreground">Rôle</th>
+                      <th className="text-left py-3 px-4 font-semibold text-foreground">Inscrit le</th>
                       <th className="text-right py-3 px-4 font-semibold text-foreground">Actions</th>
                     </tr>
                   </thead>
@@ -210,11 +210,11 @@ export default function UsersAdminPage() {
       <Dialog open={!!editUser} onOpenChange={(open) => !open && setEditUser(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit User — {editUser?.email}</DialogTitle>
+            <DialogTitle>Modifier l&apos;utilisateur — {editUser?.email}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Role</Label>
+              <Label>Rôle</Label>
               <select
                 className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
                 value={editForm.role}
@@ -230,13 +230,13 @@ export default function UsersAdminPage() {
               </select>
             </div>
             <div className="space-y-2">
-              <Label>Cooperative</Label>
+              <Label>Coopérative</Label>
               <select
                 className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
                 value={editForm.cooperative_id}
                 onChange={(e) => setEditForm((f) => ({ ...f, cooperative_id: e.target.value }))}
               >
-                <option value="">None (Super Admin / Guest)</option>
+                <option value="">Aucune (Super Admin / Invité)</option>
                 {cooperatives.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -247,17 +247,17 @@ export default function UsersAdminPage() {
             <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex gap-2">
               <AlertCircle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
               <p className="text-xs text-yellow-800">
-                Changing a user&apos;s role or cooperative will affect their access immediately.
+                Changer le rôle ou la coopérative d&apos;un utilisateur affectera son accès immédiatement.
               </p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditUser(null)} disabled={saving}>
-              Cancel
+              Annuler
             </Button>
             <Button className="bg-primary hover:bg-primary/90" onClick={handleSave} disabled={saving}>
               {saving ? <Spinner className="h-4 w-4 mr-2" /> : null}
-              Save Changes
+              Enregistrer
             </Button>
           </DialogFooter>
         </DialogContent>

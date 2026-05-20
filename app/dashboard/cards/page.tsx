@@ -83,7 +83,7 @@ export default function CardsPage() {
       .eq('cooperative_id', currentCooperative.id)
       .order('created_at', { ascending: false })
     if (error) {
-      toast({ title: 'Error', description: errorMessage(error), variant: 'destructive' })
+      toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })
     } else {
       setCards((data ?? []) as MemberCard[])
     }
@@ -180,7 +180,7 @@ export default function CardsPage() {
 
   const handleGenerate = async () => {
     if (!currentCooperative || !selectedMemberId) {
-      toast({ title: 'Select a member', variant: 'destructive' })
+      toast({ title: 'Sélectionnez un membre', variant: 'destructive' })
       return
     }
     setSaving(true)
@@ -206,10 +206,10 @@ export default function CardsPage() {
 
     setSaving(false)
     if (error) {
-      toast({ title: 'Could not generate card', description: errorMessage(error), variant: 'destructive' })
+      toast({ title: 'Impossible de générer la carte', description: errorMessage(error), variant: 'destructive' })
       return
     }
-    toast({ title: 'Card generated', description: cardNumber })
+    toast({ title: 'Carte générée', description: cardNumber })
     setShowGenerate(false)
     setSelectedMemberId('')
     fetchCards()
@@ -217,7 +217,7 @@ export default function CardsPage() {
 
   const handleBulkGenerate = async () => {
     if (!currentCooperative || bulkSelectedIds.length === 0) {
-      toast({ title: 'Select at least one member', variant: 'destructive' })
+      toast({ title: 'Sélectionnez au moins un membre', variant: 'destructive' })
       return
     }
     setSaving(true)
@@ -246,7 +246,7 @@ export default function CardsPage() {
     const { error } = await supabase.from('member_cards').insert(inserts)
     setSaving(false)
     if (error) {
-      toast({ title: 'Bulk generation failed', description: errorMessage(error), variant: 'destructive' })
+      toast({ title: 'Échec de la génération en masse', description: errorMessage(error), variant: 'destructive' })
       return
     }
     toast({
@@ -260,10 +260,10 @@ export default function CardsPage() {
 
   const handleRevoke = async (card: MemberCard) => {
     const ok = await confirm({
-      title: 'Revoke card?',
-      description: 'The member will lose marketplace access until a new card is issued.',
+      title: 'Révoquer la carte ?',
+      description: 'Le membre perdra l\'accès au marketplace jusqu\'à l\'émission d\'une nouvelle carte.',
       destructive: true,
-      confirmLabel: 'Revoke',
+      confirmLabel: 'Révoquer',
     })
     if (!ok) return
     const { error } = await supabase
@@ -271,10 +271,10 @@ export default function CardsPage() {
       .update({ status: 'revoked' })
       .eq('id', card.id)
     if (error) {
-      toast({ title: 'Revoke failed', description: errorMessage(error), variant: 'destructive' })
+      toast({ title: 'Échec de la révocation', description: errorMessage(error), variant: 'destructive' })
       return
     }
-    toast({ title: 'Card revoked' })
+    toast({ title: 'Carte révoquée' })
     fetchCards()
   }
 
@@ -288,9 +288,9 @@ export default function CardsPage() {
         faitiereName: currentCooperative?.faitiereName,
         qrPayload: card.qr_data || buildQrPayload(card.member_id, card.card_number),
       })
-      toast({ title: 'Card downloaded' })
+      toast({ title: 'Carte téléchargée' })
     } catch (e) {
-      toast({ title: 'Download failed', description: errorMessage(e), variant: 'destructive' })
+      toast({ title: 'Échec du téléchargement', description: errorMessage(e), variant: 'destructive' })
     } finally {
       setDownloadingId(null)
     }
@@ -301,9 +301,9 @@ export default function CardsPage() {
     if (active.length === 0) return
     if (active.length > 25) {
       const ok = await confirm({
-        title: `Download ${active.length} cards?`,
-        description: 'This will trigger one download per card. Your browser may ask to allow multiple downloads.',
-        confirmLabel: 'Download',
+        title: `Télécharger ${active.length} cartes ?`,
+        description: 'Cela déclenchera un téléchargement par carte. Votre navigateur pourrait demander l\'autorisation pour les téléchargements multiples.',
+        confirmLabel: 'Télécharger',
       })
       if (!ok) return
     }
@@ -320,9 +320,9 @@ export default function CardsPage() {
         // Small delay so browsers don't merge downloads
         await new Promise((r) => setTimeout(r, 150))
       }
-      toast({ title: `Downloaded ${active.length} cards` })
+      toast({ title: `${active.length} carte${active.length === 1 ? '' : 's'} téléchargée${active.length === 1 ? '' : 's'}` })
     } catch (e) {
-      toast({ title: 'Download failed', description: errorMessage(e), variant: 'destructive' })
+      toast({ title: 'Échec du téléchargement', description: errorMessage(e), variant: 'destructive' })
     } finally {
       setDownloadingAll(false)
     }
@@ -345,17 +345,17 @@ export default function CardsPage() {
     )
     setSavingTemplate(false)
     if (error) {
-      toast({ title: 'Could not save template', description: errorMessage(error), variant: 'destructive' })
+      toast({ title: 'Impossible d\'enregistrer le modèle', description: errorMessage(error), variant: 'destructive' })
       return
     }
-    toast({ title: 'Template saved' })
+    toast({ title: 'Modèle enregistré' })
   }
 
   const handleSaveSettings = async () => {
     if (!currentCooperative) return
     const parsed = cardSettingsSchema.safeParse(settings)
     if (!parsed.success) {
-      toast({ title: 'Invalid settings', description: parsed.error.issues[0]?.message, variant: 'destructive' })
+      toast({ title: 'Paramètres invalides', description: parsed.error.issues[0]?.message, variant: 'destructive' })
       return
     }
     setSavingSettings(true)
@@ -365,10 +365,10 @@ export default function CardsPage() {
     )
     setSavingSettings(false)
     if (error) {
-      toast({ title: 'Could not save settings', description: errorMessage(error), variant: 'destructive' })
+      toast({ title: 'Impossible d\'enregistrer les paramètres', description: errorMessage(error), variant: 'destructive' })
       return
     }
-    toast({ title: 'Settings saved' })
+    toast({ title: 'Paramètres enregistrés' })
   }
 
   // Preview QR payload (so the preview reflects current settings choices)
@@ -386,33 +386,33 @@ export default function CardsPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Member Cards"
-        description="Generate and manage digital member cards with QR codes"
+        title="Cartes membres"
+        description="Générer et gérer les cartes numériques avec codes QR"
       />
 
       <Tabs defaultValue="generated" className="w-full">
         <TabsList className="grid w-full max-w-lg grid-cols-3 border-b border-border bg-transparent">
           <TabsTrigger value="generated" className="border-b-2 border-transparent data-[state=active]:border-primary">
-            Cards ({cards.length})
+            Cartes ({cards.length})
           </TabsTrigger>
           <TabsTrigger value="template" className="border-b-2 border-transparent data-[state=active]:border-primary">
-            Template
+            Modèle
           </TabsTrigger>
           <TabsTrigger value="settings" className="border-b-2 border-transparent data-[state=active]:border-primary">
-            Settings
+            Paramètres
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="generated" className="space-y-6 mt-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="space-y-0.5">
-              <h2 className="text-lg font-semibold text-foreground">Generated Cards</h2>
-              <p className="text-sm text-muted-foreground">{activeCount} active card{activeCount === 1 ? '' : 's'}</p>
+              <h2 className="text-lg font-semibold text-foreground">Cartes générées</h2>
+              <p className="text-sm text-muted-foreground">{activeCount} carte{activeCount === 1 ? '' : 's'} active{activeCount === 1 ? '' : 's'}</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" className="gap-2 border-border" onClick={fetchCards} aria-label="Refresh">
+              <Button variant="outline" className="gap-2 border-border" onClick={fetchCards} aria-label="Actualiser">
                 <RefreshCw className="h-4 w-4" />
-                Refresh
+                Actualiser
               </Button>
               <Button
                 variant="outline"
@@ -421,15 +421,15 @@ export default function CardsPage() {
                 disabled={downloadingAll || activeCount === 0}
               >
                 {downloadingAll ? <Spinner className="h-4 w-4" /> : <Download className="h-4 w-4" />}
-                Download All
+                Tout télécharger
               </Button>
               <Button variant="outline" className="gap-2 border-border" onClick={() => setShowBulk(true)}>
                 <Users className="h-4 w-4" />
-                Bulk Generate
+                Génération en masse
               </Button>
               <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setShowGenerate(true)}>
                 <Plus className="h-4 w-4" />
-                Generate Card
+                Générer une carte
               </Button>
             </div>
           </div>
@@ -438,17 +438,17 @@ export default function CardsPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               className="pl-10"
-              placeholder="Search by name or card number…"
+              placeholder="Rechercher par nom ou numéro de carte…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              aria-label="Search cards"
+              aria-label="Rechercher des cartes"
             />
           </div>
 
           <Card className="border-border">
             <CardHeader>
-              <CardTitle className="text-foreground">Member Cards</CardTitle>
-              <CardDescription>All generated cards for marketplace access</CardDescription>
+              <CardTitle className="text-foreground">Cartes membres</CardTitle>
+              <CardDescription>Toutes les cartes générées pour l'accès au marketplace</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -456,17 +456,17 @@ export default function CardsPage() {
               ) : filteredCards.length === 0 ? (
                 <EmptyState
                   icon={QrCode}
-                  title={search ? 'No cards match your search' : 'No cards generated yet'}
+                  title={search ? 'Aucune carte ne correspond à votre recherche' : 'Aucune carte générée pour le moment'}
                   description={
                     search
-                      ? 'Try a different name or card number'
-                      : 'Generate cards for your members to enable marketplace access'
+                      ? 'Essayez un autre nom ou numéro de carte'
+                      : 'Générez des cartes pour vos membres afin d\'activer l\'accès au marketplace'
                   }
                   action={
                     !search ? (
                       <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setShowGenerate(true)}>
                         <Plus className="h-4 w-4" />
-                        Generate First Card
+                        Générer la première carte
                       </Button>
                     ) : null
                   }
@@ -477,10 +477,10 @@ export default function CardsPage() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-border">
-                          <th className="text-left py-3 px-4 font-semibold text-foreground">Member</th>
-                          <th className="text-left py-3 px-4 font-semibold text-foreground">Card Number</th>
-                          <th className="text-left py-3 px-4 font-semibold text-foreground">Expiry</th>
-                          <th className="text-center py-3 px-4 font-semibold text-foreground">Status</th>
+                          <th className="text-left py-3 px-4 font-semibold text-foreground">Membre</th>
+                          <th className="text-left py-3 px-4 font-semibold text-foreground">Numéro de carte</th>
+                          <th className="text-left py-3 px-4 font-semibold text-foreground">Expiration</th>
+                          <th className="text-center py-3 px-4 font-semibold text-foreground">Statut</th>
                           <th className="text-right py-3 px-4 font-semibold text-foreground">Actions</th>
                         </tr>
                       </thead>
@@ -540,8 +540,8 @@ export default function CardsPage() {
         <TabsContent value="template" className="space-y-6 mt-6">
           <Card className="border-border">
             <CardHeader>
-              <CardTitle className="text-foreground">Card Design Preview</CardTitle>
-              <CardDescription>Premium member identity pass — WAOO design</CardDescription>
+              <CardTitle className="text-foreground">Aperçu du design de carte</CardTitle>
+              <CardDescription>Carte d'identité membre premium — design WAOO</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Premium card preview */}
@@ -562,8 +562,8 @@ export default function CardsPage() {
                   {/* Header */}
                   <div className="absolute top-3 left-4 right-4 flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 border border-white/10 backdrop-blur-sm">
                     <span className="text-[10px] font-medium opacity-60">FaîtiereHub</span>
-                    <span className="text-[9px] tracking-wider opacity-70">MEMBER IDENTITY PASS</span>
-                    <span className="text-[9px] font-medium text-green-300 bg-green-500/20 px-2 py-0.5 rounded-full">✓ VERIFIED</span>
+                    <span className="text-[9px] tracking-wider opacity-70">CARTE D'IDENTITÉ MEMBRE</span>
+                    <span className="text-[9px] font-medium text-green-300 bg-green-500/20 px-2 py-0.5 rounded-full">✓ VÉRIFIÉ</span>
                   </div>
 
                   {/* Hero: Photo + Name */}
@@ -599,7 +599,7 @@ export default function CardsPage() {
                   {/* QR + Footer */}
                   <div className="absolute bottom-2 left-4 right-4 flex items-end justify-between px-2 py-1.5 rounded-lg bg-white/5 border border-white/10">
                     <div>
-                      <p className="text-[8px] opacity-50">VALID UNTIL</p>
+                      <p className="text-[8px] opacity-50">VALIDE JUSQU'AU</p>
                       <p className="text-[10px] font-semibold">19 MAY 2027</p>
                     </div>
                     <div className="text-[7px] opacity-40">{template.subtitle}</div>
@@ -611,25 +611,25 @@ export default function CardsPage() {
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <FieldText
-                  label="Card Title"
+                  label="Titre de la carte"
                   value={template.title}
                   onChange={(v) => setTemplate((t) => ({ ...t, title: v }))}
                   error={templateErrors.title}
                 />
                 <FieldText
-                  label="Card Subtitle"
+                  label="Sous-titre de la carte"
                   value={template.subtitle}
                   onChange={(v) => setTemplate((t) => ({ ...t, subtitle: v }))}
                   error={templateErrors.subtitle}
                 />
                 <FieldColor
-                  label="Background Color"
+                  label="Couleur de fond"
                   value={template.bgColor}
                   onChange={(v) => setTemplate((t) => ({ ...t, bgColor: v }))}
                   error={templateErrors.bgColor}
                 />
                 <FieldColor
-                  label="Text Color"
+                  label="Couleur du texte"
                   value={template.textColor}
                   onChange={(v) => setTemplate((t) => ({ ...t, textColor: v }))}
                   error={templateErrors.textColor}
@@ -643,7 +643,7 @@ export default function CardsPage() {
                     setTemplateErrors({})
                   }}
                 >
-                  Reset to defaults
+                  Réinitialiser
                 </Button>
                 <Button
                   className="bg-primary hover:bg-primary/90 gap-2"
@@ -651,7 +651,7 @@ export default function CardsPage() {
                   disabled={savingTemplate}
                 >
                   {savingTemplate ? <Spinner className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
-                  Save Template
+                  Enregistrer le modèle
                 </Button>
               </div>
             </CardContent>
@@ -661,12 +661,12 @@ export default function CardsPage() {
         <TabsContent value="settings" className="space-y-6 mt-6">
           <Card className="border-border">
             <CardHeader>
-              <CardTitle className="text-foreground">Card Settings</CardTitle>
-              <CardDescription>Configure card generation and expiry settings</CardDescription>
+              <CardTitle className="text-foreground">Paramètres des cartes</CardTitle>
+              <CardDescription>Configurer la génération et l'expiration des cartes</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label>Default Validity Period (days)</Label>
+                <Label>Durée de validité par défaut (jours)</Label>
                 <Input
                   type="number"
                   min={1}
@@ -680,16 +680,16 @@ export default function CardsPage() {
                   }
                 />
                 <p className="text-xs text-muted-foreground">
-                  Cards will expire after this many days from generation.
+                  Les cartes expireront après ce nombre de jours à partir de la génération.
                 </p>
               </div>
               <fieldset className="space-y-2">
-                <legend className="text-sm font-medium">QR code contents</legend>
+                <legend className="text-sm font-medium">Contenu du code QR</legend>
                 {(
                   [
-                    ['cardNumber', 'Card number'],
-                    ['memberId', 'Member ID'],
-                    ['cooperativeId', 'Cooperative ID'],
+                    ['cardNumber', 'Numéro de carte'],
+                    ['memberId', 'ID du membre'],
+                    ['cooperativeId', 'ID de la coopérative'],
                   ] as const
                 ).map(([key, label]) => (
                   <label key={key} className="flex items-center gap-2 cursor-pointer">

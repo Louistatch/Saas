@@ -13,8 +13,8 @@ const demoAccounts = [
     password: 'Demo123!SuperAdmin',
     role: 'super_admin',
     roleLabel: 'Super Admin',
-    description: 'Full platform access. Manage all cooperatives, users, and settings.',
-    cooperative: 'All cooperatives',
+    description: 'Accès complet à la plateforme. Gérer toutes les coopératives, utilisateurs et paramètres.',
+    cooperative: 'Toutes les coopératives',
     redirectTo: '/admin',
     icon: Shield,
     color: 'text-purple-600',
@@ -26,8 +26,8 @@ const demoAccounts = [
     email: 'coop-admin@demo.local',
     password: 'Demo123!CoopAdmin',
     role: 'cooperative_admin',
-    roleLabel: 'Cooperative Admin',
-    description: 'Full access to Coopérative du Nord. Manage members, marketplace, and cards.',
+    roleLabel: 'Admin coopérative',
+    description: 'Accès complet à Coopérative du Nord. Gérer les membres, le marketplace et les cartes.',
     cooperative: 'Coopérative du Nord',
     redirectTo: '/dashboard',
     icon: Users,
@@ -40,8 +40,8 @@ const demoAccounts = [
     email: 'fermes-admin@demo.local',
     password: 'Demo123!FarmesAdmin',
     role: 'cooperative_admin',
-    roleLabel: 'Cooperative Admin',
-    description: 'Full access to Fermes Unies. Manage members, marketplace, and cards.',
+    roleLabel: 'Admin coopérative',
+    description: 'Accès complet à Fermes Unies. Gérer les membres, le marketplace et les cartes.',
     cooperative: 'Fermes Unies',
     redirectTo: '/dashboard',
     icon: Users,
@@ -54,8 +54,8 @@ const demoAccounts = [
     email: 'member1@demo.local',
     password: 'Demo123!Member1',
     role: 'member',
-    roleLabel: 'Member',
-    description: 'Member of Coopérative du Nord. Access marketplace and member features.',
+    roleLabel: 'Membre',
+    description: 'Membre de Coopérative du Nord. Accès au marketplace et aux fonctionnalités membres.',
     cooperative: 'Coopérative du Nord',
     redirectTo: '/dashboard',
     icon: User,
@@ -68,8 +68,8 @@ const demoAccounts = [
     email: 'member2@demo.local',
     password: 'Demo123!Member2',
     role: 'member',
-    roleLabel: 'Member',
-    description: 'Member of Fermes Unies. Access marketplace and member features.',
+    roleLabel: 'Membre',
+    description: 'Membre de Fermes Unies. Accès au marketplace et aux fonctionnalités membres.',
     cooperative: 'Fermes Unies',
     redirectTo: '/dashboard',
     icon: User,
@@ -82,9 +82,9 @@ const demoAccounts = [
     email: 'guest@demo.local',
     password: 'Demo123!Guest',
     role: 'guest',
-    roleLabel: 'Guest',
-    description: 'Public marketplace viewing only. No account management features.',
-    cooperative: 'None',
+    roleLabel: 'Invité',
+    description: 'Consultation du marketplace uniquement. Aucune fonctionnalité de gestion de compte.',
+    cooperative: 'Aucune',
     redirectTo: '/dashboard',
     icon: Globe,
     color: 'text-gray-600',
@@ -121,7 +121,7 @@ function AccountCard({ account }: { account: typeof demoAccounts[0] }) {
           </div>
           <Link href={`/auth/login`}>
             <Button size="sm" className="gap-1 bg-primary hover:bg-primary/90 text-xs">
-              Login <ArrowRight className="h-3 w-3" />
+              Connexion <ArrowRight className="h-3 w-3" />
             </Button>
           </Link>
         </div>
@@ -143,7 +143,7 @@ function AccountCard({ account }: { account: typeof demoAccounts[0] }) {
         </div>
         <div className="flex items-center justify-between p-2 bg-secondary/30 rounded-lg">
           <div>
-            <p className="text-xs text-muted-foreground">Password</p>
+            <p className="text-xs text-muted-foreground">Mot de passe</p>
             <p className="text-sm font-mono text-foreground">
               {showPassword ? account.password : '••••••••••••'}
             </p>
@@ -166,11 +166,11 @@ function AccountCard({ account }: { account: typeof demoAccounts[0] }) {
           </div>
         </div>
         <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-          <span>Cooperative: <strong className="text-foreground">{account.cooperative}</strong></span>
+          <span>Coopérative : <strong className="text-foreground">{account.cooperative}</strong></span>
           <span>→ {account.redirectTo}</span>
         </div>
         {copied && (
-          <p className="text-xs text-green-600 text-center">✓ Copied to clipboard</p>
+          <p className="text-xs text-green-600 text-center">✓ Copié dans le presse-papiers</p>
         )}
       </CardContent>
     </Card>
@@ -182,18 +182,18 @@ export default function DemoPage() {
     <div className="min-h-screen bg-background py-12 px-4">
       <div className="max-w-5xl mx-auto space-y-10">
         <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold text-foreground">Demo Credentials</h1>
+          <h1 className="text-4xl font-bold text-foreground">Identifiants de démonstration</h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            6 pre-configured accounts to test all roles and features. Data is isolated between cooperatives.
+            6 comptes pré-configurés pour tester tous les rôles et fonctionnalités. Les données sont isolées entre les coopératives.
           </p>
           <div className="flex gap-3 justify-center">
             <Link href="/auth/login">
               <Button className="bg-primary hover:bg-primary/90 gap-2">
-                Go to Login <ArrowRight className="h-4 w-4" />
+                Aller à la connexion <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
             <Link href="/auth/signup">
-              <Button variant="outline" className="border-border">Create Account</Button>
+              <Button variant="outline" className="border-border">Créer un compte</Button>
             </Link>
           </div>
         </div>
@@ -201,15 +201,15 @@ export default function DemoPage() {
         {/* Role permissions table */}
         <Card className="border-border">
           <CardHeader>
-            <CardTitle className="text-foreground">Role Permissions</CardTitle>
-            <CardDescription>What each role can access</CardDescription>
+            <CardTitle className="text-foreground">Permissions par rôle</CardTitle>
+            <CardDescription>Ce que chaque rôle peut accéder</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-2 px-3 font-semibold text-foreground">Feature</th>
+                    <th className="text-left py-2 px-3 font-semibold text-foreground">Fonctionnalité</th>
                     <th className="text-center py-2 px-3 font-semibold text-purple-600">Super Admin</th>
                     <th className="text-center py-2 px-3 font-semibold text-blue-600">Coop Admin</th>
                     <th className="text-center py-2 px-3 font-semibold text-green-600">Member</th>
@@ -218,13 +218,13 @@ export default function DemoPage() {
                 </thead>
                 <tbody>
                   {[
-                    ['Dashboard', '✓', '✓', '✓', 'Limited'],
-                    ['Admin Panel', '✓ (all)', '✗', '✗', '✗'],
-                    ['Marketplace', '✓', '✓', '✓', '✓ (view)'],
-                    ['Members', '✓ (all)', '✓ (own)', '✓', '✗'],
-                    ['Member Cards', '✓ (all)', '✓ (own)', '✓', '✗'],
-                    ['Analytics', '✓ (all)', '✓ (own)', '✓', '✗'],
-                    ['Settings', '✓', '✓ (own)', '✗', '✗'],
+                    ['Tableau de bord', '✓', '✓', '✓', 'Limité'],
+                    ['Panneau admin', '✓ (tout)', '✗', '✗', '✗'],
+                    ['Marketplace', '✓', '✓', '✓', '✓ (lecture)'],
+                    ['Membres', '✓ (tout)', '✓ (propre)', '✓', '✗'],
+                    ['Cartes membres', '✓ (tout)', '✓ (propre)', '✓', '✗'],
+                    ['Statistiques', '✓ (tout)', '✓ (propre)', '✓', '✗'],
+                    ['Paramètres', '✓', '✓ (propre)', '✗', '✗'],
                   ].map(([feature, ...cols], i) => (
                     <tr key={i} className="border-b border-border last:border-0 hover:bg-accent/5">
                       <td className="py-2 px-3 text-foreground font-medium">{feature}</td>
@@ -243,7 +243,7 @@ export default function DemoPage() {
 
         {/* Account cards */}
         <div>
-          <h2 className="text-2xl font-bold text-foreground mb-6">All Demo Accounts</h2>
+          <h2 className="text-2xl font-bold text-foreground mb-6">Tous les comptes de démo</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {demoAccounts.map((account, i) => (
               <AccountCard key={i} account={account} />
@@ -254,13 +254,13 @@ export default function DemoPage() {
         {/* Multi-tenancy test */}
         <Card className="border-border bg-gradient-to-br from-primary/5 to-accent/5">
           <CardHeader>
-            <CardTitle className="text-foreground">Test Multi-Tenancy</CardTitle>
-            <CardDescription>Verify data isolation between cooperatives</CardDescription>
+            <CardTitle className="text-foreground">Tester le multi-tenant</CardTitle>
+            <CardDescription>Vérifier l'isolation des données entre coopératives</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Login as <strong>coop-admin@demo.local</strong> (Nord) — see only Nord members.
-              Then logout and login as <strong>fermes-admin@demo.local</strong> (Fermes) — see completely different data.
+              Connectez-vous avec <strong>coop-admin@demo.local</strong> (Nord) — vous ne verrez que les membres du Nord.
+              Puis déconnectez-vous et connectez-vous avec <strong>fermes-admin@demo.local</strong> (Fermes) — vous verrez des données complètement différentes.
             </p>
             <div className="grid grid-cols-2 gap-3">
               <div className="p-3 bg-background rounded-lg border border-border">

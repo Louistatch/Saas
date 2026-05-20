@@ -83,14 +83,14 @@ export default function DashboardPage() {
     const activities: RecentItem[] = [
       ...((recentMembersRes.data ?? []) as { first_name: string; last_name: string; created_at: string }[]).map(
         (m) => ({
-          label: `Member added: ${m.first_name} ${m.last_name}`,
+          label: `Membre ajouté : ${m.first_name} ${m.last_name}`,
           time: timeAgo(m.created_at),
           type: 'member' as const,
           date: m.created_at,
         }),
       ),
       ...((recentCardsRes.data ?? []) as { card_number: string; created_at: string }[]).map((c) => ({
-        label: `Card generated: ${c.card_number}`,
+        label: `Carte générée : ${c.card_number}`,
         time: timeAgo(c.created_at),
         type: 'card' as const,
         date: c.created_at,
@@ -120,17 +120,17 @@ export default function DashboardPage() {
   }
 
   const statCards = [
-    { title: 'Total Members', value: stats.totalMembers, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', href: '/dashboard/members' },
-    { title: 'Active Cards', value: stats.activeCards, icon: CreditCard, color: 'text-green-600', bg: 'bg-green-50', href: '/dashboard/cards' },
+    { title: 'Total membres', value: stats.totalMembers, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', href: '/dashboard/members' },
+    { title: 'Cartes actives', value: stats.activeCards, icon: CreditCard, color: 'text-green-600', bg: 'bg-green-50', href: '/dashboard/cards' },
     { title: 'Fiches techniques', value: stats.totalExploitations, icon: ShoppingCart, color: 'text-purple-600', bg: 'bg-purple-50', href: '/dashboard/marketplace' },
-    { title: 'Analytics', value: '→', icon: BarChart3, color: 'text-orange-600', bg: 'bg-orange-50', href: '/dashboard/analytics' },
+    { title: 'Statistiques', value: '→', icon: BarChart3, color: 'text-orange-600', bg: 'bg-orange-50', href: '/dashboard/analytics' },
   ]
 
   return (
     <div className="space-y-8">
       <PageHeader
-        title={`Welcome${user?.firstName ? `, ${user.firstName}` : ''} 👋`}
-        description={`${currentCooperative?.name ?? 'Your cooperative'} — here's what's happening today`}
+        title={`Bienvenue${user?.firstName ? `, ${user.firstName}` : ''} 👋`}
+        description={`${currentCooperative?.name ?? 'Votre coopérative'} — voici ce qui se passe aujourd'hui`}
       />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -161,15 +161,15 @@ export default function DashboardPage() {
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="border-border bg-gradient-to-br from-primary/5 to-accent/5">
           <CardHeader>
-            <CardTitle className="text-foreground">Quick Actions</CardTitle>
-            <CardDescription>Common tasks to manage your cooperative</CardDescription>
+            <CardTitle className="text-foreground">Actions rapides</CardTitle>
+            <CardDescription>Tâches courantes pour gérer votre coopérative</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             {[
-              { href: '/dashboard/members', icon: Users, label: 'Add New Member' },
-              { href: '/dashboard/marketplace', icon: ShoppingCart, label: 'Add Exploitation' },
-              { href: '/dashboard/cards', icon: CreditCard, label: 'Generate Member Cards' },
-              { href: '/dashboard/analytics', icon: BarChart3, label: 'View Analytics' },
+              { href: '/dashboard/members', icon: Users, label: 'Ajouter un membre' },
+              { href: '/dashboard/marketplace', icon: ShoppingCart, label: 'Ajouter une fiche' },
+              { href: '/dashboard/cards', icon: CreditCard, label: 'Générer des cartes membres' },
+              { href: '/dashboard/analytics', icon: BarChart3, label: 'Voir les statistiques' },
             ].map(({ href, icon: Icon, label }) => (
               <Link key={href} href={href} className="block">
                 <Button
@@ -186,18 +186,18 @@ export default function DashboardPage() {
 
         <Card className="border-border">
           <CardHeader>
-            <CardTitle className="text-foreground">Recent Activity</CardTitle>
-            <CardDescription>Latest changes in your cooperative</CardDescription>
+            <CardTitle className="text-foreground">Activité récente</CardTitle>
+            <CardDescription>Dernières modifications dans votre coopérative</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <LoadingBlock />
             ) : recent.length === 0 ? (
               <div className="py-6 text-center space-y-3">
-                <p className="text-muted-foreground text-sm">No activity yet</p>
+                <p className="text-muted-foreground text-sm">Aucune activité pour le moment</p>
                 <Link href="/dashboard/members">
                   <Button variant="outline" size="sm" className="gap-2 border-border">
-                    Add your first member <ArrowRight className="h-3 w-3" />
+                    Ajouter votre premier membre <ArrowRight className="h-3 w-3" />
                   </Button>
                 </Link>
               </div>
