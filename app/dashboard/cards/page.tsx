@@ -154,12 +154,22 @@ export default function CardsPage() {
   }, [currentCooperative])
 
   const buildQrPayload = useCallback(
-    (memberId: string, cardNumber: string) => {
-      const payload: Record<string, string> = {}
-      if (settings.qrCodeIncludes.cardNumber) payload.card_number = cardNumber
+    (memberId: string, cardNumber: string, member?: Pick<MemberCard['member'], 'first_name' | 'last_name' | 'phone' | 'photo_url' | 'village' | 'canton' | 'prefecture' | 'region'> | null) => {
+      // QR contains all verification info
+      const payload: Record<string, string> = {
+        card: cardNumber,
+        verify: `https://saas-one-teal-62.vercel.app/verify/${cardNumber}`,
+      }
       if (settings.qrCodeIncludes.memberId) payload.member_id = memberId
       if (settings.qrCodeIncludes.cooperativeId && currentCooperative) {
-        payload.cooperative_id = currentCooperative.id
+        payload.cooperative = currentCooperative.name
+        if (currentCooperative.faitiereName) payload.faitiere = currentCooperative.faitiereName
+      }
+      if (member) {
+        payload.name = `${member.first_name ?? ''} ${member.last_name ?? ''}`.trim()
+        if (member.phone) payload.phone = member.phone
+        if (member.village) payload.locality = [member.village, member.canton, member.prefecture, member.region].filter(Boolean).join(', ')
+        if (member.photo_url) payload.photo = 'yes'
       }
       return JSON.stringify(payload)
     },

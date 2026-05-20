@@ -9,9 +9,6 @@ interface RenderOptions {
   qrPayload: string
 }
 
-/**
- * Load an image from URL. Returns null on failure.
- */
 async function loadImage(url: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const img = new Image()
@@ -19,30 +16,11 @@ async function loadImage(url: string): Promise<HTMLImageElement | null> {
     img.onload = () => resolve(img)
     img.onerror = () => resolve(null)
     img.src = url
-    setTimeout(() => resolve(null), 5000)
+    setTimeout(() => resolve(null), 8000)
   })
 }
 
-// Premium color palette
-const COLORS = {
-  primary: '#0B6B3A',
-  accent: '#1ED760',
-  secondary: '#D9F4E6',
-  premium: '#0A1F14',
-  white: '#FFFFFF',
-  whiteAlpha: 'rgba(255,255,255,0.08)',
-  whiteAlpha15: 'rgba(255,255,255,0.15)',
-  whiteAlpha30: 'rgba(255,255,255,0.30)',
-  whiteAlpha60: 'rgba(255,255,255,0.60)',
-  whiteAlpha90: 'rgba(255,255,255,0.90)',
-  glassBg: 'rgba(255,255,255,0.06)',
-  glassBorder: 'rgba(255,255,255,0.12)',
-}
-
-function roundRect(
-  ctx: CanvasRenderingContext2D,
-  x: number, y: number, w: number, h: number, r: number,
-) {
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath()
   ctx.moveTo(x + r, y)
   ctx.lineTo(x + w - r, y)
@@ -56,39 +34,12 @@ function roundRect(
   ctx.closePath()
 }
 
-function drawGlassPanel(
-  ctx: CanvasRenderingContext2D,
-  x: number, y: number, w: number, h: number, radius = 20,
-) {
-  roundRect(ctx, x, y, w, h, radius)
-  ctx.fillStyle = COLORS.glassBg
-  ctx.fill()
-  ctx.strokeStyle = COLORS.glassBorder
-  ctx.lineWidth = 1
-  ctx.stroke()
-}
-
 /**
- * Draw organic agricultural micro-pattern (subtle leaf shapes)
- */
-function drawMicroPattern(ctx: CanvasRenderingContext2D, W: number, H: number) {
-  ctx.save()
-  ctx.globalAlpha = 0.03
-  ctx.strokeStyle = COLORS.white
-  ctx.lineWidth = 1.5
-  for (let i = 0; i < 12; i++) {
-    const x = (W * 0.1) + (i % 4) * (W * 0.25)
-    const y = (H * 0.15) + Math.floor(i / 4) * (H * 0.3)
-    ctx.beginPath()
-    ctx.ellipse(x, y, 30, 15, (i * 0.5), 0, Math.PI * 2)
-    ctx.stroke()
-  }
-  ctx.restore()
-}
-
-/**
- * Render a premium "WAOO" member card.
- * Canvas: 1600x1000 (16:10 ratio, print-quality)
+ * Render the FaîtiereHub Member Identity Pass
+ * Based on the premium design: dark green gradient, circular photo,
+ * info blocks, QR code, verified badge, digital signature, status bar.
+ * 
+ * Canvas: 1600x1000 (16:10)
  */
 export async function renderCardImage({
   card,
@@ -100,311 +51,321 @@ export async function renderCardImage({
   const canvas = document.createElement('canvas')
   canvas.width = 1600
   canvas.height = 1000
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('Canvas not supported')
+  const ctx = canvas.getContext('2d')!
+  const W = canvas.width, H = canvas.height
 
-  const W = canvas.width
-  const H = canvas.height
-
-  // === BACKGROUND: Premium gradient ===
-  const grad = ctx.createLinearGradient(0, 0, W, H)
-  grad.addColorStop(0, '#0B6B3A')
-  grad.addColorStop(0.5, '#0E8C49')
-  grad.addColorStop(1, '#163D2B')
-  ctx.fillStyle = grad
+  // === BACKGROUND: Dark green gradient ===
+  const bg = ctx.createLinearGradient(0, 0, W, H)
+  bg.addColorStop(0, '#0a2e1a')
+  bg.addColorStop(0.4, '#0d3d22')
+  bg.addColorStop(1, '#061a0f')
+  ctx.fillStyle = bg
   ctx.fillRect(0, 0, W, H)
 
-  // === ORGANIC SHAPES (depth) ===
+  // Organic leaf shapes (subtle)
   ctx.save()
-  ctx.globalAlpha = 0.06
-  ctx.fillStyle = COLORS.white
-  ctx.beginPath()
-  ctx.ellipse(W * 0.85, H * 0.15, 250, 250, 0, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.beginPath()
-  ctx.ellipse(W * 0.1, H * 0.85, 200, 200, 0, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.beginPath()
-  ctx.ellipse(W * 0.5, H * 1.1, 400, 200, 0, 0, Math.PI * 2)
-  ctx.fill()
+  ctx.globalAlpha = 0.04
+  ctx.fillStyle = '#1ed760'
+  ctx.beginPath(); ctx.ellipse(W * 0.9, 80, 200, 100, -0.3, 0, Math.PI * 2); ctx.fill()
+  ctx.beginPath(); ctx.ellipse(50, H * 0.7, 150, 80, 0.5, 0, Math.PI * 2); ctx.fill()
+  ctx.beginPath(); ctx.ellipse(W * 0.5, H - 50, 300, 60, 0, 0, Math.PI * 2); ctx.fill()
+  // Top-right decorative curve
+  ctx.strokeStyle = '#1ed760'
+  ctx.lineWidth = 2
+  ctx.beginPath(); ctx.arc(W - 100, -200, 400, 0.3, 1.2); ctx.stroke()
+  ctx.beginPath(); ctx.arc(W - 50, -250, 450, 0.3, 1.1); ctx.stroke()
   ctx.restore()
 
-  // === MICRO PATTERN ===
-  drawMicroPattern(ctx, W, H)
-
   // === HEADER BAR ===
-  drawGlassPanel(ctx, 40, 30, W - 80, 70, 16)
+  roundRect(ctx, 30, 20, W - 60, 60, 12)
+  ctx.fillStyle = 'rgba(255,255,255,0.05)'
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)'
+  ctx.lineWidth = 1
+  ctx.stroke()
 
-  // Logo text (embossed style)
-  ctx.font = '600 18px system-ui, -apple-system, sans-serif'
-  ctx.fillStyle = COLORS.whiteAlpha60
-  ctx.fillText('FaîtiereHub', 70, 72)
+  // Logo text
+  ctx.font = '700 20px system-ui'
+  ctx.fillStyle = '#1ed760'
+  ctx.fillText('🌿 FaîtiereHub', 55, 57)
 
-  // Title
-  ctx.font = '300 16px system-ui, -apple-system, sans-serif'
-  ctx.fillStyle = COLORS.whiteAlpha90
-  ctx.textAlign = 'center'
-  ctx.fillText('MEMBER IDENTITY PASS', W / 2, 72)
-  ctx.textAlign = 'left'
+  // Header title
+  ctx.font = '400 14px system-ui'
+  ctx.fillStyle = 'rgba(255,255,255,0.7)'
+  ctx.fillText('MEMBER IDENTITY PASS', 260, 50)
+  ctx.font = '300 12px system-ui'
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'
+  ctx.fillText(faitiereName ?? 'Faîtière Agricole', 260, 68)
 
-  // Verified badge
-  ctx.font = '500 13px system-ui'
-  ctx.fillStyle = COLORS.accent
-  const badgeText = '✓ VERIFIED MEMBER'
-  const badgeW = ctx.measureText(badgeText).width
-  roundRect(ctx, W - 70 - badgeW - 20, 48, badgeW + 30, 30, 15)
+  // Verified badge (top right)
+  roundRect(ctx, W - 250, 30, 200, 40, 20)
   ctx.fillStyle = 'rgba(30, 215, 96, 0.15)'
   ctx.fill()
   ctx.strokeStyle = 'rgba(30, 215, 96, 0.4)'
-  ctx.lineWidth = 1
   ctx.stroke()
-  ctx.fillStyle = COLORS.accent
-  ctx.font = '600 12px system-ui'
-  ctx.fillText(badgeText, W - 70 - badgeW - 5, 68)
+  ctx.font = '600 14px system-ui'
+  ctx.fillStyle = '#1ed760'
+  ctx.fillText('✓  VERIFIED MEMBER', W - 230, 56)
 
-  // === HERO SECTION: Photo + Name ===
-  const photoX = 80
-  const photoY = 140
-  const photoSize = 160
+  // === PHOTO (circular, left side) ===
+  const photoX = 100, photoY = 160, photoR = 110
 
-  // Photo circle with glassmorphism border
-  ctx.save()
+  // Outer ring
   ctx.beginPath()
-  ctx.arc(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2 + 6, 0, Math.PI * 2)
-  ctx.strokeStyle = COLORS.whiteAlpha30
+  ctx.arc(photoX + photoR, photoY + photoR, photoR + 8, 0, Math.PI * 2)
+  ctx.strokeStyle = 'rgba(30, 215, 96, 0.3)'
   ctx.lineWidth = 3
   ctx.stroke()
 
-  // Outer glow
-  ctx.shadowColor = 'rgba(30, 215, 96, 0.3)'
-  ctx.shadowBlur = 20
+  // Green glow
+  ctx.save()
+  ctx.shadowColor = 'rgba(30, 215, 96, 0.4)'
+  ctx.shadowBlur = 25
   ctx.beginPath()
-  ctx.arc(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2 + 2, 0, Math.PI * 2)
+  ctx.arc(photoX + photoR, photoY + photoR, photoR + 4, 0, Math.PI * 2)
   ctx.strokeStyle = 'rgba(30, 215, 96, 0.2)'
   ctx.lineWidth = 2
   ctx.stroke()
-  ctx.shadowBlur = 0
   ctx.restore()
 
-  // Clip and draw photo
+  // Photo clip
   ctx.save()
   ctx.beginPath()
-  ctx.arc(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2, 0, Math.PI * 2)
+  ctx.arc(photoX + photoR, photoY + photoR, photoR, 0, Math.PI * 2)
   ctx.clip()
 
   let photoLoaded = false
   if (card.member?.photo_url) {
     const img = await loadImage(card.member.photo_url)
     if (img) {
-      ctx.drawImage(img, photoX, photoY, photoSize, photoSize)
+      const size = photoR * 2
+      ctx.drawImage(img, photoX, photoY, size, size)
       photoLoaded = true
     }
   }
   if (!photoLoaded) {
     ctx.fillStyle = '#1a3d2b'
-    ctx.fillRect(photoX, photoY, photoSize, photoSize)
-    // Silhouette
-    ctx.fillStyle = COLORS.whiteAlpha30
-    ctx.beginPath()
-    ctx.arc(photoX + photoSize / 2, photoY + 55, 28, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.beginPath()
-    ctx.ellipse(photoX + photoSize / 2, photoY + 130, 40, 30, 0, Math.PI, 0, true)
-    ctx.fill()
+    ctx.fillRect(photoX, photoY, photoR * 2, photoR * 2)
+    ctx.fillStyle = 'rgba(255,255,255,0.2)'
+    ctx.beginPath(); ctx.arc(photoX + photoR, photoY + 70, 30, 0, Math.PI * 2); ctx.fill()
+    ctx.beginPath(); ctx.ellipse(photoX + photoR, photoY + 150, 45, 30, 0, Math.PI, 0, true); ctx.fill()
   }
   ctx.restore()
 
-  // Member name (large, elegant)
-  const nameX = photoX + photoSize + 40
-  const nameY = photoY + 40
-  const memberName = card.member
-    ? `${card.member.first_name} ${card.member.last_name}`
-    : 'Membre'
-  ctx.font = '700 42px system-ui, -apple-system, sans-serif'
-  ctx.fillStyle = COLORS.white
-  ctx.fillText(memberName, nameX, nameY)
+  // Verified checkmark on photo
+  ctx.beginPath()
+  ctx.arc(photoX + photoR * 1.6, photoY + photoR * 1.7, 18, 0, Math.PI * 2)
+  ctx.fillStyle = '#1ed760'
+  ctx.fill()
+  ctx.font = '700 16px system-ui'
+  ctx.fillStyle = '#fff'
+  ctx.fillText('✓', photoX + photoR * 1.6 - 6, photoY + photoR * 1.7 + 6)
 
-  // Role / Cooperative
-  ctx.font = '400 18px system-ui'
-  ctx.fillStyle = COLORS.whiteAlpha60
-  ctx.fillText(cooperativeName ?? 'Coopérative', nameX, nameY + 35)
+  // === MEMBER NAME (large, right of photo) ===
+  const nameX = 360, nameY = 180
+  const memberName = card.member ? `${card.member.first_name} ${card.member.last_name}`.toUpperCase() : 'MEMBRE'
+  const firstName = card.member?.first_name?.toLowerCase() ?? ''
+  const lastName = card.member?.last_name?.toUpperCase() ?? ''
 
-  // Card number (embossed style)
-  ctx.font = '300 15px ui-monospace, monospace'
-  ctx.fillStyle = COLORS.accent
-  ctx.fillText(card.card_number, nameX, nameY + 70)
+  ctx.font = '300 38px system-ui'
+  ctx.fillStyle = '#ffffff'
+  ctx.fillText(firstName, nameX, nameY)
+  ctx.font = '800 48px system-ui'
+  ctx.fillText(lastName, nameX, nameY + 55)
 
-  // === INFORMATION BLOCKS (glass panels) ===
-  const blockY = 360
-  const blockH = 90
-  const blockW = 340
-  const gap = 24
-  const col1X = 60
-  const col2X = col1X + blockW + gap
+  // Badge "MEMBRE ACTIF"
+  roundRect(ctx, nameX, nameY + 70, 170, 30, 15)
+  ctx.fillStyle = 'rgba(30, 215, 96, 0.15)'
+  ctx.fill()
+  ctx.font = '600 12px system-ui'
+  ctx.fillStyle = '#1ed760'
+  ctx.fillText('👥  MEMBRE ACTIF', nameX + 15, nameY + 90)
 
-  const infoBlocks = [
-    {
-      icon: '📍',
-      label: 'LOCALITÉ',
-      value: [card.member?.village, card.member?.canton, card.member?.prefecture, card.member?.region]
-        .filter(Boolean)
-        .join(', ') || '—',
-    },
-    {
-      icon: '📞',
-      label: 'TÉLÉPHONE',
-      value: card.member?.phone ?? '—',
-    },
-    {
-      icon: '🏢',
-      label: 'COOPÉRATIVE',
-      value: cooperativeName ?? '—',
-    },
-    {
-      icon: '🌿',
-      label: 'FAÎTIÈRE',
-      value: faitiereName ?? '—',
-    },
-  ]
+  // Cooperative
+  ctx.font = '400 16px system-ui'
+  ctx.fillStyle = 'rgba(255,255,255,0.8)'
+  ctx.fillText(`🏢  COOPÉRATIVE : ${cooperativeName ?? '—'}`, nameX, nameY + 135)
 
-  infoBlocks.forEach((block, i) => {
-    const x = i % 2 === 0 ? col1X : col2X
-    const y = blockY + Math.floor(i / 2) * (blockH + gap)
-
-    drawGlassPanel(ctx, x, y, blockW, blockH, 18)
-
-    // Icon
-    ctx.font = '24px system-ui'
-    ctx.fillText(block.icon, x + 18, y + 42)
-
-    // Label
-    ctx.font = '500 11px system-ui'
-    ctx.fillStyle = COLORS.whiteAlpha60
-    ctx.fillText(block.label, x + 55, y + 32)
-
-    // Value
-    ctx.font = '500 16px system-ui'
-    ctx.fillStyle = COLORS.white
-    const displayValue = block.value.length > 35 ? block.value.slice(0, 35) + '…' : block.value
-    ctx.fillText(displayValue, x + 55, y + 58)
-  })
-
-  // === QR CODE SECTION (right side) ===
-  const qrBlockX = W - 280
-  const qrBlockY = 360
-  const qrBlockW = 230
-  const qrBlockH = 230
-
-  drawGlassPanel(ctx, qrBlockX, qrBlockY, qrBlockW, qrBlockH, 20)
-
-  // "Scan to Verify" label
-  ctx.font = '500 11px system-ui'
-  ctx.fillStyle = COLORS.whiteAlpha60
-  ctx.textAlign = 'center'
-  ctx.fillText('SCAN TO VERIFY', qrBlockX + qrBlockW / 2, qrBlockY + 25)
-  ctx.textAlign = 'left'
-
-  // QR code
-  const matrix = toMatrix(qrPayload, 'M')
-  const qrSize = 150
-  const qrX = qrBlockX + (qrBlockW - qrSize) / 2
-  const qrY = qrBlockY + 40
-
-  // White background with rounded corners
-  roundRect(ctx, qrX - 10, qrY - 5, qrSize + 20, qrSize + 20, 12)
-  ctx.fillStyle = COLORS.white
+  // === MEMBER ID (left, below photo) ===
+  ctx.font = '500 13px system-ui'
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'
+  ctx.fillText('MEMBER ID', 80, 430)
+  ctx.font = '700 28px ui-monospace, monospace'
+  ctx.fillStyle = '#ffffff'
+  ctx.fillText(card.card_number, 80, 465)
+  // Small verified dot
+  ctx.beginPath()
+  ctx.arc(80 + ctx.measureText(card.card_number).width + 15, 458, 6, 0, Math.PI * 2)
+  ctx.fillStyle = '#1ed760'
   ctx.fill()
 
-  // QR halo glow
+  // === INFO BLOCKS (4 blocks in a row) ===
+  const blockY = 520, blockH = 130, blockW = 200, blockGap = 20
+  const blocks = [
+    { icon: '📍', label: 'LOCALITÉ', value: [card.member?.village, card.member?.canton, card.member?.prefecture, card.member?.region].filter(Boolean).join(', ') || '—' },
+    { icon: '📞', label: 'TÉLÉPHONE', value: card.member?.phone ?? '—' },
+    { icon: '🏢', label: 'COOPÉRATIVE', value: cooperativeName ?? '—' },
+    { icon: '🌿', label: 'FAÎTIÈRE', value: faitiereName ?? '—' },
+  ]
+
+  blocks.forEach((block, i) => {
+    const x = 60 + i * (blockW + blockGap)
+    roundRect(ctx, x, blockY, blockW, blockH, 16)
+    ctx.fillStyle = 'rgba(255,255,255,0.04)'
+    ctx.fill()
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)'
+    ctx.lineWidth = 1
+    ctx.stroke()
+
+    // Icon circle
+    ctx.beginPath()
+    ctx.arc(x + blockW / 2, blockY + 35, 22, 0, Math.PI * 2)
+    ctx.fillStyle = 'rgba(30, 215, 96, 0.1)'
+    ctx.fill()
+    ctx.font = '20px system-ui'
+    ctx.fillText(block.icon, x + blockW / 2 - 10, blockY + 42)
+
+    // Label
+    ctx.font = '600 10px system-ui'
+    ctx.fillStyle = 'rgba(255,255,255,0.5)'
+    ctx.textAlign = 'center'
+    ctx.fillText(block.label, x + blockW / 2, blockY + 75)
+
+    // Value
+    ctx.font = '500 12px system-ui'
+    ctx.fillStyle = '#ffffff'
+    const val = block.value.length > 22 ? block.value.slice(0, 22) + '…' : block.value
+    ctx.fillText(val, x + blockW / 2, blockY + 95)
+    ctx.textAlign = 'left'
+
+    // Bottom accent line
+    roundRect(ctx, x + blockW / 2 - 15, blockY + blockH - 15, 30, 3, 2)
+    ctx.fillStyle = '#1ed760'
+    ctx.fill()
+  })
+
+  // === QR CODE (right side) ===
+  const qrBlockX = W - 300, qrBlockY = 420
+  roundRect(ctx, qrBlockX, qrBlockY, 250, 260, 20)
+  ctx.fillStyle = 'rgba(255,255,255,0.06)'
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)'
+  ctx.stroke()
+
+  ctx.font = '600 11px system-ui'
+  ctx.fillStyle = 'rgba(255,255,255,0.6)'
+  ctx.textAlign = 'center'
+  ctx.fillText('SCAN TO VERIFY', qrBlockX + 125, qrBlockY + 25)
+  ctx.textAlign = 'left'
+
+  // QR
+  const matrix = toMatrix(qrPayload, 'M')
+  const qrSize = 160
+  const qrX = qrBlockX + 45, qrY = qrBlockY + 40
+  roundRect(ctx, qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, 12)
+  ctx.fillStyle = '#ffffff'
+  ctx.fill()
+
+  // Green halo
   ctx.save()
-  ctx.shadowColor = 'rgba(30, 215, 96, 0.25)'
+  ctx.shadowColor = 'rgba(30, 215, 96, 0.3)'
   ctx.shadowBlur = 15
-  roundRect(ctx, qrX - 10, qrY - 5, qrSize + 20, qrSize + 20, 12)
+  roundRect(ctx, qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, 12)
   ctx.strokeStyle = 'rgba(30, 215, 96, 0.3)'
   ctx.lineWidth = 2
   ctx.stroke()
   ctx.restore()
 
-  // Draw QR modules
   const cellSize = qrSize / matrix.length
-  ctx.fillStyle = COLORS.premium
+  ctx.fillStyle = '#0a2e1a'
   for (let row = 0; row < matrix.length; row++) {
     for (let col = 0; col < matrix.length; col++) {
       if (matrix[row][col]) {
-        ctx.fillRect(
-          qrX + col * cellSize,
-          qrY + row * cellSize,
-          cellSize + 0.3,
-          cellSize + 0.3,
-        )
+        ctx.fillRect(qrX + col * cellSize, qrY + row * cellSize, cellSize + 0.3, cellSize + 0.3)
       }
     }
   }
 
-  // === FOOTER ===
-  const footerY = H - 100
+  // "SECURE • VERIFIED • TRUSTED"
+  ctx.font = '500 9px system-ui'
+  ctx.fillStyle = '#1ed760'
+  ctx.textAlign = 'center'
+  ctx.fillText('✓ SECURE • VERIFIED • TRUSTED', qrBlockX + 125, qrBlockY + 240)
+  ctx.textAlign = 'left'
 
-  // Glass panel footer
-  drawGlassPanel(ctx, 40, footerY, W - 80, 70, 16)
+  // === DIGITAL SIGNATURE (left bottom) ===
+  ctx.font = 'italic 24px "Brush Script MT", cursive, system-ui'
+  ctx.fillStyle = 'rgba(255,255,255,0.4)'
+  ctx.fillText('FaîtiereHub', 80, 730)
+  ctx.font = '500 10px system-ui'
+  ctx.fillStyle = 'rgba(255,255,255,0.4)'
+  ctx.fillText('DIGITAL SIGNATURE', 80, 750)
+
+  // === FOOTER BAR ===
+  roundRect(ctx, 30, H - 110, W - 60, 80, 16)
+  ctx.fillStyle = 'rgba(255,255,255,0.04)'
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)'
+  ctx.stroke()
 
   // Valid until
-  ctx.font = '400 12px system-ui'
-  ctx.fillStyle = COLORS.whiteAlpha60
-  ctx.fillText('VALID UNTIL', 70, footerY + 30)
-
+  ctx.font = '400 11px system-ui'
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'
+  ctx.fillText('📅  VALID UNTIL', 60, H - 75)
   const expiryText = card.expiry_date
-    ? new Date(card.expiry_date).toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      }).toUpperCase()
+    ? new Date(card.expiry_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()
     : '—'
-  ctx.font = '600 18px system-ui'
-  ctx.fillStyle = COLORS.white
-  ctx.fillText(expiryText, 70, footerY + 55)
+  ctx.font = '700 22px system-ui'
+  ctx.fillStyle = '#ffffff'
+  ctx.fillText(expiryText, 60, H - 48)
 
-  // Progress bar (validity indicator)
-  const barX = 300
-  const barY = footerY + 38
-  const barW = 200
-  const barH = 6
-  // Background
-  roundRect(ctx, barX, barY, barW, barH, 3)
-  ctx.fillStyle = COLORS.whiteAlpha15
+  // Membership status + progress bar
+  ctx.font = '500 11px system-ui'
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'
+  ctx.fillText('MEMBERSHIP STATUS', 400, H - 75)
+  ctx.font = '700 20px system-ui'
+  ctx.fillStyle = '#1ed760'
+  ctx.fillText('ACTIVE', 400, H - 48)
+
+  // Progress bar
+  const barX = 520, barY = H - 58, barW = 150, barH = 8
+  roundRect(ctx, barX, barY, barW, barH, 4)
+  ctx.fillStyle = 'rgba(255,255,255,0.1)'
   ctx.fill()
-  // Fill (calculate progress based on expiry)
   let progress = 1
   if (card.expiry_date) {
     const now = Date.now()
     const created = new Date(card.created_at).getTime()
     const expiry = new Date(card.expiry_date).getTime()
-    const total = expiry - created
-    const elapsed = now - created
-    progress = Math.max(0, Math.min(1, 1 - elapsed / total))
+    progress = Math.max(0, Math.min(1, 1 - (now - created) / (expiry - created)))
   }
-  roundRect(ctx, barX, barY, barW * progress, barH, 3)
-  ctx.fillStyle = COLORS.accent
+  roundRect(ctx, barX, barY, barW * progress, barH, 4)
+  ctx.fillStyle = '#1ed760'
+  ctx.fill()
+  // Green dot
+  ctx.beginPath()
+  ctx.arc(barX + barW * progress, barY + barH / 2, 5, 0, Math.PI * 2)
   ctx.fill()
 
-  // Status indicator
-  ctx.font = '500 12px system-ui'
-  ctx.fillStyle = COLORS.accent
-  ctx.fillText(`${Math.round(progress * 100)}% remaining`, barX + barW + 15, barY + 5)
-
-  // Subtitle / branding
-  ctx.font = '300 12px system-ui'
-  ctx.fillStyle = COLORS.whiteAlpha60
-  ctx.textAlign = 'right'
-  ctx.fillText(template.subtitle || 'Digital Access Pass', W - 70, footerY + 30)
+  // Membership period (right)
   ctx.font = '500 11px system-ui'
-  ctx.fillStyle = COLORS.whiteAlpha30
-  ctx.fillText('Powered by FaîtiereHub', W - 70, footerY + 52)
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'
+  ctx.textAlign = 'right'
+  ctx.fillText('MEMBERSHIP PERIOD', W - 70, H - 75)
+  const startYear = new Date(card.created_at).getFullYear()
+  const endYear = card.expiry_date ? new Date(card.expiry_date).getFullYear() : startYear + 3
+  ctx.font = '700 18px system-ui'
+  ctx.fillStyle = '#ffffff'
+  ctx.fillText(`${startYear} - ${endYear}`, W - 70, H - 48)
+  // Checkmark
+  ctx.beginPath()
+  ctx.arc(W - 180, H - 60, 14, 0, Math.PI * 2)
+  ctx.fillStyle = '#1ed760'
+  ctx.fill()
+  ctx.font = '700 12px system-ui'
+  ctx.fillStyle = '#fff'
+  ctx.fillText('✓', W - 185, H - 55)
   ctx.textAlign = 'left'
-
-  // === CARD NUMBER (embossed, bottom-left of main area) ===
-  ctx.font = '300 13px ui-monospace, monospace'
-  ctx.fillStyle = COLORS.whiteAlpha30
-  ctx.fillText(`ID: ${card.card_number}`, 70, footerY - 20)
 
   return await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => {
@@ -414,9 +375,6 @@ export async function renderCardImage({
   })
 }
 
-/**
- * Downloads a card to the user's machine as PNG.
- */
 export async function downloadCardImage(opts: RenderOptions, filename?: string) {
   const blob = await renderCardImage(opts)
   const url = URL.createObjectURL(blob)
