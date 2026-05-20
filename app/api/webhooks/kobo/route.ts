@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
         name: `Parcelle ${culture}`,
         culture_principale: culture,
         superficie_ha: superficie,
-      }).catch(() => {}) // Non-blocking
+      }) // Non-blocking — ignore result
     }
 
     // Log the import
@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
         submission_id: submission._id || submission._uuid,
         culture,
       },
-    }).catch(() => {})
+    })
 
     log.info('Member created from KoboCollect', { id: newMember?.id, name: `${firstName} ${lastName}` })
 
