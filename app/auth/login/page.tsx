@@ -2,22 +2,38 @@
 
 import { Logo } from '@/components/shared/logo'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { useState, useEffect, useCallback, Suspense, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Eye, EyeOff } from 'lucide-react'
-import { useAuth } from '@/app/context/auth-context'
+import { createClient } from '@/lib/supabase/client'
 import { Spinner } from '@/components/shared/loading'
 import { errorMessage } from '@/lib/utils/errors'
 import { flattenZodErrors, loginSchema } from '@/lib/validators/schemas'
 
+/**
+ * Login page — SELF-CONTAINED.
+ * Does NOT depend on AuthProvider for the login action itself.
+ * This prevents any race condition between context state and redirect.
+ * 
+ * Flow:
+ * 1. User submits credentials
+ * 2. Supabase signInWithPassword (sets httpOnly cookie)
+ * 3. Fetch profile to determine role
+ * 4. Hard redirect to /dashboard or /admin (window.location.replace)
+ * 
+ * The hard redirect ensures:
+ * - Proxy re-evaluates with the new cookie
+ * - AuthProvider initializes fresh with the new session
+ * - No stale state from previous session
+ */
 function LoginInner() {
-  const router = useRouter()
   const searchParams = useSearchParams()
-  const { login, isLoading, isAuthenticated, user } = useAuth()
+  const supabase = useMemo(() => createClient(), [])
+  
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -27,45 +43,78 @@ function LoginInner() {
 
   const redirectTo = searchParams?.get('redirect')
 
-  // Only redirect AFTER a successful login (not on page load)
-  // This prevents the redirect loop when cookies are stale
-  const [hasJustLoggedIn, setHasJustLoggedIn] = useState(false)
-
+  // Check if already authenticated on mount (e.g. user navigated here manually)
+  // If so, redirect them away immediately
   useEffect(() => {
-    if (!hasJustLoggedIn || !isAuthenticated || isLoading) return
-    
-    if (redirectTo && redirectTo.startsWith('/')) {
-      router.push(redirectTo)
-    } else if (user?.role === 'super_admin') {
-      router.push('/admin')
-    } else {
-      router.push('/dashboard')
-    }
-  }, [hasJustLoggedIn, isAuthenticated, isLoading, user, router, redirectTo])
+    let cancelled = false
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (cancelled || !user) return
+      // Already logged in — determine where to go
+      supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+        .then(({ data: profile }) => {
+          if (cancelled) return
+          if (profile?.role === 'super_admin') {
+            window.location.replace('/admin')
+          } else {
+            window.location.replace(redirectTo || '/dashboard')
+          }
+        })
+    })
+    return () => { cancelled = true }
+  }, [supabase, redirectTo])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setFieldErrors({})
+
     const parsed = loginSchema.safeParse({ email, password })
     if (!parsed.success) {
       setFieldErrors(flattenZodErrors(parsed.error))
       return
     }
-    setFieldErrors({})
+
     setSubmitting(true)
+
     try {
-      await login(parsed.data.email, parsed.data.password)
-      // Login succeeded — trigger redirect via hasJustLoggedIn
-      setHasJustLoggedIn(true)
-      setTimeout(() => {
-        setSubmitting(false)
-        setError('Connexion réussie mais le profil n\'a pas pu être chargé. Veuillez réessayer.')
-      }, 8000)
+      // Step 1: Sign in with Supabase
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: parsed.data.email,
+        password: parsed.data.password,
+      })
+      if (signInError) throw signInError
+      if (!data.user) throw new Error('Aucun utilisateur retourné')
+
+      // Step 2: Fetch profile to determine redirect target
+      let role = 'member'
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .single()
+        if (profile?.role) role = profile.role
+      } catch {
+        // If profile fetch fails, default to dashboard
+      }
+
+      // Step 3: Hard redirect (kills all React state, forces fresh load)
+      if (redirectTo && redirectTo.startsWith('/')) {
+        window.location.replace(redirectTo)
+      } else if (role === 'super_admin') {
+        window.location.replace('/admin')
+      } else {
+        window.location.replace('/dashboard')
+      }
     } catch (err) {
       setError(errorMessage(err))
       setSubmitting(false)
     }
-  }
+  }, [email, password, supabase, redirectTo])
 
   return (
     <div className="min-h-screen grid md:grid-cols-2 bg-background">
@@ -133,11 +182,12 @@ function LoginInner() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   aria-invalid={!!fieldErrors.email}
+                  disabled={submitting}
                   required
                 />
-                {fieldErrors.email ? (
+                {fieldErrors.email && (
                   <p className="text-xs text-destructive">{fieldErrors.email}</p>
-                ) : null}
+                )}
               </div>
 
               <div className="space-y-2">
@@ -156,6 +206,7 @@ function LoginInner() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     aria-invalid={!!fieldErrors.password}
+                    disabled={submitting}
                     required
                     className="pr-10"
                   />
@@ -168,18 +219,18 @@ function LoginInner() {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                {fieldErrors.password ? (
+                {fieldErrors.password && (
                   <p className="text-xs text-destructive">{fieldErrors.password}</p>
-                ) : null}
+                )}
               </div>
 
               <Button
                 type="submit"
                 className="w-full bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
-                disabled={isLoading || submitting}
+                disabled={submitting}
               >
-                {isLoading || submitting ? <Spinner className="h-4 w-4" /> : null}
-                {isLoading || submitting ? 'Connexion en cours…' : 'Se connecter'}
+                {submitting ? <Spinner className="h-4 w-4" /> : null}
+                {submitting ? 'Connexion en cours…' : 'Se connecter'}
               </Button>
             </form>
 
