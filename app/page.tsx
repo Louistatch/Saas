@@ -4,7 +4,6 @@ import { ArrowRight, Users, TrendingUp, BarChart3, Zap } from 'lucide-react'
 import { HomeClient } from '@/app/components/home-client'
 import { Logo } from '@/components/shared/logo'
 import { AuthButtons } from '@/components/shared/auth-buttons'
-import { DashboardPreview } from '@/components/shared/dashboard-preview'
 
 export default function Home() {
   return (
@@ -79,7 +78,79 @@ export default function Home() {
             </div>
           </div>
 
-          <DashboardPreview />
+          {/* Video Demo + Card Showcase */}
+          <div className="relative w-full max-w-2xl mx-auto lg:mx-0">
+            {/* Video container with premium frame */}
+            <div className="rounded-2xl overflow-hidden border border-border shadow-2xl bg-card">
+              {/* Browser chrome */}
+              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-muted/30">
+                <div className="flex gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-red-400" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-400" />
+                  <div className="w-3 h-3 rounded-full bg-green-400" />
+                </div>
+                <div className="flex-1 flex justify-center">
+                  <div className="px-3 py-1 rounded-md bg-background border border-border text-[10px] text-muted-foreground font-mono">
+                    faitierehub.com
+                  </div>
+                </div>
+              </div>
+              {/* Video */}
+              <video
+                autoPlay
+                muted
+                loop
+                playsInline
+                className="w-full aspect-video object-cover"
+                poster="/showcase-card.png"
+              >
+                <source src="/demo-video.mp4" type="video/mp4" />
+              </video>
+            </div>
+
+            {/* Floating card showcase */}
+            <div className="absolute -bottom-8 -right-4 md:-right-12 w-48 md:w-56 rounded-xl overflow-hidden shadow-2xl border-2 border-white/20 rotate-3 hover:rotate-0 transition-transform duration-500">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/showcase-card.png"
+                alt="Carte membre FaîtiereHub"
+                className="w-full h-auto"
+              />
+            </div>
+
+            {/* Glow effect */}
+            <div className="absolute -inset-4 -z-10 bg-gradient-to-r from-primary/20 via-accent/10 to-primary/20 rounded-3xl blur-3xl opacity-40" />
+          </div>
+        </div>
+      </section>
+
+      {/* Card Showcase Section */}
+      <section className="py-20 sm:py-28 bg-gradient-to-b from-background to-card/50">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center space-y-4 mb-12">
+            <h2 className="text-3xl font-bold text-foreground sm:text-4xl">
+              Carte membre premium
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Chaque membre reçoit une carte numérique avec QR code vérifiable, photo d'identité et toutes ses informations.
+            </p>
+          </div>
+          <div className="flex justify-center">
+            <div className="relative group">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/showcase-card.png"
+                alt="Carte membre FaîtiereHub — Design premium avec photo, QR code, localité, coopérative"
+                className="w-full max-w-3xl rounded-2xl shadow-2xl border border-border group-hover:scale-[1.02] transition-transform duration-500"
+              />
+              {/* Decorative glow */}
+              <div className="absolute -inset-4 -z-10 bg-gradient-to-r from-primary/20 via-transparent to-primary/20 rounded-3xl blur-2xl opacity-50 group-hover:opacity-70 transition-opacity" />
+              {/* Badge */}
+              <div className="absolute top-4 right-4 bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg">
+                ✓ Vérifiable par QR
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
