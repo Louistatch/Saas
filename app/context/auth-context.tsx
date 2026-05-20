@@ -106,10 +106,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initAuth = async () => {
       try {
-        const { data: { user: sbUser } } = await supabase.auth.getUser()
+        const { data: { user: sbUser }, error: authError } = await supabase.auth.getUser()
+        
+        // If auth error (expired token, etc.) → clean up silently
+        if (authError) {
+          log.debug('Auth error on init, cleaning up', authError.message)
+          try { await supabase.auth.signOut({ scope: 'local' }) } catch {}
+          if (mounted) setIsLoading(false)
+          return
+        }
+
         if (sbUser && mounted) {
           const profile = await fetchProfile(sbUser.id)
-          if (mounted && profile) setUser(profile)
+          if (mounted) {
+            if (profile) {
+              setUser(profile)
+            } else {
+              // User exists in auth but no profile → zombie session
+              log.debug('Zombie session detected (no profile), cleaning up')
+              try { await supabase.auth.signOut({ scope: 'local' }) } catch {}
+            }
+          }
         }
       } catch (error) {
         // No session or network issue — not an error for unauthenticated visitors

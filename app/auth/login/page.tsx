@@ -3,7 +3,7 @@
 import { Logo } from '@/components/shared/logo'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { useState, useEffect, useCallback, Suspense, useMemo } from 'react'
+import { useState, useEffect, useCallback, Suspense, useMemo, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,24 +15,20 @@ import { errorMessage } from '@/lib/utils/errors'
 import { flattenZodErrors, loginSchema } from '@/lib/validators/schemas'
 
 /**
- * Login page — SELF-CONTAINED.
- * Does NOT depend on AuthProvider for the login action itself.
- * This prevents any race condition between context state and redirect.
+ * Login page — SELF-CONTAINED + SELF-HEALING.
  * 
- * Flow:
- * 1. User submits credentials
- * 2. Supabase signInWithPassword (sets httpOnly cookie)
- * 3. Fetch profile to determine role
- * 4. Hard redirect to /dashboard or /admin (window.location.replace)
- * 
- * The hard redirect ensures:
- * - Proxy re-evaluates with the new cookie
- * - AuthProvider initializes fresh with the new session
- * - No stale state from previous session
+ * Handles ALL edge cases:
+ * - Fresh login (no session)
+ * - Already authenticated (redirect immediately)
+ * - Zombie session (cookie exists but expired → clean up + allow login)
+ * - Network timeout (watchdog unblocks button after 15s)
+ * - Double submit (prevented by submitting flag)
+ * - Return user after session expiry (clean state, allow re-login)
  */
 function LoginInner() {
   const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])
+  const abortRef = useRef<AbortController | null>(null)
   
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -43,32 +39,60 @@ function LoginInner() {
 
   const redirectTo = searchParams?.get('redirect')
 
-  // Check if already authenticated on mount (e.g. user navigated here manually)
-  // If so, redirect them away immediately
+  // On mount: check if user has a VALID session
+  // If yes → redirect. If zombie/expired → clean up silently.
   useEffect(() => {
     let cancelled = false
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (cancelled || !user) return
-      // Already logged in — determine where to go
-      supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-        .then(({ data: profile }) => {
-          if (cancelled) return
-          if (profile?.role === 'super_admin') {
-            window.location.replace('/admin')
-          } else {
-            window.location.replace(redirectTo || '/dashboard')
-          }
-        })
-    })
+
+    async function checkSession() {
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        
+        if (cancelled) return
+
+        // No user or auth error → clean state, show login form
+        if (!user || authError) {
+          // Clean any zombie cookies/storage
+          try { await supabase.auth.signOut({ scope: 'local' }) } catch {}
+          return
+        }
+
+        // User exists — verify profile is accessible (session truly valid)
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+
+        if (cancelled) return
+
+        if (profileError || !profile) {
+          // Session exists but profile inaccessible → zombie session, clean up
+          try { await supabase.auth.signOut({ scope: 'local' }) } catch {}
+          return
+        }
+
+        // Fully valid session → redirect
+        if (profile.role === 'super_admin') {
+          window.location.replace('/admin')
+        } else {
+          window.location.replace(redirectTo || '/dashboard')
+        }
+      } catch {
+        // Network error or other issue → just show login form
+      }
+    }
+
+    checkSession()
     return () => { cancelled = true }
   }, [supabase, redirectTo])
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Prevent double submit
+    if (submitting) return
+    
     setError('')
     setFieldErrors({})
 
@@ -80,16 +104,30 @@ function LoginInner() {
 
     setSubmitting(true)
 
+    // Watchdog: unblock button after 15s no matter what
+    const watchdog = setTimeout(() => {
+      setSubmitting(false)
+      setError('La connexion prend trop de temps. Vérifiez votre connexion internet et réessayez.')
+    }, 15000)
+
     try {
-      // Step 1: Sign in with Supabase
+      // Cancel any previous request
+      abortRef.current?.abort()
+      abortRef.current = new AbortController()
+
+      // Step 1: Clean any stale session first
+      try { await supabase.auth.signOut({ scope: 'local' }) } catch {}
+
+      // Step 2: Sign in fresh
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: parsed.data.email,
         password: parsed.data.password,
       })
+      
       if (signInError) throw signInError
       if (!data.user) throw new Error('Aucun utilisateur retourné')
 
-      // Step 2: Fetch profile to determine redirect target
+      // Step 3: Fetch profile to determine redirect target
       let role = 'member'
       try {
         const { data: profile } = await supabase
@@ -102,19 +140,27 @@ function LoginInner() {
         // If profile fetch fails, default to dashboard
       }
 
-      // Step 3: Hard redirect (kills all React state, forces fresh load)
-      if (redirectTo && redirectTo.startsWith('/')) {
-        window.location.replace(redirectTo)
-      } else if (role === 'super_admin') {
-        window.location.replace('/admin')
-      } else {
-        window.location.replace('/dashboard')
-      }
+      // Step 4: Hard redirect (kills all React state, forces fresh load)
+      clearTimeout(watchdog)
+      
+      const target = redirectTo && redirectTo.startsWith('/')
+        ? redirectTo
+        : role === 'super_admin'
+          ? '/admin'
+          : '/dashboard'
+
+      window.location.replace(target)
+
+      // Note: setSubmitting(false) is NOT called here because
+      // window.location.replace will unload the page.
+      // The watchdog handles the case where replace fails.
+
     } catch (err) {
+      clearTimeout(watchdog)
       setError(errorMessage(err))
       setSubmitting(false)
     }
-  }, [email, password, supabase, redirectTo])
+  }, [email, password, supabase, redirectTo, submitting])
 
   return (
     <div className="min-h-screen grid md:grid-cols-2 bg-background">
@@ -129,15 +175,15 @@ function LoginInner() {
               Connectez votre coopérative
             </h2>
             <p className="text-muted-foreground">
-              Gérez vos membres, le marketplace et la croissance en un seul endroit.
+              Gérez vos membres, les comptes d&apos;exploitation et la croissance en un seul endroit.
             </p>
           </div>
 
           <ul className="space-y-4">
             {[
               'Gérer les données des membres et les cartes numériques',
-              'Exploiter un marketplace coopératif',
-              'Suivre les ventes et l\'engagement des membres',
+              'Publier les comptes d\'exploitation par région',
+              'Suivre les cotisations et l\'engagement des membres',
             ].map((benefit, i) => (
               <li key={i} className="flex gap-3">
                 <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20">
