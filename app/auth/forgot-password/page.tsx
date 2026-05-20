@@ -2,11 +2,12 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
+import { Logo } from '@/components/shared/logo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Leaf, ArrowLeft, CheckCircle } from 'lucide-react'
+import { ArrowLeft, CheckCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function ForgotPasswordPage() {
@@ -36,8 +37,7 @@ export default function ForgotPasswordPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="flex items-center gap-2 justify-center">
-          <Leaf className="h-7 w-7 text-primary" />
-          <span className="text-xl font-bold text-foreground">FaîtiereHub</span>
+          <Logo size="md" />
         </div>
 
         <Card className="border-border">

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { CheckCircle, XCircle, Shield, MapPin, Phone, Building2, Leaf, Calendar, CreditCard } from 'lucide-react'
+import { CheckCircle, XCircle, Shield, MapPin, Phone, Building2, Calendar, CreditCard, TreePine } from 'lucide-react'
 import { Logo } from '@/components/shared/logo'
 
 interface VerifyResult {
@@ -167,7 +167,7 @@ export default function VerifyCardPage() {
                   { icon: MapPin, label: 'Localité', value: locality || '—', color: 'text-[#1ed760]' },
                   { icon: Phone, label: 'Téléphone', value: result.member.phone ?? '—', color: 'text-[#1ed760]' },
                   { icon: Building2, label: 'Coopérative', value: result.cooperative?.name ?? '—', color: 'text-[#1ed760]' },
-                  { icon: Leaf, label: 'Faîtière', value: result.cooperative?.faitiere_name ?? '—', color: 'text-[#1ed760]' },
+                  { icon: TreePine, label: 'Faîtière', value: result.cooperative?.faitiere_name ?? '—', color: 'text-[#1ed760]' },
                 ].map((item, i) => (
                   <div
                     key={i}
