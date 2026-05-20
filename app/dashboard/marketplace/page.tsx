@@ -9,6 +9,7 @@ import { Plus, Upload, Search, FileText, Download, Trash2, Eye, EyeOff, File } f
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
+import { useAuth } from '@/app/context/auth-context'
 import { useToast } from '@/hooks/use-toast'
 import { useDebounced } from '@/hooks/use-debounced'
 import { LoadingBlock, Spinner } from '@/components/shared/loading'
@@ -64,6 +65,7 @@ const TYPES_AGRICULTURE = [
 
 export default function MarketplacePage() {
   const { currentCooperative } = useCooperative()
+  const { user } = useAuth()
   const { toast } = useToast()
   const { confirm, confirmNode } = useConfirm()
   const supabase = useMemo(() => createClient(), [])
@@ -251,12 +253,14 @@ export default function MarketplacePage() {
     <div className="space-y-8">
       <PageHeader
         title="Comptes d'exploitation"
-        description="Gérez les fiches techniques et itinéraires de culture pour vos membres"
+        description="Fiches techniques et itinéraires de culture par culture (DOCX, Excel)"
         action={
-          <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setShowAdd(true)}>
-            <Plus className="h-4 w-4" />
-            Nouvelle fiche
-          </Button>
+          (user?.role === 'super_admin' || currentCooperative?.level === 'faitiere') ? (
+            <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setShowAdd(true)}>
+              <Plus className="h-4 w-4" />
+              Nouvelle fiche
+            </Button>
+          ) : null
         }
       />
 

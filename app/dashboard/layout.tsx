@@ -39,7 +39,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Navigation items filtered by role
   const navigationItems = [
     { href: '/dashboard', label: 'Vue d\'ensemble', icon: Home, roles: ['super_admin', 'cooperative_admin', 'member', 'guest'] },
-    { href: '/dashboard/marketplace', label: 'Marketplace', icon: ShoppingCart, roles: ['super_admin', 'cooperative_admin', 'member', 'guest'] },
+    { href: '/dashboard/marketplace', label: 'Comptes d\'exploitation', icon: ShoppingCart, roles: ['super_admin', 'cooperative_admin', 'member', 'guest'] },
     { href: '/dashboard/templates', label: 'Modèles', icon: FolderOpen, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/members', label: 'Membres', icon: Users, roles: ['super_admin', 'cooperative_admin', 'member'] },
     { href: '/dashboard/cotisations', label: 'Cotisations', icon: Banknote, roles: ['super_admin', 'cooperative_admin'] },

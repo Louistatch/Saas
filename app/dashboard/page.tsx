@@ -156,7 +156,7 @@ export default function DashboardPage() {
           <CardContent className="space-y-2">
             {[
               { href: '/dashboard/members', icon: Users, label: 'Ajouter un membre' },
-              { href: '/dashboard/marketplace', icon: ShoppingCart, label: 'Ajouter une fiche' },
+              { href: '/dashboard/marketplace', icon: ShoppingCart, label: 'Ajouter un compte d\'exploitation' },
               { href: '/dashboard/cards', icon: CreditCard, label: 'Générer des cartes membres' },
               { href: '/dashboard/analytics', icon: BarChart3, label: 'Voir les statistiques' },
             ].map(({ href, icon: Icon, label }) => (

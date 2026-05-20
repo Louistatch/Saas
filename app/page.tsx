@@ -27,7 +27,7 @@ export default function Home() {
               </Link>
               <Link href="/marketplace">
                 <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                  Voir le marketplace
+                  Voir les comptes d&apos;exploitation
                 </Button>
               </Link>
             </div>
