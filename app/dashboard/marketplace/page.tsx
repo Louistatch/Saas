@@ -1,446 +1,575 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Search, Edit2, Trash2, Eye, EyeOff } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Plus, Upload, Search, FileText, Download, Trash2, Eye, EyeOff, File } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { useToast } from '@/hooks/use-toast'
 import { useDebounced } from '@/hooks/use-debounced'
 import { LoadingBlock, Spinner } from '@/components/shared/loading'
 import { EmptyState } from '@/components/shared/empty-state'
-import { PublishedBadge } from '@/components/shared/status-badge'
 import { PageHeader } from '@/components/shared/page-header'
 import { PaginationBar } from '@/components/shared/pagination'
 import { useConfirm } from '@/components/shared/confirm-dialog'
 import { errorMessage } from '@/lib/utils/errors'
-import { exploitationSchema, flattenZodErrors } from '@/lib/validators/schemas'
-import { PRODUCT_CATEGORIES, type Exploitation } from '@/types/domain'
 
-const PAGE_SIZE = 20
+interface FicheTechnique {
+  id: string
+  title: string
+  description: string | null
+  culture: string
+  type_agriculture: string
+  canton_id: string | null
+  prefecture_id: string | null
+  campaign: string | null
+  files: { name: string; url: string; type: string; size?: number }[]
+  price_non_member: number
+  status: string
+  download_count: number
+  created_at: string
+}
 
-type FormState = {
+interface Culture {
+  id: string
   name: string
-  description: string
+  icon: string | null
   category: string
-  producer: string
-  unit: string
-  price: string
-  active: boolean
 }
 
-const emptyForm: FormState = {
-  name: '',
-  description: '',
-  category: '',
-  producer: '',
-  unit: 'kg',
-  price: '',
-  active: true,
+interface Canton {
+  id: string
+  name: string
 }
+
+interface Prefecture {
+  id: string
+  name: string
+}
+
+const PAGE_SIZE = 15
+const TYPES_AGRICULTURE = [
+  { value: 'conventionnel', label: 'Conventionnel' },
+  { value: 'biologique', label: 'Biologique' },
+  { value: 'agroforesterie', label: 'Agroforesterie' },
+  { value: 'maraîchage', label: 'Maraîchage' },
+  { value: 'élevage', label: 'Élevage' },
+  { value: 'pisciculture', label: 'Pisciculture' },
+  { value: 'autre', label: 'Autre' },
+]
 
 export default function MarketplacePage() {
   const { currentCooperative } = useCooperative()
   const { toast } = useToast()
   const { confirm, confirmNode } = useConfirm()
   const supabase = useMemo(() => createClient(), [])
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [exploitations, setExploitations] = useState<Exploitation[]>([])
-  const [searchTerm, setSearchTerm] = useState('')
-  const debouncedSearch = useDebounced(searchTerm, 200)
+  const [fiches, setFiches] = useState<FicheTechnique[]>([])
+  const [cultures, setCultures] = useState<Culture[]>([])
+  const [cantons, setCantons] = useState<Canton[]>([])
+  const [prefectures, setPrefectures] = useState<Prefecture[]>([])
+  const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounced(search, 200)
   const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
-  const [showDialog, setShowDialog] = useState(false)
-  const [editItem, setEditItem] = useState<Exploitation | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState<FormState>(emptyForm)
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
-  const fetchExploitations = useCallback(async () => {
+  // Dialog state
+  const [showAdd, setShowAdd] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [uploadingFiles, setUploadingFiles] = useState(false)
+  const [form, setForm] = useState({
+    title: '',
+    description: '',
+    culture: '',
+    type_agriculture: 'maraîchage',
+    canton_id: '',
+    prefecture_id: '',
+    campaign: '',
+    price_non_member: 500,
+  })
+  const [pendingFiles, setPendingFiles] = useState<{ name: string; url: string; type: string; size: number }[]>([])
+
+  // Load reference data
+  useEffect(() => {
+    supabase.from('cultures').select('id, name, icon, category').order('name').then(({ data }) => setCultures(data ?? []))
+    supabase.from('prefectures').select('id, name').order('name').then(({ data }) => setPrefectures(data ?? []))
+  }, [supabase])
+
+  // Load cantons when prefecture changes
+  useEffect(() => {
+    if (!form.prefecture_id) { setCantons([]); return }
+    supabase.from('cantons').select('id, name').eq('prefecture_id', form.prefecture_id).order('name')
+      .then(({ data }) => setCantons(data ?? []))
+  }, [form.prefecture_id, supabase])
+
+  // Load fiches
+  const fetchFiches = useCallback(async () => {
     if (!currentCooperative) return
     setIsLoading(true)
-    const { data, error } = await supabase
-      .from('exploitations')
-      .select('*')
+
+    let query = supabase
+      .from('fiches_techniques')
+      .select('*', { count: 'exact' })
       .eq('cooperative_id', currentCooperative.id)
-      .order('name')
+      .order('created_at', { ascending: false })
+
+    if (debouncedSearch.trim()) {
+      query = query.or(`title.ilike.%${debouncedSearch.trim()}%,culture.ilike.%${debouncedSearch.trim()}%`)
+    }
+
+    const from = (page - 1) * PAGE_SIZE
+    query = query.range(from, from + PAGE_SIZE - 1)
+
+    const { data, error, count } = await query
     if (error) {
-      toast({ title: 'Error', description: errorMessage(error), variant: 'destructive' })
+      toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })
     } else {
-      setExploitations((data ?? []) as Exploitation[])
+      setFiches((data ?? []) as FicheTechnique[])
+      setTotal(count ?? 0)
     }
     setIsLoading(false)
-  }, [currentCooperative, supabase, toast])
+  }, [currentCooperative, supabase, debouncedSearch, page, toast])
 
-  useEffect(() => {
-    fetchExploitations()
-  }, [fetchExploitations])
+  useEffect(() => { fetchFiches() }, [fetchFiches])
+  useEffect(() => { setPage(1) }, [debouncedSearch])
 
-  useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch])
+  // File upload
+  const handleFileUpload = async (files: FileList) => {
+    if (!currentCooperative) return
+    setUploadingFiles(true)
+    const uploaded: typeof pendingFiles = []
 
-  const filtered = useMemo(() => {
-    const q = debouncedSearch.toLowerCase().trim()
-    if (!q) return exploitations
-    return exploitations.filter((e) =>
-      `${e.name} ${e.producer ?? ''} ${e.category ?? ''}`.toLowerCase().includes(q),
-    )
-  }, [exploitations, debouncedSearch])
+    for (const file of Array.from(files)) {
+      const ext = file.name.split('.').pop() ?? 'bin'
+      const path = `${currentCooperative.id}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`
 
-  const paged = useMemo(
-    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [filtered, page],
-  )
+      const { error } = await supabase.storage.from('fiches-techniques').upload(path, file)
+      if (error) {
+        toast({ title: `Échec upload: ${file.name}`, description: errorMessage(error), variant: 'destructive' })
+        continue
+      }
 
-  const openAdd = () => {
-    setEditItem(null)
-    setForm(emptyForm)
-    setFormErrors({})
-    setShowDialog(true)
+      uploaded.push({
+        name: file.name,
+        url: path,
+        type: ext,
+        size: file.size,
+      })
+    }
+
+    setPendingFiles((prev) => [...prev, ...uploaded])
+    setUploadingFiles(false)
+    if (uploaded.length > 0) {
+      toast({ title: `${uploaded.length} fichier(s) uploadé(s)` })
+    }
   }
 
-  const openEdit = (item: Exploitation) => {
-    setEditItem(item)
-    setForm({
-      name: item.name,
-      description: item.description ?? '',
-      category: item.category ?? '',
-      producer: item.producer ?? '',
-      unit: item.unit ?? 'kg',
-      price: item.price?.toString() ?? '',
-      active: item.active,
-    })
-    setFormErrors({})
-    setShowDialog(true)
-  }
-
+  // Save fiche
   const handleSave = async () => {
     if (!currentCooperative) return
-    const parsed = exploitationSchema.safeParse(form)
-    if (!parsed.success) {
-      setFormErrors(flattenZodErrors(parsed.error))
+    if (!form.title || !form.culture) {
+      toast({ title: 'Titre et culture sont obligatoires', variant: 'destructive' })
       return
     }
-    setFormErrors({})
+    if (pendingFiles.length === 0) {
+      toast({ title: 'Ajoutez au moins un fichier (DOCX, Excel ou PDF)', variant: 'destructive' })
+      return
+    }
+
     setSaving(true)
-    const payload = {
+    const { error } = await supabase.from('fiches_techniques').insert({
       cooperative_id: currentCooperative.id,
-      name: parsed.data.name,
-      description: parsed.data.description || null,
-      category: parsed.data.category || null,
-      price: parsed.data.price ? parseFloat(parsed.data.price) : null,
-      unit: parsed.data.unit || null,
-      producer: parsed.data.producer || null,
-      active: parsed.data.active,
-    }
-    const { error } = editItem
-      ? await supabase.from('exploitations').update(payload).eq('id', editItem.id)
-      : await supabase.from('exploitations').insert(payload)
+      title: form.title,
+      description: form.description || null,
+      culture: form.culture,
+      type_agriculture: form.type_agriculture,
+      canton_id: form.canton_id || null,
+      prefecture_id: form.prefecture_id || null,
+      campaign: form.campaign || null,
+      price_non_member: form.price_non_member,
+      files: pendingFiles,
+      status: 'published',
+    })
     setSaving(false)
+
     if (error) {
-      toast({ title: 'Save failed', description: errorMessage(error), variant: 'destructive' })
+      toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })
       return
     }
-    toast({
-      title: editItem ? 'Exploitation updated' : 'Exploitation added',
-      description: parsed.data.name,
-    })
-    setShowDialog(false)
-    fetchExploitations()
+
+    toast({ title: 'Fiche publiée', description: form.title })
+    setShowAdd(false)
+    setForm({ title: '', description: '', culture: '', type_agriculture: 'maraîchage', canton_id: '', prefecture_id: '', campaign: '', price_non_member: 500 })
+    setPendingFiles([])
+    fetchFiches()
   }
 
-  const handleDelete = async (item: Exploitation) => {
+  // Toggle status
+  const toggleStatus = async (fiche: FicheTechnique) => {
+    const newStatus = fiche.status === 'published' ? 'archived' : 'published'
+    const { error } = await supabase.from('fiches_techniques').update({ status: newStatus }).eq('id', fiche.id)
+    if (error) {
+      toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })
+      return
+    }
+    toast({ title: newStatus === 'published' ? 'Publiée' : 'Archivée' })
+    fetchFiches()
+  }
+
+  // Delete
+  const handleDelete = async (fiche: FicheTechnique) => {
     const ok = await confirm({
-      title: 'Delete exploitation',
-      description: `This will permanently remove "${item.name}" from the marketplace.`,
+      title: 'Supprimer cette fiche ?',
+      description: `"${fiche.title}" sera définitivement supprimée avec ses fichiers.`,
       destructive: true,
-      confirmLabel: 'Delete',
+      confirmLabel: 'Supprimer',
     })
     if (!ok) return
-    const { error } = await supabase.from('exploitations').delete().eq('id', item.id)
-    if (error) {
-      toast({ title: 'Delete failed', description: errorMessage(error), variant: 'destructive' })
-      return
+    // Delete files from storage
+    const paths = fiche.files.map((f) => f.url)
+    if (paths.length > 0) {
+      await supabase.storage.from('fiches-techniques').remove(paths)
     }
-    toast({ title: 'Exploitation deleted' })
-    fetchExploitations()
+    await supabase.from('fiches_techniques').delete().eq('id', fiche.id)
+    toast({ title: 'Fiche supprimée' })
+    fetchFiches()
   }
 
-  const toggleActive = async (item: Exploitation) => {
-    const { error } = await supabase
-      .from('exploitations')
-      .update({ active: !item.active })
-      .eq('id', item.id)
-    if (error) {
-      toast({ title: 'Update failed', description: errorMessage(error), variant: 'destructive' })
-      return
-    }
-    toast({ title: item.active ? 'Unpublished' : 'Published', description: item.name })
-    fetchExploitations()
+  const fileIcon = (type: string) => {
+    if (type === 'xlsx' || type === 'xls') return '📊'
+    if (type === 'docx' || type === 'doc') return '📄'
+    if (type === 'pdf') return '📕'
+    return '📎'
   }
 
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Marketplace"
-        description="Manage exploitations and products available to your members"
+        title="Comptes d'exploitation"
+        description="Gérez les fiches techniques et itinéraires de culture pour vos membres"
+        action={
+          <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setShowAdd(true)}>
+            <Plus className="h-4 w-4" />
+            Nouvelle fiche
+          </Button>
+        }
       />
 
-      <Tabs defaultValue="exploitations" className="w-full">
-        <TabsList className="grid w-full max-w-sm grid-cols-2 border-b border-border bg-transparent">
-          <TabsTrigger value="exploitations" className="border-b-2 border-transparent data-[state=active]:border-primary">
-            Exploitations ({exploitations.length})
-          </TabsTrigger>
-          <TabsTrigger value="categories" className="border-b-2 border-transparent data-[state=active]:border-primary">
-            Categories
-          </TabsTrigger>
-        </TabsList>
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="border-border">
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Total fiches</p>
+            <p className="text-2xl font-bold text-foreground">{total}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border">
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Publiées</p>
+            <p className="text-2xl font-bold text-green-600">{fiches.filter((f) => f.status === 'published').length}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border">
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Téléchargements</p>
+            <p className="text-2xl font-bold text-foreground">{fiches.reduce((s, f) => s + f.download_count, 0)}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border">
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Prix non-membre</p>
+            <p className="text-2xl font-bold text-foreground">500 FCFA</p>
+          </CardContent>
+        </Card>
+      </div>
 
-        <TabsContent value="exploitations" className="space-y-6 mt-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search exploitations…"
-                className="pl-10 border-border bg-background text-foreground"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                aria-label="Search exploitations"
-              />
-            </div>
-            <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={openAdd}>
-              <Plus className="h-4 w-4" />
-              Add Exploitation
-            </Button>
-          </div>
+      {/* Search */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          className="pl-10"
+          placeholder="Rechercher par titre ou culture…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
 
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle className="text-foreground">Exploitations</CardTitle>
-              <CardDescription>
-                Products and services from {currentCooperative?.name ?? 'your cooperative'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <LoadingBlock />
-              ) : filtered.length === 0 ? (
-                <EmptyState
-                  title={searchTerm ? 'No results found' : 'No exploitations yet'}
-                  description={
-                    searchTerm
-                      ? 'Try a different search'
-                      : 'Add your first exploitation to launch your marketplace'
-                  }
-                  action={
-                    !searchTerm ? (
-                      <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={openAdd}>
-                        <Plus className="h-4 w-4" />
-                        Add First Exploitation
-                      </Button>
-                    ) : null
-                  }
-                />
-              ) : (
-                <>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-border">
-                          <th className="text-left py-3 px-4 font-semibold text-foreground">Name</th>
-                          <th className="text-left py-3 px-4 font-semibold text-foreground">Producer</th>
-                          <th className="text-left py-3 px-4 font-semibold text-foreground">Category</th>
-                          <th className="text-left py-3 px-4 font-semibold text-foreground">Price</th>
-                          <th className="text-center py-3 px-4 font-semibold text-foreground">Status</th>
-                          <th className="text-right py-3 px-4 font-semibold text-foreground">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {paged.map((item) => (
-                          <tr key={item.id} className="border-b border-border hover:bg-accent/5 transition-colors">
-                            <td className="py-3 px-4 text-foreground font-medium">{item.name}</td>
-                            <td className="py-3 px-4 text-muted-foreground">{item.producer || '—'}</td>
-                            <td className="py-3 px-4 text-muted-foreground">{item.category || '—'}</td>
-                            <td className="py-3 px-4 text-foreground">
-                              {item.price != null ? `€${item.price.toFixed(2)}/${item.unit ?? 'unit'}` : '—'}
-                            </td>
-                            <td className="py-3 px-4 text-center">
-                              <PublishedBadge active={item.active} />
-                            </td>
-                            <td className="py-3 px-4 text-right">
-                              <div className="flex gap-2 justify-end">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="border-border"
-                                  onClick={() => toggleActive(item)}
-                                  title={item.active ? 'Unpublish' : 'Publish'}
-                                  aria-label={item.active ? `Unpublish ${item.name}` : `Publish ${item.name}`}
-                                >
-                                  {item.active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="border-border"
-                                  onClick={() => openEdit(item)}
-                                  aria-label={`Edit ${item.name}`}
-                                >
-                                  <Edit2 className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="border-border text-destructive hover:bg-destructive/10"
-                                  onClick={() => handleDelete(item)}
-                                  aria-label={`Delete ${item.name}`}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <PaginationBar
-                    page={page}
-                    pageSize={PAGE_SIZE}
-                    total={filtered.length}
-                    onPageChange={setPage}
-                  />
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="categories" className="space-y-6 mt-6">
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle className="text-foreground">Product Categories</CardTitle>
-              <CardDescription>Categories used to organize exploitations</CardDescription>
-            </CardHeader>
-            <CardContent>
+      {/* Fiches list */}
+      <Card className="border-border">
+        <CardHeader>
+          <CardTitle className="text-foreground">Fiches techniques</CardTitle>
+          <CardDescription>Comptes d'exploitation et itinéraires techniques uploadés</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <LoadingBlock />
+          ) : fiches.length === 0 ? (
+            <EmptyState
+              icon={FileText}
+              title={search ? 'Aucune fiche trouvée' : 'Aucune fiche technique'}
+              description={search ? 'Essayez un autre terme' : 'Uploadez vos premiers comptes d\'exploitation (DOCX, Excel)'}
+              action={
+                !search ? (
+                  <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setShowAdd(true)}>
+                    <Upload className="h-4 w-4" />
+                    Ajouter une fiche
+                  </Button>
+                ) : null
+              }
+            />
+          ) : (
+            <>
               <div className="space-y-3">
-                {PRODUCT_CATEGORIES.map((category) => {
-                  const count = exploitations.filter((e) => e.category === category).length
-                  return (
-                    <div
-                      key={category}
-                      className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent/5 transition-colors"
-                    >
-                      <span className="font-medium text-foreground">{category}</span>
-                      <span className="text-sm text-muted-foreground">
-                        {count} exploitation{count === 1 ? '' : 's'}
-                      </span>
+                {fiches.map((fiche) => (
+                  <div
+                    key={fiche.id}
+                    className="flex items-start gap-4 p-4 border border-border rounded-lg hover:bg-accent/5 transition-colors"
+                  >
+                    {/* Icon */}
+                    <div className="text-3xl shrink-0">
+                      {cultures.find((c) => c.name === fiche.culture)?.icon ?? '🌿'}
                     </div>
-                  )
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
 
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold text-foreground">{fiche.title}</h3>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${fiche.status === 'published' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                          {fiche.status === 'published' ? 'Publiée' : 'Archivée'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        {fiche.culture} • {fiche.type_agriculture}
+                        {fiche.campaign ? ` • ${fiche.campaign}` : ''}
+                      </p>
+                      {/* Files */}
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {fiche.files.map((f, i) => (
+                          <span key={i} className="inline-flex items-center gap-1 text-xs bg-secondary/50 px-2 py-1 rounded">
+                            {fileIcon(f.type)} {f.name}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {fiche.download_count} téléchargement{fiche.download_count !== 1 ? 's' : ''} • {fiche.price_non_member} FCFA (non-membres)
+                      </p>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-2 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => toggleStatus(fiche)}
+                        title={fiche.status === 'published' ? 'Archiver' : 'Publier'}
+                      >
+                        {fiche.status === 'published' ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-destructive hover:bg-destructive/10"
+                        onClick={() => handleDelete(fiche)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <PaginationBar page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Add fiche dialog */}
+      <Dialog open={showAdd} onOpenChange={setShowAdd}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editItem ? 'Edit Exploitation' : 'Add Exploitation'}</DialogTitle>
+            <DialogTitle>Nouvelle fiche technique</DialogTitle>
+            <DialogDescription>
+              Uploadez un compte d'exploitation ou itinéraire technique (DOCX, Excel, PDF)
+            </DialogDescription>
           </DialogHeader>
+
           <div className="space-y-4 py-2">
+            {/* Title */}
             <div className="space-y-2">
-              <Label>Name <span className="text-destructive">*</span></Label>
+              <Label>Titre <span className="text-destructive">*</span></Label>
               <Input
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Tomates Bio"
-                aria-invalid={!!formErrors.name}
-              />
-              {formErrors.name ? <p className="text-xs text-destructive">{formErrors.name}</p> : null}
-            </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Input
-                value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                placeholder="Description…"
+                value={form.title}
+                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                placeholder="Compte d'exploitation Tomate — Canton Tsévié"
               />
             </div>
+
+            {/* Culture + Type */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Category</Label>
+                <Label>Culture <span className="text-destructive">*</span></Label>
                 <select
                   className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
-                  value={form.category}
-                  onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                  value={form.culture}
+                  onChange={(e) => setForm((f) => ({ ...f, culture: e.target.value }))}
                 >
-                  <option value="">Select…</option>
-                  {PRODUCT_CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
+                  <option value="">— Choisir —</option>
+                  {cultures.map((c) => (
+                    <option key={c.id} value={c.name}>{c.icon} {c.name}</option>
                   ))}
                 </select>
               </div>
               <div className="space-y-2">
-                <Label>Producer</Label>
-                <Input
-                  value={form.producer}
-                  onChange={(e) => setForm((f) => ({ ...f, producer: e.target.value }))}
-                  placeholder="Ferme Dupont"
-                />
+                <Label>Type d'agriculture</Label>
+                <select
+                  className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
+                  value={form.type_agriculture}
+                  onChange={(e) => setForm((f) => ({ ...f, type_agriculture: e.target.value }))}
+                >
+                  {TYPES_AGRICULTURE.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
               </div>
             </div>
+
+            {/* Localisation */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Price (€)</Label>
-                <Input
-                  inputMode="decimal"
-                  value={form.price}
-                  onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-                  placeholder="3.50"
-                  aria-invalid={!!formErrors.price}
-                />
-                {formErrors.price ? <p className="text-xs text-destructive">{formErrors.price}</p> : null}
+                <Label>Préfecture (localisation)</Label>
+                <select
+                  className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
+                  value={form.prefecture_id}
+                  onChange={(e) => setForm((f) => ({ ...f, prefecture_id: e.target.value, canton_id: '' }))}
+                >
+                  <option value="">— Toutes —</option>
+                  {prefectures.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-2">
-                <Label>Unit</Label>
+                <Label>Canton</Label>
+                <select
+                  className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
+                  value={form.canton_id}
+                  onChange={(e) => setForm((f) => ({ ...f, canton_id: e.target.value }))}
+                  disabled={!form.prefecture_id || cantons.length === 0}
+                >
+                  <option value="">— Tous —</option>
+                  {cantons.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Campaign + Price */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Campagne</Label>
                 <Input
-                  value={form.unit}
-                  onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
-                  placeholder="kg"
+                  value={form.campaign}
+                  onChange={(e) => setForm((f) => ({ ...f, campaign: e.target.value }))}
+                  placeholder="2025-2026"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Prix non-membre (FCFA)</Label>
+                <Input
+                  type="number"
+                  value={form.price_non_member}
+                  onChange={(e) => setForm((f) => ({ ...f, price_non_member: parseInt(e.target.value) || 500 }))}
                 />
               </div>
             </div>
-            <label className="flex items-center gap-2 cursor-pointer pt-1">
-              <input
-                type="checkbox"
-                checked={form.active}
-                onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))}
-                className="rounded border-border"
+
+            {/* Description */}
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <textarea
+                className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm min-h-[60px]"
+                value={form.description}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                placeholder="Description de la fiche technique…"
               />
-              <span className="text-sm text-foreground">Published (visible in marketplace)</span>
-            </label>
+            </div>
+
+            {/* File upload */}
+            <div className="space-y-2">
+              <Label>Fichiers <span className="text-destructive">*</span></Label>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingFiles}
+                className="w-full border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary hover:bg-accent/5 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {uploadingFiles ? (
+                  <Spinner className="h-6 w-6 mx-auto" />
+                ) : (
+                  <>
+                    <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-sm text-foreground font-medium">Cliquez pour ajouter des fichiers</p>
+                    <p className="text-xs text-muted-foreground mt-1">DOCX, Excel (.xlsx), PDF — max 20 Mo</p>
+                  </>
+                )}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".docx,.xlsx,.xls,.pdf,.doc"
+                multiple
+                className="sr-only"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    handleFileUpload(e.target.files)
+                  }
+                  e.target.value = ''
+                }}
+              />
+
+              {/* Uploaded files list */}
+              {pendingFiles.length > 0 && (
+                <div className="space-y-2 mt-3">
+                  {pendingFiles.map((f, i) => (
+                    <div key={i} className="flex items-center justify-between p-2 bg-secondary/30 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <span>{fileIcon(f.type)}</span>
+                        <span className="text-sm text-foreground">{f.name}</span>
+                        <span className="text-xs text-muted-foreground">({(f.size / 1024).toFixed(0)} Ko)</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0 text-destructive"
+                        onClick={() => setPendingFiles((prev) => prev.filter((_, j) => j !== i))}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)} disabled={saving}>
-              Cancel
+            <Button variant="outline" onClick={() => setShowAdd(false)} disabled={saving}>
+              Annuler
             </Button>
             <Button
-              className="bg-primary hover:bg-primary/90"
+              className="bg-primary hover:bg-primary/90 gap-2"
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || !form.title || !form.culture || pendingFiles.length === 0}
             >
-              {saving ? <Spinner className="h-4 w-4 mr-2" /> : null}
-              {editItem ? 'Save Changes' : 'Add Exploitation'}
+              {saving ? <Spinner className="h-4 w-4" /> : <Upload className="h-4 w-4" />}
+              Publier la fiche
             </Button>
           </DialogFooter>
         </DialogContent>
