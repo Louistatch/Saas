@@ -9,58 +9,56 @@ interface ProtectedRouteProps {
 }
 
 /**
- * Client-side route guard.
+ * Client-side route guard — LIGHTWEIGHT.
  * 
- * IMPORTANT: The timeout only triggers AFTER isLoading becomes false.
- * This prevents false redirects on slow networks where getUser() takes time.
+ * The PROXY (server-side) is the primary auth gate:
+ * - It checks cookies and redirects unauthenticated users to /auth/login
+ * - If the user reaches this component, they PASSED the proxy check
  * 
- * Flow:
- * 1. Show spinner while isLoading = true (no timeout during this phase)
- * 2. Once isLoading = false:
- *    - If authenticated → show children
- *    - If NOT authenticated → redirect to login immediately
- * 3. Safety net: if isLoading stays true for 20s → redirect (something is broken)
+ * This component's job is ONLY:
+ * 1. Wait for AuthProvider to finish loading (show spinner)
+ * 2. Role-gate (e.g. /admin requires super_admin)
+ * 3. Safety net: if after 25s auth still hasn't loaded, redirect
+ * 
+ * It does NOT duplicate the proxy's auth check.
  */
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading, user } = useAuth()
-  const [loadingTooLong, setLoadingTooLong] = useState(false)
+  const [timedOut, setTimedOut] = useState(false)
 
-  // Safety net: if auth loading takes more than 20s, something is broken
-  // This handles the case where getUser() hangs indefinitely
+  // Safety net: 25s max wait for auth to load
   useEffect(() => {
-    if (!isLoading) return // Already loaded, no need for timeout
-
-    const timer = setTimeout(() => {
-      setLoadingTooLong(true)
-    }, 20000)
-
+    if (!isLoading) return
+    const timer = setTimeout(() => setTimedOut(true), 25000)
     return () => clearTimeout(timer)
   }, [isLoading])
 
-  // Redirect logic — only runs AFTER loading is complete
+  // If loading finished and not authenticated → redirect
+  // (This shouldn't happen normally because proxy already gates)
   useEffect(() => {
-    if (isLoading) return // Wait for auth to finish loading
-
+    if (isLoading) return
     if (!isAuthenticated) {
       window.location.replace(`/auth/login?redirect=${encodeURIComponent(window.location.pathname)}`)
-      return
     }
+  }, [isAuthenticated, isLoading])
 
-    // Role guard
+  // Role guard (only after auth is loaded)
+  useEffect(() => {
+    if (isLoading || !isAuthenticated) return
     if (requiredRole && user?.role !== requiredRole && user?.role !== 'super_admin') {
       window.location.replace('/dashboard')
     }
   }, [isAuthenticated, isLoading, user, requiredRole])
 
-  // Safety net redirect
+  // Safety net: auth loading hung
   useEffect(() => {
-    if (loadingTooLong && !isAuthenticated) {
+    if (timedOut && isLoading) {
       window.location.replace('/auth/login')
     }
-  }, [loadingTooLong, isAuthenticated])
+  }, [timedOut, isLoading])
 
-  // Still loading auth state — show spinner (patient, no timeout pressure)
-  if (isLoading && !loadingTooLong) {
+  // Show spinner while auth loads (trust the proxy — user is likely valid)
+  if (isLoading && !timedOut) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="space-y-4 text-center">
@@ -71,8 +69,10 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     )
   }
 
+  // Not authenticated (shouldn't happen if proxy works)
   if (!isAuthenticated) return null
 
+  // Role mismatch
   if (requiredRole && user?.role !== requiredRole && user?.role !== 'super_admin') {
     return null
   }
