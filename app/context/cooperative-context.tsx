@@ -86,11 +86,11 @@ export function CooperativeProvider({ children }: { children: React.ReactNode })
     }
   }, [user, supabase])
 
+  // Detect user switch: reset state when user changes
   useEffect(() => {
-    // Detect user switch: if user ID changed, clear stale cooperative data first
     if (user?.id !== lastUserId) {
-      if (lastUserId !== null) {
-        // User actually switched (not initial load) — clear old data
+      if (lastUserId !== null && user?.id) {
+        // User actually switched (not initial load or logout) — clear old data
         setCooperatives([])
         setCurrentCooperative(null)
         if (typeof window !== 'undefined') {
@@ -99,8 +99,12 @@ export function CooperativeProvider({ children }: { children: React.ReactNode })
       }
       setLastUserId(user?.id ?? null)
     }
+  }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch cooperatives when user changes (separate from switch detection)
+  useEffect(() => {
     fetchCooperatives()
-  }, [fetchCooperatives, user?.id, lastUserId])
+  }, [fetchCooperatives])
 
   const switchCooperative = useCallback(
     (cooperativeId: string) => {

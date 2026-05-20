@@ -98,12 +98,12 @@ export default function MembersPage() {
     }
     const { data, error } = await query
     if (error) {
-      toast({ title: 'Error', description: errorMessage(error), variant: 'destructive' })
+      toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })
     } else {
       setMembers((data ?? []) as Member[])
     }
     setIsLoading(false)
-  }, [currentCooperative, supabase, toast])
+  }, [currentCooperative, supabase, user?.role]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchMembers()
