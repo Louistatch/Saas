@@ -28,15 +28,19 @@ function LoginInner() {
   const redirectTo = searchParams?.get('redirect')
 
   useEffect(() => {
-    if (isAuthenticated && !isLoading) {
-      if (redirectTo && redirectTo.startsWith('/')) {
-        router.push(redirectTo)
-      } else if (user?.role === 'super_admin') {
-        router.push('/admin')
-      } else {
-        router.push('/dashboard')
+    // Small delay to let the auth state settle after a logout redirect
+    const timer = setTimeout(() => {
+      if (isAuthenticated && !isLoading) {
+        if (redirectTo && redirectTo.startsWith('/')) {
+          router.push(redirectTo)
+        } else if (user?.role === 'super_admin') {
+          router.push('/admin')
+        } else {
+          router.push('/dashboard')
+        }
       }
-    }
+    }, 300)
+    return () => clearTimeout(timer)
   }, [isAuthenticated, isLoading, user, router, redirectTo])
 
   const handleSubmit = async (e: React.FormEvent) => {

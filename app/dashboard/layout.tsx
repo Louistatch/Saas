@@ -32,9 +32,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { user, logout } = useAuth()
   const { currentCooperative, cooperatives, switchCooperative } = useCooperative()
 
-  const handleLogout = async () => {
-    await logout()
-    router.push('/')
+  const handleLogout = () => {
+    // Use the signout page which properly clears everything
+    window.location.href = '/auth/signout'
   }
 
   // Navigation items filtered by role

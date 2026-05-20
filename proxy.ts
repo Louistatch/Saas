@@ -69,11 +69,20 @@ export async function proxy(request: NextRequest) {
   }
 
   // Authed users away from auth pages
+  // BUT: allow if they just logged out (the signOut may not have cleared the server cookie yet)
   if (user && isAuthPage) {
-    if (role === 'super_admin') {
-      return NextResponse.redirect(new URL('/admin', request.url))
+    // Don't redirect if the user explicitly navigated here (e.g. after logout)
+    const referer = request.headers.get('referer') ?? ''
+    const isComingFromApp = referer.includes('/dashboard') || referer.includes('/admin')
+    
+    // If they're coming from the app, they probably just logged out — let them through
+    // The client-side auth context will show them as logged out
+    if (!isComingFromApp) {
+      if (role === 'super_admin') {
+        return NextResponse.redirect(new URL('/admin', request.url))
+      }
+      return NextResponse.redirect(new URL('/dashboard', request.url))
     }
-    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
   return supabaseResponse

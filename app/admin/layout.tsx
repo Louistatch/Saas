@@ -29,9 +29,9 @@ export default function AdminLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { logout } = useAuth()
 
-  const handleLogout = async () => {
-    await logout()
-    router.push('/')
+  const handleLogout = () => {
+    // Use the signout page which properly clears everything
+    window.location.href = '/auth/signout'
   }
 
   const adminLinks = [
