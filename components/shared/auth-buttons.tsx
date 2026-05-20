@@ -14,14 +14,8 @@ import { LayoutDashboard, LogOut } from 'lucide-react'
 export function AuthButtons() {
   const { isAuthenticated, isLoading, user } = useAuth()
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center gap-3">
-        <div className="h-8 w-20 bg-muted rounded animate-pulse" />
-      </div>
-    )
-  }
-
+  // Don't show skeleton — show login buttons immediately
+  // They'll be replaced once auth state is resolved
   if (isAuthenticated && user) {
     const dashboardUrl = user.role === 'super_admin' ? '/admin' : '/dashboard'
     return (
@@ -29,7 +23,7 @@ export function AuthButtons() {
         <Link href={dashboardUrl}>
           <Button size="sm" className="gap-2">
             <LayoutDashboard className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Tableau de bord</span>
+            Tableau de bord
           </Button>
         </Link>
         <Button
@@ -44,6 +38,7 @@ export function AuthButtons() {
     )
   }
 
+  // Show login buttons (also shown during loading — better than skeleton)
   return (
     <div className="flex items-center gap-3">
       <Link href="/auth/login">
