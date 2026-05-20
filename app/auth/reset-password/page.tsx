@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Logo } from '@/components/shared/logo'
 import { Button } from '@/components/ui/button'
@@ -12,18 +12,18 @@ import { createClient } from '@/lib/supabase/client'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
+  const supabase = useMemo(() => createClient(), [])
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
   const [loading, setLoading] = useState(false)
-  const supabase = createClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (password.length < 8) { setError('Password must be at least 8 characters'); return }
-    if (password !== confirm) { setError('Passwords do not match'); return }
+    if (password.length < 8) { setError('Le mot de passe doit contenir au moins 8 caractères'); return }
+    if (password !== confirm) { setError('Les mots de passe ne correspondent pas'); return }
     setLoading(true)
     const { error } = await supabase.auth.updateUser({ password })
     if (error) {
@@ -44,15 +44,15 @@ export default function ResetPasswordPage() {
 
         <Card className="border-border">
           <CardHeader className="space-y-2">
-            <CardTitle className="text-2xl">New Password</CardTitle>
-            <CardDescription>Choose a strong password for your account</CardDescription>
+            <CardTitle className="text-2xl">Nouveau mot de passe</CardTitle>
+            <CardDescription>Choisissez un mot de passe sécurisé pour votre compte</CardDescription>
           </CardHeader>
           <CardContent>
             {done ? (
               <div className="space-y-4 text-center py-4">
                 <CheckCircle className="h-12 w-12 text-green-600 mx-auto" />
-                <p className="font-medium text-foreground">Password updated!</p>
-                <p className="text-sm text-muted-foreground">Redirecting to dashboard...</p>
+                <p className="font-medium text-foreground">Mot de passe mis à jour !</p>
+                <p className="text-sm text-muted-foreground">Redirection vers le tableau de bord…</p>
               </div>
             ) : (
               <form className="space-y-4" onSubmit={handleSubmit}>
@@ -62,23 +62,25 @@ export default function ResetPasswordPage() {
                   </div>
                 )}
                 <div className="space-y-2">
-                  <Label htmlFor="password">New Password</Label>
+                  <Label htmlFor="password">Nouveau mot de passe</Label>
                   <Input
                     id="password"
                     type="password"
+                    autoComplete="new-password"
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="border-border bg-background text-foreground"
                     required
                   />
-                  <p className="text-xs text-muted-foreground">At least 8 characters</p>
+                  <p className="text-xs text-muted-foreground">Au moins 8 caractères</p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="confirm">Confirm Password</Label>
+                  <Label htmlFor="confirm">Confirmer le mot de passe</Label>
                   <Input
                     id="confirm"
                     type="password"
+                    autoComplete="new-password"
                     placeholder="••••••••"
                     value={confirm}
                     onChange={(e) => setConfirm(e.target.value)}
@@ -87,7 +89,7 @@ export default function ResetPasswordPage() {
                   />
                 </div>
                 <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={loading}>
-                  {loading ? 'Updating...' : 'Update Password'}
+                  {loading ? 'Mise à jour…' : 'Mettre à jour le mot de passe'}
                 </Button>
               </form>
             )}
