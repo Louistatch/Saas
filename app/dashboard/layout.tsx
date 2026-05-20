@@ -13,6 +13,7 @@ import {
   X,
   Home,
   FileText,
+  FolderOpen,
   Zap,
   Shield,
 } from 'lucide-react'
@@ -38,6 +39,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const navigationItems = [
     { href: '/dashboard', label: 'Overview', icon: Home, roles: ['super_admin', 'cooperative_admin', 'member', 'guest'] },
     { href: '/dashboard/marketplace', label: 'Marketplace', icon: ShoppingCart, roles: ['super_admin', 'cooperative_admin', 'member', 'guest'] },
+    { href: '/dashboard/templates', label: 'Templates', icon: FolderOpen, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/members', label: 'Members', icon: Users, roles: ['super_admin', 'cooperative_admin', 'member'] },
     { href: '/dashboard/cards', label: 'Member Cards', icon: FileText, roles: ['super_admin', 'cooperative_admin', 'member'] },
     { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3, roles: ['super_admin', 'cooperative_admin'] },
