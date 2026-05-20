@@ -47,6 +47,8 @@ export interface Cooperative {
   logo?: string
   primaryColor?: string
   faitiereName?: string
+  level?: string
+  parentId?: string
   memberCount?: number
   exploitationCount?: number
 }
@@ -58,6 +60,8 @@ export interface CooperativeRow {
   primary_color: string | null
   logo_url: string | null
   faitiere_name: string | null
+  level: string | null
+  parent_id: string | null
   created_at: string
 }
 

@@ -43,7 +43,7 @@ interface SettingsRow {
 }
 
 export default function CardsPage() {
-  const { currentCooperative } = useCooperative()
+  const { currentCooperative, cooperatives } = useCooperative()
   const { user } = useAuth()
   const { toast } = useToast()
   const { confirm, confirmNode } = useConfirm()
@@ -61,6 +61,7 @@ export default function CardsPage() {
   const [showGenerate, setShowGenerate] = useState(false)
   const [showBulk, setShowBulk] = useState(false)
   const [selectedMemberId, setSelectedMemberId] = useState('')
+  const [selectedCoopId, setSelectedCoopId] = useState('')
   const [bulkSelectedIds, setBulkSelectedIds] = useState<string[]>([])
   const [bulkSearch, setBulkSearch] = useState('')
   const [validityDays, setValidityDays] = useState(365)
@@ -76,6 +77,24 @@ export default function CardsPage() {
   const [template, setTemplate] = useState<CardTemplate>(DEFAULT_CARD_TEMPLATE)
   const [settings, setSettings] = useState<CardSettings>(DEFAULT_CARD_SETTINGS)
   const [templateErrors, setTemplateErrors] = useState<Record<string, string>>({})
+
+  // Faîtière logic: detect if current user manages a faîtière (parent org)
+  const isFaitiereAdmin = currentCooperative?.level === 'faitiere' || currentCooperative?.level === 'union'
+  
+  // Child cooperatives (only leaf-level cooperatives for card generation)
+  const childCooperatives = useMemo(() => {
+    if (!isFaitiereAdmin || !currentCooperative) return []
+    return cooperatives.filter(c => c.level === 'cooperative' && c.id !== currentCooperative.id)
+  }, [isFaitiereAdmin, currentCooperative, cooperatives])
+
+  // Members filtered by selected cooperative (for faîtière admins)
+  const [allMembers, setAllMembers] = useState<(Pick<Member, 'id' | 'first_name' | 'last_name'> & { cooperative_id: string })[]>([])
+  
+  const filteredMembersForGenerate = useMemo(() => {
+    if (!isFaitiereAdmin) return members
+    if (!selectedCoopId) return []
+    return allMembers.filter(m => m.cooperative_id === selectedCoopId)
+  }, [isFaitiereAdmin, selectedCoopId, members, allMembers])
 
   const fetchCards = useCallback(async () => {
     if (!currentCooperative) return
@@ -100,14 +119,18 @@ export default function CardsPage() {
     if (!currentCooperative) return
     let query = supabase
       .from('members')
-      .select('id, first_name, last_name')
-    if (user?.role !== 'super_admin') {
+      .select('id, first_name, last_name, cooperative_id')
+    if (user?.role !== 'super_admin' && !isFaitiereAdmin) {
       query = query.eq('cooperative_id', currentCooperative.id)
     }
     query = query.eq('status', 'active').order('last_name')
     const { data, error } = await query
-    if (!error) setMembers(data ?? [])
-  }, [currentCooperative, supabase, user])
+    if (!error) {
+      const rows = (data ?? []) as (Pick<Member, 'id' | 'first_name' | 'last_name'> & { cooperative_id: string })[]
+      setMembers(rows)
+      setAllMembers(rows)
+    }
+  }, [currentCooperative, supabase, user, isFaitiereAdmin])
 
   const loadCooperativeSettings = useCallback(async () => {
     if (!currentCooperative) return
@@ -170,8 +193,15 @@ export default function CardsPage() {
       }
       if (settings.qrCodeIncludes.memberId) payload.member_id = memberId
       if (settings.qrCodeIncludes.cooperativeId && currentCooperative) {
-        payload.cooperative = currentCooperative.name
-        if (currentCooperative.faitiereName) payload.faitiere = currentCooperative.faitiereName
+        // For faîtière: show both faîtière and cooperative
+        if (isFaitiereAdmin && selectedCoopId) {
+          const childCoop = childCooperatives.find(c => c.id === selectedCoopId)
+          payload.faitiere = currentCooperative.name
+          payload.cooperative = childCoop?.name ?? ''
+        } else {
+          payload.cooperative = currentCooperative.name
+          if (currentCooperative.faitiereName) payload.faitiere = currentCooperative.faitiereName
+        }
       }
       if (member) {
         payload.name = `${member.first_name ?? ''} ${member.last_name ?? ''}`.trim()
@@ -181,7 +211,7 @@ export default function CardsPage() {
       }
       return JSON.stringify(payload)
     },
-    [settings, currentCooperative],
+    [settings, currentCooperative, isFaitiereAdmin, selectedCoopId, childCooperatives],
   )
 
   // -- single generation --
@@ -191,10 +221,25 @@ export default function CardsPage() {
       toast({ title: 'Sélectionnez un membre', variant: 'destructive' })
       return
     }
+    // For faîtière admins, use the selected child cooperative
+    const targetCoopId = isFaitiereAdmin ? selectedCoopId : currentCooperative.id
+    const targetCoopName = isFaitiereAdmin 
+      ? childCooperatives.find(c => c.id === selectedCoopId)?.name 
+      : currentCooperative.name
+    
+    if (!targetCoopId) {
+      toast({ title: 'Sélectionnez une coopérative', variant: 'destructive' })
+      return
+    }
+
     setSaving(true)
     const expiry = new Date()
     expiry.setDate(expiry.getDate() + validityDays)
-    const cardNumber = generateCardNumber()
+    
+    // Card number uses the target cooperative prefix
+    const prefix = (targetCoopName ?? 'COP').slice(0, 3).toUpperCase().replace(/\s+/g, '')
+    const num = Math.floor(Math.random() * 90000) + 10000
+    const cardNumber = `${prefix}-${num}`
 
     // Revoke any existing active card for this member
     await supabase
@@ -203,13 +248,16 @@ export default function CardsPage() {
       .eq('member_id', selectedMemberId)
       .eq('status', 'active')
 
+    const memberData = allMembers.find(m => m.id === selectedMemberId) ?? null
+    const qrPayload = buildQrPayload(selectedMemberId, cardNumber, memberData)
+
     const { error } = await supabase.from('member_cards').insert({
-      cooperative_id: currentCooperative.id,
+      cooperative_id: targetCoopId,
       member_id: selectedMemberId,
       card_number: cardNumber,
       status: 'active',
       expiry_date: expiry.toISOString().split('T')[0],
-      qr_data: buildQrPayload(selectedMemberId, cardNumber, members.find(m => m.id === selectedMemberId) ?? null),
+      qr_data: qrPayload,
     })
 
     setSaving(false)
@@ -217,9 +265,10 @@ export default function CardsPage() {
       toast({ title: 'Impossible de générer la carte', description: errorMessage(error), variant: 'destructive' })
       return
     }
-    toast({ title: 'Carte générée', description: cardNumber })
+    toast({ title: 'Carte générée', description: `${cardNumber} — ${currentCooperative.name}/${targetCoopName}` })
     setShowGenerate(false)
     setSelectedMemberId('')
+    setSelectedCoopId('')
     fetchCards()
   }
 
@@ -289,11 +338,19 @@ export default function CardsPage() {
   const handleDownload = async (card: MemberCard) => {
     setDownloadingId(card.id)
     try {
+      // Resolve cooperative and faîtière names from the card's cooperative_id
+      const cardCoop = cooperatives.find(c => c.id === card.cooperative_id)
+      const coopName = cardCoop?.name ?? currentCooperative?.name
+      // If current org is a faîtière, use its name as faitiereName
+      const faitName = isFaitiereAdmin 
+        ? currentCooperative?.name 
+        : (cardCoop?.faitiereName ?? currentCooperative?.faitiereName)
+
       await downloadCardImage({
         card,
         template,
-        cooperativeName: currentCooperative?.name,
-        faitiereName: currentCooperative?.faitiereName,
+        cooperativeName: coopName,
+        faitiereName: faitName,
         qrPayload: card.qr_data || buildQrPayload(card.member_id, card.card_number),
       })
       toast({ title: 'Carte téléchargée' })
@@ -318,11 +375,17 @@ export default function CardsPage() {
     setDownloadingAll(true)
     try {
       for (const card of active) {
+        const cardCoop = cooperatives.find(c => c.id === card.cooperative_id)
+        const coopName = cardCoop?.name ?? currentCooperative?.name
+        const faitName = isFaitiereAdmin 
+          ? currentCooperative?.name 
+          : (cardCoop?.faitiereName ?? currentCooperative?.faitiereName)
+
         await downloadCardImage({
           card,
           template,
-          cooperativeName: currentCooperative?.name,
-          faitiereName: currentCooperative?.faitiereName,
+          cooperativeName: coopName,
+          faitiereName: faitName,
           qrPayload: card.qr_data || buildQrPayload(card.member_id, card.card_number),
         })
         // Small delay so browsers don't merge downloads
@@ -597,8 +660,8 @@ export default function CardsPage() {
                     {[
                       { icon: '📍', label: 'Localité', value: 'Village, Préfecture' },
                       { icon: '📞', label: 'Téléphone', value: '+228 90 XX XX XX' },
-                      { icon: '🏢', label: 'Coopérative', value: currentCooperative?.name ?? 'Coop' },
-                      { icon: '🌿', label: 'Faîtière', value: currentCooperative?.faitiereName ?? 'Faîtière' },
+                      { icon: '🏢', label: 'Coopérative', value: isFaitiereAdmin && selectedCoopId ? childCooperatives.find(c => c.id === selectedCoopId)?.name ?? 'Coop' : currentCooperative?.name ?? 'Coop' },
+                      { icon: '🌿', label: 'Faîtière', value: isFaitiereAdmin ? currentCooperative?.name ?? 'Faîtière' : currentCooperative?.faitiereName ?? 'FENOMAT' },
                     ].map((b, i) => (
                       <div key={i} className="px-2 py-1.5 rounded-lg bg-white/5 border border-white/10">
                         <div className="flex items-center gap-1">
@@ -737,32 +800,60 @@ export default function CardsPage() {
       <Dialog open={showGenerate} onOpenChange={setShowGenerate}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Generate Member Card</DialogTitle>
-            <DialogDescription>Create a new digital member card with QR code.</DialogDescription>
+            <DialogTitle>Générer une carte membre</DialogTitle>
+            <DialogDescription>Créer une nouvelle carte numérique avec code QR.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {/* Cooperative selector for faîtière admins */}
+            {isFaitiereAdmin && (
+              <div className="space-y-2">
+                <Label>Coopérative <span className="text-destructive">*</span></Label>
+                <select
+                  className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
+                  value={selectedCoopId}
+                  onChange={(e) => {
+                    setSelectedCoopId(e.target.value)
+                    setSelectedMemberId('')
+                  }}
+                >
+                  <option value="">— Choisir la coopérative —</option>
+                  {childCooperatives.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  La carte affichera : {currentCooperative?.name} / {childCooperatives.find(c => c.id === selectedCoopId)?.name || '…'}
+                </p>
+              </div>
+            )}
             <div className="space-y-2">
-              <Label>Member <span className="text-destructive">*</span></Label>
+              <Label>Membre <span className="text-destructive">*</span></Label>
               <select
                 className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
                 value={selectedMemberId}
                 onChange={(e) => setSelectedMemberId(e.target.value)}
+                disabled={isFaitiereAdmin && !selectedCoopId}
               >
-                <option value="">Choose a member…</option>
-                {members.map((m) => (
+                <option value="">— Choisir un membre —</option>
+                {filteredMembersForGenerate.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.first_name} {m.last_name}
                   </option>
                 ))}
               </select>
-              {members.length === 0 && (
+              {isFaitiereAdmin && !selectedCoopId && (
                 <p className="text-xs text-muted-foreground">
-                  No active members yet. Add members first.
+                  Sélectionnez d'abord une coopérative.
+                </p>
+              )}
+              {filteredMembersForGenerate.length === 0 && (selectedCoopId || !isFaitiereAdmin) && (
+                <p className="text-xs text-muted-foreground">
+                  Aucun membre actif. Ajoutez des membres d'abord.
                 </p>
               )}
             </div>
             <div className="space-y-2">
-              <Label>Validity (days)</Label>
+              <Label>Durée de validité (jours)</Label>
               <Input
                 type="number"
                 min={1}
@@ -774,15 +865,15 @@ export default function CardsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowGenerate(false)} disabled={saving}>
-              Cancel
+              Annuler
             </Button>
             <Button
               className="bg-primary hover:bg-primary/90"
               onClick={handleGenerate}
-              disabled={saving || !selectedMemberId}
+              disabled={saving || !selectedMemberId || (isFaitiereAdmin && !selectedCoopId)}
             >
               {saving ? <Spinner className="h-4 w-4 mr-2" /> : null}
-              Generate Card
+              Générer la carte
             </Button>
           </DialogFooter>
         </DialogContent>
