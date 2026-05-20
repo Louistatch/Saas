@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { createLogger } from '@/lib/utils/logger'
+import { setUserId, setTenantId, onLogoutBroadcast, destroySession } from '@/lib/auth/session'
 import type { AuthUser, UserRole } from '@/types/domain'
 
 const log = createLogger('auth')
@@ -53,6 +54,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const supabase = useMemo(() => createClient(), [])
+
+  // Track user in session for cache namespacing
+  useEffect(() => {
+    if (user) {
+      setUserId(user.id)
+      setTenantId(user.cooperativeId ?? null)
+    } else {
+      setUserId(null)
+      setTenantId(null)
+    }
+  }, [user])
+
+  // Listen for logout from other tabs
+  useEffect(() => {
+    const cleanup = onLogoutBroadcast(() => {
+      // Another tab logged out — clear our state too
+      setUser(null)
+      destroySession()
+      window.location.replace('/auth/login')
+    })
+    return cleanup
+  }, [])
 
   const fetchProfile = useCallback(
     async (userId: string): Promise<AuthUser | null> => {
@@ -200,10 +223,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   const logout = useCallback(async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) throw error
-    setUser(null)
-  }, [supabase])
+    // Use the enterprise logout procedure for complete session destruction
+    const { performLogout } = await import('@/lib/auth/logout')
+    await performLogout()
+  }, [])
 
   const refreshProfile = useCallback(async () => {
     if (!user) return

@@ -1,22 +1,26 @@
+'use client'
+
 import Link from 'next/link'
+import { useState } from 'react'
+import { Menu, X } from 'lucide-react'
 import { Logo } from '@/components/shared/logo'
 import { AuthButtons } from '@/components/shared/auth-buttons'
 
 const headerLinks = [
   { href: '/produit', label: 'Produit' },
-  { href: '/features', label: 'Fonctionnalités' },
-  { href: '/pricing', label: 'Tarifs' },
   { href: '/marketplace', label: 'Marketplace' },
   { href: '/securite', label: 'Sécurité' },
   { href: '/entreprise', label: 'Entreprise' },
+  { href: '/a-propos', label: 'À propos' },
+  { href: '/contact', label: 'Contact' },
 ]
 
 const footerColumns = [
   {
     title: 'Produit',
     links: [
-      { href: '/features', label: 'Fonctionnalités' },
-      { href: '/pricing', label: 'Tarifs' },
+      { href: '/produit', label: 'Produit' },
+      { href: '/marketplace', label: 'Marketplace' },
       { href: '/securite', label: 'Sécurité' },
       { href: '/blog', label: 'Blog' },
     ],
@@ -40,6 +44,8 @@ const footerColumns = [
 ]
 
 export function MarketingLayout({ children }: { children: React.ReactNode }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Header */}
@@ -49,7 +55,8 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
             <Logo size="md" />
           </Link>
 
-          <div className="hidden md:flex items-center gap-8">
+          {/* Desktop nav */}
+          <div className="hidden md:flex items-center gap-6">
             {headerLinks.map((link) => (
               <Link
                 key={link.href}
@@ -63,8 +70,32 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
 
           <div className="flex items-center gap-3">
             <AuthButtons />
+            {/* Mobile menu toggle */}
+            <button
+              className="md:hidden p-2 text-muted-foreground hover:text-foreground"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
           </div>
         </nav>
+
+        {/* Mobile nav dropdown */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-border bg-background px-4 py-4 space-y-2">
+            {headerLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className="block px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent/10 transition-colors"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        )}
       </header>
 
       {/* Main Content */}

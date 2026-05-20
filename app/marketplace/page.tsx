@@ -169,9 +169,16 @@ export default function PublicMarketplacePage() {
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto max-w-7xl flex items-center justify-between px-4 py-3">
-          <Link href="/" className="flex items-center gap-2">
-            <Logo size="sm" />
-          </Link>
+          <div className="flex items-center gap-6">
+            <Link href="/" className="flex items-center gap-2">
+              <Logo size="sm" />
+            </Link>
+            <nav className="hidden md:flex items-center gap-4">
+              <Link href="/produit" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Produit</Link>
+              <Link href="/a-propos" className="text-sm text-muted-foreground hover:text-foreground transition-colors">À propos</Link>
+              <Link href="/contact" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Contact</Link>
+            </nav>
+          </div>
           <div className="flex items-center gap-3">
             {memberSession ? (
               <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-full">

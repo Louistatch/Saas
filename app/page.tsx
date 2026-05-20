@@ -1,45 +1,11 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ArrowRight, Users, TrendingUp, BarChart3, Zap } from 'lucide-react'
-import { HomeClient } from '@/app/components/home-client'
-import { Logo } from '@/components/shared/logo'
-import { AuthButtons } from '@/components/shared/auth-buttons'
+import { MarketingLayout } from '@/components/shared/marketing-layout'
 
 export default function Home() {
   return (
-    <HomeClient>
-      <div className="min-h-screen bg-gradient-to-b from-background via-background to-secondary/10">
-      {/* Navigation */}
-      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-2">
-            <Logo size="md" />
-          </div>
-          
-          <div className="hidden md:flex items-center gap-8">
-            <Link href="/features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Fonctionnalités
-            </Link>
-            <Link href="/#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Comment ça marche
-            </Link>
-            <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Tarifs
-            </Link>
-            <Link href="/setup" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Installation
-            </Link>
-            <Link href="/demo" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Démo
-            </Link>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <AuthButtons />
-          </div>
-        </nav>
-      </header>
-
+    <MarketingLayout>
       {/* Hero Section */}
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
         <div className="grid gap-12 lg:grid-cols-2 lg:gap-8 items-center">
@@ -59,9 +25,9 @@ export default function Home() {
                   Essai gratuit <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-              <Link href="/demo">
+              <Link href="/marketplace">
                 <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                  Voir les identifiants démo
+                  Voir le marketplace
                 </Button>
               </Link>
             </div>
@@ -132,7 +98,7 @@ export default function Home() {
               Carte membre premium
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Chaque membre reçoit une carte numérique avec QR code vérifiable, photo d'identité et toutes ses informations.
+              Chaque membre reçoit une carte numérique avec QR code vérifiable, photo d&apos;identité et toutes ses informations.
             </p>
           </div>
           <div className="flex justify-center">
@@ -255,55 +221,6 @@ export default function Home() {
           </Link>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="border-t border-border bg-background">
-        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <div className="grid gap-8 md:grid-cols-4">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Logo size="sm" />
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Au service des coopératives agricoles avec des outils numériques.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold text-foreground mb-4">Produit</h4>
-              <ul className="space-y-2">
-                <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Fonctionnalités</Link></li>
-                <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Tarifs</Link></li>
-                <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Sécurité</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-foreground mb-4">Entreprise</h4>
-              <ul className="space-y-2">
-                <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">À propos</Link></li>
-                <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Blog</Link></li>
-                <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Contact</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-foreground mb-4">Légal</h4>
-              <ul className="space-y-2">
-                <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Confidentialité</Link></li>
-                <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Conditions</Link></li>
-                <li><Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Cookies</Link></li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-border mt-8 pt-8 flex flex-col sm:flex-row justify-between items-center">
-            <p className="text-sm text-muted-foreground">
-              © 2026 FaîtiereHub. Tous droits réservés.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Fait avec <span className="text-primary">♦</span> pour les coopératives agricoles
-            </p>
-          </div>
-        </div>
-      </footer>
-      </div>
-    </HomeClient>
+    </MarketingLayout>
   )
 }

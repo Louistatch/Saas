@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter, usePathname } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { 
   BarChart3, 
@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { Logo } from '@/components/shared/logo'
-import { useAuth } from '@/app/context/auth-context'
+import { performLogout } from '@/lib/auth/logout'
 import { ProtectedRoute } from '@/app/components/protected-route'
 
 export default function AdminLayout({
@@ -24,14 +24,11 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  const router = useRouter()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { logout } = useAuth()
 
   const handleLogout = () => {
-    // Use the signout page which properly clears everything
-    window.location.href = '/auth/signout'
+    performLogout() // Enterprise logout — clears everything, broadcasts, redirects
   }
 
   const adminLinks = [

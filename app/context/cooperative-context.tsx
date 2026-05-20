@@ -40,6 +40,9 @@ export function CooperativeProvider({ children }: { children: React.ReactNode })
   const [isLoading, setIsLoading] = useState(true)
   const supabase = useMemo(() => createClient(), [])
 
+  // Track user ID to detect user switches and reset state
+  const [lastUserId, setLastUserId] = useState<string | null>(null)
+
   const fetchCooperatives = useCallback(async () => {
     if (!user) {
       setCooperatives([])
@@ -82,8 +85,20 @@ export function CooperativeProvider({ children }: { children: React.ReactNode })
   }, [user, supabase])
 
   useEffect(() => {
+    // Detect user switch: if user ID changed, clear stale cooperative data first
+    if (user?.id !== lastUserId) {
+      if (lastUserId !== null) {
+        // User actually switched (not initial load) — clear old data
+        setCooperatives([])
+        setCurrentCooperative(null)
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem('current_coop_id')
+        }
+      }
+      setLastUserId(user?.id ?? null)
+    }
     fetchCooperatives()
-  }, [fetchCooperatives])
+  }, [fetchCooperatives, user?.id, lastUserId])
 
   const switchCooperative = useCallback(
     (cooperativeId: string) => {

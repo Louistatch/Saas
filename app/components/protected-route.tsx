@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { useAuth, type UserRole } from '@/app/context/auth-context'
 
 interface ProtectedRouteProps {
@@ -9,19 +8,23 @@ interface ProtectedRouteProps {
   requiredRole?: UserRole
 }
 
+/**
+ * Client-side route guard.
+ * Uses window.location.replace for redirects to ensure a full page reload
+ * (clears React state, forces proxy re-evaluation).
+ */
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
-  const router = useRouter()
   const { isAuthenticated, isLoading, user } = useAuth()
   const [timedOut, setTimedOut] = useState(false)
 
-  // Safety timeout: if after 10s we're still loading or not authenticated,
-  // redirect to login rather than showing a blank page forever.
+  // Safety timeout: if after 8s we're still loading or not authenticated,
+  // hard redirect to login rather than showing a blank page forever.
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!isAuthenticated) {
         setTimedOut(true)
       }
-    }, 10000)
+    }, 8000)
     return () => clearTimeout(timer)
   }, [isAuthenticated])
 
@@ -29,29 +32,29 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     if (isLoading) return
 
     if (!isAuthenticated) {
-      router.push('/auth/login')
+      // Hard redirect — clears all React state
+      window.location.replace(`/auth/login?redirect=${encodeURIComponent(window.location.pathname)}`)
       return
     }
 
     // Role guard — redirect non-admins away from admin panel
-    if (requiredRole && user?.role !== requiredRole) {
-      if (user?.role === 'super_admin') return
-      router.push('/dashboard')
+    if (requiredRole && user?.role !== requiredRole && user?.role !== 'super_admin') {
+      window.location.replace('/dashboard')
     }
-  }, [isAuthenticated, isLoading, user, requiredRole, router])
+  }, [isAuthenticated, isLoading, user, requiredRole])
 
   useEffect(() => {
     if (timedOut && !isAuthenticated) {
-      router.push('/auth/login')
+      window.location.replace('/auth/login')
     }
-  }, [timedOut, isAuthenticated, router])
+  }, [timedOut, isAuthenticated])
 
   if (isLoading || (!isAuthenticated && !timedOut)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="space-y-4 text-center">
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground">Loading…</p>
+          <p className="text-muted-foreground text-sm">Chargement…</p>
         </div>
       </div>
     )

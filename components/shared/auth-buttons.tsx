@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/app/context/auth-context'
+import { performLogout } from '@/lib/auth/logout'
 import { LayoutDashboard, LogOut } from 'lucide-react'
 
 /**
@@ -28,14 +29,17 @@ export function AuthButtons() {
         <Link href={dashboardUrl}>
           <Button size="sm" className="gap-2">
             <LayoutDashboard className="h-3.5 w-3.5" />
-            Tableau de bord
+            <span className="hidden sm:inline">Tableau de bord</span>
           </Button>
         </Link>
-        <Link href="/auth/signout">
-          <Button variant="outline" size="sm" className="gap-2">
-            <LogOut className="h-3.5 w-3.5" />
-          </Button>
-        </Link>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={() => performLogout()}
+        >
+          <LogOut className="h-3.5 w-3.5" />
+        </Button>
       </div>
     )
   }

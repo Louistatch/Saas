@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter, usePathname } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import {
   BarChart3,
@@ -22,19 +22,18 @@ import {
 import { useState } from 'react'
 import { Logo } from '@/components/shared/logo'
 import { useAuth } from '@/app/context/auth-context'
+import { performLogout } from '@/lib/auth/logout'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { ProtectedRoute } from '@/app/components/protected-route'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const { currentCooperative, cooperatives, switchCooperative } = useCooperative()
 
   const handleLogout = () => {
-    // Use the signout page which properly clears everything
-    window.location.href = '/auth/signout'
+    performLogout() // Enterprise logout — clears everything, broadcasts, redirects
   }
 
   // Navigation items filtered by role
