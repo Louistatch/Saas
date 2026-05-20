@@ -104,21 +104,18 @@ function LoginInner() {
 
     setSubmitting(true)
 
-    // Watchdog: unblock button after 15s no matter what
+    // Watchdog: unblock button after 30s no matter what
     const watchdog = setTimeout(() => {
       setSubmitting(false)
       setError('La connexion prend trop de temps. Vérifiez votre connexion internet et réessayez.')
-    }, 15000)
+    }, 30000)
 
     try {
       // Cancel any previous request
       abortRef.current?.abort()
       abortRef.current = new AbortController()
 
-      // Step 1: Clean any stale session first
-      try { await supabase.auth.signOut({ scope: 'local' }) } catch {}
-
-      // Step 2: Sign in fresh
+      // Step 1: Sign in (Supabase handles session replacement automatically)
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: parsed.data.email,
         password: parsed.data.password,
@@ -127,7 +124,7 @@ function LoginInner() {
       if (signInError) throw signInError
       if (!data.user) throw new Error('Aucun utilisateur retourné')
 
-      // Step 3: Fetch profile to determine redirect target
+      // Step 2: Fetch profile to determine redirect target
       let role = 'member'
       try {
         const { data: profile } = await supabase
@@ -140,7 +137,7 @@ function LoginInner() {
         // If profile fetch fails, default to dashboard
       }
 
-      // Step 4: Hard redirect (kills all React state, forces fresh load)
+      // Step 3: Hard redirect (kills all React state, forces fresh load)
       clearTimeout(watchdog)
       
       const target = redirectTo && redirectTo.startsWith('/')
