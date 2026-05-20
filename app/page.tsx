@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { ArrowRight, Users, TrendingUp, BarChart3, Zap } from 'lucide-react'
 import { HomeClient } from '@/app/components/home-client'
 import { Logo } from '@/components/shared/logo'
+import { AuthButtons } from '@/components/shared/auth-buttons'
 import { DashboardPreview } from '@/components/shared/dashboard-preview'
 
 export default function Home() {
@@ -35,16 +36,7 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Link href="/auth/login">
-              <Button variant="outline" size="sm">
-                Se connecter
-              </Button>
-            </Link>
-            <Link href="/auth/signup">
-              <Button size="sm" className="bg-primary hover:bg-primary/90">
-                Commencer
-              </Button>
-            </Link>
+            <AuthButtons />
           </div>
         </nav>
       </header>

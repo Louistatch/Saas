@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Logo } from '@/components/shared/logo'
-import { Button } from '@/components/ui/button'
+import { AuthButtons } from '@/components/shared/auth-buttons'
 
 const headerLinks = [
   { href: '/produit', label: 'Produit' },
@@ -62,16 +62,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-3">
-            <Link href="/auth/login">
-              <Button variant="outline" size="sm">
-                Se connecter
-              </Button>
-            </Link>
-            <Link href="/auth/signup">
-              <Button size="sm">
-                Commencer
-              </Button>
-            </Link>
+            <AuthButtons />
           </div>
         </nav>
       </header>
