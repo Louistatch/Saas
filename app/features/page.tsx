@@ -24,8 +24,8 @@ const features = [
   },
   {
     icon: ShoppingCart,
-    title: 'Marketplace',
-    description: 'Create a cooperative marketplace where members can browse and purchase from listed exploitations with seamless transactions.'
+    title: 'Comptes d\'exploitation',
+    description: 'Publiez et partagez les comptes d\'exploitation et itinéraires techniques classés par canton, préfecture et région.'
   },
   {
     icon: QrCode,
@@ -55,7 +55,7 @@ const features = [
   {
     icon: Globe,
     title: 'Embeddable Widget',
-    description: 'Embed the cooperative marketplace on your website with a customizable widget that matches your brand.'
+    description: 'Intégrez les comptes d\'exploitation sur votre site web avec un widget personnalisable.'
   },
 ]
 
@@ -68,7 +68,7 @@ export default function FeaturesPage() {
             Powerful Features for Agricultural Cooperatives
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Everything you need to manage members, operate a marketplace, and grow your cooperative in one platform.
+            Everything you need to manage members, share exploitation accounts, and grow your cooperative in one platform.
           </p>
         </div>
 
@@ -107,7 +107,7 @@ export default function FeaturesPage() {
               },
               {
                 title: 'Dairy Cooperative',
-                description: 'Members manage milk collection points and track member contributions. The marketplace connects member dairy producers with wholesale buyers.',
+                description: 'Les membres gèrent les points de collecte et suivent les contributions. Les comptes d\'exploitation sont partagés par canton et préfecture.',
               },
               {
                 title: 'Agricultural Input Cooperative',

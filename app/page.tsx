@@ -177,7 +177,7 @@ export default function Home() {
               {
                 step: "1",
                 title: "Configurez votre coopérative",
-                description: "Créez votre compte coopératif et configurez votre marketplace avec votre image de marque et vos paramètres"
+                description: "Créez votre compte et configurez votre espace avec votre image de marque et vos paramètres"
               },
               {
                 step: "2",
@@ -187,7 +187,7 @@ export default function Home() {
               {
                 step: "3",
                 title: "Activez les transactions",
-                description: "Les membres parcourent le marketplace, effectuent des achats et accèdent aux avantages avec leurs cartes"
+                description: "Les membres consultent les comptes d'exploitation, accèdent aux fiches techniques et utilisent leurs cartes"
               }
             ].map((item, i) => (
               <div key={i} className="relative space-y-4">

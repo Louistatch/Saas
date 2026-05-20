@@ -32,7 +32,7 @@ export function DashboardPreview() {
               <img src="/logo.png" alt="" className="h-6 w-6 rounded" />
               <span className="text-sm font-bold text-foreground">FaîtiereHub</span>
             </div>
-            {['Overview', 'Marketplace', 'Members', 'Cards', 'Analytics'].map((item, i) => (
+            {['Vue d\'ensemble', 'Exploitations', 'Membres', 'Cartes', 'Statistiques'].map((item, i) => (
               <div
                 key={item}
                 className={`px-3 py-2 rounded-md text-sm ${

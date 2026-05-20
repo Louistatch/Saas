@@ -15,7 +15,7 @@ const plans = [
     trial: '30 days free',
     features: [
       'Up to 500 members',
-      'Basic marketplace',
+      'Comptes d\'exploitation (basique)',
       'Member management',
       'Digital member cards',
       'Email support',
@@ -32,7 +32,7 @@ const plans = [
     trial: 'Free 14-day trial',
     features: [
       'Unlimited members',
-      'Advanced marketplace',
+      'Comptes d\'exploitation (avancé)',
       'Member scoring & segmentation',
       'Advanced digital cards with QR',
       'KoboToolbox integration',

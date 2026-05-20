@@ -41,7 +41,7 @@ export default function ConfidentialitePage() {
               <li><strong className="text-foreground">Données professionnelles :</strong> nom de la coopérative, rôle, localisation géographique des exploitations.</li>
               <li><strong className="text-foreground">Données d&apos;exploitation :</strong> superficies cultivées, types de cultures, rendements, intrants utilisés.</li>
               <li><strong className="text-foreground">Données de connexion :</strong> adresse IP, type de navigateur, pages visitées, horodatage des accès.</li>
-              <li><strong className="text-foreground">Données financières :</strong> historique des cotisations, transactions sur le marketplace (aucune donnée bancaire n&apos;est stockée directement).</li>
+              <li><strong className="text-foreground">Données financières :</strong> historique des cotisations, achats de comptes d&apos;exploitation (aucune donnée bancaire n&apos;est stockée directement).</li>
             </ul>
           </div>
 

@@ -5,7 +5,7 @@ import { Users, CreditCard, BarChart3, Database, Coins, ShoppingCart } from 'luc
 export const metadata: Metadata = {
   title: 'Produit — FaîtiereHub | Plateforme tout-en-un pour faîtières agricoles',
   description:
-    'Découvrez FaîtiereHub : gestion des membres, cartes numériques, comptes d\'exploitation, pipeline KoboCollect, cotisations et marketplace pour les faîtières agricoles.',
+    'Découvrez FaîtiereHub : gestion des membres, cartes numériques, comptes d\'exploitation, pipeline KoboCollect, cotisations pour les faîtières agricoles.',
 }
 
 const features = [
@@ -41,9 +41,9 @@ const features = [
   },
   {
     icon: ShoppingCart,
-    title: 'Marketplace',
+    title: 'Comptes d\'exploitation',
     description:
-      'Mettez en relation producteurs et acheteurs au sein de votre réseau. Catalogue de produits, gestion des commandes et suivi des transactions entre membres.',
+      'Publiez et partagez les comptes d\'exploitation et itinéraires techniques classés par canton, préfecture et région. Accès gratuit pour les membres.',
   },
 ]
 

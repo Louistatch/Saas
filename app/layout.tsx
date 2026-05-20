@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono'
 export const metadata: Metadata = {
   title: 'FaîtiereHub — Plateforme numérique pour coopératives agricoles',
   description:
-    'Donnez du pouvoir à vos coopératives agricoles avec des outils numériques pour la gestion des membres, le marketplace et les décisions basées sur les données.',
+    'Donnez du pouvoir à vos coopératives agricoles avec des outils numériques pour la gestion des membres, les comptes d\'exploitation et les décisions basées sur les données.',
   icons: {
     icon: [
       { url: '/icon-light-32x32.png', media: '(prefers-color-scheme: light)' },

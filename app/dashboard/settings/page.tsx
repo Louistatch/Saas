@@ -179,7 +179,7 @@ export default function SettingsPage() {
           <Card className="border-border">
             <CardHeader>
               <CardTitle className="text-foreground">Personnalisation de la marque</CardTitle>
-              <CardDescription>Personnalisez l'apparence du marketplace de votre coopérative</CardDescription>
+              <CardDescription>Personnalisez l&apos;apparence de votre espace coopérative</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">

@@ -57,7 +57,7 @@ export default function CookiesPage() {
               <ul className="list-disc pl-6 space-y-1 text-sm text-muted-foreground">
                 <li>La gestion de votre session d&apos;authentification</li>
                 <li>La mémorisation de vos préférences de sécurité</li>
-                <li>Le fonctionnement du panier sur le marketplace</li>
+                <li>Le fonctionnement de l&apos;accès aux comptes d&apos;exploitation</li>
                 <li>La protection contre les attaques CSRF</li>
               </ul>
               <div className="mt-3 rounded bg-muted/50 p-3">
