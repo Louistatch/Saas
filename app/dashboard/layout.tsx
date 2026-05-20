@@ -69,7 +69,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* User info */}
           <div className="px-4 py-3 border-b border-border">
             <p className="text-sm font-medium text-foreground">{user?.firstName} {user?.lastName}</p>
-            <p className="text-xs text-muted-foreground capitalize">{user?.role?.replace('_', ' ')}</p>
+            <p className="text-xs text-muted-foreground capitalize">
+              {currentCooperative?.level === 'faitiere' ? 'Admin Faîtière' :
+               currentCooperative?.level === 'union' ? 'Admin Union' :
+               user?.role?.replace('_', ' ')}
+            </p>
             {currentCooperative && (
               <p className="text-xs text-primary mt-0.5 truncate">{currentCooperative.name}</p>
             )}
