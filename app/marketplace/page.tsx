@@ -212,7 +212,7 @@ export default function PublicMarketplacePage() {
             Comptes d'exploitation agricole
           </h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Accédez aux itinéraires techniques et comptes d'exploitation par culture et localisation.
+            Accédez aux itinéraires techniques et comptes d&apos;exploitation classés par canton, préfecture et région.
             {!memberSession && ' Membres : accès gratuit avec votre carte.'}
           </p>
         </div>

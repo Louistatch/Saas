@@ -253,7 +253,7 @@ export default function MarketplacePage() {
     <div className="space-y-8">
       <PageHeader
         title="Comptes d'exploitation"
-        description="Fiches techniques et itinéraires de culture par culture (DOCX, Excel)"
+        description="Fiches techniques et itinéraires de culture classés par canton, préfecture et région"
         action={
           (user?.role === 'super_admin' || currentCooperative?.level === 'faitiere') ? (
             <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setShowAdd(true)}>
