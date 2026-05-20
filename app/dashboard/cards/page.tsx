@@ -214,37 +214,68 @@ export default function CardsPage() {
     setSaving(true)
     const expiry = new Date()
     expiry.setDate(expiry.getDate() + validityDays)
-    
-    // Card number uses the target cooperative prefix
-    const prefix = (targetCoopName ?? 'COP').slice(0, 3).toUpperCase().replace(/\s+/g, '')
-    const num = Math.floor(Math.random() * 90000) + 10000
-    const cardNumber = `${prefix}-${num}`
 
-    // Revoke any existing active card for this member
-    await supabase
+    // Check if member already has an active card — if so, RENEW it (keep same number)
+    const { data: existingCard } = await supabase
       .from('member_cards')
-      .update({ status: 'revoked' })
+      .select('id, card_number, qr_data')
       .eq('member_id', selectedMemberId)
       .eq('status', 'active')
+      .maybeSingle()
 
-    const memberData = allMembers.find(m => m.id === selectedMemberId) ?? null
-    const qrPayload = buildQrPayload(selectedMemberId, cardNumber, memberData)
+    if (existingCard) {
+      // RENEW: update expiry date, keep same card_number and qr_data
+      const { error } = await supabase
+        .from('member_cards')
+        .update({ expiry_date: expiry.toISOString().split('T')[0] })
+        .eq('id', existingCard.id)
 
-    const { error } = await supabase.from('member_cards').insert({
-      cooperative_id: targetCoopId,
-      member_id: selectedMemberId,
-      card_number: cardNumber,
-      status: 'active',
-      expiry_date: expiry.toISOString().split('T')[0],
-      qr_data: qrPayload,
-    })
+      setSaving(false)
+      if (error) {
+        toast({ title: 'Impossible de renouveler la carte', description: errorMessage(error), variant: 'destructive' })
+        return
+      }
+      toast({ title: 'Carte renouvelée', description: `${existingCard.card_number} — validité prolongée` })
+    } else {
+      // NEW CARD: generate new number (member has no active card)
+      // Also check for any previously revoked/expired card to reuse the number
+      const { data: previousCard } = await supabase
+        .from('member_cards')
+        .select('card_number')
+        .eq('member_id', selectedMemberId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
 
-    setSaving(false)
-    if (error) {
-      toast({ title: 'Impossible de générer la carte', description: errorMessage(error), variant: 'destructive' })
-      return
+      // Reuse previous card number if exists, otherwise generate new one
+      let cardNumber: string
+      if (previousCard?.card_number) {
+        cardNumber = previousCard.card_number
+      } else {
+        const prefix = (targetCoopName ?? 'COP').slice(0, 3).toUpperCase().replace(/\s+/g, '')
+        const num = Math.floor(Math.random() * 90000) + 10000
+        cardNumber = `${prefix}-${num}`
+      }
+
+      const qrPayload = buildQrPayload(selectedMemberId, cardNumber, null)
+
+      const { error } = await supabase.from('member_cards').insert({
+        cooperative_id: targetCoopId,
+        member_id: selectedMemberId,
+        card_number: cardNumber,
+        status: 'active',
+        expiry_date: expiry.toISOString().split('T')[0],
+        qr_data: qrPayload,
+      })
+
+      setSaving(false)
+      if (error) {
+        toast({ title: 'Impossible de générer la carte', description: errorMessage(error), variant: 'destructive' })
+        return
+      }
+      toast({ title: 'Carte générée', description: `${cardNumber} — ${currentCooperative.name}/${targetCoopName}` })
     }
-    toast({ title: 'Carte générée', description: `${cardNumber} — ${currentCooperative.name}/${targetCoopName}` })
+
     setShowGenerate(false)
     setSelectedMemberId('')
     setSelectedCoopId('')
@@ -261,33 +292,56 @@ export default function CardsPage() {
     expiry.setDate(expiry.getDate() + validityDays)
     const expiryStr = expiry.toISOString().split('T')[0]
 
-    await supabase
-      .from('member_cards')
-      .update({ status: 'revoked' })
-      .in('member_id', bulkSelectedIds)
-      .eq('status', 'active')
+    // For each member: renew if active card exists, create new if not
+    let renewedCount = 0
+    let createdCount = 0
 
-    const inserts = bulkSelectedIds.map((memberId) => {
-      const cardNumber = generateCardNumber()
-      return {
-        cooperative_id: currentCooperative.id,
-        member_id: memberId,
-        card_number: cardNumber,
-        status: 'active' as const,
-        expiry_date: expiryStr,
-        qr_data: buildQrPayload(memberId, cardNumber, members.find(m => m.id === memberId) ?? null),
+    for (const memberId of bulkSelectedIds) {
+      // Check for existing active card
+      const { data: existingCard } = await supabase
+        .from('member_cards')
+        .select('id, card_number')
+        .eq('member_id', memberId)
+        .eq('status', 'active')
+        .maybeSingle()
+
+      if (existingCard) {
+        // RENEW: just extend expiry
+        await supabase
+          .from('member_cards')
+          .update({ expiry_date: expiryStr })
+          .eq('id', existingCard.id)
+        renewedCount++
+      } else {
+        // Check for previous card number to reuse
+        const { data: previousCard } = await supabase
+          .from('member_cards')
+          .select('card_number')
+          .eq('member_id', memberId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        const cardNumber = previousCard?.card_number ?? generateCardNumber()
+        const qrPayload = buildQrPayload(memberId, cardNumber, null)
+
+        await supabase.from('member_cards').insert({
+          cooperative_id: currentCooperative.id,
+          member_id: memberId,
+          card_number: cardNumber,
+          status: 'active',
+          expiry_date: expiryStr,
+          qr_data: qrPayload,
+        })
+        createdCount++
       }
-    })
-
-    const { error } = await supabase.from('member_cards').insert(inserts)
-    setSaving(false)
-    if (error) {
-      toast({ title: 'Échec de la génération en masse', description: errorMessage(error), variant: 'destructive' })
-      return
     }
-    toast({
-      title: `${bulkSelectedIds.length} card${bulkSelectedIds.length === 1 ? '' : 's'} generated`,
-    })
+
+    setSaving(false)
+    const parts = []
+    if (createdCount > 0) parts.push(`${createdCount} créée${createdCount > 1 ? 's' : ''}`)
+    if (renewedCount > 0) parts.push(`${renewedCount} renouvelée${renewedCount > 1 ? 's' : ''}`)
+    toast({ title: `Cartes : ${parts.join(', ')}` })
     setShowBulk(false)
     setBulkSelectedIds([])
     setBulkSearch('')

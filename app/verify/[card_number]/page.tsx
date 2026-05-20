@@ -1,10 +1,23 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { CheckCircle, XCircle, Shield, MapPin, Phone, Building2, Calendar, CreditCard, TreePine } from 'lucide-react'
+import { CheckCircle, XCircle, Shield, MapPin, Phone, Building2, Calendar, TreePine, Coins, History, User } from 'lucide-react'
 import { Logo } from '@/components/shared/logo'
+
+/**
+ * Public verification page — accessed by scanning the QR code on a member card.
+ * 
+ * The QR code contains a FIXED URL: /verify/[card_number]
+ * This page fetches ALL data in REAL-TIME from the database.
+ * 
+ * This means:
+ * - The QR code NEVER changes (same URL for the life of the card)
+ * - New features added here are immediately visible on next scan
+ * - Member data updates are reflected instantly
+ * - No need to reprint the card when adding features
+ */
 
 interface VerifyResult {
   valid: boolean
@@ -23,53 +36,94 @@ interface VerifyResult {
     canton: string | null
     prefecture: string | null
     region: string | null
+    status: string
   }
   cooperative?: {
     name: string
     faitiere_name: string | null
   }
+  cotisations?: {
+    total: number
+    paid: number
+    pending: number
+    lastPaidDate: string | null
+  }
+  memberSince?: string
   error?: string
 }
 
 export default function VerifyCardPage() {
   const params = useParams()
   const cardNumber = params.card_number as string
+  const supabase = useMemo(() => createClient(), [])
   const [result, setResult] = useState<VerifyResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [showDetails, setShowDetails] = useState(false)
 
   useEffect(() => {
     async function verify() {
-      const supabase = createClient()
+      const decodedCardNumber = decodeURIComponent(cardNumber)
 
+      // Fetch card + member + cooperative in one query
       const { data: card, error } = await supabase
         .from('member_cards')
         .select(`
           card_number, status, expiry_date, created_at,
-          member:members(first_name, last_name, phone, photo_url, village, canton, prefecture, region),
+          member:members(id, first_name, last_name, phone, photo_url, village, canton, prefecture, region, status, created_at),
           cooperative:cooperatives(name, faitiere_name)
         `)
-        .eq('card_number', decodeURIComponent(cardNumber))
+        .eq('card_number', decodedCardNumber)
         .single()
 
       if (error || !card) {
-        setResult({ valid: false, error: 'Carte non trouvée' })
-      } else {
-        const isExpired = card.expiry_date && new Date(card.expiry_date) < new Date()
-        const isActive = card.status === 'active' && !isExpired
-        setResult({
-          valid: isActive,
-          card: { card_number: card.card_number, status: isActive ? 'active' : (isExpired ? 'expired' : card.status), expiry_date: card.expiry_date, created_at: card.created_at },
-          member: card.member as any,
-          cooperative: card.cooperative as any,
-        })
+        setResult({ valid: false, error: 'Carte non trouvée dans le système' })
+        setLoading(false)
+        setTimeout(() => setShowDetails(true), 400)
+        return
       }
+
+      const isExpired = card.expiry_date && new Date(card.expiry_date) < new Date()
+      const isActive = card.status === 'active' && !isExpired
+
+      // Fetch cotisations for this member
+      const memberId = (card.member as any)?.id
+      let cotisations = { total: 0, paid: 0, pending: 0, lastPaidDate: null as string | null }
+      
+      if (memberId) {
+        const { data: cotData } = await supabase
+          .from('cotisations')
+          .select('status, paid_date, amount')
+          .eq('member_id', memberId)
+
+        if (cotData && cotData.length > 0) {
+          cotisations.total = cotData.length
+          cotisations.paid = cotData.filter(c => c.status === 'paid').length
+          cotisations.pending = cotData.filter(c => c.status === 'pending').length
+          const lastPaid = cotData
+            .filter(c => c.status === 'paid' && c.paid_date)
+            .sort((a, b) => new Date(b.paid_date!).getTime() - new Date(a.paid_date!).getTime())[0]
+          cotisations.lastPaidDate = lastPaid?.paid_date ?? null
+        }
+      }
+
+      setResult({
+        valid: isActive,
+        card: {
+          card_number: card.card_number,
+          status: isActive ? 'active' : (isExpired ? 'expired' : card.status),
+          expiry_date: card.expiry_date,
+          created_at: card.created_at,
+        },
+        member: card.member as any,
+        cooperative: card.cooperative as any,
+        cotisations,
+        memberSince: (card.member as any)?.created_at,
+      })
       setLoading(false)
-      // Trigger animation after load
       setTimeout(() => setShowDetails(true), 600)
     }
     verify()
-  }, [cardNumber])
+  }, [cardNumber, supabase])
 
   if (loading) {
     return (
@@ -96,13 +150,11 @@ export default function VerifyCardPage() {
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] rounded-full bg-[#1ed760]/5 blur-3xl animate-pulse" />
         <div className="absolute bottom-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-[#0B6B3A]/10 blur-3xl" />
-        {/* Floating particles */}
         {isValid && (
           <>
             <div className="absolute top-[20%] left-[10%] w-2 h-2 bg-[#1ed760]/40 rounded-full animate-bounce" style={{ animationDelay: '0s', animationDuration: '3s' }} />
             <div className="absolute top-[40%] right-[15%] w-1.5 h-1.5 bg-[#1ed760]/30 rounded-full animate-bounce" style={{ animationDelay: '1s', animationDuration: '4s' }} />
             <div className="absolute top-[60%] left-[20%] w-1 h-1 bg-[#1ed760]/50 rounded-full animate-bounce" style={{ animationDelay: '2s', animationDuration: '2.5s' }} />
-            <div className="absolute top-[30%] right-[30%] w-2.5 h-2.5 bg-[#1ed760]/20 rounded-full animate-bounce" style={{ animationDelay: '0.5s', animationDuration: '3.5s' }} />
           </>
         )}
       </div>
@@ -128,7 +180,7 @@ export default function VerifyCardPage() {
                 : 'bg-red-500/10 text-red-400 border border-red-500/20'
             }`}>
               {isValid ? <CheckCircle className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
-              {isValid ? 'MEMBRE VÉRIFIÉ' : result.card?.status === 'expired' ? 'CARTE EXPIRÉE' : result.card?.status === 'revoked' ? 'CARTE RÉVOQUÉE' : 'CARTE INVALIDE'}
+              {isValid ? 'MEMBRE VÉRIFIÉ ✓' : result.card?.status === 'expired' ? 'CARTE EXPIRÉE' : result.card?.status === 'revoked' ? 'CARTE RÉVOQUÉE' : 'CARTE INVALIDE'}
             </div>
           </div>
 
@@ -158,28 +210,65 @@ export default function VerifyCardPage() {
                     {result.member.first_name} <span className="uppercase">{result.member.last_name}</span>
                   </h2>
                   <p className="text-white/50 text-sm font-mono">{result.card?.card_number}</p>
+                  {result.memberSince && (
+                    <p className="text-white/30 text-xs mt-0.5">
+                      Membre depuis {new Date(result.memberSince).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+                    </p>
+                  )}
                 </div>
               </div>
 
               {/* Info grid */}
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { icon: MapPin, label: 'Localité', value: locality || '—', color: 'text-[#1ed760]' },
-                  { icon: Phone, label: 'Téléphone', value: result.member.phone ?? '—', color: 'text-[#1ed760]' },
-                  { icon: Building2, label: 'Coopérative', value: result.cooperative?.name ?? '—', color: 'text-[#1ed760]' },
-                  { icon: TreePine, label: 'Faîtière', value: result.cooperative?.faitiere_name ?? '—', color: 'text-[#1ed760]' },
+                  { icon: MapPin, label: 'Localité', value: locality || '—' },
+                  { icon: Phone, label: 'Téléphone', value: result.member.phone ?? '—' },
+                  { icon: Building2, label: 'Coopérative', value: result.cooperative?.name ?? '—' },
+                  { icon: TreePine, label: 'Faîtière', value: result.cooperative?.faitiere_name ?? '—' },
                 ].map((item, i) => (
                   <div
                     key={i}
                     className={`p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] transition-all duration-500 ${showDetails ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
                     style={{ transitionDelay: `${300 + i * 100}ms` }}
                   >
-                    <item.icon className={`h-4 w-4 ${item.color} mb-1.5`} />
+                    <item.icon className="h-4 w-4 text-[#1ed760] mb-1.5" />
                     <p className="text-[10px] text-white/40 uppercase tracking-wider">{item.label}</p>
                     <p className="text-xs text-white font-medium mt-0.5 truncate">{item.value}</p>
                   </div>
                 ))}
               </div>
+
+              {/* Cotisations section */}
+              {result.cotisations && (
+                <div className={`p-4 rounded-xl bg-white/[0.03] border border-white/[0.06] transition-all duration-500 ${showDetails ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '700ms' }}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Coins className="h-4 w-4 text-[#1ed760]" />
+                    <p className="text-xs text-white/60 uppercase tracking-wider font-semibold">Cotisations</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-[#1ed760]">{result.cotisations.paid}</p>
+                      <p className="text-[9px] text-white/40">Payées</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-yellow-400">{result.cotisations.pending}</p>
+                      <p className="text-[9px] text-white/40">En attente</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-white/60">{result.cotisations.total}</p>
+                      <p className="text-[9px] text-white/40">Total</p>
+                    </div>
+                  </div>
+                  {result.cotisations.lastPaidDate && (
+                    <p className="text-[10px] text-white/30 mt-2 text-center">
+                      Dernière cotisation : {new Date(result.cotisations.lastPaidDate).toLocaleDateString('fr-FR')}
+                    </p>
+                  )}
+                  {result.cotisations.total === 0 && (
+                    <p className="text-[10px] text-white/30 mt-1 text-center">Aucune cotisation enregistrée</p>
+                  )}
+                </div>
+              )}
 
               {/* Validity */}
               {result.card && (
@@ -187,7 +276,7 @@ export default function VerifyCardPage() {
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-white/40" />
                     <div>
-                      <p className="text-[10px] text-white/40 uppercase">Valide jusqu'au</p>
+                      <p className="text-[10px] text-white/40 uppercase">Valide jusqu&apos;au</p>
                       <p className="text-sm text-white font-semibold">
                         {result.card.expiry_date 
                           ? new Date(result.card.expiry_date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -212,7 +301,7 @@ export default function VerifyCardPage() {
               <p className="text-white/60 text-sm">
                 {result.error ?? 'Cette carte n\'existe pas dans notre système.'}
               </p>
-              <p className="text-white/30 text-xs mt-2 font-mono">{cardNumber}</p>
+              <p className="text-white/30 text-xs mt-2 font-mono">{decodeURIComponent(cardNumber)}</p>
             </div>
           )}
 
@@ -221,7 +310,7 @@ export default function VerifyCardPage() {
             <div className="flex items-center justify-center gap-2">
               <Shield className={`h-3.5 w-3.5 ${isValid ? 'text-[#1ed760]/60' : 'text-red-400/60'}`} />
               <p className="text-[10px] text-white/30 uppercase tracking-widest">
-                Secure • Verified • FaîtiereHub
+                Sécurisé • Vérifié • FaîtiereHub
               </p>
             </div>
           </div>
@@ -230,7 +319,7 @@ export default function VerifyCardPage() {
         {/* Bottom info */}
         <div className="text-center space-y-2">
           <p className="text-white/30 text-xs">
-            Cette vérification est effectuée en temps réel sur la base de données FaîtiereHub.
+            Vérification en temps réel — les données sont toujours à jour.
           </p>
           <p className="text-white/20 text-[10px]">
             © {new Date().getFullYear()} FaîtiereHub — Plateforme des faîtières agricoles
