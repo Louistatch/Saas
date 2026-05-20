@@ -27,20 +27,25 @@ function LoginInner() {
 
   const redirectTo = searchParams?.get('redirect')
 
+  // Only auto-redirect if the user navigated here directly (not after a logout)
+  // If they came from signout or typed the URL, don't auto-redirect
   useEffect(() => {
-    // Small delay to let the auth state settle after a logout redirect
-    const timer = setTimeout(() => {
-      if (isAuthenticated && !isLoading) {
-        if (redirectTo && redirectTo.startsWith('/')) {
-          router.push(redirectTo)
-        } else if (user?.role === 'super_admin') {
-          router.push('/admin')
-        } else {
-          router.push('/dashboard')
-        }
-      }
-    }, 300)
-    return () => clearTimeout(timer)
+    if (!isAuthenticated || isLoading) return
+    
+    // Check if user just logged out (came from signout page or has a fresh page load)
+    const isPostLogout = document.referrer.includes('/auth/signout') || 
+                         document.referrer.includes('/auth/login') ||
+                         !document.referrer
+    if (isPostLogout) return // Don't auto-redirect after logout
+    
+    // User is genuinely authenticated and navigated here — redirect them
+    if (redirectTo && redirectTo.startsWith('/')) {
+      router.push(redirectTo)
+    } else if (user?.role === 'super_admin') {
+      router.push('/admin')
+    } else {
+      router.push('/dashboard')
+    }
   }, [isAuthenticated, isLoading, user, router, redirectTo])
 
   const handleSubmit = async (e: React.FormEvent) => {
