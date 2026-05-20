@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
+import { useAuth } from '@/app/context/auth-context'
 import { useToast } from '@/hooks/use-toast'
 import { useDebounced } from '@/hooks/use-debounced'
 import { LoadingBlock, Spinner } from '@/components/shared/loading'
@@ -55,6 +56,7 @@ const emptyForm: MemberFormState = {
 
 export default function MembersPage() {
   const { currentCooperative } = useCooperative()
+  const { user } = useAuth()
   const { toast } = useToast()
   const { confirm, confirmNode } = useConfirm()
   const supabase = useMemo(() => createClient(), [])
@@ -78,11 +80,12 @@ export default function MembersPage() {
   const fetchMembers = useCallback(async () => {
     if (!currentCooperative) return
     setIsLoading(true)
-    const { data, error } = await supabase
-      .from('members')
-      .select('*')
-      .eq('cooperative_id', currentCooperative.id)
-      .order('last_name')
+    let query = supabase.from('members').select('*').order('last_name')
+    // Only filter by cooperative for non-super-admins (RLS handles hierarchy)
+    if (user?.role !== 'super_admin') {
+      query = query.eq('cooperative_id', currentCooperative.id)
+    }
+    const { data, error } = await query
     if (error) {
       toast({ title: 'Error', description: errorMessage(error), variant: 'destructive' })
     } else {
