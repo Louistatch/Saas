@@ -154,7 +154,7 @@ export default function CardsPage() {
   }, [currentCooperative])
 
   const buildQrPayload = useCallback(
-    (memberId: string, cardNumber: string, member?: Pick<MemberCard['member'], 'first_name' | 'last_name' | 'phone' | 'photo_url' | 'village' | 'canton' | 'prefecture' | 'region'> | null) => {
+    (memberId: string, cardNumber: string, member?: { first_name?: string | null; last_name?: string | null; phone?: string | null; photo_url?: string | null; village?: string | null; canton?: string | null; prefecture?: string | null; region?: string | null } | null) => {
       // QR contains all verification info
       const payload: Record<string, string> = {
         card: cardNumber,
