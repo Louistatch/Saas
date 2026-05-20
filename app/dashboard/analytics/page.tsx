@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { BarChart3, Users, ShoppingCart, CreditCard, TrendingUp } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
+import { useAuth } from '@/app/context/auth-context'
 import { LoadingBlock } from '@/components/shared/loading'
 import { PageHeader } from '@/components/shared/page-header'
 
@@ -28,6 +29,7 @@ const initial: Stats = {
 
 export default function AnalyticsPage() {
   const { currentCooperative } = useCooperative()
+  const { user } = useAuth()
   const supabase = useMemo(() => createClient(), [])
   const [stats, setStats] = useState<Stats>(initial)
   const [isLoading, setIsLoading] = useState(true)
@@ -37,10 +39,20 @@ export default function AnalyticsPage() {
     setIsLoading(true)
     const coopId = currentCooperative.id
 
+    let membersQuery = supabase.from('members').select('status')
+    let fichesQuery = supabase.from('fiches_techniques').select('status')
+    let cardsQuery = supabase.from('member_cards').select('status')
+
+    if (user?.role !== 'super_admin') {
+      membersQuery = membersQuery.eq('cooperative_id', coopId)
+      fichesQuery = fichesQuery.eq('cooperative_id', coopId)
+      cardsQuery = cardsQuery.eq('cooperative_id', coopId)
+    }
+
     const [membersRes, fichesRes, cardsRes] = await Promise.all([
-      supabase.from('members').select('status').eq('cooperative_id', coopId),
-      supabase.from('fiches_techniques').select('status').eq('cooperative_id', coopId),
-      supabase.from('member_cards').select('status').eq('cooperative_id', coopId),
+      membersQuery,
+      fichesQuery,
+      cardsQuery,
     ])
 
     const members = (membersRes.data ?? []) as { status: string }[]
@@ -56,7 +68,7 @@ export default function AnalyticsPage() {
       activeCards: cards.filter((c) => c.status === 'active').length,
     })
     setIsLoading(false)
-  }, [currentCooperative, supabase])
+  }, [currentCooperative, supabase, user])
 
   useEffect(() => {
     fetchStats()

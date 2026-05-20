@@ -9,6 +9,7 @@ import { Plus, Search, CheckCircle, Clock, AlertTriangle, Banknote, TrendingUp }
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
+import { useAuth } from '@/app/context/auth-context'
 import { useToast } from '@/hooks/use-toast'
 import { useDebounced } from '@/hooks/use-debounced'
 import { LoadingBlock, Spinner } from '@/components/shared/loading'
@@ -55,6 +56,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }>
 
 export default function CotisationsPage() {
   const { currentCooperative } = useCooperative()
+  const { user } = useAuth()
   const { toast } = useToast()
   const supabase = useMemo(() => createClient(), [])
 
@@ -85,19 +87,23 @@ export default function CotisationsPage() {
   // Load members for select
   useEffect(() => {
     if (!currentCooperative) return
-    supabase.from('members').select('id, first_name, last_name')
-      .eq('cooperative_id', currentCooperative.id)
-      .eq('status', 'active')
+    let query = supabase.from('members').select('id, first_name, last_name')
+    if (user?.role !== 'super_admin') {
+      query = query.eq('cooperative_id', currentCooperative.id)
+    }
+    query.eq('status', 'active')
       .order('last_name')
       .then(({ data }) => setMembers(data ?? []))
-  }, [currentCooperative, supabase])
+  }, [currentCooperative, supabase, user])
 
   // Load stats
   useEffect(() => {
     if (!currentCooperative) return
-    supabase.from('cotisations').select('amount, status')
-      .eq('cooperative_id', currentCooperative.id)
-      .then(({ data }) => {
+    let query = supabase.from('cotisations').select('amount, status')
+    if (user?.role !== 'super_admin') {
+      query = query.eq('cooperative_id', currentCooperative.id)
+    }
+    query.then(({ data }) => {
         const rows = data ?? []
         setStats({
           count: rows.length,
@@ -106,7 +112,7 @@ export default function CotisationsPage() {
           total_overdue: rows.filter(r => r.status === 'overdue').reduce((s, r) => s + Number(r.amount), 0),
         })
       })
-  }, [currentCooperative, supabase, cotisations])
+  }, [currentCooperative, supabase, cotisations, user])
 
   // Load cotisations
   const fetchCotisations = useCallback(async () => {
@@ -116,8 +122,10 @@ export default function CotisationsPage() {
     let query = supabase
       .from('cotisations')
       .select('*, member:members(id, first_name, last_name, phone)', { count: 'exact' })
-      .eq('cooperative_id', currentCooperative.id)
-      .order('created_at', { ascending: false })
+    if (user?.role !== 'super_admin') {
+      query = query.eq('cooperative_id', currentCooperative.id)
+    }
+    query = query.order('created_at', { ascending: false })
 
     if (filterStatus) query = query.eq('status', filterStatus)
 
@@ -141,7 +149,7 @@ export default function CotisationsPage() {
       setTotal(count ?? 0)
     }
     setIsLoading(false)
-  }, [currentCooperative, supabase, filterStatus, page, toast])
+  }, [currentCooperative, supabase, filterStatus, page, toast, user])
 
   useEffect(() => { fetchCotisations() }, [fetchCotisations])
   useEffect(() => { setPage(1) }, [filterStatus])

@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Checkbox } from '@/components/ui/checkbox'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
+import { useAuth } from '@/app/context/auth-context'
 import { useToast } from '@/hooks/use-toast'
 import { useDebounced } from '@/hooks/use-debounced'
 import { LoadingBlock, Spinner } from '@/components/shared/loading'
@@ -42,6 +43,7 @@ interface SettingsRow {
 
 export default function CardsPage() {
   const { currentCooperative } = useCooperative()
+  const { user } = useAuth()
   const { toast } = useToast()
   const { confirm, confirmNode } = useConfirm()
   const supabase = useMemo(() => createClient(), [])
@@ -77,29 +79,34 @@ export default function CardsPage() {
   const fetchCards = useCallback(async () => {
     if (!currentCooperative) return
     setIsLoading(true)
-    const { data, error } = await supabase
+    let query = supabase
       .from('member_cards')
       .select('*, member:members(first_name, last_name, email, phone, photo_url, prefecture, region, village, canton, faitiere)')
-      .eq('cooperative_id', currentCooperative.id)
-      .order('created_at', { ascending: false })
+    if (user?.role !== 'super_admin') {
+      query = query.eq('cooperative_id', currentCooperative.id)
+    }
+    query = query.order('created_at', { ascending: false })
+    const { data, error } = await query
     if (error) {
       toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })
     } else {
       setCards((data ?? []) as MemberCard[])
     }
     setIsLoading(false)
-  }, [currentCooperative, supabase, toast])
+  }, [currentCooperative, supabase, toast, user])
 
   const fetchMembers = useCallback(async () => {
     if (!currentCooperative) return
-    const { data, error } = await supabase
+    let query = supabase
       .from('members')
       .select('id, first_name, last_name')
-      .eq('cooperative_id', currentCooperative.id)
-      .eq('status', 'active')
-      .order('last_name')
+    if (user?.role !== 'super_admin') {
+      query = query.eq('cooperative_id', currentCooperative.id)
+    }
+    query = query.eq('status', 'active').order('last_name')
+    const { data, error } = await query
     if (!error) setMembers(data ?? [])
-  }, [currentCooperative, supabase])
+  }, [currentCooperative, supabase, user])
 
   const loadCooperativeSettings = useCallback(async () => {
     if (!currentCooperative) return

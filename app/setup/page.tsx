@@ -9,7 +9,7 @@ export default function SetupPage() {
       <div className="max-w-4xl mx-auto space-y-12">
         {/* Header */}
         <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold text-foreground">Setup & Configuration Guide</h1>
+          <h1 className="text-4xl font-bold text-foreground">Guide de configuration</h1>
           <p className="text-lg text-muted-foreground">
             Complete guide to setting up the agricultural cooperative SaaS platform
           </p>
@@ -200,7 +200,7 @@ export default function SetupPage() {
           </Link>
           <Link href="/auth/login">
             <Button variant="outline" className="border-border">
-              Go to Login
+              Aller à la connexion
             </Button>
           </Link>
           <Link href="/">

@@ -5,7 +5,7 @@ import { Logo } from '@/components/shared/logo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Check } from 'lucide-react'
-import { useAuth } from '@/app/context/auth-context'
+import { AuthButtons } from '@/components/shared/auth-buttons'
 
 const plans = [
   {
@@ -68,8 +68,6 @@ const plans = [
 ]
 
 export default function PricingPage() {
-  const { isAuthenticated } = useAuth()
-
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -89,26 +87,7 @@ export default function PricingPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {isAuthenticated ? (
-              <Link href="/dashboard">
-                <Button size="sm" className="bg-primary hover:bg-primary/90">
-                  Dashboard
-                </Button>
-              </Link>
-            ) : (
-              <>
-                <Link href="/auth/login">
-                  <Button variant="outline" size="sm">
-                    Sign In
-                  </Button>
-                </Link>
-                <Link href="/auth/signup">
-                  <Button size="sm" className="bg-primary hover:bg-primary/90">
-                    Get Started
-                  </Button>
-                </Link>
-              </>
-            )}
+            <AuthButtons />
           </div>
         </nav>
       </header>
@@ -222,14 +201,14 @@ export default function PricingPage() {
       <section className="border-t border-border py-20 sm:py-28">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold text-foreground mb-4">
-            Ready to get started?
+            Prêt à commencer ?
           </h2>
           <p className="text-lg text-muted-foreground mb-8">
             Join agricultural cooperatives using FaîtiereHub to connect members and grow together.
           </p>
           <Link href="/auth/signup">
             <Button size="lg" className="gap-2 bg-primary hover:bg-primary/90">
-              Start Your Free Trial
+              Commencer l'essai gratuit
             </Button>
           </Link>
         </div>

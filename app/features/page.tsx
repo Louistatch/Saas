@@ -15,7 +15,7 @@ import {
   Globe,
   ArrowRight
 } from 'lucide-react'
-import { useAuth } from '@/app/context/auth-context'
+import { AuthButtons } from '@/components/shared/auth-buttons'
 
 const features = [
   {
@@ -61,8 +61,6 @@ const features = [
 ]
 
 export default function FeaturesPage() {
-  const { isAuthenticated } = useAuth()
-
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -82,26 +80,7 @@ export default function FeaturesPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {isAuthenticated ? (
-              <Link href="/dashboard">
-                <Button size="sm" className="bg-primary hover:bg-primary/90">
-                  Dashboard
-                </Button>
-              </Link>
-            ) : (
-              <>
-                <Link href="/auth/login">
-                  <Button variant="outline" size="sm">
-                    Sign In
-                  </Button>
-                </Link>
-                <Link href="/auth/signup">
-                  <Button size="sm" className="bg-primary hover:bg-primary/90">
-                    Get Started
-                  </Button>
-                </Link>
-              </>
-            )}
+            <AuthButtons />
           </div>
         </nav>
       </header>
@@ -189,7 +168,7 @@ export default function FeaturesPage() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/auth/signup">
               <Button size="lg" className="gap-2 bg-primary hover:bg-primary/90">
-                Start Free Trial <ArrowRight className="h-4 w-4" />
+                Essai gratuit <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
             <Link href="/pricing">
