@@ -66,8 +66,7 @@ export function destroySession() {
       key.startsWith('sb-') || // Supabase keys
       key.startsWith('fh_') || // Our keys
       key.startsWith('supabase') ||
-      key === 'current_coop_id' ||
-      key === 'faitierehub_locale'
+      key === 'current_coop_id'
     )) {
       keysToRemove.push(key)
     }

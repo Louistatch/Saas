@@ -11,9 +11,9 @@ const geist = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' })
 
 export const metadata: Metadata = {
-  title: 'FaîtiereHub — Agricultural Cooperative Platform',
+  title: 'FaîtiereHub — Plateforme numérique pour coopératives agricoles',
   description:
-    'Empower agricultural cooperatives with digital tools for member management, marketplace, and data-driven decisions.',
+    'Donnez du pouvoir à vos coopératives agricoles avec des outils numériques pour la gestion des membres, le marketplace et les décisions basées sur les données.',
   icons: {
     icon: [
       { url: '/icon-light-32x32.png', media: '(prefers-color-scheme: light)' },
@@ -31,7 +31,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="fr"
       className={`${geist.variable} ${geistMono.variable} bg-background`}
       suppressHydrationWarning
     >

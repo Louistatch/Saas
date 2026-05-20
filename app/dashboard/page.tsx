@@ -96,7 +96,7 @@ export default function DashboardPage() {
     activities.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     setRecent(activities.slice(0, 5))
     setIsLoading(false)
-  }, [currentCooperative, supabase])
+  }, [currentCooperative, user?.role, supabase])
 
   useEffect(() => {
     fetchStats()
