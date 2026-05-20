@@ -1,62 +1,56 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { createBrowserClient } from '@supabase/ssr'
 
 /**
- * Force sign-out page.
- * 1. Calls supabase.auth.signOut() to invalidate the session
- * 2. Clears localStorage and sessionStorage
- * 3. Redirects to /auth/login with a full page load
- * 
- * Visit /auth/signout to force-clear a stale session.
+ * Minimal sign-out page — does NOT use AuthProvider or any context.
+ * Directly creates a Supabase client and signs out.
  */
 export default function SignOutPage() {
   const [status, setStatus] = useState('Déconnexion en cours…')
 
   useEffect(() => {
-    async function performSignOut() {
+    async function doSignOut() {
       try {
-        const supabase = createClient()
-        
-        // Sign out from Supabase (clears the session token)
+        // Create client directly (no context dependency)
+        const supabase = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        )
         await supabase.auth.signOut()
-        
-        // Clear all local storage
-        localStorage.clear()
-        sessionStorage.clear()
-        
-        // Clear cookies manually (belt and suspenders)
+      } catch {
+        // Ignore errors
+      }
+
+      // Clear everything
+      try { localStorage.clear() } catch {}
+      try { sessionStorage.clear() } catch {}
+      try {
         document.cookie.split(';').forEach((c) => {
           const name = c.trim().split('=')[0]
           if (name) {
             document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`
+            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${window.location.hostname}`
           }
         })
+      } catch {}
 
-        setStatus('Redirection…')
-        
-        // Full page redirect (not client-side navigation)
-        // This ensures the proxy sees no auth cookie on the next request
-        setTimeout(() => {
-          window.location.href = '/auth/login'
-        }, 500)
-      } catch (error) {
-        setStatus('Erreur — redirection…')
-        setTimeout(() => {
-          window.location.href = '/auth/login'
-        }, 1000)
-      }
+      setStatus('Redirection…')
+      // Hard redirect
+      setTimeout(() => {
+        window.location.replace('/auth/login')
+      }, 300)
     }
 
-    performSignOut()
+    doSignOut()
   }, [])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="min-h-screen flex items-center justify-center bg-white">
       <div className="space-y-4 text-center">
-        <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-muted-foreground">{status}</p>
+        <div className="h-8 w-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="text-gray-500 text-sm">{status}</p>
       </div>
     </div>
   )
