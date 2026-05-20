@@ -185,33 +185,12 @@ export default function CardsPage() {
   }, [currentCooperative])
 
   const buildQrPayload = useCallback(
-    (memberId: string, cardNumber: string, member?: { first_name?: string | null; last_name?: string | null; phone?: string | null; photo_url?: string | null; village?: string | null; canton?: string | null; prefecture?: string | null; region?: string | null } | null) => {
-      // QR contains all verification info
-      const payload: Record<string, string> = {
-        card: cardNumber,
-        verify: `https://saas-one-teal-62.vercel.app/verify/${cardNumber}`,
-      }
-      if (settings.qrCodeIncludes.memberId) payload.member_id = memberId
-      if (settings.qrCodeIncludes.cooperativeId && currentCooperative) {
-        // For faîtière: show both faîtière and cooperative
-        if (isFaitiereAdmin && selectedCoopId) {
-          const childCoop = childCooperatives.find(c => c.id === selectedCoopId)
-          payload.faitiere = currentCooperative.name
-          payload.cooperative = childCoop?.name ?? ''
-        } else {
-          payload.cooperative = currentCooperative.name
-          if (currentCooperative.faitiereName) payload.faitiere = currentCooperative.faitiereName
-        }
-      }
-      if (member) {
-        payload.name = `${member.first_name ?? ''} ${member.last_name ?? ''}`.trim()
-        if (member.phone) payload.phone = member.phone
-        if (member.village) payload.locality = [member.village, member.canton, member.prefecture, member.region].filter(Boolean).join(', ')
-        if (member.photo_url) payload.photo = 'yes'
-      }
-      return JSON.stringify(payload)
+    (_memberId: string, cardNumber: string, _member?: { first_name?: string | null; last_name?: string | null; phone?: string | null; photo_url?: string | null; village?: string | null; canton?: string | null; prefecture?: string | null; region?: string | null } | null) => {
+      // QR code = direct verification URL (scannable by any phone)
+      // All member info is displayed on the verify page from the database
+      return `https://saas-one-teal-62.vercel.app/verify/${encodeURIComponent(cardNumber)}`
     },
-    [settings, currentCooperative, isFaitiereAdmin, selectedCoopId, childCooperatives],
+    [],
   )
 
   // -- single generation --
