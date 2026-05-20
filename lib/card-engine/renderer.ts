@@ -251,13 +251,7 @@ export async function renderToCanvas(schema: CardSchema): Promise<HTMLCanvasElem
   ctx.fillText('SCANNER POUR VÉRIFIER', qrBlockX + 125, qrBlockY + 25)
   ctx.textAlign = 'left'
 
-  const qrPayload = JSON.stringify({
-    card: member.cardNumber,
-    verify: `https://saas-one-teal-62.vercel.app/verify/${member.cardNumber}`,
-    name: `${member.firstName} ${member.lastName}`,
-    cooperative: branding.cooperativeName,
-    faitiere: branding.faitiereName,
-  })
+  const qrPayload = `https://saas-one-teal-62.vercel.app/verify/${encodeURIComponent(member.cardNumber)}`
 
   const matrix = toMatrix(qrPayload, 'M')
   const qrSize = 160
