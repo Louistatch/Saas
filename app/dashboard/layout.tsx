@@ -16,6 +16,7 @@ import {
   FolderOpen,
   Zap,
   Shield,
+  Smartphone,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Logo } from '@/components/shared/logo'
@@ -44,6 +45,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard/cards', label: 'Member Cards', icon: FileText, roles: ['super_admin', 'cooperative_admin', 'member'] },
     { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/integrations', label: 'Integrations', icon: Zap, roles: ['super_admin', 'cooperative_admin'] },
+    { href: '/dashboard/kobo-setup', label: 'KoboCollect', icon: Smartphone, roles: ['super_admin', 'cooperative_admin'] },
   ].filter(item => user?.role && item.roles.includes(user.role))
 
   return (
