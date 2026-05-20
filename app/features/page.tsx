@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Logo } from '@/components/shared/logo'
+import { MarketingLayout } from '@/components/shared/marketing-layout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { 
@@ -15,7 +15,6 @@ import {
   Globe,
   ArrowRight
 } from 'lucide-react'
-import { AuthButtons } from '@/components/shared/auth-buttons'
 
 const features = [
   {
@@ -62,29 +61,7 @@ const features = [
 
 export default function FeaturesPage() {
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-2">
-            <Logo size="md" />
-          </Link>
-          
-          <div className="hidden md:flex items-center gap-8">
-            <Link href="/features" className="text-sm font-medium text-primary">
-              Features
-            </Link>
-            <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Pricing
-            </Link>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <AuthButtons />
-          </div>
-        </nav>
-      </header>
-
+    <MarketingLayout>
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
         <div className="text-center space-y-4 mb-16">
           <h1 className="text-4xl font-bold text-foreground sm:text-5xl">
@@ -179,6 +156,6 @@ export default function FeaturesPage() {
           </div>
         </div>
       </section>
-    </div>
+    </MarketingLayout>
   )
 }
