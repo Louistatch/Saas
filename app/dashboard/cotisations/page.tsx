@@ -128,7 +128,16 @@ export default function CotisationsPage() {
     if (error) {
       toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })
     } else {
-      setCotisations((data ?? []) as Cotisation[])
+      // Client-side filter by member name (PostgREST can't filter on joined relations)
+      let filtered = (data ?? []) as Cotisation[]
+      if (debouncedSearch.trim()) {
+        const q = debouncedSearch.toLowerCase()
+        filtered = filtered.filter((c) => {
+          const name = c.member ? `${c.member.first_name} ${c.member.last_name}`.toLowerCase() : ''
+          return name.includes(q)
+        })
+      }
+      setCotisations(filtered)
       setTotal(count ?? 0)
     }
     setIsLoading(false)

@@ -182,7 +182,7 @@ export default function AnalyticsPage() {
                 items={[
                   { label: 'Publiées', value: stats.activeExploitations, color: 'bg-green-500' },
                   {
-                    label: 'Brouillons',
+                    label: 'Non publiées',
                     value: stats.totalExploitations - stats.activeExploitations,
                     color: 'bg-gray-300',
                   },

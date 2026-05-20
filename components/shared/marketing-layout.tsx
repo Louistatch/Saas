@@ -6,6 +6,7 @@ const headerLinks = [
   { href: '/produit', label: 'Produit' },
   { href: '/features', label: 'Fonctionnalités' },
   { href: '/pricing', label: 'Tarifs' },
+  { href: '/marketplace', label: 'Marketplace' },
   { href: '/securite', label: 'Sécurité' },
   { href: '/entreprise', label: 'Entreprise' },
 ]

@@ -277,8 +277,8 @@ export default function PublicMarketplacePage() {
 
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span>
-                          {fiche.prefecture?.name ?? 'National'}
-                          {fiche.canton ? ` — ${fiche.canton.name}` : ''}
+                          {(Array.isArray(fiche.prefecture) ? fiche.prefecture[0]?.name : fiche.prefecture?.name) ?? 'National'}
+                          {(Array.isArray(fiche.canton) ? fiche.canton[0]?.name : fiche.canton?.name) ? ` — ${(Array.isArray(fiche.canton) ? fiche.canton[0]?.name : fiche.canton?.name)}` : ''}
                         </span>
                         <span>{fiche.download_count} téléch.</span>
                       </div>

@@ -12,8 +12,17 @@ export async function proxy(request: NextRequest) {
   const isProtected = pathname.startsWith('/dashboard') || pathname.startsWith('/admin')
   const isAuthPage = pathname.startsWith('/auth/login') || pathname.startsWith('/auth/signup')
 
+  // Static dashboard pages that don't need fresh auth check on every pre-render
+  const isStaticDashboard = pathname === '/dashboard/kobo-setup'
+
   // If neither protected nor auth page, just pass through (no DB call)
   if (!isProtected && !isAuthPage) {
+    return NextResponse.next({ request })
+  }
+
+  // Static dashboard pages: still protected but don't need getUser() on every edge pre-render
+  // The client-side ProtectedRoute handles the actual auth check
+  if (isStaticDashboard && request.headers.get('purpose') === 'prefetch') {
     return NextResponse.next({ request })
   }
 

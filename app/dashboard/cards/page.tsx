@@ -201,7 +201,7 @@ export default function CardsPage() {
       card_number: cardNumber,
       status: 'active',
       expiry_date: expiry.toISOString().split('T')[0],
-      qr_data: buildQrPayload(selectedMemberId, cardNumber),
+      qr_data: buildQrPayload(selectedMemberId, cardNumber, members.find(m => m.id === selectedMemberId) ?? null),
     })
 
     setSaving(false)
@@ -239,7 +239,7 @@ export default function CardsPage() {
         card_number: cardNumber,
         status: 'active' as const,
         expiry_date: expiryStr,
-        qr_data: buildQrPayload(memberId, cardNumber),
+        qr_data: buildQrPayload(memberId, cardNumber, members.find(m => m.id === memberId) ?? null),
       }
     })
 

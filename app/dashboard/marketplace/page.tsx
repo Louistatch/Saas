@@ -116,7 +116,6 @@ export default function MarketplacePage() {
     let query = supabase
       .from('fiches_techniques')
       .select('*', { count: 'exact' })
-      .eq('cooperative_id', currentCooperative.id)
       .order('created_at', { ascending: false })
 
     if (debouncedSearch.trim()) {
