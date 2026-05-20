@@ -42,10 +42,10 @@ export default function DashboardPage() {
     const [
       membersRes,
       cardsRes,
-      exploitationsRes,
+      fichesRes,
       recentMembersRes,
       recentCardsRes,
-      recentExploitationsRes,
+      recentFichesRes,
     ] = await Promise.all([
       supabase.from('members').select('id', { count: 'exact', head: true }).eq('cooperative_id', coopId),
       supabase
@@ -53,7 +53,7 @@ export default function DashboardPage() {
         .select('id', { count: 'exact', head: true })
         .eq('cooperative_id', coopId)
         .eq('status', 'active'),
-      supabase.from('exploitations').select('id', { count: 'exact', head: true }).eq('cooperative_id', coopId),
+      supabase.from('fiches_techniques').select('id', { count: 'exact', head: true }).eq('cooperative_id', coopId).eq('status', 'published'),
       supabase
         .from('members')
         .select('first_name, last_name, created_at')
@@ -67,8 +67,8 @@ export default function DashboardPage() {
         .order('created_at', { ascending: false })
         .limit(2),
       supabase
-        .from('exploitations')
-        .select('name, created_at')
+        .from('fiches_techniques')
+        .select('title, created_at')
         .eq('cooperative_id', coopId)
         .order('created_at', { ascending: false })
         .limit(2),
@@ -77,7 +77,7 @@ export default function DashboardPage() {
     setStats({
       totalMembers: membersRes.count ?? 0,
       activeCards: cardsRes.count ?? 0,
-      totalExploitations: exploitationsRes.count ?? 0,
+      totalExploitations: fichesRes.count ?? 0,
     })
 
     const activities: RecentItem[] = [
@@ -95,9 +95,9 @@ export default function DashboardPage() {
         type: 'card' as const,
         date: c.created_at,
       })),
-      ...((recentExploitationsRes.data ?? []) as { name: string; created_at: string }[]).map(
+      ...((recentFichesRes.data ?? []) as { title: string; created_at: string }[]).map(
         (e) => ({
-          label: `Exploitation added: ${e.name}`,
+          label: `Fiche publiée: ${e.title}`,
           time: timeAgo(e.created_at),
           type: 'exploitation' as const,
           date: e.created_at,
@@ -122,7 +122,7 @@ export default function DashboardPage() {
   const statCards = [
     { title: 'Total Members', value: stats.totalMembers, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', href: '/dashboard/members' },
     { title: 'Active Cards', value: stats.activeCards, icon: CreditCard, color: 'text-green-600', bg: 'bg-green-50', href: '/dashboard/cards' },
-    { title: 'Exploitations', value: stats.totalExploitations, icon: ShoppingCart, color: 'text-purple-600', bg: 'bg-purple-50', href: '/dashboard/marketplace' },
+    { title: 'Fiches techniques', value: stats.totalExploitations, icon: ShoppingCart, color: 'text-purple-600', bg: 'bg-purple-50', href: '/dashboard/marketplace' },
     { title: 'Analytics', value: '→', icon: BarChart3, color: 'text-orange-600', bg: 'bg-orange-50', href: '/dashboard/analytics' },
   ]
 

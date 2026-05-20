@@ -17,6 +17,7 @@ import {
   Zap,
   Shield,
   Smartphone,
+  Banknote,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Logo } from '@/components/shared/logo'
@@ -42,6 +43,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard/marketplace', label: 'Marketplace', icon: ShoppingCart, roles: ['super_admin', 'cooperative_admin', 'member', 'guest'] },
     { href: '/dashboard/templates', label: 'Templates', icon: FolderOpen, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/members', label: 'Members', icon: Users, roles: ['super_admin', 'cooperative_admin', 'member'] },
+    { href: '/dashboard/cotisations', label: 'Cotisations', icon: Banknote, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/cards', label: 'Member Cards', icon: FileText, roles: ['super_admin', 'cooperative_admin', 'member'] },
     { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/integrations', label: 'Integrations', icon: Zap, roles: ['super_admin', 'cooperative_admin'] },
