@@ -64,13 +64,10 @@ export async function POST(
         })
 
         // Increment download count
-        await supabase.rpc('increment_download_count', { fiche_id: ficheId }).catch(() => {
-          // RPC may not exist yet, fallback
-          supabase
-            .from('fiches_techniques')
-            .update({ download_count: (fiche.download_count ?? 0) + 1 })
-            .eq('id', ficheId)
-        })
+        await supabase
+          .from('fiches_techniques')
+          .update({ download_count: (fiche.download_count ?? 0) + 1 })
+          .eq('id', ficheId)
 
         // Generate signed URLs for files
         const files = (fiche.files as { name: string; url: string; type: string }[]) ?? []
