@@ -112,7 +112,12 @@ export default function MarketplacePage() {
 
   // Load fiches
   const fetchFiches = useCallback(async () => {
-    if (!currentCooperative) return
+    if (!currentCooperative) {
+      setFiches([])
+      setTotal(0)
+      setIsLoading(false)
+      return
+    }
     setIsLoading(true)
 
     let query = supabase
@@ -130,13 +135,15 @@ export default function MarketplacePage() {
 
     const { data, error, count } = await query
     if (error) {
-      toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })
+      // Don't toast on empty results — just show empty state
+      setFiches([])
+      setTotal(0)
     } else {
       setFiches((data ?? []) as FicheTechnique[])
       setTotal(count ?? 0)
     }
     setIsLoading(false)
-  }, [currentCooperative, supabase, debouncedSearch, page, toast])
+  }, [currentCooperative, supabase, debouncedSearch, page]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchFiches() }, [fetchFiches])
   useEffect(() => { setPage(1) }, [debouncedSearch])
