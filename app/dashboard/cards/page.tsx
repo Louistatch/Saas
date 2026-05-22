@@ -186,7 +186,8 @@ export default function CardsPage() {
     (_memberId: string, cardNumber: string, _member?: { first_name?: string | null; last_name?: string | null; phone?: string | null; photo_url?: string | null; village?: string | null; canton?: string | null; prefecture?: string | null; region?: string | null } | null) => {
       // QR code = direct verification URL (scannable by any phone)
       // All member info is displayed on the verify page from the database
-      return `https://saas-one-teal-62.vercel.app/verify/${encodeURIComponent(cardNumber)}`
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://faitierehub.com'
+      return `${baseUrl}/verify/${encodeURIComponent(cardNumber)}`
     },
     [],
   )
