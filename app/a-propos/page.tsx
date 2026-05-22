@@ -87,7 +87,7 @@ export default function AProposPage() {
                 <div className="h-24 w-24 mx-auto rounded-full overflow-hidden border-2 border-primary/20">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src="/founder.jpg"
+                    src="/founder.jpeg"
                     alt={member.name}
                     className="w-full h-full object-cover"
                   />
