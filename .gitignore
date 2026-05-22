@@ -40,3 +40,10 @@ next-env.d.ts
 
 # Local backups
 *.bak
+
+# E2E Testing
+e2e/.auth/
+e2e/.env.e2e
+e2e/test-results/
+e2e/playwright-report/
+e2e/blob-report/

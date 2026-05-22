@@ -75,7 +75,7 @@ export default function Home() {
             </div>
 
             {/* Floating card showcase */}
-            <div className="absolute -bottom-8 -right-4 md:-right-12 w-48 md:w-56 rounded-xl overflow-hidden shadow-2xl border-2 border-white/20 rotate-3 hover:rotate-0 transition-transform duration-500">
+            <div className="absolute -bottom-8 -right-4 md:-right-12 w-48 md:w-56 rounded-xl overflow-hidden shadow-2xl border-2 border-white/20 rotate-3 hover:rotate-0 transition-transform duration-500 hidden sm:block">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/showcase-card.png"
