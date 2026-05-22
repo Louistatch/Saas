@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { useParams } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { CheckCircle, XCircle, Shield, MapPin, Phone, Building2, Calendar, TreePine, Coins, History, User } from 'lucide-react'
+import { createBrowserClient } from '@supabase/ssr'
+import { CheckCircle, XCircle, Shield, MapPin, Phone, Building2, Calendar, TreePine, Coins } from 'lucide-react'
 import { Logo } from '@/components/shared/logo'
 
 /**
@@ -55,12 +55,21 @@ interface VerifyResult {
 export default function VerifyCardPage() {
   const params = useParams()
   const cardNumber = params.card_number as string
-  const supabase = useMemo(() => createClient(), [])
+  // Independent Supabase client — NOT shared with AuthProvider
+  // This prevents token refresh interference
+  const supabase = useMemo(() => createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  ), [])
   const [result, setResult] = useState<VerifyResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [showDetails, setShowDetails] = useState(false)
 
   useEffect(() => {
+    // Guard: don't re-fetch if already loaded
+    if (result) return
+
+    let cancelled = false
     async function verify() {
       const decodedCardNumber = decodeURIComponent(cardNumber)
 
@@ -76,9 +85,11 @@ export default function VerifyCardPage() {
         .single()
 
       if (error || !card) {
-        setResult({ valid: false, error: 'Carte non trouvée dans le système' })
-        setLoading(false)
-        setTimeout(() => setShowDetails(true), 400)
+        if (!cancelled) {
+          setResult({ valid: false, error: 'Carte non trouvée dans le système' })
+          setLoading(false)
+          setTimeout(() => setShowDetails(true), 400)
+        }
         return
       }
 
@@ -119,11 +130,14 @@ export default function VerifyCardPage() {
         cotisations,
         memberSince: (card.member as any)?.created_at,
       })
-      setLoading(false)
-      setTimeout(() => setShowDetails(true), 600)
+      if (!cancelled) {
+        setLoading(false)
+        setTimeout(() => setShowDetails(true), 600)
+      }
     }
     verify()
-  }, [cardNumber, supabase])
+    return () => { cancelled = true }
+  }, [cardNumber]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
