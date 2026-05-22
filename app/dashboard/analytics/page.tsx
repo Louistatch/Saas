@@ -39,15 +39,9 @@ export default function AnalyticsPage() {
     setIsLoading(true)
     const coopId = currentCooperative.id
 
-    let membersQuery = supabase.from('members').select('status')
-    let fichesQuery = supabase.from('fiches_techniques').select('status')
-    let cardsQuery = supabase.from('member_cards').select('status')
-
-    if (user?.role !== 'super_admin') {
-      membersQuery = membersQuery.eq('cooperative_id', coopId)
-      fichesQuery = fichesQuery.eq('cooperative_id', coopId)
-      cardsQuery = cardsQuery.eq('cooperative_id', coopId)
-    }
+    const membersQuery = supabase.from('members').select('status').eq('cooperative_id', coopId)
+    const fichesQuery = supabase.from('fiches_techniques').select('status').eq('cooperative_id', coopId)
+    const cardsQuery = supabase.from('member_cards').select('status').eq('cooperative_id', coopId)
 
     const [membersRes, fichesRes, cardsRes] = await Promise.all([
       membersQuery,

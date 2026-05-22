@@ -29,9 +29,7 @@ export default function PrintCardsPage() {
       .from('member_cards')
       .select('*, member:members(first_name, last_name, phone, photo_url, prefecture, region, village, canton)')
       .eq('status', 'active')
-    if (user?.role !== 'super_admin') {
-      query = query.eq('cooperative_id', currentCooperative.id)
-    }
+      .eq('cooperative_id', currentCooperative.id)
     query = query.order('created_at', { ascending: false })
     const { data } = await query
     setCards((data ?? []) as MemberCard[])

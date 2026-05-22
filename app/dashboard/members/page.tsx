@@ -92,10 +92,8 @@ export default function MembersPage() {
     if (!currentCooperative) return
     setIsLoading(true)
     let query = supabase.from('members').select('*').order('last_name')
-    // Only filter by cooperative for non-super-admins (RLS handles hierarchy)
-    if (user?.role !== 'super_admin') {
-      query = query.eq('cooperative_id', currentCooperative.id)
-    }
+    // Always filter by current cooperative (even super_admin uses the switcher)
+    query = query.eq('cooperative_id', currentCooperative.id)
     const { data, error } = await query
     if (error) {
       toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })

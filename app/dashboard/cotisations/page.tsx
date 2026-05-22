@@ -87,23 +87,19 @@ export default function CotisationsPage() {
   // Load members for select
   useEffect(() => {
     if (!currentCooperative) return
-    let query = supabase.from('members').select('id, first_name, last_name')
-    if (user?.role !== 'super_admin') {
-      query = query.eq('cooperative_id', currentCooperative.id)
-    }
-    query.eq('status', 'active')
+    supabase.from('members').select('id, first_name, last_name')
+      .eq('cooperative_id', currentCooperative.id)
+      .eq('status', 'active')
       .order('last_name')
       .then(({ data }) => setMembers(data ?? []))
-  }, [currentCooperative, supabase, user])
+  }, [currentCooperative, supabase])
 
   // Load stats
   useEffect(() => {
     if (!currentCooperative) return
-    let query = supabase.from('cotisations').select('amount, status')
-    if (user?.role !== 'super_admin') {
-      query = query.eq('cooperative_id', currentCooperative.id)
-    }
-    query.then(({ data }) => {
+    supabase.from('cotisations').select('amount, status')
+      .eq('cooperative_id', currentCooperative.id)
+      .then(({ data }) => {
         const rows = data ?? []
         setStats({
           count: rows.length,
@@ -112,7 +108,7 @@ export default function CotisationsPage() {
           total_overdue: rows.filter(r => r.status === 'overdue').reduce((s, r) => s + Number(r.amount), 0),
         })
       })
-  }, [currentCooperative, supabase, cotisations, user])
+  }, [currentCooperative, supabase, cotisations])
 
   // Load cotisations
   const fetchCotisations = useCallback(async () => {
@@ -122,9 +118,7 @@ export default function CotisationsPage() {
     let query = supabase
       .from('cotisations')
       .select('*, member:members(id, first_name, last_name, phone)', { count: 'exact' })
-    if (user?.role !== 'super_admin') {
-      query = query.eq('cooperative_id', currentCooperative.id)
-    }
+      .eq('cooperative_id', currentCooperative.id)
     query = query.order('created_at', { ascending: false })
 
     if (filterStatus) query = query.eq('status', filterStatus)
@@ -136,7 +130,6 @@ export default function CotisationsPage() {
     if (error) {
       toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })
     } else {
-      // Client-side filter by member name (PostgREST can't filter on joined relations)
       let filtered = (data ?? []) as Cotisation[]
       if (debouncedSearch.trim()) {
         const q = debouncedSearch.toLowerCase()
@@ -149,7 +142,7 @@ export default function CotisationsPage() {
       setTotal(count ?? 0)
     }
     setIsLoading(false)
-  }, [currentCooperative, supabase, filterStatus, page, toast, user])
+  }, [currentCooperative, supabase, filterStatus, page, toast])
 
   useEffect(() => { fetchCotisations() }, [fetchCotisations])
   useEffect(() => { setPage(1) }, [filterStatus])

@@ -102,9 +102,7 @@ export default function CardsPage() {
     let query = supabase
       .from('member_cards')
       .select('*, member:members(first_name, last_name, email, phone, photo_url, prefecture, region, village, canton, faitiere)')
-    if (user?.role !== 'super_admin') {
-      query = query.eq('cooperative_id', currentCooperative.id)
-    }
+      .eq('cooperative_id', currentCooperative.id)
     query = query.order('created_at', { ascending: false })
     const { data, error } = await query
     if (error) {
@@ -120,7 +118,7 @@ export default function CardsPage() {
     let query = supabase
       .from('members')
       .select('id, first_name, last_name, cooperative_id')
-    if (user?.role !== 'super_admin' && !isFaitiereAdmin) {
+    if (!isFaitiereAdmin) {
       query = query.eq('cooperative_id', currentCooperative.id)
     }
     query = query.eq('status', 'active').order('last_name')

@@ -38,26 +38,15 @@ export default function DashboardPage() {
     if (!currentCooperative) return
     setIsLoading(true)
 
-    // For super_admin or faitiere-level users, don't filter by cooperative_id
-    // The RLS policies (get_accessible_cooperative_ids) handle the hierarchy
-    const needsFilter = user?.role !== 'super_admin'
+    // Always filter by the selected cooperative (super_admin uses the switcher)
     const coopId = currentCooperative.id
 
-    let membersQuery = supabase.from('members').select('id', { count: 'exact', head: true })
-    let cardsQuery = supabase.from('member_cards').select('id', { count: 'exact', head: true }).eq('status', 'active')
-    let fichesQuery = supabase.from('fiches_techniques').select('id', { count: 'exact', head: true }).eq('status', 'published')
-    let recentMembersQuery = supabase.from('members').select('first_name, last_name, created_at').order('created_at', { ascending: false }).limit(3)
-    let recentCardsQuery = supabase.from('member_cards').select('card_number, created_at').order('created_at', { ascending: false }).limit(2)
-    let recentFichesQuery = supabase.from('fiches_techniques').select('title, created_at').order('created_at', { ascending: false }).limit(2)
-
-    if (needsFilter) {
-      membersQuery = membersQuery.eq('cooperative_id', coopId)
-      cardsQuery = cardsQuery.eq('cooperative_id', coopId)
-      fichesQuery = fichesQuery.eq('cooperative_id', coopId)
-      recentMembersQuery = recentMembersQuery.eq('cooperative_id', coopId)
-      recentCardsQuery = recentCardsQuery.eq('cooperative_id', coopId)
-      recentFichesQuery = recentFichesQuery.eq('cooperative_id', coopId)
-    }
+    let membersQuery = supabase.from('members').select('id', { count: 'exact', head: true }).eq('cooperative_id', coopId)
+    let cardsQuery = supabase.from('member_cards').select('id', { count: 'exact', head: true }).eq('status', 'active').eq('cooperative_id', coopId)
+    let fichesQuery = supabase.from('fiches_techniques').select('id', { count: 'exact', head: true }).eq('status', 'published').eq('cooperative_id', coopId)
+    let recentMembersQuery = supabase.from('members').select('first_name, last_name, created_at').eq('cooperative_id', coopId).order('created_at', { ascending: false }).limit(3)
+    let recentCardsQuery = supabase.from('member_cards').select('card_number, created_at').eq('cooperative_id', coopId).order('created_at', { ascending: false }).limit(2)
+    let recentFichesQuery = supabase.from('fiches_techniques').select('title, created_at').eq('cooperative_id', coopId).order('created_at', { ascending: false }).limit(2)
 
     const [membersRes, cardsRes, fichesRes, recentMembersRes, recentCardsRes, recentFichesRes] = await Promise.all([
       membersQuery, cardsQuery, fichesQuery, recentMembersQuery, recentCardsQuery, recentFichesQuery,
