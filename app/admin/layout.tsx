@@ -36,6 +36,7 @@ export default function AdminLayout({
     { href: '/admin/cooperatives', label: 'Coopératives', icon: Building2 },
     { href: '/admin/users', label: 'Utilisateurs', icon: Users },
     { href: '/admin/analytics', label: 'Statistiques', icon: BarChart3 },
+    { href: '/admin/logs', label: 'Logs d\'audit', icon: BarChart3 },
     { href: '/admin/settings', label: 'Paramètres', icon: Settings },
   ]
 

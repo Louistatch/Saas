@@ -42,6 +42,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard/marketplace', label: 'Comptes d\'exploitation', icon: ShoppingCart, roles: ['super_admin', 'cooperative_admin', 'member', 'guest'] },
     { href: '/dashboard/templates', label: 'Modèles', icon: FolderOpen, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/members', label: 'Membres', icon: Users, roles: ['super_admin', 'cooperative_admin', 'member'] },
+    { href: '/dashboard/parcelles', label: 'Parcelles', icon: FileText, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/cotisations', label: 'Cotisations', icon: Banknote, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/cards', label: 'Cartes membres', icon: FileText, roles: ['super_admin', 'cooperative_admin', 'member'] },
     { href: '/dashboard/analytics', label: 'Statistiques', icon: BarChart3, roles: ['super_admin', 'cooperative_admin'] },

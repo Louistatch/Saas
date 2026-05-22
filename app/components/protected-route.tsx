@@ -46,7 +46,7 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
   useEffect(() => {
     if (isLoading || !isAuthenticated) return
     if (requiredRole && user?.role !== requiredRole && user?.role !== 'super_admin') {
-      window.location.replace('/dashboard')
+      window.location.replace('/forbidden')
     }
   }, [isAuthenticated, isLoading, user, requiredRole])
 
