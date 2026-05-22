@@ -102,7 +102,7 @@ export default function ConfidentialitePage() {
             <div className="rounded-lg border border-border bg-muted/30 p-6 space-y-2">
               <p className="text-foreground font-medium">Délégué à la Protection des Données</p>
               <p className="text-sm text-muted-foreground">Email : dpo@faitierehub.com</p>
-              <p className="text-sm text-muted-foreground">Adresse : Boulevard du 13 Janvier, Lomé, Togo</p>
+              <p className="text-sm text-muted-foreground">Adresse : Lomé, Togo</p>
               <p className="text-sm text-muted-foreground">
                 Vous pouvez également adresser une réclamation à l&apos;autorité de protection des données
                 compétente (ANCE — Autorité Nationale de la Certification Électronique, Togo).

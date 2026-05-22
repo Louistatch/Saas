@@ -9,10 +9,7 @@ export const metadata: Metadata = {
 }
 
 const teamMembers = [
-  { name: 'Kofi A.', role: 'CEO & Co-fondateur', initials: 'KA' },
-  { name: 'Ama D.', role: 'CTO & Co-fondatrice', initials: 'AD' },
-  { name: 'Yao M.', role: 'Responsable Produit', initials: 'YM' },
-  { name: 'Essi K.', role: 'Lead Développeur', initials: 'EK' },
+  { name: 'TATCHIDA Louis', role: 'Fondateur & CEO', initials: 'TL' },
 ]
 
 const partners = [
@@ -85,13 +82,19 @@ export default function AProposPage() {
             {teamMembers.map((member) => (
               <div
                 key={member.name}
-                className="rounded-xl border border-border bg-background p-6 text-center space-y-3"
+                className="rounded-xl border border-border bg-background p-6 text-center space-y-3 max-w-xs mx-auto"
               >
-                <div className="h-16 w-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-lg font-semibold text-primary">{member.initials}</span>
+                <div className="h-24 w-24 mx-auto rounded-full overflow-hidden border-2 border-primary/20">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/founder.jpg"
+                    alt={member.name}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
-                <h3 className="font-semibold text-foreground">{member.name}</h3>
-                <p className="text-sm text-muted-foreground">{member.role}</p>
+                <h3 className="font-semibold text-foreground text-lg">{member.name}</h3>
+                <p className="text-sm text-primary font-medium">{member.role}</p>
+                <p className="text-xs text-muted-foreground">Lomé, Togo • +228 92 54 88 38</p>
               </div>
             ))}
           </div>

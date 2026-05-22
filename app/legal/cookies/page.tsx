@@ -158,7 +158,7 @@ export default function CookiesPage() {
             </p>
             <div className="rounded-lg border border-border bg-muted/30 p-6 space-y-2">
               <p className="text-sm text-muted-foreground">Email : dpo@faitierehub.com</p>
-              <p className="text-sm text-muted-foreground">Adresse : Boulevard du 13 Janvier, Lomé, Togo</p>
+              <p className="text-sm text-muted-foreground">Adresse : Lomé, Togo</p>
             </div>
           </div>
         </div>

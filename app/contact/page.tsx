@@ -105,7 +105,7 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <p className="font-medium text-foreground">Téléphone</p>
-                      <p className="text-sm text-muted-foreground">+228 90 00 00 00</p>
+                      <p className="text-sm text-muted-foreground">+228 92 54 88 38</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-4">
@@ -115,8 +115,6 @@ export default function ContactPage() {
                     <div>
                       <p className="font-medium text-foreground">Adresse</p>
                       <p className="text-sm text-muted-foreground">
-                        Boulevard du 13 Janvier<br />
-                        Quartier Nyékonakpoè<br />
                         Lomé, Togo
                       </p>
                     </div>

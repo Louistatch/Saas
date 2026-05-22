@@ -137,10 +137,11 @@ export default function ConditionsPage() {
           <div className="space-y-4">
             <h2 className="text-2xl font-bold text-foreground">7. Contact</h2>
             <div className="rounded-lg border border-border bg-muted/30 p-6 space-y-2">
-              <p className="text-foreground font-medium">FaîtiereHub SARL</p>
-              <p className="text-sm text-muted-foreground">Boulevard du 13 Janvier, Lomé, Togo</p>
-              <p className="text-sm text-muted-foreground">Email : legal@faitierehub.com</p>
-              <p className="text-sm text-muted-foreground">RCCM : TG-LOM-2024-XXXXX</p>
+              <p className="text-foreground font-medium">FaîtiereHub</p>
+              <p className="text-sm text-muted-foreground">TATCHIDA Louis — Fondateur</p>
+              <p className="text-sm text-muted-foreground">Lomé, Togo</p>
+              <p className="text-sm text-muted-foreground">Tél : +228 92 54 88 38</p>
+              <p className="text-sm text-muted-foreground">Email : contact@faitierehub.com</p>
             </div>
           </div>
         </div>
