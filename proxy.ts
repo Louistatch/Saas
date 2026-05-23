@@ -11,6 +11,27 @@ import { createServerClient } from '@supabase/ssr'
  */
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
+  const hostname = request.headers.get('host') ?? ''
+
+  // Domain redirect: force all Vercel preview/production URLs to www.faitierehub.com
+  // This ensures QR codes always show the branded domain
+  const isVercelDomain = hostname.endsWith('.vercel.app') || hostname === 'saas-one-teal-62.vercel.app'
+  const isProductionDomain = hostname === 'www.faitierehub.com' || hostname === 'faitierehub.com'
+
+  if (isVercelDomain && !isProductionDomain) {
+    const url = new URL(request.url)
+    url.hostname = 'www.faitierehub.com'
+    url.port = ''
+    url.protocol = 'https:'
+    return NextResponse.redirect(url.toString(), { status: 301 })
+  }
+
+  // Redirect bare domain to www
+  if (hostname === 'faitierehub.com') {
+    const url = new URL(request.url)
+    url.hostname = 'www.faitierehub.com'
+    return NextResponse.redirect(url.toString(), { status: 301 })
+  }
 
   const isProtected = pathname.startsWith('/dashboard') || pathname.startsWith('/admin')
   const isAuthPage = pathname.startsWith('/auth/login') || pathname.startsWith('/auth/signup')

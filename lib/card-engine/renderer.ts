@@ -282,7 +282,7 @@ export async function renderToCanvas(schema: CardSchema): Promise<HTMLCanvasElem
   ctx.textAlign = 'left'
 
   // QR code
-  const qrPayload = `https://faitierehub.com/verify/${encodeURIComponent(member.cardNumber)}`
+  const qrPayload = `https://www.faitierehub.com/verify/${encodeURIComponent(member.cardNumber)}`
   const matrix = toMatrix(qrPayload, 'M')
   const qrSize = 170
   const qrX = qrBlockX + 50, qrY = qrBlockY + 45
