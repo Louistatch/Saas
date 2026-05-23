@@ -13,10 +13,11 @@ const teamMembers = [
 ]
 
 const partners = [
-  'Ministère de l\'Agriculture (Togo)',
-  'GIZ - Coopération Allemande',
-  'FAO - Nations Unies',
-  'Banque Mondiale - IFC',
+  {
+    name: 'FENOMAT',
+    logo: '/images/partners/fenomat.png',
+    description: 'Fédération Nationale des Organisations de Maraîchers du Togo',
+  },
 ]
 
 export default function AProposPage() {
@@ -115,13 +116,22 @@ export default function AProposPage() {
               Nous collaborons avec des institutions de référence pour maximiser notre impact.
             </p>
           </div>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {partners.map((partner) => (
               <div
-                key={partner}
-                className="rounded-lg border border-border bg-background p-6 flex items-center justify-center min-h-[100px]"
+                key={partner.name}
+                className="rounded-xl border border-border bg-background p-8 flex flex-col items-center justify-center gap-4 min-h-[160px] hover:shadow-lg hover:border-primary/20 transition-all duration-300"
               >
-                <p className="text-sm font-medium text-foreground text-center">{partner}</p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={partner.logo}
+                  alt={`Logo ${partner.name}`}
+                  className="h-16 w-auto object-contain"
+                />
+                <div className="text-center">
+                  <p className="font-semibold text-foreground">{partner.name}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{partner.description}</p>
+                </div>
               </div>
             ))}
           </div>

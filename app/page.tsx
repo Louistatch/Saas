@@ -205,6 +205,29 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Partner / Trust Section */}
+      <section className="py-16 sm:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-10">
+            <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Ils nous font confiance</p>
+          </div>
+          <div className="flex justify-center">
+            <div className="flex items-center gap-8 px-8 py-6 rounded-2xl border border-border bg-card/50 hover:shadow-lg transition-shadow">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/partners/fenomat.png"
+                alt="Logo FENOMAT — Fédération Nationale des Organisations de Maraîchers du Togo"
+                className="h-14 sm:h-16 w-auto object-contain"
+              />
+              <div className="text-left">
+                <p className="font-semibold text-foreground text-lg">FENOMAT</p>
+                <p className="text-sm text-muted-foreground">Fédération Nationale des Organisations<br className="hidden sm:block" /> de Maraîchers du Togo</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="border-t border-border bg-card/50 py-20 sm:py-28">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
