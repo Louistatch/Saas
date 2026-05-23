@@ -2,12 +2,13 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Logo } from '@/components/shared/logo'
+import Link from 'next/link'
+import { AuthSidePanel } from '@/components/shared/auth-side-panel'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { CheckCircle } from 'lucide-react'
+import { ArrowLeft, CheckCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function ResetPasswordPage() {
@@ -36,14 +37,27 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="flex items-center gap-2 justify-center">
-          <Logo size="md" />
-        </div>
+    <div className="min-h-screen grid md:grid-cols-2 bg-background">
+      <AuthSidePanel
+        title="Sécurisez votre compte"
+        description="Choisissez un mot de passe fort pour protéger votre coopérative."
+        benefits={[
+          'Au moins 8 caractères recommandés',
+          'Mélangez lettres, chiffres et symboles',
+          'Ne réutilisez pas un ancien mot de passe',
+        ]}
+        footer="Votre sécurité est notre priorité."
+      />
 
-        <Card className="border-border">
+      <div className="flex items-center justify-center p-4 sm:p-8">
+        <Card className="w-full max-w-sm border-border">
           <CardHeader className="space-y-2">
+            <div className="md:hidden mb-2">
+              <Link href="/auth/login" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <ArrowLeft className="h-4 w-4" />
+                Retour à la connexion
+              </Link>
+            </div>
             <CardTitle className="text-2xl">Nouveau mot de passe</CardTitle>
             <CardDescription>Choisissez un mot de passe sécurisé pour votre compte</CardDescription>
           </CardHeader>

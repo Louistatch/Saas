@@ -1,6 +1,7 @@
 'use client'
 
 import { Logo } from '@/components/shared/logo'
+import { AuthSidePanel } from '@/components/shared/auth-side-panel'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useState, useCallback, Suspense, useMemo } from 'react'
@@ -8,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, ArrowLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Spinner } from '@/components/shared/loading'
 import { errorMessage } from '@/lib/utils/errors'
@@ -99,45 +100,26 @@ function LoginInner() {
 
   return (
     <div className="min-h-screen grid md:grid-cols-2 bg-background">
-      <div className="hidden md:flex flex-col justify-between bg-gradient-to-br from-primary/10 to-accent/10 border-r border-border p-8">
-        <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-          <Logo size="lg" />
-        </Link>
-
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-3xl font-bold text-foreground mb-2">
-              Connectez votre coopérative
-            </h2>
-            <p className="text-muted-foreground">
-              Gérez vos membres, les comptes d&apos;exploitation et la croissance en un seul endroit.
-            </p>
-          </div>
-
-          <ul className="space-y-4">
-            {[
-              'Gérer les données des membres et les cartes numériques',
-              'Publier les comptes d\'exploitation par région',
-              'Suivre les cotisations et l\'engagement des membres',
-            ].map((benefit, i) => (
-              <li key={i} className="flex gap-3">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20">
-                  <div className="h-2 w-2 rounded-full bg-primary" />
-                </div>
-                <span className="text-muted-foreground">{benefit}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <p className="text-xs text-muted-foreground">
-          Au service des coopératives agricoles.
-        </p>
-      </div>
+      <AuthSidePanel
+        title="Connectez votre coopérative"
+        description="Gérez vos membres, les comptes d'exploitation et la croissance en un seul endroit."
+        benefits={[
+          'Gérer les données des membres et les cartes numériques',
+          'Publier les comptes d\'exploitation par région',
+          'Suivre les cotisations et l\'engagement des membres',
+        ]}
+        footer="Au service des coopératives agricoles."
+      />
 
       <div className="flex items-center justify-center p-4 sm:p-8">
         <Card className="w-full max-w-sm border-border">
           <CardHeader className="space-y-2">
+            <div className="md:hidden mb-2">
+              <Link href="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <ArrowLeft className="h-4 w-4" />
+                Retour à l&apos;accueil
+              </Link>
+            </div>
             <CardTitle className="text-2xl">Bon retour</CardTitle>
             <CardDescription>Connectez-vous à votre compte coopératif</CardDescription>
           </CardHeader>

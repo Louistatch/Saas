@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { Logo } from '@/components/shared/logo'
+import { AuthSidePanel } from '@/components/shared/auth-side-panel'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -34,14 +34,27 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="flex items-center gap-2 justify-center">
-          <Logo size="md" />
-        </div>
+    <div className="min-h-screen grid md:grid-cols-2 bg-background">
+      <AuthSidePanel
+        title="Récupérez votre accès"
+        description="Pas de panique, nous allons vous aider à retrouver l'accès à votre compte."
+        benefits={[
+          'Lien de réinitialisation envoyé par email',
+          'Processus sécurisé et rapide',
+          'Support disponible si besoin',
+        ]}
+        footer="Votre sécurité est notre priorité."
+      />
 
-        <Card className="border-border">
+      <div className="flex items-center justify-center p-4 sm:p-8">
+        <Card className="w-full max-w-sm border-border">
           <CardHeader className="space-y-2">
+            <div className="mb-2">
+              <Link href="/auth/login" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <ArrowLeft className="h-4 w-4" />
+                Retour à la connexion
+              </Link>
+            </div>
             <CardTitle className="text-2xl">Réinitialiser le mot de passe</CardTitle>
             <CardDescription>
               Entrez votre email et nous vous enverrons un lien de réinitialisation
@@ -84,12 +97,6 @@ export default function ForgotPasswordPage() {
                 <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={loading}>
                   {loading ? 'Envoi en cours...' : 'Envoyer le lien de réinitialisation'}
                 </Button>
-                <Link href="/auth/login">
-                  <Button variant="outline" className="w-full border-border gap-2">
-                    <ArrowLeft className="h-4 w-4" />
-                    Retour à la connexion
-                  </Button>
-                </Link>
               </form>
             )}
           </CardContent>
