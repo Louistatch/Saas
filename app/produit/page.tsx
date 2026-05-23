@@ -1,11 +1,11 @@
 import { Metadata } from 'next'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
-import { Users, CreditCard, BarChart3, Database, Coins, ShoppingCart } from 'lucide-react'
+import { Users, CreditCard, BarChart3, Database, Coins, ShoppingCart, Code, Globe } from 'lucide-react'
 
 export const metadata: Metadata = {
   title: 'Produit — FaîtiereHub | Plateforme tout-en-un pour faîtières agricoles',
   description:
-    'Découvrez FaîtiereHub : gestion des membres, cartes numériques, comptes d\'exploitation, pipeline KoboCollect, cotisations pour les faîtières agricoles.',
+    'Découvrez FaîtiereHub : gestion des membres, cartes numériques, comptes d\'exploitation, pipeline KoboCollect, cotisations, marketplace et widget embeddable.',
 }
 
 const features = [
@@ -25,13 +25,13 @@ const features = [
     icon: BarChart3,
     title: 'Comptes d\'exploitation',
     description:
-      'Suivez les fiches d\'exploitation de chaque membre : superficies, cultures, rendements, intrants utilisés. Générez des rapports consolidés pour votre faîtière.',
+      'Publiez et partagez les fiches techniques et itinéraires de culture classés par région, préfecture et canton. Accès gratuit pour les membres, payant pour les non-membres.',
   },
   {
     icon: Database,
     title: 'Pipeline KoboCollect',
     description:
-      'Connectez vos formulaires KoboToolbox et synchronisez automatiquement les données terrain. Webhook en temps réel, mapping intelligent des champs et historique complet.',
+      'Connectez vos formulaires KoboToolbox et synchronisez automatiquement les données terrain. Webhook en temps réel, retry queue, mapping intelligent et sync manuelle.',
   },
   {
     icon: Coins,
@@ -41,9 +41,21 @@ const features = [
   },
   {
     icon: ShoppingCart,
-    title: 'Comptes d\'exploitation',
+    title: 'Marketplace agricole',
     description:
-      'Publiez et partagez les comptes d\'exploitation et itinéraires techniques classés par canton, préfecture et région. Accès gratuit pour les membres.',
+      'Catalogue de produits, services et intrants avec filtres en cascade (région, culture, prix, certification). Full-text search, pagination et API publique.',
+  },
+  {
+    icon: Code,
+    title: 'Widget embeddable',
+    description:
+      'Intégrez FaîtiereHub sur votre site web en une ligne de code. Widgets marketplace, vérification membre, fiches techniques. Compatible WordPress, Webflow, HTML.',
+  },
+  {
+    icon: Globe,
+    title: 'Vérification QR premium',
+    description:
+      'Page de vérification mobile après scan QR : identité, services, compte d\'exploitation, timer de sécurité 60s. Design premium accessible même hors connexion.',
   },
 ]
 

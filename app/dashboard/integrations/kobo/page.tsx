@@ -381,15 +381,45 @@ export default function KoboToolboxSetupPage() {
                 </div>
               ) : null}
               {syncStatus === 'connected' ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full border-border gap-2"
-                  onClick={() => loadConfig()}
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Refresh status
-                </Button>
+                <div className="space-y-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="w-full bg-primary hover:bg-primary/90 gap-2"
+                    onClick={async () => {
+                      if (!currentCooperative) return
+                      setSaving(true)
+                      try {
+                        const res = await fetch('/api/integrations/kobo/sync', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ cooperative_id: currentCooperative.id }),
+                        })
+                        const data = await res.json()
+                        if (!res.ok) throw new Error(data.error || 'Sync failed')
+                        toast({ title: 'Sync terminée', description: data.message || `${data.sync?.created ?? 0} créés, ${data.sync?.updated ?? 0} mis à jour` })
+                        loadConfig()
+                      } catch (e: any) {
+                        toast({ title: 'Échec sync', description: e?.message, variant: 'destructive' })
+                      } finally {
+                        setSaving(false)
+                      }
+                    }}
+                    disabled={saving}
+                  >
+                    {saving ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                    Synchroniser maintenant
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full border-border gap-2"
+                    onClick={() => loadConfig()}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Rafraîchir le statut
+                  </Button>
+                </div>
               ) : null}
             </CardContent>
           </Card>
