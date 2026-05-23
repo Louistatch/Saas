@@ -150,32 +150,67 @@ export default function MarketplacePage() {
 
   // File upload
   const handleFileUpload = async (files: FileList) => {
-    if (!currentCooperative) return
+    if (!currentCooperative) {
+      toast({ title: 'Erreur', description: 'Aucune coopérative sélectionnée', variant: 'destructive' })
+      return
+    }
+    
+    // Check permission: only faitiere level or super_admin can upload
+    if (user?.role !== 'super_admin' && currentCooperative.level !== 'faitiere') {
+      toast({ title: 'Accès refusé', description: 'Seules les faîtières peuvent uploader des fiches', variant: 'destructive' })
+      return
+    }
+
     setUploadingFiles(true)
     const uploaded: typeof pendingFiles = []
 
     for (const file of Array.from(files)) {
-      const ext = file.name.split('.').pop() ?? 'bin'
-      const path = `${currentCooperative.id}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`
-
-      const { error } = await supabase.storage.from('fiches-techniques').upload(path, file)
-      if (error) {
-        toast({ title: `Échec upload: ${file.name}`, description: errorMessage(error), variant: 'destructive' })
+      // Validate file size (max 20MB)
+      if (file.size > 20 * 1024 * 1024) {
+        toast({ title: `Fichier trop volumineux: ${file.name}`, description: 'Maximum 20 Mo', variant: 'destructive' })
         continue
       }
 
-      uploaded.push({
-        name: file.name,
-        url: path,
-        type: ext,
-        size: file.size,
-      })
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? 'bin'
+      
+      // Validate file type
+      const allowedExts = ['pdf', 'docx', 'doc', 'xlsx', 'xls']
+      if (!allowedExts.includes(ext)) {
+        toast({ title: `Type non supporté: ${file.name}`, description: 'Formats acceptés: PDF, DOCX, XLSX', variant: 'destructive' })
+        continue
+      }
+
+      const path = `${currentCooperative.id}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`
+
+      try {
+        const { error } = await supabase.storage.from('fiches-techniques').upload(path, file, {
+          cacheControl: '3600',
+          upsert: false,
+        })
+        if (error) {
+          console.error('Upload error:', error)
+          toast({ title: `Échec upload: ${file.name}`, description: error.message || 'Erreur de téléversement', variant: 'destructive' })
+          continue
+        }
+
+        uploaded.push({
+          name: file.name,
+          url: path,
+          type: ext,
+          size: file.size,
+        })
+      } catch (err: any) {
+        console.error('Upload exception:', err)
+        toast({ title: `Échec upload: ${file.name}`, description: err?.message || 'Erreur réseau', variant: 'destructive' })
+      }
     }
 
     setPendingFiles((prev) => [...prev, ...uploaded])
     setUploadingFiles(false)
     if (uploaded.length > 0) {
       toast({ title: `${uploaded.length} fichier(s) uploadé(s)` })
+    } else if (Array.from(files).length > 0) {
+      toast({ title: 'Aucun fichier uploadé', description: 'Vérifiez le format et la taille de vos fichiers', variant: 'destructive' })
     }
   }
 
@@ -187,7 +222,7 @@ export default function MarketplacePage() {
       return
     }
     if (pendingFiles.length === 0) {
-      toast({ title: 'Ajoutez au moins un fichier (DOCX, Excel ou PDF)', variant: 'destructive' })
+      toast({ title: 'Ajoutez au moins un fichier', description: 'Cliquez sur la zone d\'upload pour sélectionner vos fichiers Excel et/ou PDF', variant: 'destructive' })
       return
     }
 
