@@ -81,6 +81,45 @@ export default function VerifyCardPage() {
   const [expired, setExpired] = useState(false)
   const [activeView, setActiveView] = useState<'menu' | 'identity'>('menu')
 
+  // Cache-busting: purge browser caches on every load to prevent stale content
+  useEffect(() => {
+    // 1. Clear Cache Storage API (Service Worker caches)
+    if ('caches' in window) {
+      caches.keys().then((names) => {
+        names.forEach((name) => caches.delete(name))
+      })
+    }
+
+    // 2. Unregister any service workers that might cache this page
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        registrations.forEach((reg) => reg.unregister())
+      })
+    }
+
+    // 3. Add cache-busting meta tags dynamically
+    const metaCache = document.createElement('meta')
+    metaCache.httpEquiv = 'Cache-Control'
+    metaCache.content = 'no-store, no-cache, must-revalidate'
+    document.head.appendChild(metaCache)
+
+    const metaPragma = document.createElement('meta')
+    metaPragma.httpEquiv = 'Pragma'
+    metaPragma.content = 'no-cache'
+    document.head.appendChild(metaPragma)
+
+    const metaExpires = document.createElement('meta')
+    metaExpires.httpEquiv = 'Expires'
+    metaExpires.content = '0'
+    document.head.appendChild(metaExpires)
+
+    return () => {
+      document.head.removeChild(metaCache)
+      document.head.removeChild(metaPragma)
+      document.head.removeChild(metaExpires)
+    }
+  }, [])
+
   // Security timer — 60 seconds
   useEffect(() => {
     if (loading || !result?.valid) return
@@ -170,14 +209,16 @@ export default function VerifyCardPage() {
   }, [cardNumber]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRescan = useCallback(() => {
-    setExpired(false)
-    setTimeLeft(60)
-    setResult(null)
-    setLoading(true)
-    setShowContent(false)
-    router.refresh()
-    window.location.reload()
-  }, [router])
+    // Force hard reload bypassing all caches
+    // Using cache-busting URL param + location.reload(true) equivalent
+    if ('caches' in window) {
+      caches.keys().then((names) => {
+        names.forEach((name) => caches.delete(name))
+      })
+    }
+    // Modern browsers: reload with cache bypass
+    window.location.href = window.location.pathname + '?t=' + Date.now()
+  }, [])
 
   // Loading state
   if (loading) {

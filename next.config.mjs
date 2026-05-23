@@ -46,8 +46,21 @@ const nextConfig = {
   async headers() {
     return [
       {
-        source: '/((?!embed|api/widget).*)',
+        source: '/((?!embed|api/widget|verify).*)',
         headers: securityHeaders,
+      },
+      {
+        // Verify pages: NEVER cache — always fetch fresh data after QR scan
+        source: '/verify/:path*',
+        headers: [
+          ...securityHeaders,
+          { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0' },
+          { key: 'Pragma', value: 'no-cache' },
+          { key: 'Expires', value: '0' },
+          { key: 'Surrogate-Control', value: 'no-store' },
+          { key: 'CDN-Cache-Control', value: 'no-store' },
+          { key: 'Vercel-CDN-Cache-Control', value: 'no-store' },
+        ],
       },
       {
         source: '/embed',
