@@ -226,20 +226,23 @@ export default function VerifyCardPage() {
 
   const isValid = result.valid
   const cotisationAJour = result.cotisations && result.cotisations.pending === 0 && result.cotisations.paid > 0
+  const [activeView, setActiveView] = useState<'menu' | 'identity'>('menu')
 
   // Service menu items
   const services: ServiceItem[] = [
     {
       icon: CheckCircle,
       title: 'Vérification d\'Identité',
-      description: 'Identité confirmée et carte active',
+      description: 'Voir les détails complets de ma carte',
       available: true,
+      action: () => setActiveView('identity'),
     },
     {
       icon: FileText,
       title: 'Mon Compte d\'Exploitation',
       description: 'Fiches techniques par culture',
       available: true,
+      action: () => window.open('/marketplace', '_blank'),
     },
     {
       icon: TrendingUp,
@@ -390,7 +393,7 @@ export default function VerifyCardPage() {
         )}
 
         {/* Services Menu */}
-        {isValid && (
+        {isValid && activeView === 'menu' && (
           <div className={`space-y-3 transition-all duration-700 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`} style={{ transitionDelay: '200ms' }}>
             <h3 className="text-white/60 text-xs font-semibold uppercase tracking-wider px-1">
               Mes Services
@@ -401,6 +404,7 @@ export default function VerifyCardPage() {
               return (
                 <button
                   key={i}
+                  onClick={service.action}
                   className={`w-full rounded-2xl p-4 flex items-center gap-4 text-left transition-all duration-300 active:scale-[0.98] ${
                     service.highlight
                       ? 'bg-gradient-to-r from-yellow-900/30 to-yellow-800/20 border border-yellow-500/20'
@@ -453,6 +457,122 @@ export default function VerifyCardPage() {
                 </button>
               )
             })}
+          </div>
+        )}
+
+        {/* Identity Detail View */}
+        {isValid && activeView === 'identity' && result.member && (
+          <div className="space-y-4">
+            {/* Back button */}
+            <button
+              onClick={() => setActiveView('menu')}
+              className="flex items-center gap-2 text-[#4ADE80] text-sm font-medium active:opacity-70"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Retour au menu
+            </button>
+
+            <h3 className="text-white text-lg font-bold">Vérification d&apos;Identité</h3>
+
+            {/* Full identity card */}
+            <div className="rounded-2xl bg-white/[0.04] border border-white/[0.08] p-5 space-y-4">
+              {/* Photo + status */}
+              <div className="flex items-center gap-4">
+                <div className="w-20 h-20 rounded-full overflow-hidden border-[3px] border-[#4ADE80]/40">
+                  {result.member.photo_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={result.member.photo_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-[#4ADE80]/10 flex items-center justify-center">
+                      <User className="h-9 w-9 text-[#4ADE80]/60" />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">
+                    {result.member.first_name} <span className="uppercase">{result.member.last_name}</span>
+                  </h2>
+                  <p className="text-[#4ADE80]/70 text-xs font-mono">{result.card?.card_number}</p>
+                  <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#4ADE80]/10 border border-[#4ADE80]/20">
+                    <CheckCircle className="h-3 w-3 text-[#4ADE80]" />
+                    <span className="text-[10px] font-bold text-[#4ADE80] uppercase">Membre vérifié</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Details grid */}
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                {[
+                  { icon: MapPin, label: 'Village', value: result.member.village ?? '—' },
+                  { icon: MapPin, label: 'Canton', value: result.member.canton ?? '—' },
+                  { icon: MapPin, label: 'Préfecture', value: result.member.prefecture ?? '—' },
+                  { icon: MapPin, label: 'Région', value: result.member.region ?? '—' },
+                  { icon: Phone, label: 'Téléphone', value: result.member.phone ?? '—' },
+                  { icon: Building2, label: 'Coopérative', value: result.cooperative?.name ?? '—' },
+                ].map((item, i) => (
+                  <div key={i} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <item.icon className="h-3 w-3 text-[#4ADE80]/60" />
+                      <p className="text-[9px] text-white/40 uppercase tracking-wider">{item.label}</p>
+                    </div>
+                    <p className="text-xs text-white font-medium truncate">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Cotisations */}
+              {result.cotisations && (
+                <div className="pt-3 border-t border-white/[0.06]">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Coins className="h-4 w-4 text-[#4ADE80]" />
+                    <p className="text-xs text-white/60 font-semibold uppercase tracking-wider">Cotisations</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="text-center p-2 rounded-lg bg-white/[0.03]">
+                      <p className="text-lg font-bold text-[#4ADE80]">{result.cotisations.paid}</p>
+                      <p className="text-[9px] text-white/40">Payées</p>
+                    </div>
+                    <div className="text-center p-2 rounded-lg bg-white/[0.03]">
+                      <p className="text-lg font-bold text-yellow-400">{result.cotisations.pending}</p>
+                      <p className="text-[9px] text-white/40">En attente</p>
+                    </div>
+                    <div className="text-center p-2 rounded-lg bg-white/[0.03]">
+                      <p className="text-lg font-bold text-white/60">{result.cotisations.total}</p>
+                      <p className="text-[9px] text-white/40">Total</p>
+                    </div>
+                  </div>
+                  {result.cotisations.lastPaidDate && (
+                    <p className="text-[10px] text-white/30 mt-2 text-center">
+                      Dernière : {new Date(result.cotisations.lastPaidDate).toLocaleDateString('fr-FR')}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Validity */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+                <div>
+                  <p className="text-[9px] text-white/40 uppercase">Valide jusqu&apos;au</p>
+                  <p className="text-sm text-white font-semibold">
+                    {result.card?.expiry_date
+                      ? new Date(result.card.expiry_date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
+                      : '—'}
+                  </p>
+                </div>
+                <div className="px-3 py-1 rounded-full bg-[#4ADE80]/10 text-[#4ADE80] text-xs font-bold">
+                  ● ACTIVE
+                </div>
+              </div>
+
+              {/* Member since */}
+              {result.memberSince && (
+                <p className="text-[10px] text-white/30 text-center">
+                  Membre depuis {new Date(result.memberSince).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+                </p>
+              )}
+            </div>
           </div>
         )}
 
