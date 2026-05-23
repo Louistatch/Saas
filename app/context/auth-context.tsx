@@ -227,12 +227,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
-        const { error: profErr } = await supabase
-          .from('profiles')
-          .update({ cooperative_id: coop.id, role: 'cooperative_admin' })
-          .eq('id', data.user.id)
-        if (profErr) {
-          log.error('Failed to link cooperative to profile', profErr)
+        // Use SECURITY DEFINER function to assign role (user cannot self-promote)
+        const { error: bootstrapErr } = await supabase.rpc('bootstrap_cooperative_admin', {
+          target_user_id: data.user.id,
+          target_cooperative_id: coop.id,
+        })
+        if (bootstrapErr) {
+          log.error('Failed to bootstrap cooperative admin', bootstrapErr)
         }
       }
     },

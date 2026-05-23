@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/utils/logger'
+import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 
 const log = createLogger('api:member-access')
 
@@ -10,6 +11,15 @@ const log = createLogger('api:member-access')
  * No password needed. Card number = access token for members.
  */
 export async function POST(request: NextRequest) {
+  // Rate limiting: prevent card number brute-force (10 attempts per minute per IP)
+  const clientKey = clientKeyFromHeaders(request.headers)
+  const limit = rateLimit(`member-access:${clientKey}`, 10, 60_000)
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: 'Trop de tentatives. Réessayez dans une minute.' },
+      { status: 429 },
+    )
+  }
   let body: { card_number?: string }
   try {
     body = await request.json()

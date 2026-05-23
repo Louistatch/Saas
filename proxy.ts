@@ -20,10 +20,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next({ request })
   }
 
-  // Prefetch requests: don't block with auth check (client handles it)
-  if (request.headers.get('purpose') === 'prefetch') {
-    return NextResponse.next({ request })
-  }
+  // Prefetch requests: skip auth ONLY for non-protected routes (already handled above)
+  // Protected routes MUST always be auth-checked, even for prefetch
+
 
   // Set up Supabase server client with cookie handling
   let supabaseResponse = NextResponse.next({ request })
@@ -50,10 +49,10 @@ export async function proxy(request: NextRequest) {
   // Refresh session (keeps JWT alive, rotates refresh token)
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Resolve role from JWT
+  // Resolve role from JWT — ONLY from app_metadata (server-controlled)
+  // NEVER trust user_metadata for authorization decisions
   const role: string | undefined =
-    (user?.app_metadata as { role?: string } | undefined)?.role ??
-    (user?.user_metadata as { role?: string } | undefined)?.role
+    (user?.app_metadata as { role?: string } | undefined)?.role
 
   // Protected routes: redirect unauthenticated users
   if (isProtected && !user) {

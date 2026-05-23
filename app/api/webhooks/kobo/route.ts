@@ -1,8 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/utils/logger'
+import { timingSafeEqual } from 'node:crypto'
 
 const log = createLogger('webhook:kobo')
+
+/**
+ * Timing-safe string comparison to prevent timing attacks on secrets.
+ */
+function safeCompare(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, 'utf8')
+  const bufB = Buffer.from(b, 'utf8')
+  if (bufA.length !== bufB.length) {
+    // Compare against self to maintain constant time
+    timingSafeEqual(bufA, bufA)
+    return false
+  }
+  return timingSafeEqual(bufA, bufB)
+}
 
 /**
  * POST /api/webhooks/kobo
@@ -26,11 +41,16 @@ const log = createLogger('webhook:kobo')
  * - superficie_ha
  */
 export async function POST(request: NextRequest) {
-  // Verify webhook secret (optional security layer)
+  // Verify webhook secret — MANDATORY, not optional
   const webhookSecret = request.headers.get('x-kobo-secret')
   const expectedSecret = process.env.KOBO_WEBHOOK_SECRET
 
-  if (expectedSecret && webhookSecret !== expectedSecret) {
+  if (!expectedSecret) {
+    log.error('KOBO_WEBHOOK_SECRET is not configured — rejecting all webhook requests')
+    return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })
+  }
+
+  if (!webhookSecret || !safeCompare(webhookSecret, expectedSecret)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -75,10 +95,12 @@ export async function POST(request: NextRequest) {
     if (submission.cooperative_id) {
       cooperativeId = String(submission.cooperative_id)
     } else if (cooperativeName) {
+      // Escape ILIKE special characters to prevent wildcard injection
+      const escapedName = cooperativeName.replace(/[%_\\]/g, '\\$&')
       const { data: coop } = await supabase
         .from('cooperatives')
         .select('id')
-        .ilike('name', `%${cooperativeName}%`)
+        .ilike('name', `%${escapedName}%`)
         .limit(1)
         .single()
       cooperativeId = coop?.id ?? null
