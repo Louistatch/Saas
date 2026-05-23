@@ -79,6 +79,7 @@ export default function VerifyCardPage() {
   const [showContent, setShowContent] = useState(false)
   const [timeLeft, setTimeLeft] = useState(60)
   const [expired, setExpired] = useState(false)
+  const [activeView, setActiveView] = useState<'menu' | 'identity'>('menu')
 
   // Security timer — 60 seconds
   useEffect(() => {
@@ -226,7 +227,6 @@ export default function VerifyCardPage() {
 
   const isValid = result.valid
   const cotisationAJour = result.cotisations && result.cotisations.pending === 0 && result.cotisations.paid > 0
-  const [activeView, setActiveView] = useState<'menu' | 'identity'>('menu')
 
   // Service menu items
   const services: ServiceItem[] = [
