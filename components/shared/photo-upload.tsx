@@ -53,9 +53,11 @@ export function PhotoUpload({
       setUploading(true)
 
       try {
-        // Generate a unique filename
+        // Generate a unique filename — path MUST start with cooperative ID
+        // for storage policy enforcement (tenant-scoped uploads)
         const ext = file.name.split('.').pop() || 'jpg'
-        const filename = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+        const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+        const filename = `${folder}/${safeName}`
 
         const { error: uploadError } = await supabase.storage
           .from('member-photos')

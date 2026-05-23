@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/utils/logger'
+import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 
 const log = createLogger('api:fiches')
 
@@ -10,6 +11,12 @@ const log = createLogger('api:fiches')
  * Returns metadata only (not file URLs — those require auth or purchase).
  */
 export async function GET(request: NextRequest) {
+  // Rate limit: 120 requests per minute per IP (generous for catalog browsing)
+  const limit = rateLimit(`fiches-catalog:${clientKeyFromHeaders(request.headers)}`, 120, 60_000)
+  if (!limit.ok) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   const { searchParams } = new URL(request.url)
   const culture = searchParams.get('culture')
   const cantonId = searchParams.get('canton_id')

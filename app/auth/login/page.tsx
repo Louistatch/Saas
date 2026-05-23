@@ -70,13 +70,13 @@ function LoginInner() {
 
       setProgress('Redirection…')
 
-      // Determine redirect target from JWT (no extra DB call needed)
-      const role = data.user.app_metadata?.role ?? data.user.user_metadata?.role ?? 'member'
+      // Determine redirect target from JWT — ONLY trust app_metadata
+      const role = data.user.app_metadata?.role ?? 'member'
       
       clearTimeout(timeout)
 
       // Hard redirect — immediate, no waiting for profile
-      const target = redirectTo && redirectTo.startsWith('/')
+      const target = redirectTo && redirectTo.startsWith('/') && !redirectTo.startsWith('//')
         ? redirectTo
         : role === 'super_admin'
           ? '/admin'
