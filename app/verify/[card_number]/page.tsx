@@ -142,7 +142,36 @@ export default function VerifyCardPage() {
     let cancelled = false
 
     async function verify() {
-      const decodedCardNumber = decodeURIComponent(cardNumber)
+      let decodedCardNumber = decodeURIComponent(cardNumber)
+
+      // Legacy QR format support: old cards encoded a JSON object in the QR code.
+      // The URL path may contain fragments like:
+      //   FEN-66261","member_id":"8cdf...","cooperative":"FENOMAT"...
+      // We need to extract just the card number (e.g., "FEN-66261")
+      
+      // Strategy 1: If it looks like a JSON fragment, extract the card number
+      if (decodedCardNumber.includes('"') || decodedCardNumber.includes('{') || decodedCardNumber.includes(',')) {
+        // Try to extract card number pattern (XXX-NNNNN format)
+        const cardMatch = decodedCardNumber.match(/^([A-Z]{2,5}-\d{4,6})/)
+        if (cardMatch) {
+          decodedCardNumber = cardMatch[1]
+        } else {
+          // Try parsing as JSON (in case the full JSON was URL-encoded)
+          try {
+            const parsed = JSON.parse('{' + decodedCardNumber.replace(/^[^{]*{/, ''))
+            if (parsed.card) decodedCardNumber = parsed.card
+          } catch {
+            // Try extracting from "card":"VALUE" pattern
+            const jsonCardMatch = decodedCardNumber.match(/"card"\s*:\s*"([^"]+)"/)
+            if (jsonCardMatch) {
+              decodedCardNumber = jsonCardMatch[1]
+            } else {
+              // Last resort: take everything before the first quote or comma
+              decodedCardNumber = decodedCardNumber.split(/[",{]/)[0].trim()
+            }
+          }
+        }
+      }
 
       const { data: card, error } = await supabase
         .from('member_cards')
