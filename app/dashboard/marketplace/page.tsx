@@ -42,16 +42,6 @@ interface Culture {
   category: string
 }
 
-interface Canton {
-  id: string
-  name: string
-}
-
-interface Prefecture {
-  id: string
-  name: string
-}
-
 const PAGE_SIZE = 15
 const TYPES_AGRICULTURE = [
   { value: 'conventionnel', label: 'Conventionnel' },
@@ -64,7 +54,7 @@ const TYPES_AGRICULTURE = [
 ]
 
 export default function MarketplacePage() {
-  const { currentCooperative } = useCooperative()
+  const { currentCooperative, cooperatives, switchCooperative } = useCooperative()
   const { user } = useAuth()
   const { toast } = useToast()
   const { confirm, confirmNode } = useConfirm()
@@ -72,9 +62,11 @@ export default function MarketplacePage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [fiches, setFiches] = useState<FicheTechnique[]>([])
-  const [cultures, setCultures] = useState<Culture[]>([])
-  const [cantons, setCantons] = useState<Canton[]>([])
-  const [prefectures, setPrefectures] = useState<Prefecture[]>([])
+  const [allCultures, setAllCultures] = useState<Culture[]>([])
+  const [regions, setRegions] = useState<{ id: string; name: string }[]>([])
+  const [prefectures, setPrefectures] = useState<{ id: string; name: string; region_id: string }[]>([])
+  const [allPrefectures, setAllPrefectures] = useState<{ id: string; name: string; region_id: string }[]>([])
+  const [cantons, setCantons] = useState<{ id: string; name: string }[]>([])
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounced(search, 200)
   const [page, setPage] = useState(1)
@@ -90,6 +82,7 @@ export default function MarketplacePage() {
     description: '',
     culture: '',
     type_agriculture: 'maraîchage',
+    region_id: '',
     canton_id: '',
     prefecture_id: '',
     campaign: '',
@@ -97,15 +90,42 @@ export default function MarketplacePage() {
   })
   const [pendingFiles, setPendingFiles] = useState<{ name: string; url: string; type: string; size: number }[]>([])
 
+  // Only show faitieres in the cooperative switcher for super_admin
+  const faitiereCooperatives = useMemo(() => {
+    if (user?.role !== 'super_admin') return cooperatives
+    return cooperatives.filter((c) => c.level === 'faitiere')
+  }, [cooperatives, user?.role])
+
+  // Filter cultures based on the current cooperative's specialization
+  const cultures = useMemo(() => {
+    // If cooperative has culture_categories set, filter by those categories
+    // For now FENOMAT is multi (null) so show all
+    // This will be dynamic when we load culture_categories from the cooperative
+    return allCultures
+  }, [allCultures])
+
   // Load reference data
   useEffect(() => {
-    supabase.from('cultures').select('id, name, icon, category').order('name').then(({ data }) => setCultures(data ?? []))
-    supabase.from('prefectures').select('id, name').order('name').then(({ data }) => setPrefectures(data ?? []))
+    supabase.from('cultures').select('id, name, icon, category').order('name').then(({ data }) => setAllCultures(data ?? []))
+    supabase.from('regions').select('id, name').order('name').then(({ data }) => setRegions(data ?? []))
+    supabase.from('prefectures').select('id, name, region_id').order('name').then(({ data }) => setAllPrefectures(data ?? []))
   }, [supabase])
+
+  // Cascade: filter prefectures by selected region
+  useEffect(() => {
+    if (!form.region_id) {
+      setPrefectures(allPrefectures)
+    } else {
+      setPrefectures(allPrefectures.filter((p) => p.region_id === form.region_id))
+    }
+    // Reset prefecture and canton when region changes
+    setForm((f) => ({ ...f, prefecture_id: '', canton_id: '' }))
+    setCantons([])
+  }, [form.region_id, allPrefectures])
 
   // Load cantons when prefecture changes
   useEffect(() => {
-    if (!form.prefecture_id) { setCantons([]); return }
+    if (!form.prefecture_id) { setCantons([]); setForm((f) => ({ ...f, canton_id: '' })); return }
     supabase.from('cantons').select('id, name').eq('prefecture_id', form.prefecture_id).order('name')
       .then(({ data }) => setCantons(data ?? []))
   }, [form.prefecture_id, supabase])
@@ -249,7 +269,7 @@ export default function MarketplacePage() {
 
     toast({ title: 'Fiche publiée', description: form.title })
     setShowAdd(false)
-    setForm({ title: '', description: '', culture: '', type_agriculture: 'maraîchage', canton_id: '', prefecture_id: '', campaign: '', price_non_member: 500 })
+    setForm({ title: '', description: '', culture: '', type_agriculture: 'maraîchage', region_id: '', canton_id: '', prefecture_id: '', campaign: '', price_non_member: 500 })
     setPendingFiles([])
     fetchFiches()
   }
@@ -306,6 +326,22 @@ export default function MarketplacePage() {
           ) : null
         }
       />
+
+      {/* Faitiere switcher for super_admin — only shows faitieres */}
+      {user?.role === 'super_admin' && faitiereCooperatives.length > 0 && (
+        <div className="flex items-center gap-3">
+          <Label className="text-sm text-muted-foreground whitespace-nowrap">Faîtière :</Label>
+          <select
+            className="border border-border rounded-lg px-3 py-2 bg-background text-foreground text-sm"
+            value={currentCooperative?.id || ''}
+            onChange={(e) => switchCooperative(e.target.value)}
+          >
+            {faitiereCooperatives.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -485,34 +521,51 @@ export default function MarketplacePage() {
               </div>
             </div>
 
-            {/* Localisation */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Préfecture (localisation)</Label>
-                <select
-                  className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
-                  value={form.prefecture_id}
-                  onChange={(e) => setForm((f) => ({ ...f, prefecture_id: e.target.value, canton_id: '' }))}
-                >
-                  <option value="">— Toutes —</option>
-                  {prefectures.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label>Canton</Label>
-                <select
-                  className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
-                  value={form.canton_id}
-                  onChange={(e) => setForm((f) => ({ ...f, canton_id: e.target.value }))}
-                  disabled={!form.prefecture_id || cantons.length === 0}
-                >
-                  <option value="">— Tous —</option>
-                  {cantons.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+            {/* Localisation — cascade: Région → Préfecture → Canton */}
+            <div className="space-y-4">
+              <Label className="text-sm font-semibold text-foreground">Localisation</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Région</Label>
+                  <select
+                    className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
+                    value={form.region_id}
+                    onChange={(e) => setForm((f) => ({ ...f, region_id: e.target.value }))}
+                  >
+                    <option value="">— Toutes —</option>
+                    {regions.map((r) => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Préfecture</Label>
+                  <select
+                    className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
+                    value={form.prefecture_id}
+                    onChange={(e) => setForm((f) => ({ ...f, prefecture_id: e.target.value, canton_id: '' }))}
+                    disabled={prefectures.length === 0}
+                  >
+                    <option value="">— Toutes —</option>
+                    {prefectures.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Canton</Label>
+                  <select
+                    className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
+                    value={form.canton_id}
+                    onChange={(e) => setForm((f) => ({ ...f, canton_id: e.target.value }))}
+                    disabled={!form.prefecture_id || cantons.length === 0}
+                  >
+                    <option value="">— Tous —</option>
+                    {cantons.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 
