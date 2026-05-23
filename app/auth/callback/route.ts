@@ -13,11 +13,9 @@ export async function GET(request: NextRequest) {
       // Check user role to redirect appropriately
       const { data: { user } } = await supabase.auth.getUser()
 
-      const forwardedHost = request.headers.get('x-forwarded-host')
-      const proto = request.headers.get('x-forwarded-proto')
-      const host = forwardedHost || request.headers.get('host') || ''
-      const protocol = proto || 'http'
-      const base = `${protocol}://${host}`
+      // Use request.nextUrl.origin as the trusted base URL
+      // NEVER trust x-forwarded-host for redirect targets (open redirect risk)
+      const base = request.nextUrl.origin
 
       if (user) {
         const { data: profile } = await supabase
