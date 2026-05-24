@@ -18,9 +18,9 @@ const securityHeaders = [
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      // strict-dynamic: scripts loaded by trusted scripts are allowed
-      // unsafe-inline is ignored when strict-dynamic is present (fallback for old browsers)
-      "script-src 'self' 'unsafe-inline' 'strict-dynamic' https:",
+      // Next.js requires unsafe-inline for its inline scripts.
+      // unsafe-eval removed for security — not needed by Next.js 16+
+      "script-src 'self' 'unsafe-inline' https:",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://*.supabase.co https:",
       "font-src 'self'",

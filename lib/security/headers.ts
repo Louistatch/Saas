@@ -22,7 +22,7 @@ export const SECURITY_HEADERS = {
  */
 export const CSP_DIRECTIVES = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'strict-dynamic' https:",
+  "script-src 'self' 'unsafe-inline' https:",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://*.supabase.co",
   "font-src 'self'",
