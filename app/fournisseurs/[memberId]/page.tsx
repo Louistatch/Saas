@@ -62,7 +62,7 @@ export default function SupplierProfilePage() {
           prefecture: data.prefecture,
           region: data.region,
           photo_url: data.photo_url,
-          cooperative: (data.cooperatives as { name: string } | null)?.name ?? null,
+          cooperative: (data.cooperatives as { name: string }[] | null)?.[0]?.name ?? null,
           cultures: [...new Set(parcelles.map(p => p.culture_principale).filter(Boolean))],
           superficie_totale: parcelles.reduce((s, p) => s + (p.superficie_ha ?? 0), 0),
         })
