@@ -1,8 +1,13 @@
--- Migration: verify_card RPC function (minimal version)
+-- Migration: verify_card RPC function
 --
--- Returns ONLY the columns we are sure exist. We start without photo_url
--- and other optional fields to ensure the function deploys successfully.
--- More fields can be added once the actual schema is known.
+-- Returns ONLY columns confirmed to exist in the actual schema:
+--   members: id, cooperative_id, first_name, last_name, email, phone, address,
+--            date_of_birth, status, created_at, updated_at
+--   cooperatives: id, name, faitiere_name (other fields)
+--   member_cards: card_number, status, expiry_date, member_id, cooperative_id,
+--                 created_at, qr_data
+--
+-- Sensitive fields (email, phone, address, date_of_birth) are NEVER returned.
 --
 -- Apply via: Supabase SQL Editor
 
@@ -14,10 +19,6 @@ RETURNS TABLE (
   card_created_at   timestamptz,
   first_name        text,
   last_name         text,
-  village           text,
-  canton            text,
-  prefecture        text,
-  region            text,
   member_status     text,
   member_since      timestamptz,
   cooperative_name  text,
@@ -35,10 +36,6 @@ AS $$
     mc.created_at,
     m.first_name,
     m.last_name,
-    m.village,
-    m.canton,
-    m.prefecture,
-    m.region,
     m.status::text,
     m.created_at,
     coop.name,
@@ -51,3 +48,6 @@ AS $$
 $$;
 
 GRANT EXECUTE ON FUNCTION public.verify_card(text[]) TO anon, authenticated;
+
+COMMENT ON FUNCTION public.verify_card(text[]) IS
+'Public card verification used by /verify/[card_number]. SECURITY DEFINER bypasses anon REVOKE on members. Returns only public, non-sensitive fields.';
