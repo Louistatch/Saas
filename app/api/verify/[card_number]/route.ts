@@ -87,13 +87,12 @@ export async function GET(
   const [prefix, suffix] = parsed.data.split('-')
   const variants = expandAmbiguousVariants(prefix).map((p) => `${p}-${suffix}`)
 
-  // Requête sur la VUE restrictive uniquement (pas les tables brutes)
-  const { data, error } = await supabase
-    .from('member_cards_public')
-    .select('*')
-    .in('card_number', variants)
-    .limit(1)
-    .maybeSingle()
+  // Appel de la RPC verify_card (SECURITY DEFINER) — contourne les REVOKE anon
+  // sur les tables members/cooperatives. La fonction n'expose que les champs publics.
+  const { data: rows, error } = await supabase
+    .rpc('verify_card', { p_card_numbers: variants })
+
+  const data = Array.isArray(rows) ? rows[0] : null
 
   if (error || !data) {
     await new Promise(r => setTimeout(r, 100)) // Timing-safe
@@ -102,13 +101,13 @@ export async function GET(
 
   // Vérifier l'expiration
   const isExpired = data.expiry_date && new Date(data.expiry_date) < new Date()
-  const isActive = data.status === 'active' && !isExpired
+  const isActive = data.card_status === 'active' && !isExpired
 
   return NextResponse.json({
     valid: isActive,
     card: {
       card_number: data.card_number,
-      status: isActive ? 'active' : (isExpired ? 'expired' : data.status),
+      status: isActive ? 'active' : (isExpired ? 'expired' : data.card_status),
       expiry_date: data.expiry_date,
       created_at: data.card_created_at,
     },
