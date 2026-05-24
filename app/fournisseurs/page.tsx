@@ -84,7 +84,7 @@ export default async function FournisseursPage({ searchParams }: PageProps) {
       prefecture: m.prefecture as string | null,
       region: m.region as string | null,
       photo_url: m.photo_url as string | null,
-      cooperative: (m.cooperatives as { name: string } | null)?.name ?? null,
+      cooperative: (m.cooperatives as { name: string }[] | null)?.[0]?.name ?? null,
       cultures,
       superficie_totale: parcelles.reduce((s, p) => s + (p.superficie_ha ?? 0), 0),
       level,
