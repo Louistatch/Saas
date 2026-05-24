@@ -82,13 +82,13 @@ function LoginInner() {
     setSubmitting(true)
     setProgress('Authentification…')
 
-    // Timeout: 8s max — if Supabase is slow, fail fast and let user retry
-    // Facebook technique: never let the user wait more than a few seconds
+    // Timeout: 15s max — Supabase free tier can have cold starts
+    // Facebook technique: never let the user wait forever
     const timeoutId = setTimeout(() => {
       setError('Le serveur met trop de temps à répondre. Réessayez.')
       setSubmitting(false)
       setProgress('')
-    }, 8000)
+    }, 15000)
 
     try {
       // SINGLE network call: signInWithPassword
