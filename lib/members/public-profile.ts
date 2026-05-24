@@ -58,15 +58,14 @@ export async function getPublicMemberProfile(
   // Fetch parcelles for agriculture profile
   const { data: parcelles } = await supabase
     .from('parcelles')
-    .select('culture_principale, superficie_ha')
+    .select('id, culture_principale, superficie_ha')
     .eq('member_id', memberId)
 
-  // Fetch productions for season count
   // Fetch productions via parcelle IDs
-  const parcelleIds = (parcelles ?? []).map((p: { id?: string }) => p.id).filter(Boolean) as string[]
+  const parcelleList = (parcelles ?? []) as { id: string; culture_principale: string; superficie_ha: number }[]
+  const parcelleIds = parcelleList.map((p) => p.id).filter(Boolean)
   let productionData: { campaign: string }[] = []
   if (parcelleIds.length > 0) {
-    // Fetch productions for this member's parcelles
     const { data: prods } = await supabase
       .from('productions')
       .select('campaign, parcelle_id')
@@ -75,10 +74,9 @@ export async function getPublicMemberProfile(
   }
 
   // Calculate agriculture profile
-  const parcelleList = (parcelles ?? []) as { culture_principale: string; superficie_ha: number }[]
-  const cultures = [...new Set(parcelleList.map(p => p.culture_principale).filter(Boolean))]
+  const cultures = [...new Set(parcelleList.map((p) => p.culture_principale).filter(Boolean))]
   const superficie_totale = parcelleList.reduce((sum, p) => sum + (p.superficie_ha ?? 0), 0)
-  const seasons = [...new Set(productionData.map(p => p.campaign).filter(Boolean))]
+  const seasons = [...new Set(productionData.map((p) => p.campaign).filter(Boolean))]
 
   // Calculate level (simplified — matches get_member_score logic)
   const { data: cotisations } = await supabase
@@ -100,7 +98,7 @@ export async function getPublicMemberProfile(
   }
 
   // Determine if certified supplier
-  const coop = member.cooperatives as { name: string; faitiere_name: string | null; level: string | null } | null
+  const coop = (member.cooperatives as { name: string; faitiere_name: string | null; level: string | null }[] | null)?.[0] ?? null
   const isCertified = (level === 'Argent' || level === 'Or') && coop?.level === 'faitiere'
 
   return {
