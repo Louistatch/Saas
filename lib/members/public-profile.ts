@@ -88,7 +88,7 @@ export async function getPublicMemberProfile(
     .eq('status', 'paid')
 
   const paidCount = (cotisations ?? []).length
-  const consecutiveCampaigns = new Set((cotisations ?? []).map(c => (c as { campaign: string }).campaign).filter(Boolean)).size
+  const consecutiveCampaigns = new Set((cotisations ?? []).map((c: { campaign: string }) => c.campaign).filter(Boolean)).size
   const productionCount = productionData.length
 
   let level: 'Bronze' | 'Argent' | 'Or' | null = 'Bronze'
