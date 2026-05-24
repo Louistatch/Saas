@@ -16,6 +16,7 @@ import { useDebounced } from '@/hooks/use-debounced'
 import { LoadingBlock, Spinner } from '@/components/shared/loading'
 import { EmptyState } from '@/components/shared/empty-state'
 import { MemberStatusBadge } from '@/components/shared/status-badge'
+import { ScoreBadge } from '@/components/members/score-badge'
 import { PageHeader } from '@/components/shared/page-header'
 import { PaginationBar } from '@/components/shared/pagination'
 import { useConfirm } from '@/components/shared/confirm-dialog'
@@ -406,7 +407,10 @@ export default function MembersPage() {
                         {paged.map((member) => (
                           <tr key={member.id} className="border-b border-border hover:bg-accent/5 transition-colors">
                             <td className="py-3 px-4 text-foreground font-medium">
-                              {member.first_name} {member.last_name}
+                              <div className="flex items-center gap-2">
+                                {member.first_name} {member.last_name}
+                                <ScoreBadge memberId={member.id} />
+                              </div>
                             </td>
                             <td className="py-3 px-4 text-muted-foreground">{member.email || '—'}</td>
                             <td className="py-3 px-4 text-muted-foreground">{member.phone || '—'}</td>
