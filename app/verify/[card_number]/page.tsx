@@ -1,10 +1,13 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { createBrowserClient } from '@supabase/ssr'
+// [SECURITY FIX - FORGE-001 - Sous-étape C]
+// Suppression de l'accès Supabase direct — utilisation de /api/verify/[card_number]
+// Les données sensibles (phone, email, id, cotisations, parcelles) ne sont plus exposées.
+
+import { useEffect, useState, useCallback } from 'react'
+import { useParams } from 'next/navigation'
 import {
-  CheckCircle, XCircle, Shield, MapPin, Phone, Building2,
+  CheckCircle, XCircle, Shield, MapPin, Building2,
   FileText, TrendingUp, PhoneCall, Map, CloudRain,
   ShoppingCart, Coins, QrCode, Timer, User,
 } from 'lucide-react'
@@ -14,13 +17,14 @@ import { Logo } from '@/components/shared/logo'
  * Public verification page — accessed by scanning the QR code on a member card.
  * 
  * The QR code contains a FIXED URL: /verify/[card_number]
- * This page fetches ALL data in REAL-TIME from the database.
+ * This page fetches data via the secure /api/verify route (vue restrictive).
  * 
  * Features:
- * - Identity verification (real-time)
+ * - Identity verification (real-time via API serveur)
  * - Service menu (exploitation accounts, market prices, technician, etc.)
  * - 60-second security timer with auto-expiry
  * - Premium mobile-first agricultural design
+ * - Ne jamais exposer phone, email, id interne, cotisations détaillées
  */
 
 interface VerifyResult {
@@ -32,37 +36,20 @@ interface VerifyResult {
     created_at: string
   }
   member?: {
-    id: string
     first_name: string
     last_name: string
-    phone: string | null
     photo_url: string | null
     village: string | null
     canton: string | null
     prefecture: string | null
     region: string | null
     status: string
+    member_since: string | null
   }
   cooperative?: {
     name: string
     faitiere_name: string | null
   }
-  cotisations?: {
-    total: number
-    paid: number
-    pending: number
-    lastPaidDate: string | null
-  }
-  agriculture?: {
-    cultures: string[]
-    superficie_totale: number
-    parcelle_count: number
-    production_count: number
-    seasons: string[]
-  }
-  level?: 'Bronze' | 'Argent' | 'Or' | null
-  isCertifiedSupplier?: boolean
-  memberSince?: string
   error?: string
 }
 
@@ -77,12 +64,7 @@ interface ServiceItem {
 
 export default function VerifyCardPage() {
   const params = useParams()
-  const router = useRouter()
   const cardNumber = params.card_number as string
-  const supabase = useMemo(() => createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  ), [])
   const [result, setResult] = useState<VerifyResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [showContent, setShowContent] = useState(false)
@@ -90,42 +72,25 @@ export default function VerifyCardPage() {
   const [expired, setExpired] = useState(false)
   const [activeView, setActiveView] = useState<'menu' | 'identity'>('menu')
 
-  // Cache-busting: purge browser caches on every load to prevent stale content
+  // Reset ALL state when card_number changes (navigating between cards)
   useEffect(() => {
-    // 1. Clear Cache Storage API (Service Worker caches)
-    if ('caches' in window) {
-      caches.keys().then((names) => {
-        names.forEach((name) => caches.delete(name))
-      })
-    }
+    setResult(null)
+    setLoading(true)
+    setShowContent(false)
+    setTimeLeft(60)
+    setExpired(false)
+    setActiveView('menu')
+  }, [cardNumber])
 
-    // 2. Unregister any service workers that might cache this page
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then((registrations) => {
-        registrations.forEach((reg) => reg.unregister())
-      })
-    }
-
-    // 3. Add cache-busting meta tags dynamically
+  // Prevent browser caching of this page (security: stale card data)
+  useEffect(() => {
     const metaCache = document.createElement('meta')
     metaCache.httpEquiv = 'Cache-Control'
     metaCache.content = 'no-store, no-cache, must-revalidate'
     document.head.appendChild(metaCache)
 
-    const metaPragma = document.createElement('meta')
-    metaPragma.httpEquiv = 'Pragma'
-    metaPragma.content = 'no-cache'
-    document.head.appendChild(metaPragma)
-
-    const metaExpires = document.createElement('meta')
-    metaExpires.httpEquiv = 'Expires'
-    metaExpires.content = '0'
-    document.head.appendChild(metaExpires)
-
     return () => {
       document.head.removeChild(metaCache)
-      document.head.removeChild(metaPragma)
-      document.head.removeChild(metaExpires)
     }
   }, [])
 
@@ -145,156 +110,37 @@ export default function VerifyCardPage() {
     return () => clearInterval(interval)
   }, [loading, result?.valid])
 
-  // Fetch verification data
+  // Fetch verification data via secure API route
   useEffect(() => {
-    if (result) return
     let cancelled = false
 
     async function verify() {
-      let decodedCardNumber = decodeURIComponent(cardNumber)
+      try {
+        // [SECURITY FIX - FORGE-001] Utiliser l'API serveur au lieu de Supabase direct
+        const res = await fetch(`/api/verify/${encodeURIComponent(cardNumber)}`)
+        const data = await res.json()
 
-      // Legacy QR format support: old cards encoded a JSON object in the QR code.
-      // The URL path may contain fragments like:
-      //   FEN-66261","member_id":"8cdf...","cooperative":"FENOMAT"...
-      // We need to extract just the card number (e.g., "FEN-66261")
-      
-      // Strategy 1: If it looks like a JSON fragment, extract the card number
-      if (decodedCardNumber.includes('"') || decodedCardNumber.includes('{') || decodedCardNumber.includes(',')) {
-        // Try to extract card number pattern (XXX-NNNNN format)
-        const cardMatch = decodedCardNumber.match(/^([A-Z]{2,5}-\d{4,6})/)
-        if (cardMatch) {
-          decodedCardNumber = cardMatch[1]
+        if (cancelled) return
+
+        if (!res.ok || !data.valid) {
+          setResult({ valid: false, error: data.error ?? 'Carte non trouvée dans le système' })
         } else {
-          // Try parsing as JSON (in case the full JSON was URL-encoded)
-          try {
-            const parsed = JSON.parse('{' + decodedCardNumber.replace(/^[^{]*{/, ''))
-            if (parsed.card) decodedCardNumber = parsed.card
-          } catch {
-            // Try extracting from "card":"VALUE" pattern
-            const jsonCardMatch = decodedCardNumber.match(/"card"\s*:\s*"([^"]+)"/)
-            if (jsonCardMatch) {
-              decodedCardNumber = jsonCardMatch[1]
-            } else {
-              // Last resort: take everything before the first quote or comma
-              decodedCardNumber = decodedCardNumber.split(/[",{]/)[0].trim()
-            }
-          }
+          setResult(data)
         }
-      }
-
-      const { data: card, error } = await supabase
-        .from('member_cards')
-        .select(`
-          card_number, status, expiry_date, created_at,
-          member:members(id, first_name, last_name, phone, photo_url, village, canton, prefecture, region, status, created_at),
-          cooperative:cooperatives(name, faitiere_name)
-        `)
-        .eq('card_number', decodedCardNumber)
-        .single()
-
-      if (error || !card) {
+      } catch {
         if (!cancelled) {
-          setResult({ valid: false, error: 'Carte non trouvée dans le système' })
+          setResult({ valid: false, error: 'Erreur de connexion au serveur' })
+        }
+      } finally {
+        if (!cancelled) {
           setLoading(false)
+          setTimeout(() => setShowContent(true), 300)
         }
-        return
-      }
-
-      const isExpired = card.expiry_date && new Date(card.expiry_date) < new Date()
-      const isActive = card.status === 'active' && !isExpired
-
-      // Fetch cotisations
-      const memberData = (card.member as { id: string; created_at: string }[] | null)?.[0]
-      const memberId = memberData?.id
-      let cotisations = { total: 0, paid: 0, pending: 0, lastPaidDate: null as string | null }
-
-      if (memberId) {
-        const { data: cotData } = await supabase
-          .from('cotisations')
-          .select('status, paid_date, amount')
-          .eq('member_id', memberId)
-
-        if (cotData && cotData.length > 0) {
-          cotisations.total = cotData.length
-          cotisations.paid = cotData.filter(c => c.status === 'paid').length
-          cotisations.pending = cotData.filter(c => c.status === 'pending').length
-          const lastPaid = cotData
-            .filter(c => c.status === 'paid' && c.paid_date)
-            .sort((a, b) => new Date(b.paid_date!).getTime() - new Date(a.paid_date!).getTime())[0]
-          cotisations.lastPaidDate = lastPaid?.paid_date ?? null
-        }
-      }
-
-      if (!cancelled) {
-        // Fetch agriculture profile (parcelles + productions)
-        let agriculture = { cultures: [] as string[], superficie_totale: 0, parcelle_count: 0, production_count: 0, seasons: [] as string[] }
-        let level: 'Bronze' | 'Argent' | 'Or' | null = 'Bronze'
-        let isCertifiedSupplier = false
-
-        if (memberId) {
-          const { data: parcelles } = await supabase
-            .from('parcelles')
-            .select('id, culture_principale, superficie_ha')
-            .eq('member_id', memberId)
-
-          const parcelleList = (parcelles ?? []) as { id: string; culture_principale: string; superficie_ha: number }[]
-          agriculture.cultures = [...new Set(parcelleList.map(p => p.culture_principale).filter(Boolean))]
-          agriculture.superficie_totale = parcelleList.reduce((s, p) => s + (p.superficie_ha ?? 0), 0)
-          agriculture.parcelle_count = parcelleList.length
-
-          // Fetch productions
-          if (parcelleList.length > 0) {
-            const { data: prods } = await supabase
-              .from('productions')
-              .select('campaign')
-              .in('parcelle_id', parcelleList.map(p => p.id))
-            const prodList = (prods ?? []) as { campaign: string }[]
-            agriculture.production_count = prodList.length
-            agriculture.seasons = [...new Set(prodList.map(p => p.campaign).filter(Boolean))]
-          }
-
-          // Calculate level
-          const paidCotisations = cotisations.paid
-          const consecutiveCampaigns = new Set(
-            ((await supabase.from('cotisations').select('campaign').eq('member_id', memberId).eq('status', 'paid')).data ?? [])
-              .map((c: { campaign: string }) => c.campaign).filter(Boolean)
-          ).size
-
-          if (paidCotisations >= 1 && agriculture.parcelle_count >= 1 && agriculture.production_count >= 1) {
-            level = 'Argent'
-          }
-          if (paidCotisations >= 1 && agriculture.parcelle_count >= 1 && agriculture.production_count >= 2 && consecutiveCampaigns >= 2) {
-            level = 'Or'
-          }
-
-          // Check if certified supplier (FENOMAT faitiere + Argent/Or)
-          const coopData = (card.cooperative as { name: string; faitiere_name: string | null }[] | null)?.[0] ?? null
-          isCertifiedSupplier = (level === 'Argent' || level === 'Or') && (coopData?.faitiere_name === 'FENOMAT' || coopData?.name === 'FENOMAT')
-        }
-
-        setResult({
-          valid: isActive,
-          card: {
-            card_number: card.card_number,
-            status: isActive ? 'active' : (isExpired ? 'expired' : card.status),
-            expiry_date: card.expiry_date,
-            created_at: card.created_at,
-          },
-          member: (card.member as VerifyResult['member'][] | null)?.[0] ?? undefined,
-          cooperative: (card.cooperative as { name: string; faitiere_name: string | null }[] | null)?.[0] ?? undefined,
-          cotisations,
-          agriculture,
-          level,
-          isCertifiedSupplier,
-          memberSince: memberData?.created_at,
-        })
-        setLoading(false)
-        setTimeout(() => setShowContent(true), 300)
       }
     }
     verify()
     return () => { cancelled = true }
-  }, [cardNumber]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cardNumber])
 
   const handleRescan = useCallback(() => {
     // Force hard reload bypassing all caches
@@ -355,7 +201,6 @@ export default function VerifyCardPage() {
   }
 
   const isValid = result.valid
-  const cotisationAJour = result.cotisations && result.cotisations.pending === 0 && result.cotisations.paid > 0
 
   // Service menu items
   const services: ServiceItem[] = [
@@ -406,9 +251,8 @@ export default function VerifyCardPage() {
     {
       icon: Coins,
       title: 'Adhérer / Renouveler ma Cotisation',
-      description: cotisationAJour ? 'Cotisation à jour ✓' : 'Cotisation en attente — Régulariser',
+      description: 'Gérer ma cotisation',
       available: false,
-      highlight: !cotisationAJour,
     },
   ]
 
@@ -458,29 +302,10 @@ export default function VerifyCardPage() {
                   <h1 className="text-lg font-bold text-white leading-tight">
                     {result.member.first_name} <span className="uppercase">{result.member.last_name}</span>
                   </h1>
-                  {/* Level badge */}
-                  {result.level && (
-                    <span
-                      className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9px] font-bold border"
-                      style={{
-                        borderColor: result.level === 'Or' ? '#FFD700' : result.level === 'Argent' ? '#A8A9AD' : '#CD7F32',
-                        color: result.level === 'Or' ? '#FFD700' : result.level === 'Argent' ? '#A8A9AD' : '#CD7F32',
-                      }}
-                    >
-                      {result.level === 'Or' ? '🥇' : result.level === 'Argent' ? '🥈' : '🥉'} {result.level}
-                    </span>
-                  )}
                 </div>
                 <p className="text-[#4ADE80]/70 text-xs font-mono mt-0.5">
                   ID: {result.card?.card_number}
                 </p>
-                {/* Certified supplier label */}
-                {result.isCertifiedSupplier && (
-                  <div className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-[#4ADE80]/10 border border-[#4ADE80]/20">
-                    <CheckCircle className="h-2.5 w-2.5 text-[#4ADE80]" />
-                    <span className="text-[9px] font-semibold text-[#4ADE80]">Fournisseur certifié {result.cooperative?.faitiere_name ?? result.cooperative?.name}</span>
-                  </div>
-                )}
                 <div className="flex items-center gap-1.5 mt-1.5">
                   <Building2 className="h-3 w-3 text-white/40" />
                   <p className="text-white/50 text-[11px] truncate">
@@ -499,14 +324,10 @@ export default function VerifyCardPage() {
             </div>
 
             {/* Quick stats */}
-            <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-white/[0.06]">
-              <div className="text-center">
-                <p className="text-sm font-bold text-[#4ADE80]">{result.cotisations?.paid ?? 0}</p>
-                <p className="text-[9px] text-white/40 uppercase">Cotisations</p>
-              </div>
+            <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-white/[0.06]">
               <div className="text-center">
                 <p className="text-sm font-bold text-white">
-                  {result.memberSince ? new Date(result.memberSince).getFullYear() : '—'}
+                  {result.member.member_since ? new Date(result.member.member_since).getFullYear() : '—'}
                 </p>
                 <p className="text-[9px] text-white/40 uppercase">Membre depuis</p>
               </div>
@@ -517,48 +338,6 @@ export default function VerifyCardPage() {
                 <p className="text-[9px] text-white/40 uppercase">Carte</p>
               </div>
             </div>
-
-            {/* Agriculture profile */}
-            {result.agriculture && result.agriculture.parcelle_count > 0 && (
-              <div className="mt-4 pt-4 border-t border-white/[0.06] space-y-2">
-                <p className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">Profil agriculteur</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {result.agriculture.cultures.length > 0 && (
-                    <div className="p-2 rounded-lg bg-white/[0.03]">
-                      <p className="text-[9px] text-white/40">Cultures</p>
-                      <p className="text-xs text-white font-medium truncate">{result.agriculture.cultures.join(', ')}</p>
-                    </div>
-                  )}
-                  <div className="p-2 rounded-lg bg-white/[0.03]">
-                    <p className="text-[9px] text-white/40">Superficie</p>
-                    <p className="text-xs text-white font-medium">{result.agriculture.superficie_totale.toFixed(1)} ha</p>
-                  </div>
-                  {result.agriculture.seasons.length > 0 && (
-                    <div className="p-2 rounded-lg bg-white/[0.03]">
-                      <p className="text-[9px] text-white/40">Saisons</p>
-                      <p className="text-xs text-white font-medium">{result.agriculture.seasons.length} campagne{result.agriculture.seasons.length > 1 ? 's' : ''}</p>
-                    </div>
-                  )}
-                  <div className="p-2 rounded-lg bg-white/[0.03]">
-                    <p className="text-[9px] text-white/40">Parcelles</p>
-                    <p className="text-xs text-white font-medium">{result.agriculture.parcelle_count}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Demander un devis button (for certified suppliers) */}
-            {result.isCertifiedSupplier && result.member && (
-              <div className="mt-4 pt-3 border-t border-white/[0.06]">
-                <button
-                  onClick={() => window.open(`/fournisseurs/${result.member!.id}`, '_blank')}
-                  className="w-full py-2.5 rounded-xl bg-[#4ADE80]/10 border border-[#4ADE80]/20 text-[#4ADE80] text-xs font-semibold flex items-center justify-center gap-2 active:bg-[#4ADE80]/20 transition-colors"
-                >
-                  <FileText className="h-3.5 w-3.5" />
-                  Demander un devis
-                </button>
-              </div>
-            )}
           </div>
         )}
 
@@ -694,14 +473,13 @@ export default function VerifyCardPage() {
                 </div>
               </div>
 
-              {/* Details grid */}
+              {/* Details grid — [SECURITY FIX - FORGE-001] Ne plus exposer phone/email */}
               <div className="grid grid-cols-2 gap-3 pt-2">
                 {[
                   { icon: MapPin, label: 'Village', value: result.member.village ?? '—' },
                   { icon: MapPin, label: 'Canton', value: result.member.canton ?? '—' },
                   { icon: MapPin, label: 'Préfecture', value: result.member.prefecture ?? '—' },
                   { icon: MapPin, label: 'Région', value: result.member.region ?? '—' },
-                  { icon: Phone, label: 'Téléphone', value: result.member.phone ?? '—' },
                   { icon: Building2, label: 'Coopérative', value: result.cooperative?.name ?? '—' },
                 ].map((item, i) => (
                   <div key={i} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.05]">
@@ -713,35 +491,6 @@ export default function VerifyCardPage() {
                   </div>
                 ))}
               </div>
-
-              {/* Cotisations */}
-              {result.cotisations && (
-                <div className="pt-3 border-t border-white/[0.06]">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Coins className="h-4 w-4 text-[#4ADE80]" />
-                    <p className="text-xs text-white/60 font-semibold uppercase tracking-wider">Cotisations</p>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="text-center p-2 rounded-lg bg-white/[0.03]">
-                      <p className="text-lg font-bold text-[#4ADE80]">{result.cotisations.paid}</p>
-                      <p className="text-[9px] text-white/40">Payées</p>
-                    </div>
-                    <div className="text-center p-2 rounded-lg bg-white/[0.03]">
-                      <p className="text-lg font-bold text-yellow-400">{result.cotisations.pending}</p>
-                      <p className="text-[9px] text-white/40">En attente</p>
-                    </div>
-                    <div className="text-center p-2 rounded-lg bg-white/[0.03]">
-                      <p className="text-lg font-bold text-white/60">{result.cotisations.total}</p>
-                      <p className="text-[9px] text-white/40">Total</p>
-                    </div>
-                  </div>
-                  {result.cotisations.lastPaidDate && (
-                    <p className="text-[10px] text-white/30 mt-2 text-center">
-                      Dernière : {new Date(result.cotisations.lastPaidDate).toLocaleDateString('fr-FR')}
-                    </p>
-                  )}
-                </div>
-              )}
 
               {/* Validity */}
               <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.05]">
@@ -759,9 +508,9 @@ export default function VerifyCardPage() {
               </div>
 
               {/* Member since */}
-              {result.memberSince && (
+              {result.member.member_since && (
                 <p className="text-[10px] text-white/30 text-center">
-                  Membre depuis {new Date(result.memberSince).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+                  Membre depuis {new Date(result.member.member_since).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
                 </p>
               )}
             </div>
@@ -806,14 +555,17 @@ export default function VerifyCardPage() {
           </div>
         )}
 
-        {/* Footer */}
+        {/* Footer — [SECURITY FIX - PHANTOM-001] Indicateurs visuels anti-phishing */}
         <div className="text-center pt-2 pb-4">
           <div className="flex items-center justify-center gap-2 mb-2">
             <Shield className="h-3 w-3 text-[#4ADE80]/40" />
             <p className="text-[10px] text-white/25 uppercase tracking-widest">
-              Sécurisé • Vérifié • FaîtiereHub
+              Vérification officielle FENOMAT · www.faitierehub.com
             </p>
           </div>
+          <p className="text-white/20 text-[9px] mb-1">
+            Ne partagez jamais votre code PIN ou mot de passe sur cette page
+          </p>
           <p className="text-white/15 text-[9px]">
             © {new Date().getFullYear()} FaîtiereHub — Plateforme des faîtières agricoles
           </p>
