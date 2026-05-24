@@ -1,13 +1,8 @@
--- Migration: verify_card RPC function
+-- Migration: verify_card RPC function (minimal version)
 --
--- Replaces the broken member_cards_public view that fails because anon was revoked
--- access to underlying tables (members, cooperatives, etc.).
---
--- This function is SECURITY DEFINER so it runs with the creator's privileges,
--- bypassing the anon REVOKE on members/cooperatives.
---
--- NOTE: members table uses TEXT columns for village/canton/prefecture/region
--- (not FK references — the cantons table doesn't even exist).
+-- Returns ONLY the columns we are sure exist. We start without photo_url
+-- and other optional fields to ensure the function deploys successfully.
+-- More fields can be added once the actual schema is known.
 --
 -- Apply via: Supabase SQL Editor
 
@@ -19,7 +14,6 @@ RETURNS TABLE (
   card_created_at   timestamptz,
   first_name        text,
   last_name         text,
-  photo_url         text,
   village           text,
   canton            text,
   prefecture        text,
@@ -41,7 +35,6 @@ AS $$
     mc.created_at,
     m.first_name,
     m.last_name,
-    m.photo_url,
     m.village,
     m.canton,
     m.prefecture,
@@ -58,6 +51,3 @@ AS $$
 $$;
 
 GRANT EXECUTE ON FUNCTION public.verify_card(text[]) TO anon, authenticated;
-
-COMMENT ON FUNCTION public.verify_card(text[]) IS
-'Public card verification used by /verify/[card_number]. SECURITY DEFINER to bypass anon REVOKE on members/cooperatives. Returns only public fields.';

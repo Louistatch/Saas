@@ -114,7 +114,7 @@ export async function GET(
     member: {
       first_name: data.first_name,
       last_name: data.last_name,
-      photo_url: data.photo_url,
+      photo_url: data.photo_url ?? null,
       village: data.village,
       canton: data.canton,
       prefecture: data.prefecture,
