@@ -265,21 +265,29 @@ export default function CardsPage() {
 
       const qrPayload = buildQrPayload(selectedMemberId, cardNumber, null)
 
-      const { error } = await supabase.from('member_cards').insert({
-        cooperative_id: targetCoopId,
-        member_id: selectedMemberId,
-        card_number: cardNumber,
-        status: 'active',
-        expiry_date: expiry.toISOString().split('T')[0],
-        qr_data: qrPayload,
-      })
+      const { data: inserted, error } = await supabase
+        .from('member_cards')
+        .insert({
+          cooperative_id: targetCoopId,
+          member_id: selectedMemberId,
+          card_number: cardNumber,
+          status: 'active',
+          expiry_date: expiry.toISOString().split('T')[0],
+          qr_data: qrPayload,
+        })
+        .select('id, card_number')
+        .single()
 
       setSaving(false)
-      if (error) {
-        toast({ title: 'Impossible de générer la carte', description: errorMessage(error), variant: 'destructive' })
+      if (error || !inserted) {
+        toast({
+          title: 'Impossible de générer la carte',
+          description: errorMessage(error) || 'La carte n\'a pas été enregistrée (vérifiez vos droits)',
+          variant: 'destructive',
+        })
         return
       }
-      toast({ title: 'Carte générée', description: `${cardNumber} — ${currentCooperative.name}/${targetCoopName}` })
+      toast({ title: 'Carte générée', description: `${inserted.card_number} — ${currentCooperative.name}/${targetCoopName}` })
     }
 
     setShowGenerate(false)
