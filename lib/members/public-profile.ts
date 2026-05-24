@@ -62,20 +62,15 @@ export async function getPublicMemberProfile(
     .eq('member_id', memberId)
 
   // Fetch productions for season count
-  const { data: productions } = await supabase
-    .from('productions')
-    .select('campaign')
-    .eq('parcelle_id', memberId) // This won't work — need to join via parcelles
-
-  // Actually fetch productions via parcelle IDs
-  const parcelleIds = (parcelles ?? []).map(p => (p as { id?: string }).id).filter(Boolean)
+  // Fetch productions via parcelle IDs
+  const parcelleIds = (parcelles ?? []).map((p: { id?: string }) => p.id).filter(Boolean) as string[]
   let productionData: { campaign: string }[] = []
-  if (parcelles && parcelles.length > 0) {
+  if (parcelleIds.length > 0) {
     // Fetch productions for this member's parcelles
     const { data: prods } = await supabase
       .from('productions')
       .select('campaign, parcelle_id')
-      .in('parcelle_id', (parcelles as { id?: string }[]).map(p => p.id).filter(Boolean) as string[])
+      .in('parcelle_id', parcelleIds)
     productionData = (prods ?? []) as { campaign: string }[]
   }
 
