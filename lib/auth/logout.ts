@@ -14,30 +14,46 @@ import { destroySession, broadcastLogout } from './session'
 /**
  * Full logout procedure — call this instead of supabase.auth.signOut() directly.
  * 
- * Facebook-style: instant visual feedback, background cleanup, smooth transition.
+ * Critical: uses scope:'global' to revoke the refresh token server-side,
+ * not just clear local state. Otherwise the user stays logged-in across tabs.
  */
 export async function performLogout(): Promise<never> {
   // STEP 0: Instant visual feedback — show transition overlay BEFORE any async work
   // This eliminates the white flash that makes logout feel slow
   showTransitionOverlay()
 
-  // STEP 1: Revoke the session server-side (non-blocking)
+  // STEP 1: Revoke the session SERVER-SIDE via API route
+  // This is the ONLY way to clear httpOnly cookies set by @supabase/ssr
+  // (document.cookie cannot delete httpOnly cookies)
   try {
-    // Use the singleton browser client so onAuthStateChange fires in AuthProvider
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+      cache: 'no-store',
+    })
+  } catch {
+    // Continue even if the request fails — we'll clear everything locally below
+  }
+
+  // STEP 2: Also clear client-side session state (singleton client)
+  try {
     const supabase = createClient()
     await supabase.auth.signOut({ scope: 'local' })
   } catch {
-    // Continue even if signOut fails — we'll clear everything locally
+    // Continue
   }
 
-  // STEP 2: Destroy all local state
+  // STEP 3: Destroy all local state (cookies non-httpOnly, localStorage, sessionStorage)
   destroySession()
 
-  // STEP 3: Notify other tabs
+  // STEP 4: Notify other tabs
   broadcastLogout()
 
-  // STEP 4: Smooth navigation to login
-  // Use replace to prevent back-button returning to authenticated state
+  // STEP 5: Full page reload to /auth/login
+  // We MUST use window.location here (not router.replace):
+  // - Forces re-init of all React providers (clears stale auth state)
+  // - Removes the transition overlay from the DOM
+  // - Prevents back-button from returning to authenticated state
   window.location.replace('/auth/login')
 
   // TypeScript: this never returns

@@ -22,35 +22,10 @@ import { flattenZodErrors, loginSchema } from '@/lib/validators/schemas'
  * - NO session check on mount (eliminates 4-8s delay on slow networks)
  * - Single network call: signInWithPassword (profile fetch is optional)
  * - Immediate redirect after signIn success (don't wait for profile)
- * - 10s timeout with smart recovery
- * - Visual progress feedback
- * - Facebook-style transition overlay (no white flash)
+ * - 15s timeout with smart recovery
+ * - Visual progress feedback via the submit button
+ * - SPA navigation via router.replace (no full reload)
  */
-
-/** Facebook-style transition overlay for post-login navigation */
-function showLoginTransition() {
-  if (document.getElementById('fh-transition')) return
-  const overlay = document.createElement('div')
-  overlay.id = 'fh-transition'
-  overlay.style.cssText = `
-    position:fixed;inset:0;z-index:99999;
-    background:linear-gradient(135deg,#0A2E1A 0%,#0A3D22 50%,#061a0f 100%);
-    display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;
-    opacity:0;transition:opacity 200ms ease-in;
-  `
-  overlay.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="1.5">
-        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-      </svg>
-      <span style="color:white;font-size:18px;font-weight:700;font-family:system-ui;">FaîtiereHub</span>
-    </div>
-    <div style="width:24px;height:24px;border:3px solid rgba(74,222,128,0.2);border-top-color:#4ADE80;border-radius:50%;animation:fh-spin 0.6s linear infinite;"></div>
-    <style>@keyframes fh-spin{to{transform:rotate(360deg)}}</style>
-  `
-  document.body.appendChild(overlay)
-  requestAnimationFrame(() => { overlay.style.opacity = '1' })
-}
 
 function LoginInner() {
   const searchParams = useSearchParams()
@@ -105,9 +80,6 @@ function LoginInner() {
 
       // Determine redirect target from JWT — ONLY trust app_metadata
       const role = data.user.app_metadata?.role ?? 'member'
-
-      // Facebook-style: show transition overlay BEFORE navigation
-      showLoginTransition()
       setProgress('Redirection…')
 
       const target = redirectTo && /^\/[^/]/.test(redirectTo)
@@ -116,9 +88,7 @@ function LoginInner() {
           ? '/admin'
           : '/dashboard'
 
-      // Small delay to let the overlay render, then navigate
-      // Use router.replace for SPA transition (no full reload, preserves state)
-      await new Promise(r => setTimeout(r, 150))
+      // SPA navigation — instant, preserves React state, no overlay needed
       router.replace(target)
 
     } catch (err: any) {

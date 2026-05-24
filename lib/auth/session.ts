@@ -73,15 +73,20 @@ export function destroySession() {
   }
   keysToRemove.forEach(k => localStorage.removeItem(k))
   
-  // Clear all cookies (including httpOnly via expiry)
-  document.cookie.split(';').forEach((c) => {
-    const name = c.trim().split('=')[0]
-    if (name) {
-      // Clear for all possible paths
-      document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`
-      document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${window.location.hostname}`
-      document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/auth`
-    }
+  // Clear all cookies (best-effort — httpOnly cookies CAN'T be cleared from JS,
+  // they must be cleared by the server via /api/auth/logout)
+  const cookieNames = document.cookie.split(';').map((c) => c.trim().split('=')[0]).filter(Boolean)
+  // Also try common Supabase cookie names that may not appear in document.cookie if httpOnly
+  const supabaseCookieNames = cookieNames.filter((n) => n.startsWith('sb-'))
+  const allNames = [...new Set([...cookieNames, ...supabaseCookieNames])]
+
+  allNames.forEach((name) => {
+    // Clear for all possible paths and subdomains
+    const expire = 'expires=Thu, 01 Jan 1970 00:00:00 GMT'
+    document.cookie = `${name}=; ${expire}; path=/`
+    document.cookie = `${name}=; ${expire}; path=/; domain=${window.location.hostname}`
+    document.cookie = `${name}=; ${expire}; path=/; domain=.${window.location.hostname}`
+    document.cookie = `${name}=; ${expire}; path=/auth`
   })
 }
 
