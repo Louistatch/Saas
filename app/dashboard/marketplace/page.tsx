@@ -259,6 +259,7 @@ export default function MarketplacePage() {
       price_non_member: form.price_non_member,
       files: pendingFiles,
       status: 'published',
+      is_free_for_members: true,
     })
     setSaving(false)
 
