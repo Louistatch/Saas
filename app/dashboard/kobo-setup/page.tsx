@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Download, CheckCircle, ArrowRight, Smartphone, Upload, Globe, Zap, Copy, ExternalLink, Play, FileSpreadsheet } from 'lucide-react'
@@ -322,9 +323,11 @@ export default function KoboSetupPage() {
                 <p className="text-sm text-muted-foreground">
                   Les nouveaux membres apparaîtront dans <strong>Dashboard → Membres</strong>
                 </p>
-                <Button variant="outline" className="gap-2" onClick={() => window.location.href = '/dashboard/members'}>
-                  Voir les membres <ArrowRight className="h-4 w-4" />
-                </Button>
+                <Link href="/dashboard/members">
+                  <Button variant="outline" className="gap-2">
+                    Voir les membres <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
               </div>
             </div>
           )}

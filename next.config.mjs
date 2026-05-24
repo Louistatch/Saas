@@ -47,26 +47,8 @@ const nextConfig = {
   async headers() {
     return [
       {
-        source: '/((?!embed|api/widget|verify|dashboard|admin).*)',
+        source: '/((?!embed|api/widget|verify).*)',
         headers: securityHeaders,
-      },
-      {
-        // Protected routes: NEVER cache (prevents back-button showing stale authenticated content)
-        source: '/dashboard/:path*',
-        headers: [
-          ...securityHeaders,
-          { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate, max-age=0' },
-          { key: 'Pragma', value: 'no-cache' },
-        ],
-      },
-      {
-        // Admin routes: NEVER cache
-        source: '/admin/:path*',
-        headers: [
-          ...securityHeaders,
-          { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate, max-age=0' },
-          { key: 'Pragma', value: 'no-cache' },
-        ],
       },
       {
         // Verify pages: NEVER cache — always fetch fresh data after QR scan

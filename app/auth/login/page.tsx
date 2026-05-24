@@ -1,10 +1,10 @@
 'use client'
 
+import Link from 'next/link'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { useState, useCallback, Suspense, useMemo } from 'react'
 import { Logo } from '@/components/shared/logo'
 import { AuthSidePanel } from '@/components/shared/auth-side-panel'
-import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
-import { useState, useCallback, Suspense, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -54,6 +54,7 @@ function showLoginTransition() {
 
 function LoginInner() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   
   const [email, setEmail] = useState('')
@@ -116,8 +117,9 @@ function LoginInner() {
           : '/dashboard'
 
       // Small delay to let the overlay render, then navigate
+      // Use router.replace for SPA transition (no full reload, preserves state)
       await new Promise(r => setTimeout(r, 150))
-      window.location.replace(target)
+      router.replace(target)
 
     } catch (err: any) {
       clearTimeout(timeoutId)

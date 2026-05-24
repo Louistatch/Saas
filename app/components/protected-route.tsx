@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import { useAuth, type UserRole } from '@/app/context/auth-context'
 
 interface ProtectedRouteProps {
@@ -18,12 +19,14 @@ interface ProtectedRouteProps {
  * This component's job is ONLY:
  * 1. Wait for AuthProvider to finish loading (show spinner)
  * 2. Role-gate (e.g. /admin requires super_admin)
- * 3. Safety net: if after 25s auth still hasn't loaded, redirect
+ * 3. Safety net: if after 8s auth still hasn't loaded, redirect
  * 
  * It does NOT duplicate the proxy's auth check.
  */
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading, user } = useAuth()
+  const router = useRouter()
+  const pathname = usePathname()
   const [timedOut, setTimedOut] = useState(false)
 
   // Safety net: 8s max wait for auth to load (matches login timeout)
@@ -33,29 +36,29 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     return () => clearTimeout(timer)
   }, [isLoading])
 
-  // If loading finished and not authenticated → redirect
-  // (This shouldn't happen normally because proxy already gates)
+  // If loading finished and not authenticated → redirect (SPA navigation)
   useEffect(() => {
     if (isLoading) return
     if (!isAuthenticated) {
-      window.location.replace(`/auth/login?redirect=${encodeURIComponent(window.location.pathname)}`)
+      const redirectParam = pathname && /^\/[^/]/.test(pathname) ? `?redirect=${encodeURIComponent(pathname)}` : ''
+      router.replace(`/auth/login${redirectParam}`)
     }
-  }, [isAuthenticated, isLoading])
+  }, [isAuthenticated, isLoading, pathname, router])
 
   // Role guard (only after auth is loaded)
   useEffect(() => {
     if (isLoading || !isAuthenticated) return
     if (requiredRole && user?.role !== requiredRole && user?.role !== 'super_admin') {
-      window.location.replace('/forbidden')
+      router.replace('/forbidden')
     }
-  }, [isAuthenticated, isLoading, user, requiredRole])
+  }, [isAuthenticated, isLoading, user, requiredRole, router])
 
   // Safety net: auth loading hung
   useEffect(() => {
     if (timedOut && isLoading) {
-      window.location.replace('/auth/login')
+      router.replace('/auth/login')
     }
-  }, [timedOut, isLoading])
+  }, [timedOut, isLoading, router])
 
   // Show spinner while auth loads (trust the proxy — user is likely valid)
   if (isLoading && !timedOut) {

@@ -72,7 +72,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Another tab logged out — clear our state too
       setUser(null)
       destroySession()
-      window.location.replace('/auth/login')
+      // Only redirect if we're on a protected page (avoid redirect loops on auth pages)
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth/')) {
+        window.location.replace('/auth/login')
+      }
     })
     return cleanup
   }, [])

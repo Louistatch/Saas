@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Zap, Check, ExternalLink, Lock } from 'lucide-react'
@@ -64,6 +65,7 @@ interface IntegrationStatus {
 }
 
 export default function IntegrationsPage() {
+  const router = useRouter()
   const { currentCooperative } = useCooperative()
   const { toast } = useToast()
   const supabase = useMemo(() => createClient(), [])
@@ -102,7 +104,7 @@ export default function IntegrationsPage() {
     if (!currentCooperative) return
     if (def.key === 'kobo' && currentStatus !== 'connected') {
       // Force the user to set credentials via the dedicated page.
-      window.location.href = '/dashboard/integrations/kobo'
+      router.push('/dashboard/integrations/kobo')
       return
     }
     setToggling(def.key)
