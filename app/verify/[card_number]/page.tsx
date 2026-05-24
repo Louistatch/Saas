@@ -267,7 +267,7 @@ export default function VerifyCardPage() {
           }
 
           // Check if certified supplier (FENOMAT faitiere + Argent/Or)
-          const coopData = card.cooperative as { name: string; faitiere_name: string | null } | null
+          const coopData = (card.cooperative as { name: string; faitiere_name: string | null }[] | null)?.[0] ?? null
           isCertifiedSupplier = (level === 'Argent' || level === 'Or') && (coopData?.faitiere_name === 'FENOMAT' || coopData?.name === 'FENOMAT')
         }
 
@@ -280,7 +280,7 @@ export default function VerifyCardPage() {
             created_at: card.created_at,
           },
           member: card.member as VerifyResult['member'],
-          cooperative: card.cooperative as VerifyResult['cooperative'],
+          cooperative: (card.cooperative as { name: string; faitiere_name: string | null }[] | null)?.[0] ?? undefined,
           cotisations,
           agriculture,
           level,
