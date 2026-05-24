@@ -35,9 +35,18 @@ export async function proxy(request: NextRequest) {
 
   const isProtected = pathname.startsWith('/dashboard') || pathname.startsWith('/admin')
   const isAuthPage = pathname.startsWith('/auth/login') || pathname.startsWith('/auth/signup')
+  const isAuthFlow = pathname.startsWith('/auth/')
 
   // Fast path: public routes — no auth check needed
   if (!isProtected && !isAuthPage) {
+    return NextResponse.next({ request })
+  }
+
+  // FAST PATH for auth pages (login, forgot-password, reset-password, signout)
+  // Skip getUser() entirely — these pages don't need server-side auth validation
+  // This makes post-logout navigation INSTANT (like Facebook/Instagram)
+  if (isAuthFlow && !isAuthPage) {
+    // /auth/forgot-password, /auth/reset-password, /auth/signout, /auth/callback
     return NextResponse.next({ request })
   }
 
@@ -88,7 +97,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  // Auth pages: NEVER redirect from /auth/login
+  // Auth pages: if user is already authenticated, redirect to dashboard
+  // But NEVER redirect from /auth/login — user might be re-authenticating
   if (user && pathname.startsWith('/auth/signup')) {
     return NextResponse.redirect(new URL(
       role === 'super_admin' ? '/admin' : '/dashboard',
@@ -96,6 +106,8 @@ export async function proxy(request: NextRequest) {
     ))
   }
 
+  // Auth pages: skip getUser() entirely for login/forgot/reset — no need to validate
+  // This makes the login page load INSTANTLY after logout (no network call)
   return supabaseResponse
 }
 
