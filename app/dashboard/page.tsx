@@ -10,6 +10,7 @@ import { useCooperative } from '@/app/context/cooperative-context'
 import { useAuth } from '@/app/context/auth-context'
 import { Spinner, LoadingBlock } from '@/components/shared/loading'
 import { PageHeader } from '@/components/shared/page-header'
+import { AgriScoreWidget } from '@/components/dashboard/agri-score-widget'
 import { timeAgo } from '@/lib/utils/time'
 
 interface Stats {
@@ -137,6 +138,9 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
+        {/* Agri Score Widget */}
+        <AgriScoreWidget memberId={user?.id} />
+
         <Card className="border-border bg-gradient-to-br from-primary/5 to-accent/5">
           <CardHeader>
             <CardTitle className="text-foreground">Actions rapides</CardTitle>
