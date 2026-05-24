@@ -194,24 +194,6 @@ export function FicheFilterBar({
           </select>
         </div>
 
-        {/* Coopérative */}
-        <div className="space-y-2">
-          <Label htmlFor="cooperative">Coopérative</Label>
-          <select
-            id="cooperative"
-            className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
-            value={filters.cooperative_id}
-            onChange={(e) => setFilter('cooperative_id', e.target.value)}
-          >
-            <option value="">Toutes les coopératives</option>
-            {referenceData.cooperatives.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
         {/* Reset */}
         {activeFilterCount > 0 ? (
           <Button
