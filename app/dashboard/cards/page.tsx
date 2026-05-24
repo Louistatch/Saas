@@ -177,7 +177,14 @@ export default function CardsPage() {
   // -- helpers --
 
   const generateCardNumber = useCallback(() => {
-    const prefix = currentCooperative?.name?.slice(0, 3).toUpperCase().replace(/\s+/g, '') || 'COP'
+    // Build a prefix from the cooperative name, using only unambiguous letters.
+    // We strip O (looks like 0), I (looks like 1), and any non-letter chars.
+    const safe =
+      currentCooperative?.name
+        ?.toUpperCase()
+        .replace(/[^A-Z]/g, '')
+        .replace(/[OI]/g, '') ?? ''
+    const prefix = (safe.slice(0, 3) || 'COP').padEnd(2, 'X')
     const num = Math.floor(Math.random() * 90000) + 10000
     return `${prefix}-${num}`
   }, [currentCooperative])
