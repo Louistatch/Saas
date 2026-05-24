@@ -1,146 +1,320 @@
+/**
+ * /api/integrations/kobo — CRUD sécurisé pour la configuration KoboToolbox
+ *
+ * GET    ?cooperativeId={uuid} — Retourne la config (token masqué)
+ * POST   — Crée/update la config (chiffre le token, teste la connexion)
+ * DELETE ?cooperativeId={uuid} — Soft delete (active = false)
+ *
+ * GET /api/integrations/kobo/stats?cooperativeId={uuid} — voir route séparée
+ *
+ * @security assertAuthenticated + assertFaitiereAccess (POST/DELETE)
+ * @security assertTenantAccess (GET)
+ * @security API token chiffré AES-256-GCM avant stockage
+ * @security Token JAMAIS retourné au client (masqué: "••••••••{last4}")
+ *
+ * @test Happy path: valid config + valid token → 200 + {ok: true}
+ * @test Auth failure: non-faitiere user → 403
+ * @test Validation failure: invalid formId → 400
+ */
 import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
+import { assertAuthenticated, assertTenantAccess, assertFaitiereAccess } from '@/lib/security/assert-access'
 import { encryptSecret, isEncrypted } from '@/lib/utils/crypto'
 import { createLogger } from '@/lib/utils/logger'
-import { uuidSchema } from '@/lib/validators/schemas'
+import { KoboSyncService } from '@/lib/kobo/sync-service'
+import {
+  koboConfigSchema,
+  koboConfigQuerySchema,
+  koboDeleteQuerySchema,
+  koboStatsQuerySchema,
+} from '@/lib/validators/kobo'
+import type { KoboConfigResponse, KoboStatsResponse } from '@/lib/kobo/types'
 
-const log = createLogger('api:kobo')
+const log = createLogger('api:integrations:kobo')
 
-const upsertSchema = z.object({
-  cooperative_id: uuidSchema,
-  api_key: z.string().min(10).optional(),
-  form_id: z.string().min(1).max(120),
-  auto_sync: z.boolean().optional(),
-  auto_score: z.boolean().optional(),
-  field_mapping: z
-    .object({
-      name: z.string().max(100).optional(),
-      email: z.string().max(100).optional(),
-      phone: z.string().max(100).optional(),
-      member_id: z.string().max(100).optional(),
+// =========================================================
+// GET /api/integrations/kobo?cooperativeId={uuid}
+// =========================================================
+export async function GET(request: NextRequest) {
+  // Auth check
+  const authResult = await assertAuthenticated()
+  if (!authResult.ok) return authResult.response
+
+  const { ctx } = authResult
+  const { searchParams } = new URL(request.url)
+
+  // Check if this is a stats request
+  const isStats = searchParams.has('stats')
+
+  // Validate query params
+  const queryParsed = koboConfigQuerySchema.safeParse({
+    cooperativeId: searchParams.get('cooperativeId'),
+  })
+
+  if (!queryParsed.success) {
+    return NextResponse.json(
+      { error: 'Invalid cooperativeId', issues: queryParsed.error.flatten().fieldErrors },
+      { status: 400 },
+    )
+  }
+
+  const { cooperativeId } = queryParsed.data
+
+  // Tenant access check
+  const tenantResult = await assertTenantAccess(cooperativeId)
+  if (!tenantResult.ok) return tenantResult.response
+
+  const { supabase } = ctx
+
+  // Stats endpoint
+  if (isStats) {
+    const { data, error } = await supabase.rpc('get_kobo_stats', {
+      p_cooperative_id: cooperativeId,
     })
-    .optional(),
-})
 
-async function assertAccess(cooperativeId: string) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { ok: false, status: 401 as const, supabase }
+    if (error) {
+      log.error('Failed to get kobo stats', { error: error.message, cooperativeId })
+      return NextResponse.json({ error: 'Failed to fetch stats' }, { status: 500 })
+    }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, cooperative_id')
-    .eq('id', user.id)
-    .single<{ role: string; cooperative_id: string | null }>()
+    const stats = data as KoboStatsResponse | null
+    return NextResponse.json(stats ?? {
+      total: 0,
+      pending: 0,
+      processing: 0,
+      matched: 0,
+      unmatched: 0,
+      errors: 0,
+      duplicates: 0,
+      lastSync: null,
+    }, {
+      headers: { 'Cache-Control': 'private, max-age=60' },
+    })
+  }
 
-  if (!profile) return { ok: false, status: 401 as const, supabase }
-  const allowed =
-    profile.role === 'super_admin' ||
-    (profile.role === 'cooperative_admin' && profile.cooperative_id === cooperativeId)
-  if (!allowed) return { ok: false, status: 403 as const, supabase }
-  return { ok: true, status: 200 as const, supabase }
+  // Get integration config
+  const { data: integration, error } = await supabase
+    .from('integrations')
+    .select('id, cooperative_id, type, status, config, last_sync_at, created_at')
+    .eq('cooperative_id', cooperativeId)
+    .eq('type', 'kobo')
+    .maybeSingle()
+
+  if (error) {
+    log.error('Failed to fetch integration', { error: error.message, cooperativeId })
+    return NextResponse.json({ error: 'Failed to fetch integration' }, { status: 500 })
+  }
+
+  if (!integration) {
+    return NextResponse.json({ configured: false }, { status: 200 })
+  }
+
+  const config = integration.config as Record<string, unknown> | null
+
+  // Mask the API token — NEVER return it to the client
+  const rawToken = config?.api_key as string | undefined
+  let apiTokenMasked = ''
+  if (rawToken && isEncrypted(rawToken)) {
+    // Show only format indicator
+    apiTokenMasked = '••••••••••••••••'
+  } else if (rawToken) {
+    apiTokenMasked = `••••••••${rawToken.slice(-4)}`
+  }
+
+  // Get field mappings
+  const { data: mappings } = await supabase
+    .from('kobo_field_mappings')
+    .select('*')
+    .eq('cooperative_id', cooperativeId)
+    .eq('form_id', (config?.form_id as string) ?? '')
+
+  const response: KoboConfigResponse = {
+    cooperativeId,
+    formId: (config?.form_id as string) ?? '',
+    webhookEnabled: (config?.webhook_enabled as boolean) ?? true,
+    status: integration.status ?? 'disconnected',
+    lastSyncAt: integration.last_sync_at ?? null,
+    apiTokenMasked,
+    fieldMappings: mappings ?? [],
+  }
+
+  return NextResponse.json(response)
 }
 
+// =========================================================
+// POST /api/integrations/kobo
+// =========================================================
 export async function POST(request: NextRequest) {
+  // Auth: only faitiere admins can configure integrations
+  const authResult = await assertFaitiereAccess()
+  if (!authResult.ok) return authResult.response
+
+  const { ctx } = authResult
+
+  // Parse body
   let body: unknown
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
-  const parsed = upsertSchema.safeParse(body)
+
+  // Validate with Zod
+  const parsed = koboConfigSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Invalid input', issues: parsed.error.issues },
+      { error: 'Invalid input', issues: parsed.error.flatten().fieldErrors },
       { status: 400 },
     )
   }
 
-  const access = await assertAccess(parsed.data.cooperative_id)
-  if (!access.ok) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: access.status })
-  }
-  const { supabase } = access
+  const { cooperativeId, apiToken, formId, webhookEnabled, fieldMappings } = parsed.data
 
-  // Fetch existing config to preserve encrypted key when not rotating
-  const { data: existing } = await supabase
-    .from('integrations')
-    .select('config')
-    .eq('cooperative_id', parsed.data.cooperative_id)
-    .eq('type', 'kobo')
-    .maybeSingle<{ config: Record<string, unknown> | null }>()
+  // Tenant access check
+  const tenantResult = await assertTenantAccess(cooperativeId)
+  if (!tenantResult.ok) return tenantResult.response
 
-  const existingKey =
-    existing?.config && typeof existing.config === 'object'
-      ? (existing.config as { api_key?: unknown }).api_key
-      : undefined
+  const { supabase } = ctx
 
-  let apiKeyCipher: string | undefined
-  if (parsed.data.api_key) {
-    try {
-      apiKeyCipher = encryptSecret(parsed.data.api_key)
-    } catch (e) {
-      log.error('Failed to encrypt secret', e)
-      return NextResponse.json(
-        { error: 'Server is missing encryption configuration' },
-        { status: 500 },
-      )
-    }
-  } else if (isEncrypted(existingKey)) {
-    apiKeyCipher = existingKey
+  // Test connection to KoboToolbox before saving
+  const syncService = new KoboSyncService()
+  const connectionTest = await syncService.testConnection(apiToken, formId)
+
+  if (!connectionTest.valid) {
+    return NextResponse.json(
+      {
+        error: 'Connexion KoboToolbox échouée',
+        details: connectionTest.error,
+      },
+      { status: 422 },
+    )
   }
 
-  const { error } = await supabase.from('integrations').upsert(
+  // Encrypt the API token
+  let encryptedToken: string
+  try {
+    encryptedToken = encryptSecret(apiToken)
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Encryption failed'
+    log.error('Failed to encrypt API token', { error: message })
+    return NextResponse.json(
+      { error: 'Server encryption configuration error' },
+      { status: 500 },
+    )
+  }
+
+  // Upsert integration config
+  const { error: upsertError } = await supabase.from('integrations').upsert(
     {
-      cooperative_id: parsed.data.cooperative_id,
+      cooperative_id: cooperativeId,
       type: 'kobo',
-      status: apiKeyCipher ? 'connected' : 'disconnected',
-      last_sync_at: apiKeyCipher ? new Date().toISOString() : null,
+      status: 'connected',
+      last_sync_at: new Date().toISOString(),
       config: {
-        api_key: apiKeyCipher ?? null,
-        form_id: parsed.data.form_id,
-        auto_sync: parsed.data.auto_sync ?? true,
-        auto_score: parsed.data.auto_score ?? true,
-        field_mapping: parsed.data.field_mapping ?? {
-          name: 'name',
-          email: 'email',
-          phone: 'phone',
-          member_id: 'member_id',
-        },
+        api_key: encryptedToken,
+        form_id: formId,
+        webhook_enabled: webhookEnabled,
+        form_title: connectionTest.formTitle ?? null,
+        submission_count: connectionTest.submissionCount ?? 0,
       },
     },
     { onConflict: 'cooperative_id,type' },
   )
 
-  if (error) {
-    log.error('Failed to upsert kobo integration', error)
+  if (upsertError) {
+    log.error('Failed to upsert integration', { error: upsertError.message, cooperativeId })
     return NextResponse.json({ error: 'Failed to save integration' }, { status: 500 })
   }
-  return NextResponse.json({ ok: true })
+
+  // Save field mappings if provided
+  if (fieldMappings && fieldMappings.length > 0) {
+    // Delete existing mappings for this form
+    await supabase
+      .from('kobo_field_mappings')
+      .delete()
+      .eq('cooperative_id', cooperativeId)
+      .eq('form_id', formId)
+
+    // Insert new mappings
+    const mappingRows = fieldMappings.map((m) => ({
+      cooperative_id: cooperativeId,
+      form_id: formId,
+      kobo_field: m.koboField,
+      target_table: m.targetTable,
+      target_column: m.targetColumn,
+      transform_fn: m.transformFn ?? null,
+      is_key_field: m.isKeyField,
+    }))
+
+    const { error: mappingError } = await supabase
+      .from('kobo_field_mappings')
+      .insert(mappingRows)
+
+    if (mappingError) {
+      log.error('Failed to save field mappings', { error: mappingError.message })
+      // Non-blocking — config is saved, mappings can be retried
+    }
+  }
+
+  log.info('Kobo integration configured', {
+    cooperativeId,
+    formId,
+    formTitle: connectionTest.formTitle,
+  })
+
+  return NextResponse.json({
+    ok: true,
+    formTitle: connectionTest.formTitle,
+    submissionCount: connectionTest.submissionCount,
+  })
 }
 
+// =========================================================
+// DELETE /api/integrations/kobo?cooperativeId={uuid}
+// =========================================================
 export async function DELETE(request: NextRequest) {
+  // Auth: only faitiere admins can delete integrations
+  const authResult = await assertFaitiereAccess()
+  if (!authResult.ok) return authResult.response
+
+  const { ctx } = authResult
   const { searchParams } = new URL(request.url)
-  const cooperativeId = searchParams.get('cooperative_id')
-  const parsed = uuidSchema.safeParse(cooperativeId)
-  if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid cooperative id' }, { status: 400 })
+
+  // Validate query params
+  const queryParsed = koboDeleteQuerySchema.safeParse({
+    cooperativeId: searchParams.get('cooperativeId'),
+  })
+
+  if (!queryParsed.success) {
+    return NextResponse.json(
+      { error: 'Invalid cooperativeId' },
+      { status: 400 },
+    )
   }
-  const access = await assertAccess(parsed.data)
-  if (!access.ok) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: access.status })
-  }
-  const { supabase } = access
+
+  const { cooperativeId } = queryParsed.data
+
+  // Tenant access check
+  const tenantResult = await assertTenantAccess(cooperativeId)
+  if (!tenantResult.ok) return tenantResult.response
+
+  const { supabase } = ctx
+
+  // Soft delete: set status to disconnected, clear sensitive config
   const { error } = await supabase
     .from('integrations')
-    .update({ status: 'disconnected', config: {} })
-    .eq('cooperative_id', parsed.data)
+    .update({
+      status: 'disconnected',
+      config: { api_key: null, form_id: null, webhook_enabled: false },
+    })
+    .eq('cooperative_id', cooperativeId)
     .eq('type', 'kobo')
+
   if (error) {
+    log.error('Failed to disconnect integration', { error: error.message, cooperativeId })
     return NextResponse.json({ error: 'Failed to disconnect' }, { status: 500 })
   }
-  return NextResponse.json({ ok: true })
+
+  log.info('Kobo integration disconnected', { cooperativeId })
+
+  return NextResponse.json({ ok: true, message: 'Intégration KoboToolbox déconnectée' })
 }

@@ -1,119 +1,159 @@
+/**
+ * POST /api/integrations/kobo/sync
+ *
+ * Triggers a manual sync from KoboToolbox API.
+ * Pulls new submissions, processes them, and retries failed ones.
+ *
+ * Body: { cooperativeId: uuid, mode: 'full' | 'incremental' }
+ *
+ * @security assertAuthenticated + assertRole(['cooperative_admin','faitiere_admin','super_admin'])
+ * @security assertTenantAccess(cooperativeId)
+ * @security Rate limited: 5 req/min/user (anti-spam)
+ * @security maxDuration = 60 (Vercel function timeout)
+ *
+ * @test Happy path: valid auth + connected integration → 200 + SyncResult
+ * @test Auth failure: member role → 403
+ * @test Validation failure: missing cooperativeId → 400
+ */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { decryptSecret } from '@/lib/utils/crypto'
+import { assertAuthenticated, assertTenantAccess, assertRole } from '@/lib/security/assert-access'
 import { createLogger } from '@/lib/utils/logger'
-import { fetchKoboSubmissions, processKoboSubmissions, retryFailedSubmissions } from '@/lib/kobo/sync-service'
-import { uuidSchema } from '@/lib/validators/schemas'
+import { decryptSecret } from '@/lib/utils/crypto'
+import { rateLimit, clientKeyFromHeaders } from '@/lib/utils/rate-limit'
+import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
+import { koboSyncRequestSchema } from '@/lib/validators/kobo'
+import { KoboSyncService } from '@/lib/kobo/sync-service'
+import type { SyncResult } from '@/lib/kobo/types'
 
 const log = createLogger('api:kobo:sync')
 
-/**
- * POST /api/integrations/kobo/sync
- * 
- * Triggers a manual sync from KoboToolbox.
- * Pulls new submissions and processes them into the database.
- * Also retries any failed submissions from the queue.
- */
+// Vercel function timeout — 60 seconds
+export const maxDuration = 60
+
 export async function POST(request: NextRequest) {
-  let body: { cooperative_id?: string }
+  // -------------------------------------------------------
+  // Rate limiting: 5 req/min/user (anti-spam sync manuelle)
+  // -------------------------------------------------------
+  const persistentBlock = await applyRateLimit(request, 'auth')
+  if (persistentBlock) return persistentBlock
+
+  const ip = clientKeyFromHeaders(request.headers)
+  const rl = rateLimit(`sync:kobo:${ip}`, 5, 60_000)
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: 'Trop de requêtes de synchronisation. Réessayez dans quelques instants.' },
+      { status: 429 },
+    )
+  }
+
+  // -------------------------------------------------------
+  // Authentication + Role check
+  // -------------------------------------------------------
+  const roleResult = await assertRole('cooperative_admin')
+  if (!roleResult.ok) return roleResult.response
+
+  const { ctx } = roleResult
+
+  // -------------------------------------------------------
+  // Parse + validate body
+  // -------------------------------------------------------
+  let body: unknown
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const parsed = uuidSchema.safeParse(body.cooperative_id)
+  const parsed = koboSyncRequestSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid cooperative_id' }, { status: 400 })
-  }
-  const cooperativeId = parsed.data
-
-  // Auth check
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json(
+      { error: 'Invalid input', issues: parsed.error.flatten().fieldErrors },
+      { status: 400 },
+    )
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, cooperative_id')
-    .eq('id', user.id)
-    .single<{ role: string; cooperative_id: string | null }>()
+  const { cooperativeId, mode } = parsed.data
 
-  if (!profile) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  // -------------------------------------------------------
+  // Tenant access check
+  // -------------------------------------------------------
+  const tenantResult = await assertTenantAccess(cooperativeId)
+  if (!tenantResult.ok) return tenantResult.response
 
-  const allowed =
-    profile.role === 'super_admin' ||
-    (profile.role === 'cooperative_admin' && profile.cooperative_id === cooperativeId)
-  if (!allowed) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  const { supabase } = ctx
 
+  // -------------------------------------------------------
   // Get integration config
+  // -------------------------------------------------------
   const { data: integration } = await supabase
     .from('integrations')
-    .select('config, status, last_sync_at')
+    .select('id, config, status, last_sync_at')
     .eq('cooperative_id', cooperativeId)
     .eq('type', 'kobo')
-    .single()
+    .maybeSingle()
 
   if (!integration || integration.status !== 'connected') {
-    return NextResponse.json({ error: 'KoboToolbox not connected' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Intégration KoboToolbox non connectée' },
+      { status: 400 },
+    )
   }
 
   const config = integration.config as {
     api_key?: string
     form_id?: string
-    field_mapping?: Record<string, string>
+    webhook_enabled?: boolean
+  } | null
+
+  if (!config?.api_key || !config?.form_id) {
+    return NextResponse.json(
+      { error: 'Configuration incomplète : clé API ou Form ID manquant' },
+      { status: 400 },
+    )
   }
 
-  if (!config.api_key || !config.form_id) {
-    return NextResponse.json({ error: 'Missing API key or form ID' }, { status: 400 })
-  }
-
+  // -------------------------------------------------------
+  // Decrypt API token
+  // -------------------------------------------------------
+  let apiToken: string
   try {
-    // Decrypt API key
-    const apiKey = decryptSecret(config.api_key)
-
-    // Fetch new submissions since last sync
-    const submissions = await fetchKoboSubmissions(
-      apiKey,
-      config.form_id,
-      integration.last_sync_at ?? undefined,
+    apiToken = decryptSecret(config.api_key)
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Decryption failed'
+    log.error('Failed to decrypt API token', { error: message, cooperativeId })
+    return NextResponse.json(
+      { error: 'Erreur de déchiffrement du token. Reconfigurez l\'intégration.' },
+      { status: 500 },
     )
+  }
 
-    log.info('Fetched Kobo submissions', { count: submissions.length, cooperativeId })
+  // -------------------------------------------------------
+  // Determine sync start date
+  // -------------------------------------------------------
+  let since: Date | undefined
+  if (mode === 'incremental' && integration.last_sync_at) {
+    since = new Date(integration.last_sync_at)
+  }
+  // mode === 'full' → since = undefined → fetch all
 
-    // Process submissions
-    const result = await processKoboSubmissions(
+  // -------------------------------------------------------
+  // Execute sync
+  // -------------------------------------------------------
+  const syncService = new KoboSyncService()
+
+  let result: SyncResult
+  try {
+    result = await syncService.pullSubmissions({
       cooperativeId,
-      submissions,
-      config.field_mapping ?? {},
-    )
-
-    // Retry failed from queue
-    const retryResult = await retryFailedSubmissions(cooperativeId)
-
-    // Update last_sync_at
-    await supabase
-      .from('integrations')
-      .update({ last_sync_at: new Date().toISOString(), status: 'connected' })
-      .eq('cooperative_id', cooperativeId)
-      .eq('type', 'kobo')
-
-    return NextResponse.json({
-      success: true,
-      sync: result,
-      retries: retryResult,
-      message: `Sync terminée: ${result.created} créés, ${result.updated} mis à jour, ${result.skipped} ignorés, ${result.failed} échoués`,
+      formId: config.form_id,
+      apiToken,
+      since,
     })
-  } catch (error: any) {
-    log.error('Kobo sync failed', error)
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Sync failed'
+    log.error('Kobo sync failed', { error: message, cooperativeId })
 
-    // Update status to error
+    // Update integration status
     await supabase
       .from('integrations')
       .update({ status: 'error' })
@@ -121,8 +161,62 @@ export async function POST(request: NextRequest) {
       .eq('type', 'kobo')
 
     return NextResponse.json(
-      { error: 'Sync failed', details: error?.message },
+      { error: 'Synchronisation échouée', details: message },
       { status: 500 },
     )
   }
+
+  // -------------------------------------------------------
+  // Retry failed submissions
+  // -------------------------------------------------------
+  let retryResult: { succeeded: number; failed: number } = { succeeded: 0, failed: 0 }
+  try {
+    const retry = await syncService.retryFailedSubmissions(cooperativeId)
+    retryResult = { succeeded: retry.succeeded, failed: retry.failed }
+  } catch (err: unknown) {
+    log.warn('Retry failed submissions error', {
+      error: err instanceof Error ? err.message : 'Unknown',
+      cooperativeId,
+    })
+  }
+
+  // -------------------------------------------------------
+  // Update last_sync_at
+  // -------------------------------------------------------
+  await supabase
+    .from('integrations')
+    .update({
+      last_sync_at: new Date().toISOString(),
+      status: 'connected',
+    })
+    .eq('cooperative_id', cooperativeId)
+    .eq('type', 'kobo')
+
+  // -------------------------------------------------------
+  // Response
+  // -------------------------------------------------------
+  log.info('Kobo sync completed', {
+    cooperativeId,
+    mode,
+    received: result.received,
+    matched: result.matched,
+    errors: result.errors,
+    duration: result.duration,
+  })
+
+  return NextResponse.json({
+    success: result.success,
+    syncLogId: result.syncLogId,
+    mode,
+    sync: {
+      received: result.received,
+      processed: result.processed,
+      matched: result.matched,
+      unmatched: result.unmatched,
+      errors: result.errors,
+      duration: result.duration,
+    },
+    retries: retryResult,
+    message: `Sync terminée : ${result.received} reçues, ${result.matched} matchées, ${result.unmatched} non matchées, ${result.errors} erreurs`,
+  })
 }

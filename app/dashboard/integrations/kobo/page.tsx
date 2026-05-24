@@ -1,453 +1,384 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowRight, CheckCircle2, Key, Settings, RefreshCw, AlertCircle } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import {
+  Settings,
+  RefreshCw,
+  Database,
+  BookOpen,
+  Activity,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+} from 'lucide-react'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { useToast } from '@/hooks/use-toast'
-import { Spinner } from '@/components/shared/loading'
+import { useKoboStats } from '@/hooks/use-kobo-stats'
+import { useKoboSync } from '@/hooks/use-kobo-sync'
 import { PageHeader } from '@/components/shared/page-header'
-import { useConfirm } from '@/components/shared/confirm-dialog'
-import { errorMessage } from '@/lib/utils/errors'
+import { KoboConfigForm } from '@/components/dashboard/KoboConfigForm'
+import { KoboSyncPanel } from '@/components/dashboard/KoboSyncPanel'
+import { KoboSubmissionsTable } from '@/components/dashboard/KoboSubmissionsTable'
+import { Progress } from '@/components/ui/progress'
 
-const MASKED = '••••••••••••'
-
-type SyncStatus = 'idle' | 'syncing' | 'connected' | 'error'
-
-interface IntegrationConfig {
-  api_key?: string | null
-  form_id?: string
-  auto_sync?: boolean
-  auto_score?: boolean
-  field_mapping?: {
-    name?: string
-    email?: string
-    phone?: string
-    member_id?: string
-  }
-}
-
-interface IntegrationRow {
-  config: IntegrationConfig | null
-  status: string
-  last_sync_at: string | null
-}
-
-const DEFAULT_MAPPING = { name: 'name', email: 'email', phone: 'phone', member_id: 'member_id' }
-
-export default function KoboToolboxSetupPage() {
+/**
+ * /dashboard/integrations/kobo — Full KoboToolbox integration dashboard
+ *
+ * 4 tabs:
+ *  1. Configuration — API token, form ID, field mappings, webhook URL
+ *  2. Synchronisation — Stats, sync buttons, progress bar
+ *  3. Soumissions — Paginated table with filters
+ *  4. Guide — Step-by-step setup instructions
+ */
+export default function KoboIntegrationPage() {
   const { currentCooperative } = useCooperative()
   const { toast } = useToast()
-  const { confirm, confirmNode } = useConfirm()
-  const supabase = useMemo(() => createClient(), [])
+  const [activeTab, setActiveTab] = useState('config')
 
-  const [apiKey, setApiKey] = useState('')
-  const [hasExistingKey, setHasExistingKey] = useState(false)
-  const [formId, setFormId] = useState('')
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle')
-  const [lastSync, setLastSync] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [autoSync, setAutoSync] = useState(true)
-  const [autoScore, setAutoScore] = useState(true)
-  const [fieldMapping, setFieldMapping] = useState(DEFAULT_MAPPING)
+  const cooperativeId = currentCooperative?.id ?? null
 
-  const loadConfig = useCallback(async () => {
-    if (!currentCooperative) return
-    const { data } = await supabase
-      .from('integrations')
-      .select('config, status, last_sync_at')
-      .eq('cooperative_id', currentCooperative.id)
-      .eq('type', 'kobo')
-      .maybeSingle<IntegrationRow>()
+  // Hooks
+  const { stats, isLoading: statsLoading, refetch: refetchStats } = useKoboStats(cooperativeId)
+  const { isSyncing, progress, result, error: syncError, startSync, cancelSync } = useKoboSync(cooperativeId)
 
-    if (data) {
-      const cfg = data.config ?? {}
-      const keyExists = !!cfg.api_key
-      setHasExistingKey(keyExists)
-      setApiKey(keyExists ? MASKED : '')
-      setFormId(cfg.form_id ?? '')
-      setAutoSync(cfg.auto_sync ?? true)
-      setAutoScore(cfg.auto_score ?? true)
-      setFieldMapping({ ...DEFAULT_MAPPING, ...(cfg.field_mapping ?? {}) })
-      setSyncStatus(
-        data.status === 'connected'
-          ? 'connected'
-          : data.status === 'error'
-            ? 'error'
-            : 'idle',
-      )
-      setLastSync(data.last_sync_at)
-    } else {
-      setHasExistingKey(false)
-    }
-  }, [currentCooperative, supabase])
-
-  useEffect(() => {
-    loadConfig()
-  }, [loadConfig])
-
-  const submit = async (newKey?: string) => {
-    if (!currentCooperative) return
-    setSaving(true)
-    setSyncStatus('syncing')
-    try {
-      const res = await fetch('/api/integrations/kobo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cooperative_id: currentCooperative.id,
-          api_key: newKey,
-          form_id: formId,
-          auto_sync: autoSync,
-          auto_score: autoScore,
-          field_mapping: fieldMapping,
-        }),
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error ?? 'Save failed')
-      }
-      setSyncStatus('connected')
-      toast({ title: 'Configuration saved' })
-      loadConfig()
-    } catch (e) {
-      setSyncStatus('error')
-      toast({ title: 'Save failed', description: errorMessage(e), variant: 'destructive' })
-    } finally {
-      setSaving(false)
-    }
+  // Show sync result toast
+  if (result && !isSyncing) {
+    // Handled in KoboSyncPanel
   }
 
-  const handleConnect = () => {
-    if (!formId) {
-      toast({ title: 'Form ID is required', variant: 'destructive' })
-      return
-    }
-    if (!apiKey || apiKey === MASKED) {
-      if (!hasExistingKey) {
-        toast({ title: 'API token is required', variant: 'destructive' })
-        return
-      }
-      // re-save without rotating the key
-      void submit()
-      return
-    }
-    if (apiKey.length < 10) {
-      toast({ title: 'API token looks too short', variant: 'destructive' })
-      return
-    }
-    void submit(apiKey)
-  }
-
-  const handleSaveMapping = () => submit()
-
-  const handleDisconnect = async () => {
-    if (!currentCooperative) return
-    const ok = await confirm({
-      title: 'Disconnect KoboToolbox?',
-      description: 'Saved credentials will be cleared. Sync will stop.',
-      destructive: true,
-      confirmLabel: 'Disconnect',
-    })
-    if (!ok) return
-    setSaving(true)
-    try {
-      const res = await fetch(
-        `/api/integrations/kobo?cooperative_id=${encodeURIComponent(currentCooperative.id)}`,
-        { method: 'DELETE' },
-      )
-      if (!res.ok) throw new Error('Failed to disconnect')
-      toast({ title: 'Disconnected' })
-      setApiKey('')
-      setFormId('')
-      setHasExistingKey(false)
-      setSyncStatus('idle')
-      setLastSync(null)
-    } catch (e) {
-      toast({ title: 'Disconnect failed', description: errorMessage(e), variant: 'destructive' })
-    } finally {
-      setSaving(false)
-    }
+  if (!currentCooperative) {
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          title="Intégration KoboToolbox"
+          description="Connectez KoboCollect pour synchroniser les données terrain"
+        />
+        <Card className="border-border">
+          <CardContent className="py-12 text-center">
+            <p className="text-muted-foreground">
+              Sélectionnez une coopérative pour configurer l&apos;intégration.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
-        title="KoboToolbox Integration"
-        description="Connect KoboToolbox to sync member data and calculate member scores"
+        title="Intégration KoboToolbox"
+        description="Collecte terrain → Synchronisation → Données membres"
       />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2 border-border">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-foreground">
-              <Settings className="h-5 w-5" />
-              Setup KoboToolbox Connection
-            </CardTitle>
-            <CardDescription>
-              Configure your KoboToolbox API credentials to sync member data. Tokens are
-              encrypted server-side.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="credentials" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 border-b border-border bg-transparent">
-                <TabsTrigger
-                  value="credentials"
-                  className="border-b-2 border-transparent data-[state=active]:border-primary"
-                >
-                  Credentials
-                </TabsTrigger>
-                <TabsTrigger
-                  value="mapping"
-                  className="border-b-2 border-transparent data-[state=active]:border-primary"
-                >
-                  Field Mapping
-                </TabsTrigger>
-              </TabsList>
+      {/* Stats summary bar */}
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          <StatCard label="Total" value={stats.total} icon={Database} />
+          <StatCard
+            label="Matchées"
+            value={stats.matched}
+            icon={CheckCircle2}
+            className="text-green-600"
+          />
+          <StatCard
+            label="Non matchées"
+            value={stats.unmatched}
+            icon={AlertCircle}
+            className="text-orange-500"
+          />
+          <StatCard
+            label="Erreurs"
+            value={stats.errors}
+            icon={AlertCircle}
+            className="text-red-500"
+          />
+          <StatCard
+            label="En attente"
+            value={stats.pending}
+            icon={Clock}
+            className="text-blue-500"
+          />
+          <StatCard
+            label="Dernière sync"
+            value={stats.lastSync ? formatRelativeDate(stats.lastSync) : '—'}
+            icon={RefreshCw}
+            isText
+          />
+        </div>
+      )}
 
-              <TabsContent value="credentials" className="space-y-4 mt-6">
-                <div className="space-y-2">
-                  <Label className="text-foreground flex items-center gap-2">
-                    <Key className="h-4 w-4" />
-                    KoboToolbox API Token
-                  </Label>
-                  <Input
-                    type="password"
-                    placeholder={hasExistingKey ? 'Leave blank to keep existing token' : 'Your KoboToolbox API token'}
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Get your token from KoboToolbox → Account Settings → Security. Tokens are
-                    encrypted with AES-256-GCM before being persisted.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Form / Survey ID</Label>
-                  <Input
-                    placeholder="e.g., a1b2c3d4e5f6g7h8"
-                    value={formId}
-                    onChange={(e) => setFormId(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-3 pt-2">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={autoSync}
-                      onChange={(e) => setAutoSync(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-sm text-foreground">Auto-sync daily</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={autoScore}
-                      onChange={(e) => setAutoScore(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-sm text-foreground">Create member scores automatically</span>
-                  </label>
-                </div>
-
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    className="flex-1 gap-2 bg-primary hover:bg-primary/90"
-                    onClick={handleConnect}
-                    disabled={saving}
-                  >
-                    {saving ? (
-                      <Spinner className="h-4 w-4" />
-                    ) : syncStatus === 'connected' ? (
-                      <CheckCircle2 className="h-4 w-4" />
-                    ) : (
-                      <ArrowRight className="h-4 w-4" />
-                    )}
-                    {saving
-                      ? 'Saving…'
-                      : syncStatus === 'connected'
-                        ? 'Save Changes'
-                        : 'Connect & Save'}
-                  </Button>
-                  {syncStatus === 'connected' ? (
-                    <Button
-                      variant="outline"
-                      className="border-destructive/30 text-destructive hover:bg-destructive/10"
-                      onClick={handleDisconnect}
-                      disabled={saving}
-                    >
-                      Disconnect
-                    </Button>
-                  ) : null}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="mapping" className="space-y-4 mt-6">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-900">
-                    Map your KoboToolbox form fields to member profile fields.
-                  </p>
-                </div>
-
-                <div className="space-y-4">
-                  {(
-                    [
-                      { label: 'Member Name', key: 'name', required: true },
-                      { label: 'Member Email', key: 'email', required: true },
-                      { label: 'Member Phone', key: 'phone', required: false },
-                      { label: 'Member ID', key: 'member_id', required: false },
-                    ] as const
-                  ).map((field) => (
-                    <div key={field.key} className="grid grid-cols-3 gap-4 items-center">
-                      <Label className="text-foreground text-sm">
-                        {field.label}
-                        {field.required ? <span className="text-destructive ml-1">*</span> : null}
-                      </Label>
-                      <div className="col-span-2">
-                        <Input
-                          value={fieldMapping[field.key]}
-                          onChange={(e) =>
-                            setFieldMapping((m) => ({ ...m, [field.key]: e.target.value }))
-                          }
-                          className="text-sm"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <Button
-                  className="w-full gap-2 bg-primary hover:bg-primary/90"
-                  onClick={handleSaveMapping}
-                  disabled={saving}
-                >
-                  {saving ? <Spinner className="h-4 w-4" /> : null}
-                  Save Field Mapping
-                </Button>
-              </TabsContent>
-            </Tabs>
+      {/* Sync progress bar (visible during sync) */}
+      {isSyncing && progress && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-foreground">
+                Synchronisation en cours...
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {progress.current}/{progress.total}
+              </span>
+            </div>
+            <Progress
+              value={progress.total > 0 ? (progress.current / progress.total) * 100 : 0}
+              className="h-2"
+            />
+            <div className="flex justify-end mt-2">
+              <Button variant="ghost" size="sm" onClick={cancelSync}>
+                Annuler
+              </Button>
+            </div>
           </CardContent>
         </Card>
+      )}
 
-        <div className="space-y-6">
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle className="text-foreground text-lg">Connection Status</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Status</span>
-                <span
-                  className={`text-sm font-medium flex items-center gap-1 ${
-                    syncStatus === 'connected'
-                      ? 'text-green-600'
-                      : syncStatus === 'error'
-                        ? 'text-destructive'
-                        : 'text-muted-foreground'
-                  }`}
-                >
-                  {syncStatus === 'connected' ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
-                  {syncStatus === 'error' ? <AlertCircle className="h-3.5 w-3.5" /> : null}
-                  {syncStatus === 'connected'
-                    ? 'Connected'
-                    : syncStatus === 'error'
-                      ? 'Error'
-                      : 'Disconnected'}
-                </span>
-              </div>
-              {lastSync ? (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Last sync</span>
-                  <span className="text-xs font-medium text-foreground">
-                    {new Date(lastSync).toLocaleString()}
-                  </span>
-                </div>
-              ) : null}
-              {formId ? (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Form ID</span>
-                  <span className="text-xs font-mono text-foreground">
-                    {formId.slice(0, 12)}{formId.length > 12 ? '…' : ''}
-                  </span>
-                </div>
-              ) : null}
-              {syncStatus === 'connected' ? (
-                <div className="space-y-2">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="w-full bg-primary hover:bg-primary/90 gap-2"
-                    onClick={async () => {
-                      if (!currentCooperative) return
-                      setSaving(true)
-                      try {
-                        const res = await fetch('/api/integrations/kobo/sync', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ cooperative_id: currentCooperative.id }),
-                        })
-                        const data = await res.json()
-                        if (!res.ok) throw new Error(data.error || 'Sync failed')
-                        toast({ title: 'Sync terminée', description: data.message || `${data.sync?.created ?? 0} créés, ${data.sync?.updated ?? 0} mis à jour` })
-                        loadConfig()
-                      } catch (e: any) {
-                        toast({ title: 'Échec sync', description: e?.message, variant: 'destructive' })
-                      } finally {
-                        setSaving(false)
-                      }
-                    }}
-                    disabled={saving}
-                  >
-                    {saving ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                    Synchroniser maintenant
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full border-border gap-2"
-                    onClick={() => loadConfig()}
-                  >
-                    <RefreshCw className="h-3.5 w-3.5" />
-                    Rafraîchir le statut
-                  </Button>
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
+      {/* Main tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-4 bg-muted/50">
+          <TabsTrigger value="config" className="gap-2">
+            <Settings className="h-4 w-4 hidden sm:block" />
+            Configuration
+          </TabsTrigger>
+          <TabsTrigger value="sync" className="gap-2">
+            <Activity className="h-4 w-4 hidden sm:block" />
+            Synchronisation
+          </TabsTrigger>
+          <TabsTrigger value="submissions" className="gap-2">
+            <Database className="h-4 w-4 hidden sm:block" />
+            Soumissions
+          </TabsTrigger>
+          <TabsTrigger value="guide" className="gap-2">
+            <BookOpen className="h-4 w-4 hidden sm:block" />
+            Guide
+          </TabsTrigger>
+        </TabsList>
 
-          <Card className="border-border bg-gradient-to-br from-primary/5 to-accent/5">
-            <CardHeader>
-              <CardTitle className="text-foreground text-lg">Need Help?</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-3">
-                The KoboToolbox sync runs daily once auto-sync is enabled.
-              </p>
-              <a
-                href="https://support.kobotoolbox.org/api.html"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block"
-              >
-                <Button variant="outline" size="sm" className="border-border">
-                  View Documentation
-                </Button>
-              </a>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+        {/* Tab 1: Configuration */}
+        <TabsContent value="config" className="mt-6">
+          <KoboConfigForm
+            cooperativeId={currentCooperative.id}
+            onSaved={() => {
+              refetchStats()
+              toast({ title: 'Configuration sauvegardée' })
+            }}
+          />
+        </TabsContent>
 
-      {confirmNode}
+        {/* Tab 2: Synchronisation */}
+        <TabsContent value="sync" className="mt-6">
+          <KoboSyncPanel
+            cooperativeId={currentCooperative.id}
+            stats={stats}
+            statsLoading={statsLoading}
+            isSyncing={isSyncing}
+            progress={progress}
+            result={result}
+            syncError={syncError}
+            onStartSync={startSync}
+            onRetry={() => startSync('incremental')}
+            onRefreshStats={refetchStats}
+          />
+        </TabsContent>
+
+        {/* Tab 3: Soumissions */}
+        <TabsContent value="submissions" className="mt-6">
+          <KoboSubmissionsTable cooperativeId={currentCooperative.id} />
+        </TabsContent>
+
+        {/* Tab 4: Guide */}
+        <TabsContent value="guide" className="mt-6">
+          <GuideTab cooperativeId={currentCooperative.id} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
+}
+
+// =========================================================
+// Stat card component
+// =========================================================
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  className = '',
+  isText = false,
+}: {
+  label: string
+  value: number | string
+  icon: React.ComponentType<{ className?: string }>
+  className?: string
+  isText?: boolean
+}) {
+  return (
+    <Card className="border-border">
+      <CardContent className="py-3 px-4">
+        <div className="flex items-center gap-2">
+          <Icon className={`h-4 w-4 ${className || 'text-muted-foreground'}`} />
+          <span className="text-xs text-muted-foreground">{label}</span>
+        </div>
+        <p className={`text-lg font-semibold mt-1 ${className || 'text-foreground'}`}>
+          {isText ? value : typeof value === 'number' ? value.toLocaleString('fr-FR') : value}
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
+// =========================================================
+// Guide tab
+// =========================================================
+function GuideTab({ cooperativeId }: { cooperativeId: string }) {
+  const webhookUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/api/webhooks/kobo`
+    : 'https://www.faitierehub.com/api/webhooks/kobo'
+
+  const steps = [
+    {
+      title: 'Créer un compte KoboToolbox',
+      description: 'Inscrivez-vous gratuitement sur KoboToolbox si ce n\'est pas déjà fait.',
+      link: 'https://www.kobotoolbox.org/',
+      linkLabel: 'Ouvrir KoboToolbox',
+    },
+    {
+      title: 'Importer le formulaire FENOMAT',
+      description: 'Téléchargez le XLSForm pré-configuré et importez-le dans votre projet KoboToolbox.',
+      action: 'download',
+    },
+    {
+      title: 'Copier le Form ID',
+      description: 'Dans KoboToolbox, ouvrez votre formulaire → Settings → copiez l\'identifiant du formulaire (uid).',
+    },
+    {
+      title: 'Générer un API Token',
+      description: 'Allez dans Account Settings → Security → API Key. Copiez le token.',
+      link: 'https://kf.kobotoolbox.org/#/account-settings',
+      linkLabel: 'Ouvrir les paramètres',
+    },
+    {
+      title: 'Configurer le webhook',
+      description: 'Dans KoboToolbox → Project Settings → REST Services → ajoutez un nouveau service.',
+      detail: `URL du webhook : ${webhookUrl}`,
+    },
+    {
+      title: 'Tester avec KoboCollect',
+      description: 'Installez KoboCollect sur un téléphone Android, connectez-vous, et soumettez un formulaire test.',
+      link: 'https://play.google.com/store/apps/details?id=org.koboc.collect.android',
+      linkLabel: 'Installer KoboCollect',
+    },
+  ]
+
+  return (
+    <div className="space-y-6">
+      <Card className="border-border">
+        <CardHeader>
+          <CardTitle>Guide de configuration</CardTitle>
+          <CardDescription>
+            Suivez ces 6 étapes pour connecter KoboCollect à FaîtiereHub
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            {steps.map((step, index) => (
+              <div key={index} className="flex gap-4">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-semibold">
+                  {index + 1}
+                </div>
+                <div className="flex-1 space-y-1">
+                  <h4 className="text-sm font-medium text-foreground">{step.title}</h4>
+                  <p className="text-sm text-muted-foreground">{step.description}</p>
+                  {step.detail && (
+                    <code className="block text-xs bg-muted px-3 py-2 rounded mt-2 break-all">
+                      {step.detail}
+                    </code>
+                  )}
+                  {step.link && (
+                    <a
+                      href={step.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block mt-1"
+                    >
+                      <Button variant="outline" size="sm">
+                        {step.linkLabel}
+                      </Button>
+                    </a>
+                  )}
+                  {step.action === 'download' && (
+                    <Button variant="outline" size="sm" className="mt-1">
+                      Télécharger le XLSForm
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Webhook info card */}
+      <Card className="border-border">
+        <CardHeader>
+          <CardTitle className="text-base">Informations webhook</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div>
+            <Label className="text-xs text-muted-foreground">URL du webhook</Label>
+            <CopyableField value={webhookUrl} />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Header d&apos;authentification</Label>
+            <code className="block text-xs bg-muted px-3 py-2 rounded mt-1">
+              X-Kobo-Secret: [votre secret configuré dans .env]
+            </code>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// =========================================================
+// Helpers
+// =========================================================
+function Label({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <span className={`text-sm font-medium ${className}`}>{children}</span>
+}
+
+function CopyableField({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(value)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="flex items-center gap-2 mt-1">
+      <code className="flex-1 text-xs bg-muted px-3 py-2 rounded break-all">{value}</code>
+      <Button variant="ghost" size="sm" onClick={handleCopy}>
+        {copied ? '✓' : 'Copier'}
+      </Button>
+    </div>
+  )
+}
+
+function formatRelativeDate(dateStr: string): string {
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMin = Math.floor(diffMs / 60_000)
+  const diffHours = Math.floor(diffMs / 3_600_000)
+  const diffDays = Math.floor(diffMs / 86_400_000)
+
+  if (diffMin < 1) return 'À l\'instant'
+  if (diffMin < 60) return `Il y a ${diffMin}min`
+  if (diffHours < 24) return `Il y a ${diffHours}h`
+  if (diffDays < 7) return `Il y a ${diffDays}j`
+  return date.toLocaleDateString('fr-FR')
 }

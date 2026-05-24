@@ -1,13 +1,42 @@
+/**
+ * POST /api/webhooks/kobo
+ *
+ * KoboToolbox webhook endpoint — receives field submissions in real-time.
+ *
+ * Pipeline (strict order):
+ *  1. Method guard (POST only)
+ *  2. Content-Type + Size validation
+ *  3. Rate limiting (100 req/min/IP)
+ *  4. Authentication (HMAC-SHA256 signature OR Bearer secret, timing-safe)
+ *  5. JSON parsing + Zod validation
+ *  6. Tenant resolution (_xform_id_string → cooperative_id)
+ *  7. Deduplication (_uuid check)
+ *  8. Insert + async processing (match + process)
+ *  9. Response (always 200 if auth OK — Kobo retries on non-200)
+ *
+ * @security KOBO_WEBHOOK_SECRET required, timing-safe comparison
+ * @security Rate limited: 100 req/min/IP via Upstash (fallback in-memory)
+ * @security Payload capped at 2MB
+ * @security No stack traces exposed to client
+ *
+ * @test Happy path: valid signature + valid payload → 200 + submission_id
+ * @test Auth failure: missing/invalid signature → 403
+ * @test Validation failure: malformed payload → 200 + {valid: false}
+ */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { timingSafeEqual, createHmac } from 'node:crypto'
+import { createClient } from '@/lib/supabase/admin'
 import { createLogger } from '@/lib/utils/logger'
-import { timingSafeEqual } from 'node:crypto'
+import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
+import { rateLimit, clientKeyFromHeaders } from '@/lib/utils/rate-limit'
+import { koboWebhookPayloadSchema } from '@/lib/validators/kobo'
+import type { KoboWebhookResponse } from '@/lib/kobo/types'
 
 const log = createLogger('webhook:kobo')
 
-/**
- * Timing-safe string comparison to prevent timing attacks on secrets.
- */
+// =========================================================
+// Timing-safe string comparison
+// =========================================================
 function safeCompare(a: string, b: string): boolean {
   const bufA = Buffer.from(a, 'utf8')
   const bufB = Buffer.from(b, 'utf8')
@@ -19,243 +48,371 @@ function safeCompare(a: string, b: string): boolean {
   return timingSafeEqual(bufA, bufB)
 }
 
-/**
- * POST /api/webhooks/kobo
- * 
- * Webhook endpoint for KoboCollect submissions.
- * When a technician submits a form in the field:
- * 1. Receives the submission data (name, phone, photo, location, cooperative, culture)
- * 2. Cleans and validates the data
- * 3. Creates the member in the correct cooperative
- * 4. The card can then be generated from the dashboard
- * 
- * KoboToolbox sends data as JSON with field mappings configured in the integration settings.
- * 
- * Expected fields (configurable via field_mapping in integrations table):
- * - first_name, last_name
- * - phone
- * - photo (attachment URL)
- * - cooperative_name or cooperative_id
- * - region, prefecture, canton, village
- * - culture_principale
- * - superficie_ha
- */
-export async function POST(request: NextRequest) {
-  // Verify webhook secret — MANDATORY, not optional
-  const webhookSecret = request.headers.get('x-kobo-secret')
+// =========================================================
+// HMAC-SHA256 signature verification
+// =========================================================
+function verifyHmacSignature(
+  payload: string,
+  signature: string,
+  secret: string,
+): boolean {
+  const expected = createHmac('sha256', secret).update(payload).digest('hex')
+  return safeCompare(signature, expected)
+}
+
+// =========================================================
+// POST handler
+// =========================================================
+export async function POST(request: NextRequest): Promise<NextResponse<KoboWebhookResponse | { error: string }>> {
+  // -------------------------------------------------------
+  // 1. Content-Type validation
+  // -------------------------------------------------------
+  const contentType = request.headers.get('content-type') ?? ''
+  if (!contentType.includes('application/json')) {
+    return NextResponse.json(
+      { error: 'Content-Type invalide' },
+      { status: 415 },
+    )
+  }
+
+  // -------------------------------------------------------
+  // 2. Size check — payload ≤ 2MB
+  // -------------------------------------------------------
+  const contentLength = parseInt(
+    request.headers.get('content-length') ?? '0',
+    10,
+  )
+  if (isNaN(contentLength) || contentLength > 2_097_152) {
+    return NextResponse.json(
+      { error: 'Payload trop volumineux (max 2MB)' },
+      { status: 413 },
+    )
+  }
+
+  // -------------------------------------------------------
+  // 3. Rate limiting — 100 req/min/IP
+  // -------------------------------------------------------
+  // Try persistent (Upstash) first, fallback to in-memory
+  const persistentBlock = await applyRateLimit(request, 'verify')
+  if (persistentBlock) return persistentBlock as NextResponse<{ error: string }>
+
+  // In-memory fallback (if Upstash not configured)
+  const ip = clientKeyFromHeaders(request.headers)
+  const rl = rateLimit(`webhook:kobo:${ip}`, 100, 60_000)
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: 'Trop de requêtes' },
+      { status: 429 },
+    )
+  }
+
+  // -------------------------------------------------------
+  // 4. Authentication — timing-safe secret verification
+  // -------------------------------------------------------
   const expectedSecret = process.env.KOBO_WEBHOOK_SECRET
-
-  if (!expectedSecret) {
-    log.error('KOBO_WEBHOOK_SECRET is not configured — rejecting all webhook requests')
-    return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })
+  if (!expectedSecret || expectedSecret.length < 32) {
+    log.error('KOBO_WEBHOOK_SECRET is not configured or too short — rejecting all requests')
+    return NextResponse.json(
+      { error: 'Webhook not configured' },
+      { status: 503 },
+    )
   }
 
-  if (!webhookSecret || !safeCompare(webhookSecret, expectedSecret)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  let body: Record<string, unknown>
+  // Read raw body for HMAC verification
+  let rawBody: string
   try {
-    body = await request.json()
+    rawBody = await request.text()
+  } catch {
+    return NextResponse.json({ error: 'Cannot read body' }, { status: 400 })
+  }
+
+  // Check multiple auth methods (in priority order):
+  // 1. X-KoboToolbox-Signature (HMAC-SHA256)
+  // 2. X-Kobo-Secret (direct secret comparison)
+  // 3. Authorization: Bearer <secret>
+  const hmacSignature = request.headers.get('x-kobotoolbox-signature')
+  const directSecret = request.headers.get('x-kobo-secret')
+  const authHeader = request.headers.get('authorization')
+
+  let authenticated = false
+
+  if (hmacSignature) {
+    authenticated = verifyHmacSignature(rawBody, hmacSignature, expectedSecret)
+  } else if (directSecret) {
+    authenticated = safeCompare(directSecret, expectedSecret)
+  } else if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7)
+    authenticated = safeCompare(token, expectedSecret)
+  }
+
+  if (!authenticated) {
+    log.warn('Webhook authentication failed', { ip })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  }
+
+  // -------------------------------------------------------
+  // 5. JSON parsing + Zod validation
+  // -------------------------------------------------------
+  let body: unknown
+  try {
+    body = JSON.parse(rawBody)
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  log.info('KoboCollect submission received', { keys: Object.keys(body) })
+  const parsed = koboWebhookPayloadSchema.safeParse(body)
+  if (!parsed.success) {
+    log.error('Webhook payload validation failed', {
+      errors: parsed.error.flatten().fieldErrors,
+    })
+    // Return 200 to Kobo (otherwise it retries indefinitely)
+    return NextResponse.json({ received: true, status: 'error', message: 'Invalid payload' })
+  }
 
-  try {
-    const supabase = await createClient()
+  const payload = parsed.data
 
-    // Extract and clean data from KoboCollect submission
-    // KoboCollect sends nested data — we flatten it
-    const submission = flattenKoboData(body)
+  // -------------------------------------------------------
+  // 6. Tenant resolution — _xform_id_string → cooperative_id
+  // -------------------------------------------------------
+  const supabase = createClient()
 
-    const firstName = cleanString(submission.first_name || submission.prenom || submission.nom_prenom?.split(' ')[0])
-    const lastName = cleanString(submission.last_name || submission.nom || submission.nom_prenom?.split(' ').slice(1).join(' '))
-    const phone = cleanPhone(submission.phone || submission.telephone || submission.tel)
-    const photoUrl = submission.photo || submission._attachments?.[0]?.download_url || null
-    const cooperativeName = cleanString(submission.cooperative || submission.cooperative_name || submission.nom_cooperative)
-    const region = cleanString(submission.region)
-    const prefecture = cleanString(submission.prefecture)
-    const canton = cleanString(submission.canton)
-    const village = cleanString(submission.village || submission.localite)
-    const culture = cleanString(submission.culture || submission.culture_principale)
-    const superficie = submission.superficie_ha ? parseFloat(String(submission.superficie_ha)) : null
+  const { data: integration } = await supabase
+    .from('integrations')
+    .select('id, cooperative_id, config')
+    .eq('type', 'kobo')
+    .eq('status', 'connected')
+    .filter('config->>form_id', 'eq', payload._xform_id_string)
+    .limit(1)
+    .maybeSingle()
 
-    // Validation
-    if (!firstName || !lastName) {
-      return NextResponse.json(
-        { error: 'Nom et prénom sont obligatoires', received: { firstName, lastName } },
-        { status: 400 },
-      )
-    }
+  if (!integration) {
+    log.warn('No integration found for form', {
+      formId: payload._xform_id_string,
+    })
+    // Return 200 — don't make Kobo retry for a config issue
+    return NextResponse.json({
+      received: true,
+      status: 'error',
+      message: 'No integration configured for this form',
+    })
+  }
 
-    // Find the cooperative
-    let cooperativeId: string | null = null
-    if (submission.cooperative_id) {
-      cooperativeId = String(submission.cooperative_id)
-    } else if (cooperativeName) {
-      // Escape ILIKE special characters to prevent wildcard injection
-      const escapedName = cooperativeName.replace(/[%_\\]/g, '\\$&')
-      const { data: coop } = await supabase
-        .from('cooperatives')
-        .select('id')
-        .ilike('name', `%${escapedName}%`)
-        .limit(1)
-        .single()
-      cooperativeId = coop?.id ?? null
-    }
+  const cooperativeId = integration.cooperative_id as string
 
-    if (!cooperativeId) {
-      // Fallback: try to find by the integration's cooperative_id
-      // (the webhook URL might be specific to a cooperative)
-      const coopIdParam = new URL(request.url).searchParams.get('cooperative_id')
-      if (coopIdParam) cooperativeId = coopIdParam
+  // -------------------------------------------------------
+  // 7. Deduplication — check kobo_instance_id
+  // -------------------------------------------------------
+  const { data: existing } = await supabase
+    .from('kobo_submissions')
+    .select('id, status')
+    .eq('kobo_instance_id', payload._uuid)
+    .maybeSingle()
 
-      if (!cooperativeId) {
-        return NextResponse.json(
-          { error: 'Coopérative non trouvée', cooperative_name: cooperativeName },
-          { status: 400 },
-        )
-      }
-    }
+  if (existing) {
+    return NextResponse.json({
+      received: true,
+      submission_id: existing.id,
+      status: 'duplicate',
+      message: 'Already processed',
+    })
+  }
 
-    // Check for duplicate (same name + phone in same cooperative)
-    if (phone) {
-      const { data: existing } = await supabase
-        .from('members')
-        .select('id')
-        .eq('cooperative_id', cooperativeId)
-        .eq('phone', phone)
-        .limit(1)
-        .single()
+  // -------------------------------------------------------
+  // 8. Insert + async processing
+  // -------------------------------------------------------
 
-      if (existing) {
-        // Update existing member instead of creating duplicate
-        await supabase.from('members').update({
-          first_name: firstName,
-          last_name: lastName,
-          photo_url: photoUrl,
-          region: region,
-          prefecture: prefecture,
-          canton: canton,
-          village: village,
-        }).eq('id', existing.id)
+  // Extract card number from payload (configurable via field mappings)
+  const config = integration.config as Record<string, unknown> | null
+  const fieldMapping = (config?.field_mapping as Record<string, string>) ?? {}
+  const cardNumberField = fieldMapping.member_id ?? 'member_card_number'
+  const memberCardNumber = extractCardNumber(payload, cardNumberField)
 
-        log.info('Member updated (duplicate phone)', { id: existing.id, phone })
-        return NextResponse.json({
-          success: true,
-          action: 'updated',
-          member_id: existing.id,
-          message: `Membre ${firstName} ${lastName} mis à jour`,
-        })
-      }
-    }
+  // Insert submission
+  const { data: submission, error: insertError } = await supabase
+    .from('kobo_submissions')
+    .insert({
+      cooperative_id: cooperativeId,
+      kobo_instance_id: payload._uuid,
+      kobo_form_id: payload._xform_id_string,
+      raw_payload: payload as unknown as Record<string, unknown>,
+      member_card_number: memberCardNumber,
+      status: 'pending' as const,
+      submitted_at: payload._submission_time,
+    })
+    .select('id')
+    .single()
 
-    // Create the member
-    const { data: newMember, error: memberError } = await supabase
-      .from('members')
-      .insert({
-        cooperative_id: cooperativeId,
-        first_name: firstName,
-        last_name: lastName,
-        phone: phone,
-        photo_url: photoUrl,
-        region: region,
-        prefecture: prefecture,
-        canton: canton,
-        village: village,
-        status: 'active',
+  if (insertError || !submission) {
+    log.error('Failed to insert kobo submission', {
+      error: insertError?.message,
+      cooperativeId,
+      instanceId: payload._uuid,
+    })
+    // Still return 200 — don't make Kobo retry
+    return NextResponse.json({
+      received: true,
+      status: 'error',
+      message: 'Storage error',
+    })
+  }
+
+  // Log sync event
+  await supabase.from('kobo_sync_logs').insert({
+    cooperative_id: cooperativeId,
+    integration_id: integration.id,
+    sync_type: 'webhook' as const,
+    status: 'started' as const,
+    submissions_received: 1,
+    started_at: new Date().toISOString(),
+  })
+
+  // Fire-and-forget: match + process (wrapped in try/catch)
+  processSubmissionAsync(supabase, submission.id, cooperativeId).catch(
+    (err: unknown) => {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      log.error('Async processing failed', {
+        submissionId: submission.id,
+        cooperativeId,
+        error: message,
       })
-      .select('id')
+    },
+  )
+
+  // -------------------------------------------------------
+  // 9. Response — always 200 if auth passed
+  // -------------------------------------------------------
+  return NextResponse.json({
+    received: true,
+    submission_id: submission.id,
+    status: 'pending',
+    message: 'Submission received and queued for processing',
+  })
+}
+
+// =========================================================
+// Method guard — reject non-POST
+// =========================================================
+export async function GET() {
+  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 })
+}
+
+export async function PUT() {
+  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 })
+}
+
+export async function DELETE() {
+  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 })
+}
+
+// =========================================================
+// Async processing (fire-and-forget)
+// =========================================================
+async function processSubmissionAsync(
+  supabase: ReturnType<typeof createClient>,
+  submissionId: string,
+  cooperativeId: string,
+): Promise<void> {
+  try {
+    // Step 1: Match to member
+    await supabase.rpc('match_kobo_submission_to_member', {
+      p_submission_id: submissionId,
+    })
+
+    // Step 2: Check if matched
+    const { data: updated } = await supabase
+      .from('kobo_submissions')
+      .select('status, member_id')
+      .eq('id', submissionId)
       .single()
 
-    if (memberError) {
-      log.error('Failed to create member', memberError)
-      return NextResponse.json(
-        { error: 'Échec création membre', details: memberError.message },
-        { status: 500 },
-      )
+    if (updated?.status === 'matched' && updated.member_id) {
+      // Step 3: Process (extract parcelles/productions)
+      await supabase.rpc('process_kobo_submission', {
+        p_submission_id: submissionId,
+      })
     }
 
-    // If culture + superficie provided, create a parcelle
-    if (culture && newMember) {
-      await supabase.from('parcelles').insert({
-        member_id: newMember.id,
-        cooperative_id: cooperativeId,
-        name: `Parcelle ${culture}`,
-        culture_principale: culture,
-        superficie_ha: superficie,
-      }) // Non-blocking — ignore result
-    }
+    // Update sync log
+    const matchStatus = updated?.status === 'matched' ? 1 : 0
+    await supabase
+      .from('kobo_sync_logs')
+      .update({
+        status: 'success' as const,
+        submissions_processed: 1,
+        submissions_matched: matchStatus,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('cooperative_id', cooperativeId)
+      .eq('sync_type', 'webhook')
+      .is('completed_at', null)
+      .order('started_at', { ascending: false })
+      .limit(1)
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Processing error'
 
-    // Log the import
-    await supabase.from('audit_logs').insert({
-      cooperative_id: cooperativeId,
-      action: 'member.create.kobo',
-      entity_type: 'member',
-      entity_id: newMember?.id,
-      metadata: {
-        source: 'kobocollect',
-        submission_id: submission._id || submission._uuid,
-        culture,
-      },
-    })
+    // Mark submission as error
+    await supabase
+      .from('kobo_submissions')
+      .update({
+        status: 'error' as const,
+        error_message: message,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', submissionId)
 
-    log.info('Member created from KoboCollect', { id: newMember?.id, name: `${firstName} ${lastName}` })
+    // Update sync log
+    await supabase
+      .from('kobo_sync_logs')
+      .update({
+        status: 'failed' as const,
+        submissions_errors: 1,
+        error_details: { error: message } as unknown as Record<string, unknown>,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('cooperative_id', cooperativeId)
+      .eq('sync_type', 'webhook')
+      .is('completed_at', null)
+      .order('started_at', { ascending: false })
+      .limit(1)
 
-    return NextResponse.json({
-      success: true,
-      action: 'created',
-      member_id: newMember?.id,
-      message: `Membre ${firstName} ${lastName} créé dans la coopérative`,
-    })
-
-  } catch (error) {
-    log.error('Webhook processing error', error)
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+    throw err // Re-throw for the .catch() handler to log
   }
 }
 
-// --- Helpers ---
+// =========================================================
+// Extract card number from payload
+// =========================================================
+function extractCardNumber(
+  payload: Record<string, unknown>,
+  fieldName: string,
+): string | null {
+  // Try direct field
+  if (payload[fieldName] && typeof payload[fieldName] === 'string') {
+    return (payload[fieldName] as string).trim().toUpperCase()
+  }
 
-function flattenKoboData(data: Record<string, unknown>): Record<string, any> {
-  const flat: Record<string, any> = {}
-  for (const [key, value] of Object.entries(data)) {
+  // Try nested (KoboCollect group/field format)
+  for (const [key, value] of Object.entries(payload)) {
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      // Flatten nested groups (KoboCollect uses group/field format)
-      for (const [subKey, subValue] of Object.entries(value as Record<string, unknown>)) {
-        flat[subKey] = subValue
+      const nested = value as Record<string, unknown>
+      if (nested[fieldName] && typeof nested[fieldName] === 'string') {
+        return (nested[fieldName] as string).trim().toUpperCase()
       }
-    } else {
-      // Remove KoboCollect prefixes like "group_abc/"
-      const cleanKey = key.includes('/') ? key.split('/').pop()! : key
-      flat[cleanKey] = value
+    }
+    // Try "S1/member_card_number" style keys
+    if (key.endsWith(`/${fieldName}`) && typeof value === 'string') {
+      return value.trim().toUpperCase()
     }
   }
-  return flat
-}
 
-function cleanString(value: unknown): string | null {
-  if (!value) return null
-  const str = String(value).trim()
-  if (str === '' || str === 'null' || str === 'undefined' || str === 'n/a') return null
-  // Capitalize first letter
-  return str.charAt(0).toUpperCase() + str.slice(1)
-}
+  // Fallback: common field names
+  const fallbacks = ['member_card_number', 'card_number', 'numero_carte']
+  for (const fb of fallbacks) {
+    if (fb === fieldName) continue
+    if (payload[fb] && typeof payload[fb] === 'string') {
+      return (payload[fb] as string).trim().toUpperCase()
+    }
+  }
 
-function cleanPhone(value: unknown): string | null {
-  if (!value) return null
-  let phone = String(value).replace(/[^0-9+]/g, '')
-  // Add Togo country code if missing
-  if (phone.length === 8 && !phone.startsWith('+')) {
-    phone = '+228' + phone
-  } else if (phone.startsWith('228') && phone.length === 11) {
-    phone = '+' + phone
-  }
-  // Format: +228 XX XX XX XX
-  if (phone.startsWith('+228') && phone.length === 12) {
-    phone = `+228 ${phone.slice(4, 6)} ${phone.slice(6, 8)} ${phone.slice(8, 10)} ${phone.slice(10, 12)}`
-  }
-  return phone || null
+  return null
 }

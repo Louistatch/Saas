@@ -1,314 +1,706 @@
 /**
- * KoboCollect Sync Service
- * 
+ * KoboCollect Sync Service v2
+ *
  * Handles:
- * - Pulling submissions from KoboToolbox API
- * - Retry queue for failed syncs
- * - Conflict resolution (duplicate detection)
- * - Data mapping from Kobo fields to Supabase tables
- * - Audit logging
+ * - Paginated pull from KoboToolbox API v2
+ * - Batch processing (chunks of 50)
+ * - Retry queue with exponential backoff
+ * - Connection testing
+ * - Form structure retrieval (for mapping UI)
+ * - Audit logging via kobo_sync_logs
+ *
+ * All network calls have 30s timeout + 3 retries with exponential backoff.
+ * The API token NEVER leaves the server.
  */
 import 'server-only'
-import { createClient } from '@/lib/supabase/server'
-import { decryptSecret } from '@/lib/utils/crypto'
-import { createLogger } from '@/lib/utils/logger'
 
-const log = createLogger('kobo:sync')
+import { createClient } from '@/lib/supabase/server'
+import { createLogger } from '@/lib/utils/logger'
+import { decryptSecret } from '@/lib/utils/crypto'
+import type {
+  KoboApiSubmission,
+  KoboApiDataResponse,
+  KoboFormField,
+  KoboFormGroup,
+  KoboFormStructure,
+  SyncOptions,
+  SyncResult,
+  RetryResult,
+  TestConnectionResult,
+  KoboFieldMappingRow,
+} from './types'
+
+const log = createLogger('kobo:sync-service')
 
 const KOBO_API_BASE = 'https://kf.kobotoolbox.org/api/v2'
+const REQUEST_TIMEOUT_MS = 30_000
+const MAX_RETRIES = 3
+const BATCH_SIZE = 50
+const PAGE_SIZE = 100
 
-export interface KoboSubmission {
-  _id: number
-  _uuid: string
-  _submission_time: string
-  _attachments?: { download_url: string; filename: string }[]
-  [key: string]: unknown
-}
+// =========================================================
+// KoboSyncService class
+// =========================================================
 
-export interface SyncResult {
-  total: number
-  created: number
-  updated: number
-  skipped: number
-  failed: number
-  errors: { submission_id: string; error: string }[]
-}
+export class KoboSyncService {
+  private supabase: Awaited<ReturnType<typeof createClient>> | null = null
 
-export interface FieldMapping {
-  first_name?: string
-  last_name?: string
-  phone?: string
-  email?: string
-  photo?: string
-  region?: string
-  prefecture?: string
-  canton?: string
-  village?: string
-  culture?: string
-  superficie?: string
-  cooperative_name?: string
-}
-
-/**
- * Fetch submissions from KoboToolbox API
- */
-export async function fetchKoboSubmissions(
-  apiKey: string,
-  formId: string,
-  since?: string,
-): Promise<KoboSubmission[]> {
-  const url = new URL(`${KOBO_API_BASE}/assets/${formId}/data.json`)
-  if (since) {
-    url.searchParams.set('query', JSON.stringify({ _submission_time: { $gte: since } }))
-  }
-  url.searchParams.set('limit', '1000')
-  url.searchParams.set('sort', JSON.stringify({ _submission_time: -1 }))
-
-  const response = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Token ${apiKey}`,
-      Accept: 'application/json',
-    },
-    signal: AbortSignal.timeout(30_000),
-  })
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => '')
-    throw new Error(`KoboToolbox API error ${response.status}: ${text.slice(0, 200)}`)
+  private async getSupabase() {
+    if (!this.supabase) {
+      this.supabase = await createClient()
+    }
+    return this.supabase
   }
 
-  const data = await response.json()
-  return data.results ?? data ?? []
-}
+  // -----------------------------------------------------------
+  // Pull submissions from KoboToolbox API v2 (paginated)
+  // -----------------------------------------------------------
+  async pullSubmissions(options: SyncOptions): Promise<SyncResult> {
+    const startTime = Date.now()
+    const supabase = await this.getSupabase()
 
-/**
- * Process a batch of Kobo submissions into the database.
- * Uses the retry queue for resilience.
- */
-export async function processKoboSubmissions(
-  cooperativeId: string,
-  submissions: KoboSubmission[],
-  fieldMapping: FieldMapping,
-): Promise<SyncResult> {
-  const supabase = await createClient()
-  const result: SyncResult = { total: submissions.length, created: 0, updated: 0, skipped: 0, failed: 0, errors: [] }
+    // Create sync log entry
+    const { data: syncLog } = await supabase
+      .from('kobo_sync_logs')
+      .insert({
+        cooperative_id: options.cooperativeId,
+        sync_type: 'pull' as const,
+        status: 'started' as const,
+        started_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single()
 
-  for (const submission of submissions) {
-    const submissionId = String(submission._uuid || submission._id)
+    const syncLogId = syncLog?.id ?? crypto.randomUUID()
+
+    const result: SyncResult = {
+      success: false,
+      syncLogId,
+      received: 0,
+      processed: 0,
+      matched: 0,
+      unmatched: 0,
+      errors: 0,
+      duration: 0,
+      errorDetails: [],
+    }
 
     try {
-      // Check if already processed
-      const { data: existing } = await supabase
-        .from('kobo_sync_queue')
-        .select('id, status')
-        .eq('cooperative_id', cooperativeId)
-        .eq('submission_id', submissionId)
-        .single()
+      // Fetch all submissions (paginated)
+      const allSubmissions = await this.fetchAllSubmissions(
+        options.apiToken,
+        options.formId,
+        options.since,
+      )
 
-      if (existing?.status === 'completed') {
-        result.skipped++
-        continue
+      result.received = allSubmissions.length
+
+      if (allSubmissions.length === 0) {
+        result.success = true
+        result.duration = Date.now() - startTime
+        await this.completeSyncLog(syncLogId, result)
+        return result
       }
 
-      // Flatten nested Kobo data
-      const flat = flattenSubmission(submission)
+      // Get field mappings for this cooperative/form
+      const mappings = await this.getFieldMappings(
+        options.cooperativeId,
+        options.formId,
+      )
 
-      // Extract fields using mapping
-      const firstName = extractField(flat, fieldMapping.first_name ?? 'prenom', 'first_name')
-      const lastName = extractField(flat, fieldMapping.last_name ?? 'nom', 'last_name')
-      const phone = cleanPhone(extractField(flat, fieldMapping.phone ?? 'telephone', 'phone'))
-      const region = extractField(flat, fieldMapping.region ?? 'region', 'region')
-      const prefecture = extractField(flat, fieldMapping.prefecture ?? 'prefecture', 'prefecture')
-      const canton = extractField(flat, fieldMapping.canton ?? 'canton', 'canton')
-      const village = extractField(flat, fieldMapping.village ?? 'village', 'village')
-      const culture = extractField(flat, fieldMapping.culture ?? 'culture_principale', 'culture')
-      const superficie = parseFloat(extractField(flat, fieldMapping.superficie ?? 'superficie_ha', '') || '0') || null
-      const photoUrl = submission._attachments?.[0]?.download_url ?? null
+      // Process in batches
+      const batches = this.chunk(allSubmissions, BATCH_SIZE)
+      let processedCount = 0
 
-      if (!firstName || !lastName) {
-        result.failed++
-        result.errors.push({ submission_id: submissionId, error: 'Nom/prénom manquant' })
-        await queueFailed(supabase, cooperativeId, submissionId, submission, 'Nom/prénom manquant')
-        continue
-      }
+      for (const batch of batches) {
+        const batchResults = await this.processBatch(
+          batch,
+          options.cooperativeId,
+          options.formId,
+          mappings,
+        )
 
-      // Check for duplicate (same phone in same cooperative)
-      let memberId: string | null = null
-      if (phone) {
-        const { data: dup } = await supabase
-          .from('members')
-          .select('id')
-          .eq('cooperative_id', cooperativeId)
-          .eq('phone', phone)
-          .single()
+        result.processed += batchResults.processed
+        result.matched += batchResults.matched
+        result.unmatched += batchResults.unmatched
+        result.errors += batchResults.errors
+        if (batchResults.errorDetails) {
+          result.errorDetails = [
+            ...(result.errorDetails ?? []),
+            ...batchResults.errorDetails,
+          ]
+        }
 
-        if (dup) {
-          // Update existing
-          await supabase.from('members').update({
-            first_name: firstName,
-            last_name: lastName,
-            photo_url: photoUrl,
-            region, prefecture, canton, village,
-          }).eq('id', dup.id)
-          memberId = dup.id
-          result.updated++
+        processedCount += batch.length
+        if (options.onProgress) {
+          options.onProgress(processedCount, allSubmissions.length)
         }
       }
 
-      if (!memberId) {
-        // Create new member
-        const { data: newMember, error: insertErr } = await supabase
-          .from('members')
+      result.success = result.errors === 0
+      result.duration = Date.now() - startTime
+      await this.completeSyncLog(syncLogId, result)
+
+      return result
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown sync error'
+      log.error('Pull submissions failed', { error: message, cooperativeId: options.cooperativeId })
+
+      result.duration = Date.now() - startTime
+      result.errorDetails = [{ instanceId: 'global', error: message }]
+      await this.failSyncLog(syncLogId, message)
+
+      return result
+    }
+  }
+
+  // -----------------------------------------------------------
+  // Retry failed submissions from kobo_submissions table
+  // -----------------------------------------------------------
+  async retryFailedSubmissions(cooperativeId: string): Promise<RetryResult> {
+    const supabase = await this.getSupabase()
+
+    const { data: failed } = await supabase
+      .from('kobo_submissions')
+      .select('*')
+      .eq('cooperative_id', cooperativeId)
+      .in('status', ['error', 'pending'])
+      .order('created_at', { ascending: true })
+      .limit(BATCH_SIZE)
+
+    if (!failed || failed.length === 0) {
+      return { total: 0, retried: 0, succeeded: 0, failed: 0, errors: [] }
+    }
+
+    const result: RetryResult = {
+      total: failed.length,
+      retried: 0,
+      succeeded: 0,
+      failed: 0,
+      errors: [],
+    }
+
+    for (const submission of failed) {
+      result.retried++
+
+      try {
+        // Re-attempt matching
+        await supabase.rpc('match_kobo_submission_to_member', {
+          p_submission_id: submission.id,
+        })
+
+        // Check if matched
+        const { data: updated } = await supabase
+          .from('kobo_submissions')
+          .select('status, member_id')
+          .eq('id', submission.id)
+          .single()
+
+        if (updated?.status === 'matched' && updated.member_id) {
+          // Process the submission
+          await supabase.rpc('process_kobo_submission', {
+            p_submission_id: submission.id,
+          })
+          result.succeeded++
+        } else {
+          result.failed++
+          result.errors.push({
+            instanceId: submission.kobo_instance_id,
+            error: 'Could not match to member',
+          })
+        }
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Retry failed'
+        result.failed++
+        result.errors.push({
+          instanceId: submission.kobo_instance_id,
+          error: message,
+        })
+      }
+    }
+
+    return result
+  }
+
+  // -----------------------------------------------------------
+  // Test connection to KoboToolbox
+  // -----------------------------------------------------------
+  async testConnection(
+    apiToken: string,
+    formId: string,
+  ): Promise<TestConnectionResult> {
+    try {
+      const response = await this.fetchWithRetry(
+        `${KOBO_API_BASE}/assets/${encodeURIComponent(formId)}/`,
+        apiToken,
+      )
+
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          return { valid: false, error: 'Token API invalide ou expiré' }
+        }
+        if (response.status === 404) {
+          return { valid: false, error: 'Formulaire non trouvé (vérifiez le Form ID)' }
+        }
+        return { valid: false, error: `Erreur KoboToolbox: ${response.status}` }
+      }
+
+      const data = (await response.json()) as {
+        name?: string
+        deployment__submission_count?: number
+      }
+
+      return {
+        valid: true,
+        formTitle: data.name ?? undefined,
+        submissionCount: data.deployment__submission_count ?? 0,
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Connection failed'
+      log.error('KoboToolbox connection test failed', { error: message })
+      return { valid: false, error: message }
+    }
+  }
+
+  // -----------------------------------------------------------
+  // Get form structure (for field mapping UI)
+  // -----------------------------------------------------------
+  async getFormStructure(
+    apiToken: string,
+    formId: string,
+  ): Promise<KoboFormStructure> {
+    const response = await this.fetchWithRetry(
+      `${KOBO_API_BASE}/assets/${encodeURIComponent(formId)}/`,
+      apiToken,
+    )
+
+    if (!response.ok) {
+      throw new Error(`KoboToolbox API error: ${response.status}`)
+    }
+
+    const asset = (await response.json()) as {
+      content?: {
+        survey?: Array<{
+          type: string
+          name?: string
+          $autoname?: string
+          label?: string[]
+          required?: boolean
+        }>
+      }
+    }
+
+    const survey = asset.content?.survey ?? []
+    const fields: KoboFormField[] = []
+    const groups: KoboFormGroup[] = []
+    let currentGroup: KoboFormGroup | null = null
+
+    for (const row of survey) {
+      const name = row.name ?? row.$autoname ?? ''
+      const label = Array.isArray(row.label) ? row.label[0] : undefined
+
+      if (row.type === 'begin_group' || row.type === 'begin_repeat') {
+        currentGroup = {
+          name,
+          label: label ? { default: label } : undefined,
+          fields: [],
+          repeat: row.type === 'begin_repeat',
+        }
+        groups.push(currentGroup)
+      } else if (row.type === 'end_group' || row.type === 'end_repeat') {
+        currentGroup = null
+      } else if (name && !row.type.startsWith('begin') && !row.type.startsWith('end')) {
+        const field: KoboFormField = {
+          name,
+          type: row.type,
+          label: label ? { default: label } : undefined,
+          group: currentGroup?.name,
+          required: row.required,
+        }
+        fields.push(field)
+        if (currentGroup) {
+          currentGroup.fields.push(field)
+        }
+      }
+    }
+
+    return { fields, groups }
+  }
+
+  // -----------------------------------------------------------
+  // Private: Fetch all submissions with pagination
+  // -----------------------------------------------------------
+  private async fetchAllSubmissions(
+    apiToken: string,
+    formId: string,
+    since?: Date,
+  ): Promise<KoboApiSubmission[]> {
+    const allSubmissions: KoboApiSubmission[] = []
+    let offset = 0
+    let hasMore = true
+
+    while (hasMore) {
+      const url = new URL(
+        `${KOBO_API_BASE}/assets/${encodeURIComponent(formId)}/data/`,
+      )
+      url.searchParams.set('format', 'json')
+      url.searchParams.set('limit', String(PAGE_SIZE))
+      url.searchParams.set('start', String(offset))
+
+      if (since) {
+        url.searchParams.set(
+          'query',
+          JSON.stringify({
+            _submission_time: { $gte: since.toISOString() },
+          }),
+        )
+      }
+
+      const response = await this.fetchWithRetry(url.toString(), apiToken)
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => '')
+        throw new Error(
+          `KoboToolbox API error ${response.status}: ${text.slice(0, 200)}`,
+        )
+      }
+
+      const data = (await response.json()) as KoboApiDataResponse | KoboApiSubmission[]
+
+      // KoboToolbox API can return either paginated or flat array
+      let results: KoboApiSubmission[]
+      if (Array.isArray(data)) {
+        results = data
+        hasMore = false
+      } else {
+        results = data.results ?? []
+        hasMore = data.next !== null && results.length === PAGE_SIZE
+      }
+
+      allSubmissions.push(...results)
+      offset += PAGE_SIZE
+
+      // Safety: cap at 10,000 submissions per sync
+      if (allSubmissions.length >= 10_000) {
+        log.warn('Reached 10,000 submission cap during pull', { formId })
+        hasMore = false
+      }
+    }
+
+    return allSubmissions
+  }
+
+  // -----------------------------------------------------------
+  // Private: Process a batch of submissions
+  // -----------------------------------------------------------
+  private async processBatch(
+    submissions: KoboApiSubmission[],
+    cooperativeId: string,
+    formId: string,
+    mappings: KoboFieldMappingRow[],
+  ): Promise<{
+    processed: number
+    matched: number
+    unmatched: number
+    errors: number
+    errorDetails: Array<{ instanceId: string; error: string }>
+  }> {
+    const supabase = await this.getSupabase()
+    const batchResult = {
+      processed: 0,
+      matched: 0,
+      unmatched: 0,
+      errors: 0,
+      errorDetails: [] as Array<{ instanceId: string; error: string }>,
+    }
+
+    for (const submission of submissions) {
+      const instanceId = submission._uuid ?? String(submission._id)
+
+      try {
+        // Deduplication check
+        const { data: existing } = await supabase
+          .from('kobo_submissions')
+          .select('id, status')
+          .eq('kobo_instance_id', instanceId)
+          .maybeSingle()
+
+        if (existing) {
+          // Already processed — skip
+          batchResult.processed++
+          if (existing.status === 'matched') batchResult.matched++
+          else batchResult.unmatched++
+          continue
+        }
+
+        // Extract card number from payload using key field mapping
+        const cardNumber = this.extractCardNumber(submission, mappings)
+
+        // Insert into kobo_submissions
+        const { data: inserted, error: insertError } = await supabase
+          .from('kobo_submissions')
           .insert({
             cooperative_id: cooperativeId,
-            first_name: firstName,
-            last_name: lastName,
-            phone,
-            photo_url: photoUrl,
-            region, prefecture, canton, village,
-            status: 'active',
+            kobo_instance_id: instanceId,
+            kobo_form_id: formId,
+            raw_payload: submission as unknown as Record<string, unknown>,
+            member_card_number: cardNumber,
+            status: 'pending' as const,
+            submitted_at: submission._submission_time,
           })
           .select('id')
           .single()
 
-        if (insertErr || !newMember) {
-          result.failed++
-          result.errors.push({ submission_id: submissionId, error: insertErr?.message ?? 'Insert failed' })
-          await queueFailed(supabase, cooperativeId, submissionId, submission, insertErr?.message ?? 'Insert failed')
+        if (insertError || !inserted) {
+          batchResult.errors++
+          batchResult.errorDetails.push({
+            instanceId,
+            error: insertError?.message ?? 'Insert failed',
+          })
           continue
         }
-        memberId = newMember.id
-        result.created++
-      }
 
-      // Create parcelle if culture data exists
-      if (culture && memberId) {
-        await supabase.from('parcelles').insert({
-          member_id: memberId,
-          cooperative_id: cooperativeId,
-          name: `Parcelle ${culture}`,
-          culture_principale: culture,
-          superficie_ha: superficie,
+        // Attempt matching
+        await supabase.rpc('match_kobo_submission_to_member', {
+          p_submission_id: inserted.id,
+        })
+
+        // Check result
+        const { data: updated } = await supabase
+          .from('kobo_submissions')
+          .select('status, member_id')
+          .eq('id', inserted.id)
+          .single()
+
+        if (updated?.status === 'matched' && updated.member_id) {
+          // Process (extract parcelles/productions)
+          await supabase.rpc('process_kobo_submission', {
+            p_submission_id: inserted.id,
+          })
+          batchResult.matched++
+        } else {
+          batchResult.unmatched++
+        }
+
+        batchResult.processed++
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Processing error'
+        batchResult.errors++
+        batchResult.errorDetails.push({ instanceId, error: message })
+        log.error('Failed to process submission', {
+          instanceId,
+          cooperativeId,
+          error: message,
         })
       }
+    }
 
-      // Mark as completed in queue
-      await supabase.from('kobo_sync_queue').upsert({
-        cooperative_id: cooperativeId,
-        submission_id: submissionId,
-        payload: submission as any,
-        status: 'completed',
-        processed_at: new Date().toISOString(),
-      }, { onConflict: 'cooperative_id,submission_id' })
+    return batchResult
+  }
 
-      // Audit log
-      await supabase.from('audit_logs').insert({
-        cooperative_id: cooperativeId,
-        action: 'member.sync.kobo',
-        entity_type: 'member',
-        entity_id: memberId,
-        metadata: { submission_id: submissionId, source: 'kobo_sync' },
+  // -----------------------------------------------------------
+  // Private: Extract card number from submission using mappings
+  // -----------------------------------------------------------
+  private extractCardNumber(
+    submission: KoboApiSubmission,
+    mappings: KoboFieldMappingRow[],
+  ): string | null {
+    // Find the key field mapping
+    const keyMapping = mappings.find((m) => m.is_key_field)
+
+    if (keyMapping) {
+      const value = this.getNestedValue(submission, keyMapping.kobo_field)
+      if (value) return this.applyTransform(String(value), keyMapping.transform_fn)
+    }
+
+    // Fallback: look for common card number field names
+    const fallbackKeys = [
+      'member_card_number',
+      'card_number',
+      'numero_carte',
+      'S1/member_card_number',
+    ]
+
+    for (const key of fallbackKeys) {
+      const value = this.getNestedValue(submission, key)
+      if (value) return String(value).trim().toUpperCase()
+    }
+
+    return null
+  }
+
+  // -----------------------------------------------------------
+  // Private: Get nested value from submission (supports "group/field" paths)
+  // -----------------------------------------------------------
+  private getNestedValue(
+    obj: Record<string, unknown>,
+    path: string,
+  ): unknown {
+    // Try direct key first
+    if (path in obj) return obj[path]
+
+    // Try nested path (KoboCollect uses "group/field" format)
+    const parts = path.split('/')
+    let current: unknown = obj
+    for (const part of parts) {
+      if (current === null || current === undefined) return null
+      if (typeof current !== 'object') return null
+      current = (current as Record<string, unknown>)[part]
+    }
+    return current
+  }
+
+  // -----------------------------------------------------------
+  // Private: Apply transform function to a value
+  // -----------------------------------------------------------
+  private applyTransform(value: string, transformFn: string | null): string {
+    if (!transformFn) return value.trim()
+
+    switch (transformFn) {
+      case 'uppercase':
+        return value.trim().toUpperCase()
+      case 'trim':
+        return value.trim()
+      case 'to_number':
+        return value.replace(/[^0-9.-]/g, '')
+      case 'to_date':
+        return value.trim()
+      default:
+        return value.trim()
+    }
+  }
+
+  // -----------------------------------------------------------
+  // Private: Get field mappings for a cooperative/form
+  // -----------------------------------------------------------
+  private async getFieldMappings(
+    cooperativeId: string,
+    formId: string,
+  ): Promise<KoboFieldMappingRow[]> {
+    const supabase = await this.getSupabase()
+
+    const { data } = await supabase
+      .from('kobo_field_mappings')
+      .select('*')
+      .eq('cooperative_id', cooperativeId)
+      .eq('form_id', formId)
+
+    return (data as KoboFieldMappingRow[] | null) ?? []
+  }
+
+  // -----------------------------------------------------------
+  // Private: Complete sync log
+  // -----------------------------------------------------------
+  private async completeSyncLog(syncLogId: string, result: SyncResult): Promise<void> {
+    const supabase = await this.getSupabase()
+
+    await supabase
+      .from('kobo_sync_logs')
+      .update({
+        status: result.errors > 0 ? ('partial' as const) : ('success' as const),
+        submissions_received: result.received,
+        submissions_processed: result.processed,
+        submissions_matched: result.matched,
+        submissions_errors: result.errors,
+        duration_ms: result.duration,
+        error_details: result.errorDetails?.length
+          ? (result.errorDetails as unknown as Record<string, unknown>)
+          : null,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', syncLogId)
+  }
+
+  // -----------------------------------------------------------
+  // Private: Fail sync log
+  // -----------------------------------------------------------
+  private async failSyncLog(syncLogId: string, error: string): Promise<void> {
+    const supabase = await this.getSupabase()
+
+    await supabase
+      .from('kobo_sync_logs')
+      .update({
+        status: 'failed' as const,
+        error_details: { error } as unknown as Record<string, unknown>,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', syncLogId)
+  }
+
+  // -----------------------------------------------------------
+  // Private: Fetch with retry (exponential backoff)
+  // -----------------------------------------------------------
+  private async fetchWithRetry(
+    url: string,
+    apiToken: string,
+    attempt: number = 0,
+  ): Promise<Response> {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Token ${apiToken}`,
+          Accept: 'application/json',
+        },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       })
 
-    } catch (err: any) {
-      result.failed++
-      result.errors.push({ submission_id: submissionId, error: err?.message ?? 'Unknown error' })
-      await queueFailed(supabase, cooperativeId, submissionId, submission, err?.message)
-    }
-  }
-
-  return result
-}
-
-/**
- * Retry failed submissions from the queue
- */
-export async function retryFailedSubmissions(cooperativeId: string): Promise<SyncResult> {
-  const supabase = await createClient()
-
-  const { data: pending } = await supabase
-    .from('kobo_sync_queue')
-    .select('*')
-    .eq('cooperative_id', cooperativeId)
-    .in('status', ['pending', 'failed'])
-    .lt('attempts', 5)
-    .lte('next_retry_at', new Date().toISOString())
-    .order('created_at')
-    .limit(50)
-
-  if (!pending || pending.length === 0) {
-    return { total: 0, created: 0, updated: 0, skipped: 0, failed: 0, errors: [] }
-  }
-
-  // Get field mapping
-  const { data: integration } = await supabase
-    .from('integrations')
-    .select('config')
-    .eq('cooperative_id', cooperativeId)
-    .eq('type', 'kobo')
-    .single()
-
-  const mapping = (integration?.config as any)?.field_mapping ?? {}
-
-  const submissions = pending.map(p => p.payload as KoboSubmission)
-  return processKoboSubmissions(cooperativeId, submissions, mapping)
-}
-
-// --- Helpers ---
-
-async function queueFailed(
-  supabase: any,
-  cooperativeId: string,
-  submissionId: string,
-  payload: any,
-  errorMessage?: string,
-) {
-  const backoff = Math.min(300_000, 30_000 * Math.pow(2, 0)) // exponential backoff
-  await supabase.from('kobo_sync_queue').upsert({
-    cooperative_id: cooperativeId,
-    submission_id: submissionId,
-    payload,
-    status: 'failed',
-    error_message: errorMessage,
-    attempts: 1,
-    next_retry_at: new Date(Date.now() + backoff).toISOString(),
-  }, { onConflict: 'cooperative_id,submission_id' })
-}
-
-function flattenSubmission(data: Record<string, unknown>): Record<string, string> {
-  const flat: Record<string, string> = {}
-  for (const [key, value] of Object.entries(data)) {
-    if (value === null || value === undefined) continue
-    if (typeof value === 'object' && !Array.isArray(value)) {
-      for (const [subKey, subValue] of Object.entries(value as Record<string, unknown>)) {
-        if (subValue != null) flat[subKey] = String(subValue)
+      // Retry on 5xx or 429
+      if (
+        (response.status >= 500 || response.status === 429) &&
+        attempt < MAX_RETRIES
+      ) {
+        const delay = Math.min(30_000, 1000 * Math.pow(2, attempt))
+        await this.sleep(delay)
+        return this.fetchWithRetry(url, apiToken, attempt + 1)
       }
-    } else {
-      const cleanKey = key.includes('/') ? key.split('/').pop()! : key
-      flat[cleanKey] = String(value)
+
+      return response
+    } catch (err: unknown) {
+      if (attempt < MAX_RETRIES) {
+        const delay = Math.min(30_000, 1000 * Math.pow(2, attempt))
+        log.warn('KoboToolbox request failed, retrying', {
+          attempt: attempt + 1,
+          delay,
+          error: err instanceof Error ? err.message : 'Unknown',
+        })
+        await this.sleep(delay)
+        return this.fetchWithRetry(url, apiToken, attempt + 1)
+      }
+      throw err
     }
   }
-  return flat
-}
 
-function extractField(flat: Record<string, string>, ...keys: string[]): string | null {
-  for (const key of keys) {
-    if (!key) continue
-    if (flat[key] && flat[key] !== 'null' && flat[key] !== 'undefined') {
-      const val = flat[key].trim()
-      return val ? val.charAt(0).toUpperCase() + val.slice(1) : null
+  // -----------------------------------------------------------
+  // Private: Utilities
+  // -----------------------------------------------------------
+  private chunk<T>(array: T[], size: number): T[][] {
+    const chunks: T[][] = []
+    for (let i = 0; i < array.length; i += size) {
+      chunks.push(array.slice(i, i + size))
     }
+    return chunks
   }
-  return null
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms))
+  }
 }
 
-function cleanPhone(value: string | null): string | null {
-  if (!value) return null
-  let phone = value.replace(/[^0-9+]/g, '')
-  if (phone.length === 8 && !phone.startsWith('+')) {
-    phone = '+228' + phone
-  } else if (phone.startsWith('228') && phone.length === 11) {
-    phone = '+' + phone
+// =========================================================
+// Singleton factory
+// =========================================================
+let instance: KoboSyncService | null = null
+
+export function getKoboSyncService(): KoboSyncService {
+  if (!instance) {
+    instance = new KoboSyncService()
   }
-  return phone || null
+  return instance
+}
+
+// =========================================================
+// Convenience: decrypt token helper (used by route handlers)
+// =========================================================
+export function decryptApiToken(encryptedToken: string): string {
+  return decryptSecret(encryptedToken)
 }
