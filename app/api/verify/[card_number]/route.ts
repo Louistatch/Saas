@@ -80,51 +80,72 @@ export async function GET(
     return NextResponse.json({ valid: false, error: 'Carte non trouvée' }, { status: 404 })
   }
 
+  // Use server client — the anon RLS policy allows SELECT on active member_cards
+  // with embedded joins to members and cooperatives.
   const supabase = await createClient()
 
   // Construire la liste des variantes possibles (O↔0, I↔1) du préfixe.
-  // Limite à 16 variantes max (4 caractères ambigus = 2^4) pour éviter l'explosion combinatoire.
   const [prefix, suffix] = parsed.data.split('-')
   const variants = expandAmbiguousVariants(prefix).map((p) => `${p}-${suffix}`)
 
-  // Appel de la RPC verify_card (SECURITY DEFINER) — contourne les REVOKE anon
-  // sur les tables members/cooperatives. La fonction n'expose que les champs publics.
-  const { data: rows, error } = await supabase
-    .rpc('verify_card', { p_card_numbers: variants })
+  // First: get the card (anon can read active cards)
+  const { data: card, error: cardError } = await supabase
+    .from('member_cards')
+    .select('card_number, status, expiry_date, created_at, member_id, cooperative_id')
+    .in('card_number', variants)
+    .eq('status', 'active')
+    .limit(1)
+    .maybeSingle()
 
-  const data = Array.isArray(rows) ? rows[0] : null
-
-  if (error || !data) {
+  if (cardError || !card) {
     await new Promise(r => setTimeout(r, 100)) // Timing-safe
     return NextResponse.json({ valid: false, error: 'Carte non trouvée' }, { status: 404 })
   }
 
+  // Second: get member info (may fail if anon doesn't have access — graceful fallback)
+  let member: any = null
+  let coop: any = null
+
+  const { data: memberData } = await supabase
+    .from('members')
+    .select('first_name, last_name, photo_url, village, canton, prefecture, region, status, created_at')
+    .eq('id', card.member_id)
+    .maybeSingle()
+  if (memberData) member = memberData
+
+  const { data: coopData } = await supabase
+    .from('cooperatives')
+    .select('name, faitiere_name')
+    .eq('id', card.cooperative_id)
+    .maybeSingle()
+  if (coopData) coop = coopData
+
   // Vérifier l'expiration
-  const isExpired = data.expiry_date && new Date(data.expiry_date) < new Date()
-  const isActive = data.card_status === 'active' && !isExpired
+  const isExpired = card.expiry_date && new Date(card.expiry_date) < new Date()
+  const isActive = card.status === 'active' && !isExpired
 
   return NextResponse.json({
     valid: isActive,
     card: {
-      card_number: data.card_number,
-      status: isActive ? 'active' : (isExpired ? 'expired' : data.card_status),
-      expiry_date: data.expiry_date,
-      created_at: data.card_created_at,
+      card_number: card.card_number,
+      status: isActive ? 'active' : (isExpired ? 'expired' : card.status),
+      expiry_date: card.expiry_date,
+      created_at: card.created_at,
     },
     member: {
-      first_name: data.first_name,
-      last_name: data.last_name,
-      photo_url: data.photo_url ?? null,
-      village: data.village ?? null,
-      canton: data.canton ?? null,
-      prefecture: data.prefecture ?? null,
-      region: data.region ?? null,
-      status: data.member_status,
-      member_since: data.member_since,
+      first_name: member?.first_name ?? null,
+      last_name: member?.last_name ?? null,
+      photo_url: member?.photo_url ?? null,
+      village: member?.village ?? null,
+      canton: member?.canton ?? null,
+      prefecture: member?.prefecture ?? null,
+      region: member?.region ?? null,
+      status: member?.status ?? null,
+      member_since: member?.created_at ?? null,
     },
     cooperative: {
-      name: data.cooperative_name,
-      faitiere_name: data.faitiere_name ?? null,
+      name: coop?.name ?? null,
+      faitiere_name: coop?.faitiere_name ?? null,
     },
   })
 }
