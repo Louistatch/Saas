@@ -124,7 +124,7 @@ export async function GET(
     },
     cooperative: {
       name: data.cooperative_name,
-      faitiere_name: data.faitiere_name,
+      faitiere_name: null,
     },
   })
 }
