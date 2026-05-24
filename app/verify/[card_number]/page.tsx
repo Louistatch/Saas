@@ -204,7 +204,8 @@ export default function VerifyCardPage() {
       const isActive = card.status === 'active' && !isExpired
 
       // Fetch cotisations
-      const memberId = (card.member as any)?.id
+      const memberData = (card.member as { id: string; created_at: string }[] | null)?.[0]
+      const memberId = memberData?.id
       let cotisations = { total: 0, paid: 0, pending: 0, lastPaidDate: null as string | null }
 
       if (memberId) {
@@ -279,13 +280,13 @@ export default function VerifyCardPage() {
             expiry_date: card.expiry_date,
             created_at: card.created_at,
           },
-          member: card.member as VerifyResult['member'],
+          member: (card.member as VerifyResult['member'][] | null)?.[0] ?? undefined,
           cooperative: (card.cooperative as { name: string; faitiere_name: string | null }[] | null)?.[0] ?? undefined,
           cotisations,
           agriculture,
           level,
           isCertifiedSupplier,
-          memberSince: (card.member as { created_at?: string })?.created_at,
+          memberSince: memberData?.created_at,
         })
         setLoading(false)
         setTimeout(() => setShowContent(true), 300)
