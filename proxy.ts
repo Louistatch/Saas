@@ -34,19 +34,18 @@ export async function proxy(request: NextRequest) {
   }
 
   const isProtected = pathname.startsWith('/dashboard') || pathname.startsWith('/admin')
-  const isAuthPage = pathname.startsWith('/auth/login') || pathname.startsWith('/auth/signup')
-  const isAuthFlow = pathname.startsWith('/auth/')
+  const isAuthPage = pathname.startsWith('/auth/')
 
   // Fast path: public routes — no auth check needed
   if (!isProtected && !isAuthPage) {
     return NextResponse.next({ request })
   }
 
-  // FAST PATH for auth pages (login, forgot-password, reset-password, signout)
-  // Skip getUser() entirely — these pages don't need server-side auth validation
-  // This makes post-logout navigation INSTANT (like Facebook/Instagram)
-  if (isAuthFlow && !isAuthPage) {
-    // /auth/forgot-password, /auth/reset-password, /auth/signout, /auth/callback
+  // FAST PATH: ALL auth pages load INSTANTLY — zero server-side auth check
+  // Facebook technique: login/signup pages never wait for session validation.
+  // If user is already logged in, the CLIENT-SIDE AuthProvider will detect it
+  // and redirect. This eliminates the "stuck on login" bug when cookies are stale.
+  if (isAuthPage) {
     return NextResponse.next({ request })
   }
 
@@ -99,12 +98,9 @@ export async function proxy(request: NextRequest) {
 
   // Auth pages: if user is already authenticated, redirect to dashboard
   // But NEVER redirect from /auth/login — user might be re-authenticating
-  if (user && pathname.startsWith('/auth/signup')) {
-    return NextResponse.redirect(new URL(
-      role === 'super_admin' ? '/admin' : '/dashboard',
-      request.url,
-    ))
-  }
+  // NOTE: This code is unreachable now (auth pages return early above)
+  // Kept as documentation of the intended behavior.
+  // The CLIENT-SIDE handles this redirect via useEffect in signup page.
 
   // Auth pages: skip getUser() entirely for login/forgot/reset — no need to validate
   // This makes the login page load INSTANTLY after logout (no network call)

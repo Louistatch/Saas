@@ -82,9 +82,13 @@ function LoginInner() {
     setSubmitting(true)
     setProgress('Authentification…')
 
-    // Timeout: 10s max for the entire login flow
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 10000)
+    // Timeout: 8s max — if Supabase is slow, fail fast and let user retry
+    // Facebook technique: never let the user wait more than a few seconds
+    const timeoutId = setTimeout(() => {
+      setError('Le serveur met trop de temps à répondre. Réessayez.')
+      setSubmitting(false)
+      setProgress('')
+    }, 8000)
 
     try {
       // SINGLE network call: signInWithPassword
@@ -92,20 +96,18 @@ function LoginInner() {
         email: parsed.data.email,
         password: parsed.data.password,
       })
-      
+
+      clearTimeout(timeoutId)
+
       if (signInError) throw signInError
       if (!data.user) throw new Error('Échec de connexion')
 
-      setProgress('Redirection…')
-
       // Determine redirect target from JWT — ONLY trust app_metadata
       const role = data.user.app_metadata?.role ?? 'member'
-      
-      clearTimeout(timeout)
 
       // Facebook-style: show transition overlay BEFORE navigation
-      // This prevents the white flash between login and dashboard
       showLoginTransition()
+      setProgress('Redirection…')
 
       const target = redirectTo && redirectTo.startsWith('/') && !redirectTo.startsWith('//')
         ? redirectTo
@@ -114,12 +116,12 @@ function LoginInner() {
           : '/dashboard'
 
       // Small delay to let the overlay render, then navigate
-      await new Promise(r => setTimeout(r, 100))
+      await new Promise(r => setTimeout(r, 150))
       window.location.replace(target)
 
     } catch (err: any) {
-      clearTimeout(timeout)
-      
+      clearTimeout(timeoutId)
+
       if (err?.name === 'AbortError' || err?.message?.includes('abort')) {
         setError('Connexion trop lente. Réessayez.')
       } else {
