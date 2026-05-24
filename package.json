@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "security:check": "npx tsx scripts/pre-deploy-security-check.ts",
+    "predeploy": "npm run security:check",
     "test:e2e": "playwright test --config=e2e/playwright.config.ts",
     "test:e2e:ui": "playwright test --config=e2e/playwright.config.ts --ui",
     "test:e2e:headed": "playwright test --config=e2e/playwright.config.ts --headed",
@@ -46,6 +48,8 @@
     "@sentry/nextjs": "^10.53.1",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",
+    "@upstash/ratelimit": "^2.0.5",
+    "@upstash/redis": "^1.34.3",
     "@vercel/analytics": "1.6.1",
     "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.1",
@@ -76,6 +80,7 @@
     "dotenv": "^17.4.2",
     "postcss": "^8.5",
     "tailwindcss": "^4.2.0",
+    "tsx": "^4.19.4",
     "tw-animate-css": "1.3.3",
     "typescript": "5.7.3"
   }
