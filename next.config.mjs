@@ -18,14 +18,15 @@ const securityHeaders = [
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      // unsafe-inline required by Next.js; unsafe-eval needed for dev mode only
-      // TODO: Migrate to nonce-based CSP for production hardening
-      "script-src 'self' 'unsafe-inline'",
+      // strict-dynamic: scripts loaded by trusted scripts are allowed
+      // unsafe-inline is ignored when strict-dynamic is present (fallback for old browsers)
+      "script-src 'self' 'unsafe-inline' 'strict-dynamic' https:",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://*.supabase.co",
+      "img-src 'self' data: blob: https://*.supabase.co https:",
       "font-src 'self'",
-      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.vercel-analytics.com`,
+      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.vercel-analytics.com https://*.vercel.app`,
       "frame-ancestors 'self'",
+      "frame-src 'self' https://*.vercel.app",
       "base-uri 'self'",
       "form-action 'self'",
       "upgrade-insecure-requests",
