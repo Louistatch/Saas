@@ -353,6 +353,9 @@ END $$;
 -- 8. verify_card RPC function (final version with all fields)
 -- =============================================================================
 
+-- Drop any previous version (return type may have changed across iterations)
+DROP FUNCTION IF EXISTS public.verify_card(text[]);
+
 CREATE OR REPLACE FUNCTION public.verify_card(p_card_numbers text[])
 RETURNS TABLE (
   card_number       text,
