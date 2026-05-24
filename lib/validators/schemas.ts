@@ -11,7 +11,7 @@ export const hexColorSchema = z
   .string()
   .regex(HEX_COLOR_RE, 'Must be a valid hex color (e.g. #16a34a)')
 
-export const emailSchema = z.string().email('Invalid email address')
+export const emailSchema = z.string().trim().toLowerCase().email('Invalid email address')
 
 export const memberSchema = z.object({
   first_name: z.string().min(1, 'First name is required').max(100),

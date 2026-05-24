@@ -5,7 +5,7 @@
  */
 
 export const SECURITY_HEADERS = {
-  'X-Frame-Options': 'SAMEORIGIN',
+  'X-Frame-Options': 'DENY',
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'X-DNS-Prefetch-Control': 'on',
@@ -17,17 +17,17 @@ export const SECURITY_HEADERS = {
  * Content Security Policy — strict but functional.
  * 
  * NOTE: 'unsafe-inline' for scripts is required by Next.js for inline scripts.
- * 'unsafe-eval' is required by some dependencies. Both should be removed
- * when migrating to nonce-based CSP in production.
+ * When strict-dynamic is present, unsafe-inline is ignored by modern browsers
+ * but serves as a fallback for older ones.
  */
 export const CSP_DIRECTIVES = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  "script-src 'self' 'unsafe-inline' 'strict-dynamic' https:",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://*.supabase.co",
   "font-src 'self'",
   "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.vercel-analytics.com",
-  "frame-ancestors 'self'",
+  "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
   "upgrade-insecure-requests",

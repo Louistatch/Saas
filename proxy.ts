@@ -87,7 +87,10 @@ export async function proxy(request: NextRequest) {
   if (isProtected && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
-    url.searchParams.set('redirect', pathname)
+    // Validate redirect parameter: must start with '/' and NOT '//' (open redirect prevention)
+    if (/^\/[^/]/.test(pathname)) {
+      url.searchParams.set('redirect', pathname)
+    }
     return NextResponse.redirect(url)
   }
 

@@ -21,16 +21,16 @@ export default function ForgotPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (!email) { setError('L\'email est requis'); return }
+    const trimmedEmail = email.trim().toLowerCase()
+    if (!trimmedEmail) { setError('L\'email est requis'); return }
     setLoading(true)
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    // [SECURITY FIX - PHANTOM-002] Ne jamais révéler si l'email existe ou non
+    await supabase.auth.resetPasswordForEmail(trimmedEmail, {
       redirectTo: `${window.location.origin}/auth/reset-password`,
     })
-    if (error) {
-      setError(error.message)
-    } else {
-      setSent(true)
-    }
+    // TOUJOURS afficher le message de succès, même si l'email n'existe pas
+    // (Supabase peut retourner une erreur "User not found" — ne pas la transmettre)
+    setSent(true)
     setLoading(false)
   }
 
@@ -95,7 +95,7 @@ export default function ForgotPasswordPage() {
                 <CheckCircle className="h-12 w-12 text-green-600 mx-auto" />
                 <p className="font-medium text-foreground">Vérifiez votre email</p>
                 <p className="text-sm text-muted-foreground">
-                  Nous avons envoyé un lien de réinitialisation à <strong>{email}</strong>
+                  Si cet email est enregistré, un lien de réinitialisation a été envoyé à <strong>{email}</strong>
                 </p>
                 <Link href="/auth/login">
                   <Button variant="outline" className="w-full border-border gap-2">

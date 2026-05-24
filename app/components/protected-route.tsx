@@ -26,10 +26,10 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
   const { isAuthenticated, isLoading, user } = useAuth()
   const [timedOut, setTimedOut] = useState(false)
 
-  // Safety net: 25s max wait for auth to load
+  // Safety net: 8s max wait for auth to load (matches login timeout)
   useEffect(() => {
     if (!isLoading) return
-    const timer = setTimeout(() => setTimedOut(true), 25000)
+    const timer = setTimeout(() => setTimedOut(true), 8000)
     return () => clearTimeout(timer)
   }, [isLoading])
 

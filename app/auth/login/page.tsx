@@ -109,7 +109,7 @@ function LoginInner() {
       showLoginTransition()
       setProgress('Redirection…')
 
-      const target = redirectTo && redirectTo.startsWith('/') && !redirectTo.startsWith('//')
+      const target = redirectTo && /^\/[^/]/.test(redirectTo)
         ? redirectTo
         : role === 'super_admin'
           ? '/admin'

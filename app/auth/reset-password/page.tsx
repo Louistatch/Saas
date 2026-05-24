@@ -32,7 +32,8 @@ export default function ResetPasswordPage() {
       setError(error.message)
     } else {
       setDone(true)
-      setTimeout(() => router.push('/dashboard'), 2000)
+      // Redirect to login (not dashboard) — user should re-authenticate with new password
+      setTimeout(() => router.push('/auth/login'), 2000)
     }
     setLoading(false)
   }
@@ -95,7 +96,7 @@ export default function ResetPasswordPage() {
               <div className="space-y-4 text-center py-4">
                 <CheckCircle className="h-12 w-12 text-green-600 mx-auto" />
                 <p className="font-medium text-foreground">Mot de passe mis à jour !</p>
-                <p className="text-sm text-muted-foreground">Redirection vers le tableau de bord…</p>
+                <p className="text-sm text-muted-foreground">Redirection vers la page de connexion…</p>
               </div>
             ) : (
               <form className="space-y-4" onSubmit={handleSubmit}>

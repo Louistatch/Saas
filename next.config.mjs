@@ -2,13 +2,13 @@ import { withSentryConfig } from '@sentry/nextjs'
 
 /** @type {import('next').NextConfig} */
 const securityHeaders = [
-  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+  { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'X-DNS-Prefetch-Control', value: 'on' },
   {
     key: 'Permissions-Policy',
-    value: 'camera=(), microphone=(), geolocation=()',
+    value: 'camera=(), microphone=(), geolocation=(self)',
   },
   {
     key: 'Strict-Transport-Security',
@@ -25,7 +25,7 @@ const securityHeaders = [
       "img-src 'self' data: blob: https://*.supabase.co https:",
       "font-src 'self'",
       `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.vercel-analytics.com https://*.vercel.app`,
-      "frame-ancestors 'self'",
+      "frame-ancestors 'none'",
       "frame-src 'self' https://*.vercel.app",
       "base-uri 'self'",
       "form-action 'self'",
@@ -47,14 +47,35 @@ const nextConfig = {
   async headers() {
     return [
       {
-        source: '/((?!embed|api/widget|verify).*)',
+        source: '/((?!embed|api/widget|verify|dashboard|admin).*)',
         headers: securityHeaders,
+      },
+      {
+        // Protected routes: NEVER cache (prevents back-button showing stale authenticated content)
+        source: '/dashboard/:path*',
+        headers: [
+          ...securityHeaders,
+          { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate, max-age=0' },
+          { key: 'Pragma', value: 'no-cache' },
+        ],
+      },
+      {
+        // Admin routes: NEVER cache
+        source: '/admin/:path*',
+        headers: [
+          ...securityHeaders,
+          { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate, max-age=0' },
+          { key: 'Pragma', value: 'no-cache' },
+        ],
       },
       {
         // Verify pages: NEVER cache — always fetch fresh data after QR scan
         source: '/verify/:path*',
         headers: [
-          ...securityHeaders,
+          // Allow framing for verify (QR scan in apps)
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
           { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0' },
           { key: 'Pragma', value: 'no-cache' },
           { key: 'Expires', value: '0' },
@@ -66,6 +87,7 @@ const nextConfig = {
       {
         source: '/embed',
         headers: [
+          // Embed: allow framing from any origin (widget use case)
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'no-referrer' },
         ],

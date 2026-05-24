@@ -4,34 +4,41 @@ import { createClient } from '@/lib/supabase/server'
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
+  const next = searchParams.get('next')
+
+  // Use request.nextUrl.origin as the trusted base URL
+  // NEVER trust x-forwarded-host for redirect targets (open redirect risk)
+  const base = request.nextUrl.origin
 
   if (code) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error) {
-      // Check user role to redirect appropriately
-      const { data: { user } } = await supabase.auth.getUser()
+      // Check user role from app_metadata ONLY (server-controlled, never user_metadata)
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
 
-      // Use request.nextUrl.origin as the trusted base URL
-      // NEVER trust x-forwarded-host for redirect targets (open redirect risk)
-      const base = request.nextUrl.origin
+      if (userError || !user) {
+        return NextResponse.redirect(`${base}/auth/login?error=callback_failed`)
+      }
 
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single()
+      // Role from app_metadata — the ONLY trusted source
+      const role = (user.app_metadata as { role?: string } | undefined)?.role
 
-        if (profile?.role === 'super_admin') {
-          return NextResponse.redirect(`${base}/admin`)
-        }
+      // Validate ?next parameter: must start with '/' and not '//' (open redirect prevention)
+      const validNext = next && /^\/[^/]/.test(next) ? next : null
+
+      if (validNext) {
+        return NextResponse.redirect(`${base}${validNext}`)
+      }
+
+      if (role === 'super_admin') {
+        return NextResponse.redirect(`${base}/admin`)
       }
 
       return NextResponse.redirect(`${base}/dashboard`)
     }
   }
 
-  return NextResponse.redirect(`${request.nextUrl.origin}/auth/login?error=callback_failed`)
+  return NextResponse.redirect(`${base}/auth/login?error=callback_failed`)
 }
