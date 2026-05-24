@@ -53,6 +53,15 @@ interface VerifyResult {
     pending: number
     lastPaidDate: string | null
   }
+  agriculture?: {
+    cultures: string[]
+    superficie_totale: number
+    parcelle_count: number
+    production_count: number
+    seasons: string[]
+  }
+  level?: 'Bronze' | 'Argent' | 'Or' | null
+  isCertifiedSupplier?: boolean
   memberSince?: string
   error?: string
 }
@@ -216,6 +225,52 @@ export default function VerifyCardPage() {
       }
 
       if (!cancelled) {
+        // Fetch agriculture profile (parcelles + productions)
+        let agriculture = { cultures: [] as string[], superficie_totale: 0, parcelle_count: 0, production_count: 0, seasons: [] as string[] }
+        let level: 'Bronze' | 'Argent' | 'Or' | null = 'Bronze'
+        let isCertifiedSupplier = false
+
+        if (memberId) {
+          const { data: parcelles } = await supabase
+            .from('parcelles')
+            .select('id, culture_principale, superficie_ha')
+            .eq('member_id', memberId)
+
+          const parcelleList = (parcelles ?? []) as { id: string; culture_principale: string; superficie_ha: number }[]
+          agriculture.cultures = [...new Set(parcelleList.map(p => p.culture_principale).filter(Boolean))]
+          agriculture.superficie_totale = parcelleList.reduce((s, p) => s + (p.superficie_ha ?? 0), 0)
+          agriculture.parcelle_count = parcelleList.length
+
+          // Fetch productions
+          if (parcelleList.length > 0) {
+            const { data: prods } = await supabase
+              .from('productions')
+              .select('campaign')
+              .in('parcelle_id', parcelleList.map(p => p.id))
+            const prodList = (prods ?? []) as { campaign: string }[]
+            agriculture.production_count = prodList.length
+            agriculture.seasons = [...new Set(prodList.map(p => p.campaign).filter(Boolean))]
+          }
+
+          // Calculate level
+          const paidCotisations = cotisations.paid
+          const consecutiveCampaigns = new Set(
+            ((await supabase.from('cotisations').select('campaign').eq('member_id', memberId).eq('status', 'paid')).data ?? [])
+              .map((c: { campaign: string }) => c.campaign).filter(Boolean)
+          ).size
+
+          if (paidCotisations >= 1 && agriculture.parcelle_count >= 1 && agriculture.production_count >= 1) {
+            level = 'Argent'
+          }
+          if (paidCotisations >= 1 && agriculture.parcelle_count >= 1 && agriculture.production_count >= 2 && consecutiveCampaigns >= 2) {
+            level = 'Or'
+          }
+
+          // Check if certified supplier (FENOMAT faitiere + Argent/Or)
+          const coopData = card.cooperative as { name: string; faitiere_name: string | null } | null
+          isCertifiedSupplier = (level === 'Argent' || level === 'Or') && (coopData?.faitiere_name === 'FENOMAT' || coopData?.name === 'FENOMAT')
+        }
+
         setResult({
           valid: isActive,
           card: {
@@ -224,10 +279,13 @@ export default function VerifyCardPage() {
             expiry_date: card.expiry_date,
             created_at: card.created_at,
           },
-          member: card.member as any,
-          cooperative: card.cooperative as any,
+          member: card.member as VerifyResult['member'],
+          cooperative: card.cooperative as VerifyResult['cooperative'],
           cotisations,
-          memberSince: (card.member as any)?.created_at,
+          agriculture,
+          level,
+          isCertifiedSupplier,
+          memberSince: (card.member as { created_at?: string })?.created_at,
         })
         setLoading(false)
         setTimeout(() => setShowContent(true), 300)
@@ -395,12 +453,33 @@ export default function VerifyCardPage() {
 
               {/* Info */}
               <div className="flex-1 min-w-0">
-                <h1 className="text-lg font-bold text-white leading-tight">
-                  {result.member.first_name} <span className="uppercase">{result.member.last_name}</span>
-                </h1>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-lg font-bold text-white leading-tight">
+                    {result.member.first_name} <span className="uppercase">{result.member.last_name}</span>
+                  </h1>
+                  {/* Level badge */}
+                  {result.level && (
+                    <span
+                      className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9px] font-bold border"
+                      style={{
+                        borderColor: result.level === 'Or' ? '#FFD700' : result.level === 'Argent' ? '#A8A9AD' : '#CD7F32',
+                        color: result.level === 'Or' ? '#FFD700' : result.level === 'Argent' ? '#A8A9AD' : '#CD7F32',
+                      }}
+                    >
+                      {result.level === 'Or' ? '🥇' : result.level === 'Argent' ? '🥈' : '🥉'} {result.level}
+                    </span>
+                  )}
+                </div>
                 <p className="text-[#4ADE80]/70 text-xs font-mono mt-0.5">
                   ID: {result.card?.card_number}
                 </p>
+                {/* Certified supplier label */}
+                {result.isCertifiedSupplier && (
+                  <div className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-[#4ADE80]/10 border border-[#4ADE80]/20">
+                    <CheckCircle className="h-2.5 w-2.5 text-[#4ADE80]" />
+                    <span className="text-[9px] font-semibold text-[#4ADE80]">Fournisseur certifié {result.cooperative?.faitiere_name ?? result.cooperative?.name}</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-1.5 mt-1.5">
                   <Building2 className="h-3 w-3 text-white/40" />
                   <p className="text-white/50 text-[11px] truncate">
@@ -437,6 +516,48 @@ export default function VerifyCardPage() {
                 <p className="text-[9px] text-white/40 uppercase">Carte</p>
               </div>
             </div>
+
+            {/* Agriculture profile */}
+            {result.agriculture && result.agriculture.parcelle_count > 0 && (
+              <div className="mt-4 pt-4 border-t border-white/[0.06] space-y-2">
+                <p className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">Profil agriculteur</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {result.agriculture.cultures.length > 0 && (
+                    <div className="p-2 rounded-lg bg-white/[0.03]">
+                      <p className="text-[9px] text-white/40">Cultures</p>
+                      <p className="text-xs text-white font-medium truncate">{result.agriculture.cultures.join(', ')}</p>
+                    </div>
+                  )}
+                  <div className="p-2 rounded-lg bg-white/[0.03]">
+                    <p className="text-[9px] text-white/40">Superficie</p>
+                    <p className="text-xs text-white font-medium">{result.agriculture.superficie_totale.toFixed(1)} ha</p>
+                  </div>
+                  {result.agriculture.seasons.length > 0 && (
+                    <div className="p-2 rounded-lg bg-white/[0.03]">
+                      <p className="text-[9px] text-white/40">Saisons</p>
+                      <p className="text-xs text-white font-medium">{result.agriculture.seasons.length} campagne{result.agriculture.seasons.length > 1 ? 's' : ''}</p>
+                    </div>
+                  )}
+                  <div className="p-2 rounded-lg bg-white/[0.03]">
+                    <p className="text-[9px] text-white/40">Parcelles</p>
+                    <p className="text-xs text-white font-medium">{result.agriculture.parcelle_count}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Demander un devis button (for certified suppliers) */}
+            {result.isCertifiedSupplier && result.member && (
+              <div className="mt-4 pt-3 border-t border-white/[0.06]">
+                <button
+                  onClick={() => window.open(`/fournisseurs/${result.member!.id}`, '_blank')}
+                  className="w-full py-2.5 rounded-xl bg-[#4ADE80]/10 border border-[#4ADE80]/20 text-[#4ADE80] text-xs font-semibold flex items-center justify-center gap-2 active:bg-[#4ADE80]/20 transition-colors"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  Demander un devis
+                </button>
+              </div>
+            )}
           </div>
         )}
 
