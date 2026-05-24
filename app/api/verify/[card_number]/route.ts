@@ -114,17 +114,17 @@ export async function GET(
     member: {
       first_name: data.first_name,
       last_name: data.last_name,
-      photo_url: null,
-      village: null,
-      canton: null,
-      prefecture: null,
-      region: null,
+      photo_url: data.photo_url ?? null,
+      village: data.village ?? null,
+      canton: data.canton ?? null,
+      prefecture: data.prefecture ?? null,
+      region: data.region ?? null,
       status: data.member_status,
       member_since: data.member_since,
     },
     cooperative: {
       name: data.cooperative_name,
-      faitiere_name: null,
+      faitiere_name: data.faitiere_name ?? null,
     },
   })
 }
