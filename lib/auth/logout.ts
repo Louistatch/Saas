@@ -8,7 +8,7 @@
  * 3. Navigate to login
  */
 
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient } from '@/lib/supabase/client'
 import { destroySession, broadcastLogout } from './session'
 
 /**
@@ -23,10 +23,8 @@ export async function performLogout(): Promise<never> {
 
   // STEP 1: Revoke the session server-side (non-blocking)
   try {
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    )
+    // Use the singleton browser client so onAuthStateChange fires in AuthProvider
+    const supabase = createClient()
     await supabase.auth.signOut({ scope: 'local' })
   } catch {
     // Continue even if signOut fails — we'll clear everything locally
