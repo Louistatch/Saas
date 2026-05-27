@@ -93,8 +93,30 @@ export default function MembersPage() {
     if (!currentCooperative) return
     setIsLoading(true)
     let query = supabase.from('members').select('*').order('last_name')
-    // Always filter by current cooperative (even super_admin uses the switcher)
-    query = query.eq('cooperative_id', currentCooperative.id)
+    
+    // For faitiere/union: load members from all child cooperatives
+    if (currentCooperative.level === 'faitiere' || currentCooperative.level === 'union') {
+      const { data: childCoops } = await supabase
+        .from('cooperatives')
+        .select('id')
+        .or(`id.eq.${currentCooperative.id},parent_id.eq.${currentCooperative.id}`)
+      
+      // Also get grandchildren (cooperatives under unions)
+      const childIds = (childCoops ?? []).map(c => c.id)
+      if (childIds.length > 0) {
+        const { data: grandChildCoops } = await supabase
+          .from('cooperatives')
+          .select('id')
+          .in('parent_id', childIds)
+        const allIds = [...new Set([...childIds, ...(grandChildCoops ?? []).map(c => c.id)])]
+        query = query.in('cooperative_id', allIds)
+      } else {
+        query = query.eq('cooperative_id', currentCooperative.id)
+      }
+    } else {
+      query = query.eq('cooperative_id', currentCooperative.id)
+    }
+    
     const { data, error } = await query
     if (error) {
       toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })

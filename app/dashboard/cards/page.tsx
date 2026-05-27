@@ -102,7 +102,19 @@ export default function CardsPage() {
     let query = supabase
       .from('member_cards')
       .select('*, member:members(first_name, last_name, email, phone, photo_url, prefecture, region, village, canton, faitiere)')
-      .eq('cooperative_id', currentCooperative.id)
+    
+    // For faitiere/union: load cards from all child cooperatives
+    if (currentCooperative.level === 'faitiere' || currentCooperative.level === 'union') {
+      const coopIds = cooperatives.map(c => c.id)
+      if (coopIds.length > 0) {
+        query = query.in('cooperative_id', coopIds)
+      } else {
+        query = query.eq('cooperative_id', currentCooperative.id)
+      }
+    } else {
+      query = query.eq('cooperative_id', currentCooperative.id)
+    }
+    
     query = query.order('created_at', { ascending: false })
     const { data, error } = await query
     if (error) {
@@ -111,7 +123,7 @@ export default function CardsPage() {
       setCards((data ?? []) as MemberCard[])
     }
     setIsLoading(false)
-  }, [currentCooperative, supabase, toast, user])
+  }, [currentCooperative, cooperatives, supabase, toast, user])
 
   const fetchMembers = useCallback(async () => {
     if (!currentCooperative) return

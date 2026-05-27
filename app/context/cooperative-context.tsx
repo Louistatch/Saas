@@ -60,7 +60,23 @@ export function CooperativeProvider({ children }: { children: React.ReactNode })
         .select('id, name, description, logo_url, primary_color, faitiere_name, level, parent_id, created_at')
 
       if (user.role !== 'super_admin' && user.cooperativeId) {
-        query = query.eq('id', user.cooperativeId)
+        // For faitiere/union admins: load the full hierarchy (self + children + grandchildren)
+        // For cooperative admins: load only their cooperative
+        query = query.or(`id.eq.${user.cooperativeId},parent_id.eq.${user.cooperativeId}`)
+        
+        // Also fetch grandchildren (cooperatives under unions)
+        const { data: childIds } = await supabase
+          .from('cooperatives')
+          .select('id')
+          .eq('parent_id', user.cooperativeId)
+        
+        if (childIds && childIds.length > 0) {
+          const ids = [user.cooperativeId, ...childIds.map(c => c.id)]
+          query = supabase
+            .from('cooperatives')
+            .select('id, name, description, logo_url, primary_color, faitiere_name, level, parent_id, created_at')
+            .or(ids.map(id => `id.eq.${id},parent_id.eq.${id}`).join(','))
+        }
       }
 
       const { data, error } = await query.order('name')
