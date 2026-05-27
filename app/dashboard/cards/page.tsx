@@ -105,9 +105,21 @@ export default function CardsPage() {
     
     // For faitiere/union: load cards from all child cooperatives
     if (currentCooperative.level === 'faitiere' || currentCooperative.level === 'union') {
-      const coopIds = cooperatives.map(c => c.id)
-      if (coopIds.length > 0) {
-        query = query.in('cooperative_id', coopIds)
+      // Fetch all cooperative IDs in hierarchy directly (don't depend on context)
+      const { data: allCoops } = await supabase
+        .from('cooperatives')
+        .select('id')
+        .or(`id.eq.${currentCooperative.id},parent_id.eq.${currentCooperative.id}`)
+      const directIds = (allCoops ?? []).map(c => c.id)
+      
+      // Also get grandchildren
+      if (directIds.length > 0) {
+        const { data: grandChildren } = await supabase
+          .from('cooperatives')
+          .select('id')
+          .in('parent_id', directIds)
+        const allIds = [...new Set([...directIds, ...(grandChildren ?? []).map(c => c.id)])]
+        query = query.in('cooperative_id', allIds)
       } else {
         query = query.eq('cooperative_id', currentCooperative.id)
       }
