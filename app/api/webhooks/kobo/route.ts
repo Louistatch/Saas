@@ -313,33 +313,35 @@ async function processSubmissionAsync(
   cooperativeId: string,
 ): Promise<void> {
   try {
-    // Step 1: Match to member
-    await supabase.rpc('match_kobo_submission_to_member', {
-      p_submission_id: submissionId,
-    })
-
-    // Step 2: Check if matched
-    const { data: updated } = await supabase
+    // Get the submission payload
+    const { data: submission } = await supabase
       .from('kobo_submissions')
-      .select('status, member_id')
+      .select('id, raw_payload, member_card_number, cooperative_id')
       .eq('id', submissionId)
       .single()
 
-    if (updated?.status === 'matched' && updated.member_id) {
-      // Step 3: Process (extract parcelles/productions)
-      await supabase.rpc('process_kobo_submission', {
+    if (!submission) throw new Error('Submission not found')
+
+    const payload = submission.raw_payload as Record<string, unknown>
+
+    // Determine mode: ENROLLMENT (no card number) or UPDATE (has card number)
+    if (submission.member_card_number) {
+      // === UPDATE MODE: Match existing member by card number ===
+      await supabase.rpc('match_kobo_submission_to_member', {
         p_submission_id: submissionId,
       })
+    } else {
+      // === ENROLLMENT MODE: Create new member + generate card ===
+      await enrollNewMemberFromSubmission(supabase, submissionId, cooperativeId, payload)
     }
 
-    // Update sync log
-    const matchStatus = updated?.status === 'matched' ? 1 : 0
+    // Update sync log as success
     await supabase
       .from('kobo_sync_logs')
       .update({
         status: 'success' as const,
         submissions_processed: 1,
-        submissions_matched: matchStatus,
+        submissions_matched: 1,
         completed_at: new Date().toISOString(),
       })
       .eq('cooperative_id', cooperativeId)
@@ -375,8 +377,135 @@ async function processSubmissionAsync(
       .order('started_at', { ascending: false })
       .limit(1)
 
-    throw err // Re-throw for the .catch() handler to log
+    throw err
   }
+}
+
+// =========================================================
+// Enrollment: Create new member from Kobo submission
+// =========================================================
+async function enrollNewMemberFromSubmission(
+  supabase: ReturnType<typeof createClient>,
+  submissionId: string,
+  faitiereId: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  // Extract fields from payload (KoboCollect uses "group/field" format)
+  const nomComplet = getPayloadField(payload, 'S1/nom_complet') ?? ''
+  const telephone = getPayloadField(payload, 'S1/telephone') ?? ''
+  const email = getPayloadField(payload, 'S1/email') ?? null
+  const region = getPayloadField(payload, 'S3/region') ?? null
+  const prefecture = getPayloadField(payload, 'S3/prefecture') ?? null
+  const canton = getPayloadField(payload, 'S3/canton') ?? null
+  const village = getPayloadField(payload, 'S3/village') ?? null
+  const nomCooperative = getPayloadField(payload, 'S2/nom_cooperative') ?? ''
+
+  // Split nom_complet into first_name + last_name
+  const nameParts = nomComplet.trim().split(/\s+/)
+  const firstName = nameParts[0] ?? ''
+  const lastName = nameParts.slice(1).join(' ') || firstName
+
+  // Resolve cooperative: find by name within the faitiere hierarchy
+  let targetCooperativeId = faitiereId
+  if (nomCooperative) {
+    const { data: coop } = await supabase
+      .from('cooperatives')
+      .select('id')
+      .ilike('name', `%${nomCooperative.trim()}%`)
+      .limit(1)
+      .maybeSingle()
+    if (coop) targetCooperativeId = coop.id
+  }
+
+  // Create the member
+  const { data: newMember, error: memberError } = await supabase
+    .from('members')
+    .insert({
+      cooperative_id: targetCooperativeId,
+      first_name: firstName,
+      last_name: lastName,
+      phone: telephone.trim() || null,
+      email: email,
+      region: region,
+      prefecture: prefecture,
+      canton: canton,
+      village: village,
+      status: 'active',
+    })
+    .select('id')
+    .single()
+
+  if (memberError || !newMember) {
+    throw new Error(`Failed to create member: ${memberError?.message ?? 'Unknown'}`)
+  }
+
+  // Generate card number (PREFIX-XXXXXX)
+  // Use cooperative prefix or default FEN
+  const { data: coopData } = await supabase
+    .from('cooperatives')
+    .select('name, faitiere_name')
+    .eq('id', targetCooperativeId)
+    .single()
+
+  const prefix = (coopData?.faitiere_name ?? 'FEN').substring(0, 3).toUpperCase()
+  const randomNum = Math.floor(10000 + Math.random() * 90000)
+  const cardNumber = `${prefix}-${randomNum}`
+
+  // Create member card
+  const expiryDate = new Date()
+  expiryDate.setFullYear(expiryDate.getFullYear() + 1)
+
+  await supabase.from('member_cards').insert({
+    cooperative_id: targetCooperativeId,
+    member_id: newMember.id,
+    card_number: cardNumber,
+    status: 'active',
+    expiry_date: expiryDate.toISOString().split('T')[0],
+    qr_data: `https://www.faitierehub.com/verify/${cardNumber}`,
+  })
+
+  // Update submission as matched
+  await supabase
+    .from('kobo_submissions')
+    .update({
+      status: 'matched' as const,
+      member_id: newMember.id,
+      member_card_number: cardNumber,
+      matched_at: new Date().toISOString(),
+      processed_at: new Date().toISOString(),
+      processed_payload: {
+        mode: 'enrollment',
+        member_id: newMember.id,
+        card_number: cardNumber,
+        cooperative_id: targetCooperativeId,
+        cooperative_name: coopData?.name ?? nomCooperative,
+      } as unknown as Record<string, unknown>,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', submissionId)
+
+  log.info('New member enrolled via KoboCollect', {
+    memberId: newMember.id,
+    cardNumber,
+    cooperativeId: targetCooperativeId,
+    submissionId,
+  })
+}
+
+// =========================================================
+// Helper: Get field from Kobo payload (supports nested paths)
+// =========================================================
+function getPayloadField(payload: Record<string, unknown>, path: string): string | null {
+  // Try direct key
+  if (path in payload && typeof payload[path] === 'string') {
+    return (payload[path] as string).trim()
+  }
+  // Try nested (KoboCollect "group/field" format stored as flat keys)
+  for (const [key, value] of Object.entries(payload)) {
+    if (key === path && typeof value === 'string') return value.trim()
+    if (key.endsWith(`/${path.split('/').pop()}`) && typeof value === 'string') return value.trim()
+  }
+  return null
 }
 
 // =========================================================
