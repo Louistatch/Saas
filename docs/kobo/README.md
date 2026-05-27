@@ -1,76 +1,105 @@
-# XLSForm FENOMAT — Fiche Membre Collecte Terrain
+# KoboCollect → FaîtièreHub — XLSForm d'enrôlement
 
 ## Fichiers
 
 | Fichier | Description |
 |---------|-------------|
-| `survey.csv` | Feuille "survey" — structure du formulaire (8 sections) |
-| `choices.csv` | Feuille "choices" — listes de choix (régions, préfectures, cantons, cultures, etc.) |
-| `settings.csv` | Feuille "settings" — métadonnées du formulaire |
+| `faitierehub_carte_membre_v2.xlsx` | **XLSForm prêt à importer** dans KoboToolbox |
+| `generate_xlsform.py` | Script Python (openpyxl) pour régénérer le XLSX |
 
-## Comment créer le .xlsx
+## Principe
 
-### Option 1 : Google Sheets (recommandé)
-1. Créer un nouveau Google Sheets
-2. Renommer le premier onglet "survey" → coller le contenu de `survey.csv`
-3. Créer un onglet "choices" → coller le contenu de `choices.csv`
-4. Créer un onglet "settings" → coller le contenu de `settings.csv`
-5. Fichier → Télécharger → Microsoft Excel (.xlsx)
+L'agent collecteur saisit les données du membre sur le terrain. Après soumission :
+- Le **numéro de carte** est généré automatiquement par le système
+- Le **niveau** (Bronze 🥉 / Argent 🥈 / Or 🥇) est calculé automatiquement par le serveur
+- La **carte membre** (numérique + physique) est produite avec QR code vérifiable
 
-### Option 2 : Import direct dans KoboToolbox
-KoboToolbox accepte les fichiers .xlsx avec les 3 feuilles nommées exactement :
-- `survey`
-- `choices`
-- `settings`
+## Structure du formulaire (7 sections)
 
-### Option 3 : Ligne de commande (Python)
-```bash
-pip install openpyxl pandas
-python -c "
-import pandas as pd
-survey = pd.read_csv('survey.csv')
-choices = pd.read_csv('choices.csv')
-settings = pd.read_csv('settings.csv')
-with pd.ExcelWriter('fenomat_membre_v3.xlsx') as writer:
-    survey.to_excel(writer, sheet_name='survey', index=False)
-    choices.to_excel(writer, sheet_name='choices', index=False)
-    settings.to_excel(writer, sheet_name='settings', index=False)
-print('✅ fenomat_membre_v3.xlsx créé')
-"
+```
+┌─────────────────────────────────────────────────────────────┐
+│ S1 — Identité du membre                                     │
+│   nom_complet, date_naissance, sexe, telephone, email,      │
+│   photo_membre, consentement_donnees                        │
+├─────────────────────────────────────────────────────────────┤
+│ S2 — Organisation                                           │
+│   code_faitiere, nom_cooperative, nom_union,                │
+│   date_adhesion, statut_membre                              │
+│   ⚡ Numéro de carte + niveau = générés par le système      │
+├─────────────────────────────────────────────────────────────┤
+│ S3 — Localisation géographique                              │
+│   region (5 régions Togo), prefecture (36 préfectures),     │
+│   canton, village, gps_localisation                         │
+├─────────────────────────────────────────────────────────────┤
+│ S4 — Cotisations                                            │
+│   nb_cotisations_12mois, montant_derniere_cotisation,       │
+│   date_derniere_cotisation, type_derniere_cotisation         │
+├─────────────────────────────────────────────────────────────┤
+│ S5 — Parcelles agricoles (REPEAT)                           │
+│   culture_principale, superficie_ha, type_sol,              │
+│   irrigation, type_agriculture, localite_parcelle           │
+├─────────────────────────────────────────────────────────────┤
+│ S6 — Productions (REPEAT)                                   │
+│   culture_produite, campagne_annee, rendement_kg,           │
+│   quantite_vendue_kg, prix_vente_fcfa                       │
+├─────────────────────────────────────────────────────────────┤
+│ S7 — Validation & Soumission                                │
+│   Récapitulatif, confirmation, observations_agent,          │
+│   nom_agent                                                 │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Sections du formulaire
+## Listes de choix (onglet choices)
 
-| # | Section | Champs principaux |
-|---|---------|-------------------|
-| S1 | Identification membre | N° carte, photo |
-| S2 | Localisation GPS | GPS, région, préfecture, canton, village |
-| S3 | Profil exploitation | Superficie, mode faire-valoir, eau, équipements |
-| S4 | Cultures (repeat ×10) | Culture, superficie, saison, semences, engrais |
-| S5 | Production (repeat ×10) | Campagne, rendement, prix, canal vente, pertes |
-| S6 | Intrants & dépenses | Semences, engrais, pesticides, main d'œuvre, crédit |
-| S7 | Besoins & formations | Formations, groupement, téléphone, opérateur |
-| S8 | Validation | Enquêteur, date, observations, consentement |
+| Liste | Contenu |
+|-------|---------|
+| `region_list` | 5 régions du Togo (Maritime, Plateaux, Centrale, Kara, Savanes) |
+| `prefecture_list` | 36 préfectures du Togo (toutes) |
+| `type_sol_list` | Argileux, Sableux, Limoneux, Latéritique, Ferralitique, Hydromorphe, Volcanique, Mixte |
+| `irrigation_list` | Pluviale, Goutte-à-goutte, Aspersion, Gravitaire, Pompage, Bas-fond, Aucune |
+| `type_agriculture_list` | Conventionnel, Biologique, Agroforesterie, Maraîchage, Élevage, Pisciculture, Mixte |
+| `type_cotisation_list` | Cotisation annuelle, Crédit, Remboursement, Amende, Don |
+| `campagne_list` | 2020 à 2026 |
 
-## Calculs automatiques
+## Calculs automatiques côté serveur (pas dans le formulaire)
 
-- `revenu_brut_total` : somme des (rendement_kg × prix_vente_moyen) par culture
-- `depenses_totales` : somme de toutes les dépenses
-- `marge_nette_estimee` : revenu_brut_total - depenses_totales
+| Critère | Règle |
+|---------|-------|
+| Bronze 🥉 | Membre actif + ≥1 cotisation payée dans les 12 derniers mois |
+| Argent 🥈 | Bronze + ≥1 parcelle + ≥1 production enregistrée |
+| Or 🥇 | Argent + ≥2 campagnes distinctes + ≥2 productions |
 
-## Listes de choix
+## Mapping vers la base de données
 
-- **Régions** : 5 régions du Togo (Maritime, Plateaux, Centrale, Kara, Savanes)
-- **Préfectures** : 30+ préfectures avec choice_filter par région
-- **Cantons** : 25+ cantons avec choice_filter par préfecture
-- **Cultures** : 25 cultures maraîchères/vivrières courantes au Togo
-- **Équipements** : 9 types d'équipements agricoles
-- **Sources d'eau** : 6 sources
-- **Canaux de vente** : 5 canaux
+| Champ XLSForm | Table cible | Colonne | Transform |
+|---------------|-------------|---------|-----------|
+| `S1/nom_complet` | `members` | `first_name + last_name` | split |
+| `S1/telephone` | `members` | `phone` | trim |
+| `S1/photo_membre` | `members` | `photo_url` | upload |
+| `S3/region` | `members` | `region` | — |
+| `S3/prefecture` | `members` | `prefecture` | — |
+| `S3/canton` | `members` | `canton` | — |
+| `S3/village` | `members` | `village` | — |
+| `S5/culture_principale` | `parcelles` | `culture_principale` | trim |
+| `S5/superficie_ha` | `parcelles` | `superficie_ha` | to_number |
+| `S5/type_agriculture` | `parcelles` | `type_agriculture` | — |
+| `S6/rendement_kg` | `productions` | `rendement_kg` | to_number |
+| `S6/prix_vente_fcfa` | `productions` | `prix_vente_fcfa` | to_number |
+| `S6/campagne_annee` | `productions` | `campagne_annee` | — |
 
-## Configuration KoboToolbox
+**Note :** Le numéro de carte est généré par le système. Le matching pour les mises à jour se fait par nom + coopérative + téléphone.
 
-- **Form ID** : `fenomat_membre_v3`
-- **Version** : `2026050100` (format YYYYMMDDVV)
-- **Langue** : Français
-- **Instance name** : `{card_number}_{date}`
+## Import dans KoboToolbox
+
+1. Connectez-vous sur https://kf.kobotoolbox.org
+2. Cliquez **New** → **Upload an XLSForm**
+3. Sélectionnez `faitierehub_carte_membre_v2.xlsx`
+4. Vérifiez la prévisualisation
+5. Cliquez **Deploy**
+
+## Régénérer le XLSX
+
+```bash
+pip install openpyxl
+python generate_xlsform.py
+```

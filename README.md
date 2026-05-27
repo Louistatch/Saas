@@ -113,10 +113,11 @@ FaîtiereHub digitalise la gestion des organisations agricoles en Afrique de l'O
 | Frontend | Next.js 16 (App Router), React 19, TypeScript strict |
 | UI | shadcn/ui (new-york), Tailwind CSS v4, Lucide icons |
 | Backend | Supabase (PostgreSQL, Auth, Storage, RLS) |
+| Rate Limiting | Upstash Redis (persistant) + in-memory (fallback) |
 | Déploiement | Vercel (Edge + Serverless) |
 | Collecte terrain | KoboToolbox / KoboCollect |
 | Monitoring | Sentry, Vercel Analytics |
-| Sécurité | CSP strict-dynamic, HSTS, rate limiting |
+| Sécurité | CSP strict-dynamic, HSTS, rate limiting, Zod validation |
 
 ### Hiérarchie multi-tenant
 
@@ -130,14 +131,24 @@ Super Admin (plateforme)
 
 ### Sécurité
 
+- **3 audits de sécurité** passés (score actuel : 9.2/10)
 - RLS (Row Level Security) sur les 28 tables
 - Hiérarchie-aware via `get_accessible_cooperative_ids()`
 - Rôles dans `app_metadata` uniquement (jamais `user_metadata`)
-- Rate limiting sur tous les endpoints publics
+- Rate limiting sur tous les endpoints publics (in-memory + Upstash Redis persistant)
 - Secrets chiffrés AES-256-GCM
-- Webhook Kobo avec timing-safe comparison
+- Webhook Kobo avec timing-safe comparison + validation payload (taille + Zod)
 - CSP strict-dynamic, HSTS, X-Frame-Options
-- Input validation Zod sur toutes les entrées
+- Input validation Zod sur toutes les entrées (y compris paramètres de recherche)
+- Protection injection PostgREST (échappement ILIKE + séparateurs)
+- Bucket `member-photos` privé avec signed URLs
+- Vue SQL restrictive pour vérification publique (pas d'accès direct aux données sensibles)
+- Forgot-password anti-énumération (message identique)
+- Origin validation exacte sur embed (pas de `.includes()`)
+- `security.txt` publié (RFC 9116)
+- Leaked password protection (HaveIBeenPwned)
+- pg_cron pour purge automatique des données obsolètes
+- Script pré-déploiement (`npm run security:check`)
 - Anti-cache multi-couche sur `/verify/*`
 - Domain redirect 301 (vercel.app → faitierehub.com)
 
@@ -181,6 +192,7 @@ Super Admin (plateforme)
 │       ├── embed/                  # API embed (origin-validated)
 │       ├── fiches/                 # Catalogue fiches techniques
 │       ├── member-access/          # Vérification carte membre
+│       ├── verify/[card_number]/   # API vérification carte (vue restrictive, rate limited)
 │       ├── integrations/kobo/      # Config + sync Kobo
 │       ├── webhooks/kobo/          # Webhook KoboCollect
 │       └── widget/                 # Widget API legacy
@@ -203,9 +215,11 @@ Super Admin (plateforme)
 │   ├── kobo/                       # Service de sync KoboCollect
 │   ├── members/                    # Score (Bronze/Argent/Or) + public-profile
 │   ├── auth/                       # Session, logout (Facebook-style)
-│   ├── utils/                      # Crypto, rate-limit, logger, etc.
+│   ├── utils/                      # Crypto, rate-limit, rate-limit-persistent, logger
 │   └── validators/                 # Schémas Zod
 ├── types/                          # Types TypeScript (domain.ts)
+├── scripts/
+│   └── pre-deploy-security-check.ts # Validation sécurité pré-déploiement
 ├── public/
 │   ├── embed/                      # SDK JavaScript embeddable
 │   └── images/partners/            # Logos partenaires (FENOMAT)
@@ -242,6 +256,8 @@ NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 INTEGRATION_SECRET_KEY=           # openssl rand -base64 32
 KOBO_WEBHOOK_SECRET=              # openssl rand -hex 32
+UPSTASH_REDIS_REST_URL=           # https://xxx.upstash.io (optionnel, rate limiting persistant)
+UPSTASH_REDIS_REST_TOKEN=         # Token Upstash (optionnel)
 ```
 
 ### Développement
@@ -260,9 +276,10 @@ npm run start
 ### Vérifications
 
 ```bash
-npm run typecheck    # TypeScript strict
-npm run lint         # ESLint
-npm run test:e2e     # Tests Playwright
+npm run typecheck       # TypeScript strict
+npm run lint            # ESLint
+npm run security:check  # Validation sécurité pré-déploiement (11 checks)
+npm run test:e2e        # Tests Playwright
 ```
 
 ---
@@ -308,13 +325,20 @@ Le projet est déployé automatiquement sur **Vercel** :
 
 ### Fonctions SQL
 
-| Fonction | Description |
-|----------|-------------|
-| `get_member_score(uuid)` | Calcule le niveau Bronze/Argent/Or à la volée |
-| `get_accessible_cooperative_ids()` | Retourne les IDs accessibles (hiérarchie) |
-| `search_marketplace(...)` | Recherche full-text avec tous les filtres |
-| `bootstrap_cooperative_admin(...)` | Auto-promotion sécurisée au signup |
-| `increment_download_count(uuid)` | Compteur atomique de téléchargements |
+| Fonction | Description | Accès |
+|----------|-------------|-------|
+| `get_member_score(uuid)` | Calcule le niveau Bronze/Argent/Or à la volée | authenticated |
+| `get_accessible_cooperative_ids()` | Retourne les IDs accessibles (hiérarchie récursive) | authenticated |
+| `search_marketplace(...)` | Recherche full-text avec tous les filtres | authenticated |
+| `get_platform_totals()` | Statistiques plateforme (guard super_admin interne) | authenticated (super_admin) |
+| `bootstrap_cooperative_admin(...)` | Auto-promotion sécurisée au signup | service_role uniquement |
+| `increment_download_count(uuid)` | Compteur atomique de téléchargements | service_role uniquement |
+
+### Vues SQL
+
+| Vue | Description | Accès |
+|----|-------------|-------|
+| `member_cards_public` | Données carte restrictives pour vérification publique (pas de phone/email/id) | anon, authenticated |
 
 ---
 

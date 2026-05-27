@@ -1,5 +1,6 @@
 ﻿'use client'
 
+// Build: 2026-05-27T12:30 — force CDN invalidation
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'

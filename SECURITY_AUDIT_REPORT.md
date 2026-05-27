@@ -1,352 +1,467 @@
-# 🔒 Rapport d'Audit Sécurité — FaîtiereHub
+# Security Audit Report — FaîtiereHub
 
-**Date :** 23 mai 2026  
-**Auditeur :** Principal Security Engineer + Staff Fullstack Engineer  
-**Scope :** Audit complet (code, RLS, storage, auth, API, infrastructure)  
-**Méthodologie :** White-box, accès complet au code source et à la base de données
-
----
-
-## Résumé Exécutif
-
-| Métrique | Score |
-|----------|-------|
-| **Sécurité globale** | **8.5/10** |
-| **Architecture** | **8/10** |
-| **Production Readiness** | **7.5/10** |
-
-Le projet présente une architecture de sécurité **solide et bien pensée** avec defense-in-depth (proxy + RLS + validation applicative). Les vulnérabilités identifiées sont principalement des **incohérences de scoping** dans les policies RLS et des **durcissements manquants** plutôt que des failles fondamentales d'architecture.
+**Date** : 24 mai 2026  
+**Auditeurs** : GHOST, FORGE, PHANTOM, SHIELD, SENTINEL  
+**Périmètre exclu** : Aucun module non développé identifié (pas de TODO/501 dans les routes actives). Les services marqués "Bientôt" dans la page /verify sont des liens UI désactivés, pas des endpoints.
 
 ---
 
-## PHASE 1 — Architecture de Sécurité
+## Résumé exécutif
 
-### Flux d'Authentification
+| Niveau | Count | Action |
+|--------|-------|--------|
+| **Critical** | 3 | ⛔ Bloquer le déploiement |
+| **High** | 7 | Corriger dans les 48h |
+| **Medium** | 8 | Corriger dans la semaine |
+| **Low** | 5 | Backlog |
+| **Total** | **23** | |
 
+---
+
+## 🔴 FINDINGS CRITIQUES — Bloquer le déploiement
+
+### [GHOST-001] CRITICAL | Absence de middleware serveur — Aucune protection serveur des routes
+
+**Fichier(s)** : `middleware.ts` (ABSENT)  
+**Vecteur** : Un attaquant peut accéder directement aux pages `/dashboard/*` et `/admin/*` via le navigateur. La seule protection est le composant client `<ProtectedRoute>` qui s'exécute APRÈS le chargement de la page. Les données sont déjà récupérées côté client via Supabase (protégées par RLS), mais le HTML/JS de l'interface admin est servi sans vérification.  
+**PoC** :
 ```
-Browser → proxy.ts (JWT validation via getUser())
-       → Redirect si non-authentifié
-       → Role check depuis app_metadata UNIQUEMENT
-       → Supabase cookie refresh automatique
-       → Page rendue (RSC ou Client Component)
+// Désactiver JavaScript dans le navigateur → la page admin se charge sans garde
+// Ou : intercepter la réponse avant que ProtectedRoute ne redirige
+curl https://faitierehub.com/admin → 200 OK (HTML complet servi)
 ```
+**Fix** :
+```typescript
+// middleware.ts (racine du projet)
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
 
-### Trust Boundaries
+export async function middleware(request: NextRequest) {
+  const response = NextResponse.next()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => request.cookies.getAll(), setAll: (cookies) => cookies.forEach(({ name, value, options }) => response.cookies.set(name, value, options)) } }
+  )
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
+    return NextResponse.redirect(new URL('/auth/login', request.url))
+  }
+  if (!user && request.nextUrl.pathname.startsWith('/admin')) {
+    return NextResponse.redirect(new URL('/auth/login', request.url))
+  }
+  return response
+}
 
+export const config = { matcher: ['/dashboard/:path*', '/admin/:path*'] }
 ```
-┌─────────────────────────────────────────────────┐
-│ UNTRUSTED: Browser, user_metadata, query params │
-├─────────────────────────────────────────────────┤
-│ SEMI-TRUSTED: proxy.ts (validates JWT)          │
-├─────────────────────────────────────────────────┤
-│ TRUSTED: Server-side code, app_metadata         │
-├─────────────────────────────────────────────────┤
-│ AUTHORITATIVE: RLS policies, DB constraints     │
-└─────────────────────────────────────────────────┘
+**Effort** : S (2h)
+
+---
+
+### [GHOST-002] CRITICAL | Injection SQL via paramètre `search` dans /api/marketplace
+
+**Fichier(s)** : `app/api/marketplace/route.ts` (ligne ~45)  
+**Vecteur** : Le paramètre `q` (search) est injecté directement dans un `.or()` Supabase sans échappement des caractères spéciaux ILIKE (`%`, `_`, `\`). Plus grave : la construction de la chaîne `.or()` permet potentiellement une injection de filtre PostgREST.  
+**PoC** :
 ```
-
-### Points Forts Architecturaux
-
-1. ✅ **Rôles dans `app_metadata`** — non-manipulable par le client
-2. ✅ **`sync_role_to_auth_metadata`** — synchronise automatiquement le rôle DB → JWT
-3. ✅ **`bootstrap_cooperative_admin`** — seul chemin d'auto-promotion, avec gardes temporelles
-4. ✅ **`get_accessible_cooperative_ids()`** — isolation hiérarchique récursive
-5. ✅ **RLS sur 100% des tables** (24 tables vérifiées)
-6. ✅ **Pas de `USING (true)` sur les tables sensibles**
-7. ✅ **Webhook secret obligatoire + timing-safe compare**
-8. ✅ **AES-256-GCM pour les secrets d'intégration**
-9. ✅ **Proxy hardened** — pas de bypass prefetch pour routes protégées
-10. ✅ **Zod validation** sur tous les inputs API
-
----
-
-## PHASE 2 — Vulnérabilités Détectées
-
-### 🔴 CRITIQUE (0 trouvées)
-
-Aucune vulnérabilité critique non-corrigée. Les précédentes (privilege escalation, webhook sans auth, SQL injection) ont été correctement corrigées.
+GET /api/marketplace?q=test%25,id.eq.true);--
+// La chaîne construite devient :
+// name.ilike.%test%,id.eq.true);--%,description.ilike.%...
+// PostgREST peut interpréter les virgules comme séparateurs de filtres
+```
+**Fix** :
+```typescript
+// Échapper les caractères spéciaux ILIKE ET les virgules/parenthèses PostgREST
+if (search) {
+  const sanitized = search
+    .replace(/[%_\\]/g, '\\$&')  // Échapper ILIKE wildcards
+    .replace(/[,()]/g, '')        // Supprimer les séparateurs PostgREST
+    .slice(0, 100)                // Limiter la longueur
+  query = query.or(
+    `name.ilike.%${sanitized}%,description.ilike.%${sanitized}%,culture.ilike.%${sanitized}%`
+  )
+}
+```
+**Effort** : S (1h)
 
 ---
 
-### 🟠 HAUTE (3 trouvées — corrigées)
+### [FORGE-001] CRITICAL | La clé anon peut lire les données membres via la page /verify
 
-#### H1. Storage `member-photos` — Cross-Tenant Upload
+**Fichier(s)** : `app/verify/[card_number]/page.tsx`, politique RLS `Public can view member info for card verification`  
+**Vecteur** : La page de vérification utilise `createBrowserClient` avec la clé anon et fait des requêtes directes aux tables `member_cards`, `members`, `cotisations`, `parcelles`, `productions`. La politique RLS sur `members` autorise la lecture anon pour tout membre ayant une carte active. Un attaquant peut énumérer les numéros de carte (format prévisible `XXX-NNNNN`) et extraire les données personnelles de TOUS les membres.  
+**PoC** :
+```javascript
+// Script d'énumération
+for (let i = 10000; i < 99999; i++) {
+  const { data } = await supabase
+    .from('member_cards')
+    .select('*, member:members(*)')
+    .eq('card_number', `FEN-${i}`)
+    .eq('status', 'active')
+    .single()
+  if (data) console.log(data.member) // Nom, téléphone, village, photo...
+}
+```
+**Fix** :
+1. Remplacer l'accès direct Supabase par un appel API serveur avec rate limiting
+2. Restreindre la politique RLS anon pour ne retourner que les champs non-sensibles
+3. Ajouter un hash de vérification dans le QR code (HMAC du card_number)
 
-**Avant :** Tout `cooperative_admin` pouvait uploader/supprimer des photos dans N'IMPORTE QUEL dossier du bucket, y compris ceux d'autres coopératives.
-
-**Attaque :** Un admin malveillant de la coopérative A uploade une photo dans le dossier de la coopérative B, remplaçant potentiellement la photo d'un membre.
-
-**Impact :** Intégrité des données, usurpation d'identité visuelle.
-
-**Correction appliquée :** Policy storage scoped par `get_accessible_cooperative_ids()` — l'admin ne peut uploader que dans les dossiers de sa hiérarchie.
-
----
-
-#### H2. Storage `fiches-techniques` — Bypass du modèle payant
-
-**Avant :** Tout utilisateur authentifié (même un simple `member`) pouvait télécharger directement les fichiers du bucket via l'API Supabase Storage, contournant le système de paiement.
-
-**Attaque :** Un membre authentifié appelle directement `supabase.storage.from('fiches-techniques').download(path)` sans passer par l'API `/api/fiches/[id]/access`.
-
-**Impact :** Perte de revenus, contournement du modèle économique.
-
-**Correction appliquée :** SELECT policy restreinte aux admins uniquement. Les téléchargements passent obligatoirement par les signed URLs générées par l'API (qui vérifie carte/achat).
-
----
-
-#### H3. `increment_download_count` — Callable par anon
-
-**Avant :** La fonction SECURITY DEFINER `increment_download_count` était exécutable par le rôle `anon` via `/rest/v1/rpc/increment_download_count`.
-
-**Attaque :** Un attaquant non-authentifié pouvait inflater arbitrairement le compteur de téléchargements de n'importe quelle fiche, faussant les statistiques.
-
-**Impact :** Intégrité des données, manipulation des métriques.
-
-**Correction appliquée :** `REVOKE EXECUTE FROM anon` sur la fonction.
+```sql
+-- Restreindre les colonnes visibles via une vue
+CREATE VIEW public.member_cards_public AS
+SELECT mc.card_number, mc.status, mc.expiry_date, mc.cooperative_id,
+       m.first_name, m.last_name, m.photo_url, m.village, m.canton, m.prefecture
+FROM member_cards mc
+JOIN members m ON m.id = mc.member_id
+WHERE mc.status = 'active';
+-- NE PAS exposer : phone, email, address, id exact
+```
+**Effort** : M (1 jour)
 
 ---
 
-### 🟡 MOYENNE (7 trouvées — corrigées)
+## 🟠 FINDINGS HIGH — Corriger dans les 48h
 
-#### M1. Policies RLS incohérentes — `get_my_cooperative_id()` vs `get_accessible_cooperative_ids()`
+### [GHOST-003] HIGH | Rate limiter in-memory — inefficace en production Vercel
 
-**Tables affectées :** `documents`, `exploitations`, `productions`, `integrations`, `member_access_logs`
-
-**Problème :** Ces tables utilisaient `get_my_cooperative_id()` qui retourne uniquement la coopérative directe de l'utilisateur. Un admin de faîtière ne pouvait pas voir les données de ses coopératives enfants.
-
-**Impact :** Fonctionnalité cassée pour les admins hiérarchiques (pas une faille de sécurité directe, mais un contournement potentiel si l'admin utilise des workarounds).
-
-**Correction :** Migration vers `get_accessible_cooperative_ids()` pour toutes les tables concernées.
-
----
-
-#### M2. Open Redirect partiel dans la page login
-
-**Problème :** Le paramètre `redirectTo` acceptait `//evil.com` (protocol-relative URL) qui commence par `/`.
-
-**Correction :** Ajout de la vérification `!redirectTo.startsWith('//')`.
+**Fichier(s)** : `lib/utils/rate-limit.ts`  
+**Vecteur** : Le rate limiter utilise un `Map` en mémoire. Sur Vercel Serverless, chaque invocation peut être une nouvelle instance. Le rate limiting est donc inefficace : un attaquant peut brute-forcer les numéros de carte sans être bloqué.  
+**Fix** : Utiliser Upstash Redis (gratuit pour les petits volumes) ou Vercel KV.
+```typescript
+// Alternative rapide : utiliser les headers Vercel Edge
+// Ou intégrer @upstash/ratelimit
+import { Ratelimit } from '@upstash/ratelimit'
+import { Redis } from '@upstash/redis'
+const ratelimit = new Ratelimit({ redis: Redis.fromEnv(), limiter: Ratelimit.slidingWindow(10, '60 s') })
+```
+**Effort** : M (1 jour)
 
 ---
 
-#### M3. API `/api/fiches` sans rate limiting
+### [GHOST-004] HIGH | Pas de validation de taille du payload webhook Kobo
 
-**Problème :** Le catalogue public n'avait aucune protection contre le scraping massif.
-
-**Correction :** Rate limit de 120 req/min/IP ajouté.
-
----
-
-#### M4. Widget API sans CORS preflight handler
-
-**Problème :** L'endpoint `/api/widget` envoyait `Access-Control-Allow-Origin: *` mais ne gérait pas les requêtes OPTIONS (preflight), causant des erreurs CORS pour les requêtes complexes.
-
-**Correction :** Handler OPTIONS ajouté avec les headers CORS appropriés.
-
----
-
-#### M5. CSP avec `unsafe-eval`
-
-**Problème :** La Content Security Policy autorisait `unsafe-eval`, permettant l'exécution de code via `eval()`, `Function()`, etc. en cas de XSS.
-
-**Correction :** Suppression de `unsafe-eval`. Note : `unsafe-inline` reste nécessaire pour Next.js.
+**Fichier(s)** : `app/api/webhooks/kobo/route.ts`  
+**Vecteur** : Aucune vérification de `Content-Length`. Un payload de 50MB peut crasher la fonction serverless ou causer un déni de service.  
+**Fix** :
+```typescript
+// En début de handler
+const contentLength = parseInt(request.headers.get('content-length') ?? '0')
+if (contentLength > 1_048_576) { // 1MB max
+  return NextResponse.json({ error: 'Payload too large' }, { status: 413 })
+}
+```
+**Effort** : S (30min)
 
 ---
 
-#### M6. `member_cards` SELECT policy trop permissive pour anon
+### [FORGE-002] HIGH | `increment_download_count` callable par tout utilisateur authentifié
 
-**Problème :** La policy `USING (true)` permettait à n'importe qui d'énumérer TOUTES les cartes membres (numéros, dates d'expiration, etc.).
-
-**Correction :** Restreint à `status = 'active'` uniquement. L'accès est de toute façon rate-limité au niveau API.
-
----
-
-#### M7. Public bucket `member-photos` permet le listing
-
-**Problème :** La policy SELECT sur `storage.objects` pour le bucket public permet de lister tous les fichiers, exposant potentiellement des photos de membres.
-
-**Status :** Signalé par Supabase Advisor. Le bucket est public par design (les photos sont affichées sur les cartes). Le risque est accepté mais documenté.
+**Fichier(s)** : Fonction SQL `increment_download_count`  
+**Vecteur** : Cette fonction SECURITY DEFINER est exposée via `/rest/v1/rpc/increment_download_count`. N'importe quel utilisateur authentifié peut l'appeler avec n'importe quel `fiche_id` pour gonfler artificiellement les compteurs de téléchargement.  
+**Fix** :
+```sql
+REVOKE EXECUTE ON FUNCTION public.increment_download_count FROM authenticated;
+REVOKE EXECUTE ON FUNCTION public.increment_download_count FROM anon;
+-- Seul le service_role (utilisé côté serveur) pourra l'appeler
+```
+**Effort** : S (30min)
 
 ---
 
-### 🟢 BASSE (5 identifiées — non-bloquantes)
+### [FORGE-003] HIGH | `get_platform_totals` expose les statistiques à tout utilisateur authentifié
 
-| # | Problème | Recommandation | Effort |
-|---|----------|----------------|--------|
-| L1 | Rate limiter in-memory (single instance) | Migrer vers Upstash Redis | 1j |
-| L2 | Leaked password protection désactivée | Activer dans Supabase Dashboard | 5min |
-| L3 | Pas de CAPTCHA après N échecs login | Ajouter hCaptcha/Turnstile | 2h |
-| L4 | Pas de MFA pour les admins | Activer TOTP dans Supabase Auth | 1j |
-| L5 | `unsafe-inline` dans CSP (scripts) | Migrer vers nonce-based CSP | 2j |
-
----
-
-## PHASE 3 — Corrections Appliquées
-
-### Migration SQL appliquée : `security_hardening_phase1`
-
-| # | Action | Sévérité |
-|---|--------|----------|
-| 1 | REVOKE anon sur `increment_download_count` | 🟠 HIGH |
-| 2 | Storage `member-photos` scoped par hiérarchie | 🟠 HIGH |
-| 3 | Storage `fiches-techniques` SELECT restreint aux admins | 🟠 HIGH |
-| 4 | `member_cards` anon policy restreinte | 🟡 MEDIUM |
-| 5 | `documents` policies → `get_accessible_cooperative_ids()` | 🟡 MEDIUM |
-| 6 | `exploitations` policies → `get_accessible_cooperative_ids()` | 🟡 MEDIUM |
-| 7 | `productions` policies → `get_accessible_cooperative_ids()` | 🟡 MEDIUM |
-| 8 | `integrations` policies → `get_accessible_cooperative_ids()` | 🟡 MEDIUM |
-| 9 | `member_access_logs` view → `get_accessible_cooperative_ids()` | 🟡 MEDIUM |
-| 10 | Index `member_cards(card_number)` pour lookups rapides | 🟢 LOW |
-| 11 | Index `audit_logs(cooperative_id, created_at)` | 🟢 LOW |
-
-### Corrections code applicatif
-
-| Fichier | Correction |
-|---------|-----------|
-| `next.config.mjs` | Suppression `unsafe-eval` du CSP |
-| `app/auth/login/page.tsx` | Protection open redirect (`//`) |
-| `app/api/fiches/route.ts` | Rate limiting ajouté (120/min/IP) |
-| `app/api/widget/route.ts` | CORS preflight handler + headers structurés |
-| `components/shared/photo-upload.tsx` | Commentaire path-scoping |
-| `lib/security/assert-access.ts` | **NOUVEAU** — Couche d'autorisation centralisée |
-| `lib/security/headers.ts` | **NOUVEAU** — Headers de sécurité centralisés |
+**Fichier(s)** : Fonction SQL `get_platform_totals`  
+**Vecteur** : Tout utilisateur authentifié (même un simple `member`) peut appeler `/rest/v1/rpc/get_platform_totals` et obtenir les statistiques globales de la plateforme (nombre total de coopératives, membres, etc.). Information concurrentielle sensible.  
+**Fix** :
+```sql
+-- Ajouter une vérification de rôle dans la fonction OU révoquer l'accès
+REVOKE EXECUTE ON FUNCTION public.get_platform_totals FROM authenticated;
+-- Seul le service_role (API routes serveur) l'appellera
+```
+**Effort** : S (30min)
 
 ---
 
-## PHASE 4 — Hardening Additionnel (Recommandations)
+### [PHANTOM-001] HIGH | Page /verify expose trop d'informations personnelles
 
-### Priorité 1 — Quick Wins (< 1 jour)
-
-1. **Activer Leaked Password Protection** dans Supabase Dashboard → Auth → Settings
-2. **Ajouter `X-Request-ID`** dans le proxy pour la traçabilité
-3. **Limiter les colonnes retournées** par la policy anon sur `member_cards` (ne pas exposer `qr_data`)
-
-### Priorité 2 — Court terme (1-3 jours)
-
-4. **Migrer rate limiter vers Upstash Redis** pour support multi-instance
-5. **Activer MFA (TOTP)** pour les rôles `super_admin` et `faitiere_admin`
-6. **Ajouter audit logging** sur les opérations sensibles (changement de rôle, suppression membre)
-7. **Implémenter CAPTCHA** après 5 échecs de login consécutifs
-
-### Priorité 3 — Moyen terme (1-2 semaines)
-
-8. **Nonce-based CSP** pour éliminer `unsafe-inline`
-9. **Server Actions** pour les mutations critiques (changement de rôle, suppression)
-10. **Monitoring** — alertes sur patterns anormaux (bulk downloads, rate limit hits)
-11. **Penetration testing externe** par un tiers
+**Fichier(s)** : `app/verify/[card_number]/page.tsx`  
+**Cible humaine** : Agriculteur / Acheteur malveillant  
+**Scénario** :
+1. **Setup** : L'attaquant obtient un numéro de carte (visible sur la carte physique, ou deviné)
+2. **Action** : Il accède à `/verify/FEN-12345` et obtient : nom complet, photo, téléphone (via cotisations), village exact, cultures, superficie
+3. **Impact** : Profilage pour arnaques ciblées, vol d'identité, harcèlement  
+**Vraisemblance** : Haute (les cartes sont physiques, les numéros sont séquentiels)  
+**Fix UX + Code** :
+- Masquer le téléphone (ne jamais l'exposer publiquement)
+- Tronquer le village à la préfecture uniquement
+- Ajouter un timer de 30s (déjà fait : 60s) et un CAPTCHA avant affichage
+- Rendre le format de numéro non-séquentiel (UUID court ou hash)
+**Effort** : M (1 jour)
 
 ---
 
-## PHASE 5 — Vérification RLS
+### [SHIELD-001] HIGH | CSP contient 'unsafe-inline' et 'unsafe-eval'
 
-### Matrice d'Accès Complète
-
-| Table | anon SELECT | auth SELECT | auth INSERT | auth UPDATE | auth DELETE |
-|-------|-------------|-------------|-------------|-------------|-------------|
-| `profiles` | ❌ | Own + super_admin | ❌ (trigger) | Own (sans role/coop_id) + super_admin | ❌ |
-| `cooperatives` | ✅ All | ✅ All | Faitiere/super | Own coop admin + super | Super only |
-| `members` | Active card holders | Accessible coops | Coop admins (hierarchy) | Coop admins (hierarchy) | Coop admins (hierarchy) |
-| `member_cards` | Active only | Accessible coops | Coop admins (hierarchy) | Coop admins (hierarchy) | Coop admins (hierarchy) |
-| `fiches_techniques` | Published | Published + faitiere all | Faitiere + super | Faitiere + super | Faitiere + super |
-| `exploitations` | Active only | Accessible coops ✅ | Coop admins (hierarchy) ✅ | Coop admins (hierarchy) ✅ | Coop admins (hierarchy) ✅ |
-| `integrations` | ❌ | Accessible coops ✅ | Coop admins (hierarchy) ✅ | Coop admins (hierarchy) ✅ | Coop admins (hierarchy) ✅ |
-| `documents` | ❌ | Accessible coops ✅ | Coop admins (hierarchy) ✅ | Coop admins (hierarchy) ✅ | Coop admins (hierarchy) ✅ |
-| `productions` | ❌ | Accessible coops ✅ | Coop admins (hierarchy) ✅ | Coop admins (hierarchy) ✅ | Coop admins (hierarchy) ✅ |
-| `parcelles` | ❌ | Accessible coops | Coop admins (hierarchy) | Coop admins (hierarchy) | Coop admins (hierarchy) |
-| `cotisations` | ❌ | Accessible coops | Coop admins (hierarchy) | Coop admins (hierarchy) | Coop admins (hierarchy) |
-| `audit_logs` | INSERT (member.create.*) | Own coop admins | Own user_id | ❌ | ❌ |
-| `member_access_logs` | INSERT (card_number req) | Accessible coops ✅ | card_number + action | ❌ | ❌ |
-| `purchases` | INSERT (pending + valid fiche) | Own coop fiches admins | Public (restricted) | ❌ | ❌ |
-| `notifications` | ❌ | Own only | ❌ | Own only | ❌ |
-| `platform_settings` | ❌ | Super_admin | Super_admin | Super_admin | Super_admin |
-| `cooperative_settings` | ❌ | Accessible coops | Coop admins (hierarchy) | Coop admins (hierarchy) | Coop admins (hierarchy) |
-| `templates` | ❌ | Accessible coops | Coop admins (hierarchy) | Coop admins (hierarchy) | Coop admins (hierarchy) |
-| Geo tables (regions, prefectures, cantons, communes, villages) | ✅ Read | ✅ Read | Super_admin | Super_admin | Super_admin |
-| `cultures` | ✅ Read | ✅ Read | Super_admin | Super_admin | Super_admin |
-
-✅ = Corrigé dans cette migration
-
-### SECURITY DEFINER Functions — Analyse
-
-| Fonction | Risque | Verdict |
-|----------|--------|---------|
-| `bootstrap_cooperative_admin` | Élévation de privilège | ✅ **SAFE** — vérifie `target_user_id = auth.uid()`, pas déjà bootstrappé, coopérative < 60s |
-| `get_accessible_cooperative_ids` | Fuite de hiérarchie | ✅ **SAFE** — retourne uniquement les IDs accessibles à l'utilisateur courant |
-| `get_my_cooperative_id` | Fuite d'info | ✅ **SAFE** — retourne uniquement le cooperative_id de l'utilisateur courant |
-| `get_platform_totals` | Fuite de données | ✅ **SAFE** — vérifie `role = 'super_admin'` en interne |
-| `increment_download_count` | Manipulation de données | ✅ **FIXED** — anon révoqué |
-| `handle_new_user` | Création de profil | ✅ **SAFE** — trigger on auth.users INSERT, pas appelable directement |
-| `sync_role_to_auth_metadata` | Sync rôle → JWT | ✅ **SAFE** — trigger on profiles UPDATE, pas appelable directement |
-
-### Scénarios d'Attaque Testés
-
-| Scénario | Résultat |
-|----------|----------|
-| User modifie son propre `role` via UPDATE profiles | ❌ Bloqué par WITH CHECK (role = ancien role) |
-| User modifie son `cooperative_id` | ❌ Bloqué par WITH CHECK (cooperative_id IS NOT DISTINCT FROM ancien) |
-| Coop admin A accède aux membres de coop B | ❌ Bloqué par `get_accessible_cooperative_ids()` |
-| Anon appelle `bootstrap_cooperative_admin` | ❌ Bloqué (authenticated only) |
-| User appelle `bootstrap_cooperative_admin` pour un autre user | ❌ Bloqué par `target_user_id != auth.uid()` |
-| User re-bootstrap après avoir déjà un rôle | ❌ Bloqué par `cooperative_id IS NOT NULL OR role != 'member'` |
-| Anon inflate download_count | ❌ **FIXED** — REVOKE EXECUTE FROM anon |
-| Member télécharge fiche sans payer via storage direct | ❌ **FIXED** — SELECT restreint aux admins |
-| Admin coop A uploade photo dans dossier coop B | ❌ **FIXED** — path scoped par hiérarchie |
+**Fichier(s)** : `next.config.mjs`  
+**Vecteur** : `'unsafe-inline'` et `'unsafe-eval'` dans `script-src` annulent la protection CSP contre les attaques XSS. Un attaquant qui trouve un point d'injection peut exécuter du JavaScript arbitraire.  
+**Fix** : Migrer vers un CSP basé sur des nonces. Next.js 16 supporte les nonces via `next/headers`.
+```javascript
+// Remplacer 'unsafe-inline' 'unsafe-eval' par :
+"script-src 'self' 'strict-dynamic' 'nonce-${nonce}'",
+// Et configurer le nonce dans le layout
+```
+**Note** : `'strict-dynamic'` est déjà présent, ce qui ignore `'unsafe-inline'` dans les navigateurs modernes. Mais les vieux Android (cible Togo) ne supportent pas `strict-dynamic` et tombent sur `'unsafe-inline'`.  
+**Effort** : M (1 jour)
 
 ---
 
-## PHASE 6 — Production Readiness
+### [SHIELD-002] HIGH | Bucket `member-photos` est public avec listing autorisé
 
-### Scalabilité
-
-| Composant | Limite actuelle | Bottleneck | Solution |
-|-----------|----------------|------------|----------|
-| Rate limiter | Single instance | Multi-pod deployment | Upstash Redis |
-| Pagination | Client-side | > 500 membres | `.range()` server-side |
-| RLS functions | Recursive CTE | > 100 coopératives | Materialized view ou cache |
-| Storage | Supabase Pro (8GB) | Fiches volumineuses | CDN + compression |
-
-### Coûts Estimés (Production)
-
-| Service | Plan | Coût/mois |
-|---------|------|-----------|
-| Vercel | Pro | $20 |
-| Supabase | Pro | $25 |
-| Upstash Redis | Pay-as-you-go | ~$5 |
-| Sentry | Free tier | $0 |
-| **Total** | | **~$50/mois** |
-
-Scalable jusqu'à ~10,000 membres et 50 coopératives sans changement d'architecture.
-
-### Checklist Production Finale
-
-- [x] TypeScript strict (no ignoreBuildErrors)
-- [x] RLS sur 100% des tables (24 tables)
-- [x] Aucune policy `USING (true)` sur tables sensibles
-- [x] Secrets chiffrés (AES-256-GCM)
-- [x] Security headers (CSP sans unsafe-eval, HSTS, X-Frame-Options)
-- [x] Rate limiting sur tous les endpoints publics
-- [x] UUID validation sur tous les inputs
-- [x] Webhook secret obligatoire + timing-safe
-- [x] Storage policies scoped par tenant/hiérarchie
-- [x] Profile role non-modifiable par l'utilisateur
-- [x] Open redirect prevention
-- [x] CORS preflight handling
-- [x] Sentry error tracking
-- [x] Trigger functions non-appelables via API
-- [x] Hierarchy-aware policies sur toutes les tables
-- [ ] Upstash Redis (rate-limit distribué)
-- [ ] Leaked password protection activée
-- [ ] MFA pour admins
-- [ ] Nonce-based CSP
-- [ ] Penetration testing externe
-- [ ] Load testing (k6)
-- [ ] Backup automatique vérifié
+**Fichier(s)** : Storage Supabase, politique `Public can view member photos`  
+**Vecteur** : N'importe qui peut lister TOUS les fichiers du bucket `member-photos` via l'API Storage. Les photos des membres sont accessibles sans authentification.  
+**Fix** :
+```sql
+-- Supprimer la politique de listing public
+DROP POLICY "Public can view member photos" ON storage.objects;
+-- Créer une politique qui n'autorise que l'accès par URL signée (via le serveur)
+CREATE POLICY "Authenticated users view own coop photos"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'member-photos' AND (storage.foldername(name))[1] IN (
+  SELECT id::text FROM get_accessible_cooperative_ids()
+));
+```
+**Effort** : S (2h)
 
 ---
 
-## Conclusion
+## 🟡 FINDINGS MEDIUM — Corriger dans la semaine
 
-Ce projet est **au-dessus de la moyenne** en termes de sécurité pour un SaaS multi-tenant. L'architecture defense-in-depth (proxy + RLS + validation) est solide. Les corrections appliquées dans cet audit comblent les dernières incohérences de scoping et durcissent les surfaces d'attaque restantes.
+### [GHOST-005] MEDIUM | Kobo sync route ne vérifie pas la hiérarchie coopérative
 
-**Risque résiduel principal :** Le rate limiter in-memory ne protège pas en déploiement multi-instance (Vercel serverless). C'est le seul point qui nécessite une action avant un lancement à grande échelle.
+**Fichier(s)** : `app/api/integrations/kobo/sync/route.ts` (ligne ~35)  
+**Vecteur** : La vérification d'accès compare `profile.cooperative_id === cooperativeId` directement, sans utiliser `get_accessible_cooperative_ids()`. Un admin de faîtière ne peut pas sync ses coopératives enfants via cette route (bug fonctionnel), mais surtout la logique est incohérente avec le reste du système.  
+**Fix** : Utiliser `assertTenantAccess(cooperativeId)` de `lib/security/assert-access.ts`.  
+**Effort** : S (1h)
 
-**Recommandation :** Activer la protection contre les mots de passe compromis (5 minutes dans le dashboard Supabase) et migrer vers Upstash Redis (1 jour de travail) avant le lancement production.
+---
+
+### [GHOST-006] MEDIUM | Pas de validation Zod sur le body du webhook Kobo
+
+**Fichier(s)** : `app/api/webhooks/kobo/route.ts`  
+**Vecteur** : Le body JSON est parsé et utilisé directement sans schéma Zod. Des champs inattendus ou des types incorrects pourraient causer des erreurs non gérées ou des insertions malformées.  
+**Fix** : Ajouter un schéma Zod minimal pour valider la structure attendue.  
+**Effort** : S (2h)
+
+---
+
+### [FORGE-004] MEDIUM | `contact_requests` INSERT policy est `WITH CHECK (true)`
+
+**Fichier(s)** : Politique RLS `contact_requests_insert_public`  
+**Vecteur** : N'importe qui (anon ou authenticated) peut insérer dans `contact_requests` sans restriction. Bien que la route API ait un rate limit, un attaquant peut contourner l'API et insérer directement via l'API REST Supabase avec la clé anon.  
+**Fix** :
+```sql
+DROP POLICY "contact_requests_insert_public" ON contact_requests;
+CREATE POLICY "contact_requests_insert_public" ON contact_requests
+FOR INSERT TO anon, authenticated
+WITH CHECK (
+  member_id IN (SELECT id FROM members WHERE status = 'active')
+  AND char_length(buyer_name) >= 2
+  AND char_length(message) >= 10
+);
+```
+**Effort** : S (30min)
+
+---
+
+### [FORGE-005] MEDIUM | Fonctions `search_marketplace` et `get_member_score` sans search_path fixe
+
+**Fichier(s)** : Fonctions SQL  
+**Vecteur** : Sans `SET search_path TO 'public'`, ces fonctions sont vulnérables à une attaque par manipulation du search_path si un utilisateur peut créer des objets dans un schéma prioritaire.  
+**Fix** :
+```sql
+ALTER FUNCTION public.search_marketplace SET search_path TO 'public';
+ALTER FUNCTION public.get_member_score SET search_path TO 'public';
+```
+**Effort** : S (15min)
+
+---
+
+### [PHANTOM-002] MEDIUM | Énumération d'emails via forgot-password
+
+**Fichier(s)** : `app/auth/forgot-password/page.tsx` (utilise Supabase Auth)  
+**Vecteur** : Par défaut, Supabase Auth retourne des réponses différentes selon que l'email existe ou non. Un attaquant peut déterminer quels emails sont enregistrés.  
+**Fix** : Activer l'option "Double confirm email changes" dans Supabase Auth settings et s'assurer que la réponse est toujours identique ("Si cet email existe, un lien a été envoyé").  
+**Effort** : S (30min)
+
+---
+
+### [PHANTOM-003] MEDIUM | Widget embed sans validation stricte d'origine
+
+**Fichier(s)** : `app/api/embed/route.ts` (ligne ~50)  
+**Vecteur** : La validation d'origine utilise `origin.includes(o)` ce qui est trop permissif. Si `allowed_origins` contient `"example.com"`, alors `"evil-example.com"` passe aussi.  
+**Fix** :
+```typescript
+const allowed = config.allowed_origins.some((o: string) =>
+  o === '*' || origin === o || origin === `https://${o}` || origin === `http://${o}`
+)
+```
+**Effort** : S (30min)
+
+---
+
+### [SHIELD-003] MEDIUM | Pas de header X-Frame-Options sur les routes /embed et /api/widget
+
+**Fichier(s)** : `next.config.mjs` (headers config)  
+**Vecteur** : Les routes embed sont exclues des security headers (intentionnel pour l'embedding), mais elles n'ont aucune protection contre le clickjacking par des sites non autorisés. La validation d'origine côté API ne protège pas le rendu HTML.  
+**Fix** : Ajouter `frame-ancestors` dynamique basé sur `allowed_origins` dans les réponses embed.  
+**Effort** : S (2h)
+
+---
+
+### [SHIELD-004] MEDIUM | Leaked Password Protection désactivée
+
+**Fichier(s)** : Configuration Supabase Auth  
+**Vecteur** : Les utilisateurs peuvent s'inscrire avec des mots de passe compromis (présents dans les fuites de données HaveIBeenPwned).  
+**Fix** : Activer "Leaked Password Protection" dans le dashboard Supabase → Authentication → Settings.  
+**Effort** : S (5min)
+
+---
+
+### [FORGE-006] MEDIUM | Pas de purge automatique de `kobo_sync_queue`
+
+**Fichier(s)** : Table `kobo_sync_queue`  
+**Vecteur** : Les entrées `completed` ne sont jamais supprimées. Sur le long terme, la table peut grossir indéfiniment et dégrader les performances.  
+**Fix** : Ajouter un cron Supabase (pg_cron) pour purger les entrées complétées de plus de 30 jours.
+```sql
+SELECT cron.schedule('purge-kobo-queue', '0 3 * * 0', $$
+  DELETE FROM kobo_sync_queue WHERE status = 'completed' AND processed_at < now() - interval '30 days';
+$$);
+```
+**Effort** : S (1h)
+
+---
+
+## 🟢 FINDINGS LOW — Backlog
+
+### [GHOST-007] LOW | Pas de CSRF protection explicite sur les actions admin
+
+**Fichier(s)** : `app/admin/*`  
+**Vecteur** : Les actions admin (suppression de coopérative, modification de rôle) n'ont pas de token CSRF explicite. Supabase Auth cookies + SameSite atténuent le risque, mais une protection explicite est recommandée.  
+**Effort** : M
+
+---
+
+### [PHANTOM-004] LOW | QR code contient uniquement le card_number sans hash de sécurité
+
+**Fichier(s)** : Génération de cartes (dashboard)  
+**Vecteur** : Un faux QR code avec un numéro de carte valide redirige vers la vraie page de vérification. Pas de moyen de distinguer un QR authentique d'un QR copié.  
+**Fix** : Encoder un HMAC dans le QR : `/verify/FEN-12345?sig=abc123`  
+**Effort** : M
+
+---
+
+### [SHIELD-005] LOW | Pas de fichier `security.txt` sur le domaine
+
+**Fichier(s)** : `public/.well-known/security.txt` (absent)  
+**Fix** : Créer le fichier avec un contact de sécurité.  
+**Effort** : S (15min)
+
+---
+
+### [SHIELD-006] LOW | Geolocation policy trop restrictive
+
+**Fichier(s)** : `next.config.mjs` — `Permissions-Policy: geolocation=()`  
+**Vecteur** : La politique bloque la géolocalisation même pour le site lui-même. Si une future feature nécessite le GPS (localisation de parcelles), elle sera bloquée.  
+**Fix** : Changer en `geolocation=(self)`.  
+**Effort** : S (5min)
+
+---
+
+### [FORGE-007] LOW | `bootstrap_cooperative_admin` exposée via REST API
+
+**Fichier(s)** : Fonction SQL  
+**Vecteur** : Bien que la fonction ait des gardes internes (vérifie `auth.uid()`, profil non bootstrappé, coopérative créée < 60s), son exposition via l'API REST est un risque de surface inutile.  
+**Fix** : `REVOKE EXECUTE ON FUNCTION public.bootstrap_cooperative_admin FROM anon;` (déjà fait pour anon, mais vérifier).  
+**Effort** : S (15min)
+
+---
+
+## ✅ Ce qui est BIEN (ne pas casser)
+
+| Mécanisme | Évaluation |
+|-----------|-----------|
+| **AES-256-GCM pour les secrets** | ✅ IV aléatoire par chiffrement, format versionné, clé serveur-only |
+| **Timing-safe comparison webhook** | ✅ `crypto.timingSafeEqual` correctement implémenté |
+| **RLS activé sur TOUTES les tables** | ✅ 27/27 tables ont RLS enabled |
+| **Rôles lus depuis `app_metadata`** | ✅ `is_super_admin()` et `is_coop_admin()` lisent `auth.jwt() -> 'app_metadata'` (non modifiable par l'utilisateur) |
+| **Hiérarchie coopérative récursive** | ✅ `get_accessible_cooperative_ids()` utilise un CTE récursif correct |
+| **Profil non auto-modifiable (rôle/coop)** | ✅ La politique `update_own_profile` empêche de changer `role` ou `cooperative_id` |
+| **Auth callback sécurisé** | ✅ Utilise `request.nextUrl.origin` (pas `x-forwarded-host`) pour les redirections |
+| **Logout cross-tab** | ✅ BroadcastChannel + localStorage fallback |
+| **Pagination bornée** | ✅ `Math.min(limit, 50)` sur marketplace et fiches |
+| **Erreurs normalisées** | ✅ `normalizeError()` ne leak pas les détails SQL |
+| **HSTS avec preload** | ✅ `max-age=63072000; includeSubDomains; preload` |
+| **Zod validation sur les routes authentifiées** | ✅ Kobo integration, contact-request, fiches |
+| **Session destruction complète** | ✅ Cookies, localStorage, sessionStorage, BroadcastChannel |
+
+---
+
+## 📋 Plan d'action séquencé
+
+### Jour 1 (Avant déploiement) — Critiques
+1. ⛔ Créer `middleware.ts` pour protéger `/dashboard/*` et `/admin/*` côté serveur
+2. ⛔ Corriger l'injection dans `/api/marketplace` (échapper le paramètre `search`)
+3. ⛔ Migrer la page `/verify` vers un appel API serveur avec rate limiting (ou restreindre la politique RLS anon)
+
+### Jour 2-3 — High
+4. Intégrer Upstash Redis pour le rate limiting (ou Vercel KV)
+5. Ajouter la validation de taille du payload webhook
+6. Révoquer `EXECUTE` sur `increment_download_count` et `get_platform_totals` pour les rôles non-admin
+7. Restreindre le bucket `member-photos` (supprimer le listing public)
+8. Réduire les données exposées sur `/verify`
+9. Planifier la migration CSP vers nonces
+
+### Semaine 2 — Medium
+10. Corriger la validation d'origine du widget embed
+11. Activer Leaked Password Protection
+12. Ajouter un cron de purge pour `kobo_sync_queue`
+13. Fixer les `search_path` des fonctions SQL
+14. Ajouter la validation Zod sur le webhook Kobo
+15. Corriger la politique RLS `contact_requests`
+
+---
+
+## Checklist de go/no-go production
+
+- [ ] Zéro finding Critical ouvert
+- [ ] `middleware.ts` déployé et testé
+- [ ] Injection marketplace corrigée
+- [ ] Variables d'env vérifiées sur Vercel (`INTEGRATION_SECRET_KEY`, `KOBO_WEBHOOK_SECRET`)
+- [ ] Headers HTTP vérifiés sur prod (CSP, HSTS, X-Frame-Options)
+- [ ] Rate limiting fonctionnel en serverless
+- [ ] Bucket `member-photos` en mode privé
+- [ ] Leaked Password Protection activée
+- [ ] Logs Sentry filtrés (zéro PII)
+- [ ] Backup Supabase configuré (Point-in-Time Recovery)
+- [ ] Contact `security.txt` publié
+
+---
+
+## Questions de fond — Réponses
+
+| Question | Réponse |
+|----------|---------|
+| Rôles lus depuis `user_metadata` ? | ❌ Non — correctement lus depuis `app_metadata` via JWT |
+| Webhook Kobo idempotent ? | ✅ Oui — vérifie `kobo_sync_queue` avant insertion |
+| Que peut faire la clé anon ? | ⚠️ Lire les membres avec carte active, les fiches publiées, les produits marketplace, les coopératives, les régions/préfectures/cantons |
+| Données prod en dev ? | ✅ `.env.local` dans `.gitignore`, `.env.example` sans valeurs réelles |
+| Ex-employé malveillant ? | ⚠️ Pas de procédure documentée de révocation de session/clés |
+| Supabase down pendant webhook ? | ✅ Queue de retry avec backoff exponentiel (max 5 tentatives) |
+
+---
+
+*Signature orchestrateur : Audit automatisé — 24 mai 2026*

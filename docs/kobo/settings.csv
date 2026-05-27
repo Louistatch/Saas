@@ -1,2 +1,0 @@
-form_title,form_id,version,instance_name,default_language
-Fiche Membre FENOMAT - Collecte Terrain,fenomat_membre_v3,2026050100,"concat(${member_card_number}, '_', ${date_enquete})",Français

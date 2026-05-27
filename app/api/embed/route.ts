@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/utils/logger'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
+import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 
 const log = createLogger('api:embed')
 
@@ -23,6 +24,10 @@ export function OPTIONS() {
  * Validates origin against allowed_origins in embed_configs.
  */
 export async function GET(request: NextRequest) {
+  // [SECURITY FIX - GHOST-003] Rate limiting persistant via Upstash (si configuré)
+  const persistentBlock = await applyRateLimit(request, 'embed')
+  if (persistentBlock) return persistentBlock
+
   const limit = rateLimit(`embed:${clientKeyFromHeaders(request.headers)}`, 60, 60_000)
   if (!limit.ok) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: CORS_HEADERS })
@@ -54,16 +59,22 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Validate origin if allowed_origins is set
+    // [SECURITY FIX - PHANTOM-003] Validation d'origine sécurisée — comparaison exacte
     const origin = request.headers.get('origin')
     if (config.allowed_origins && config.allowed_origins.length > 0 && origin) {
-      const allowed = config.allowed_origins.some((o: string) =>
-        o === '*' || origin.includes(o),
-      )
-      if (!allowed) {
+      const isOriginAllowed = config.allowed_origins.some((allowed: string) => {
+        if (allowed === '*') return true // Wildcard explicite seulement
+
+        // Normaliser pour comparer exactement (pas .includes() qui est vulnérable)
+        const normalizeOrigin = (o: string) =>
+          o.startsWith('http') ? o.replace(/\/$/, '') : `https://${o}`.replace(/\/$/, '')
+
+        return normalizeOrigin(origin) === normalizeOrigin(allowed)
+      })
+      if (!isOriginAllowed) {
         return NextResponse.json(
           { error: 'Origin not allowed' },
-          { status: 403, headers: CORS_HEADERS },
+          { status: 403, headers: { ...CORS_HEADERS, 'Access-Control-Allow-Origin': 'null' } },
         )
       }
     }
