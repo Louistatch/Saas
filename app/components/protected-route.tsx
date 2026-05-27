@@ -19,7 +19,7 @@ interface ProtectedRouteProps {
  * This component's job is ONLY:
  * 1. Wait for AuthProvider to finish loading (show spinner)
  * 2. Role-gate (e.g. /admin requires super_admin)
- * 3. Safety net: if after 8s auth still hasn't loaded, redirect
+ * 3. Safety net: if after 30s auth still hasn't loaded, reload page
  * 
  * It does NOT duplicate the proxy's auth check.
  */
@@ -29,21 +29,13 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
   const pathname = usePathname()
   const [timedOut, setTimedOut] = useState(false)
 
-  // Safety net: 20s max wait for auth to load (generous for cold starts)
+  // Safety net: 30s max wait for auth to load
+  // If it takes this long, something is wrong — reload the page
   useEffect(() => {
     if (!isLoading) return
-    const timer = setTimeout(() => setTimedOut(true), 20000)
+    const timer = setTimeout(() => setTimedOut(true), 30000)
     return () => clearTimeout(timer)
   }, [isLoading])
-
-  // If loading finished and not authenticated → redirect (SPA navigation)
-  useEffect(() => {
-    if (isLoading) return
-    if (!isAuthenticated) {
-      const redirectParam = pathname && /^\/[^/]/.test(pathname) ? `?redirect=${encodeURIComponent(pathname)}` : ''
-      router.replace(`/auth/login${redirectParam}`)
-    }
-  }, [isAuthenticated, isLoading, pathname, router])
 
   // Role guard (only after auth is loaded)
   useEffect(() => {
@@ -53,14 +45,14 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     }
   }, [isAuthenticated, isLoading, user, requiredRole, router])
 
-  // Safety net: auth loading hung
+  // Safety net: auth loading hung — reload page (proxy will handle redirect if needed)
   useEffect(() => {
     if (timedOut && isLoading) {
-      router.replace('/auth/login')
+      window.location.reload()
     }
-  }, [timedOut, isLoading, router])
+  }, [timedOut, isLoading])
 
-  // Show spinner while auth loads (trust the proxy — user is likely valid)
+  // Show spinner while auth loads (trust the proxy — user IS authenticated if they got here)
   if (isLoading && !timedOut) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -72,8 +64,9 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     )
   }
 
-  // Not authenticated (shouldn't happen if proxy works)
-  if (!isAuthenticated) return null
+  // Not authenticated after loading — this shouldn't happen if proxy works
+  // But don't redirect aggressively — just show nothing and let proxy handle on next nav
+  if (!isAuthenticated && !isLoading) return null
 
   // Role mismatch
   if (requiredRole && user?.role !== requiredRole && user?.role !== 'super_admin') {
