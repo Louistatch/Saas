@@ -58,13 +58,15 @@ function LoginInner() {
     setSubmitting(true)
     setProgress('Authentification…')
 
-    // Timeout: 15s max — Supabase free tier can have cold starts
-    // Facebook technique: never let the user wait forever
-    const timeoutId = setTimeout(() => {
-      setError('Le serveur met trop de temps à répondre. Réessayez.')
-      setSubmitting(false)
-      setProgress('')
-    }, 15000)
+    // No hard timeout — Supabase free tier cold starts can take 20-30s
+    // Instead, show progressive feedback to the user
+    const progressTimer = setTimeout(() => {
+      setProgress('Connexion en cours, veuillez patienter…')
+    }, 5000)
+
+    const slowTimer = setTimeout(() => {
+      setProgress('Le serveur démarre, encore quelques secondes…')
+    }, 12000)
 
     try {
       // SINGLE network call: signInWithPassword
@@ -73,7 +75,8 @@ function LoginInner() {
         password: parsed.data.password,
       })
 
-      clearTimeout(timeoutId)
+      clearTimeout(progressTimer)
+      clearTimeout(slowTimer)
 
       if (signInError) throw signInError
       if (!data.user) throw new Error('Échec de connexion')
@@ -92,10 +95,11 @@ function LoginInner() {
       router.replace(target)
 
     } catch (err: any) {
-      clearTimeout(timeoutId)
+      clearTimeout(progressTimer)
+      clearTimeout(slowTimer)
 
       if (err?.name === 'AbortError' || err?.message?.includes('abort')) {
-        setError('Connexion trop lente. Réessayez.')
+        setError('Connexion interrompue. Réessayez.')
       } else {
         setError(errorMessage(err))
       }
