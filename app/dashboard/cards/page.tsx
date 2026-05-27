@@ -97,15 +97,14 @@ export default function CardsPage() {
   }, [isFaitiereAdmin, selectedCoopId, members, allMembers])
 
   const fetchCards = useCallback(async () => {
-    if (!currentCooperative) return
     setIsLoading(true)
     let query = supabase
       .from('member_cards')
       .select('*, member:members(first_name, last_name, email, phone, photo_url, prefecture, region, village, canton, faitiere)')
     
-    // For faitiere/union: load cards from all child cooperatives
-    if (currentCooperative.level === 'faitiere' || currentCooperative.level === 'union') {
-      // Fetch all cooperative IDs in hierarchy directly (don't depend on context)
+    // If we know the cooperative, filter by hierarchy. Otherwise load all accessible.
+    if (currentCooperative && (currentCooperative.level === 'faitiere' || currentCooperative.level === 'union')) {
+      // Fetch all cooperative IDs in hierarchy directly
       const { data: allCoops } = await supabase
         .from('cooperatives')
         .select('id')
@@ -120,12 +119,11 @@ export default function CardsPage() {
           .in('parent_id', directIds)
         const allIds = [...new Set([...directIds, ...(grandChildren ?? []).map(c => c.id)])]
         query = query.in('cooperative_id', allIds)
-      } else {
-        query = query.eq('cooperative_id', currentCooperative.id)
       }
-    } else {
+    } else if (currentCooperative) {
       query = query.eq('cooperative_id', currentCooperative.id)
     }
+    // If currentCooperative is null, load all (RLS will filter)
     
     query = query.order('created_at', { ascending: false })
     const { data, error } = await query
@@ -135,14 +133,13 @@ export default function CardsPage() {
       setCards((data ?? []) as MemberCard[])
     }
     setIsLoading(false)
-  }, [currentCooperative, cooperatives, supabase, toast, user])
+  }, [currentCooperative, supabase, toast])
 
   const fetchMembers = useCallback(async () => {
-    if (!currentCooperative) return
     let query = supabase
       .from('members')
       .select('id, first_name, last_name, cooperative_id')
-    if (!isFaitiereAdmin) {
+    if (currentCooperative && !isFaitiereAdmin) {
       query = query.eq('cooperative_id', currentCooperative.id)
     }
     query = query.eq('status', 'active').order('last_name')
