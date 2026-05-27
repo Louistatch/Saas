@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useAuth, type UserRole } from '@/app/context/auth-context'
 
 interface ProtectedRouteProps {
@@ -10,32 +10,30 @@ interface ProtectedRouteProps {
 }
 
 /**
- * Client-side route guard — LIGHTWEIGHT.
+ * Client-side route guard — TRUST THE PROXY.
  * 
  * The PROXY (server-side) is the primary auth gate:
  * - It checks cookies and redirects unauthenticated users to /auth/login
  * - If the user reaches this component, they PASSED the proxy check
  * 
- * This component's job is ONLY:
- * 1. Wait for AuthProvider to finish loading (show spinner)
- * 2. Role-gate (e.g. /admin requires super_admin)
- * 3. Safety net: if after 30s auth still hasn't loaded, reload page
- * 
- * It does NOT duplicate the proxy's auth check.
+ * This component shows a brief spinner (max 3s) then renders content.
+ * The proxy guarantees the user is authenticated.
  */
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading, user } = useAuth()
   const router = useRouter()
-  const pathname = usePathname()
-  const [timedOut, setTimedOut] = useState(false)
+  const [showContent, setShowContent] = useState(false)
 
-  // Safety net: 30s max wait for auth to load
-  // If it takes this long, something is wrong — reload the page
+  // Show content immediately if auth is ready, or after 3s max (trust the proxy)
   useEffect(() => {
-    if (!isLoading) return
-    const timer = setTimeout(() => setTimedOut(true), 30000)
+    if (!isLoading && isAuthenticated) {
+      setShowContent(true)
+      return
+    }
+    // After 3s, show content anyway — proxy already validated the session
+    const timer = setTimeout(() => setShowContent(true), 3000)
     return () => clearTimeout(timer)
-  }, [isLoading])
+  }, [isLoading, isAuthenticated])
 
   // Role guard (only after auth is loaded)
   useEffect(() => {
@@ -45,15 +43,8 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     }
   }, [isAuthenticated, isLoading, user, requiredRole, router])
 
-  // Safety net: auth loading hung — reload page (proxy will handle redirect if needed)
-  useEffect(() => {
-    if (timedOut && isLoading) {
-      window.location.reload()
-    }
-  }, [timedOut, isLoading])
-
-  // Show spinner while auth loads (trust the proxy — user IS authenticated if they got here)
-  if (isLoading && !timedOut) {
+  // Brief spinner while waiting
+  if (!showContent) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="space-y-4 text-center">
@@ -62,15 +53,6 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
         </div>
       </div>
     )
-  }
-
-  // Not authenticated after loading — this shouldn't happen if proxy works
-  // But don't redirect aggressively — just show nothing and let proxy handle on next nav
-  if (!isAuthenticated && !isLoading) return null
-
-  // Role mismatch
-  if (requiredRole && user?.role !== requiredRole && user?.role !== 'super_admin') {
-    return null
   }
 
   return <>{children}</>
