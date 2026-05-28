@@ -16,6 +16,7 @@ export interface RenderOptions {
   cooperativeName?: string
   faitiereName?: string
   qrPayload: string
+  level?: 'or' | 'argent' | 'bronze'
 }
 
 /**
@@ -41,6 +42,7 @@ export async function renderCardImage(opts: RenderOptions): Promise<Blob> {
     faitiereName: opts.faitiereName ?? 'FENOMAT',
     accentColor: opts.template.bgColor === '#16a34a' ? '#1ed760' : opts.template.bgColor,
     textColor: opts.template.textColor,
+    level: opts.level,
   })
   return renderToPng(schema)
 }
@@ -67,6 +69,7 @@ export async function downloadCardImage(opts: RenderOptions, filename?: string):
     faitiereName: opts.faitiereName ?? 'FENOMAT',
     accentColor: opts.template.bgColor === '#16a34a' ? '#1ed760' : opts.template.bgColor,
     textColor: opts.template.textColor,
+    level: opts.level,
   })
   await engineDownload(schema, filename ?? `carte-membre-${opts.card.card_number}.png`)
 }

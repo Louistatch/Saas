@@ -41,6 +41,8 @@ export interface CardSchema {
     cardNumber: string
     expiryDate: string
     createdAt: string
+    /** Membership level: 'or' | 'argent' | 'bronze' */
+    level?: 'or' | 'argent' | 'bronze'
   }
   /** Visual style overrides */
   styles: {
@@ -77,6 +79,7 @@ export function buildCardSchema(opts: {
   faitiereName: string
   accentColor?: string
   textColor?: string
+  level?: 'or' | 'argent' | 'bronze'
 }): CardSchema {
   const locality = [
     opts.member.village,
@@ -110,6 +113,7 @@ export function buildCardSchema(opts: {
       cardNumber: opts.cardNumber,
       expiryDate: opts.expiryDate ?? '',
       createdAt: opts.createdAt,
+      level: opts.level ?? 'bronze',
     },
     styles: {
       accentColor: opts.accentColor ?? '#1ed760',
