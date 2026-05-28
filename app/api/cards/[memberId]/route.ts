@@ -4,18 +4,40 @@
  * GET /api/cards/:memberId
  * 
  * Generates a high-resolution PNG of the member identity card
- * using SVG rendering + @resvg/resvg-js (no Chromium needed).
+ * using SVG rendering + @resvg/resvg-wasm (Vercel/Turbopack compatible).
  * 
  * Auth: requires authenticated user with access to the member's cooperative.
  * Output: image/png (2360px wide, ~80ms generation time)
  */
 
 import { NextResponse, type NextRequest } from 'next/server'
-import { Resvg } from '@resvg/resvg-js'
+import { initWasm, Resvg } from '@resvg/resvg-wasm'
 import { createClient } from '@/lib/supabase/server'
 import { buildCardSchema, renderToSvgString } from '@/lib/card-engine'
 
 export const runtime = 'nodejs'
+
+// Initialize WASM once (singleton pattern for serverless)
+let wasmInitialized = false
+async function ensureWasm() {
+  if (wasmInitialized) return
+  try {
+    // Fetch the WASM binary from node_modules at build/runtime
+    const { readFile } = await import('node:fs/promises')
+    const { join } = await import('node:path')
+    const wasmPath = join(process.cwd(), 'node_modules', '@resvg', 'resvg-wasm', 'index_bg.wasm')
+    const wasmBuffer = await readFile(wasmPath)
+    await initWasm(wasmBuffer)
+    wasmInitialized = true
+  } catch (e: unknown) {
+    // Already initialized (hot reload in dev)
+    if (e instanceof Error && e.message.includes('Already initialized')) {
+      wasmInitialized = true
+    } else {
+      throw e
+    }
+  }
+}
 
 export async function GET(
   request: NextRequest,
@@ -95,18 +117,15 @@ export async function GET(
   // Render SVG
   const svg = renderToSvgString(schema)
 
-  // Rasterize to PNG at 2x resolution (2360×1480)
+  // Initialize WASM and rasterize to PNG at 2x resolution (2360×1480)
+  await ensureWasm()
   const resvg = new Resvg(svg, {
     fitTo: { mode: 'width', value: 2360 },
-    font: {
-      loadSystemFonts: false,
-      defaultFontFamily: 'sans-serif',
-    },
   })
   const pngData = resvg.render()
   const pngBuffer = pngData.asPng()
 
-  // Return PNG with cache headers (card is valid for a while)
+  // Return PNG with cache headers
   return new NextResponse(pngBuffer, {
     status: 200,
     headers: {

@@ -44,6 +44,11 @@ const nextConfig = {
   turbopack: {
     root: '.',
   },
+  // Ensure @resvg/resvg-wasm is not bundled by Turbopack (uses WASM binary)
+  serverExternalPackages: ['@resvg/resvg-wasm'],
+  outputFileTracingIncludes: {
+    '/api/cards/[memberId]': ['./node_modules/@resvg/resvg-wasm/index_bg.wasm'],
+  },
   async headers() {
     return [
       {
