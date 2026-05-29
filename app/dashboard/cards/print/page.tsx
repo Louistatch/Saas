@@ -7,13 +7,14 @@ import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { useAuth } from '@/app/context/auth-context'
 import { LoadingBlock } from '@/components/shared/loading'
-import { QrImage } from '@/components/shared/qr-image'
+import { buildCardSchema, renderToSvgString } from '@/lib/card-engine'
 import Link from 'next/link'
 import type { MemberCard } from '@/types/domain'
 
 /**
- * Print page: displays 8 member cards per A4 page.
- * Optimized for printing (no sidebar, no header, print-specific CSS).
+ * Print page: displays member cards for A4 printing.
+ * Uses the SVG card renderer for pixel-perfect output.
+ * 2 cards per row, 4 rows per page = 8 cards per A4.
  */
 export default function PrintCardsPage() {
   const { currentCooperative } = useCooperative()
@@ -27,7 +28,7 @@ export default function PrintCardsPage() {
     setIsLoading(true)
     let query = supabase
       .from('member_cards')
-      .select('*, member:members(first_name, last_name, phone, photo_url, prefecture, region, village, canton)')
+      .select('*, member:members(first_name, last_name, phone, photo_url, prefecture, region, village, canton, faitiere)')
       .eq('status', 'active')
       .eq('cooperative_id', currentCooperative.id)
     query = query.order('created_at', { ascending: false })
@@ -52,28 +53,33 @@ export default function PrintCardsPage() {
           </Button>
         </Link>
         <div className="text-sm text-gray-500">
-          {cards.length} carte{cards.length !== 1 ? 's' : ''} • {Math.ceil(cards.length / 8)} page{Math.ceil(cards.length / 8) !== 1 ? 's' : ''} A4
+          {cards.length} carte{cards.length !== 1 ? 's' : ''} • {Math.ceil(cards.length / 4)} page{Math.ceil(cards.length / 4) !== 1 ? 's' : ''} A4
         </div>
         <Button onClick={handlePrint} className="gap-2">
           <Printer className="h-4 w-4" /> Imprimer en PDF
         </Button>
       </div>
 
-      {/* A4 Pages */}
+      {/* A4 Pages — 4 cards per page (2 cols × 2 rows, landscape cards) */}
       <div className="print:m-0 p-4 print:p-0">
-        {Array.from({ length: Math.ceil(cards.length / 8) }).map((_, pageIdx) => {
-          const pageCards = cards.slice(pageIdx * 8, (pageIdx + 1) * 8)
+        {Array.from({ length: Math.ceil(cards.length / 4) }).map((_, pageIdx) => {
+          const pageCards = cards.slice(pageIdx * 4, (pageIdx + 1) * 4)
           return (
             <div
               key={pageIdx}
-              className="w-[210mm] h-[297mm] mx-auto mb-8 print:mb-0 print:break-after-page bg-white grid grid-cols-2 grid-rows-4 gap-2 p-4 print:p-[5mm]"
+              className="w-[210mm] h-[297mm] mx-auto mb-8 print:mb-0 print:break-after-page bg-white grid grid-cols-1 grid-rows-4 gap-3 p-4 print:p-[5mm]"
               style={{ pageBreakAfter: 'always' }}
             >
               {pageCards.map((card) => (
-                <MiniCard key={card.id} card={card} cooperativeName={currentCooperative?.name} faitiereName={currentCooperative?.faitiereName} />
+                <MiniCardSvg
+                  key={card.id}
+                  card={card}
+                  cooperativeName={currentCooperative?.name}
+                  faitiereName={currentCooperative?.faitiereName}
+                />
               ))}
               {/* Fill empty slots */}
-              {Array.from({ length: 8 - pageCards.length }).map((_, i) => (
+              {Array.from({ length: 4 - pageCards.length }).map((_, i) => (
                 <div key={`empty-${i}`} className="border border-dashed border-gray-200 rounded-lg" />
               ))}
             </div>
@@ -92,7 +98,7 @@ export default function PrintCardsPage() {
   )
 }
 
-function MiniCard({
+function MiniCardSvg({
   card,
   cooperativeName,
   faitiereName,
@@ -101,53 +107,32 @@ function MiniCard({
   cooperativeName?: string
   faitiereName?: string
 }) {
-  const memberName = card.member ? `${card.member.first_name} ${card.member.last_name}` : '—'
-  const locality = [card.member?.village, card.member?.canton, card.member?.prefecture].filter(Boolean).join(', ')
-  const qrData = card.qr_data || JSON.stringify({ card: card.card_number })
+  const svgString = useMemo(() => {
+    const schema = buildCardSchema({
+      member: {
+        first_name: card.member?.first_name ?? '',
+        last_name: card.member?.last_name ?? '',
+        phone: card.member?.phone,
+        photo_url: card.member?.photo_url,
+        village: card.member?.village,
+        canton: card.member?.canton,
+        prefecture: card.member?.prefecture,
+        region: card.member?.region,
+      },
+      cardNumber: card.card_number,
+      expiryDate: card.expiry_date,
+      createdAt: card.created_at,
+      cooperativeName: cooperativeName ?? '',
+      faitiereName: faitiereName ?? 'FaîtiereHub',
+      level: 'bronze',
+    })
+    return renderToSvgString(schema)
+  }, [card, cooperativeName, faitiereName])
 
   return (
-    <div className="border border-gray-300 rounded-lg overflow-hidden bg-gradient-to-br from-[#0a2e1a] to-[#0d3d22] text-white p-3 flex flex-col justify-between relative" style={{ fontSize: '8px' }}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-1">
-        <span className="font-bold text-[9px] text-green-300">FaîtiereHub</span>
-        <span className="text-[7px] opacity-60">CARTE MEMBRE</span>
-        <span className="text-[7px] text-green-300 bg-green-900/50 px-1 rounded">✓</span>
-      </div>
-
-      {/* Body */}
-      <div className="flex gap-2 flex-1">
-        {/* Photo */}
-        <div className="w-12 h-14 rounded bg-white/10 overflow-hidden shrink-0 flex items-center justify-center">
-          {card.member?.photo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={card.member.photo_url} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <span className="text-lg opacity-30">👤</span>
-          )}
-        </div>
-
-        {/* Info */}
-        <div className="flex-1 min-w-0 space-y-0.5">
-          <p className="font-bold text-[10px] truncate">{memberName}</p>
-          <p className="text-[7px] opacity-70 truncate">{cooperativeName ?? '—'}</p>
-          <p className="text-[7px] opacity-60 truncate">{locality || '—'}</p>
-          {card.member?.phone && <p className="text-[7px] opacity-60">{card.member.phone}</p>}
-          <p className="font-mono text-[8px] text-green-300 mt-1">{card.card_number}</p>
-        </div>
-
-        {/* QR */}
-        <div className="shrink-0">
-          <div className="bg-white rounded p-0.5">
-            <QrImage value={qrData} size={40} margin={0} />
-          </div>
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="flex items-center justify-between mt-1 pt-1 border-t border-white/10">
-        <span className="text-[6px] opacity-50">Valide: {card.expiry_date ?? '—'}</span>
-        <span className="text-[6px] opacity-50">{faitiereName ?? 'FENOMAT'}</span>
-      </div>
-    </div>
+    <div
+      className="w-full h-full rounded-lg overflow-hidden shadow-sm"
+      dangerouslySetInnerHTML={{ __html: svgString }}
+    />
   )
 }

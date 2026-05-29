@@ -22,7 +22,7 @@ import { CardStatusBadge } from '@/components/shared/status-badge'
 import { PageHeader } from '@/components/shared/page-header'
 import { PaginationBar } from '@/components/shared/pagination'
 import { useConfirm } from '@/components/shared/confirm-dialog'
-import { QrImage } from '@/components/shared/qr-image'
+import { CardSvgPreview } from '@/components/dashboard/card-svg-preview'
 import { errorMessage } from '@/lib/utils/errors'
 import { cardSettingsSchema, cardTemplateSchema, flattenZodErrors } from '@/lib/validators/schemas'
 import { downloadCardImage, renderCardImage } from '@/lib/utils/card-image'
@@ -690,70 +690,13 @@ export default function CardsPage() {
               <CardDescription>Carte d'identité membre premium — design WAOO</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Premium card preview */}
+              {/* Premium card preview — SVG-based (matches actual export) */}
               <div className="flex justify-center">
-                <div
-                  className="w-full max-w-lg aspect-[16/10] rounded-2xl shadow-2xl relative overflow-hidden"
-                  style={{
-                    background: `linear-gradient(135deg, ${template.bgColor}, #0E8C49, #163D2B)`,
-                    color: template.textColor,
-                  }}
-                  aria-label="Card preview"
-                >
-                  {/* Organic shapes */}
-                  <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -mr-16 -mt-16" />
-                  <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full -ml-20 -mb-20" />
-                  <div className="absolute top-1/2 right-1/4 w-24 h-24 bg-white/3 rounded-full" />
-
-                  {/* Header */}
-                  <div className="absolute top-3 left-4 right-4 flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 border border-white/10 backdrop-blur-sm">
-                    <span className="text-[10px] font-medium opacity-60">FaîtiereHub</span>
-                    <span className="text-[9px] tracking-wider opacity-70">CARTE D'IDENTITÉ MEMBRE</span>
-                    <span className="text-[9px] font-medium text-green-300 bg-green-500/20 px-2 py-0.5 rounded-full">✓ VÉRIFIÉ</span>
-                  </div>
-
-                  {/* Hero: Photo + Name */}
-                  <div className="absolute top-16 left-5 flex items-center gap-3">
-                    <div className="w-14 h-14 rounded-full bg-white/10 border-2 border-white/20 flex items-center justify-center">
-                      <span className="text-lg opacity-40">👤</span>
-                    </div>
-                    <div>
-                      <p className="text-lg font-bold leading-tight">{template.title || 'Nom Membre'}</p>
-                      <p className="text-[10px] opacity-60">{currentCooperative?.name ?? 'Coopérative'}</p>
-                      <p className="text-[9px] font-mono text-green-300 mt-0.5">COOP-12345</p>
-                    </div>
-                  </div>
-
-                  {/* Info blocks */}
-                  <div className="absolute bottom-16 left-4 right-4 grid grid-cols-2 gap-2">
-                    {[
-                      { icon: '📍', label: 'Localité', value: 'Village, Préfecture' },
-                      { icon: '📞', label: 'Téléphone', value: '+228 90 XX XX XX' },
-                      { icon: '🏢', label: 'Coopérative', value: isFaitiereAdmin && selectedCoopId ? childCooperatives.find(c => c.id === selectedCoopId)?.name ?? 'Coop' : currentCooperative?.name ?? 'Coop' },
-                      { icon: '🌿', label: 'Faîtière', value: isFaitiereAdmin ? currentCooperative?.name ?? 'Faîtière' : currentCooperative?.faitiereName ?? 'FENOMAT' },
-                    ].map((b, i) => (
-                      <div key={i} className="px-2 py-1.5 rounded-lg bg-white/5 border border-white/10">
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px]">{b.icon}</span>
-                          <span className="text-[8px] uppercase opacity-50">{b.label}</span>
-                        </div>
-                        <p className="text-[9px] font-medium truncate mt-0.5">{b.value}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* QR + Footer */}
-                  <div className="absolute bottom-2 left-4 right-4 flex items-end justify-between px-2 py-1.5 rounded-lg bg-white/5 border border-white/10">
-                    <div>
-                      <p className="text-[8px] opacity-50">VALIDE JUSQU'AU</p>
-                      <p className="text-[10px] font-semibold">19 MAY 2027</p>
-                    </div>
-                    <div className="text-[7px] opacity-40">{template.subtitle}</div>
-                    <div className="bg-white rounded-md p-1">
-                      <QrImage value={previewQr} size={32} margin={0} />
-                    </div>
-                  </div>
-                </div>
+                <CardSvgPreview
+                  cooperativeName={isFaitiereAdmin && selectedCoopId ? childCooperatives.find(c => c.id === selectedCoopId)?.name : currentCooperative?.name}
+                  faitiereName={isFaitiereAdmin ? currentCooperative?.name : currentCooperative?.faitiereName}
+                  level="or"
+                />
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <FieldText
