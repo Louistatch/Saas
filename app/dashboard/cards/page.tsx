@@ -98,13 +98,16 @@ export default function CardsPage() {
   }, [isFaitiereAdmin, selectedCoopId, members, allMembers])
 
   const fetchCards = useCallback(async () => {
+    if (!currentCooperative) {
+      setIsLoading(false)
+      return
+    }
     setIsLoading(true)
     let query = supabase
       .from('member_cards')
       .select('*, member:members(first_name, last_name, email, phone, photo_url, prefecture, region, village, canton, faitiere)')
     
-    // If we know the cooperative, filter by hierarchy. Otherwise load all accessible.
-    if (currentCooperative && (currentCooperative.level === 'faitiere' || currentCooperative.level === 'union')) {
+    if (currentCooperative.level === 'faitiere' || currentCooperative.level === 'union') {
       // Fetch all cooperative IDs in hierarchy directly
       const { data: allCoops } = await supabase
         .from('cooperatives')
@@ -121,7 +124,7 @@ export default function CardsPage() {
         const allIds = [...new Set([...directIds, ...(grandChildren ?? []).map(c => c.id)])]
         query = query.in('cooperative_id', allIds)
       }
-    } else if (currentCooperative) {
+    } else {
       query = query.eq('cooperative_id', currentCooperative.id)
     }
     // If currentCooperative is null, load all (RLS will filter)
