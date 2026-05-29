@@ -74,7 +74,10 @@ export default function IntegrationsPage() {
   const [toggling, setToggling] = useState<string | null>(null)
 
   const loadStatuses = useCallback(async () => {
-    if (!currentCooperative) return
+    if (!currentCooperative) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     const { data, error } = await supabase
       .from('integrations')

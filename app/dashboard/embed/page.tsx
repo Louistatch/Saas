@@ -56,7 +56,10 @@ export default function EmbedConfigPage() {
   const [newOrigin, setNewOrigin] = useState('')
 
   const loadConfig = useCallback(async () => {
-    if (!currentCooperative) return
+    if (!currentCooperative) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     const { data } = await supabase
       .from('embed_configs')

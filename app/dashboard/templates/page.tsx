@@ -61,14 +61,38 @@ export default function TemplatesPage() {
   const [pendingFile, setPendingFile] = useState<{ name: string; path: string; type: string; size: number } | null>(null)
 
   const fetchTemplates = useCallback(async () => {
-    if (!currentCooperative) return
+    if (!currentCooperative) {
+      setIsLoading(false)
+      return
+    }
     setIsLoading(true)
-    const { data, error } = await supabase
+
+    let query = supabase
       .from('templates')
       .select('*')
-      .eq('cooperative_id', currentCooperative.id)
-      .order('category')
-      .order('title')
+
+    // For faitiere/union: load templates from all child cooperatives
+    if (currentCooperative.level === 'faitiere' || currentCooperative.level === 'union') {
+      const { data: childCoops } = await supabase
+        .from('cooperatives')
+        .select('id')
+        .or(`id.eq.${currentCooperative.id},parent_id.eq.${currentCooperative.id}`)
+      const childIds = (childCoops ?? []).map(c => c.id)
+      if (childIds.length > 0) {
+        const { data: grandChildCoops } = await supabase
+          .from('cooperatives')
+          .select('id')
+          .in('parent_id', childIds)
+        const allIds = [...new Set([...childIds, ...(grandChildCoops ?? []).map(c => c.id)])]
+        query = query.in('cooperative_id', allIds)
+      } else {
+        query = query.eq('cooperative_id', currentCooperative.id)
+      }
+    } else {
+      query = query.eq('cooperative_id', currentCooperative.id)
+    }
+
+    const { data, error } = await query.order('category').order('title')
     if (error) {
       toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })
     } else {

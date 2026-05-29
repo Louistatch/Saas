@@ -143,8 +143,29 @@ export default function MarketplacePage() {
     let query = supabase
       .from('fiches_techniques')
       .select('*', { count: 'exact' })
-      .eq('cooperative_id', currentCooperative.id)
-      .order('created_at', { ascending: false })
+
+    // For faitiere/union: load fiches from all child cooperatives
+    if (currentCooperative.level === 'faitiere' || currentCooperative.level === 'union') {
+      const { data: childCoops } = await supabase
+        .from('cooperatives')
+        .select('id')
+        .or(`id.eq.${currentCooperative.id},parent_id.eq.${currentCooperative.id}`)
+      const childIds = (childCoops ?? []).map(c => c.id)
+      if (childIds.length > 0) {
+        const { data: grandChildCoops } = await supabase
+          .from('cooperatives')
+          .select('id')
+          .in('parent_id', childIds)
+        const allIds = [...new Set([...childIds, ...(grandChildCoops ?? []).map(c => c.id)])]
+        query = query.in('cooperative_id', allIds)
+      } else {
+        query = query.eq('cooperative_id', currentCooperative.id)
+      }
+    } else {
+      query = query.eq('cooperative_id', currentCooperative.id)
+    }
+
+    query = query.order('created_at', { ascending: false })
 
     if (debouncedSearch.trim()) {
       query = query.or(`title.ilike.%${debouncedSearch.trim()}%,culture.ilike.%${debouncedSearch.trim()}%`)

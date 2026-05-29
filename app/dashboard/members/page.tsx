@@ -90,7 +90,10 @@ export default function MembersPage() {
   const [importing, setImporting] = useState(false)
 
   const fetchMembers = useCallback(async () => {
-    if (!currentCooperative) return
+    if (!currentCooperative) {
+      setIsLoading(false)
+      return
+    }
     setIsLoading(true)
     let query = supabase.from('members').select('*').order('last_name')
     

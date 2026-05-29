@@ -24,7 +24,10 @@ export default function PrintCardsPage() {
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchCards = useCallback(async () => {
-    if (!currentCooperative) return
+    if (!currentCooperative) {
+      setIsLoading(false)
+      return
+    }
     setIsLoading(true)
     let query = supabase
       .from('member_cards')

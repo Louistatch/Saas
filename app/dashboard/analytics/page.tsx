@@ -35,7 +35,10 @@ export default function AnalyticsPage() {
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchStats = useCallback(async () => {
-    if (!currentCooperative) return
+    if (!currentCooperative) {
+      setIsLoading(false)
+      return
+    }
     setIsLoading(true)
     const coopId = currentCooperative.id
 

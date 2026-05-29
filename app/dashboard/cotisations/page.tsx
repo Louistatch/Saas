@@ -112,7 +112,10 @@ export default function CotisationsPage() {
 
   // Load cotisations
   const fetchCotisations = useCallback(async () => {
-    if (!currentCooperative) return
+    if (!currentCooperative) {
+      setIsLoading(false)
+      return
+    }
     setIsLoading(true)
 
     let query = supabase
