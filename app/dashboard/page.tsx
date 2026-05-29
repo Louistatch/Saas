@@ -36,7 +36,10 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchStats = useCallback(async () => {
-    if (!currentCooperative) return
+    if (!currentCooperative) {
+      setIsLoading(false)
+      return
+    }
     setIsLoading(true)
 
     // Always filter by the selected cooperative (super_admin uses the switcher)
