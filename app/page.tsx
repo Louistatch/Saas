@@ -61,14 +61,15 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-              {/* Video */}
+              {/* Video — lazy: shows the poster image instantly, only fetches
+                  the (heavy) video when the user taps play. preload="none"
+                  prevents the 35MB download on page load (major mobile speedup). */}
               <video
-                autoPlay
-                muted
-                loop
+                controls
+                preload="none"
                 playsInline
                 className="w-full aspect-video object-cover"
-                poster="/showcase-card.png"
+                poster="/showcase-card.webp"
               >
                 <source src="/demo-video.mp4" type="video/mp4" />
               </video>
@@ -78,7 +79,7 @@ export default function Home() {
             <div className="absolute -bottom-8 -right-4 md:-right-12 w-48 md:w-56 rounded-xl overflow-hidden shadow-2xl border-2 border-white/20 rotate-3 hover:rotate-0 transition-transform duration-500 hidden sm:block">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/showcase-card.png"
+                src="/showcase-card.webp"
                 alt="Carte membre FaîtiereHub"
                 className="w-full h-auto"
               />
@@ -105,7 +106,7 @@ export default function Home() {
             <div className="relative group">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/showcase-card.png"
+                src="/showcase-card.webp"
                 alt="Carte membre FaîtiereHub — Design premium avec photo, QR code, localité, coopérative"
                 className="w-full max-w-3xl rounded-2xl shadow-2xl border border-border group-hover:scale-[1.02] transition-transform duration-500"
               />
