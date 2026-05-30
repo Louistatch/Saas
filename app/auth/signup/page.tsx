@@ -3,277 +3,213 @@
 import { Logo } from '@/components/shared/logo'
 import { AuthSidePanel } from '@/components/shared/auth-side-panel'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Eye, EyeOff, ArrowLeft, MailCheck } from 'lucide-react'
-import { useAuth } from '@/app/context/auth-context'
+import { ArrowLeft, Send, CheckCircle2 } from 'lucide-react'
 import { Spinner } from '@/components/shared/loading'
-import { errorMessage } from '@/lib/utils/errors'
-import { flattenZodErrors, signupSchema } from '@/lib/validators/schemas'
 
+/**
+ * Signup page — replaced by a "Request Access" form.
+ * 
+ * On FaîtiereHub, accounts are created by the platform admin.
+ * Users (faîtières, coopératives) submit a request here,
+ * and the admin creates their account manually.
+ */
 export default function SignupPage() {
-  const router = useRouter()
-  const { signup, isLoading, isAuthenticated, user } = useAuth()
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
+    organizationName: '',
+    contactName: '',
+    phone: '',
     email: '',
-    cooperative: '',
-    password: '',
+    type: 'faitiere',
+    message: '',
   })
-  const [acceptTerms, setAcceptTerms] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState('')
-  const [emailSent, setEmailSent] = useState(false)
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
-
-  useEffect(() => {
-    if (isAuthenticated && !isLoading) {
-      router.replace(user?.role === 'super_admin' ? '/admin' : '/dashboard')
-    }
-  }, [isAuthenticated, isLoading, user, router])
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { id, value } = e.target
-    setFormData((prev) => ({ ...prev, [id]: value }))
-  }
+  const [submitted, setSubmitted] = useState(false)
+  const [error, setError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
-
-    if (!acceptTerms) {
-      setError('Veuillez accepter les Conditions d\'utilisation pour continuer.')
+    if (!formData.organizationName || !formData.contactName || !formData.phone) {
+      setError('Veuillez remplir les champs obligatoires')
       return
     }
-
-    const parsed = signupSchema.safeParse(formData)
-    if (!parsed.success) {
-      setFieldErrors(flattenZodErrors(parsed.error))
-      return
-    }
-    setFieldErrors({})
-
     setSubmitting(true)
+    setError('')
     try {
-      const { needsEmailConfirmation } = await signup(
-        parsed.data.email,
-        parsed.data.password,
-        parsed.data.firstName,
-        parsed.data.lastName,
-        parsed.data.cooperative,
-      )
-      if (needsEmailConfirmation) {
-        // AUTH-12: route to the dedicated check-email page with resend support.
-        router.push(`/auth/verify-email?email=${encodeURIComponent(parsed.data.email)}`)
-        return
+      const res = await fetch('/api/contact-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.contactName,
+          email: formData.email || `${formData.phone}@faitierehub.com`,
+          phone: formData.phone,
+          organization: formData.organizationName,
+          type: formData.type,
+          message: formData.message || `Demande d'accès - ${formData.type} - ${formData.organizationName}`,
+        }),
+      })
+      if (res.ok) {
+        setSubmitted(true)
+      } else {
+        setError('Erreur lors de l\'envoi. Réessayez ou contactez-nous par WhatsApp.')
       }
-    } catch (err) {
-      setError(errorMessage(err))
-      setSubmitting(false)
+    } catch {
+      setError('Erreur de connexion. Vérifiez votre internet.')
     }
+    setSubmitting(false)
   }
 
-  return (
-    <div className="min-h-screen grid md:grid-cols-2 bg-background">
-      <AuthSidePanel
-        title="Développez votre coopérative"
-        description="Mettez votre coopérative en ligne en quelques minutes avec notre plateforme."
-        benefits={[
-          'Essai gratuit de 30 jours, sans carte bancaire',
-          'Configuration en moins de 5 minutes',
-          'Équipe de support dédiée',
-        ]}
-        footer="Rejoignez les coopératives agricoles utilisant FaîtiereHub."
-      />
-
-      <div className="flex flex-col items-center justify-center p-4 sm:p-8 overflow-y-auto">
-        {/* Mobile header: logo + back link + mini card */}
-        <div className="md:hidden w-full max-w-sm mb-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-              <ArrowLeft className="h-4 w-4" />
-              Accueil
-            </Link>
-            <Logo size="sm" />
-          </div>
-          {/* Mini card illustration mobile */}
-          <div className="relative mx-auto w-full max-w-[240px]">
-            <div className="bg-gradient-to-br from-primary via-primary/90 to-green-700 rounded-xl p-4 shadow-lg transform -rotate-1">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-white/70 text-[9px] uppercase tracking-widest">Carte Membre</p>
-                  <p className="text-white font-bold text-xs">FaîtiereHub</p>
-                </div>
-                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                  <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                  </svg>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 mt-3">
-                <div className="w-8 h-8 rounded-full bg-white/20" />
-                <div className="space-y-1">
-                  <div className="h-2 w-16 bg-white/30 rounded-full" />
-                  <div className="h-1.5 w-10 bg-white/20 rounded-full" />
-                </div>
-              </div>
+  if (submitted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <Card className="w-full max-w-md border-border">
+          <CardContent className="pt-8 pb-8 text-center space-y-4">
+            <div className="w-16 h-16 mx-auto rounded-full bg-green-100 flex items-center justify-center">
+              <CheckCircle2 className="h-8 w-8 text-green-600" />
             </div>
-          </div>
-        </div>
-
-        <Card className="w-full max-w-sm border-border">
-          <CardHeader className="space-y-2">
-            <CardTitle className="text-2xl">Créer votre compte</CardTitle>
-            <CardDescription>Commencez avec FaîtiereHub dès aujourd&apos;hui</CardDescription>
-          </CardHeader>
-
-          <CardContent>
-            {emailSent ? (
-              <div className="space-y-4 text-center py-4">
-                <MailCheck className="h-12 w-12 text-green-600 mx-auto" />
-                <p className="font-medium text-foreground">Vérifiez votre boîte mail</p>
-                <p className="text-sm text-muted-foreground">
-                  Un lien de confirmation a été envoyé à{' '}
-                  <strong>{formData.email}</strong>. Cliquez dessus pour activer
-                  votre compte et finaliser la création de votre coopérative.
-                </p>
-                <Link href="/auth/login">
-                  <Button variant="outline" className="w-full border-border gap-2">
-                    <ArrowLeft className="h-4 w-4" />
-                    Retour à la connexion
-                  </Button>
-                </Link>
-              </div>
-            ) : (
-            <form className="space-y-4" onSubmit={handleSubmit} noValidate>
-              {error && (
-                <div
-                  className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-sm text-destructive"
-                  role="alert"
-                >
-                  {error}
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                <Field id="firstName" label="Prénom" value={formData.firstName} onChange={handleChange} placeholder="Jean" error={fieldErrors.firstName} required />
-                <Field id="lastName" label="Nom" value={formData.lastName} onChange={handleChange} placeholder="Dupont" error={fieldErrors.lastName} required />
-              </div>
-
-              <Field id="cooperative" label="Nom de la coopérative" value={formData.cooperative} onChange={handleChange} placeholder="Votre coopérative" error={fieldErrors.cooperative} required />
-
-              <Field id="email" type="email" label="Adresse email" value={formData.email} onChange={handleChange} placeholder="vous@cooperative.com" error={fieldErrors.email} required autoComplete="email" />
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Mot de passe</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    value={formData.password}
-                    onChange={handleChange}
-                    autoComplete="new-password"
-                    aria-invalid={!!fieldErrors.password}
-                    required
-                    className="pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((s) => !s)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
-                    aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-                {fieldErrors.password ? (
-                  <p className="text-xs text-destructive">{fieldErrors.password}</p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Au moins 8 caractères avec des lettres et des chiffres.
-                  </p>
-                )}
-              </div>
-
-              <div className="flex items-start gap-2 pt-2">
-                <Checkbox id="terms" className="mt-1" checked={acceptTerms} onCheckedChange={(v) => setAcceptTerms(!!v)} />
-                <label htmlFor="terms" className="text-sm text-muted-foreground leading-relaxed cursor-pointer">
-                  J&apos;accepte les{' '}
-                  <Link href="#" className="text-primary hover:underline">Conditions d&apos;utilisation</Link>
-                  {' '}et la{' '}
-                  <Link href="#" className="text-primary hover:underline">Politique de confidentialité</Link>
-                </label>
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
-                disabled={isLoading || submitting}
-              >
-                {isLoading || submitting ? <Spinner className="h-4 w-4" /> : null}
-                {isLoading || submitting ? 'Création du compte…' : 'Créer un compte'}
-              </Button>
-            </form>
-            )}
-
-            {!emailSent && (
-            <p className="mt-6 text-center text-sm text-muted-foreground">
-              Vous avez déjà un compte ?{' '}
-              <Link href="/auth/login" className="text-primary hover:underline font-medium">
-                Se connecter
-              </Link>
+            <h2 className="text-xl font-bold text-foreground">Demande envoyée !</h2>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Votre demande d&apos;accès a été transmise à l&apos;équipe FaîtiereHub.
+              Nous vous contacterons sous 24-48h pour créer votre compte.
             </p>
-            )}
+            <div className="pt-4 space-y-2">
+              <Link href="/auth/login">
+                <Button className="w-full">Aller à la connexion</Button>
+              </Link>
+              <a
+                href="https://wa.me/22890000000?text=Bonjour%2C%20j%27ai%20fait%20une%20demande%20d%27acc%C3%A8s%20sur%20FaitireHub"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button variant="outline" className="w-full mt-2">💬 Nous contacter sur WhatsApp</Button>
+              </a>
+            </div>
           </CardContent>
         </Card>
       </div>
-    </div>
-  )
-}
+    )
+  }
 
-function Field({
-  id,
-  label,
-  value,
-  onChange,
-  placeholder,
-  type,
-  error,
-  required,
-  autoComplete,
-}: {
-  id: string
-  label: string
-  value: string
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
-  placeholder?: string
-  type?: string
-  error?: string
-  required?: boolean
-  autoComplete?: string
-}) {
   return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      <Input
-        id={id}
-        type={type ?? 'text'}
-        placeholder={placeholder}
-        value={value}
-        onChange={onChange}
-        required={required}
-        autoComplete={autoComplete}
-        aria-invalid={!!error}
-      />
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+    <div className="min-h-screen flex">
+      {/* Side panel */}
+      <AuthSidePanel />
+
+      {/* Form */}
+      <div className="flex-1 flex items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
+        <div className="w-full max-w-md space-y-6">
+          <div className="flex items-center justify-between">
+            <Link href="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <ArrowLeft className="h-4 w-4" /> Accueil
+            </Link>
+            <Logo size="sm" />
+          </div>
+
+          <Card className="border-border">
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-2xl font-bold text-foreground">Demander un accès</CardTitle>
+              <CardDescription>
+                Les comptes sont créés par l&apos;administrateur. Remplissez ce formulaire et nous vous contacterons.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="type">Type d&apos;organisation *</Label>
+                  <select
+                    id="type"
+                    value={formData.type}
+                    onChange={(e) => setFormData(f => ({ ...f, type: e.target.value }))}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="faitiere">Faîtière / Fédération</option>
+                    <option value="union">Union régionale</option>
+                    <option value="cooperative">Coopérative</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="org">Nom de l&apos;organisation *</Label>
+                  <Input
+                    id="org"
+                    placeholder="Ex: FENOMAT, FNGPC..."
+                    value={formData.organizationName}
+                    onChange={(e) => setFormData(f => ({ ...f, organizationName: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="contact">Nom du responsable *</Label>
+                  <Input
+                    id="contact"
+                    placeholder="Prénom et nom"
+                    value={formData.contactName}
+                    onChange={(e) => setFormData(f => ({ ...f, contactName: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Téléphone *</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="+228 90 XX XX XX"
+                    value={formData.phone}
+                    onChange={(e) => setFormData(f => ({ ...f, phone: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email (optionnel)</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="contact@organisation.tg"
+                    value={formData.email}
+                    onChange={(e) => setFormData(f => ({ ...f, email: e.target.value }))}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="message">Message (optionnel)</Label>
+                  <textarea
+                    id="message"
+                    placeholder="Précisions sur votre organisation, nombre de membres..."
+                    value={formData.message}
+                    onChange={(e) => setFormData(f => ({ ...f, message: e.target.value }))}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px] resize-none"
+                  />
+                </div>
+
+                {error && (
+                  <p className="text-sm text-destructive bg-destructive/10 rounded-md p-2">{error}</p>
+                )}
+
+                <Button type="submit" className="w-full gap-2" disabled={submitting}>
+                  {submitting ? <Spinner className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+                  Envoyer la demande
+                </Button>
+              </form>
+
+              <div className="mt-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Vous avez déjà un compte ?{' '}
+                  <Link href="/auth/login" className="text-primary font-medium hover:underline">
+                    Se connecter
+                  </Link>
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   )
 }
