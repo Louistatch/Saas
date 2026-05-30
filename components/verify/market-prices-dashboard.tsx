@@ -53,36 +53,41 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber }: P
   // Fetch prefectures for a region
   const fetchPrefectures = useCallback(async (regionId: string) => {
     setLoading(true)
+    const controller = new AbortController()
     try {
-      const res = await fetch(`/api/market-prices?action=prefectures&region_id=${regionId}`)
+      const res = await fetch(`/api/market-prices?action=prefectures&region_id=${regionId}`, { signal: controller.signal })
       const data = await res.json()
-      setPrefectures(data.prefectures ?? [])
-    } catch { setPrefectures([]) }
-    setLoading(false)
+      if (!controller.signal.aborted) setPrefectures(data.prefectures ?? [])
+    } catch (e: unknown) { if (!(e instanceof Error && e.name === 'AbortError')) setPrefectures([]) }
+    if (!controller.signal.aborted) setLoading(false)
   }, [])
 
   // Fetch cantons for a prefecture
   const fetchCantons = useCallback(async (prefectureId: string) => {
     setLoading(true)
+    const controller = new AbortController()
     try {
-      const res = await fetch(`/api/market-prices?action=cantons&prefecture_id=${prefectureId}`)
+      const res = await fetch(`/api/market-prices?action=cantons&prefecture_id=${prefectureId}`, { signal: controller.signal })
       const data = await res.json()
-      setCantons(data.cantons ?? [])
-    } catch { setCantons([]) }
-    setLoading(false)
+      if (!controller.signal.aborted) setCantons(data.cantons ?? [])
+    } catch (e: unknown) { if (!(e instanceof Error && e.name === 'AbortError')) setCantons([]) }
+    if (!controller.signal.aborted) setLoading(false)
   }, [])
 
   // Fetch prices for a location
   const fetchPrices = useCallback(async (regionId: string, marketName?: string) => {
     setLoading(true)
+    const controller = new AbortController()
     try {
-      const res = await fetch(`/api/market-prices?region_id=${regionId}`)
+      const res = await fetch(`/api/market-prices?region_id=${regionId}`, { signal: controller.signal })
       const data = await res.json()
-      let filtered = data.prices ?? []
-      if (marketName) filtered = filtered.filter((p: MarketPrice) => p.market_name === marketName)
-      setPrices(filtered)
-    } catch { setPrices([]) }
-    setLoading(false)
+      if (!controller.signal.aborted) {
+        let filtered = data.prices ?? []
+        if (marketName) filtered = filtered.filter((p: MarketPrice) => p.market_name === marketName)
+        setPrices(filtered)
+      }
+    } catch (e: unknown) { if (!(e instanceof Error && e.name === 'AbortError')) setPrices([]) }
+    if (!controller.signal.aborted) setLoading(false)
   }, [])
 
   const handleSelectRegion = (region: typeof REGIONS[0]) => {

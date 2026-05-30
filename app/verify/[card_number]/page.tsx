@@ -69,7 +69,7 @@ export default function VerifyCardPage() {
   const [result, setResult] = useState<VerifyResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [showContent, setShowContent] = useState(false)
-  const [timeLeft, setTimeLeft] = useState(60)
+  const [timeLeft, setTimeLeft] = useState(600)
   const [expired, setExpired] = useState(false)
   const [activeView, setActiveView] = useState<'menu' | 'identity' | 'prices'>('menu')
 
@@ -78,7 +78,7 @@ export default function VerifyCardPage() {
     setResult(null)
     setLoading(true)
     setShowContent(false)
-    setTimeLeft(60)
+    setTimeLeft(600)
     setExpired(false)
     setActiveView('menu')
   }, [cardNumber])
@@ -95,7 +95,7 @@ export default function VerifyCardPage() {
     }
   }, [])
 
-  // Security timer — 60 seconds
+  // Security timer — 10 minutes (600 seconds)
   useEffect(() => {
     if (loading || !result?.valid) return
     const interval = setInterval(() => {
@@ -111,48 +111,43 @@ export default function VerifyCardPage() {
     return () => clearInterval(interval)
   }, [loading, result?.valid])
 
-  // Fetch verification data via secure API route
+  // Fetch verification data via secure API route (with AbortController to prevent race conditions)
   useEffect(() => {
-    let cancelled = false
+    const controller = new AbortController()
 
     async function verify() {
       try {
-        // [SECURITY FIX - FORGE-001] Utiliser l'API serveur au lieu de Supabase direct
-        const res = await fetch(`/api/verify/${encodeURIComponent(cardNumber)}`)
+        const res = await fetch(`/api/verify/${encodeURIComponent(cardNumber)}`, {
+          signal: controller.signal,
+        })
         const data = await res.json()
 
-        if (cancelled) return
+        if (controller.signal.aborted) return
 
         if (!res.ok || !data.valid) {
           setResult({ valid: false, error: data.error ?? 'Carte non trouvée dans le système' })
         } else {
           setResult(data)
         }
-      } catch {
-        if (!cancelled) {
+      } catch (e: unknown) {
+        if (e instanceof Error && e.name === 'AbortError') return
+        if (!controller.signal.aborted) {
           setResult({ valid: false, error: 'Erreur de connexion au serveur' })
         }
       } finally {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setLoading(false)
           setTimeout(() => setShowContent(true), 300)
         }
       }
     }
     verify()
-    return () => { cancelled = true }
+    return () => { controller.abort() }
   }, [cardNumber])
 
   const handleRescan = useCallback(() => {
-    // Force hard reload bypassing all caches
-    // Using cache-busting URL param + location.reload(true) equivalent
-    if ('caches' in window) {
-      caches.keys().then((names) => {
-        names.forEach((name) => caches.delete(name))
-      })
-    }
-    // Modern browsers: reload with cache bypass
-    window.location.href = window.location.pathname + '?t=' + Date.now()
+    // Force redirect to scanner — no simple page reload (security: must physically scan)
+    window.location.href = '/scan'
   }, [])
 
   // Loading state
@@ -214,7 +209,7 @@ export default function VerifyCardPage() {
           <div>
             <h2 className="text-xl font-bold text-white">Session expirée</h2>
             <p className="text-white/50 text-sm mt-2">
-              Pour votre sécurité, cette session a expiré après 60 secondes.
+              Pour votre sécurité, cette session a expiré après 10 minutes.
             </p>
           </div>
           <button
@@ -568,27 +563,27 @@ export default function VerifyCardPage() {
           <div className={`rounded-2xl bg-white/[0.03] border border-white/[0.06] p-4 space-y-3 transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '600ms' }}>
             {/* Timer bar */}
             <div className="flex items-center gap-3">
-              <Timer className={`h-4 w-4 shrink-0 ${timeLeft <= 15 ? 'text-red-400 animate-pulse' : 'text-white/40'}`} />
+              <Timer className={`h-4 w-4 shrink-0 ${timeLeft <= 60 ? 'text-red-400 animate-pulse' : 'text-white/40'}`} />
               <div className="flex-1">
                 <div className="h-1.5 rounded-full bg-white/[0.08] overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-1000 ease-linear ${
-                      timeLeft <= 15 ? 'bg-red-400' : timeLeft <= 30 ? 'bg-yellow-400' : 'bg-[#4ADE80]'
+                      timeLeft <= 60 ? 'bg-red-400' : timeLeft <= 180 ? 'bg-yellow-400' : 'bg-[#4ADE80]'
                     }`}
-                    style={{ width: `${(timeLeft / 60) * 100}%` }}
+                    style={{ width: `${(timeLeft / 600) * 100}%` }}
                   />
                 </div>
               </div>
               <span className={`text-xs font-mono font-bold min-w-[32px] text-right ${
-                timeLeft <= 15 ? 'text-red-400' : 'text-white/50'
+                timeLeft <= 60 ? 'text-red-400' : 'text-white/50'
               }`}>
-                {timeLeft}s
+                {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
               </span>
             </div>
 
             <p className="text-[10px] text-white/30 text-center leading-relaxed">
-              Cette session expire dans {timeLeft} secondes pour votre sécurité.
-              Rescannez le QR code pour un nouvel accès.
+              Session active — {Math.floor(timeLeft / 60)} min restantes.
+              Après expiration, rescannez votre carte.
             </p>
 
             <button
