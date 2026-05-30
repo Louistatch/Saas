@@ -69,7 +69,7 @@ export default function ScanPage() {
           dans le cadre, la vérification démarre toute seule.
         </p>
 
-        <QrScanner onResult={handleResult} onError={setError} className="scan-cam" />
+        <QrScanner onResult={handleResult} className="scan-cam" />
 
         {error && <p className="scan-error">{error}</p>}
 
