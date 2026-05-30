@@ -24,12 +24,17 @@
  * @test Validation failure: malformed payload → 200 + {valid: false}
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { timingSafeEqual, createHmac } from 'node:crypto'
 import { createClient } from '@/lib/supabase/admin'
 import { createLogger } from '@/lib/utils/logger'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
-import { rateLimit, clientKeyFromHeaders } from '@/lib/utils/rate-limit'
-import { koboWebhookPayloadSchema } from '@/lib/validators/kobo'
+import {
+  koboWebhookPayloadSchema,
+  cooperativeNameSchema,
+  escapeIlike,
+} from '@/lib/validators/kobo'
+import { cardPrefix, generateUniqueCardNumber } from '@/lib/utils/card-number'
 import type { KoboWebhookResponse } from '@/lib/kobo/types'
 
 const log = createLogger('webhook:kobo')
@@ -90,21 +95,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<KoboWebho
   }
 
   // -------------------------------------------------------
-  // 3. Rate limiting — 100 req/min/IP
+  // 3. Rate limiting — dedicated 'webhook' bucket (100 req/min/IP) — BUG-01
+  // Single source of truth: Upstash. No redundant in-memory limiter.
   // -------------------------------------------------------
-  // Try persistent (Upstash) first, fallback to in-memory
-  const persistentBlock = await applyRateLimit(request, 'verify')
-  if (persistentBlock) return persistentBlock as NextResponse<{ error: string }>
-
-  // In-memory fallback (if Upstash not configured)
-  const ip = clientKeyFromHeaders(request.headers)
-  const rl = rateLimit(`webhook:kobo:${ip}`, 100, 60_000)
-  if (!rl.ok) {
-    return NextResponse.json(
-      { error: 'Trop de requêtes' },
-      { status: 429 },
-    )
-  }
+  const rateLimitBlock = await applyRateLimit(request, 'webhook')
+  if (rateLimitBlock) return rateLimitBlock as NextResponse<{ error: string }>
 
   // -------------------------------------------------------
   // 4. Authentication — timing-safe secret verification
@@ -146,7 +141,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<KoboWebho
   }
 
   if (!authenticated) {
-    log.warn('Webhook authentication failed', { ip })
+    log.warn('Webhook authentication failed', {
+      ip: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown',
+    })
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
   }
 
@@ -266,16 +263,21 @@ export async function POST(request: NextRequest): Promise<NextResponse<KoboWebho
     started_at: new Date().toISOString(),
   })
 
-  // Fire-and-forget: match + process (wrapped in try/catch)
-  processSubmissionAsync(supabase, submission.id, cooperativeId).catch(
-    (err: unknown) => {
-      const message = err instanceof Error ? err.message : 'Unknown error'
-      log.error('Async processing failed', {
-        submissionId: submission.id,
-        cooperativeId,
-        error: message,
-      })
-    },
+  // BUG-03: hand the async processing to the Vercel runtime via waitUntil().
+  // Unlike fire-and-forget, this keeps the function instance alive until the
+  // promise settles, so the submission can never be stranded in 'pending' when
+  // the instance is recycled. The webhook still returns 200 immediately.
+  waitUntil(
+    processSubmissionAsync(supabase, submission.id, cooperativeId).catch(
+      (err: unknown) => {
+        const message = err instanceof Error ? err.message : 'Unknown error'
+        log.error('Async processing failed', {
+          submissionId: submission.id,
+          cooperativeId,
+          error: message,
+        })
+      },
+    ),
   )
 
   // -------------------------------------------------------
@@ -405,16 +407,39 @@ async function enrollNewMemberFromSubmission(
   const firstName = nameParts[0] ?? ''
   const lastName = nameParts.slice(1).join(' ') || firstName
 
-  // Resolve cooperative: find by name within the faitiere hierarchy
+  // Resolve cooperative by name — SEC-03.
+  // Validate with Zod, escape ILIKE wildcards, and RESTRICT the search to the
+  // faitière's own hierarchy so a malicious payload cannot attach a member to
+  // an arbitrary cooperative elsewhere in the system.
   let targetCooperativeId = faitiereId
   if (nomCooperative) {
-    const { data: coop } = await supabase
-      .from('cooperatives')
-      .select('id')
-      .ilike('name', `%${nomCooperative.trim()}%`)
-      .limit(1)
-      .maybeSingle()
-    if (coop) targetCooperativeId = coop.id
+    const parsedName = cooperativeNameSchema.safeParse(nomCooperative)
+    if (parsedName.success) {
+      const safeName = escapeIlike(parsedName.data)
+
+      // Accessible hierarchy from the faitière root (self + descendants).
+      const { data: accessible } = await supabase.rpc(
+        'get_cooperative_descendants',
+        { p_root_id: faitiereId },
+      )
+      const allowedIds: string[] = Array.isArray(accessible)
+        ? (accessible as { id: string }[]).map((r) => r.id)
+        : [faitiereId]
+
+      const { data: coop } = await supabase
+        .from('cooperatives')
+        .select('id')
+        .ilike('name', `%${safeName}%`)
+        .in('id', allowedIds)
+        .limit(1)
+        .maybeSingle()
+
+      if (coop) targetCooperativeId = coop.id
+    } else {
+      log.warn('Invalid cooperative name in payload — defaulting to faitiere', {
+        faitiereId,
+      })
+    }
   }
 
   // Create the member
@@ -439,17 +464,15 @@ async function enrollNewMemberFromSubmission(
     throw new Error(`Failed to create member: ${memberError?.message ?? 'Unknown'}`)
   }
 
-  // Generate card number (PREFIX-XXXXXX)
-  // Use cooperative prefix or default FEN
+  // Generate card number — SEC-02: crypto-secure + uniqueness retry loop.
   const { data: coopData } = await supabase
     .from('cooperatives')
     .select('name, faitiere_name')
     .eq('id', targetCooperativeId)
     .single()
 
-  const prefix = (coopData?.faitiere_name ?? 'FEN').substring(0, 3).toUpperCase()
-  const randomNum = Math.floor(10000 + Math.random() * 90000)
-  const cardNumber = `${prefix}-${randomNum}`
+  const prefix = cardPrefix(coopData?.faitiere_name ?? coopData?.name ?? 'FEN')
+  const cardNumber = await generateUniqueCardNumber(supabase, prefix)
 
   // Create member card
   const expiryDate = new Date()

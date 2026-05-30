@@ -201,18 +201,25 @@ export default function CardsPage() {
 
   // -- helpers --
 
-  const generateCardNumber = useCallback(() => {
-    // Build a prefix from the cooperative name, using only unambiguous letters.
-    // We strip O (looks like 0), I (looks like 1), and any non-letter chars.
-    const safe =
-      currentCooperative?.name
-        ?.toUpperCase()
-        .replace(/[^A-Z]/g, '')
-        .replace(/[OI]/g, '') ?? ''
-    const prefix = (safe.slice(0, 3) || 'COP').padEnd(2, 'X')
-    const num = Math.floor(Math.random() * 90000) + 10000
-    return `${prefix}-${num}`
-  }, [currentCooperative])
+  const generateCardNumber = useCallback(
+    async (cooperativeId: string): Promise<string> => {
+      // SEC-02: numbers are generated SERVER-SIDE with crypto.randomInt() and a
+      // DB uniqueness check, never with client-side Math.random().
+      const res = await fetch('/api/cards/generate-number', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ cooperativeId }),
+      })
+      if (!res.ok) {
+        const { error: msg } = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(msg ?? 'Échec de génération du numéro de carte')
+      }
+      const { cardNumber } = (await res.json()) as { cardNumber: string }
+      return cardNumber
+    },
+    [],
+  )
 
   const buildQrPayload = useCallback(
     (_memberId: string, cardNumber: string, _member?: { first_name?: string | null; last_name?: string | null; phone?: string | null; photo_url?: string | null; village?: string | null; canton?: string | null; prefecture?: string | null; region?: string | null } | null) => {
@@ -278,14 +285,12 @@ export default function CardsPage() {
         .limit(1)
         .maybeSingle()
 
-      // Reuse previous card number if exists, otherwise generate new one
+      // Reuse previous card number if exists, otherwise generate one server-side.
       let cardNumber: string
       if (previousCard?.card_number) {
         cardNumber = previousCard.card_number
       } else {
-        const prefix = (targetCoopName ?? 'COP').slice(0, 3).toUpperCase().replace(/\s+/g, '')
-        const num = Math.floor(Math.random() * 90000) + 10000
-        cardNumber = `${prefix}-${num}`
+        cardNumber = await generateCardNumber(targetCoopId)
       }
 
       const qrPayload = buildQrPayload(selectedMemberId, cardNumber, null)
@@ -361,7 +366,8 @@ export default function CardsPage() {
           .limit(1)
           .maybeSingle()
 
-        const cardNumber = previousCard?.card_number ?? generateCardNumber()
+        const cardNumber =
+          previousCard?.card_number ?? (await generateCardNumber(currentCooperative.id))
         const qrPayload = buildQrPayload(memberId, cardNumber, null)
 
         await supabase.from('member_cards').insert({

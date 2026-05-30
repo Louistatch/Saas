@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/app/context/auth-context'
 import { CooperativeProvider } from '@/app/context/cooperative-context'
 import { ThemeProvider } from '@/components/theme-provider'
+import { PostHogProvider } from '@/app/providers/posthog-provider'
 import { Toaster } from '@/components/ui/toaster'
 import './globals.css'
 
@@ -37,13 +38,15 @@ export default function RootLayout({
     >
       <body className="font-sans antialiased min-h-screen">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-          <AuthProvider>
-            <CooperativeProvider>
-              {children}
-              <Toaster />
-              {process.env.NODE_ENV === 'production' && <Analytics />}
-            </CooperativeProvider>
-          </AuthProvider>
+          <PostHogProvider>
+            <AuthProvider>
+              <CooperativeProvider>
+                {children}
+                <Toaster />
+                {process.env.NODE_ENV === 'production' && <Analytics />}
+              </CooperativeProvider>
+            </AuthProvider>
+          </PostHogProvider>
         </ThemeProvider>
       </body>
     </html>

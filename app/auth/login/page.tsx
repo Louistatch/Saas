@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { useState, useCallback, Suspense, useMemo } from 'react'
+import { useState, useCallback, Suspense } from 'react'
 import { Logo } from '@/components/shared/logo'
 import { AuthSidePanel } from '@/components/shared/auth-side-panel'
 import { Button } from '@/components/ui/button'
@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Eye, EyeOff, ArrowLeft } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { useAuth } from '@/app/context/auth-context'
 import { Spinner } from '@/components/shared/loading'
 import { errorMessage } from '@/lib/utils/errors'
 import { flattenZodErrors, loginSchema } from '@/lib/validators/schemas'
@@ -30,8 +30,8 @@ import { flattenZodErrors, loginSchema } from '@/lib/validators/schemas'
 function LoginInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const supabase = useMemo(() => createClient(), [])
-  
+  const { login } = useAuth()
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -45,7 +45,7 @@ function LoginInner() {
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     if (submitting) return
-    
+
     setError('')
     setFieldErrors({})
 
@@ -58,55 +58,37 @@ function LoginInner() {
     setSubmitting(true)
     setProgress('Authentification…')
 
-    // No hard timeout — Supabase free tier cold starts can take 20-30s
-    // Instead, show progressive feedback to the user
+    // Progressive feedback for Supabase free-tier cold starts (no hard timeout).
     const progressTimer = setTimeout(() => {
       setProgress('Connexion en cours, veuillez patienter…')
     }, 5000)
-
     const slowTimer = setTimeout(() => {
       setProgress('Le serveur démarre, encore quelques secondes…')
     }, 12000)
 
     try {
-      // SINGLE network call: signInWithPassword
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email: parsed.data.email,
-        password: parsed.data.password,
-      })
+      // SINGLE source of truth: the AuthContext.login() method.
+      const user = await login(parsed.data.email, parsed.data.password)
 
       clearTimeout(progressTimer)
       clearTimeout(slowTimer)
 
-      if (signInError) throw signInError
-      if (!data.user) throw new Error('Échec de connexion')
-
-      // Determine redirect target from JWT — ONLY trust app_metadata
-      const role = data.user.app_metadata?.role ?? 'member'
       setProgress('Redirection…')
 
-      const target = redirectTo && /^\/[^/]/.test(redirectTo)
-        ? redirectTo
-        : role === 'super_admin'
-          ? '/admin'
-          : '/dashboard'
+      const safeRedirect =
+        redirectTo && /^\/[^/]/.test(redirectTo) ? redirectTo : null
+      const target =
+        safeRedirect ?? (user?.role === 'super_admin' ? '/admin' : '/dashboard')
 
-      // SPA navigation — instant, preserves React state, no overlay needed
       router.replace(target)
-
-    } catch (err: any) {
+    } catch (err: unknown) {
       clearTimeout(progressTimer)
       clearTimeout(slowTimer)
-
-      if (err?.name === 'AbortError' || err?.message?.includes('abort')) {
-        setError('Connexion interrompue. Réessayez.')
-      } else {
-        setError(errorMessage(err))
-      }
+      setError(errorMessage(err))
       setSubmitting(false)
       setProgress('')
     }
-  }, [email, password, supabase, redirectTo, submitting])
+  }, [email, password, login, redirectTo, submitting, router])
 
   return (
     <div className="min-h-screen grid md:grid-cols-2 bg-background">

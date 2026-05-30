@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useReferenceData } from './use-reference-data'
 import type { MarketplaceFilters } from './use-marketplace-filters'
 
 export interface PublicFiche {
@@ -28,14 +28,6 @@ interface FichesResult {
   pageSize: number
 }
 
-interface ReferenceData {
-  regions: { id: string; name: string }[]
-  prefectures: { id: string; name: string; region_id: string }[]
-  cantons: { id: string; name: string; prefecture_id: string }[]
-  cultures: { id: string; name: string; icon: string | null; category: string }[]
-  cooperatives: { id: string; name: string }[]
-}
-
 const PAGE_SIZE = 20
 
 /**
@@ -43,44 +35,15 @@ const PAGE_SIZE = 20
  * Used by the public marketplace page.
  */
 export function useFichesPublic(filters: MarketplaceFilters) {
-  const supabase = useMemo(() => createClient(), [])
   const [data, setData] = useState<FichesResult | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [referenceData, setReferenceData] = useState<ReferenceData>({
-    regions: [],
-    prefectures: [],
-    cantons: [],
-    cultures: [],
-    cooperatives: [],
-  })
-  const [refLoading, setRefLoading] = useState(true)
+
+  // DUP-01 / OPT-04: shared cached reference data instead of per-mount fetch.
+  const { referenceData, isLoading: refLoading } = useReferenceData()
 
   const cacheRef = useRef<Map<string, { data: FichesResult; ts: number }>>(new Map())
   const abortRef = useRef<AbortController | null>(null)
-
-  // Load reference data once
-  useEffect(() => {
-    const load = async () => {
-      setRefLoading(true)
-      const [regRes, prefRes, cantRes, cultRes, coopRes] = await Promise.all([
-        supabase.from('regions').select('id, name').order('name'),
-        supabase.from('prefectures').select('id, name, region_id').order('name'),
-        supabase.from('cantons').select('id, name, prefecture_id').order('name'),
-        supabase.from('cultures').select('id, name, icon, category').order('name'),
-        supabase.from('cooperatives').select('id, name').order('name'),
-      ])
-      setReferenceData({
-        regions: regRes.data ?? [],
-        prefectures: prefRes.data ?? [],
-        cantons: cantRes.data ?? [],
-        cultures: cultRes.data ?? [],
-        cooperatives: coopRes.data ?? [],
-      })
-      setRefLoading(false)
-    }
-    load()
-  }, [supabase])
 
   const cacheKey = useMemo(() => JSON.stringify(filters), [filters])
 

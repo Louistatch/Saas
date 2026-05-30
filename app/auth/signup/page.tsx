@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Eye, EyeOff, ArrowLeft } from 'lucide-react'
+import { Eye, EyeOff, ArrowLeft, MailCheck } from 'lucide-react'
 import { useAuth } from '@/app/context/auth-context'
 import { Spinner } from '@/components/shared/loading'
 import { errorMessage } from '@/lib/utils/errors'
@@ -29,6 +29,7 @@ export default function SignupPage() {
   const [acceptTerms, setAcceptTerms] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
+  const [emailSent, setEmailSent] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
 
@@ -61,13 +62,20 @@ export default function SignupPage() {
 
     setSubmitting(true)
     try {
-      await signup(
+      const { needsEmailConfirmation } = await signup(
         parsed.data.email,
         parsed.data.password,
         parsed.data.firstName,
         parsed.data.lastName,
         parsed.data.cooperative,
       )
+      if (needsEmailConfirmation) {
+        // Email confirmation is ON — show the check-email screen instead of
+        // leaving the user on a spinning button forever.
+        setEmailSent(true)
+        setSubmitting(false)
+      }
+      // Otherwise the AuthProvider/redirect effect routes to the dashboard.
     } catch (err) {
       setError(errorMessage(err))
       setSubmitting(false)
@@ -129,6 +137,23 @@ export default function SignupPage() {
           </CardHeader>
 
           <CardContent>
+            {emailSent ? (
+              <div className="space-y-4 text-center py-4">
+                <MailCheck className="h-12 w-12 text-green-600 mx-auto" />
+                <p className="font-medium text-foreground">Vérifiez votre boîte mail</p>
+                <p className="text-sm text-muted-foreground">
+                  Un lien de confirmation a été envoyé à{' '}
+                  <strong>{formData.email}</strong>. Cliquez dessus pour activer
+                  votre compte et finaliser la création de votre coopérative.
+                </p>
+                <Link href="/auth/login">
+                  <Button variant="outline" className="w-full border-border gap-2">
+                    <ArrowLeft className="h-4 w-4" />
+                    Retour à la connexion
+                  </Button>
+                </Link>
+              </div>
+            ) : (
             <form className="space-y-4" onSubmit={handleSubmit} noValidate>
               {error && (
                 <div
@@ -199,13 +224,16 @@ export default function SignupPage() {
                 {isLoading || submitting ? 'Création du compte…' : 'Créer un compte'}
               </Button>
             </form>
+            )}
 
+            {!emailSent && (
             <p className="mt-6 text-center text-sm text-muted-foreground">
               Vous avez déjà un compte ?{' '}
               <Link href="/auth/login" className="text-primary hover:underline font-medium">
                 Se connecter
               </Link>
             </p>
+            )}
           </CardContent>
         </Card>
       </div>

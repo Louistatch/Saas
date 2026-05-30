@@ -207,3 +207,30 @@ export const koboTestConnectionSchema = z.object({
 })
 
 export type KoboTestConnectionInput = z.infer<typeof koboTestConnectionSchema>
+
+// =========================================================
+// Cooperative name (enrollment) — SEC-03
+// Validated and ILIKE-escaped before any DB lookup.
+// =========================================================
+
+/**
+ * Validates a cooperative name coming from an untrusted KoboCollect payload.
+ * Length-bounded and trimmed. Does NOT escape — call escapeIlike() before
+ * interpolating into an .ilike() pattern.
+ */
+export const cooperativeNameSchema = z
+  .string()
+  .trim()
+  .min(2, 'Nom de coopérative trop court')
+  .max(100, 'Nom de coopérative trop long')
+
+/**
+ * Escapes PostgreSQL ILIKE wildcards (%, _, \) so user input cannot widen
+ * the match. Use for the SEARCH TERM, then wrap with your own %...% bounds.
+ *
+ *   const safe = escapeIlike(parsed)        // "a_b%" -> "a\_b\%"
+ *   .ilike('name', `%${safe}%`)
+ */
+export function escapeIlike(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`)
+}

@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
 /**
- * Proxy (Next 16 convention) — PRIMARY auth gate.
- * 
- * CRITICAL: refreshes the session on EVERY request to keep cookies alive.
- * This prevents the "redirect loop after login" bug caused by stale JWTs.
+ * Next.js middleware — PRIMARY auth gate (SEC-01 / AUTH-07).
+ *
+ * CRITICAL: refreshes the Supabase session on EVERY request to keep the JWT
+ * cookies alive server-side. This is the Supabase-recommended pattern for
+ * Next.js App Router and prevents:
+ *   - stale-JWT redirect loops after login
+ *   - silent token expiry in Server Components / API routes (AUTH-07)
+ *
+ * Scale note (10M MAU): getUser() here hits Supabase Auth, but the result is
+ * cookie-cached by @supabase/ssr; only expired tokens trigger a refresh round-trip.
  */
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const hostname = request.headers.get('host') ?? ''
 

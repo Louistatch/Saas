@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { createLogger } from '@/lib/utils/logger'
 import { setUserId, setTenantId, onLogoutBroadcast, destroySession } from '@/lib/auth/session'
@@ -16,14 +17,14 @@ export interface AuthContextType {
   user: AuthUser | null
   isLoading: boolean
   isAuthenticated: boolean
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<AuthUser | null>
   signup: (
     email: string,
     password: string,
     firstName: string,
     lastName: string,
     cooperativeName?: string,
-  ) => Promise<void>
+  ) => Promise<{ needsEmailConfirmation: boolean }>
   logout: () => Promise<void>
   refreshProfile: () => Promise<void>
 }
@@ -54,6 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const supabase = useMemo(() => createClient(), [])
+  const router = useRouter()
 
   // Track user in session for cache namespacing
   useEffect(() => {
@@ -144,14 +146,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return
+
         if (event === 'SIGNED_OUT') {
           setUser(null)
           return
         }
+
+        // AUTH-08: password recovery flow — Supabase emits this when the user
+        // lands from a reset-password email link. Route them to set a new password.
+        if (event === 'PASSWORD_RECOVERY') {
+          router.replace('/auth/reset-password')
+          return
+        }
+
+        // AUTH-08: profile/email/role updated server-side — refresh in-memory user
+        // so a role change (e.g. from the admin panel) takes effect without re-login.
+        if (event === 'USER_UPDATED') {
+          if (session?.user) {
+            const profile = await fetchProfile(session.user.id)
+            if (mounted && profile) setUser(profile)
+          }
+          return
+        }
+
         if (session?.user) {
           const profile = await fetchProfile(session.user.id)
           if (mounted && profile) setUser(profile)
-          // If profile is null, user stays null — they'll be treated as unauthenticated
+          // If profile is null, user stays null — treated as unauthenticated.
         }
       },
     )
@@ -160,34 +181,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false
       subscription?.unsubscribe()
     }
-  }, [supabase, fetchProfile])
+  }, [supabase, fetchProfile, router])
 
   const login = useCallback(
-    async (email: string, password: string) => {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+    async (email: string, password: string): Promise<AuthUser | null> => {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
+      if (!data.user) return null
+      // Resolve the freshest profile so the caller can route by role.
+      const profile = await fetchProfile(data.user.id)
+      if (profile) setUser(profile)
+      return profile
     },
-    [supabase],
+    [supabase, fetchProfile],
   )
 
-  /**
-   * Polls for the trigger-created profile row. Returns the row or null on timeout.
-   */
-  const waitForProfile = useCallback(
-    async (userId: string, attempts = 8, delayMs = 400): Promise<ProfileRow | null> => {
-      for (let i = 0; i < attempts; i++) {
-        await new Promise((r) => setTimeout(r, delayMs))
-        const { data } = await supabase
-          .from('profiles')
-          .select('id, email, first_name, last_name, role, cooperative_id')
-          .eq('id', userId)
-          .single<ProfileRow>()
-        if (data) return data
-      }
-      return null
-    },
-    [supabase],
-  )
+  const refreshProfile = useCallback(async () => {
+    if (!user) return
+    const profile = await fetchProfile(user.id)
+    if (profile) setUser(profile)
+  }, [fetchProfile, user])
 
   const signup = useCallback(
     async (
@@ -196,7 +209,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       firstName: string,
       lastName: string,
       cooperativeName?: string,
-    ) => {
+    ): Promise<{ needsEmailConfirmation: boolean }> => {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -210,37 +223,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       })
       if (error) throw error
-      if (!data.user) return
+      if (!data.user) return { needsEmailConfirmation: false }
 
-      if (cooperativeName) {
-        const profile = await waitForProfile(data.user.id)
-        if (!profile) {
-          log.warn('Profile trigger did not run within timeout — skipping cooperative bootstrap')
-          return
-        }
-
-        const { data: coop, error: coopError } = await supabase
-          .from('cooperatives')
-          .insert({ name: cooperativeName, description: '' })
-          .select('id')
-          .single<{ id: string }>()
-
-        if (coopError || !coop) {
-          log.error('Failed to create cooperative on signup', coopError)
-          return
-        }
-
-        // Use SECURITY DEFINER function to assign role (user cannot self-promote)
-        const { error: bootstrapErr } = await supabase.rpc('bootstrap_cooperative_admin', {
-          target_user_id: data.user.id,
-          target_cooperative_id: coop.id,
+      // When email confirmation is ON, there is no active session yet, so the
+      // cooperative bootstrap can't run here — it will run after the user
+      // confirms and lands authenticated. Signal the UI to show a check-email screen.
+      const hasSession = !!data.session
+      if (cooperativeName && hasSession) {
+        // AUTH-03: cooperative creation + role assignment happen SERVER-SIDE.
+        const res = await fetch('/api/auth/complete-signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ cooperativeName }),
         })
-        if (bootstrapErr) {
-          log.error('Failed to bootstrap cooperative admin', bootstrapErr)
+        if (!res.ok) {
+          const { error: msg } = (await res.json().catch(() => ({}))) as { error?: string }
+          log.error('complete-signup failed', { status: res.status, msg })
+          throw new Error(msg ?? 'Failed to finalize cooperative setup')
         }
+        await refreshProfile()
       }
+
+      return { needsEmailConfirmation: !hasSession }
     },
-    [supabase, waitForProfile],
+    [supabase, refreshProfile],
   )
 
   const logout = useCallback(async () => {
@@ -248,12 +255,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { performLogout } = await import('@/lib/auth/logout')
     await performLogout()
   }, [])
-
-  const refreshProfile = useCallback(async () => {
-    if (!user) return
-    const profile = await fetchProfile(user.id)
-    if (profile) setUser(profile)
-  }, [fetchProfile, user])
 
   const value: AuthContextType = {
     user,

@@ -48,6 +48,13 @@ export const rateLimiters = redis
         limiter: Ratelimit.slidingWindow(5, '60 s'),
         prefix: 'rl:auth',
       }),
+
+      // Webhooks (Kobo) : 100/minute — high write volume from field syncs (BUG-01)
+      webhook: new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(100, '60 s'),
+        prefix: 'rl:webhook',
+      }),
     }
   : null
 
@@ -58,7 +65,7 @@ export const rateLimiters = redis
  */
 export async function applyRateLimit(
   request: NextRequest,
-  limiter: 'verify' | 'marketplace' | 'embed' | 'auth'
+  limiter: 'verify' | 'marketplace' | 'embed' | 'auth' | 'webhook'
 ): Promise<NextResponse | null> {
   if (!rateLimiters) {
     // Upstash not configured — fall through to in-memory rate limiter in route handlers

@@ -8,6 +8,7 @@
 import 'server-only'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { redirect } from 'next/navigation'
 
 export interface AccessContext {
   userId: string
@@ -63,6 +64,38 @@ export async function assertAuthenticated() {
     return { ok: false as const, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
   }
   return { ok: true as const, ctx }
+}
+
+/**
+ * Server-Component / page guard (BUG-05).
+ *
+ * Unlike assertRole (which returns a NextResponse for API routes), this throws
+ * a Next.js redirect when access is denied — the correct primitive for
+ * Server Components and layouts. Use it at the top of protected pages:
+ *
+ *   const ctx = await requireRole('super_admin')  // redirects if unauthorized
+ *
+ * Defense-in-depth: this runs in addition to the edge middleware AND RLS.
+ */
+export async function requireRole(
+  requiredRole: 'super_admin' | 'cooperative_admin',
+): Promise<AccessContext> {
+  const ctx = await getAccessContext()
+
+  if (!ctx) {
+    redirect('/auth/login')
+  }
+  if (requiredRole === 'super_admin' && ctx.role !== 'super_admin') {
+    redirect('/forbidden')
+  }
+  if (
+    requiredRole === 'cooperative_admin' &&
+    ctx.role !== 'super_admin' &&
+    ctx.role !== 'cooperative_admin'
+  ) {
+    redirect('/forbidden')
+  }
+  return ctx
 }
 
 /**

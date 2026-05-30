@@ -5,6 +5,31 @@ import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 
 const log = createLogger('api:member-access')
 
+/** Shape of the embedded member relation returned by the card query. */
+interface MemberRelation {
+  id: string
+  first_name: string | null
+  last_name: string | null
+  phone: string | null
+  photo_url: string | null
+  village: string | null
+  canton: string | null
+  prefecture: string | null
+  region: string | null
+}
+
+/**
+ * PostgREST returns an embedded one-to-one relation either as an object or,
+ * depending on the inferred cardinality, as a single-element array. Normalize
+ * both into a single MemberRelation | null — without resorting to `as any`.
+ */
+function normalizeMember(
+  member: MemberRelation | MemberRelation[] | null,
+): MemberRelation | null {
+  if (!member) return null
+  return Array.isArray(member) ? (member[0] ?? null) : member
+}
+
 /**
  * POST /api/member-access
  * Login by card number — returns member info + cooperative if valid.
@@ -68,17 +93,22 @@ export async function POST(request: NextRequest) {
       .eq('id', card.cooperative_id)
       .single()
 
+    // Normalize the embedded relation (object | single-element array) safely.
+    const member = normalizeMember(
+      card.member as MemberRelation | MemberRelation[] | null,
+    )
+
     // Log access
     await supabase.from('member_access_logs').insert({
       card_number: cardNumber,
-      member_id: (card.member as any)?.id,
+      member_id: member?.id ?? null,
       cooperative_id: card.cooperative_id,
       action: 'login',
     })
 
     return NextResponse.json({
       success: true,
-      member: card.member,
+      member,
       card: {
         number: card.card_number,
         expiry: card.expiry_date,

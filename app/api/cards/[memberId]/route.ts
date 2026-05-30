@@ -13,6 +13,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { initWasm, Resvg } from '@resvg/resvg-wasm'
 import { createClient } from '@/lib/supabase/server'
+import { assertTenantAccess } from '@/lib/security/assert-access'
 import { buildCardSchema, renderToSvgString } from '@/lib/card-engine'
 
 export const runtime = 'nodejs'
@@ -73,6 +74,12 @@ export async function GET(
       { status: 404 }
     )
   }
+
+  // SEC-05: verify the caller actually has access to this card's cooperative.
+  // Authentication alone is insufficient — any admin could otherwise render the
+  // PNG of a member in a cooperative they don't belong to.
+  const tenant = await assertTenantAccess(card.cooperative_id)
+  if (!tenant.ok) return tenant.response
 
   // Fetch member details
   const { data: member } = await supabase

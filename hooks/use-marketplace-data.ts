@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useReferenceData } from './use-reference-data'
 import type { MarketplaceFilters } from './use-marketplace-filters'
 
 export interface MarketplaceProduct {
@@ -36,14 +37,6 @@ interface MarketplaceResult {
   total_pages: number
 }
 
-interface ReferenceData {
-  regions: { id: string; name: string }[]
-  prefectures: { id: string; name: string; region_id: string }[]
-  cantons: { id: string; name: string; prefecture_id: string }[]
-  cultures: { id: string; name: string; icon: string | null; category: string }[]
-  cooperatives: { id: string; name: string }[]
-}
-
 const PAGE_SIZE = 20
 
 /**
@@ -55,41 +48,14 @@ export function useMarketplaceData(filters: MarketplaceFilters) {
   const [data, setData] = useState<MarketplaceResult | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [referenceData, setReferenceData] = useState<ReferenceData>({
-    regions: [],
-    prefectures: [],
-    cantons: [],
-    cultures: [],
-    cooperatives: [],
-  })
-  const [refLoading, setRefLoading] = useState(true)
 
-  // Cache for reference data
+  // DUP-01 / OPT-04: reference data comes from the shared cached hook,
+  // not a per-mount 5-query fetch.
+  const { referenceData, isLoading: refLoading } = useReferenceData()
+
+  // Cache for marketplace query results (filter-keyed)
   const cacheRef = useRef<Map<string, { data: MarketplaceResult; ts: number }>>(new Map())
   const abortRef = useRef<AbortController | null>(null)
-
-  // Load reference data once
-  useEffect(() => {
-    const load = async () => {
-      setRefLoading(true)
-      const [regRes, prefRes, cantRes, cultRes, coopRes] = await Promise.all([
-        supabase.from('regions').select('id, name').order('name'),
-        supabase.from('prefectures').select('id, name, region_id').order('name'),
-        supabase.from('cantons').select('id, name, prefecture_id').order('name'),
-        supabase.from('cultures').select('id, name, icon, category').order('name'),
-        supabase.from('cooperatives').select('id, name').order('name'),
-      ])
-      setReferenceData({
-        regions: regRes.data ?? [],
-        prefectures: prefRes.data ?? [],
-        cantons: cantRes.data ?? [],
-        cultures: cultRes.data ?? [],
-        cooperatives: coopRes.data ?? [],
-      })
-      setRefLoading(false)
-    }
-    load()
-  }, [supabase])
 
   // Build cache key from filters
   const cacheKey = useMemo(() => JSON.stringify(filters), [filters])
@@ -137,9 +103,9 @@ export function useMarketplaceData(filters: MarketplaceFilters) {
       const parsed = result as MarketplaceResult
       setData(parsed)
       cacheRef.current.set(cacheKey, { data: parsed, ts: Date.now() })
-    } catch (err: any) {
-      if (err?.name === 'AbortError') return
-      setError(err?.message ?? 'Erreur de chargement')
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      setError(err instanceof Error ? err.message : 'Erreur de chargement')
     } finally {
       setIsLoading(false)
     }
