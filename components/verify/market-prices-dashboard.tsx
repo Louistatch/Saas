@@ -24,8 +24,8 @@ const CULTURE_LIST = [
   { id: '939b0bc8-54d5-45ae-926b-df491ba062fd', name: 'Manioc', emoji: '🌱' },
 ]
 
-interface Prefecture { id: string; name: string }
-interface Canton { id: string; name: string }
+interface Prefecture { id: string; name: string; priceCount?: number }
+interface Canton { id: string; name: string; priceCount?: number }
 interface MarketPrice { id: string; culture_id: string; market_name: string; price: number; trend: string; verified: boolean; cultures: { name: string } | null }
 
 function TrendBadge({ trend }: { trend: string }) {
@@ -49,6 +49,15 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber }: P
   const [submitForm, setSubmitForm] = useState({ culture_id: '', price: '' })
   const [submitting, setSubmitting] = useState(false)
   const [submitResult, setSubmitResult] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [regionCounts, setRegionCounts] = useState<Record<string, number>>({})
+
+  // Load region counts on mount
+  useEffect(() => {
+    fetch('/api/market-prices?action=regions')
+      .then(r => r.json())
+      .then(d => setRegionCounts(d.regionCounts ?? {}))
+      .catch(() => {})
+  }, [])
 
   // Fetch prefectures for a region
   const fetchPrefectures = useCallback(async (regionId: string) => {
@@ -182,7 +191,13 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber }: P
           {REGIONS.map((r) => (
             <button key={r.id} onClick={() => handleSelectRegion(r)} className="w-full rounded-2xl bg-white/[0.04] border border-white/[0.08] p-4 flex items-center gap-4 active:scale-[0.98] transition-transform hover:bg-white/[0.06]">
               <div className="w-12 h-12 rounded-xl bg-[#4ADE80]/10 flex items-center justify-center text-xl">{r.emoji}</div>
-              <div className="flex-1 text-left"><p className="text-sm font-semibold text-white">{r.name}</p></div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-semibold text-white">{r.name}</p>
+                <p className="text-[11px] text-white/40">{regionCounts[r.id] ?? 0} prix enregistrés</p>
+              </div>
+              {(regionCounts[r.id] ?? 0) > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-[#4ADE80]/10 text-[#4ADE80] text-[10px] font-bold">{regionCounts[r.id]}</span>
+              )}
               <svg className="h-4 w-4 text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
           ))}
@@ -196,6 +211,9 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber }: P
             <button key={p.id} onClick={() => handleSelectPrefecture(p)} className="w-full rounded-xl bg-white/[0.04] border border-white/[0.08] p-3.5 flex items-center gap-3 active:scale-[0.98] transition-transform hover:bg-white/[0.06]">
               <MapPin className="h-4 w-4 text-[#4ADE80]/60 shrink-0" />
               <span className="text-sm text-white font-medium flex-1 text-left">{p.name}</span>
+              {(p.priceCount ?? 0) > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-[#4ADE80]/10 text-[#4ADE80] text-[10px] font-bold">{p.priceCount}</span>
+              )}
               <svg className="h-3.5 w-3.5 text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
           ))}
@@ -209,6 +227,11 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber }: P
             <button key={c.id} onClick={() => handleSelectCanton(c)} className="w-full rounded-xl bg-white/[0.04] border border-white/[0.08] p-3.5 flex items-center gap-3 active:scale-[0.98] transition-transform hover:bg-white/[0.06]">
               <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-sm">🏘️</div>
               <span className="text-sm text-white font-medium flex-1 text-left">{c.name}</span>
+              {(c.priceCount ?? 0) > 0 ? (
+                <span className="px-2 py-0.5 rounded-full bg-[#4ADE80]/10 text-[#4ADE80] text-[10px] font-bold">{c.priceCount} prix</span>
+              ) : (
+                <span className="text-[10px] text-white/25">aucun prix</span>
+              )}
               <svg className="h-3.5 w-3.5 text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
           ))}

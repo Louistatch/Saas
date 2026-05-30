@@ -20,6 +20,19 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createClient()
 
+  // Return regions with price counts
+  if (action === 'regions') {
+    const { data: allPrices } = await supabase
+      .from('market_prices')
+      .select('region_id')
+    
+    const regionCounts: Record<string, number> = {}
+    for (const p of allPrices ?? []) {
+      regionCounts[p.region_id] = (regionCounts[p.region_id] ?? 0) + 1
+    }
+    return NextResponse.json({ regionCounts })
+  }
+
   // Return prefectures for a region
   if (action === 'prefectures' && regionId) {
     const { data } = await supabase
@@ -27,7 +40,21 @@ export async function GET(request: NextRequest) {
       .select('id, name')
       .eq('region_id', regionId)
       .order('name')
-    return NextResponse.json({ prefectures: data ?? [] })
+    
+    // Count prices per prefecture (via market_prices where region matches)
+    const { data: priceCounts } = await supabase
+      .from('market_prices')
+      .select('market_name')
+      .eq('region_id', regionId)
+    
+    const prefWithCounts = (data ?? []).map(p => ({
+      ...p,
+      priceCount: (priceCounts ?? []).filter(pc => 
+        pc.market_name?.toLowerCase().includes(p.name.toLowerCase())
+      ).length,
+    }))
+    
+    return NextResponse.json({ prefectures: prefWithCounts })
   }
 
   // Return cantons for a prefecture
@@ -37,7 +64,32 @@ export async function GET(request: NextRequest) {
       .select('id, name')
       .eq('prefecture_id', prefectureId)
       .order('name')
-    return NextResponse.json({ cantons: data ?? [] })
+    
+    // Get the region_id for this prefecture
+    const { data: pref } = await supabase
+      .from('prefectures')
+      .select('region_id')
+      .eq('id', prefectureId)
+      .maybeSingle()
+    
+    // Count prices per canton
+    let cantonCounts: { market_name: string }[] = []
+    if (pref?.region_id) {
+      const { data: prices } = await supabase
+        .from('market_prices')
+        .select('market_name')
+        .eq('region_id', pref.region_id)
+      cantonCounts = prices ?? []
+    }
+    
+    const cantonsWithCounts = (data ?? []).map(c => ({
+      ...c,
+      priceCount: cantonCounts.filter(pc => 
+        pc.market_name?.toLowerCase() === c.name.toLowerCase()
+      ).length,
+    }))
+    
+    return NextResponse.json({ cantons: cantonsWithCounts })
   }
 
   // Default: return market prices
