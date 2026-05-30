@@ -1,0 +1,118 @@
+{
+  "last_updated": "2026-05-30",
+  "currency": "FCFA",
+  "unit": "kg",
+  "note": "Prix indicatifs moyens. Mis à jour par les coopératives via le dashboard.",
+  "cultures": [
+    {
+      "id": "tomate",
+      "name": "Tomate",
+      "emoji": "🍅",
+      "season": "oct-mars",
+      "prices": [
+        { "market": "Lomé", "price": 450, "trend": "up" },
+        { "market": "Kara", "price": 380, "trend": "stable" },
+        { "market": "Sokodé", "price": 350, "trend": "down" }
+      ]
+    },
+    {
+      "id": "oignon",
+      "name": "Oignon",
+      "emoji": "🧅",
+      "season": "nov-avr",
+      "prices": [
+        { "market": "Lomé", "price": 600, "trend": "up" },
+        { "market": "Dapaong", "price": 420, "trend": "stable" },
+        { "market": "Kara", "price": 500, "trend": "up" }
+      ]
+    },
+    {
+      "id": "piment",
+      "name": "Piment",
+      "emoji": "🌶️",
+      "season": "toute année",
+      "prices": [
+        { "market": "Lomé", "price": 1200, "trend": "stable" },
+        { "market": "Kpalimé", "price": 900, "trend": "down" },
+        { "market": "Atakpamé", "price": 950, "trend": "stable" }
+      ]
+    },
+    {
+      "id": "gombo",
+      "name": "Gombo",
+      "emoji": "🥒",
+      "season": "mai-oct",
+      "prices": [
+        { "market": "Lomé", "price": 550, "trend": "up" },
+        { "market": "Sokodé", "price": 400, "trend": "stable" },
+        { "market": "Kara", "price": 420, "trend": "up" }
+      ]
+    },
+    {
+      "id": "laitue",
+      "name": "Laitue / Salade",
+      "emoji": "🥬",
+      "season": "nov-mars",
+      "prices": [
+        { "market": "Lomé", "price": 300, "trend": "stable" },
+        { "market": "Kpalimé", "price": 250, "trend": "down" },
+        { "market": "Tsévié", "price": 280, "trend": "stable" }
+      ]
+    },
+    {
+      "id": "carotte",
+      "name": "Carotte",
+      "emoji": "🥕",
+      "season": "nov-mars",
+      "prices": [
+        { "market": "Lomé", "price": 500, "trend": "up" },
+        { "market": "Kara", "price": 450, "trend": "stable" },
+        { "market": "Dapaong", "price": 480, "trend": "up" }
+      ]
+    },
+    {
+      "id": "chou",
+      "name": "Chou",
+      "emoji": "🥦",
+      "season": "oct-fév",
+      "prices": [
+        { "market": "Lomé", "price": 350, "trend": "stable" },
+        { "market": "Kpalimé", "price": 280, "trend": "down" },
+        { "market": "Sokodé", "price": 320, "trend": "stable" }
+      ]
+    },
+    {
+      "id": "concombre",
+      "name": "Concombre",
+      "emoji": "🥒",
+      "season": "toute année",
+      "prices": [
+        { "market": "Lomé", "price": 250, "trend": "down" },
+        { "market": "Tsévié", "price": 200, "trend": "stable" },
+        { "market": "Atakpamé", "price": 220, "trend": "stable" }
+      ]
+    },
+    {
+      "id": "aubergine",
+      "name": "Aubergine",
+      "emoji": "🍆",
+      "season": "toute année",
+      "prices": [
+        { "market": "Lomé", "price": 400, "trend": "stable" },
+        { "market": "Kara", "price": 320, "trend": "up" },
+        { "market": "Sokodé", "price": 350, "trend": "stable" }
+      ]
+    },
+    {
+      "id": "poivron",
+      "name": "Poivron",
+      "emoji": "🫑",
+      "season": "oct-mars",
+      "prices": [
+        { "market": "Lomé", "price": 800, "trend": "up" },
+        { "market": "Kpalimé", "price": 650, "trend": "stable" },
+        { "market": "Kara", "price": 700, "trend": "up" }
+      ]
+    }
+  ]
+}
