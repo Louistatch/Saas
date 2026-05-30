@@ -13,11 +13,34 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
+  const action = searchParams.get('action')
   const regionId = searchParams.get('region_id')
   const cultureId = searchParams.get('culture_id')
+  const prefectureId = searchParams.get('prefecture_id')
 
   const supabase = await createClient()
 
+  // Return prefectures for a region
+  if (action === 'prefectures' && regionId) {
+    const { data } = await supabase
+      .from('prefectures')
+      .select('id, name')
+      .eq('region_id', regionId)
+      .order('name')
+    return NextResponse.json({ prefectures: data ?? [] })
+  }
+
+  // Return cantons for a prefecture
+  if (action === 'cantons' && prefectureId) {
+    const { data } = await supabase
+      .from('cantons')
+      .select('id, name')
+      .eq('prefecture_id', prefectureId)
+      .order('name')
+    return NextResponse.json({ cantons: data ?? [] })
+  }
+
+  // Default: return market prices
   let query = supabase
     .from('market_prices')
     .select('id, culture_id, region_id, market_name, price, unit, currency, trend, verified, created_at, cultures(name), regions(name)')
@@ -26,7 +49,6 @@ export async function GET(request: NextRequest) {
   if (regionId) query = query.eq('region_id', regionId)
   if (cultureId) query = query.eq('culture_id', cultureId)
 
-  // Only show latest price per culture+market (deduplicate)
   const { data, error } = await query.limit(200)
 
   if (error) {
