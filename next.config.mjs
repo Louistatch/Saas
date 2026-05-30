@@ -39,7 +39,12 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   images: {
-    unoptimized: true,
+    // OPT-05: enable Next.js image optimization. Supabase Storage public URLs
+    // are whitelisted as remote sources. Modern formats served automatically.
+    formats: ['image/avif', 'image/webp'],
+    remotePatterns: [
+      { protocol: 'https', hostname: '*.supabase.co', pathname: '/storage/v1/object/public/**' },
+    ],
   },
   turbopack: {
     root: '.',

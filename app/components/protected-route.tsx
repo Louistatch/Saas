@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth, type UserRole } from '@/app/context/auth-context'
 
@@ -10,41 +10,46 @@ interface ProtectedRouteProps {
 }
 
 /**
- * Client-side route guard — TRUST THE PROXY.
- * 
- * The PROXY (server-side) is the primary auth gate:
- * - It checks cookies and redirects unauthenticated users to /auth/login
- * - If the user reaches this component, they PASSED the proxy check
- * 
- * This component shows a brief spinner (max 3s) then renders content.
- * The proxy guarantees the user is authenticated.
+ * Client-side route guard (SEC-04 hardened).
+ *
+ * Defense-in-depth layer that runs AFTER the edge middleware. It NEVER reveals
+ * protected content without a positive authentication signal — there is no
+ * "show anyway after 3s" fallback (that was the SEC-04 vulnerability).
+ *
+ * States:
+ *   - loading            → spinner
+ *   - not authenticated  → redirect to /auth/login (no content shown)
+ *   - wrong role         → redirect to /forbidden  (no content shown)
+ *   - authenticated + ok → render children
  */
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading, user } = useAuth()
   const router = useRouter()
-  const [showContent, setShowContent] = useState(false)
 
-  // Show content immediately if auth is ready, or after 3s max (trust the proxy)
+  // Redirect once auth has resolved.
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      setShowContent(true)
+    if (isLoading) return
+
+    if (!isAuthenticated) {
+      const current =
+        typeof window !== 'undefined'
+          ? window.location.pathname + window.location.search
+          : ''
+      router.replace(`/auth/login?redirect=${encodeURIComponent(current)}`)
       return
     }
-    // After 3s, show content anyway — proxy already validated the session
-    const timer = setTimeout(() => setShowContent(true), 3000)
-    return () => clearTimeout(timer)
-  }, [isLoading, isAuthenticated])
 
-  // Role guard (only after auth is loaded)
-  useEffect(() => {
-    if (isLoading || !isAuthenticated) return
     if (requiredRole && user?.role !== requiredRole && user?.role !== 'super_admin') {
       router.replace('/forbidden')
     }
   }, [isAuthenticated, isLoading, user, requiredRole, router])
 
-  // Brief spinner while waiting
-  if (!showContent) {
+  // Show a spinner while resolving, or while a redirect is in flight.
+  const authorized =
+    isAuthenticated &&
+    (!requiredRole || user?.role === requiredRole || user?.role === 'super_admin')
+
+  if (isLoading || !authorized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="space-y-4 text-center">

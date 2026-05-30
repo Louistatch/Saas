@@ -70,12 +70,10 @@ export default function SignupPage() {
         parsed.data.cooperative,
       )
       if (needsEmailConfirmation) {
-        // Email confirmation is ON — show the check-email screen instead of
-        // leaving the user on a spinning button forever.
-        setEmailSent(true)
-        setSubmitting(false)
+        // AUTH-12: route to the dedicated check-email page with resend support.
+        router.push(`/auth/verify-email?email=${encodeURIComponent(parsed.data.email)}`)
+        return
       }
-      // Otherwise the AuthProvider/redirect effect routes to the dashboard.
     } catch (err) {
       setError(errorMessage(err))
       setSubmitting(false)

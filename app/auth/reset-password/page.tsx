@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Logo } from '@/components/shared/logo'
@@ -11,6 +11,9 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowLeft, CheckCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { errorMessage } from '@/lib/utils/errors'
+
+type SessionState = 'checking' | 'valid' | 'invalid'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -20,6 +23,39 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [sessionState, setSessionState] = useState<SessionState>('checking')
+
+  // AUTH-06: only allow the password change with a valid RECOVERY session.
+  // We listen for PASSWORD_RECOVERY (emitted when arriving from the email link)
+  // and also check for an existing session, with a timeout fallback.
+  useEffect(() => {
+    let settled = false
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        settled = true
+        setSessionState('valid')
+      }
+    })
+
+    // If a session already exists (code already exchanged by the callback), allow.
+    supabase.auth.getSession().then(({ data }) => {
+      if (!settled && data.session) {
+        settled = true
+        setSessionState('valid')
+      }
+    })
+
+    // No recovery signal within 6s → treat the link as expired/invalid.
+    const timer = setTimeout(() => {
+      if (!settled) setSessionState('invalid')
+    }, 6000)
+
+    return () => {
+      subscription?.unsubscribe()
+      clearTimeout(timer)
+    }
+  }, [supabase])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -27,12 +63,13 @@ export default function ResetPasswordPage() {
     if (password.length < 8) { setError('Le mot de passe doit contenir au moins 8 caractères'); return }
     if (password !== confirm) { setError('Les mots de passe ne correspondent pas'); return }
     setLoading(true)
-    const { error } = await supabase.auth.updateUser({ password })
-    if (error) {
-      setError(error.message)
+    const { error: updateError } = await supabase.auth.updateUser({ password })
+    if (updateError) {
+      setError(errorMessage(updateError))
     } else {
       setDone(true)
-      // Redirect to login (not dashboard) — user should re-authenticate with new password
+      // Invalidate everywhere, then send the user to log in with the new password.
+      await supabase.auth.signOut()
       setTimeout(() => router.push('/auth/login'), 2000)
     }
     setLoading(false)
@@ -92,7 +129,27 @@ export default function ResetPasswordPage() {
             <CardDescription>Choisissez un mot de passe sécurisé pour votre compte</CardDescription>
           </CardHeader>
           <CardContent>
-            {done ? (
+            {sessionState === 'checking' ? (
+              <div className="space-y-4 text-center py-6">
+                <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+                <p className="text-sm text-muted-foreground">Vérification du lien…</p>
+              </div>
+            ) : sessionState === 'invalid' ? (
+              <div className="space-y-4 text-center py-4">
+                <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
+                  <ArrowLeft className="h-6 w-6 text-destructive" />
+                </div>
+                <p className="font-medium text-foreground">Lien expiré ou invalide</p>
+                <p className="text-sm text-muted-foreground">
+                  Ce lien de réinitialisation n&apos;est plus valable. Demandez-en un nouveau.
+                </p>
+                <Link href="/auth/forgot-password">
+                  <Button variant="outline" className="w-full border-border">
+                    Demander un nouveau lien
+                  </Button>
+                </Link>
+              </div>
+            ) : done ? (
               <div className="space-y-4 text-center py-4">
                 <CheckCircle className="h-12 w-12 text-green-600 mx-auto" />
                 <p className="font-medium text-foreground">Mot de passe mis à jour !</p>

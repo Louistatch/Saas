@@ -157,14 +157,45 @@ export default function VerifyCardPage() {
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0A2E1A] flex items-center justify-center">
-        <div className="text-center space-y-6">
-          <div className="relative">
-            <div className="w-20 h-20 border-4 border-[#4ADE80]/30 border-t-[#4ADE80] rounded-full animate-spin mx-auto" />
-            <Shield className="h-8 w-8 text-[#4ADE80] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-          </div>
-          <p className="text-white/60 text-sm animate-pulse">Vérification en cours...</p>
+      <div className="vfy-loading">
+        <div className="vfy-loading-orb">
+          <span className="vfy-ring r1" />
+          <span className="vfy-ring r2" />
+          <span className="vfy-ring r3" />
+          <Shield className="vfy-shield" />
         </div>
+        <p className="vfy-loading-text">
+          Vérification de la carte
+          <span className="vfy-dots"><i>.</i><i>.</i><i>.</i></span>
+        </p>
+        <p className="vfy-loading-sub">Connexion sécurisée au registre FaîtiereHub</p>
+
+        <style>{`
+          .vfy-loading {
+            min-height: 100dvh; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 14px; padding: 24px;
+            background: radial-gradient(120% 100% at 50% -10%, #0f5130 0%, #0a2616 50%, #04120a 100%);
+            font-family: 'Barlow', system-ui, sans-serif;
+          }
+          .vfy-loading-orb { position: relative; width: 132px; height: 132px; display: grid; place-items: center; }
+          .vfy-ring {
+            position: absolute; inset: 0; border-radius: 50%;
+            border: 2px solid rgba(77,255,160,.25); animation: vfyPulse 2.4s ease-out infinite;
+          }
+          .vfy-ring.r2 { animation-delay: .8s; } .vfy-ring.r3 { animation-delay: 1.6s; }
+          @keyframes vfyPulse { 0% { transform: scale(.4); opacity: .9; } 100% { transform: scale(1.15); opacity: 0; } }
+          .vfy-shield {
+            width: 44px; height: 44px; color: #4dffa0;
+            filter: drop-shadow(0 0 14px rgba(77,255,160,.6)); animation: vfyFloat 2.6s ease-in-out infinite;
+          }
+          @keyframes vfyFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+          .vfy-loading-text { color: #fff; font-weight: 700; font-size: 18px; letter-spacing:.2px; display:inline-flex; }
+          .vfy-dots i { animation: vfyBlink 1.4s infinite; opacity: 0; }
+          .vfy-dots i:nth-child(2){ animation-delay:.2s } .vfy-dots i:nth-child(3){ animation-delay:.4s }
+          @keyframes vfyBlink { 0%,100%{opacity:0} 50%{opacity:1} }
+          .vfy-loading-sub { color: #8fc6a4; font-size: 13px; }
+          @media (prefers-reduced-motion: reduce){ .vfy-ring,.vfy-shield,.vfy-dots i{ animation: none } }
+        `}</style>
       </div>
     )
   }
@@ -258,6 +289,13 @@ export default function VerifyCardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0A2E1A] via-[#0A3D22] to-[#061a0f] relative overflow-hidden">
+      <style>{`
+        .vfy-hero { animation: vfyHeroIn .55s cubic-bezier(.2,.7,.2,1) both; }
+        @keyframes vfyHeroIn { from { opacity:0; transform: translateY(16px) scale(.98); } to { opacity:1; transform:none; } }
+        .vfy-check { animation: vfyPop .5s cubic-bezier(.2,1.4,.4,1) .35s both; }
+        @keyframes vfyPop { 0% { transform: scale(0); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
+        @media (prefers-reduced-motion: reduce){ .vfy-hero,.vfy-check{ animation:none } }
+      `}</style>
       {/* Background effects */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-[-15%] right-[-15%] w-[400px] h-[400px] rounded-full bg-[#4ADE80]/5 blur-3xl" />
@@ -271,28 +309,28 @@ export default function VerifyCardPage() {
           <Logo size="sm" textClassName="text-white" />
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#4ADE80]/10 border border-[#4ADE80]/20">
             <CheckCircle className="h-3.5 w-3.5 text-[#4ADE80]" />
-            <span className="text-[11px] font-semibold text-[#4ADE80] uppercase tracking-wide">Verified</span>
+            <span className="text-[11px] font-semibold text-[#4ADE80] uppercase tracking-wide">Vérifié</span>
           </div>
         </div>
 
         {/* Member Card Header */}
         {result.member && isValid && (
-          <div className={`rounded-2xl bg-gradient-to-br from-[#0A5C36] to-[#0d4a2e] border border-[#4ADE80]/15 p-5 shadow-xl transition-all duration-500 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+          <div className={`vfy-hero rounded-2xl bg-gradient-to-br from-[#0A5C36] to-[#0d4a2e] border border-[#4ADE80]/15 p-5 shadow-xl transition-all duration-500 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
             <div className="flex items-center gap-4">
-              {/* Photo */}
+              {/* Photo (enlarged) */}
               <div className="relative shrink-0">
-                <div className="w-[72px] h-[72px] rounded-full overflow-hidden border-[3px] border-[#4ADE80]/40 shadow-lg">
+                <div className="w-[92px] h-[92px] rounded-full overflow-hidden border-[3px] border-[#4ADE80]/40 shadow-lg">
                   {result.member.photo_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={result.member.photo_url} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full bg-[#4ADE80]/10 flex items-center justify-center">
-                      <User className="h-8 w-8 text-[#4ADE80]/60" />
+                      <User className="h-10 w-10 text-[#4ADE80]/60" />
                     </div>
                   )}
                 </div>
-                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#4ADE80] rounded-full flex items-center justify-center shadow-md">
-                  <CheckCircle className="h-3.5 w-3.5 text-white" />
+                <div className="vfy-check absolute -bottom-1 -right-1 w-7 h-7 bg-[#4ADE80] rounded-full flex items-center justify-center shadow-md ring-2 ring-[#0A5C36]">
+                  <CheckCircle className="h-4 w-4 text-white" />
                 </div>
               </div>
 

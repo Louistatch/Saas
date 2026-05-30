@@ -18,6 +18,13 @@ interface CardSvgPreviewProps {
   cooperativeName?: string
   faitiereName?: string
   level?: 'or' | 'argent' | 'bronze'
+  template?: {
+    title: string
+    subtitle: string
+    bgColor: string
+    accentColor: string
+    textColor: string
+  }
   className?: string
 }
 
@@ -40,6 +47,7 @@ export function CardSvgPreview({
   cooperativeName = 'Coopérative',
   faitiereName = 'FaîtiereHub',
   level = 'bronze',
+  template,
   className = '',
 }: CardSvgPreviewProps) {
   const svgString = useMemo(() => {
@@ -60,9 +68,11 @@ export function CardSvgPreview({
       cooperativeName,
       faitiereName,
       level,
+      accentColor: template?.accentColor,
+      template,
     })
     return renderToSvgString(schema)
-  }, [firstName, lastName, phone, photoUrl, village, canton, prefecture, region, cardNumber, expiryDate, createdAt, cooperativeName, faitiereName, level])
+  }, [firstName, lastName, phone, photoUrl, village, canton, prefecture, region, cardNumber, expiryDate, createdAt, cooperativeName, faitiereName, level, template])
 
   return (
     <div

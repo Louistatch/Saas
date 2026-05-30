@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, Users, TrendingUp, BarChart3, Zap } from 'lucide-react'
+import { ArrowRight, Users, TrendingUp, BarChart3, Zap, ScanLine } from 'lucide-react'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
 
 export default function Home() {
@@ -25,9 +25,9 @@ export default function Home() {
                   Essai gratuit <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-              <Link href="/marketplace">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                  Voir les comptes d&apos;exploitation
+              <Link href="/scan">
+                <Button size="lg" variant="outline" className="gap-2 w-full sm:w-auto">
+                  <ScanLine className="h-4 w-4" /> Scanner une carte
                 </Button>
               </Link>
             </div>

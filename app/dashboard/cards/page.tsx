@@ -705,6 +705,7 @@ export default function CardsPage() {
                   cooperativeName={isFaitiereAdmin && selectedCoopId ? childCooperatives.find(c => c.id === selectedCoopId)?.name : currentCooperative?.name}
                   faitiereName={isFaitiereAdmin ? currentCooperative?.name : currentCooperative?.faitiereName}
                   level="or"
+                  template={template}
                 />
               </div>
               <div className="grid gap-4 md:grid-cols-2">
@@ -725,6 +726,12 @@ export default function CardsPage() {
                   value={template.bgColor}
                   onChange={(v) => setTemplate((t) => ({ ...t, bgColor: v }))}
                   error={templateErrors.bgColor}
+                />
+                <FieldColor
+                  label="Couleur d'accent"
+                  value={template.accentColor}
+                  onChange={(v) => setTemplate((t) => ({ ...t, accentColor: v }))}
+                  error={templateErrors.accentColor}
                 />
                 <FieldColor
                   label="Couleur du texte"

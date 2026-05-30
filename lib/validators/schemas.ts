@@ -54,6 +54,7 @@ export const cardTemplateSchema = z.object({
   title: z.string().min(1).max(60),
   subtitle: z.string().min(1).max(60),
   bgColor: hexColorSchema,
+  accentColor: hexColorSchema,
   textColor: hexColorSchema,
 })
 

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { Menu, X } from 'lucide-react'
+import { Menu, X, ScanLine } from 'lucide-react'
 import { Logo } from '@/components/shared/logo'
 import { AuthButtons } from '@/components/shared/auth-buttons'
 
@@ -69,6 +69,13 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-3">
+            <Link
+              href="/scan"
+              className="hidden sm:inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/15 transition-colors"
+            >
+              <ScanLine className="h-4 w-4" />
+              Scanner
+            </Link>
             <AuthButtons />
             {/* Mobile menu toggle */}
             <button
@@ -84,6 +91,14 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
         {/* Mobile nav dropdown */}
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-border bg-background px-4 py-4 space-y-2">
+            <Link
+              href="/scan"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-semibold text-primary bg-primary/10 hover:bg-primary/15 transition-colors"
+            >
+              <ScanLine className="h-4 w-4" />
+              Scanner une carte
+            </Link>
             {headerLinks.map((link) => (
               <Link
                 key={link.href}

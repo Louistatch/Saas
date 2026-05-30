@@ -112,6 +112,7 @@ export interface CardTemplate {
   title: string
   subtitle: string
   bgColor: string
+  accentColor: string
   textColor: string
 }
 
@@ -143,9 +144,10 @@ export interface IntegrationRow {
 }
 
 export const DEFAULT_CARD_TEMPLATE: CardTemplate = {
-  title: 'Member Card',
-  subtitle: 'Digital Access Pass',
-  bgColor: '#16a34a',
+  title: 'Carte de Membre',
+  subtitle: "Pass d'accès coopératif",
+  bgColor: '#0d3d22',
+  accentColor: '#1ed760',
   textColor: '#ffffff',
 }
 
