@@ -350,11 +350,11 @@ export default function VerifyCardPage() {
                     {result.cooperative?.name}
                   </p>
                 </div>
-                {result.member.prefecture && (
+                {(result.member.village || result.member.canton || result.member.prefecture || result.member.region) && (
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <MapPin className="h-3 w-3 text-white/40" />
                     <p className="text-white/40 text-[11px] truncate">
-                      {[result.member.canton, result.member.prefecture].filter(Boolean).join(', ')}
+                      {[result.member.village, result.member.canton, result.member.prefecture, result.member.region].filter(Boolean).join(', ')}
                     </p>
                   </div>
                 )}
@@ -519,6 +519,7 @@ export default function VerifyCardPage() {
                   { icon: MapPin, label: 'Préfecture', value: result.member.prefecture ?? '—' },
                   { icon: MapPin, label: 'Région', value: result.member.region ?? '—' },
                   { icon: Building2, label: 'Coopérative', value: result.cooperative?.name ?? '—' },
+                  { icon: Building2, label: 'Faîtière', value: result.cooperative?.faitiere_name ?? '—' },
                 ].map((item, i) => (
                   <div key={i} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.05]">
                     <div className="flex items-center gap-1.5 mb-1">
