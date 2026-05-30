@@ -16,12 +16,6 @@ const CULTURE_LIST = [
   { id: 'c2891f71-e3d8-4f08-b5ac-992bce1ddff4', name: 'Oignon', emoji: '🧅' },
   { id: '3cb519af-7572-499e-ab58-83655f05825a', name: 'Piment', emoji: '🌶️' },
   { id: '478432bd-83c8-4923-8aa2-ceb686c0bc1e', name: 'Gombo', emoji: '🥒' },
-  { id: '560aec9a-25b4-44c0-870c-f616561dc29c', name: 'Maïs', emoji: '🌽' },
-  { id: '5a52aeb1-d214-496b-9c1a-9180a417d31e', name: 'Riz', emoji: '🍚' },
-  { id: 'a13a54ad-a0a4-4415-a53f-38b61afea2f9', name: 'Igname', emoji: '🥔' },
-  { id: 'dea07009-bf00-4f13-b24b-8b45a8eb8b5a', name: 'Soja', emoji: '🫘' },
-  { id: '689b2812-9361-4792-89f6-810c40ed6bad', name: 'Arachide', emoji: '🥜' },
-  { id: '939b0bc8-54d5-45ae-926b-df491ba062fd', name: 'Manioc', emoji: '🌱' },
 ]
 
 interface Prefecture { id: string; name: string; priceCount?: number }
@@ -311,7 +305,7 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
           </div>
           <div>
             <label className="text-[10px] text-white/50 uppercase tracking-wider font-semibold block mb-1.5">Culture</label>
-            <div className="grid grid-cols-5 gap-1.5">
+            <div className="grid grid-cols-4 gap-2">
               {CULTURE_LIST.map((c) => (
                 <button key={c.id} onClick={() => setSubmitForm(f => ({ ...f, culture_id: c.id }))} className={`flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all ${submitForm.culture_id === c.id ? 'bg-[#4ADE80]/10 border-[#4ADE80]/40' : 'bg-white/[0.02] border-white/[0.06]'}`}>
                   <span className="text-lg">{c.emoji}</span>
