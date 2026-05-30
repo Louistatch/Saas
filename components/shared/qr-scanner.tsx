@@ -81,14 +81,53 @@ export function QrScanner({ onResult, onError, className = '' }: QrScannerProps)
     }
 
     setState('starting')
+
+    // Try the rear camera first, then fall back to ANY camera. Some Android
+    // builds reject the object form of facingMode and throw immediately, which
+    // we don't want to misread as a permission denial.
+    let stream: MediaStream | null = null
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
         audio: false,
       })
+    } catch (err1) {
+      if (err1 instanceof DOMException && err1.name === 'NotAllowedError') {
+        setState('denied')
+        onError?.('camera-denied')
+        return
+      }
+      // Constraint/overconstrained/other → retry with the most permissive request.
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+      } catch (err2) {
+        if (err2 instanceof DOMException && err2.name === 'NotAllowedError') {
+          setState('denied')
+          onError?.('camera-denied')
+        } else {
+          const name = err2 instanceof DOMException ? err2.name : 'Erreur'
+          setState('error')
+          setErrorMsg(
+            name === 'NotFoundError'
+              ? "Aucune caméra détectée sur cet appareil."
+              : `Caméra inaccessible (${name}).`,
+          )
+          onError?.('camera-error')
+        }
+        return
+      }
+    }
+
+    try {
       streamRef.current = stream
       const video = videoRef.current
-      if (!video) return
+      if (!video) {
+        // Should not happen (video is always mounted), but guard anyway.
+        stream.getTracks().forEach((t) => t.stop())
+        setState('error')
+        setErrorMsg('Lecteur vidéo indisponible. Rechargez la page.')
+        return
+      }
       video.srcObject = stream
       await video.play()
       setState('scanning')
@@ -141,15 +180,13 @@ export function QrScanner({ onResult, onError, className = '' }: QrScannerProps)
         rafRef.current = requestAnimationFrame(tick)
       }
       rafRef.current = requestAnimationFrame(tick)
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'NotAllowedError') {
-        setState('denied')
-        onError?.('camera-denied')
-      } else {
-        setState('error')
-        setErrorMsg("Impossible d'accéder à la caméra de cet appareil.")
-        onError?.('camera-error')
-      }
+    } catch {
+      // Failure after the stream was obtained (e.g. video.play()) — non-fatal
+      // for permissions, but we surface a generic error and stop the stream.
+      streamRef.current?.getTracks().forEach((t) => t.stop())
+      setState('error')
+      setErrorMsg('Le flux vidéo n\'a pas pu démarrer. Réessayez.')
+      onError?.('camera-error')
     }
   }, [handleHit, onError])
 
@@ -199,8 +236,11 @@ export function QrScanner({ onResult, onError, className = '' }: QrScannerProps)
               <>
                 <p className="qr-cta-title">Caméra bloquée</p>
                 <p className="qr-cta-text">
-                  Autorisez la caméra dans les réglages du navigateur (icône 🔒
-                  dans la barre d'adresse), puis réessayez.
+                  La caméra a été bloquée pour ce site. Pour la débloquer :
+                  touchez le <strong>cadenas 🔒</strong> à gauche de l'adresse en
+                  haut → <strong>Autorisations</strong> →{' '}
+                  <strong>Caméra</strong> → <strong>Autoriser</strong>, puis
+                  rechargez la page.
                 </p>
                 <button className="qr-cta-btn" onClick={startCamera}>Réessayer</button>
               </>
