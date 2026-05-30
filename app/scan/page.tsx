@@ -19,6 +19,7 @@ import { ArrowLeft, ScanLine } from 'lucide-react'
 export default function ScanPage() {
   const router = useRouter()
   const [error, setError] = useState('')
+  const [scanKey, setScanKey] = useState(0) // Force remount of scanner on retry
 
   const extractCardNumber = (raw: string): string | null => {
     const value = raw.trim()
@@ -42,6 +43,8 @@ export default function ScanPage() {
         router.push(`/verify/${encodeURIComponent(card)}`)
       } else {
         setError('QR code non reconnu. Utilisez une carte FaîtiereHub valide.')
+        // Reset scanner after 2s so user can try again
+        setTimeout(() => { setError(''); setScanKey(k => k + 1) }, 2000)
       }
     },
     [router],
@@ -69,7 +72,7 @@ export default function ScanPage() {
           dans le cadre, la vérification démarre toute seule.
         </p>
 
-        <QrScanner onResult={handleResult} className="scan-cam" />
+        <QrScanner key={scanKey} onResult={handleResult} className="scan-cam" />
 
         {error && <p className="scan-error">{error}</p>}
 
