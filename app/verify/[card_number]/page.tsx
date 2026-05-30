@@ -555,7 +555,17 @@ export default function VerifyCardPage() {
 
         {/* Market Prices Dashboard */}
         {isValid && activeView === 'prices' && (
-          <MarketPricesDashboard onBack={() => setActiveView('menu')} cooperativeName={result.cooperative?.name} cardNumber={cardNumber} />
+          <MarketPricesDashboard
+            onBack={() => setActiveView('menu')}
+            cooperativeName={result.cooperative?.name}
+            cardNumber={cardNumber}
+            memberLocality={{
+              village: result.member?.village ?? null,
+              canton: result.member?.canton ?? null,
+              prefecture: result.member?.prefecture ?? null,
+              region: result.member?.region ?? null,
+            }}
+          />
         )}
 
         {/* Security Timer */}

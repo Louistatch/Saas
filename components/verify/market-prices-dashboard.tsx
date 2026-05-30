@@ -34,9 +34,19 @@ function TrendBadge({ trend }: { trend: string }) {
   return <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-white/5 text-white/50 text-[9px] font-bold">→ Stable</span>
 }
 
-interface Props { onBack: () => void; cooperativeName?: string; cardNumber: string }
+interface Props {
+  onBack: () => void
+  cooperativeName?: string
+  cardNumber: string
+  memberLocality?: {
+    village: string | null
+    canton: string | null
+    prefecture: string | null
+    region: string | null
+  }
+}
 
-export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber }: Props) {
+export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, memberLocality }: Props) {
   type Step = 'regions' | 'prefectures' | 'cantons' | 'prices' | 'submit'
   const [step, setStep] = useState<Step>('regions')
   const [selectedRegion, setSelectedRegion] = useState<typeof REGIONS[0] | null>(null)
@@ -118,16 +128,22 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber }: P
   }
 
   const handleSubmitPrice = async () => {
-    if (!submitForm.culture_id || !submitForm.price || !selectedRegion) return
+    if (!submitForm.culture_id || !submitForm.price) return
     setSubmitting(true); setSubmitResult(null)
+    // Use member's locality as the market name (they can only report for their zone)
+    const marketName = memberLocality?.canton ?? memberLocality?.village ?? selectedCanton?.name ?? selectedPrefecture?.name ?? 'Non précisé'
+    // Find the region from member's locality or selected region
+    const memberRegion = REGIONS.find(r => r.name === memberLocality?.region)
+    const regionId = memberRegion?.id ?? selectedRegion?.id
+    if (!regionId) { setSubmitResult({ ok: false, msg: 'Région introuvable' }); setSubmitting(false); return }
     try {
       const res = await fetch('/api/market-prices', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           card_number: decodeURIComponent(cardNumber),
           culture_id: submitForm.culture_id,
-          region_id: selectedRegion.id,
-          market_name: selectedCanton?.name ?? selectedPrefecture?.name ?? 'Non précisé',
+          region_id: regionId,
+          market_name: marketName,
           price: parseInt(submitForm.price, 10),
         }),
       })
@@ -135,7 +151,6 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber }: P
       if (res.ok) {
         setSubmitResult({ ok: true, msg: data.message ?? 'Prix enregistré !' })
         setSubmitForm({ culture_id: '', price: '' })
-        if (selectedRegion && selectedCanton) fetchPrices(selectedRegion.id, selectedCanton.name)
       } else { setSubmitResult({ ok: false, msg: data.error ?? 'Erreur' }) }
     } catch { setSubmitResult({ ok: false, msg: 'Erreur de connexion' }) }
     setSubmitting(false)
@@ -265,11 +280,16 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber }: P
               ))}
             </div>
           )}
-          <button onClick={() => setStep('submit')} className="w-full rounded-2xl p-4 bg-gradient-to-r from-[#0A5C36] to-[#0d7a4a] border border-[#4ADE80]/20 flex items-center gap-3 active:scale-[0.98] transition-transform">
+          <button onClick={() => {
+            // Pre-fill with member's locality from their card
+            const memberRegion = REGIONS.find(r => r.name === memberLocality?.region)
+            if (memberRegion) setSelectedRegion(memberRegion)
+            setStep('submit')
+          }} className="w-full rounded-2xl p-4 bg-gradient-to-r from-[#0A5C36] to-[#0d7a4a] border border-[#4ADE80]/20 flex items-center gap-3 active:scale-[0.98] transition-transform">
             <div className="w-10 h-10 rounded-xl bg-[#4ADE80]/15 flex items-center justify-center shrink-0"><TrendingUp className="h-5 w-5 text-[#4ADE80]" /></div>
             <div className="flex-1 text-left">
               <p className="text-sm font-semibold text-white">Renseigner un prix</p>
-              <p className="text-[11px] text-white/50">Partagez les prix de votre zone</p>
+              <p className="text-[11px] text-white/50">📍 {memberLocality?.canton ?? memberLocality?.village ?? 'Votre zone'}</p>
             </div>
           </button>
         </div>
@@ -278,7 +298,17 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber }: P
       {/* Step 5: Submit */}
       {step === 'submit' && (
         <div className="rounded-2xl bg-white/[0.04] border border-white/[0.08] p-5 space-y-4">
-          <p className="text-sm font-bold text-white">Nouveau prix — {selectedCanton?.name ?? selectedPrefecture?.name}</p>
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-8 h-8 rounded-lg bg-[#4ADE80]/10 flex items-center justify-center"><TrendingUp className="h-4 w-4 text-[#4ADE80]" /></div>
+            <div>
+              <p className="text-sm font-bold text-white">Renseigner un prix</p>
+              <p className="text-[10px] text-white/40">📍 {[memberLocality?.village, memberLocality?.canton, memberLocality?.prefecture].filter(Boolean).join(', ') || 'Votre zone'}</p>
+            </div>
+          </div>
+          <div className="rounded-lg bg-white/[0.03] border border-white/[0.05] p-2.5">
+            <p className="text-[9px] text-white/40 uppercase tracking-wider mb-1">Votre localité (carte membre)</p>
+            <p className="text-xs text-white font-medium">{[memberLocality?.village, memberLocality?.canton, memberLocality?.prefecture, memberLocality?.region].filter(Boolean).join(', ') || '—'}</p>
+          </div>
           <div>
             <label className="text-[10px] text-white/50 uppercase tracking-wider font-semibold block mb-1.5">Culture</label>
             <div className="grid grid-cols-5 gap-1.5">
