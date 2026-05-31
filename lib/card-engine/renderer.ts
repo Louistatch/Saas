@@ -57,7 +57,7 @@ function medallionMark(x: number, y: number, ring: string): string {
 }
 
 function generateQrSvgPath(text: string): string {
-  const matrix = encodeText(text, 'H')
+  const matrix = encodeText(text, 'L')
   const n = matrix.length
   let path = ''
   for (let y = 0; y < n; y++) {
@@ -121,7 +121,7 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
   // QR code
   const qrPayload = `https://www.faitierehub.com/verify/${encodeURIComponent(member.cardNumber)}`
   const qrPath = generateQrSvgPath(qrPayload)
-  const qrMatrix = encodeText(qrPayload, 'H')
+  const qrMatrix = encodeText(qrPayload, 'L')
   const qrModuleCount = qrMatrix.length
 
   // Name: adapt font size based on length
@@ -255,18 +255,17 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
         <text x="0" y="32" font-family="'Caveat', 'Segoe Script', cursive" font-weight="600" font-size="30" fill="${escapeXml(darken(accent, 0.6))}">${escapeXml(member.firstName)}</text>
       </g>
 
-      <!-- QR Code (FR) -->
-      <g transform="translate(0 286)">
-        <rect x="0" y="0" width="136" height="136" rx="14" fill="#fff" filter="url(#shadow)"/>
-        <g transform="translate(9 9)">
-          <svg viewBox="0 0 ${qrModuleCount} ${qrModuleCount}" width="118" height="118" shape-rendering="crispEdges">
+      <!-- QR Code (FR) — enlarged + pure black for reliable A7 print scanning -->
+      <g transform="translate(0 270)">
+        <rect x="0" y="0" width="220" height="220" rx="16" fill="#ffffff" filter="url(#shadow)"/>
+        <g transform="translate(10 10)">
+          <svg viewBox="0 0 ${qrModuleCount} ${qrModuleCount}" width="200" height="200" shape-rendering="crispEdges">
             <rect width="100%" height="100%" fill="#ffffff"/>
-            <path d="${qrPath}" fill="${escapeXml(darken(accent, 0.6))}"/>
+            <path d="${qrPath}" fill="#000000"/>
           </svg>
         </g>
-        <text x="154" y="46" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="700" font-size="15" fill="${escapeXml(darken(accent, 0.6))}" letter-spacing="1.2">SCANNER POUR</text>
-        <text x="154" y="66" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="700" font-size="15" fill="${escapeXml(darken(accent, 0.6))}" letter-spacing="1.2">VÉRIFIER</text>
-        <text x="154" y="92" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="9" fill="${escapeXml(darken(accent, 0.2))}" letter-spacing="0.8">SÉCURISÉ • CERTIFIÉ</text>
+        <text x="0" y="244" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="700" font-size="15" fill="${escapeXml(darken(accent, 0.6))}" letter-spacing="1.2">SCANNER POUR VÉRIFIER</text>
+        <text x="0" y="262" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="9" fill="${escapeXml(darken(accent, 0.2))}" letter-spacing="0.8">SÉCURISÉ • CERTIFIÉ</text>
       </g>
     </g>
 
