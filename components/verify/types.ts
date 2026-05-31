@@ -4,8 +4,8 @@
  */
 
 export interface VerifyMember {
-  first_name: string
-  last_name: string
+  first_name: string | null
+  last_name: string | null
   photo_url: string | null
   village: string | null
   canton: string | null
@@ -44,9 +44,12 @@ export interface TechnicienContact {
 
 export type VerifyView = 'menu' | 'identity' | 'prices' | 'technicien'
 
-/** Full name, last name uppercased for the card. */
+/** Full name, last name uppercased for the card. Null-safe. */
 export function memberFullName(m: Pick<VerifyMember, 'first_name' | 'last_name'>): string {
-  return `${m.first_name} ${m.last_name.toUpperCase()}`.trim()
+  const first = (m.first_name ?? '').trim()
+  const last = (m.last_name ?? '').trim().toUpperCase()
+  const full = `${first} ${last}`.trim()
+  return full || 'Membre'
 }
 
 /** Locality string from the most specific available geo field. */

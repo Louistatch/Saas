@@ -38,8 +38,8 @@ interface VerifyResult {
     created_at: string
   }
   member?: {
-    first_name: string
-    last_name: string
+    first_name: string | null
+    last_name: string | null
     photo_url: string | null
     village: string | null
     canton: string | null
