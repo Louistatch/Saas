@@ -14,6 +14,7 @@ import {
 import { Logo } from '@/components/shared/logo'
 import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboard'
 import { Card3D } from '@/components/verify/card-3d'
+import { memberFullName, memberLocality as getMemberLocality, waNumber } from '@/components/verify/types'
 
 /**
  * Public verification page — accessed by scanning the QR code on a member card.
@@ -62,17 +63,6 @@ interface ServiceItem {
   available: boolean
   action?: () => void
   highlight?: boolean
-}
-
-/**
- * Normalize a phone number for a wa.me link. Togo numbers are 8 digits;
- * we prefix the country code 228 when no international prefix is present.
- */
-function waNumber(phone: string): string {
-  const digits = phone.replace(/\D/g, '')
-  if (digits.startsWith('228')) return digits
-  if (digits.length === 8) return `228${digits}`
-  return digits
 }
 
 export default function VerifyCardPage() {
@@ -500,7 +490,7 @@ export default function VerifyCardPage() {
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-white">
-                    {result.member.first_name} <span className="uppercase">{result.member.last_name}</span>
+                    {result.member.first_name ?? ''} <span className="uppercase">{result.member.last_name ?? ''}</span>
                   </h2>
                   <p className="text-[#4ADE80]/70 text-xs font-mono">{result.card?.card_number}</p>
                   <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#4ADE80]/10 border border-[#4ADE80]/20">
