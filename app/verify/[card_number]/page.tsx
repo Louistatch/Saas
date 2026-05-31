@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { Logo } from '@/components/shared/logo'
 import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboard'
+import { Card3D } from '@/components/verify/card-3d'
 
 /**
  * Public verification page — accessed by scanning the QR code on a member card.
@@ -346,69 +347,14 @@ export default function VerifyCardPage() {
           </div>
         </div>
 
-        {/* Member Card Header */}
-        {result.member && isValid && (
-          <div className={`vfy-hero rounded-2xl bg-gradient-to-br from-[#0A5C36] to-[#0d4a2e] border border-[#4ADE80]/15 p-5 shadow-xl transition-all duration-500 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-            <div className="flex items-center gap-4">
-              {/* Photo (enlarged) */}
-              <div className="relative shrink-0">
-                <div className="w-[92px] h-[92px] rounded-full overflow-hidden border-[3px] border-[#4ADE80]/40 shadow-lg">
-                  {result.member.photo_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={result.member.photo_url} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full bg-[#4ADE80]/10 flex items-center justify-center">
-                      <User className="h-10 w-10 text-[#4ADE80]/60" />
-                    </div>
-                  )}
-                </div>
-                <div className="vfy-check absolute -bottom-1 -right-1 w-7 h-7 bg-[#4ADE80] rounded-full flex items-center justify-center shadow-md ring-2 ring-[#0A5C36]">
-                  <CheckCircle className="h-4 w-4 text-white" />
-                </div>
-              </div>
-
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-lg font-bold text-white leading-tight">
-                    {result.member.first_name} <span className="uppercase">{result.member.last_name}</span>
-                  </h1>
-                </div>
-                <p className="text-[#4ADE80]/70 text-xs font-mono mt-0.5">
-                  ID: {result.card?.card_number}
-                </p>
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  <Building2 className="h-3 w-3 text-white/40" />
-                  <p className="text-white/50 text-[11px] truncate">
-                    {result.cooperative?.name}
-                  </p>
-                </div>
-                {(result.member.village || result.member.canton || result.member.prefecture || result.member.region) && (
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <MapPin className="h-3 w-3 text-white/40" />
-                    <p className="text-white/40 text-[11px] truncate">
-                      {[result.member.village, result.member.canton, result.member.prefecture, result.member.region].filter(Boolean).join(', ')}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Quick stats */}
-            <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-white/[0.06]">
-              <div className="text-center">
-                <p className="text-sm font-bold text-white">
-                  {result.member.member_since ? new Date(result.member.member_since).getFullYear() : '—'}
-                </p>
-                <p className="text-[9px] text-white/40 uppercase">Membre depuis</p>
-              </div>
-              <div className="text-center">
-                <p className={`text-sm font-bold ${isValid ? 'text-[#4ADE80]' : 'text-red-400'}`}>
-                  {isValid ? '● Active' : '● Inactive'}
-                </p>
-                <p className="text-[9px] text-white/40 uppercase">Carte</p>
-              </div>
-            </div>
+        {/* 3D Membership Card — realistic, tactile, tilts with pointer/device */}
+        {result.member && result.card && isValid && activeView === 'menu' && (
+          <div className={`transition-all duration-500 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+            <Card3D
+              member={result.member}
+              card={result.card}
+              cooperative={result.cooperative}
+            />
           </div>
         )}
 
