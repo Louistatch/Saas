@@ -9,7 +9,7 @@ import { useParams } from 'next/navigation'
 import {
   CheckCircle, XCircle, Shield, MapPin, Building2,
   FileText, TrendingUp, PhoneCall, Map, CloudRain,
-  ShoppingCart, Coins, QrCode, Timer, User,
+  ShoppingCart, Coins, QrCode, Timer, User, ArrowLeft,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/logo'
 import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboard'
@@ -63,6 +63,17 @@ interface ServiceItem {
   highlight?: boolean
 }
 
+/**
+ * Normalize a phone number for a wa.me link. Togo numbers are 8 digits;
+ * we prefix the country code 228 when no international prefix is present.
+ */
+function waNumber(phone: string): string {
+  const digits = phone.replace(/\D/g, '')
+  if (digits.startsWith('228')) return digits
+  if (digits.length === 8) return `228${digits}`
+  return digits
+}
+
 export default function VerifyCardPage() {
   const params = useParams()
   const cardNumber = params.card_number as string
@@ -71,7 +82,9 @@ export default function VerifyCardPage() {
   const [showContent, setShowContent] = useState(false)
   const [timeLeft, setTimeLeft] = useState(600)
   const [expired, setExpired] = useState(false)
-  const [activeView, setActiveView] = useState<'menu' | 'identity' | 'prices'>('menu')
+  const [activeView, setActiveView] = useState<'menu' | 'identity' | 'prices' | 'technicien'>('menu')
+  const [contacts, setContacts] = useState<{ role: 'technicien' | 'coordo'; name: string; phone: string; canton?: string | null }[] | null>(null)
+  const [contactsLoading, setContactsLoading] = useState(false)
 
   // Reset ALL state when card_number changes (navigating between cards)
   useEffect(() => {
@@ -229,6 +242,25 @@ export default function VerifyCardPage() {
 
   const isValid = result.valid
 
+  // Load technician + coordo contacts when the producer opens that view.
+  useEffect(() => {
+    if (activeView !== 'technicien' || contacts !== null) return
+    let cancelled = false
+    setContactsLoading(true)
+    fetch(`/api/technicien/${encodeURIComponent(cardNumber)}`)
+      .then((r) => r.json())
+      .then((d: { contacts?: typeof contacts }) => {
+        if (!cancelled) setContacts(d.contacts ?? [])
+      })
+      .catch(() => {
+        if (!cancelled) setContacts([])
+      })
+      .finally(() => {
+        if (!cancelled) setContactsLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [activeView, contacts, cardNumber])
+
   // Service menu items
   const services: ServiceItem[] = [
     {
@@ -255,8 +287,9 @@ export default function VerifyCardPage() {
     {
       icon: PhoneCall,
       title: 'Contacter Mon Technicien',
-      description: 'Appeler le technicien de la faîtière',
-      available: false,
+      description: 'Technicien de mon canton + Coordonnateur',
+      available: true,
+      action: () => setActiveView('technicien'),
     },
     {
       icon: Map,
@@ -566,6 +599,75 @@ export default function VerifyCardPage() {
               region: result.member?.region ?? null,
             }}
           />
+        )}
+
+        {isValid && activeView === 'technicien' && (
+          <div className="space-y-4">
+            <button
+              onClick={() => setActiveView('menu')}
+              className="flex items-center gap-2 text-white/60 hover:text-white text-sm transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" /> Retour
+            </button>
+
+            <div className="text-center space-y-1 mb-2">
+              <h2 className="text-white text-xl font-bold">Contacter un technicien</h2>
+              <p className="text-white/50 text-sm">Appelez le technicien de votre canton ou votre coordonnateur</p>
+            </div>
+
+            {contactsLoading && (
+              <div className="flex justify-center py-8">
+                <div className="h-7 w-7 border-3 border-[#4ADE80]/30 border-t-[#4ADE80] rounded-full animate-spin" />
+              </div>
+            )}
+
+            {!contactsLoading && contacts && contacts.length === 0 && (
+              <div className="rounded-2xl bg-white/5 border border-white/10 p-6 text-center">
+                <PhoneCall className="h-8 w-8 text-white/30 mx-auto mb-3" />
+                <p className="text-white/70 text-sm">
+                  Aucun technicien n&apos;est encore enregistré pour votre canton.
+                  Contactez l&apos;administration de votre faîtière.
+                </p>
+              </div>
+            )}
+
+            {!contactsLoading && contacts && contacts.map((c, i) => (
+              <div
+                key={i}
+                className="rounded-2xl bg-gradient-to-br from-[#0A5C36] to-[#0d4a2e] border border-[#4ADE80]/15 p-5 shadow-xl"
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-full bg-[#4ADE80]/15 flex items-center justify-center shrink-0">
+                    <PhoneCall className="h-6 w-6 text-[#4ADE80]" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] uppercase tracking-wide text-[#4ADE80] font-semibold">
+                      {c.role === 'coordo' ? 'SE / Coordonnateur' : `Technicien${c.canton ? ` · ${c.canton}` : ''}`}
+                    </p>
+                    <p className="text-white font-bold truncate">{c.name}</p>
+                    <p className="text-white/60 text-sm font-mono">{c.phone}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <a
+                    href={`tel:${c.phone.replace(/\s/g, '')}`}
+                    className="flex items-center justify-center gap-2 rounded-xl bg-[#4ADE80] text-[#04140b] font-semibold py-3 active:scale-95 transition-transform"
+                  >
+                    <PhoneCall className="h-4 w-4" /> Appeler
+                  </a>
+                  <a
+                    href={`https://wa.me/${waNumber(c.phone)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-[#25D366] text-white font-semibold py-3 active:scale-95 transition-transform"
+                  >
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.82 11.82 0 018.413 3.488 11.82 11.82 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.978-1.607z"/></svg>
+                    WhatsApp
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
 
         {/* Security Timer */}

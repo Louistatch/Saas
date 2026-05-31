@@ -19,6 +19,7 @@ import {
   Smartphone,
   Banknote,
   Code,
+  PhoneCall,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Logo } from '@/components/shared/logo'
@@ -45,6 +46,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard/members', label: 'Membres', icon: Users, roles: ['super_admin', 'cooperative_admin', 'member'] },
     { href: '/dashboard/parcelles', label: 'Parcelles', icon: FileText, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/cotisations', label: 'Cotisations', icon: Banknote, roles: ['super_admin', 'cooperative_admin'] },
+    { href: '/dashboard/techniciens', label: 'Techniciens', icon: PhoneCall, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/cards', label: 'Cartes membres', icon: FileText, roles: ['super_admin', 'cooperative_admin', 'member'] },
     { href: '/dashboard/analytics', label: 'Statistiques', icon: BarChart3, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/integrations', label: 'Intégrations', icon: Zap, roles: ['super_admin', 'cooperative_admin'] },
