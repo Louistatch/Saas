@@ -97,7 +97,16 @@ export default function SignupPage() {
   return (
     <div className="min-h-screen flex">
       {/* Side panel */}
-      <AuthSidePanel />
+      <AuthSidePanel
+        title="Rejoignez FaîtiereHub"
+        description="La plateforme de gestion des faîtières agricoles du Togo"
+        benefits={[
+          'Gestion centralisée de vos membres',
+          'Cartes numériques avec QR code',
+          'Prix du marché en temps réel',
+          'Fiches techniques par culture',
+        ]}
+      />
 
       {/* Form */}
       <div className="flex-1 flex items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
