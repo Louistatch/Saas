@@ -321,8 +321,30 @@ export default function VerifyCardPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0A2E1A] via-[#0A3D22] to-[#061a0f] relative overflow-hidden" style={{ isolation: 'isolate' }}>
+    <div className="min-h-screen relative overflow-hidden vfy-root" style={{ isolation: 'isolate' }}>
       <style>{`
+        .vfy-root {
+          background:
+            radial-gradient(80% 55% at 18% 8%, rgba(34,197,94,.16), transparent 60%),
+            radial-gradient(70% 50% at 88% 92%, rgba(16,120,72,.20), transparent 60%),
+            linear-gradient(180deg, #07140d 0%, #0a2417 45%, #061710 100%);
+        }
+        .vfy-root::before {
+          content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+          background-image: radial-gradient(rgba(255,255,255,.025) 1px, transparent 1px);
+          background-size: 4px 4px; opacity: .5;
+        }
+        .vfy-glass {
+          background: linear-gradient(160deg, rgba(255,255,255,.07), rgba(255,255,255,.02));
+          border: 1px solid rgba(255,255,255,.09);
+          backdrop-filter: blur(12px) saturate(1.1);
+          -webkit-backdrop-filter: blur(12px) saturate(1.1);
+          box-shadow: 0 8px 30px -12px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08);
+        }
+        .vfy-tile { transition: transform .25s cubic-bezier(.2,.7,.2,1), background .25s, border-color .25s; }
+        .vfy-tile:active { transform: scale(.975); }
+        .vfy-tile:hover { border-color: rgba(77,255,160,.35); }
+        .vfy-eyebrow { font-family: 'Barlow Condensed','Barlow',sans-serif; letter-spacing: 3px; }
         .vfy-hero { animation: vfyHeroIn .55s cubic-bezier(.2,.7,.2,1) both; will-change: transform, opacity; }
         @keyframes vfyHeroIn { from { opacity:0; transform: translateY(16px) scale(.98); } to { opacity:1; transform: translateZ(0); } }
         .vfy-check { animation: vfyPop .5s cubic-bezier(.2,1.4,.4,1) .35s both; will-change: transform; }
@@ -331,7 +353,7 @@ export default function VerifyCardPage() {
         @media (prefers-reduced-motion: reduce){ .vfy-hero,.vfy-check{ animation:none } }
       `}</style>
       {/* Background effects — GPU-isolated to prevent rendering artifacts */}
-      <div className="absolute inset-0 pointer-events-none" style={{ transform: 'translateZ(0)', willChange: 'transform' }}>
+      <div className="absolute inset-0 pointer-events-none" style={{ transform: 'translateZ(0)', willChange: 'transform', zIndex: 0 }}>
         <div className="absolute top-[-15%] right-[-15%] w-[400px] h-[400px] rounded-full bg-[#4ADE80]/5 blur-3xl" style={{ transform: 'translateZ(0)', backfaceVisibility: 'hidden' }} />
         <div className="absolute bottom-[-10%] left-[-10%] w-[350px] h-[350px] rounded-full bg-[#0A5C36]/20 blur-3xl" style={{ transform: 'translateZ(0)', backfaceVisibility: 'hidden' }} />
       </div>
@@ -341,9 +363,12 @@ export default function VerifyCardPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <Logo size="sm" textClassName="text-white" />
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#4ADE80]/10 border border-[#4ADE80]/20">
-            <CheckCircle className="h-3.5 w-3.5 text-[#4ADE80]" />
-            <span className="text-[11px] font-semibold text-[#4ADE80] uppercase tracking-wide">Vérifié</span>
+          <div className="vfy-glass flex items-center gap-2 px-3 py-1.5 rounded-full">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#4ADE80] opacity-60" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#4ADE80]" />
+            </span>
+            <span className="text-[11px] font-semibold text-[#9bffc8] uppercase tracking-wide">Vérifié</span>
           </div>
         </div>
 
@@ -383,7 +408,7 @@ export default function VerifyCardPage() {
         {/* Services Menu */}
         {isValid && activeView === 'menu' && (
           <div className={`space-y-3 transition-all duration-700 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`} style={{ transitionDelay: '200ms' }}>
-            <h3 className="text-white/60 text-xs font-semibold uppercase tracking-wider px-1">
+            <h3 className="text-[#7fd9a5] vfy-eyebrow text-[11px] font-bold uppercase px-1">
               Mes Services
             </h3>
 
@@ -393,51 +418,46 @@ export default function VerifyCardPage() {
                 <button
                   key={i}
                   onClick={service.action}
-                  className={`w-full rounded-2xl p-4 flex items-center gap-4 text-left transition-all duration-300 active:scale-[0.98] ${
-                    service.highlight
-                      ? 'bg-gradient-to-r from-yellow-900/30 to-yellow-800/20 border border-yellow-500/20'
-                      : service.available
-                        ? 'bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.06]'
-                        : 'bg-white/[0.02] border border-white/[0.05]'
+                  className={`vfy-glass vfy-tile w-full rounded-2xl p-4 flex items-center gap-4 text-left ${
+                    !service.available ? 'opacity-55' : ''
                   }`}
-                  style={{ animationDelay: `${i * 50}ms` }}
                   disabled={!service.available}
                 >
                   {/* Icon */}
-                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
                     service.highlight
-                      ? 'bg-yellow-500/15'
+                      ? 'bg-gradient-to-br from-yellow-400/25 to-yellow-600/10'
                       : service.available
-                        ? 'bg-[#4ADE80]/10'
+                        ? 'bg-gradient-to-br from-[#4ADE80]/20 to-[#0A5C36]/10'
                         : 'bg-white/[0.05]'
                   }`}>
                     <Icon className={`h-5 w-5 ${
                       service.highlight
-                        ? 'text-yellow-400'
+                        ? 'text-yellow-300'
                         : service.available
-                          ? 'text-[#4ADE80]'
+                          ? 'text-[#5dffaa]'
                           : 'text-white/30'
                     }`} />
                   </div>
 
                   {/* Text */}
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-semibold ${service.available ? 'text-white' : 'text-white/50'}`}>
+                    <p className={`text-[15px] font-semibold ${service.available ? 'text-white' : 'text-white/50'}`}>
                       {service.title}
                     </p>
-                    <p className={`text-[11px] mt-0.5 ${service.highlight ? 'text-yellow-400/70' : 'text-white/40'}`}>
+                    <p className={`text-[11px] mt-0.5 ${service.highlight ? 'text-yellow-300/70' : 'text-white/45'}`}>
                       {service.description}
                     </p>
                   </div>
 
-                  {/* Status badge */}
+                  {/* Chevron / status */}
                   <div className="shrink-0">
                     {service.available ? (
-                      <span className="px-2 py-1 rounded-full bg-[#4ADE80]/10 text-[#4ADE80] text-[9px] font-bold uppercase">
-                        Actif
-                      </span>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-[#5dffaa]/70">
+                        <path d="M9 6l6 6-6 6" />
+                      </svg>
                     ) : (
-                      <span className="px-2 py-1 rounded-full bg-orange-500/10 text-orange-400 text-[9px] font-bold uppercase">
+                      <span className="px-2 py-1 rounded-full bg-orange-500/10 text-orange-300/80 text-[9px] font-bold uppercase">
                         Bientôt
                       </span>
                     )}
