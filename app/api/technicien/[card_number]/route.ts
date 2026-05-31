@@ -91,13 +91,13 @@ export async function GET(
     // 3. Resolve the cooperative → its faîtière (root of the hierarchy) + canton fallback.
     const { data: coop } = await supabase
       .from('cooperatives')
-      .select('id, parent_id, level, canton_id, faitiere_name')
+      .select('id, parent_id, level, faitiere_name')
       .eq('id', card.cooperative_id)
       .maybeSingle()
 
     if (!coop) return NextResponse.json({ contacts: [] })
 
-    const cantonId = member?.canton_id ?? coop.canton_id ?? null
+    const cantonId = member?.canton_id ?? null
     const cantonText = member?.canton ?? null  // fallback for text-based matching
 
     // Walk up parent_id until we reach the faîtière (level = 'faitiere').
