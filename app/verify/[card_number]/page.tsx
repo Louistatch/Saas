@@ -205,16 +205,18 @@ export default function VerifyCardPage() {
             background: radial-gradient(120% 100% at 50% -10%, #0f5130 0%, #0a2616 50%, #04120a 100%);
             font-family: 'Barlow', system-ui, sans-serif;
           }
-          .vfy-loading-orb { position: relative; width: 132px; height: 132px; display: grid; place-items: center; }
+          .vfy-loading-orb { position: relative; width: 132px; height: 132px; display: grid; place-items: center; transform: translateZ(0); }
           .vfy-ring {
             position: absolute; inset: 0; border-radius: 50%;
             border: 2px solid rgba(77,255,160,.25); animation: vfyPulse 2.4s ease-out infinite;
+            will-change: transform, opacity; backface-visibility: hidden;
           }
           .vfy-ring.r2 { animation-delay: .8s; } .vfy-ring.r3 { animation-delay: 1.6s; }
           @keyframes vfyPulse { 0% { transform: scale(.4); opacity: .9; } 100% { transform: scale(1.15); opacity: 0; } }
           .vfy-shield {
             width: 44px; height: 44px; color: #4dffa0;
             filter: drop-shadow(0 0 14px rgba(77,255,160,.6)); animation: vfyFloat 2.6s ease-in-out infinite;
+            will-change: transform; transform: translateZ(0);
           }
           @keyframes vfyFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
           .vfy-loading-text { color: #fff; font-weight: 700; font-size: 18px; letter-spacing:.2px; display:inline-flex; }
@@ -318,18 +320,19 @@ export default function VerifyCardPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0A2E1A] via-[#0A3D22] to-[#061a0f] relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-b from-[#0A2E1A] via-[#0A3D22] to-[#061a0f] relative overflow-hidden" style={{ isolation: 'isolate' }}>
       <style>{`
-        .vfy-hero { animation: vfyHeroIn .55s cubic-bezier(.2,.7,.2,1) both; }
-        @keyframes vfyHeroIn { from { opacity:0; transform: translateY(16px) scale(.98); } to { opacity:1; transform:none; } }
-        .vfy-check { animation: vfyPop .5s cubic-bezier(.2,1.4,.4,1) .35s both; }
-        @keyframes vfyPop { 0% { transform: scale(0); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
+        .vfy-hero { animation: vfyHeroIn .55s cubic-bezier(.2,.7,.2,1) both; will-change: transform, opacity; }
+        @keyframes vfyHeroIn { from { opacity:0; transform: translateY(16px) scale(.98); } to { opacity:1; transform: translateZ(0); } }
+        .vfy-check { animation: vfyPop .5s cubic-bezier(.2,1.4,.4,1) .35s both; will-change: transform; }
+        @keyframes vfyPop { 0% { transform: scale(0); } 60% { transform: scale(1.25); } 100% { transform: scale(1) translateZ(0); } }
+        .vfy-gpu-layer { transform: translateZ(0); backface-visibility: hidden; -webkit-backface-visibility: hidden; }
         @media (prefers-reduced-motion: reduce){ .vfy-hero,.vfy-check{ animation:none } }
       `}</style>
-      {/* Background effects */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-[-15%] right-[-15%] w-[400px] h-[400px] rounded-full bg-[#4ADE80]/5 blur-3xl" />
-        <div className="absolute bottom-[-10%] left-[-10%] w-[350px] h-[350px] rounded-full bg-[#0A5C36]/20 blur-3xl" />
+      {/* Background effects — GPU-isolated to prevent rendering artifacts */}
+      <div className="absolute inset-0 pointer-events-none" style={{ transform: 'translateZ(0)', willChange: 'transform' }}>
+        <div className="absolute top-[-15%] right-[-15%] w-[400px] h-[400px] rounded-full bg-[#4ADE80]/5 blur-3xl" style={{ transform: 'translateZ(0)', backfaceVisibility: 'hidden' }} />
+        <div className="absolute bottom-[-10%] left-[-10%] w-[350px] h-[350px] rounded-full bg-[#0A5C36]/20 blur-3xl" style={{ transform: 'translateZ(0)', backfaceVisibility: 'hidden' }} />
       </div>
 
       <div className="relative z-10 max-w-md mx-auto px-4 py-6 space-y-5">
