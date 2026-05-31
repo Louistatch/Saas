@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>FaîtiereHub — Carte SVG paysage (A7 optimisé)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@500;600;700&family=Caveat:wght@600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  /* ═══ MODE APERÇU (écran) ═══ */
+  body{ margin:0; padding:24px; background:#1c1c1c; display:flex; flex-wrap:wrap; align-items:center; justify-content:center; min-height:100vh; gap:16px; }
+  svg.card{ width:1180px; height:740px; max-width:100%; height:auto; border-radius:18px; box-shadow:0 40px 90px rgba(0,0,0,.55); display:block; }
+  #qr-hidden{ position:absolute; left:-9999px; }
+
+  /* ═══ MODE IMPRESSION — 4 cartes A7 sur une page A5 ═══ */
+  @media print {
+    @page {
+      size: A5 landscape;
+      margin: 3mm;
+    }
+    body {
+      background: #fff;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 2mm;
+      padding: 0;
+      margin: 0;
+      width: 100%;
+      height: 100%;
+    }
+    svg.card {
+      width: 100%;
+      height: auto;
+      max-width: 100%;
+      border-radius: 4px;
+      box-shadow: none;
+      /* Forcer le rendu couleur haute qualité */
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      color-adjust: exact;
+    }
+    #qr-hidden { display:none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="qr-hidden"></div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     CARTE EN SVG PUR — 1180 × 740
+     QR code agrandi à 200×200 pour scan fiable en A7
+     Contraste QR maximisé : noir pur #000 sur blanc #fff
+     Résolution QR : 512px pour netteté à l'impression
+═════════════════════════════════════════════════════════════════ -->
+<svg class="card" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 740" id="card">
+
+  <defs>
+    <radialGradient id="bgGrad" cx="26%" cy="36%" r="80%">
+      <stop offset="0%"  stop-color="#115c30"/>
+      <stop offset="40%" stop-color="#0c3a20"/>
+      <stop offset="72%" stop-color="#0a2616"/>
+      <stop offset="100%" stop-color="#04140b"/>
+    </radialGradient>
+
+    <radialGradient id="haloGrad" cx="22%" cy="42%" r="40%">
+      <stop offset="0%"  stop-color="#3ee06a" stop-opacity="0.28"/>
+      <stop offset="70%" stop-color="#3ee06a" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0"   stop-color="#3ee06a"/>
+      <stop offset="0.6" stop-color="#15813f"/>
+      <stop offset="1"   stop-color="#0c3d22"/>
+    </linearGradient>
+
+    <linearGradient id="panelGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0"   stop-color="#f1f7ef" stop-opacity="0"/>
+      <stop offset=".3"  stop-color="#f1f7ef" stop-opacity=".95"/>
+      <stop offset="1"   stop-color="#e2efe1"/>
+    </linearGradient>
+
+    <linearGradient id="pillGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#145a32" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#082818" stop-opacity=".35"/>
+    </linearGradient>
+
+    <linearGradient id="iconGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#27c24c"/>
+      <stop offset="1" stop-color="#15813f"/>
+    </linearGradient>
+
+    <linearGradient id="orGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffd95e"/>
+      <stop offset="1" stop-color="#e0a106"/>
+    </linearGradient>
+
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="14" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
+      <feOffset dy="6"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.4"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <clipPath id="cardClip"><rect x="0" y="0" width="1180" height="740" rx="34" ry="34"/></clipPath>
+    <clipPath id="photoClip"><circle cx="166" cy="240" r="106"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#cardClip)">
+
+    <!-- Fond -->
+    <rect x="0" y="0" width="1180" height="740" fill="url(#bgGrad)"/>
+    <rect x="0" y="0" width="1180" height="740" fill="url(#haloGrad)"/>
+
+    <!-- Filigrane feuille -->
+    <g opacity="0.09" transform="translate(-30 470) rotate(8) scale(3.3)">
+      <path d="M50 5C30 20 15 45 20 75c2 12 8 18 8 18s-2-30 12-48C58 25 72 18 72 18S60 10 50 5z" fill="#3ee06a"/>
+    </g>
+
+    <!-- ════ LOGO ════ -->
+    <g transform="translate(44 36)">
+      <circle cx="25" cy="25" r="25" fill="url(#iconGrad)" filter="url(#shadow)"/>
+      <path d="M25 11C20 15 17 20 18 26c.5 3 2 4.5 2 4.5S19.5 23 23 18c2.5-3.5 6-5 6-5S27 12.5 25 11z" fill="#fff"/>
+      <text x="62" y="22" font-family="Barlow Condensed" font-weight="800" font-size="28" fill="#fff">Faîtiere</text>
+      <text x="155" y="22" font-family="Barlow Condensed" font-weight="800" font-size="28" fill="#3ee06a">Hub</text>
+    </g>
+
+    <!-- ════ PHOTO ════ -->
+    <circle cx="166" cy="240" r="115" fill="url(#ringGrad)" filter="url(#glow)"/>
+    <circle cx="166" cy="240" r="108" fill="#0c3d22"/>
+    <g clip-path="url(#photoClip)">
+      <rect x="60" y="134" width="212" height="212" fill="#1d6b3c"/>
+      <g transform="translate(166 240)" fill="#bfe9cc" opacity="0.6">
+        <circle cx="0" cy="-22" r="28"/>
+        <path d="M-56 56 C -56 12, 56 12, 56 56 Z"/>
+      </g>
+    </g>
+
+    <!-- ════ NOM + STATUT ════ -->
+    <g transform="translate(308 178)">
+      <text x="0" y="0" font-family="Barlow Condensed" font-weight="800" font-size="60" fill="#fff" id="svg-name">abla AKWA</text>
+
+      <!-- Badge niveau Or -->
+      <g transform="translate(0 22)" id="svg-level-group">
+        <rect x="0" y="0" width="170" height="36" rx="18" fill="url(#orGrad)" filter="url(#shadow)"/>
+        <text x="14" y="24" font-size="20">🥇</text>
+        <text x="42" y="25" font-family="Barlow Condensed" font-weight="700" font-size="16" fill="#3d2c00" letter-spacing="1.6">NIVEAU OR</text>
+      </g>
+
+      <!-- Pilule MEMBRE ACTIF -->
+      <g transform="translate(186 22)">
+        <rect x="0" y="0" width="172" height="36" rx="18" fill="#27c24c" fill-opacity="0.18" stroke="#3ee06a" stroke-opacity="0.4"/>
+        <circle cx="16" cy="18" r="5" fill="#3ee06a"/>
+        <text x="30" y="24" font-family="Barlow Condensed" font-weight="700" font-size="15" fill="#3ee06a" letter-spacing="1.8">MEMBRE ACTIF</text>
+      </g>
+
+      <!-- Coopérative -->
+      <text x="0" y="92" font-family="Barlow Condensed" font-weight="600" font-size="19" fill="#7fd99a" letter-spacing="0.6">COOPÉRATIVE : <tspan fill="#fff" font-weight="700" id="svg-coop">Alliance Agricole</tspan></text>
+    </g>
+
+    <!-- ════ PILULES D'INFOS (grille 2×2) ════ -->
+    <g id="pills" transform="translate(54 408)">
+      <!-- Localité -->
+      <g transform="translate(0 0)">
+        <rect x="0" y="0" width="312" height="76" rx="18" fill="url(#pillGrad)" stroke="#3ee06a" stroke-opacity="0.22"/>
+        <g transform="translate(16 14)">
+          <rect x="0" y="0" width="48" height="48" rx="13" fill="url(#iconGrad)" filter="url(#shadow)"/>
+          <path d="M24 41s14-13 14-24a14 14 0 10-28 0c0 11 14 24 14 24z" fill="none" stroke="#fff" stroke-width="1.8" transform="scale(0.5) translate(0 0)"/>
+          <circle cx="24" cy="20" r="4.8" fill="#fff" transform="scale(0.5) translate(0 0)"/>
+        </g>
+        <text x="80" y="32" font-family="Barlow Condensed" font-weight="600" font-size="11" fill="#7fd99a" letter-spacing="1.8">LOCALITÉ</text>
+        <text x="80" y="54" font-family="Barlow" font-weight="600" font-size="16" fill="#fff" id="svg-localite">lama, lama, kozah, Kara</text>
+      </g>
+      <!-- Téléphone -->
+      <g transform="translate(332 0)">
+        <rect x="0" y="0" width="312" height="76" rx="18" fill="url(#pillGrad)" stroke="#3ee06a" stroke-opacity="0.22"/>
+        <g transform="translate(16 14)">
+          <rect x="0" y="0" width="48" height="48" rx="13" fill="url(#iconGrad)" filter="url(#shadow)"/>
+          <path d="M14 14h4l3 7-3 1c1 3 4 6 7 7l1-3 7 3v4c0 1-1 2-2 2-12 0-22-10-22-22 0-1 1-2 2-2z" fill="#fff" transform="scale(0.7)"/>
+        </g>
+        <text x="80" y="32" font-family="Barlow Condensed" font-weight="600" font-size="11" fill="#7fd99a" letter-spacing="1.8">TÉLÉPHONE</text>
+        <text x="80" y="54" font-family="Barlow" font-weight="600" font-size="16" fill="#fff" id="svg-tel">+228 92 54 88 38</text>
+      </g>
+      <!-- Coopérative -->
+      <g transform="translate(0 90)">
+        <rect x="0" y="0" width="312" height="76" rx="18" fill="url(#pillGrad)" stroke="#3ee06a" stroke-opacity="0.22"/>
+        <g transform="translate(16 14)">
+          <rect x="0" y="0" width="48" height="48" rx="13" fill="url(#iconGrad)" filter="url(#shadow)"/>
+          <path d="M6 36V14l16-10 16 10v22" fill="none" stroke="#fff" stroke-width="2" transform="scale(0.7)"/>
+          <rect x="14" y="22" width="12" height="14" fill="#fff" transform="scale(0.7)"/>
+        </g>
+        <text x="80" y="32" font-family="Barlow Condensed" font-weight="600" font-size="11" fill="#7fd99a" letter-spacing="1.8">COOPÉRATIVE</text>
+        <text x="80" y="54" font-family="Barlow" font-weight="600" font-size="16" fill="#fff" id="svg-coop2">Alliance Agricole</text>
+      </g>
+      <!-- Faîtière -->
+      <g transform="translate(332 90)">
+        <rect x="0" y="0" width="312" height="76" rx="18" fill="url(#pillGrad)" stroke="#3ee06a" stroke-opacity="0.22"/>
+        <g transform="translate(16 14)">
+          <rect x="0" y="0" width="48" height="48" rx="13" fill="url(#iconGrad)" filter="url(#shadow)"/>
+          <circle cx="16" cy="14" r="5" fill="#fff" transform="scale(0.7) translate(4 4)"/>
+          <circle cx="28" cy="14" r="5" fill="#fff" transform="scale(0.7) translate(4 4)"/>
+          <path d="M4 34c0-5 4-8 8-8s8 3 8 8M20 34c0-5 4-8 8-8s5 2 5 6" fill="none" stroke="#fff" stroke-width="1.8" transform="scale(0.7) translate(4 4)"/>
+        </g>
+        <text x="80" y="32" font-family="Barlow Condensed" font-weight="600" font-size="11" fill="#7fd99a" letter-spacing="1.8">FAÎTIÈRE</text>
+        <text x="80" y="54" font-family="Barlow" font-weight="600" font-size="15" fill="#fff" id="svg-faitiere">Alliance des Faîtières Agricoles</text>
+      </g>
+    </g>
+
+    <!-- ════ PANNEAU CLAIR DROIT ════ -->
+    <g>
+      <path d="M1180 0 L1180 740 L824 740 C784 600 802 430 794 290 C786 175 808 78 846 0 Z"
+            fill="url(#panelGrad)"/>
+
+      <g transform="translate(864 40)" font-family="Barlow Condensed">
+        <!-- Titre -->
+        <text x="0" y="20" font-weight="800" font-size="22" fill="#0a3a1f" letter-spacing="3">MEMBER IDENTITY PASS</text>
+        <text x="0" y="38" font-family="Barlow" font-weight="600" font-size="11" fill="#3d7a52" letter-spacing="1.2" id="svg-faitiere-sub">Alliance des Faîtières Agricoles</text>
+
+        <!-- Badge VERIFIED MEMBER -->
+        <g transform="translate(0 48)" filter="url(#shadow)">
+          <rect x="0" y="0" width="196" height="32" rx="16" fill="url(#iconGrad)"/>
+          <circle cx="18" cy="16" r="8" fill="none" stroke="#fff" stroke-width="1.8"/>
+          <path d="M14 16 l3 3 l5 -5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <text x="34" y="21" font-weight="700" font-size="13" fill="#fff" letter-spacing="2">VERIFIED MEMBER</text>
+        </g>
+
+        <!-- Champs : Member ID + Valid Until -->
+        <g transform="translate(0 104)">
+          <text x="0" y="0" font-family="Barlow" font-weight="600" font-size="11" fill="#3d7a52" letter-spacing="1.5">MEMBER ID</text>
+          <text x="0" y="22" font-weight="800" font-size="20" fill="#0a3a1f" id="svg-memberid">ALL-64706</text>
+
+          <text x="155" y="0" font-family="Barlow" font-weight="600" font-size="11" fill="#3d7a52" letter-spacing="1.5">VALID UNTIL</text>
+          <text x="155" y="22" font-weight="800" font-size="20" fill="#0a3a1f" id="svg-validuntil">19 MAY 2027</text>
+        </g>
+
+        <!-- Champs : Status + Period -->
+        <g transform="translate(0 156)">
+          <text x="0" y="0" font-family="Barlow" font-weight="600" font-size="11" fill="#3d7a52" letter-spacing="1.5">MEMBERSHIP STATUS</text>
+          <text x="0" y="22" font-weight="800" font-size="20" fill="#15813f" id="svg-status">ACTIVE</text>
+
+          <text x="155" y="0" font-family="Barlow" font-weight="600" font-size="11" fill="#3d7a52" letter-spacing="1.5">MEMBERSHIP PERIOD</text>
+          <text x="155" y="22" font-weight="800" font-size="20" fill="#0a3a1f" id="svg-period">2024 - 2027</text>
+        </g>
+
+        <!-- Signature (compactée) -->
+        <g transform="translate(0 206)">
+          <text x="0" y="0" font-family="Barlow" font-weight="600" font-size="10" fill="#3d7a52" letter-spacing="1.5">DIGITAL SIGNATURE</text>
+          <text x="0" y="28" font-family="Caveat" font-weight="600" font-size="30" fill="#0a3a1f" id="svg-signature">Faîtiere</text>
+        </g>
+
+        <!-- ═══ QR CODE AGRANDI — 200×200 pour scan fiable en A7 ═══ -->
+        <!-- Taille physique en A7 : ~15mm × 15mm (minimum recommandé : 10mm) -->
+        <g transform="translate(20 270)">
+          <!-- Fond blanc avec bordure épaisse pour contraste maximal -->
+          <rect x="-10" y="-10" width="220" height="220" rx="16" fill="#ffffff" stroke="#0a3a1f" stroke-width="3" filter="url(#shadow)"/>
+          <!-- QR code injecté — NOIR PUR sur BLANC PUR pour contraste maximal -->
+          <image id="svg-qr" x="0" y="0" width="200" height="200" href="" image-rendering="pixelated"/>
+          <!-- Texte à droite du QR -->
+          <g transform="translate(232 60)">
+            <text x="0" y="0" font-family="Barlow Condensed" font-weight="700" font-size="16" fill="#0a3a1f" letter-spacing="2">SCAN TO</text>
+            <text x="0" y="22" font-family="Barlow Condensed" font-weight="700" font-size="16" fill="#0a3a1f" letter-spacing="2">VERIFY</text>
+            <text x="0" y="52" font-family="Barlow" font-weight="600" font-size="10" fill="#15813f" letter-spacing="0.8">SECURE</text>
+            <text x="0" y="66" font-family="Barlow" font-weight="600" font-size="10" fill="#15813f" letter-spacing="0.8">VERIFIED</text>
+            <text x="0" y="80" font-family="Barlow" font-weight="600" font-size="10" fill="#15813f" letter-spacing="0.8">TRUSTED</text>
+          </g>
+        </g>
+      </g>
+    </g>
+
+  </g>
+</svg>
+
+<script>
+/* ════════════════════════════════════════════════════════════════
+   DONNÉES — branche-toi ici depuis Supabase
+═════════════════════════════════════════════════════════════════ */
+const memberData = {
+  firstName:"abla", lastName:"AKWA", memberId:"ALL-64706",
+  validUntil:"19 MAY 2027", status:"ACTIVE", level:"or",
+  coopName:"Alliance Agricole", faitiere:"Alliance des Faîtières Agricoles",
+  localite:"lama, lama, kozah, Kara", tel:"+228 92 54 88 38",
+  periodYears:"2024 - 2027", photoUrl:null,
+  verifyUrl:"https://www.faitierehub.com/verify/ALL-64706"
+};
+
+function setText(id, value){
+  const el = document.getElementById(id);
+  if(el) el.textContent = value;
+}
+
+function applyLevel(level){
+  const g = document.getElementById('svg-level-group');
+  if(!g) return;
+  const themes = {
+    or:     { fill:'url(#orGrad)',   icon:'🥇', txt:'NIVEAU OR',     color:'#3d2c00' },
+    argent: { fill:'#cfd8df',         icon:'🥈', txt:'NIVEAU ARGENT', color:'#2a3540' },
+    bronze: { fill:'#c2854f',         icon:'🥉', txt:'NIVEAU BRONZE', color:'#3a1e08' }
+  };
+  const t = themes[level] || themes.bronze;
+  g.querySelector('rect').setAttribute('fill', t.fill);
+  g.querySelectorAll('text')[0].textContent = t.icon;
+  const lbl = g.querySelectorAll('text')[1];
+  lbl.textContent = t.txt;
+  lbl.setAttribute('fill', t.color);
+}
+
+function render(d){
+  document.getElementById('svg-name').textContent          = `${d.firstName} ${d.lastName}`;
+  document.getElementById('svg-coop').textContent          = d.coopName;
+  document.getElementById('svg-coop2').textContent         = d.coopName;
+  document.getElementById('svg-faitiere').textContent      = d.faitiere;
+  document.getElementById('svg-faitiere-sub').textContent  = d.faitiere;
+  document.getElementById('svg-localite').textContent      = d.localite;
+  document.getElementById('svg-tel').textContent           = d.tel;
+  document.getElementById('svg-memberid').textContent      = d.memberId;
+  document.getElementById('svg-validuntil').textContent    = d.validUntil;
+  document.getElementById('svg-status').textContent        = d.status;
+  document.getElementById('svg-period').textContent        = d.periodYears;
+  document.getElementById('svg-signature').textContent     = d.firstName;
+  applyLevel(d.level);
+
+  /* ═══ QR CODE — OPTIMISÉ POUR IMPRESSION COULEUR A7 ═══
+     Problème résolu :
+     1. Résolution 512px (au lieu de 208) → plus de modules, meilleure netteté
+     2. Couleur NOIR PUR #000000 (au lieu de vert #0a3a1f) → contraste maximal
+     3. Niveau correction L (au lieu de H) → modules plus gros, plus faciles à scanner
+        (H = 30% correction = modules plus petits et denses)
+        (L = 7% correction = modules plus gros, scan plus facile en petit format)
+     4. Taille affichée 200×200 dans le SVG (au lieu de 104×104) → ~15mm en A7
+  */
+  const hidden = document.getElementById('qr-hidden');
+  hidden.innerHTML = '';
+  new QRCode(hidden, {
+    text: d.verifyUrl,
+    width: 512,
+    height: 512,
+    colorDark: "#000000",    // NOIR PUR — contraste maximal pour photocopie couleur
+    colorLight: "#ffffff",   // BLANC PUR
+    correctLevel: QRCode.CorrectLevel.L  // Modules plus gros = scan plus facile en petit
+  });
+  setTimeout(() => {
+    const img = hidden.querySelector('img') || hidden.querySelector('canvas');
+    if(!img) return;
+    const dataUrl = img.tagName === 'CANVAS' ? img.toDataURL('image/png') : img.src;
+    document.getElementById('svg-qr').setAttribute('href', dataUrl);
+  }, 80);
+}
+render(memberData);
+</script>
+</body>
+</html>
