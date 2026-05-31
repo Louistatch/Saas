@@ -163,6 +163,25 @@ export default function VerifyCardPage() {
     window.location.href = '/scan'
   }, [])
 
+  // Load technician + coordo contacts when the producer opens that view.
+  useEffect(() => {
+    if (activeView !== 'technicien' || contacts !== null) return
+    let cancelled = false
+    setContactsLoading(true)
+    fetch(`/api/technicien/${encodeURIComponent(cardNumber)}`)
+      .then((r) => r.json())
+      .then((d: { contacts?: typeof contacts }) => {
+        if (!cancelled) setContacts(d.contacts ?? [])
+      })
+      .catch(() => {
+        if (!cancelled) setContacts([])
+      })
+      .finally(() => {
+        if (!cancelled) setContactsLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [activeView, contacts, cardNumber])
+
   // Loading state
   if (loading) {
     return (
@@ -209,6 +228,8 @@ export default function VerifyCardPage() {
     )
   }
 
+  const isValid = result?.valid ?? false
+
   if (!result) return null
 
   // Expired session
@@ -239,27 +260,6 @@ export default function VerifyCardPage() {
       </div>
     )
   }
-
-  const isValid = result.valid
-
-  // Load technician + coordo contacts when the producer opens that view.
-  useEffect(() => {
-    if (activeView !== 'technicien' || contacts !== null) return
-    let cancelled = false
-    setContactsLoading(true)
-    fetch(`/api/technicien/${encodeURIComponent(cardNumber)}`)
-      .then((r) => r.json())
-      .then((d: { contacts?: typeof contacts }) => {
-        if (!cancelled) setContacts(d.contacts ?? [])
-      })
-      .catch(() => {
-        if (!cancelled) setContacts([])
-      })
-      .finally(() => {
-        if (!cancelled) setContactsLoading(false)
-      })
-    return () => { cancelled = true }
-  }, [activeView, contacts, cardNumber])
 
   // Service menu items
   const services: ServiceItem[] = [
