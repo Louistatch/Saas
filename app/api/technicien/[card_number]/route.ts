@@ -50,9 +50,10 @@ export async function GET(
   }
 
   // 2. Resolve the producer's canton_id (from the member, fallback to coop).
+  //    If canton_id is null, we'll try matching by canton text name later.
   const { data: member } = await supabase
     .from('members')
-    .select('canton_id')
+    .select('canton_id, canton')
     .eq('id', card.member_id)
     .maybeSingle()
 
@@ -66,6 +67,7 @@ export async function GET(
   if (!coop) return NextResponse.json({ contacts: [] })
 
   const cantonId = member?.canton_id ?? coop.canton_id ?? null
+  const cantonText = member?.canton ?? null  // fallback for text-based matching
 
   // Walk up parent_id until we reach the faîtière (level = 'faitiere').
   let faitiereId = coop.level === 'faitiere' ? coop.id : null
@@ -90,6 +92,9 @@ export async function GET(
 
   if (faitiereId) {
     // 4a. Technician of the producer's canton, within their faîtière ONLY.
+    //     Primary: match by canton_id (UUID).
+    //     Fallback: if canton_id is null, match by canton text name (for members
+    //     imported from Kobo without proper canton_id linkage).
     if (cantonId) {
       const { data: tech } = await supabase
         .from('techniciens')
@@ -107,6 +112,29 @@ export async function GET(
           phone: tech.phone,
           canton: cantonName ?? null,
         })
+      }
+    } else if (cantonText) {
+      // Fallback: resolve canton_id from the text name, then find the technician.
+      const { data: cantonRow } = await supabase
+        .from('cantons')
+        .select('id, name')
+        .ilike('name', cantonText.trim())
+        .maybeSingle()
+      if (cantonRow) {
+        const { data: tech } = await supabase
+          .from('techniciens')
+          .select('name, phone')
+          .eq('faitiere_id', faitiereId)
+          .eq('canton_id', cantonRow.id)
+          .maybeSingle()
+        if (tech) {
+          contacts.push({
+            role: 'technicien',
+            name: tech.name,
+            phone: tech.phone,
+            canton: cantonRow.name,
+          })
+        }
       }
     }
 
