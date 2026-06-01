@@ -254,7 +254,7 @@ export default function TechniciensPage() {
                     {cantonName(t)} · <span className="font-mono">{t.phone}</span>
                   </p>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => handleDelete(t.id)} className="text-destructive hover:text-destructive">
+                <Button variant="ghost" size="icon" onClick={() => handleDelete(t.id)} aria-label={`Supprimer le technicien ${t.name}`} className="text-destructive hover:text-destructive">
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>

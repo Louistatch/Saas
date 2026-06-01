@@ -103,6 +103,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             size="icon"
             variant="outline"
             onClick={() => setSidebarOpen((o) => !o)}
+            aria-label={sidebarOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
             className="border-border"
           >
             {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
