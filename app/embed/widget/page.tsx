@@ -16,11 +16,36 @@ interface EmbedTheme {
   fontFamily?: string
 }
 
+interface WidgetFiche {
+  id: string
+  culture?: string | null
+  title?: string | null
+  type_agriculture?: string | null
+  price_non_member?: number | null
+}
+interface WidgetData {
+  error?: string
+  fiches?: WidgetFiche[]
+  // In stats mode these are counts; in marketplace mode products is an array.
+  products?: number | Record<string, unknown>[]
+  members?: number | unknown[]
+}
+interface WidgetCooperative {
+  name?: string | null
+  faitiere_name?: string | null
+  logo_url?: string | null
+}
+interface WidgetVerifyResult {
+  card?: { expiry?: string | null }
+  cooperative?: WidgetCooperative
+  member?: { first_name?: string | null; last_name?: string | null }
+}
+
 function useEmbedData(cooperativeId: string, widget: string) {
   const supabase = useMemo(() => createClient(), [])
-  const [data, setData] = useState<any>(null)
+  const [data, setData] = useState<WidgetData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [cooperative, setCooperative] = useState<any>(null)
+  const [cooperative, setCooperative] = useState<WidgetCooperative | null>(null)
 
   useEffect(() => {
     if (!cooperativeId) return
@@ -81,7 +106,7 @@ function useEmbedData(cooperativeId: string, widget: string) {
 
 function MemberVerifyWidget({ cooperativeId }: { cooperativeId: string }) {
   const [cardNumber, setCardNumber] = useState('')
-  const [result, setResult] = useState<any>(null)
+  const [result, setResult] = useState<WidgetVerifyResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -223,11 +248,12 @@ function EmbedWidgetContent() {
       )}
 
       {/* Widget content */}
-      {widget === 'marketplace' && data?.products && (
+      {widget === 'marketplace' && Array.isArray(data?.products) && (
         <div className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {data.products.map((product: any) => (
-              <ProductCard key={product.id} product={product} />
+            {(data.products as Record<string, unknown>[]).map((product) => (
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              <ProductCard key={String(product.id)} product={product as any} />
             ))}
           </div>
           {data.products.length === 0 && (
@@ -242,7 +268,7 @@ function EmbedWidgetContent() {
 
       {widget === 'fiches' && data?.fiches && (
         <div className="space-y-2">
-          {data.fiches.map((fiche: any) => (
+          {data.fiches.map((fiche: WidgetFiche) => (
             <Card key={fiche.id} className="border-border">
               <CardContent className="p-3 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -266,14 +292,14 @@ function EmbedWidgetContent() {
           <Card className="border-border">
             <CardContent className="p-4 text-center">
               <Users className="h-8 w-8 text-primary mx-auto mb-2" />
-              <p className="text-2xl font-bold text-foreground">{data.members}</p>
+              <p className="text-2xl font-bold text-foreground">{typeof data.members === 'number' ? data.members : 0}</p>
               <p className="text-xs text-muted-foreground">Membres</p>
             </CardContent>
           </Card>
           <Card className="border-border">
             <CardContent className="p-4 text-center">
               <ShoppingCart className="h-8 w-8 text-primary mx-auto mb-2" />
-              <p className="text-2xl font-bold text-foreground">{data.products}</p>
+              <p className="text-2xl font-bold text-foreground">{typeof data.products === 'number' ? data.products : 0}</p>
               <p className="text-xs text-muted-foreground">Produits</p>
             </CardContent>
           </Card>

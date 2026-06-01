@@ -240,9 +240,10 @@ export default function MarketplacePage() {
           type: ext,
           size: file.size,
         })
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Upload exception:', err)
-        toast({ title: `Échec upload: ${file.name}`, description: err?.message || 'Erreur réseau', variant: 'destructive' })
+        const msg = err instanceof Error ? err.message : 'Erreur réseau'
+        toast({ title: `Échec upload: ${file.name}`, description: msg, variant: 'destructive' })
       }
     }
 

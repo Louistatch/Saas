@@ -93,12 +93,12 @@ export async function GET(request: NextRequest) {
       fiches.length === 0
         ? `<div style="text-align:center;padding:40px;color:#888;">Aucune fiche technique disponible</div>`
         : fiches
-            .map((f: any) => `
+            .map((f: { culture?: string | null; title?: string | null; type_agriculture?: string | null; price_non_member?: number | null }) => `
         <div class="card">
           <div class="card-image">📄</div>
           <div class="card-content">
             <div class="card-category">${escapeHtml(f.culture ?? 'Culture')}</div>
-            <div class="card-name">${escapeHtml(f.title)}</div>
+            <div class="card-name">${escapeHtml(f.title ?? 'Fiche technique')}</div>
             <div class="card-producer">${escapeHtml(f.type_agriculture ?? '')}</div>
             <div class="card-footer">
               <span class="card-price">${f.price_non_member} FCFA</span>

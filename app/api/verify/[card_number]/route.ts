@@ -103,21 +103,36 @@ export async function GET(
   }
 
   // Second: get member info (may fail if anon doesn't have access — graceful fallback)
-  let member: any = null
-  let coop: any = null
+  interface MemberRow {
+    first_name: string | null
+    last_name: string | null
+    photo_url: string | null
+    village: string | null
+    canton: string | null
+    prefecture: string | null
+    region: string | null
+    status: string | null
+    created_at: string | null
+  }
+  interface CoopRow {
+    name: string | null
+    faitiere_name: string | null
+  }
+  let member: MemberRow | null = null
+  let coop: CoopRow | null = null
 
   const { data: memberData } = await supabase
     .from('members')
     .select('first_name, last_name, photo_url, village, canton, prefecture, region, status, created_at')
     .eq('id', card.member_id)
-    .maybeSingle()
+    .maybeSingle<MemberRow>()
   if (memberData) member = memberData
 
   const { data: coopData } = await supabase
     .from('cooperatives')
     .select('name, faitiere_name')
     .eq('id', card.cooperative_id)
-    .maybeSingle()
+    .maybeSingle<CoopRow>()
   if (coopData) coop = coopData
 
   // Vérifier l'expiration
