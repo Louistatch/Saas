@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { MapPin, Leaf, MessageCircle, User } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 
 export interface SupplierData {
   id: string
@@ -43,8 +44,7 @@ export function SupplierCard({ supplier }: SupplierCardProps) {
           <div className="shrink-0">
             <div className="w-14 h-14 rounded-full overflow-hidden border-2 bg-secondary/30" style={{ borderColor: config.color }}>
               {supplier.photo_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={supplier.photo_url} alt="" className="w-full h-full object-cover" />
+                <Image src={supplier.photo_url} alt="" width={56} height={56} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <User className="h-6 w-6 text-muted-foreground" />

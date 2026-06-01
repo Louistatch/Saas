@@ -105,7 +105,7 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
               <div className="card3d-photo-inner">
                 {member.photo_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={member.photo_url} alt="" />
+                  <img src={member.photo_url} alt="" loading="lazy" decoding="async" />
                 ) : (
                   <div className="card3d-photo-empty">
                     <User size={42} />

@@ -236,7 +236,7 @@ function EmbedWidgetContent() {
       {cooperative && (
         <div className="flex items-center gap-3 pb-3 border-b border-border">
           {cooperative.logo_url && (
-            <img src={cooperative.logo_url} alt="" className="h-8 w-8 rounded-full object-cover" />
+            <img src={cooperative.logo_url} alt="" loading="lazy" decoding="async" className="h-8 w-8 rounded-full object-cover" />
           )}
           <div>
             <h2 className="font-semibold text-foreground text-sm">{cooperative.name}</h2>

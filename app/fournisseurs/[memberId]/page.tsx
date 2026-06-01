@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { useParams } from 'next/navigation'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -152,8 +153,7 @@ export default function SupplierProfilePage() {
             <div className="flex items-start gap-5">
               <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-primary/20 shrink-0 bg-secondary/30">
                 {supplier.photo_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={supplier.photo_url} alt="" className="w-full h-full object-cover" />
+                  <Image src={supplier.photo_url} alt="" width={80} height={80} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <User className="h-8 w-8 text-muted-foreground" />

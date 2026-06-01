@@ -481,7 +481,7 @@ export default function VerifyCardPage() {
                 <div className="w-20 h-20 rounded-full overflow-hidden border-[3px] border-[#4ADE80]/40">
                   {result.member.photo_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={result.member.photo_url} alt="" className="w-full h-full object-cover" />
+                    <img src={result.member.photo_url} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full bg-[#4ADE80]/10 flex items-center justify-center">
                       <User className="h-9 w-9 text-[#4ADE80]/60" />
