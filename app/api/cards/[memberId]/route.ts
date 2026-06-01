@@ -14,6 +14,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { initWasm, Resvg } from '@resvg/resvg-wasm'
 import { createClient } from '@/lib/supabase/server'
 import { assertTenantAccess } from '@/lib/security/assert-access'
+import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 import { buildCardSchema, renderToSvgString } from '@/lib/card-engine'
 
 export const runtime = 'nodejs'
@@ -44,6 +45,11 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ memberId: string }> }
 ) {
+  // Rate limit: PNG generation is CPU/WASM heavy (~80ms). Without this an
+  // authenticated user could saturate the runtime by hammering this endpoint.
+  const rateLimited = await applyRateLimit(request, 'embed')
+  if (rateLimited) return rateLimited
+
   const { memberId } = await params
 
   if (!memberId || memberId.length < 10) {

@@ -10,8 +10,12 @@
 
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 
 export async function GET(request: NextRequest) {
+  const rateLimited = await applyRateLimit(request, 'marketplace')
+  if (rateLimited) return rateLimited
+
   const { searchParams } = new URL(request.url)
   const action = searchParams.get('action')
   const regionId = searchParams.get('region_id')
@@ -111,6 +115,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Rate limit price submissions — a leaked/guessed card number must not allow
+  // flooding the market with fake prices.
+  const rateLimited = await applyRateLimit(request, 'marketplace')
+  if (rateLimited) return rateLimited
+
   try {
     const body = await request.json()
     const { card_number, culture_id, region_id, market_name, price } = body
