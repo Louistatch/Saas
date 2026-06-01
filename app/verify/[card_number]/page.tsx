@@ -9,11 +9,12 @@ import { useParams } from 'next/navigation'
 import {
   CheckCircle, XCircle, Shield, MapPin, Building2,
   FileText, TrendingUp, PhoneCall, Map, CloudRain,
-  ShoppingCart, Coins, QrCode, Timer, User, ArrowLeft,
+  ShoppingCart, Coins, QrCode, Timer, User, ArrowLeft, Bot,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/logo'
 import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboard'
 import { Card3D } from '@/components/verify/card-3d'
+import { AiChat } from '@/components/verify/ai-chat'
 import { memberFullName, memberLocality as getMemberLocality, waNumber } from '@/components/verify/types'
 
 /**
@@ -73,7 +74,7 @@ export default function VerifyCardPage() {
   const [showContent, setShowContent] = useState(false)
   const [timeLeft, setTimeLeft] = useState(600)
   const [expired, setExpired] = useState(false)
-  const [activeView, setActiveView] = useState<'menu' | 'identity' | 'prices' | 'technicien'>('menu')
+  const [activeView, setActiveView] = useState<'menu' | 'identity' | 'prices' | 'technicien' | 'ai'>('menu')
   const [contacts, setContacts] = useState<{ role: 'technicien' | 'coordo'; name: string; phone: string; canton?: string | null }[] | null>(null)
   const [contactsLoading, setContactsLoading] = useState(false)
 
@@ -276,6 +277,14 @@ export default function VerifyCardPage() {
       description: 'Cours actuels : Lomé, Kara, Sokodé...',
       available: true,
       action: () => setActiveView('prices'),
+    },
+    {
+      icon: Bot,
+      title: 'Discuter avec l\'IA',
+      description: 'AgriTogo : conseils, prix, cultures — votre assistant',
+      available: true,
+      highlight: true,
+      action: () => setActiveView('ai'),
     },
     {
       icon: PhoneCall,
@@ -627,6 +636,15 @@ export default function VerifyCardPage() {
               </div>
             ))}
           </div>
+        )}
+
+        {/* AgriTogo AI Chat */}
+        {isValid && activeView === 'ai' && result.member && (
+          <AiChat
+            cardNumber={cardNumber}
+            memberName={(result.member.first_name ?? '').trim()}
+            onBack={() => setActiveView('menu')}
+          />
         )}
 
         {/* Security Timer */}
