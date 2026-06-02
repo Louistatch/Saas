@@ -196,7 +196,7 @@ RÈGLES :
     try {
       const genAI = new GoogleGenerativeAI(key)
       const model = genAI.getGenerativeModel({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash',
         systemInstruction: systemPrompt,
       })
 
@@ -214,7 +214,7 @@ RÈGLES :
         response: aiResponse,
         engine: attempt > 0 ? `gemini-direct (clé ${attempt + 1}/${totalKeys})` : 'gemini-direct',
         agent_type: null,
-        model_used: 'gemini-2.0-flash',
+        model_used: 'gemini-2.5-flash',
         debate_used: false,
       })
     } catch (err) {
