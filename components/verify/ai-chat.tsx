@@ -6,6 +6,8 @@ import { ArrowLeft, Send, Bot, User, Loader2 } from 'lucide-react'
 interface Message {
   role: 'user' | 'assistant'
   content: string
+  engine?: string | null
+  debate?: boolean
 }
 
 interface AiChatProps {
@@ -54,7 +56,12 @@ export function AiChat({ cardNumber, memberName, onBack }: AiChatProps) {
       const data = await res.json()
 
       if (data.response) {
-        setMessages((m) => [...m, { role: 'assistant', content: data.response }])
+        setMessages((m) => [...m, {
+          role: 'assistant',
+          content: data.response,
+          engine: data.engine ?? null,
+          debate: data.debate_used ?? false,
+        }])
       } else {
         setMessages((m) => [
           ...m,
@@ -137,6 +144,12 @@ export function AiChat({ cardNumber, memberName, onBack }: AiChatProps) {
               {m.content.split('\n').map((line, j) => (
                 <p key={j}>{line}</p>
               ))}
+              {m.role === 'assistant' && m.engine && (
+                <span className="ai-msg-engine">
+                  {m.engine === 'agritogo-multiagent' ? '🧠 Multi-Agent' : '⚡ Gemini'}
+                  {m.debate ? ' • Débat' : ''}
+                </span>
+              )}
             </div>
           </div>
         ))}
@@ -215,6 +228,7 @@ export function AiChat({ cardNumber, memberName, onBack }: AiChatProps) {
         .ai-msg-assistant .ai-msg-bubble { background:rgba(255,255,255,.06); color:#e0f5eb; border-bottom-left-radius:4px; }
         .ai-msg-user .ai-msg-bubble { background:rgba(77,255,160,.18); color:#eafff2; border-bottom-right-radius:4px; }
         .ai-msg-typing { display:flex; align-items:center; gap:8px; color:#7fd9a5; font-size:13px; }
+        .ai-msg-engine { display:block; margin-top:6px; font-size:10px; color:#6b9e80; letter-spacing:.3px; }
         .ai-chat-input-bar { display:flex; gap:8px; padding:12px 14px;
           border-top: 1px solid rgba(255,255,255,.06); background:rgba(0,0,0,.15); }
         .ai-chat-input { flex:1; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1);

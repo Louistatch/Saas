@@ -1,19 +1,20 @@
 /**
  * POST /api/ai/chat
  *
- * AgriTogo intelligence engine integrated into FaîtiereHub.
- * The producer scans their card → arrives on verify → taps "Discuter avec l'IA"
- * → this endpoint powers the conversation.
+ * AgriTogo × FaîtiereHub — AI chat endpoint.
  *
- * Flow:
- *   1. Resolve the producer's context from their card (region, cooperative, cultures).
- *   2. Load recent market prices for their zone.
- *   3. Load conversation history (last 10 messages).
- *   4. Call Gemini with a structured agricultural system prompt.
- *   5. Save both messages to ai_conversations.
- *   6. Return the AI response.
+ * Architecture:
+ *   1. Try the AgriTogo multi-agent service (AGRITOGO_API_URL) first.
+ *      → This uses the full Decision Intelligence Engine: 6 specialized agents,
+ *        14 tools (market data + ML + KoboCollect), multi-model debate, UX reformulation.
+ *   2. If AgriTogo is down or unavailable → fallback to direct Gemini API.
+ *      → Simpler but still contextual (loads producer context + prices from Supabase).
  *
- * Requires env: GEMINI_API_KEY
+ * Both paths save conversation history to the shared ai_conversations table.
+ *
+ * Env vars:
+ *   AGRITOGO_API_URL   — e.g. https://agritogo.up.railway.app (optional)
+ *   GEMINI_API_KEY     — fallback Gemini key (required)
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
@@ -25,14 +26,6 @@ const MAX_HISTORY = 10
 export async function POST(request: NextRequest) {
   const rateLimited = await applyRateLimit(request, 'verify')
   if (rateLimited) return rateLimited
-
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: 'Service IA temporairement indisponible.' },
-      { status: 503 },
-    )
-  }
 
   let body: { card_number?: string; message?: string }
   try {
@@ -51,9 +44,52 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Message trop long (1000 caractères max).' }, { status: 400 })
   }
 
+  // ─── Strategy 1: AgriTogo multi-agent service ───────────────────
+  const agritogoUrl = process.env.AGRITOGO_API_URL
+  if (agritogoUrl) {
+    try {
+      const agriRes = await fetch(`${agritogoUrl}/api/v1/agent/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userMessage,
+          card_number: cardNumber,
+          audience: 'farmer',
+        }),
+        signal: AbortSignal.timeout(30000), // 30s timeout
+      })
+
+      if (agriRes.ok) {
+        const data = await agriRes.json()
+        if (data.response) {
+          return NextResponse.json({
+            response: data.response,
+            engine: 'agritogo-multiagent',
+            agent_type: data.agent_type ?? null,
+            model_used: data.model_used ?? null,
+            debate_used: data.debate_used ?? false,
+          })
+        }
+      }
+      // If AgriTogo returned an error, fall through to Gemini fallback
+      console.warn('[AI Chat] AgriTogo returned non-OK, falling back to Gemini')
+    } catch (err) {
+      console.warn('[AI Chat] AgriTogo unreachable, falling back to Gemini:', err instanceof Error ? err.message : err)
+    }
+  }
+
+  // ─── Strategy 2: Direct Gemini fallback ─────────────────────────
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: 'Service IA temporairement indisponible.' },
+      { status: 503 },
+    )
+  }
+
   const supabase = await createClient()
 
-  // ─── 1. Resolve the producer's context ───────────────────────────
+  // Resolve the producer's context
   const { data: card } = await supabase
     .from('member_cards')
     .select('member_id, cooperative_id')
@@ -77,59 +113,38 @@ export async function POST(request: NextRequest) {
     .eq('id', card.cooperative_id)
     .maybeSingle()
 
-  // ─── 2. Load market prices for the producer's region ─────────────
-  const regionName = member?.region ?? null
+  // Load market prices for the producer's region
   let pricesContext = 'Aucun prix disponible pour cette zone.'
-
+  const regionName = member?.region ?? null
   if (regionName) {
-    const { data: prices } = await supabase
-      .from('market_prices')
-      .select('market_name, price, unit, currency, created_at, cultures!inner(name)')
-      .eq('regions.name', regionName)
-      .order('created_at', { ascending: false })
-      .limit(30)
+    const { data: regionRow } = await supabase
+      .from('regions')
+      .select('id')
+      .eq('name', regionName)
+      .maybeSingle()
 
-    // Fallback: query without the join filter if the above returns nothing
-    // (the join syntax may vary; use a direct region_id lookup)
-    if (!prices || prices.length === 0) {
-      const { data: regionRow } = await supabase
-        .from('regions')
-        .select('id')
-        .eq('name', regionName)
-        .maybeSingle()
+    if (regionRow) {
+      const { data: prices } = await supabase
+        .from('market_prices')
+        .select('market_name, price, unit, currency, created_at, culture:cultures(name)')
+        .eq('region_id', regionRow.id)
+        .order('created_at', { ascending: false })
+        .limit(30)
 
-      if (regionRow) {
-        const { data: fallbackPrices } = await supabase
-          .from('market_prices')
-          .select('market_name, price, unit, currency, created_at, culture:cultures(name)')
-          .eq('region_id', regionRow.id)
-          .order('created_at', { ascending: false })
-          .limit(30)
-
-        if (fallbackPrices && fallbackPrices.length > 0) {
-          pricesContext = fallbackPrices
-            .map((p) => {
-              const cultureName = Array.isArray(p.culture)
-                ? (p.culture[0] as { name?: string })?.name
-                : (p.culture as { name?: string } | null)?.name
-              return `${cultureName ?? '?'}: ${p.price} ${p.currency}/${p.unit} à ${p.market_name} (${new Date(p.created_at).toLocaleDateString('fr-FR')})`
-            })
-            .join('\n')
-        }
+      if (prices && prices.length > 0) {
+        pricesContext = prices
+          .map((p) => {
+            const cultureName = Array.isArray(p.culture)
+              ? (p.culture[0] as { name?: string })?.name
+              : (p.culture as { name?: string } | null)?.name
+            return `${cultureName ?? '?'}: ${p.price} ${p.currency}/${p.unit} à ${p.market_name} (${new Date(p.created_at).toLocaleDateString('fr-FR')})`
+          })
+          .join('\n')
       }
-    } else {
-      pricesContext = prices
-        .map((p) => {
-          const cultureName = Array.isArray(p.cultures)
-            ? (p.cultures as unknown as { name?: string }[])[0]?.name
-            : (p.cultures as unknown as { name?: string } | null)?.name
-          return `${cultureName ?? '?'}: ${p.price} ${p.currency}/${p.unit} à ${p.market_name} (${new Date(p.created_at).toLocaleDateString('fr-FR')})`
-        })
-        .join('\n')
     }
   }
 
-  // ─── 3. Load conversation history ───────────────────────────────
+  // Load conversation history
   const { data: history } = await supabase
     .from('ai_conversations')
     .select('role, content')
@@ -137,9 +152,8 @@ export async function POST(request: NextRequest) {
     .order('created_at', { ascending: true })
     .limit(MAX_HISTORY)
 
-  // ─── 4. Build the Gemini prompt ─────────────────────────────────
-  const systemPrompt = `Tu es l'assistant agricole intelligent de FaîtiereHub, une plateforme pour les coopératives agricoles du Togo.
-Tu t'appelles AgriTogo. Tu réponds en français, de manière claire, pratique et adaptée à un producteur agricole.
+  // Build Gemini prompt
+  const systemPrompt = `Tu es AgriTogo, l'assistant agricole intelligent de FaîtiereHub, une plateforme pour les coopératives agricoles du Togo.
 
 CONTEXTE DU PRODUCTEUR :
 - Nom : ${member?.first_name ?? ''} ${member?.last_name ?? ''}
@@ -168,7 +182,6 @@ RÈGLES :
     parts: [{ text: h.content }],
   }))
 
-  // ─── 5. Call Gemini ─────────────────────────────────────────────
   try {
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
@@ -181,18 +194,24 @@ RÈGLES :
     const result = await chat.sendMessage(userMessage)
     const aiResponse = result.response.text()
 
-    // ─── 6. Save both messages ──────────────────────────────────
+    // Save both messages
     await supabase.from('ai_conversations').insert([
       { card_number: cardNumber, role: 'user', content: userMessage },
       { card_number: cardNumber, role: 'assistant', content: aiResponse },
     ])
 
-    return NextResponse.json({ response: aiResponse })
+    return NextResponse.json({
+      response: aiResponse,
+      engine: 'gemini-direct',
+      agent_type: null,
+      model_used: 'gemini-2.0-flash',
+      debate_used: false,
+    })
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Erreur inconnue'
     console.error('[AI Chat] Gemini error:', msg)
     return NextResponse.json(
-      { error: 'L\'assistant IA n\'a pas pu répondre. Réessayez.' },
+      { error: "L'assistant IA n'a pas pu répondre. Réessayez." },
       { status: 502 },
     )
   }
