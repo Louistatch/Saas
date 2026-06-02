@@ -238,18 +238,11 @@ export function AiChat({ cardNumber, memberName, onBack }: AiChatProps) {
           transition:transform .15s, opacity .15s; }
         .ai-chat-send:disabled { opacity:.4; cursor:default; }
         .ai-chat-send:active:not(:disabled) { transform:scale(.92); }
+        .ai-inline-code { background:rgba(0,0,0,.06); padding:1px 5px; border-radius:4px; font-size:.88em; font-family:monospace; }
+        .ai-md-li { padding-left:.8em; text-indent:-.8em; }
+        .ai-msg-bubble strong { font-weight:600; color:#b3ffd6; }
+        .ai-msg-bubble em { font-style:italic; color:#a0e8c0; }
       `}
-    .ai-inline-code {
-      background: rgba(0,0,0,0.06);
-      padding: 1px 5px;
-      border-radius: 4px;
-      font-size: 0.88em;
-      font-family: monospace;
-    }
-    .ai-md-li {
-      padding-left: 0.8em;
-      text-indent: -0.8em;
-    }
     </style>
     </div>
   )
