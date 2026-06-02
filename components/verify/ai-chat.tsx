@@ -141,9 +141,7 @@ export function AiChat({ cardNumber, memberName, onBack }: AiChatProps) {
               {m.role === 'assistant' ? <Bot size={14} /> : <User size={14} />}
             </div>
             <div className="ai-msg-bubble">
-              {m.content.split('\n').map((line, j) => (
-                <p key={j}>{line}</p>
-              ))}
+              {renderMd(m.content)}
               {m.role === 'assistant' && m.engine && (
                 <span className="ai-msg-engine">
                   {m.engine === 'agritogo-multiagent' ? '🧠 Multi-Agent' : '⚡ Gemini'}
@@ -240,7 +238,49 @@ export function AiChat({ cardNumber, memberName, onBack }: AiChatProps) {
           transition:transform .15s, opacity .15s; }
         .ai-chat-send:disabled { opacity:.4; cursor:default; }
         .ai-chat-send:active:not(:disabled) { transform:scale(.92); }
-      `}</style>
+      `}
+    .ai-inline-code {
+      background: rgba(0,0,0,0.06);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 0.88em;
+      font-family: monospace;
+    }
+    .ai-md-li {
+      padding-left: 0.8em;
+      text-indent: -0.8em;
+    }
+    </style>
     </div>
   )
 }
+/** Lightweight markdown → JSX (bold, italic, code, lists) */
+function renderMd(text: string) {
+  return text.split('\n').map((line, i) => {
+    const trimmed = line.trim()
+    // Empty line → spacer
+    if (!trimmed) return <br key={i} />
+    // Bullet list item
+    const isBullet = /^[-*•]\s+/.test(trimmed)
+    const content = isBullet ? trimmed.replace(/^[-*•]\s+/, '') : trimmed
+    // Inline formatting: **bold**, *italic*, `code`
+    const parts: React.ReactNode[] = []
+    const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g
+    let last = 0
+    let match: RegExpExecArray | null
+    let key = 0
+    const src = content
+    while ((match = regex.exec(src)) !== null) {
+      if (match.index > last) parts.push(src.slice(last, match.index))
+      if (match[2]) parts.push(<strong key={`b${i}-${key++}`}>{match[2]}</strong>)
+      else if (match[3]) parts.push(<em key={`i${i}-${key++}`}>{match[3]}</em>)
+      else if (match[4]) parts.push(<code key={`c${i}-${key++}`} className="ai-inline-code">{match[4]}</code>)
+      last = match.index + match[0].length
+    }
+    if (last < src.length) parts.push(src.slice(last))
+    if (isBullet) return <p key={i} className="ai-md-li">{'• '}{parts}</p>
+    return <p key={i}>{parts}</p>
+  })
+}
+
+
