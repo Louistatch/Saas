@@ -78,9 +78,10 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // ─── Strategy 2: Direct Gemini fallback ─────────────────────────
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) {
+  // ─── Strategy 2: Direct Gemini fallback (with key rotation) ──────
+  const { getGeminiKey, rotateGeminiKey, getKeyCount } = await import('@/lib/utils/gemini-keys')
+  const firstKey = getGeminiKey()
+  if (!firstKey) {
     return NextResponse.json(
       { error: 'Service IA temporairement indisponible.' },
       { status: 503 },
@@ -182,39 +183,60 @@ RÈGLES :
     parts: [{ text: h.content }],
   }))
 
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
-      systemInstruction: systemPrompt,
-    })
+  // ─── Gemini call with key rotation (retry on 429) ───────────────
+  const totalKeys = getKeyCount()
+  let lastError = ''
+  let usedKey = ''
 
-    const chat = model.startChat({
-      history: geminiHistory,
-    })
+  for (let attempt = 0; attempt < totalKeys; attempt++) {
+    const key = attempt === 0 ? firstKey : rotateGeminiKey()
+    if (!key) break
+    usedKey = key.slice(0, 8) + '…'
 
-    const result = await chat.sendMessage(userMessage)
-    const aiResponse = result.response.text()
+    try {
+      const genAI = new GoogleGenerativeAI(key)
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-2.0-flash',
+        systemInstruction: systemPrompt,
+      })
 
-    // Save both messages
-    await supabase.from('ai_conversations').insert([
-      { card_number: cardNumber, role: 'user', content: userMessage },
-      { card_number: cardNumber, role: 'assistant', content: aiResponse },
-    ])
+      const chat = model.startChat({ history: geminiHistory })
+      const result = await chat.sendMessage(userMessage)
+      const aiResponse = result.response.text()
 
-    return NextResponse.json({
-      response: aiResponse,
-      engine: 'gemini-direct',
-      agent_type: null,
-      model_used: 'gemini-2.0-flash',
-      debate_used: false,
-    })
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Erreur inconnue'
-    console.error('[AI Chat] Gemini error:', msg)
-    return NextResponse.json(
-      { error: "L'assistant IA n'a pas pu répondre. Réessayez." },
-      { status: 502 },
-    )
+      // Save both messages
+      await supabase.from('ai_conversations').insert([
+        { card_number: cardNumber, role: 'user', content: userMessage },
+        { card_number: cardNumber, role: 'assistant', content: aiResponse },
+      ])
+
+      return NextResponse.json({
+        response: aiResponse,
+        engine: attempt > 0 ? `gemini-direct (clé ${attempt + 1}/${totalKeys})` : 'gemini-direct',
+        agent_type: null,
+        model_used: 'gemini-2.0-flash',
+        debate_used: false,
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erreur inconnue'
+      lastError = msg
+
+      // Only retry on 429 (quota exceeded) — other errors are fatal
+      if (msg.includes('429') || msg.includes('quota') || msg.includes('Too Many Requests')) {
+        console.warn(`[AI Chat] Key ${usedKey} quota exceeded, rotating (${attempt + 1}/${totalKeys})`)
+        rotateGeminiKey()
+        continue
+      }
+
+      // Non-quota error → don't retry
+      console.error('[AI Chat] Gemini error (non-quota):', msg)
+      break
+    }
   }
+
+  console.error('[AI Chat] All Gemini keys exhausted:', lastError)
+  return NextResponse.json(
+    { error: 'Toutes les clés IA sont épuisées. Réessayez dans quelques minutes.' },
+    { status: 429 },
+  )
 }
