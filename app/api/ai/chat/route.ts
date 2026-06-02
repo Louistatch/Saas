@@ -221,22 +221,59 @@ RÈGLES :
       const msg = err instanceof Error ? err.message : 'Erreur inconnue'
       lastError = msg
 
-      // Only retry on 429 (quota exceeded) — other errors are fatal
+      // 429 (quota exceeded) → rotate key and retry immediately
       if (msg.includes('429') || msg.includes('quota') || msg.includes('Too Many Requests')) {
         console.warn(`[AI Chat] Key ${usedKey} quota exceeded, rotating (${attempt + 1}/${totalKeys})`)
         rotateGeminiKey()
         continue
       }
 
-      // Non-quota error → don't retry
-      console.error('[AI Chat] Gemini error (non-quota):', msg)
-      break
+      // 503 (overloaded) → wait briefly and retry with same key
+      if (msg.includes('503') || msg.includes('Service Unavailable') || msg.includes('high demand') || msg.includes('overloaded')) {
+        console.warn(`[AI Chat] Gemini 503 (surcharge), retry dans 2s (${attempt + 1}/${totalKeys})`)
+        await new Promise(r => setTimeout(r, 2000 + attempt * 1000)) // 2s, 3s, 4s...
+        continue
+      }
+
+      // Other errors → log but don't give up yet (try next key)
+      console.error(`[AI Chat] Gemini error: ${msg} (${attempt + 1}/${totalKeys})`)
+      rotateGeminiKey()
+      continue
     }
   }
 
-  console.error('[AI Chat] All Gemini keys exhausted:', lastError)
+  // ─── Fallback : essayer gemini-2.5-flash-lite (plus léger, moins surchargé) ───
+  console.warn('[AI Chat] Primary model exhausted, trying gemini-2.5-flash-lite fallback...')
+  const fallbackKey = getGeminiKey()
+  if (fallbackKey) {
+    try {
+      const genAI = new GoogleGenerativeAI(fallbackKey)
+      const fallbackModel = genAI.getGenerativeModel({
+        model: 'gemini-2.5-flash-lite',
+        systemInstruction: systemPrompt,
+      })
+      const chat = fallbackModel.startChat({ history: geminiHistory })
+      const result = await chat.sendMessage(userMessage)
+      const aiResponse = result.response.text()
+      await supabase.from('ai_conversations').insert([
+        { card_number: cardNumber, role: 'user', content: userMessage },
+        { card_number: cardNumber, role: 'assistant', content: aiResponse },
+      ])
+      return NextResponse.json({
+        response: aiResponse,
+        engine: 'gemini-fallback',
+        agent_type: null,
+        model_used: 'gemini-2.5-flash-lite',
+        debate_used: false,
+      })
+    } catch (fallbackErr) {
+      console.error('[AI Chat] Fallback model also failed:', fallbackErr instanceof Error ? fallbackErr.message : fallbackErr)
+    }
+  }
+
+  console.error('[AI Chat] All models exhausted:', lastError)
   return NextResponse.json(
-    { error: 'Toutes les clés IA sont épuisées. Réessayez dans quelques minutes.' },
-    { status: 429 },
+    { error: 'Le service IA est temporairement surchargé. Réessayez dans 30 secondes.' },
+    { status: 503 },
   )
 }
