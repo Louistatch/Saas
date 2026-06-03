@@ -144,7 +144,8 @@ export function AiChat({ cardNumber, memberName, onBack }: AiChatProps) {
               {renderMd(m.content)}
               {m.role === 'assistant' && m.engine && (
                 <span className="ai-msg-engine">
-                  {m.engine === 'agritogo-multiagent' ? '🧠 Multi-Agent' : '⚡ Gemini'}
+                  {m.engine === 'direct-data' ? '⚡ Réponse instantanée' :
+                   m.engine === 'agritogo-multiagent' ? '🧠 Multi-Agent' : '💬 Gemini'}
                   {m.debate ? ' • Débat' : ''}
                 </span>
               )}
