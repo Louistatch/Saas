@@ -169,7 +169,7 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
   return (
     <div className="space-y-4">
       {/* Back + Breadcrumb */}
-      <button onClick={goBack} className="flex items-center gap-2 text-[#4ADE80] text-sm font-medium active:opacity-70">
+      <button onClick={goBack} className="flex items-center gap-2 text-[#34d399] text-sm font-medium active:opacity-70">
         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" /></svg>
         {step === 'regions' ? 'Retour au menu' : 'Retour'}
       </button>
@@ -179,7 +179,7 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-white text-lg font-bold flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-[#4ADE80]" /> Prix du Marché
+            <TrendingUp className="h-5 w-5 text-[#34d399]" /> Prix du Marché
           </h3>
           <p className="text-white/40 text-[11px] mt-0.5">
             {step === 'regions' && 'Choisir une région'}
@@ -194,20 +194,20 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
         </div>
       </div>
 
-      {loading && <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-[#4ADE80]/30 border-t-[#4ADE80] rounded-full animate-spin" /></div>}
+      {loading && <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-emerald-500/30 border-t-[#34d399] rounded-full animate-spin" /></div>}
 
       {/* Step 1: Regions */}
       {step === 'regions' && !loading && (
         <div className="space-y-2">
           {REGIONS.map((r) => (
-            <button key={r.id} onClick={() => handleSelectRegion(r)} className="w-full rounded-2xl bg-white/[0.04] border border-white/[0.08] p-4 flex items-center gap-4 active:scale-[0.98] transition-transform hover:bg-white/[0.06]">
-              <div className="w-12 h-12 rounded-xl bg-[#4ADE80]/10 flex items-center justify-center text-xl">{r.emoji}</div>
+            <button key={r.id} onClick={() => handleSelectRegion(r)} className="w-full rounded-2xl vfp-card p-4 flex items-center gap-4 active:scale-[0.98] transition-transform ">
+              <div className="w-12 h-12 rounded-xl emerald-500/10 flex items-center justify-center text-xl">{r.emoji}</div>
               <div className="flex-1 text-left">
                 <p className="text-sm font-semibold text-white">{r.name}</p>
                 <p className="text-[11px] text-white/40">{regionCounts[r.id] ?? 0} prix enregistrés</p>
               </div>
               {(regionCounts[r.id] ?? 0) > 0 && (
-                <span className="px-2 py-0.5 rounded-full bg-[#4ADE80]/10 text-[#4ADE80] text-[10px] font-bold">{regionCounts[r.id]}</span>
+                <span className="px-2 py-0.5 rounded-full emerald-500/10 text-[#34d399] text-[10px] font-bold">{regionCounts[r.id]}</span>
               )}
               <svg className="h-4 w-4 text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
@@ -219,11 +219,11 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
       {step === 'prefectures' && !loading && (
         <div className="space-y-2">
           {prefectures.map((p) => (
-            <button key={p.id} onClick={() => handleSelectPrefecture(p)} className="w-full rounded-xl bg-white/[0.04] border border-white/[0.08] p-3.5 flex items-center gap-3 active:scale-[0.98] transition-transform hover:bg-white/[0.06]">
-              <MapPin className="h-4 w-4 text-[#4ADE80]/60 shrink-0" />
+            <button key={p.id} onClick={() => handleSelectPrefecture(p)} className="w-full rounded-xl vfp-card p-3.5 flex items-center gap-3 active:scale-[0.98] transition-transform ">
+              <MapPin className="h-4 w-4 text-[#34d399]/60 shrink-0" />
               <span className="text-sm text-white font-medium flex-1 text-left">{p.name}</span>
               {(p.priceCount ?? 0) > 0 && (
-                <span className="px-2 py-0.5 rounded-full bg-[#4ADE80]/10 text-[#4ADE80] text-[10px] font-bold">{p.priceCount}</span>
+                <span className="px-2 py-0.5 rounded-full emerald-500/10 text-[#34d399] text-[10px] font-bold">{p.priceCount}</span>
               )}
               <svg className="h-3.5 w-3.5 text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
@@ -235,11 +235,11 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
       {step === 'cantons' && !loading && (
         <div className="space-y-2">
           {cantons.map((c) => (
-            <button key={c.id} onClick={() => handleSelectCanton(c)} className="w-full rounded-xl bg-white/[0.04] border border-white/[0.08] p-3.5 flex items-center gap-3 active:scale-[0.98] transition-transform hover:bg-white/[0.06]">
-              <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-sm">🏘️</div>
+            <button key={c.id} onClick={() => handleSelectCanton(c)} className="w-full rounded-xl vfp-card p-3.5 flex items-center gap-3 active:scale-[0.98] transition-transform ">
+              <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center text-sm">🏘️</div>
               <span className="text-sm text-white font-medium flex-1 text-left">{c.name}</span>
               {(c.priceCount ?? 0) > 0 ? (
-                <span className="px-2 py-0.5 rounded-full bg-[#4ADE80]/10 text-[#4ADE80] text-[10px] font-bold">{c.priceCount} prix</span>
+                <span className="px-2 py-0.5 rounded-full emerald-500/10 text-[#34d399] text-[10px] font-bold">{c.priceCount} prix</span>
               ) : (
                 <span className="text-[10px] text-white/25">aucun prix</span>
               )}
@@ -253,15 +253,15 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
       {step === 'prices' && !loading && (
         <div className="space-y-3">
           {prices.length === 0 ? (
-            <div className="rounded-2xl bg-white/[0.03] border border-white/[0.06] p-6 text-center">
+            <div className="rounded-2xl vfp-card p-6 text-center">
               <p className="text-white/50 text-sm">Aucun prix disponible ici</p>
               <p className="text-white/30 text-xs mt-1">Soyez le premier à renseigner !</p>
             </div>
           ) : (
             <div className="space-y-2">
               {prices.map((p) => (
-                <div key={p.id} className="rounded-xl bg-white/[0.04] border border-white/[0.08] p-3 flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-white/[0.06] flex items-center justify-center text-lg shrink-0">
+                <div key={p.id} className="rounded-xl vfp-card p-3 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-white/[0.04] flex items-center justify-center text-lg shrink-0">
                     {CULTURE_LIST.find(c => c.id === p.culture_id)?.emoji ?? '🌱'}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -281,8 +281,8 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
             const memberRegion = REGIONS.find(r => r.name === memberLocality?.region)
             if (memberRegion) setSelectedRegion(memberRegion)
             setStep('submit')
-          }} className="w-full rounded-2xl p-4 bg-gradient-to-r from-[#0A5C36] to-[#0d7a4a] border border-[#4ADE80]/20 flex items-center gap-3 active:scale-[0.98] transition-transform">
-            <div className="w-10 h-10 rounded-xl bg-[#4ADE80]/15 flex items-center justify-center shrink-0"><TrendingUp className="h-5 w-5 text-[#4ADE80]" /></div>
+          }} className="w-full rounded-2xl p-4 bg-gradient-to-r from-emerald-900 to-emerald-800 border border-emerald-500/20 flex items-center gap-3 active:scale-[0.98] transition-transform">
+            <div className="w-10 h-10 rounded-xl emerald-500/15 flex items-center justify-center shrink-0"><TrendingUp className="h-5 w-5 text-[#34d399]" /></div>
             <div className="flex-1 text-left">
               <p className="text-sm font-semibold text-white">Renseigner un prix</p>
               <p className="text-[11px] text-white/50">📍 {memberLocality?.canton ?? memberLocality?.village ?? 'Votre zone'}</p>
@@ -293,9 +293,9 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
 
       {/* Step 5: Submit */}
       {step === 'submit' && (
-        <div className="rounded-2xl bg-white/[0.04] border border-white/[0.08] p-5 space-y-4">
+        <div className="rounded-2xl vfp-card p-5 space-y-4">
           <div className="flex items-center gap-2 mb-1">
-            <div className="w-8 h-8 rounded-lg bg-[#4ADE80]/10 flex items-center justify-center"><TrendingUp className="h-4 w-4 text-[#4ADE80]" /></div>
+            <div className="w-8 h-8 rounded-lg emerald-500/10 flex items-center justify-center"><TrendingUp className="h-4 w-4 text-[#34d399]" /></div>
             <div>
               <p className="text-sm font-bold text-white">Renseigner un prix</p>
               <p className="text-[10px] text-white/40">📍 {[memberLocality?.village, memberLocality?.canton, memberLocality?.prefecture].filter(Boolean).join(', ') || 'Votre zone'}</p>
@@ -309,7 +309,7 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
             <label className="text-[10px] text-white/50 uppercase tracking-wider font-semibold block mb-1.5">Culture</label>
             <div className="grid grid-cols-4 gap-2">
               {CULTURE_LIST.map((c) => (
-                <button key={c.id} onClick={() => setSubmitForm(f => ({ ...f, culture_id: c.id }))} className={`flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all ${submitForm.culture_id === c.id ? 'bg-[#4ADE80]/10 border-[#4ADE80]/40' : 'bg-white/[0.02] border-white/[0.06]'}`}>
+                <button key={c.id} onClick={() => setSubmitForm(f => ({ ...f, culture_id: c.id }))} className={`flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all ${submitForm.culture_id === c.id ? 'emerald-500/10 border-emerald-500/40' : 'bg-white/[0.02] border-white/[0.06]'}`}>
                   <span className="text-lg">{c.emoji}</span>
                   <span className="text-[8px] text-white/60 text-center">{c.name}</span>
                 </button>
@@ -318,12 +318,12 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
           </div>
           <div>
             <label className="text-[10px] text-white/50 uppercase tracking-wider font-semibold block mb-1.5">Prix (FCFA/kg)</label>
-            <input type="number" inputMode="numeric" placeholder="Ex: 450" value={submitForm.price} onChange={(e) => setSubmitForm(f => ({ ...f, price: e.target.value }))} className="w-full rounded-xl bg-white/[0.06] border border-white/[0.1] px-4 py-3 text-white text-lg font-bold placeholder:text-white/20 focus:outline-none focus:border-[#4ADE80]/40" />
+            <input type="number" inputMode="numeric" placeholder="Ex: 450" value={submitForm.price} onChange={(e) => setSubmitForm(f => ({ ...f, price: e.target.value }))} className="w-full rounded-xl bg-white/[0.04] border border-white/[0.1] px-4 py-3 text-white text-lg font-bold placeholder:text-white/20 focus:outline-none focus:border-emerald-500/40" />
           </div>
-          <button onClick={handleSubmitPrice} disabled={!submitForm.culture_id || !submitForm.price || submitting} className="w-full py-3.5 rounded-xl bg-[#4ADE80] text-[#0A2E1A] font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-40 active:scale-[0.97] transition-transform">
-            {submitting ? <div className="w-4 h-4 border-2 border-[#0A2E1A]/30 border-t-[#0A2E1A] rounded-full animate-spin" /> : <>✓ Envoyer</>}
+          <button onClick={handleSubmitPrice} disabled={!submitForm.culture_id || !submitForm.price || submitting} className="w-full py-3.5 rounded-xl bg-[#1ed760] text-[#04140b] font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-40 active:scale-[0.97] transition-transform">
+            {submitting ? <div className="w-4 h-4 border-2 border-[#04140b]/30 border-t-[#04140b] rounded-full animate-spin" /> : <>✓ Envoyer</>}
           </button>
-          {submitResult && <div className={`rounded-xl p-3 text-center text-xs font-medium ${submitResult.ok ? 'bg-[#4ADE80]/10 text-[#4ADE80]' : 'bg-red-500/10 text-red-400'}`}>{submitResult.msg}</div>}
+          {submitResult && <div className={`rounded-xl p-3 text-center text-xs font-medium ${submitResult.ok ? 'emerald-500/10 text-[#34d399]' : 'bg-red-500/10 text-red-400'}`}>{submitResult.msg}</div>}
           <p className="text-[9px] text-white/25 text-center">Vérifié par la coopérative avant publication</p>
         </div>
       )}
