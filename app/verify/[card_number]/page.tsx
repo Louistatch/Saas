@@ -128,7 +128,8 @@ export default function VerifyCardPage() {
 
   const isValid = result.valid && result.card?.status === 'active'
   const fullName = memberFullName(result.member as Parameters<typeof memberFullName>[0])
-  const firstName = result.member?.first_name?.trim() ?? 'Membre'
+  const rawFirst = (result.member?.first_name ?? '').trim()
+  const firstName = rawFirst ? rawFirst.charAt(0).toUpperCase() + rawFirst.slice(1).toLowerCase() : fullName?.split(' ')[0] || 'Producteur'
   const greetHour = new Date().getHours()
   const greeting = greetHour < 12 ? 'Bonjour' : greetHour < 18 ? 'Bon après-midi' : 'Bonsoir'
 
