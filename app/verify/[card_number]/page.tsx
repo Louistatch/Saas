@@ -1,15 +1,12 @@
 'use client'
 
-// [SECURITY FIX - FORGE-001 - Sous-étape C]
-// Suppression de l'accès Supabase direct — utilisation de /api/verify/[card_number]
-// Les données sensibles (phone, email, id, cotisations, parcelles) ne sont plus exposées.
-
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import {
   CheckCircle, XCircle, Shield, MapPin, Building2,
   FileText, TrendingUp, PhoneCall, Map, CloudRain,
-  ShoppingCart, Coins, QrCode, Timer, User, ArrowLeft, Bot,
+  ShoppingCart, Coins, Timer, User, ArrowLeft, Bot,
+  ChevronRight, Bell, Sparkles,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/logo'
 import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboard'
@@ -17,53 +14,21 @@ import { Card3D } from '@/components/verify/card-3d'
 import { AiChat } from '@/components/verify/ai-chat'
 import { memberFullName, memberLocality as getMemberLocality, waNumber } from '@/components/verify/types'
 
-/**
- * Public verification page — accessed by scanning the QR code on a member card.
- * 
- * The QR code contains a FIXED URL: /verify/[card_number]
- * This page fetches data via the secure /api/verify route (vue restrictive).
- * 
- * Features:
- * - Identity verification (real-time via API serveur)
- * - Service menu (exploitation accounts, market prices, technician, etc.)
- * - 60-second security timer with auto-expiry
- * - Premium mobile-first agricultural design
- * - Ne jamais exposer phone, email, id interne, cotisations détaillées
- */
-
 interface VerifyResult {
   valid: boolean
-  card?: {
-    card_number: string
-    status: string
-    expiry_date: string | null
-    created_at: string
-  }
+  card?: { card_number: string; status: string; expiry_date: string | null; created_at: string }
   member?: {
-    first_name: string | null
-    last_name: string | null
-    photo_url: string | null
-    village: string | null
-    canton: string | null
-    prefecture: string | null
-    region: string | null
-    status: string
-    member_since: string | null
+    first_name: string | null; last_name: string | null; photo_url: string | null
+    village: string | null; canton: string | null; prefecture: string | null; region: string | null
+    status: string; member_since: string | null
   }
-  cooperative?: {
-    name: string
-    faitiere_name: string | null
-  }
+  cooperative?: { name: string; faitiere_name: string | null }
   error?: string
 }
 
 interface ServiceItem {
-  icon: typeof CheckCircle
-  title: string
-  description: string
-  available: boolean
-  action?: () => void
-  highlight?: boolean
+  icon: typeof CheckCircle; title: string; description: string
+  available: boolean; action?: () => void; highlight?: boolean; gradient: string
 }
 
 export default function VerifyCardPage() {
@@ -78,438 +43,314 @@ export default function VerifyCardPage() {
   const [contacts, setContacts] = useState<{ role: 'technicien' | 'coordo'; name: string; phone: string; canton?: string | null }[] | null>(null)
   const [contactsLoading, setContactsLoading] = useState(false)
 
-  // Reset ALL state when card_number changes (navigating between cards)
   useEffect(() => {
-    setResult(null)
-    setLoading(true)
-    setShowContent(false)
-    setTimeLeft(600)
-    setExpired(false)
-    setActiveView('menu')
+    setResult(null); setLoading(true); setShowContent(false)
+    setTimeLeft(600); setExpired(false); setActiveView('menu')
   }, [cardNumber])
 
-  // Prevent browser caching of this page (security: stale card data)
   useEffect(() => {
-    const metaCache = document.createElement('meta')
-    metaCache.httpEquiv = 'Cache-Control'
-    metaCache.content = 'no-store, no-cache, must-revalidate'
-    document.head.appendChild(metaCache)
-
-    return () => {
-      document.head.removeChild(metaCache)
-    }
+    const meta = document.createElement('meta')
+    meta.httpEquiv = 'Cache-Control'
+    meta.content = 'no-store, no-cache, must-revalidate'
+    document.head.appendChild(meta)
+    return () => { document.head.removeChild(meta) }
   }, [])
 
-  // Security timer — 10 minutes (600 seconds)
   useEffect(() => {
-    if (loading || !result?.valid) return
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval)
-          setExpired(true)
-          return 0
-        }
+    async function fetchCard() {
+      try {
+        const res = await fetch(`/api/verify/${encodeURIComponent(cardNumber)}`)
+        const data: VerifyResult = await res.json()
+        setResult(data)
+      } catch { setResult({ valid: false, error: 'Erreur réseau.' }) }
+      finally { setLoading(false); setTimeout(() => setShowContent(true), 120) }
+    }
+    fetchCard()
+  }, [cardNumber])
+
+  useEffect(() => {
+    if (!result?.valid || expired) return
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) { setExpired(true); clearInterval(timer); return 0 }
         return prev - 1
       })
     }, 1000)
-    return () => clearInterval(interval)
-  }, [loading, result?.valid])
+    return () => clearInterval(timer)
+  }, [result?.valid, expired])
 
-  // Fetch verification data via secure API route (with AbortController to prevent race conditions)
-  useEffect(() => {
-    const controller = new AbortController()
-
-    async function verify() {
-      try {
-        const res = await fetch(`/api/verify/${encodeURIComponent(cardNumber)}`, {
-          signal: controller.signal,
-        })
-        const data = await res.json()
-
-        if (controller.signal.aborted) return
-
-        if (!res.ok || !data.valid) {
-          setResult({ valid: false, error: data.error ?? 'Carte non trouvée dans le système' })
-        } else {
-          setResult(data)
-        }
-      } catch (e: unknown) {
-        if (e instanceof Error && e.name === 'AbortError') return
-        if (!controller.signal.aborted) {
-          setResult({ valid: false, error: 'Erreur de connexion au serveur' })
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false)
-          setTimeout(() => setShowContent(true), 300)
-        }
-      }
-    }
-    verify()
-    return () => { controller.abort() }
-  }, [cardNumber])
-
-  const handleRescan = useCallback(() => {
-    // Force redirect to scanner — no simple page reload (security: must physically scan)
-    window.location.href = '/scan'
-  }, [])
-
-  // Load technician + coordo contacts when the producer opens that view.
-  useEffect(() => {
-    if (activeView !== 'technicien' || contacts !== null) return
-    let cancelled = false
+  const loadContacts = useCallback(async () => {
+    if (contacts || contactsLoading) return
     setContactsLoading(true)
-    fetch(`/api/technicien/${encodeURIComponent(cardNumber)}`)
-      .then((r) => r.json())
-      .then((d: { contacts?: typeof contacts }) => {
-        if (!cancelled) setContacts(d.contacts ?? [])
-      })
-      .catch(() => {
-        if (!cancelled) setContacts([])
-      })
-      .finally(() => {
-        if (!cancelled) setContactsLoading(false)
-      })
-    return () => { cancelled = true }
-  }, [activeView, contacts, cardNumber])
+    try {
+      const res = await fetch(`/api/technicien/${encodeURIComponent(cardNumber)}`)
+      if (res.ok) { const d = await res.json(); setContacts(d.contacts ?? []) }
+      else setContacts([])
+    } catch { setContacts([]) }
+    finally { setContactsLoading(false) }
+  }, [cardNumber, contacts, contactsLoading])
 
-  // Loading state
+  useEffect(() => {
+    if (activeView === 'technicien') loadContacts()
+  }, [activeView, loadContacts])
+
   if (loading) {
     return (
-      <div className="vfy-loading">
-        <div className="vfy-loading-orb">
-          <span className="vfy-ring r1" />
-          <span className="vfy-ring r2" />
-          <span className="vfy-ring r3" />
-          <Shield className="vfy-shield" />
+      <div className="min-h-screen vfp-bg flex items-center justify-center">
+        <style>{vfpStyles}</style>
+        <div className="text-center">
+          <div className="vfp-loader mx-auto mb-4" />
+          <p className="text-[#7fd9a5] text-sm font-medium tracking-wide">Vérification en cours...</p>
         </div>
-        <p className="vfy-loading-text">
-          Vérification de la carte
-          <span className="vfy-dots"><i>.</i><i>.</i><i>.</i></span>
-        </p>
-        <p className="vfy-loading-sub">Connexion sécurisée au registre FaîtiereHub</p>
-
-        <style>{`
-          .vfy-loading {
-            min-height: 100dvh; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; gap: 14px; padding: 24px;
-            background: radial-gradient(120% 100% at 50% -10%, #0f5130 0%, #0a2616 50%, #04120a 100%);
-            font-family: 'Barlow', system-ui, sans-serif;
-          }
-          .vfy-loading-orb { position: relative; width: 132px; height: 132px; display: grid; place-items: center; transform: translateZ(0); }
-          .vfy-ring {
-            position: absolute; inset: 0; border-radius: 50%;
-            border: 2px solid rgba(77,255,160,.25); animation: vfyPulse 2.4s ease-out infinite;
-            will-change: transform, opacity; backface-visibility: hidden;
-          }
-          .vfy-ring.r2 { animation-delay: .8s; } .vfy-ring.r3 { animation-delay: 1.6s; }
-          @keyframes vfyPulse { 0% { transform: scale(.4); opacity: .9; } 100% { transform: scale(1.15); opacity: 0; } }
-          .vfy-shield {
-            width: 44px; height: 44px; color: #4dffa0;
-            filter: drop-shadow(0 0 14px rgba(77,255,160,.6)); animation: vfyFloat 2.6s ease-in-out infinite;
-            will-change: transform; transform: translateZ(0);
-          }
-          @keyframes vfyFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-          .vfy-loading-text { color: #fff; font-weight: 700; font-size: 18px; letter-spacing:.2px; display:inline-flex; }
-          .vfy-dots i { animation: vfyBlink 1.4s infinite; opacity: 0; }
-          .vfy-dots i:nth-child(2){ animation-delay:.2s } .vfy-dots i:nth-child(3){ animation-delay:.4s }
-          @keyframes vfyBlink { 0%,100%{opacity:0} 50%{opacity:1} }
-          .vfy-loading-sub { color: #8fc6a4; font-size: 13px; }
-          @media (prefers-reduced-motion: reduce){ .vfy-ring,.vfy-shield,.vfy-dots i{ animation: none } }
-        `}</style>
       </div>
     )
   }
 
-  const isValid = result?.valid ?? false
+  if (expired) {
+    return (
+      <div className="min-h-screen vfp-bg flex items-center justify-center px-6">
+        <style>{vfpStyles}</style>
+        <div className="text-center max-w-xs">
+          <div className="w-16 h-16 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center mx-auto mb-4">
+            <Timer className="h-7 w-7 text-orange-400" />
+          </div>
+          <h2 className="text-xl font-bold text-white mb-2">Session expirée</h2>
+          <p className="text-white/50 text-sm mb-6">Scannez à nouveau la carte pour accéder aux services.</p>
+          <a href={`/verify/${cardNumber}`} className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#1ed760] text-[#04140b] font-bold text-sm">
+            Rescanner la carte
+          </a>
+        </div>
+      </div>
+    )
+  }
 
   if (!result) return null
 
-  // Expired session
-  if (expired) {
-    return (
-      <div className="min-h-screen bg-[#0A2E1A] flex items-center justify-center px-4">
-        <div className="text-center space-y-6 max-w-sm">
-          <div className="w-20 h-20 mx-auto rounded-full bg-[#0A5C36]/50 flex items-center justify-center">
-            <Timer className="h-10 w-10 text-[#4ADE80]/60" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-white">Session expirée</h2>
-            <p className="text-white/50 text-sm mt-2">
-              Pour votre sécurité, cette session a expiré après 10 minutes.
-            </p>
-          </div>
-          <button
-            onClick={handleRescan}
-            className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#0A5C36] to-[#0d7a4a] text-white font-semibold text-base flex items-center justify-center gap-3 active:scale-[0.98] transition-transform"
-          >
-            <QrCode className="h-5 w-5" />
-            Rescanner le QR Code
-          </button>
-          <p className="text-white/30 text-xs">
-            Scannez à nouveau le QR code de votre carte pour un nouvel accès.
-          </p>
-        </div>
-      </div>
-    )
-  }
+  const isValid = result.valid && result.card?.status === 'active'
+  const fullName = memberFullName(result.member as Parameters<typeof memberFullName>[0])
+  const firstName = result.member?.first_name?.trim() ?? 'Membre'
+  const greetHour = new Date().getHours()
+  const greeting = greetHour < 12 ? 'Bonjour' : greetHour < 18 ? 'Bon après-midi' : 'Bonsoir'
 
-  // Service menu items
-  const services: ServiceItem[] = [
-    {
-      icon: CheckCircle,
-      title: 'Vérification d\'Identité',
-      description: 'Voir les détails complets de ma carte',
-      available: true,
-      action: () => setActiveView('identity'),
-    },
-    {
-      icon: FileText,
-      title: 'Mon Compte d\'Exploitation',
-      description: 'Fiches techniques par culture',
-      available: true,
-      action: () => window.open('/marketplace', '_blank'),
-    },
-    {
-      icon: TrendingUp,
-      title: 'Prix du Marché en Temps Réel',
-      description: 'Cours actuels : Lomé, Kara, Sokodé...',
-      available: true,
-      action: () => setActiveView('prices'),
-    },
-    {
-      icon: Bot,
-      title: 'Discuter avec l\'IA',
-      description: 'AgriTogo : conseils, prix, cultures — votre assistant',
-      available: true,
-      highlight: true,
-      action: () => setActiveView('ai'),
-    },
-    {
-      icon: PhoneCall,
-      title: 'Contacter Mon Technicien',
-      description: 'Technicien de mon canton + Coordonnateur',
-      available: true,
-      action: () => setActiveView('technicien'),
-    },
-    {
-      icon: Map,
-      title: 'Mes Parcelles & GPS',
-      description: 'Localisation et suivi de mes parcelles',
-      available: false,
-    },
-    {
-      icon: CloudRain,
-      title: 'Alertes Météo & Maladies',
-      description: 'Prévisions et alertes phytosanitaires',
-      available: false,
-    },
-    {
-      icon: ShoppingCart,
-      title: 'Commander des Intrants',
-      description: 'Semences, engrais, produits phyto',
-      available: false,
-    },
-    {
-      icon: Coins,
-      title: 'Adhérer / Renouveler ma Cotisation',
-      description: 'Gérer ma cotisation',
-      available: false,
-    },
+  const mainServices: ServiceItem[] = [
+    { icon: Shield, title: 'Vérification d\'Identité', description: 'Voir les détails complets de ma carte', available: true, action: () => setActiveView('identity'), gradient: 'from-emerald-500/20 to-emerald-700/5' },
+    { icon: FileText, title: 'Mon Compte d\'Exploitation', description: 'Fiches techniques par culture', available: true, action: () => window.open('/marketplace', '_blank'), gradient: 'from-cyan-500/20 to-cyan-700/5' },
+    { icon: TrendingUp, title: 'Prix du Marché en Temps Réel', description: 'Cours actuels : Lomé, Kara, Sokodé...', available: true, action: () => setActiveView('prices'), gradient: 'from-violet-500/20 to-violet-700/5' },
+    { icon: Bot, title: 'Discuter avec l\'IA', description: 'AgriTogo : conseils, prix, cultures — votre assistant', available: true, highlight: true, action: () => setActiveView('ai'), gradient: 'from-amber-400/20 to-amber-600/5' },
+  ]
+
+  const moreServices: ServiceItem[] = [
+    { icon: PhoneCall, title: 'Contacter Mon Technicien', description: 'Technicien de mon canton', available: true, action: () => setActiveView('technicien'), gradient: 'from-emerald-500/20 to-emerald-700/5' },
+    { icon: Map, title: 'Mes Parcelles & GPS', description: 'Localisation et suivi', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
+    { icon: CloudRain, title: 'Alertes Météo', description: 'Prévisions et alertes', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
+    { icon: ShoppingCart, title: 'Commander des Intrants', description: 'Semences, engrais', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
+    { icon: Coins, title: 'Renouveler ma Cotisation', description: 'Gérer ma cotisation', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
   ]
 
   return (
-    <div className="min-h-screen relative overflow-hidden vfy-root" style={{ isolation: 'isolate' }}>
-      <style>{`
-        .vfy-root {
-          background:
-            radial-gradient(80% 55% at 18% 8%, rgba(34,197,94,.16), transparent 60%),
-            radial-gradient(70% 50% at 88% 92%, rgba(16,120,72,.20), transparent 60%),
-            linear-gradient(180deg, #07140d 0%, #0a2417 45%, #061710 100%);
-        }
-        .vfy-root::before {
-          content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
-          background-image: radial-gradient(rgba(255,255,255,.025) 1px, transparent 1px);
-          background-size: 4px 4px; opacity: .5;
-        }
-        .vfy-glass {
-          background: linear-gradient(160deg, rgba(255,255,255,.07), rgba(255,255,255,.02));
-          border: 1px solid rgba(255,255,255,.09);
-          backdrop-filter: blur(12px) saturate(1.1);
-          -webkit-backdrop-filter: blur(12px) saturate(1.1);
-          box-shadow: 0 8px 30px -12px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08);
-        }
-        .vfy-tile { transition: transform .25s cubic-bezier(.2,.7,.2,1), background .25s, border-color .25s; }
-        .vfy-tile:active { transform: scale(.975); }
-        .vfy-tile:hover { border-color: rgba(77,255,160,.35); }
-        .vfy-eyebrow { font-family: 'Barlow Condensed','Barlow',sans-serif; letter-spacing: 3px; }
-        .vfy-hero { animation: vfyHeroIn .55s cubic-bezier(.2,.7,.2,1) both; will-change: transform, opacity; }
-        @keyframes vfyHeroIn { from { opacity:0; transform: translateY(16px) scale(.98); } to { opacity:1; transform: translateZ(0); } }
-        .vfy-check { animation: vfyPop .5s cubic-bezier(.2,1.4,.4,1) .35s both; will-change: transform; }
-        @keyframes vfyPop { 0% { transform: scale(0); } 60% { transform: scale(1.25); } 100% { transform: scale(1) translateZ(0); } }
-        .vfy-gpu-layer { transform: translateZ(0); backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-        @media (prefers-reduced-motion: reduce){ .vfy-hero,.vfy-check{ animation:none } }
-      `}</style>
-      {/* Background effects — GPU-isolated to prevent rendering artifacts */}
-      <div className="absolute inset-0 pointer-events-none" style={{ transform: 'translateZ(0)', willChange: 'transform', zIndex: 0 }}>
-        <div className="absolute top-[-15%] right-[-15%] w-[400px] h-[400px] rounded-full bg-[#4ADE80]/5 blur-3xl" style={{ transform: 'translateZ(0)', backfaceVisibility: 'hidden' }} />
-        <div className="absolute bottom-[-10%] left-[-10%] w-[350px] h-[350px] rounded-full bg-[#0A5C36]/20 blur-3xl" style={{ transform: 'translateZ(0)', backfaceVisibility: 'hidden' }} />
+    <div className="min-h-screen vfp-bg relative overflow-hidden" style={{ isolation: 'isolate' }}>
+      <style>{vfpStyles}</style>
+
+      {/* Ambient glow */}
+      <div className="absolute inset-0 pointer-events-none" style={{ transform: 'translateZ(0)', zIndex: 0 }}>
+        <div className="absolute top-[-20%] right-[-15%] w-[500px] h-[500px] rounded-full bg-[#10b981]/8 blur-[100px]" />
+        <div className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full bg-[#0d9b5e]/12 blur-[80px]" />
       </div>
 
-      <div className="relative z-10 max-w-md mx-auto px-4 py-6 space-y-5">
+      <div className="relative z-10 max-w-md mx-auto px-4 pt-4 pb-8 space-y-5">
 
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <Logo size="sm" textClassName="text-white" />
-          <div className="vfy-glass flex items-center gap-2 px-3 py-1.5 rounded-full">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#4ADE80] opacity-60" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#4ADE80]" />
-            </span>
-            <span className="text-[11px] font-semibold text-[#9bffc8] uppercase tracking-wide">Vérifié</span>
+        {/* ─── Premium Header ─── */}
+        <header className="flex items-center justify-between vfp-enter">
+          <div className="flex items-center gap-3">
+            <button className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Menu">
+              <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><path d="M1 1h16M1 7h10M1 13h14" stroke="#9bffc8" strokeWidth="1.6" strokeLinecap="round"/></svg>
+            </button>
+            <Logo size="sm" textClassName="text-white" />
           </div>
-        </div>
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center relative">
+              <Bell className="h-4.5 w-4.5 text-white/60" />
+            </div>
+            <div className="w-10 h-10 rounded-full vfp-glass-subtle flex items-center justify-center border-2 border-emerald-500/30">
+              {result.member?.photo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={result.member.photo_url} alt="" className="w-full h-full rounded-full object-cover" />
+              ) : (
+                <User className="h-4.5 w-4.5 text-white/60" />
+              )}
+            </div>
+          </div>
+        </header>
 
-        {/* 3D Membership Card — realistic, tactile, tilts with pointer/device */}
+        {/* ─── Hero Section ─── */}
+        {isValid && activeView === 'menu' && (
+          <section className={`vfp-enter transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '100ms' }}>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-white/60 text-sm mb-1">{greeting}, {firstName} ! 👋</p>
+                <h1 className="text-[26px] font-bold text-white leading-tight">
+                  Votre espace,<br/>
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#34d399] to-[#6ee7b7]">votre succès.</span>
+                </h1>
+                <p className="text-white/40 text-xs mt-2">Gérez, développez et prospérez avec FaîtiereHub.</p>
+              </div>
+              <div className="vfp-glass-subtle rounded-2xl px-4 py-3 text-center shrink-0">
+                <div className="w-10 h-10 rounded-full bg-emerald-500/15 flex items-center justify-center mx-auto mb-1.5">
+                  <CheckCircle className="h-5 w-5 text-[#34d399] vfp-pop" />
+                </div>
+                <p className="text-white text-[11px] font-semibold">Compte vérifié</p>
+                <div className="flex items-center gap-1 justify-center mt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#34d399] animate-pulse" />
+                  <span className="text-[#7fd9a5] text-[9px]">Membre actif</span>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ─── 3D Member Card ─── */}
         {result.member && result.card && isValid && activeView === 'menu' && (
-          <div className={`transition-all duration-500 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-            <Card3D
-              member={result.member}
-              card={result.card}
-              cooperative={result.cooperative}
-            />
+          <div className={`transition-all duration-600 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`} style={{ transitionDelay: '200ms' }}>
+            <Card3D member={result.member} card={result.card} cooperative={result.cooperative} />
           </div>
         )}
 
-        {/* Invalid card state */}
+        {/* ─── Invalid / Not Found states ─── */}
         {!isValid && result.member && (
-          <div className="rounded-2xl bg-red-950/30 border border-red-500/20 p-6 text-center">
+          <div className="rounded-2xl bg-red-950/20 border border-red-500/15 p-6 text-center vfp-enter">
             <XCircle className="h-12 w-12 text-red-400/60 mx-auto mb-3" />
-            <h2 className="text-lg font-bold text-white">
-              {result.card?.status === 'expired' ? 'Carte Expirée' : 'Carte Invalide'}
-            </h2>
-            <p className="text-white/50 text-sm mt-1">
-              Contactez votre coopérative pour renouveler votre carte.
-            </p>
+            <h2 className="text-lg font-bold text-white">{result.card?.status === 'expired' ? 'Carte Expirée' : 'Carte Invalide'}</h2>
+            <p className="text-white/50 text-sm mt-1">Contactez votre coopérative pour renouveler.</p>
           </div>
         )}
-
         {!result.member && (
-          <div className="rounded-2xl bg-red-950/30 border border-red-500/20 p-6 text-center">
+          <div className="rounded-2xl bg-red-950/20 border border-red-500/15 p-6 text-center vfp-enter">
             <XCircle className="h-12 w-12 text-red-400/60 mx-auto mb-3" />
             <h2 className="text-lg font-bold text-white">Carte Non Trouvée</h2>
             <p className="text-white/50 text-sm mt-1">{result.error}</p>
-            <p className="text-white/30 text-xs font-mono mt-2">{decodeURIComponent(cardNumber)}</p>
+            <p className="text-white/20 text-xs font-mono mt-2">{decodeURIComponent(cardNumber)}</p>
           </div>
         )}
 
-        {/* Services Menu */}
+        {/* ─── Services Grid (2 cols) ─── */}
         {isValid && activeView === 'menu' && (
-          <div className={`space-y-3 transition-all duration-700 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`} style={{ transitionDelay: '200ms' }}>
-            <h3 className="text-[#7fd9a5] vfy-eyebrow text-[11px] font-bold uppercase px-1">
-              Mes Services
-            </h3>
+          <section className={`transition-all duration-700 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`} style={{ transitionDelay: '300ms' }}>
+            <div className="flex items-center justify-between mb-3 px-1">
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#34d399]" />
+                <h3 className="text-white font-semibold text-[15px]">Mes services</h3>
+              </div>
+              <span className="text-white/40 text-xs">Tout ce dont vous avez besoin.</span>
+            </div>
 
-            {services.map((service, i) => {
-              const Icon = service.icon
+            <div className="grid grid-cols-2 gap-3">
+              {mainServices.map((s, i) => {
+                const Icon = s.icon
+                return (
+                  <button key={i} onClick={s.action} className={`vfp-card group text-left rounded-2xl p-4 flex flex-col justify-between min-h-[160px] ${!s.available ? 'opacity-50' : ''}`} disabled={!s.available}>
+                    <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${s.gradient} flex items-center justify-center mb-3 group-active:scale-90 transition-transform`}>
+                      <Icon className={`h-5 w-5 ${s.highlight ? 'text-amber-300' : 'text-[#5dffaa]'}`} />
+                    </div>
+                    <div>
+                      <p className="text-white font-semibold text-[13px] leading-tight mb-1">{s.title}</p>
+                      <p className={`text-[10px] leading-snug ${s.highlight ? 'text-amber-300/60' : 'text-white/40'}`}>{s.description}</p>
+                    </div>
+                    <div className="flex justify-end mt-2">
+                      <div className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-[#34d399]/20 transition-colors">
+                        <ChevronRight className="h-3.5 w-3.5 text-white/50 group-hover:text-[#34d399] transition-colors" />
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* More services - compact */}
+            {moreServices.map((s, i) => {
+              const Icon = s.icon
               return (
-                <button
-                  key={i}
-                  onClick={service.action}
-                  className={`vfy-glass vfy-tile w-full rounded-2xl p-4 flex items-center gap-4 text-left ${
-                    !service.available ? 'opacity-55' : ''
-                  }`}
-                  disabled={!service.available}
+                <button key={i} onClick={s.action} disabled={!s.available}
+                  className={`vfp-card w-full rounded-xl p-3 flex items-center gap-3 text-left mt-2 ${!s.available ? 'opacity-40' : ''}`}
                 >
-                  {/* Icon */}
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
-                    service.highlight
-                      ? 'bg-gradient-to-br from-yellow-400/25 to-yellow-600/10'
-                      : service.available
-                        ? 'bg-gradient-to-br from-[#4ADE80]/20 to-[#0A5C36]/10'
-                        : 'bg-white/[0.05]'
-                  }`}>
-                    <Icon className={`h-5 w-5 ${
-                      service.highlight
-                        ? 'text-yellow-300'
-                        : service.available
-                          ? 'text-[#5dffaa]'
-                          : 'text-white/30'
-                    }`} />
+                  <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${s.gradient} flex items-center justify-center shrink-0`}>
+                    <Icon className={`h-4 w-4 ${s.available ? 'text-[#5dffaa]' : 'text-white/30'}`} />
                   </div>
-
-                  {/* Text */}
                   <div className="flex-1 min-w-0">
-                    <p className={`text-[15px] font-semibold ${service.available ? 'text-white' : 'text-white/50'}`}>
-                      {service.title}
-                    </p>
-                    <p className={`text-[11px] mt-0.5 ${service.highlight ? 'text-yellow-300/70' : 'text-white/45'}`}>
-                      {service.description}
-                    </p>
+                    <p className={`text-[13px] font-medium ${s.available ? 'text-white' : 'text-white/40'}`}>{s.title}</p>
+                    <p className="text-[10px] text-white/30">{s.description}</p>
                   </div>
-
-                  {/* Chevron / status */}
-                  <div className="shrink-0">
-                    {service.available ? (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-[#5dffaa]/70">
-                        <path d="M9 6l6 6-6 6" />
-                      </svg>
-                    ) : (
-                      <span className="px-2 py-1 rounded-full bg-orange-500/10 text-orange-300/80 text-[9px] font-bold uppercase">
-                        Bientôt
-                      </span>
-                    )}
-                  </div>
+                  {s.available ? (
+                    <ChevronRight className="h-4 w-4 text-white/30 shrink-0" />
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full bg-white/5 text-white/30 text-[8px] font-bold uppercase shrink-0">Bientôt</span>
+                  )}
                 </button>
               )
             })}
+          </section>
+        )}
+
+        {/* ─── Market Prices Widget (inline on menu) ─── */}
+        {isValid && activeView === 'menu' && (
+          <section className={`transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '400ms' }}>
+            <MarketPricesDashboard compact onSeeMore={() => setActiveView('prices')} />
+          </section>
+        )}
+
+        {/* ─── AI CTA Banner ─── */}
+        {isValid && activeView === 'menu' && (
+          <section className={`transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '500ms' }}>
+            <button onClick={() => setActiveView('ai')} className="vfp-card w-full rounded-2xl p-4 flex items-center gap-4 text-left group">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400/20 to-emerald-500/10 flex items-center justify-center shrink-0">
+                <Sparkles className="h-5 w-5 text-amber-300 group-hover:scale-110 transition-transform" />
+              </div>
+              <div className="flex-1">
+                <p className="text-white font-semibold text-sm">Besoin d&apos;aide ou de conseils ?</p>
+                <p className="text-white/40 text-[11px]">Discutez avec AgriTogo, votre assistant IA.</p>
+              </div>
+              <div className="px-4 py-2 rounded-full bg-[#1ed760] text-[#04140b] font-bold text-xs shrink-0 group-active:scale-95 transition-transform">
+                Commencer
+              </div>
+            </button>
+          </section>
+        )}
+
+        {/* ─── Prices Full View ─── */}
+        {isValid && activeView === 'prices' && (
+          <div className="space-y-4 vfp-enter">
+            <button onClick={() => setActiveView('menu')} className="flex items-center gap-2 text-[#34d399] text-sm font-medium active:opacity-70">
+              <ArrowLeft className="h-4 w-4" /> Retour
+            </button>
+            <MarketPricesDashboard />
           </div>
         )}
 
-        {/* Identity Detail View */}
+        {/* ─── Identity View ─── */}
         {isValid && activeView === 'identity' && result.member && (
-          <div className="space-y-4">
-            {/* Back button */}
-            <button
-              onClick={() => setActiveView('menu')}
-              className="flex items-center gap-2 text-[#4ADE80] text-sm font-medium active:opacity-70"
-            >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Retour au menu
+          <div className="space-y-4 vfp-enter">
+            <button onClick={() => setActiveView('menu')} className="flex items-center gap-2 text-[#34d399] text-sm font-medium active:opacity-70">
+              <ArrowLeft className="h-4 w-4" /> Retour
             </button>
-
             <h3 className="text-white text-lg font-bold">Vérification d&apos;Identité</h3>
-
-            {/* Full identity card */}
-            <div className="rounded-2xl bg-white/[0.04] border border-white/[0.08] p-5 space-y-4">
-              {/* Photo + status */}
+            <div className="vfp-card rounded-2xl p-5 space-y-4">
               <div className="flex items-center gap-4">
-                <div className="w-20 h-20 rounded-full overflow-hidden border-[3px] border-[#4ADE80]/40">
+                <div className="w-20 h-20 rounded-full overflow-hidden border-[3px] border-[#34d399]/40">
                   {result.member.photo_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={result.member.photo_url} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                    <img src={result.member.photo_url} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full bg-[#4ADE80]/10 flex items-center justify-center">
-                      <User className="h-9 w-9 text-[#4ADE80]/60" />
-                    </div>
+                    <div className="w-full h-full bg-emerald-500/10 flex items-center justify-center"><User className="h-9 w-9 text-[#34d399]/60" /></div>
                   )}
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-white">
-                    {result.member.first_name ?? ''} <span className="uppercase">{result.member.last_name ?? ''}</span>
-                  </h2>
-                  <p className="text-[#4ADE80]/70 text-xs font-mono">{result.card?.card_number}</p>
-                  <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#4ADE80]/10 border border-[#4ADE80]/20">
-                    <CheckCircle className="h-3 w-3 text-[#4ADE80]" />
-                    <span className="text-[10px] font-bold text-[#4ADE80] uppercase">Membre vérifié</span>
+                  <h2 className="text-xl font-bold text-white">{result.member.first_name ?? ''} <span className="uppercase">{result.member.last_name ?? ''}</span></h2>
+                  <p className="text-[#34d399]/70 text-xs font-mono">{result.card?.card_number}</p>
+                  <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                    <CheckCircle className="h-3 w-3 text-[#34d399]" />
+                    <span className="text-[10px] font-bold text-[#34d399] uppercase">Membre vérifié</span>
                   </div>
                 </div>
               </div>
-
-              {/* Details grid — [SECURITY FIX - FORGE-001] Ne plus exposer phone/email */}
               <div className="grid grid-cols-2 gap-3 pt-2">
                 {[
                   { icon: MapPin, label: 'Village', value: result.member.village ?? '—' },
@@ -518,191 +359,120 @@ export default function VerifyCardPage() {
                   { icon: MapPin, label: 'Région', value: result.member.region ?? '—' },
                   { icon: Building2, label: 'Coopérative', value: result.cooperative?.name ?? '—' },
                   { icon: Building2, label: 'Faîtière', value: result.cooperative?.faitiere_name ?? '—' },
-                ].map((item, i) => (
-                  <div key={i} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.05]">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <item.icon className="h-3 w-3 text-[#4ADE80]/60" />
-                      <p className="text-[9px] text-white/40 uppercase tracking-wider">{item.label}</p>
+                ].map((item, i) => {
+                  const IIcon = item.icon
+                  return (
+                    <div key={i} className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <IIcon className="h-3 w-3 text-white/30" />
+                        <span className="text-[9px] text-white/40 uppercase font-semibold tracking-wider">{item.label}</span>
+                      </div>
+                      <p className="text-white text-sm font-medium leading-tight">{item.value}</p>
                     </div>
-                    <p className="text-xs text-white font-medium truncate">{item.value}</p>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
-
-              {/* Validity */}
-              <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.05]">
-                <div>
-                  <p className="text-[9px] text-white/40 uppercase">Valide jusqu&apos;au</p>
-                  <p className="text-sm text-white font-semibold">
-                    {result.card?.expiry_date
-                      ? new Date(result.card.expiry_date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
-                      : '—'}
-                  </p>
-                </div>
-                <div className="px-3 py-1 rounded-full bg-[#4ADE80]/10 text-[#4ADE80] text-xs font-bold">
-                  ● ACTIVE
-                </div>
-              </div>
-
-              {/* Member since */}
-              {result.member.member_since && (
-                <p className="text-[10px] text-white/30 text-center">
-                  Membre depuis {new Date(result.member.member_since).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
-                </p>
-              )}
             </div>
           </div>
         )}
 
-        {/* Market Prices Dashboard */}
-        {isValid && activeView === 'prices' && (
-          <MarketPricesDashboard
-            onBack={() => setActiveView('menu')}
-            cooperativeName={result.cooperative?.name}
-            cardNumber={cardNumber}
-            memberLocality={{
-              village: result.member?.village ?? null,
-              canton: result.member?.canton ?? null,
-              prefecture: result.member?.prefecture ?? null,
-              region: result.member?.region ?? null,
-            }}
-          />
-        )}
-
+        {/* ─── Technicien View ─── */}
         {isValid && activeView === 'technicien' && (
-          <div className="space-y-4">
-            <button
-              onClick={() => setActiveView('menu')}
-              className="flex items-center gap-2 text-white/60 hover:text-white text-sm transition-colors"
-            >
+          <div className="space-y-4 vfp-enter">
+            <button onClick={() => setActiveView('menu')} className="flex items-center gap-2 text-[#34d399] text-sm font-medium active:opacity-70">
               <ArrowLeft className="h-4 w-4" /> Retour
             </button>
-
-            <div className="text-center space-y-1 mb-2">
-              <h2 className="text-white text-xl font-bold">Contacter un technicien</h2>
-              <p className="text-white/50 text-sm">Appelez le technicien de votre canton ou votre coordonnateur</p>
-            </div>
-
-            {contactsLoading && (
-              <div className="flex justify-center py-8">
-                <div className="h-7 w-7 border-3 border-[#4ADE80]/30 border-t-[#4ADE80] rounded-full animate-spin" />
+            <h3 className="text-white text-lg font-bold">Contacter Mon Technicien</h3>
+            {contactsLoading && <div className="vfp-card rounded-2xl p-8 text-center"><div className="vfp-loader mx-auto" /><p className="text-white/40 text-sm mt-3">Recherche...</p></div>}
+            {contacts && contacts.length === 0 && (
+              <div className="vfp-card rounded-2xl p-6 text-center">
+                <PhoneCall className="h-8 w-8 text-white/20 mx-auto mb-2" />
+                <p className="text-white/50 text-sm">Aucun technicien trouvé pour votre zone.</p>
               </div>
             )}
-
-            {!contactsLoading && contacts && contacts.length === 0 && (
-              <div className="rounded-2xl bg-white/5 border border-white/10 p-6 text-center">
-                <PhoneCall className="h-8 w-8 text-white/30 mx-auto mb-3" />
-                <p className="text-white/70 text-sm">
-                  Aucun technicien n&apos;est encore enregistré pour votre canton.
-                  Contactez l&apos;administration de votre faîtière.
-                </p>
-              </div>
-            )}
-
-            {!contactsLoading && contacts && contacts.map((c, i) => (
-              <div
-                key={i}
-                className="rounded-2xl bg-gradient-to-br from-[#0A5C36] to-[#0d4a2e] border border-[#4ADE80]/15 p-5 shadow-xl"
-              >
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-full bg-[#4ADE80]/15 flex items-center justify-center shrink-0">
-                    <PhoneCall className="h-6 w-6 text-[#4ADE80]" />
+            {contacts && contacts.length > 0 && contacts.map((c, i) => (
+              <div key={i} className="vfp-card rounded-2xl p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/15 flex items-center justify-center">
+                    <User className="h-5 w-5 text-[#34d399]" />
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-[11px] uppercase tracking-wide text-[#4ADE80] font-semibold">
-                      {c.role === 'coordo' ? 'SE / Coordonnateur' : `Technicien${c.canton ? ` · ${c.canton}` : ''}`}
-                    </p>
-                    <p className="text-white font-bold truncate">{c.name}</p>
-                    <p className="text-white/60 text-sm font-mono">{c.phone}</p>
+                  <div>
+                    <p className="text-white font-semibold text-sm">{c.name}</p>
+                    <p className="text-white/40 text-[10px] uppercase tracking-wider">{c.role === 'technicien' ? `Technicien${c.canton ? ` — ${c.canton}` : ''}` : 'Coordonnateur Faîtière'}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <a
-                    href={`tel:${c.phone.replace(/\s/g, '')}`}
-                    className="flex items-center justify-center gap-2 rounded-xl bg-[#4ADE80] text-[#04140b] font-semibold py-3 active:scale-95 transition-transform"
-                  >
-                    <PhoneCall className="h-4 w-4" /> Appeler
-                  </a>
-                  <a
-                    href={`https://wa.me/${waNumber(c.phone)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 rounded-xl bg-[#25D366] text-white font-semibold py-3 active:scale-95 transition-transform"
-                  >
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.82 11.82 0 018.413 3.488 11.82 11.82 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.978-1.607z"/></svg>
-                    WhatsApp
-                  </a>
+                <div className="flex gap-2">
+                  <a href={`tel:${c.phone}`} className="flex-1 py-2.5 rounded-xl bg-[#1ed760] text-[#04140b] text-xs font-bold text-center active:scale-95 transition-transform">📞 Appeler</a>
+                  <a href={`https://wa.me/${waNumber(c.phone)}`} target="_blank" rel="noopener noreferrer" className="flex-1 py-2.5 rounded-xl bg-[#25D366]/15 text-[#25D366] text-xs font-bold text-center border border-[#25D366]/20 active:scale-95 transition-transform">💬 WhatsApp</a>
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* AgriTogo AI Chat */}
+        {/* ─── AI Chat View ─── */}
         {isValid && activeView === 'ai' && result.member && (
-          <AiChat
-            cardNumber={cardNumber}
-            memberName={(result.member.first_name ?? '').trim()}
-            onBack={() => setActiveView('menu')}
-          />
+          <AiChat cardNumber={cardNumber} memberName={firstName} onBack={() => setActiveView('menu')} />
         )}
 
-        {/* Security Timer */}
-        {isValid && (
-          <div className={`rounded-2xl bg-white/[0.03] border border-white/[0.06] p-4 space-y-3 transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '600ms' }}>
-            {/* Timer bar */}
+        {/* ─── Security Timer ─── */}
+        {isValid && activeView === 'menu' && (
+          <div className={`vfp-card rounded-2xl p-3 transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '600ms' }}>
             <div className="flex items-center gap-3">
-              <Timer className={`h-4 w-4 shrink-0 ${timeLeft <= 60 ? 'text-red-400 animate-pulse' : 'text-white/40'}`} />
+              <Timer className="h-4 w-4 text-white/30 shrink-0" />
               <div className="flex-1">
-                <div className="h-1.5 rounded-full bg-white/[0.08] overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-1000 ease-linear ${
-                      timeLeft <= 60 ? 'bg-red-400' : timeLeft <= 180 ? 'bg-yellow-400' : 'bg-[#4ADE80]'
-                    }`}
-                    style={{ width: `${(timeLeft / 600) * 100}%` }}
-                  />
+                <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                  <div className="h-full rounded-full bg-gradient-to-r from-[#34d399] to-[#10b981] transition-all duration-1000" style={{ width: `${(timeLeft / 600) * 100}%` }} />
                 </div>
               </div>
-              <span className={`text-xs font-mono font-bold min-w-[32px] text-right ${
-                timeLeft <= 60 ? 'text-red-400' : 'text-white/50'
-              }`}>
-                {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
-              </span>
+              <span className="text-white/30 text-[11px] font-mono shrink-0">{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
             </div>
-
-            <p className="text-[10px] text-white/30 text-center leading-relaxed">
-              Session active — {Math.floor(timeLeft / 60)} min restantes.
-              Après expiration, rescannez votre carte.
-            </p>
-
-            <button
-              onClick={handleRescan}
-              className="w-full py-2.5 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white/50 text-xs font-medium flex items-center justify-center gap-2 active:bg-white/[0.08] transition-colors"
-            >
-              <QrCode className="h-3.5 w-3.5" />
-              Rescanner
-            </button>
           </div>
         )}
 
-        {/* Footer — [SECURITY FIX - PHANTOM-001] Indicateurs visuels anti-phishing */}
-        <div className="text-center pt-2 pb-4">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Shield className="h-3 w-3 text-[#4ADE80]/40" />
-            <p className="text-[10px] text-white/25 uppercase tracking-widest">
-              Vérification officielle FENOMAT · www.faitierehub.com
-            </p>
-          </div>
-          <p className="text-white/20 text-[9px] mb-1">
-            Ne partagez jamais votre code PIN ou mot de passe sur cette page
-          </p>
-          <p className="text-white/15 text-[9px]">
-            © {new Date().getFullYear()} FaîtiereHub — Plateforme des faîtières agricoles
-          </p>
-        </div>
       </div>
     </div>
   )
 }
 
-// Market Prices Dashboard — imported from components/verify/market-prices-dashboard.tsx
+/* ─── Premium Styles ─── */
+const vfpStyles = `
+  .vfp-bg {
+    background:
+      radial-gradient(80% 55% at 18% 8%, rgba(16,185,129,.10), transparent 60%),
+      radial-gradient(60% 45% at 85% 90%, rgba(13,155,94,.12), transparent 60%),
+      linear-gradient(180deg, #040f0a 0%, #071a12 45%, #04120b 100%);
+  }
+  .vfp-bg::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+    background-image: radial-gradient(rgba(255,255,255,.018) 1px, transparent 1px);
+    background-size: 3px 3px; opacity: .4;
+  }
+  .vfp-glass-subtle {
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.06);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .vfp-card {
+    background: linear-gradient(160deg, rgba(255,255,255,.055), rgba(255,255,255,.015));
+    border: 1px solid rgba(255,255,255,.07);
+    backdrop-filter: blur(12px) saturate(1.05);
+    -webkit-backdrop-filter: blur(12px) saturate(1.05);
+    box-shadow: 0 4px 24px -8px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.06);
+    transition: transform .2s cubic-bezier(.2,.7,.2,1), border-color .2s, box-shadow .2s;
+  }
+  .vfp-card:active:not(:disabled) { transform: scale(.97); }
+  .vfp-card:hover:not(:disabled) { border-color: rgba(52,211,153,.25); box-shadow: 0 4px 24px -8px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.06), 0 0 0 1px rgba(52,211,153,.08); }
+  .vfp-enter { animation: vfpIn .5s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes vfpIn { from { opacity:0; transform: translateY(12px); } to { opacity:1; transform: none; } }
+  .vfp-pop { animation: vfpPop .5s cubic-bezier(.2,1.4,.4,1) .3s both; }
+  @keyframes vfpPop { 0% { transform: scale(0); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
+  .vfp-loader {
+    width: 32px; height: 32px; border: 2.5px solid rgba(52,211,153,.15);
+    border-top-color: #34d399; border-radius: 50%;
+    animation: vfpSpin .7s linear infinite;
+  }
+  @keyframes vfpSpin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .vfp-enter,.vfp-pop { animation: none; } }
+`

@@ -29,18 +29,20 @@ function TrendBadge({ trend }: { trend: string }) {
 }
 
 interface Props {
-  onBack: () => void
+  onBack?: () => void
   cooperativeName?: string
-  cardNumber: string
+  cardNumber?: string
   memberLocality?: {
     village: string | null
     canton: string | null
     prefecture: string | null
     region: string | null
   }
+  compact?: boolean
+  onSeeMore?: () => void
 }
 
-export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, memberLocality }: Props) {
+export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, memberLocality, compact, onSeeMore }: Props) {
   type Step = 'regions' | 'prefectures' | 'cantons' | 'prices' | 'submit'
   const [step, setStep] = useState<Step>('regions')
   const [selectedRegion, setSelectedRegion] = useState<typeof REGIONS[0] | null>(null)
@@ -134,7 +136,7 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
       const res = await fetch('/api/market-prices', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          card_number: decodeURIComponent(cardNumber),
+          card_number: decodeURIComponent(cardNumber ?? ''),
           culture_id: submitForm.culture_id,
           region_id: regionId,
           market_name: marketName,
@@ -155,7 +157,7 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
     if (step === 'prices') { setStep('cantons'); return }
     if (step === 'cantons') { setStep('prefectures'); setSelectedPrefecture(null); return }
     if (step === 'prefectures') { setStep('regions'); setSelectedRegion(null); return }
-    onBack()
+    onBack?.()
   }
 
   const breadcrumb = [
