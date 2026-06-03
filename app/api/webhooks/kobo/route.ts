@@ -326,15 +326,37 @@ async function processSubmissionAsync(
 
     const payload = submission.raw_payload as Record<string, unknown>
 
-    // Determine mode: ENROLLMENT (no card number) or UPDATE (has card number)
-    if (submission.member_card_number) {
-      // === UPDATE MODE: Match existing member by card number ===
-      await supabase.rpc('match_kobo_submission_to_member', {
-        p_submission_id: submissionId,
-      })
-    } else {
-      // === ENROLLMENT MODE: Create new member + generate card ===
-      await enrollNewMemberFromSubmission(supabase, submissionId, cooperativeId, payload)
+    // ── Route by form type (from integration config) ───────────
+    const { data: integ } = await supabase
+      .from('integrations')
+      .select('config')
+      .eq('cooperative_id', cooperativeId)
+      .eq('type', 'kobo')
+      .eq('status', 'connected')
+      .limit(1)
+      .maybeSingle()
+
+    const formType = (integ?.config as Record<string, unknown>)?.form_type as string | undefined
+
+    switch (formType) {
+      case 'market_price':
+        await processMarketPriceSubmission(supabase, submissionId, payload)
+        break
+      case 'harvest':
+        await processHarvestSubmission(supabase, submissionId, cooperativeId, payload)
+        break
+      case 'plot_survey':
+        await processPlotSurveySubmission(supabase, submissionId, cooperativeId, payload)
+        break
+      default:
+        // Default: member enrollment/update (existing behavior)
+        if (submission.member_card_number) {
+          await supabase.rpc('match_kobo_submission_to_member', {
+            p_submission_id: submissionId,
+          })
+        } else {
+          await enrollNewMemberFromSubmission(supabase, submissionId, cooperativeId, payload)
+        }
     }
 
     // Update sync log as success
@@ -567,4 +589,203 @@ function extractCardNumber(
   }
 
   return null
+}
+
+
+// =========================================================
+// Market Price: Insert price records from field survey
+// =========================================================
+// KoboCollect form fields expected:
+//   S1/date_releve     — date of the survey
+//   S1/marche          — market name (select_one: Lome, Kpalime, Atakpame, Sokode, Kara)
+//   S1/agent           — name of the agent who collected
+//   S2/produits        — repeat group with:
+//     S2/produits/nom_produit  — product name (select_one from cultures list)
+//     S2/produits/prix_kg      — price per kg in FCFA
+//     S2/produits/unite        — unit (kg, tas, sac)
+//     S2/produits/observation  — optional note
+async function processMarketPriceSubmission(
+  supabase: ReturnType<typeof createClient>,
+  submissionId: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const log = createLogger('kobo-market-price')
+
+  const dateReleve = getPayloadField(payload, 'S1/date_releve') ?? new Date().toISOString().slice(0, 10)
+  const marche = getPayloadField(payload, 'S1/marche') ?? 'Lomé'
+
+  // Extract repeat group (products)
+  const produits = (payload['S2/produits'] ?? payload['produits'] ?? []) as Array<Record<string, unknown>>
+
+  if (!Array.isArray(produits) || produits.length === 0) {
+    log.warn('No products in market price submission', { submissionId })
+    await supabase.from('kobo_submissions').update({
+      status: 'processed' as const, updated_at: new Date().toISOString(),
+    }).eq('id', submissionId)
+    return
+  }
+
+  // Resolve culture IDs
+  const { data: cultures } = await supabase.from('cultures').select('id, name')
+  const cultureMap = new Map((cultures ?? []).map((c: { id: string; name: string }) => [c.name.toLowerCase(), c.id]))
+
+  let inserted = 0
+  for (const p of produits) {
+    const nomProduit = String(p['S2/produits/nom_produit'] ?? p['nom_produit'] ?? '').trim()
+    const prixKg = Number(p['S2/produits/prix_kg'] ?? p['prix_kg'] ?? 0)
+
+    if (!nomProduit || prixKg <= 0) continue
+
+    // Find or fuzzy-match culture
+    let cultureId = cultureMap.get(nomProduit.toLowerCase())
+    if (!cultureId) {
+      for (const [name, id] of cultureMap) {
+        if (name.includes(nomProduit.toLowerCase()) || nomProduit.toLowerCase().includes(name)) {
+          cultureId = id
+          break
+        }
+      }
+    }
+
+    if (!cultureId) {
+      log.warn('Unknown product, skipping', { nomProduit, submissionId })
+      continue
+    }
+
+    await supabase.from('market_prices').insert({
+      culture_id: cultureId,
+      market_name: marche,
+      price: prixKg,
+      source: 'kobo',
+      created_at: dateReleve,
+    })
+    inserted++
+  }
+
+  log.info('Market prices inserted', { submissionId, count: inserted, market: marche })
+
+  await supabase.from('kobo_submissions').update({
+    status: 'processed' as const,
+    updated_at: new Date().toISOString(),
+  }).eq('id', submissionId)
+}
+
+
+// =========================================================
+// Harvest: Insert production records
+// =========================================================
+// KoboCollect form fields expected:
+//   S1/carte_membre     — member card number
+//   S1/campagne         — campaign year (e.g. "2026A")
+//   S2/recoltes         — repeat group with:
+//     S2/recoltes/culture    — crop name
+//     S2/recoltes/quantite_kg — quantity harvested in kg
+//     S2/recoltes/parcelle   — optional parcelle reference
+async function processHarvestSubmission(
+  supabase: ReturnType<typeof createClient>,
+  submissionId: string,
+  cooperativeId: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const log = createLogger('kobo-harvest')
+
+  const cardNumber = getPayloadField(payload, 'S1/carte_membre') ?? ''
+  const campagne = getPayloadField(payload, 'S1/campagne') ?? new Date().getFullYear().toString()
+
+  // Resolve member
+  const { data: card } = await supabase
+    .from('member_cards')
+    .select('member_id')
+    .eq('card_number', cardNumber)
+    .maybeSingle()
+
+  if (!card) {
+    log.warn('Card not found for harvest', { cardNumber, submissionId })
+    return
+  }
+
+  const recoltes = (payload['S2/recoltes'] ?? payload['recoltes'] ?? []) as Array<Record<string, unknown>>
+
+  for (const r of recoltes) {
+    const culture = String(r['S2/recoltes/culture'] ?? r['culture'] ?? '')
+    const quantite = Number(r['S2/recoltes/quantite_kg'] ?? r['quantite_kg'] ?? 0)
+
+    if (!culture || quantite <= 0) continue
+
+    await supabase.from('productions').insert({
+      member_id: card.member_id,
+      culture_name: culture,
+      quantity_kg: quantite,
+      campaign_year: campagne,
+      cooperative_id: cooperativeId,
+      source: 'kobo',
+    })
+  }
+
+  log.info('Harvest recorded', { submissionId, cardNumber, count: recoltes.length })
+
+  await supabase.from('kobo_submissions').update({
+    status: 'processed' as const, updated_at: new Date().toISOString(),
+  }).eq('id', submissionId)
+}
+
+
+// =========================================================
+// Plot Survey: Insert/update parcelle records
+// =========================================================
+// KoboCollect form fields expected:
+//   S1/carte_membre     — member card number
+//   S1/campagne         — campaign
+//   S2/parcelles        — repeat group with:
+//     S2/parcelles/culture       — crop planted
+//     S2/parcelles/surface_ha    — surface in hectares
+//     S2/parcelles/gps           — GPS coordinates (lat, lon)
+//     S2/parcelles/photo         — photo of the plot
+async function processPlotSurveySubmission(
+  supabase: ReturnType<typeof createClient>,
+  submissionId: string,
+  cooperativeId: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const log = createLogger('kobo-plot')
+
+  const cardNumber = getPayloadField(payload, 'S1/carte_membre') ?? ''
+  const campagne = getPayloadField(payload, 'S1/campagne') ?? new Date().getFullYear().toString()
+
+  const { data: card } = await supabase
+    .from('member_cards')
+    .select('member_id')
+    .eq('card_number', cardNumber)
+    .maybeSingle()
+
+  if (!card) {
+    log.warn('Card not found for plot survey', { cardNumber, submissionId })
+    return
+  }
+
+  const parcelles = (payload['S2/parcelles'] ?? payload['parcelles'] ?? []) as Array<Record<string, unknown>>
+
+  for (const p of parcelles) {
+    const culture = String(p['S2/parcelles/culture'] ?? p['culture'] ?? '')
+    const surface = Number(p['S2/parcelles/surface_ha'] ?? p['surface_ha'] ?? 0)
+    const gps = String(p['S2/parcelles/gps'] ?? p['gps'] ?? '')
+
+    if (!culture || surface <= 0) continue
+
+    await supabase.from('parcelles').insert({
+      member_id: card.member_id,
+      culture_name: culture,
+      surface_ha: surface,
+      gps_coordinates: gps || null,
+      campaign_year: campagne,
+      cooperative_id: cooperativeId,
+      source: 'kobo',
+    })
+  }
+
+  log.info('Plots recorded', { submissionId, cardNumber, count: parcelles.length })
+
+  await supabase.from('kobo_submissions').update({
+    status: 'processed' as const, updated_at: new Date().toISOString(),
+  }).eq('id', submissionId)
 }
