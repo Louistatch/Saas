@@ -6,7 +6,7 @@ import {
   CheckCircle, XCircle, Shield, MapPin, Building2,
   FileText, TrendingUp, PhoneCall, Map, CloudRain,
   ShoppingCart, Coins, Timer, User, ArrowLeft, Bot,
-  ChevronRight, Bell, Sparkles,
+  Bell, Sparkles,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/logo'
 import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboard'
@@ -132,19 +132,16 @@ export default function VerifyCardPage() {
   const greetHour = new Date().getHours()
   const greeting = greetHour < 12 ? 'Bonjour' : greetHour < 18 ? 'Bon après-midi' : 'Bonsoir'
 
-  const mainServices: ServiceItem[] = [
-    { icon: Shield, title: 'Vérification d\'Identité', description: 'Voir les détails complets de ma carte', available: true, action: () => setActiveView('identity'), gradient: 'from-emerald-500/20 to-emerald-700/5' },
-    { icon: FileText, title: 'Mon Compte d\'Exploitation', description: 'Fiches techniques par culture', available: true, action: () => window.open('/marketplace', '_blank'), gradient: 'from-cyan-500/20 to-cyan-700/5' },
-    { icon: TrendingUp, title: 'Prix du Marché en Temps Réel', description: 'Cours actuels : Lomé, Kara, Sokodé...', available: true, action: () => setActiveView('prices'), gradient: 'from-violet-500/20 to-violet-700/5' },
-    { icon: Bot, title: 'Discuter avec l\'IA', description: 'AgriTogo : conseils, prix, cultures — votre assistant', available: true, highlight: true, action: () => setActiveView('ai'), gradient: 'from-amber-400/20 to-amber-600/5' },
-  ]
-
-  const moreServices: ServiceItem[] = [
-    { icon: PhoneCall, title: 'Contacter Mon Technicien', description: 'Technicien de mon canton', available: true, action: () => setActiveView('technicien'), gradient: 'from-emerald-500/20 to-emerald-700/5' },
-    { icon: Map, title: 'Mes Parcelles & GPS', description: 'Localisation et suivi', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
-    { icon: CloudRain, title: 'Alertes Météo', description: 'Prévisions et alertes', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
-    { icon: ShoppingCart, title: 'Commander des Intrants', description: 'Semences, engrais', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
-    { icon: Coins, title: 'Renouveler ma Cotisation', description: 'Gérer ma cotisation', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
+  const services: ServiceItem[] = [
+    { icon: Shield, title: 'Vérification', description: 'Détails de ma carte', available: true, action: () => setActiveView('identity'), gradient: 'from-emerald-500/20 to-emerald-700/5' },
+    { icon: FileText, title: 'Mon Exploitation', description: 'Fiches techniques', available: true, action: () => window.open('/marketplace', '_blank'), gradient: 'from-cyan-500/20 to-cyan-700/5' },
+    { icon: TrendingUp, title: 'Prix du Marché', description: 'Cours en temps réel', available: true, action: () => setActiveView('prices'), gradient: 'from-violet-500/20 to-violet-700/5' },
+    { icon: Bot, title: 'Assistant IA', description: 'Conseils & prévisions', available: true, highlight: true, action: () => setActiveView('ai'), gradient: 'from-amber-400/20 to-amber-600/5' },
+    { icon: PhoneCall, title: 'Mon Technicien', description: 'Appel & WhatsApp', available: true, action: () => setActiveView('technicien'), gradient: 'from-teal-500/20 to-teal-700/5' },
+    { icon: Map, title: 'Parcelles GPS', description: 'Suivi de mes parcelles', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
+    { icon: CloudRain, title: 'Alertes Météo', description: 'Prévisions & alertes', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
+    { icon: ShoppingCart, title: 'Intrants', description: 'Semences & engrais', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
+    { icon: Coins, title: 'Cotisation', description: 'Adhérer / Renouveler', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
   ]
 
   return (
@@ -243,50 +240,23 @@ export default function VerifyCardPage() {
               <span className="text-white/40 text-xs">Tout ce dont vous avez besoin.</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              {mainServices.map((s, i) => {
+            <div className="grid grid-cols-3 gap-2.5">
+              {services.map((s, i) => {
                 const Icon = s.icon
                 return (
-                  <button key={i} onClick={s.action} className={`vfp-card group text-left rounded-2xl p-4 flex flex-col justify-between min-h-[160px] ${!s.available ? 'opacity-50' : ''}`} disabled={!s.available}>
-                    <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${s.gradient} flex items-center justify-center mb-3 group-active:scale-90 transition-transform`}>
-                      <Icon className={`h-5 w-5 ${s.highlight ? 'text-amber-300' : 'text-[#5dffaa]'}`} />
+                  <button key={i} onClick={s.action} className={`vfp-card group text-left rounded-2xl p-3 flex flex-col items-center justify-center text-center min-h-[120px] ${!s.available ? 'opacity-40' : ''}`} disabled={!s.available}>
+                    <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${s.gradient} flex items-center justify-center mb-2 group-active:scale-90 transition-transform`}>
+                      <Icon className={`h-5 w-5 ${s.highlight ? 'text-amber-300' : s.available ? 'text-[#5dffaa]' : 'text-white/30'}`} />
                     </div>
-                    <div>
-                      <p className="text-white font-semibold text-[13px] leading-tight mb-1">{s.title}</p>
-                      <p className={`text-[10px] leading-snug ${s.highlight ? 'text-amber-300/60' : 'text-white/40'}`}>{s.description}</p>
-                    </div>
-                    <div className="flex justify-end mt-2">
-                      <div className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-[#34d399]/20 transition-colors">
-                        <ChevronRight className="h-3.5 w-3.5 text-white/50 group-hover:text-[#34d399] transition-colors" />
-                      </div>
-                    </div>
+                    <p className={`font-semibold text-[11px] leading-tight mb-0.5 ${s.available ? 'text-white' : 'text-white/40'}`}>{s.title}</p>
+                    <p className={`text-[9px] leading-snug ${s.highlight ? 'text-amber-300/50' : 'text-white/30'}`}>{s.description}</p>
+                    {!s.available && (
+                      <span className="mt-1.5 px-2 py-0.5 rounded-full bg-white/5 text-white/25 text-[7px] font-bold uppercase">Bientôt</span>
+                    )}
                   </button>
                 )
               })}
             </div>
-
-            {/* More services - compact */}
-            {moreServices.map((s, i) => {
-              const Icon = s.icon
-              return (
-                <button key={i} onClick={s.action} disabled={!s.available}
-                  className={`vfp-card w-full rounded-xl p-3 flex items-center gap-3 text-left mt-2 ${!s.available ? 'opacity-40' : ''}`}
-                >
-                  <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${s.gradient} flex items-center justify-center shrink-0`}>
-                    <Icon className={`h-4 w-4 ${s.available ? 'text-[#5dffaa]' : 'text-white/30'}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-[13px] font-medium ${s.available ? 'text-white' : 'text-white/40'}`}>{s.title}</p>
-                    <p className="text-[10px] text-white/30">{s.description}</p>
-                  </div>
-                  {s.available ? (
-                    <ChevronRight className="h-4 w-4 text-white/30 shrink-0" />
-                  ) : (
-                    <span className="px-2 py-0.5 rounded-full bg-white/5 text-white/30 text-[8px] font-bold uppercase shrink-0">Bientôt</span>
-                  )}
-                </button>
-              )
-            })}
           </section>
         )}
 
