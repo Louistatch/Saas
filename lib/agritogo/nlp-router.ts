@@ -65,57 +65,63 @@ const MARCHES: Record<string, string> = {
   'notsé': 'Notsé', 'notse': 'Notsé',
 }
 
-// ─── Intent rules (ordered by priority) ──────────────────────────
+// ─── Conversational markers → ALWAYS needs LLM ──────────────────
+const LLM_MARKERS = [
+  'comment', 'pourquoi', 'explique', 'aide', 'conseil',
+  'devrais', 'faut-il', 'est-ce que', 'est-ce qu',
+  'penses', 'pense', 'crois', 'recommande', 'suggère', 'suggere',
+  'que faire', 'quoi faire', 'mieux', 'meilleur',
+  'améliorer', 'ameliorer', 'optimiser', 'stratégie', 'strategie',
+  'avenir', 'futur', 'prochaine', 'saison',
+  'problème', 'probleme', 'difficulté', 'difficile',
+  'merci', 'ok', 'oui', 'non', 'd\'accord', 'compris',
+  'je veux', 'je souhaite', 'j\'aimerais', 'j\'ai',
+  'mon', 'ma', 'mes', 'notre', 'nos', // possessifs = contexte personnel → LLM
+]
+
+// ─── Intent rules (only SHORT factual queries are direct) ────────
 const INTENT_RULES: { keywords: string[]; intent: Intent; needsLLM: boolean }[] = [
-  // Salutations
+  // Salutations — direct, no LLM needed
   { keywords: ['bonjour', 'salut', 'bonsoir', 'hello', 'coucou', 'hey'],
     intent: 'salutation', needsLLM: false },
 
-  // Prix simple — most common query
-  { keywords: ['prix', 'coûte', 'coute', 'combien', 'tarif', 'vaut', 'cher', 'cours'],
+  // ONLY these very specific patterns go direct (must also pass the guards below):
+  // "prix du maïs", "combien coûte le riz", "tarif igname"
+  { keywords: ['prix', 'coûte', 'coute', 'combien', 'tarif'],
     intent: 'prix_simple', needsLLM: false },
 
-  // Tendance
-  { keywords: ['tendance', 'monte', 'descend', 'baisse', 'hausse', 'évolue', 'evolue', 'variation', 'augmente', 'diminue', 'stable'],
+  // "tendance maïs", "le riz monte ?"
+  { keywords: ['tendance'],
     intent: 'tendance', needsLLM: false },
 
-  // Prédiction rendement
-  { keywords: ['rendement', 'récolte', 'recolte', 'production', 'yield', 'productivité', 'hectare', 'ha'],
-    intent: 'prediction_rendement', needsLLM: false },
-
-  // Volatilité
-  { keywords: ['volatilité', 'volatilite', 'fluctuation', 'instable', 'garch'],
-    intent: 'volatilite', needsLLM: false },
-
-  // Risque financier
-  { keywords: ['risque', 'crédit', 'credit', 'emprunt', 'prêt', 'pret', 'rembourser', 'dette', 'financement'],
-    intent: 'risque_financier', needsLLM: false },
-
-  // Segmentation
-  { keywords: ['type agriculteur', 'catégorie', 'categorie', 'profil', 'segment', 'classif', 'groupe'],
-    intent: 'segmentation', needsLLM: false },
-
-  // KPI
-  { keywords: ['kpi', 'indicateur', 'performance', 'bilan', 'statistique', 'dashboard'],
-    intent: 'kpi', needsLLM: false },
-
-  // Listes
-  { keywords: ['quels produits', 'liste produits', 'produits disponibles', 'cultures disponibles'],
+  // "liste des produits", "quels produits"
+  { keywords: ['quels produits', 'liste produits', 'produits disponibles'],
     intent: 'liste_produits', needsLLM: false },
-  { keywords: ['quels marchés', 'liste marchés', 'marches disponibles', 'où acheter', 'où vendre'],
+  { keywords: ['quels marchés', 'liste marchés', 'marchés disponibles'],
     intent: 'liste_marches', needsLLM: false },
 
-  // Decision/Conseil (NEEDS LLM)
-  { keywords: ['vendre', 'acheter', 'stocker', 'moment', 'quand', 'stratégie', 'strategie', 'investir', 'décision', 'decision'],
+  // Everything else → LLM (agent handles it with full context)
+  { keywords: ['rendement', 'récolte', 'recolte', 'production', 'yield'],
+    intent: 'prediction_rendement', needsLLM: true },
+  { keywords: ['volatilité', 'volatilite', 'fluctuation', 'garch'],
+    intent: 'volatilite', needsLLM: true },
+  { keywords: ['risque', 'crédit', 'credit', 'emprunt', 'prêt', 'pret'],
+    intent: 'risque_financier', needsLLM: true },
+  { keywords: ['segmentation', 'type agriculteur', 'profil', 'catégorie'],
+    intent: 'segmentation', needsLLM: true },
+  { keywords: ['kpi', 'indicateur', 'performance', 'bilan', 'dashboard'],
+    intent: 'kpi', needsLLM: true },
+  { keywords: ['vendre', 'acheter', 'stocker', 'investir', 'décision'],
     intent: 'conseil_decision', needsLLM: true },
-
-  // Conseil général (NEEDS LLM)
-  { keywords: ['conseil', 'aide', 'comment', 'quoi faire', 'recommand', 'suggère', 'suggere', 'explique', 'pourquoi'],
-    intent: 'conseil_general', needsLLM: true },
+  { keywords: ['monte', 'descend', 'baisse', 'hausse', 'augmente', 'diminue', 'stable'],
+    intent: 'tendance', needsLLM: true },
 ]
 
 /**
  * Parse a French agricultural query into structured intent + entities.
+ *
+ * KEY PRINCIPLE: default to LLM. Only short, purely factual queries go direct.
+ * "prix maïs" → direct. "comment évolue le prix du maïs cette saison?" → LLM.
  */
 export function parseQuery(message: string): ParsedQuery {
   const raw = message.trim()
@@ -157,7 +163,22 @@ export function parseQuery(message: string): ParsedQuery {
     quantite = qteMatch[0]
   }
 
-  // Detect intent
+  // ─── GUARD 1: Conversational markers → ALWAYS LLM ─────────────
+  const hasConversationalMarker = LLM_MARKERS.some(marker => {
+    const normalizedMarker = marker.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    return q.includes(normalizedMarker)
+  })
+
+  // ─── GUARD 2: Long messages (>10 words) → ALWAYS LLM ──────────
+  const wordCount = raw.split(/\s+/).length
+  const isLong = wordCount > 10
+
+  // ─── GUARD 3: Questions with ? → likely needs explanation → LLM
+  // UNLESS it's a pure "combien coûte X?" pattern
+  const hasQuestionMark = raw.includes('?')
+  const isPureFactualQuestion = hasQuestionMark && wordCount <= 6 && !hasConversationalMarker
+
+  // ─── Detect intent ─────────────────────────────────────────────
   let intent: Intent = 'conseil_general'
   let needsLLM = true
   let confidence = 0.3
@@ -175,12 +196,26 @@ export function parseQuery(message: string): ParsedQuery {
     }
   }
 
-  // Boost confidence if we extracted entities matching the intent
-  if (produit && ['prix_simple', 'tendance', 'volatilite'].includes(intent)) {
+  // ─── Apply guards: force LLM when conversation detected ────────
+  if (hasConversationalMarker || isLong) {
+    needsLLM = true
+    confidence = Math.min(confidence, 0.7)
+  }
+
+  // ─── Only allow direct (no LLM) for very short factual queries ─
+  // "prix maïs" (2 words) → direct
+  // "quel est le prix actuel du maïs sur le marché de Kara?" (12 words) → LLM
+  if (!needsLLM && wordCount > 8) {
+    needsLLM = true
+  }
+
+  // Salutation is always direct regardless of length
+  if (intent === 'salutation') {
+    needsLLM = false
     confidence = 0.95
   }
 
-  // High stakes → force LLM even if simple intent matched
+  // High stakes amount → force LLM
   if (montant && montant >= 100000) {
     needsLLM = true
     intent = 'conseil_decision'
