@@ -9,8 +9,8 @@ import { AuthButtons } from '@/components/shared/auth-buttons'
 const headerLinks = [
   { href: '/produit', label: 'Produit' },
   { href: '/marketplace', label: 'Comptes d\'exploitation' },
+  { href: '/pricing', label: 'Tarifs' },
   { href: '/securite', label: 'Sécurité' },
-  { href: '/entreprise', label: 'Entreprise' },
   { href: '/a-propos', label: 'À propos' },
   { href: '/contact', label: 'Contact' },
 ]
@@ -21,6 +21,7 @@ const footerColumns = [
     links: [
       { href: '/produit', label: 'Produit' },
       { href: '/marketplace', label: 'Comptes d\'exploitation' },
+      { href: '/pricing', label: 'Tarifs' },
       { href: '/securite', label: 'Sécurité' },
       { href: '/blog', label: 'Blog' },
     ],

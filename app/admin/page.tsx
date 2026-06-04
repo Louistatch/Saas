@@ -112,10 +112,10 @@ export default function AdminOverview() {
   }, [fetchStats])
 
   const statCards = [
-    { title: 'Total coopératives', value: stats.totalCooperatives, icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50', href: '/admin/cooperatives' },
-    { title: 'Total membres', value: stats.totalMembers, icon: Users, color: 'text-green-600', bg: 'bg-green-50', href: '/admin/users' },
-    { title: 'Fiches techniques', value: stats.totalExploitations, icon: ShoppingCart, color: 'text-purple-600', bg: 'bg-purple-50', href: '/admin/analytics' },
-    { title: 'Cartes actives', value: stats.totalCards, icon: CreditCard, color: 'text-orange-600', bg: 'bg-orange-50', href: '/admin/analytics' },
+    { title: 'Total coopératives', value: stats.totalCooperatives, icon: Building2, color: 'text-primary', bg: 'bg-primary/10', href: '/admin/cooperatives' },
+    { title: 'Total membres', value: stats.totalMembers, icon: Users, color: 'text-primary', bg: 'bg-primary/15', href: '/admin/users' },
+    { title: 'Fiches techniques', value: stats.totalExploitations, icon: ShoppingCart, color: 'text-accent-foreground', bg: 'bg-accent/20', href: '/admin/analytics' },
+    { title: 'Cartes actives', value: stats.totalCards, icon: CreditCard, color: 'text-muted-foreground', bg: 'bg-muted', href: '/admin/analytics' },
   ]
 
   return (
@@ -170,7 +170,7 @@ export default function AdminOverview() {
                         {timeAgo(coop.created_at)}
                       </p>
                     </div>
-                    <span className="px-2 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full ml-3 shrink-0">
+                    <span className="px-2 py-1 text-xs font-semibold text-primary bg-primary/10 rounded-full ml-3 shrink-0">
                       Actif
                     </span>
                   </div>

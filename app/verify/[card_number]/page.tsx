@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 import {
   CheckCircle, XCircle, Shield, MapPin, Building2,
   FileText, TrendingUp, PhoneCall, Map, CloudRain,
@@ -100,7 +101,7 @@ export default function VerifyCardPage() {
         <style>{vfpStyles}</style>
         <div className="text-center">
           <div className="vfp-loader mx-auto mb-4" />
-          <p className="text-[#7fd9a5] text-sm font-medium tracking-wide">Vérification en cours...</p>
+          <p className="text-[var(--vfp-accent-dim)] text-sm font-medium tracking-wide">Vérification en cours...</p>
         </div>
       </div>
     )
@@ -111,12 +112,12 @@ export default function VerifyCardPage() {
       <div className="min-h-screen vfp-bg flex items-center justify-center px-6">
         <style>{vfpStyles}</style>
         <div className="text-center max-w-xs">
-          <div className="w-16 h-16 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center mx-auto mb-4">
-            <Timer className="h-7 w-7 text-orange-400" />
+          <div className="w-16 h-16 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-center justify-center mx-auto mb-4">
+            <Timer className="h-7 w-7 text-destructive" />
           </div>
           <h2 className="text-xl font-bold text-white mb-2">Session expirée</h2>
           <p className="text-white/50 text-sm mb-6">Scannez à nouveau la carte pour accéder aux services.</p>
-          <a href={`/verify/${cardNumber}`} className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#1ed760] text-[#04140b] font-bold text-sm">
+          <a href={`/verify/${cardNumber}`} className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[var(--vfp-cta)] text-[var(--vfp-cta-fg)] font-bold text-sm">
             Rescanner la carte
           </a>
         </div>
@@ -134,7 +135,7 @@ export default function VerifyCardPage() {
   const greeting = greetHour < 12 ? 'Bonjour' : greetHour < 18 ? 'Bon après-midi' : 'Bonsoir'
 
   const services: ServiceItem[] = [
-    { icon: Shield, title: 'Vérification', description: 'Détails de ma carte', available: true, action: () => setActiveView('identity'), gradient: 'from-emerald-500/20 to-emerald-700/5' },
+    { icon: Shield, title: 'Vérification', description: 'Détails de ma carte', available: true, action: () => setActiveView('identity'), gradient: 'from-[var(--vfp-accent)]/20 to-[var(--vfp-accent)]/5' },
     { icon: FileText, title: 'Mon Exploitation', description: 'Fiches techniques', available: true, action: () => window.open('/marketplace', '_blank'), gradient: 'from-cyan-500/20 to-cyan-700/5' },
     { icon: TrendingUp, title: 'Prix du Marché', description: 'Cours en temps réel', available: true, action: () => setActiveView('prices'), gradient: 'from-violet-500/20 to-violet-700/5' },
     { icon: Bot, title: 'Assistant IA', description: 'Conseils & prévisions', available: true, highlight: true, action: () => setActiveView('ai'), gradient: 'from-amber-400/20 to-amber-600/5' },
@@ -151,8 +152,8 @@ export default function VerifyCardPage() {
 
       {/* Ambient glow */}
       <div className="absolute inset-0 pointer-events-none" style={{ transform: 'translateZ(0)', zIndex: 0 }}>
-        <div className="absolute top-[-20%] right-[-15%] w-[500px] h-[500px] rounded-full bg-[#10b981]/8 blur-[100px]" />
-        <div className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full bg-[#0d9b5e]/12 blur-[80px]" />
+        <div className="absolute top-[-20%] right-[-15%] w-[500px] h-[500px] rounded-full bg-[var(--vfp-accent)]/[0.08] blur-[100px]" />
+        <div className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full bg-[var(--vfp-accent)]/[0.12] blur-[80px]" />
       </div>
 
       <div className="relative z-10 max-w-md mx-auto px-4 pt-4 pb-8 space-y-5">
@@ -160,16 +161,18 @@ export default function VerifyCardPage() {
         {/* ─── Premium Header ─── */}
         <header className="flex items-center justify-between vfp-enter">
           <div className="flex items-center gap-3">
-            <button className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Menu">
-              <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><path d="M1 1h16M1 7h10M1 13h14" stroke="#9bffc8" strokeWidth="1.6" strokeLinecap="round"/></svg>
-            </button>
-            <Logo size="sm" textClassName="text-white" />
+            <Link href="/" className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Accueil">
+              <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><path d="M1 1h16M1 7h10M1 13h14" stroke="var(--vfp-accent)" strokeWidth="1.6" strokeLinecap="round"/></svg>
+            </Link>
+            <Link href="/">
+              <Logo size="sm" textClassName="text-white" />
+            </Link>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center relative">
               <Bell className="h-4.5 w-4.5 text-white/60" />
             </div>
-            <div className="w-10 h-10 rounded-full vfp-glass-subtle flex items-center justify-center border-2 border-emerald-500/30">
+            <div className="w-10 h-10 rounded-full vfp-glass-subtle flex items-center justify-center border-2 border-[var(--vfp-accent)]/30">
               {result.member?.photo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={result.member.photo_url} alt="" className="w-full h-full rounded-full object-cover" />
@@ -188,18 +191,18 @@ export default function VerifyCardPage() {
                 <p className="text-white/60 text-sm mb-1">{greeting}, {firstName} ! 👋</p>
                 <h1 className="text-[26px] font-bold text-white leading-tight">
                   Votre espace,<br/>
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#34d399] to-[#6ee7b7]">votre succès.</span>
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--vfp-accent)] to-[var(--vfp-accent-dim)]">votre succès.</span>
                 </h1>
                 <p className="text-white/40 text-sm mt-2">Gérez, développez et prospérez avec FaîtiereHub.</p>
               </div>
               <div className="vfp-glass-subtle rounded-2xl px-4 py-3 text-center shrink-0">
-                <div className="w-10 h-10 rounded-full bg-emerald-500/15 flex items-center justify-center mx-auto mb-1.5">
-                  <CheckCircle className="h-5 w-5 text-[#34d399] vfp-pop" />
+                <div className="w-10 h-10 rounded-full bg-[var(--vfp-accent)]/15 flex items-center justify-center mx-auto mb-1.5">
+                  <CheckCircle className="h-5 w-5 text-[var(--vfp-accent)] vfp-pop" />
                 </div>
                 <p className="text-white text-sm font-semibold">Compte vérifié</p>
                 <div className="flex items-center gap-1 justify-center mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#34d399] animate-pulse" />
-                  <span className="text-[#7fd9a5] text-[9px]">Membre actif</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--vfp-accent)] animate-pulse" />
+                  <span className="text-[var(--vfp-accent-dim)] text-[9px]">Membre actif</span>
                 </div>
               </div>
             </div>
@@ -235,7 +238,7 @@ export default function VerifyCardPage() {
           <section className={`transition-all duration-700 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`} style={{ transitionDelay: '300ms' }}>
             <div className="flex items-center justify-between mb-3 px-1">
               <div className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#34d399]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--vfp-accent)]" />
                 <h3 className="text-white font-semibold text-[15px]">Mes services</h3>
               </div>
               <span className="text-white/40 text-sm">Tout ce dont vous avez besoin.</span>
@@ -247,7 +250,7 @@ export default function VerifyCardPage() {
                 return (
                   <button key={i} onClick={s.action} className={`vfp-card group text-left rounded-2xl p-3 flex flex-col items-center justify-center text-center min-h-[120px] ${!s.available ? 'opacity-40' : ''}`} disabled={!s.available}>
                     <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${s.gradient} flex items-center justify-center mb-2 group-active:scale-90 transition-transform`}>
-                      <Icon className={`h-5 w-5 ${s.highlight ? 'text-amber-300' : s.available ? 'text-[#5dffaa]' : 'text-white/30'}`} />
+                      <Icon className={`h-5 w-5 ${s.highlight ? 'text-amber-300' : s.available ? 'text-[var(--vfp-accent-bright)]' : 'text-white/30'}`} />
                     </div>
                     <p className={`font-semibold text-[13px] leading-tight mb-0.5 ${s.available ? 'text-white' : 'text-white/40'}`}>{s.title}</p>
                     <p className={`text-[9px] leading-snug ${s.highlight ? 'text-amber-300/50' : 'text-white/30'}`}>{s.description}</p>
@@ -266,7 +269,7 @@ export default function VerifyCardPage() {
         {/* ─── Prices Full View ─── */}
         {isValid && activeView === 'prices' && (
           <div className="space-y-4 vfp-enter">
-            <button onClick={() => setActiveView('menu')} className="flex items-center gap-2 text-[#34d399] text-sm font-medium active:opacity-70">
+            <button onClick={() => setActiveView('menu')} className="flex items-center gap-2 text-[var(--vfp-accent)] text-sm font-medium active:opacity-70">
               <ArrowLeft className="h-4 w-4" /> Retour
             </button>
             <MarketPricesDashboard />
@@ -276,34 +279,34 @@ export default function VerifyCardPage() {
         {/* ─── Identity View ─── */}
         {isValid && activeView === 'identity' && result.member && (
           <div className="space-y-4 vfp-enter">
-            <button onClick={() => setActiveView('menu')} className="flex items-center gap-2 text-[#34d399] text-sm font-medium active:opacity-70">
+            <button onClick={() => setActiveView('menu')} className="flex items-center gap-2 text-[var(--vfp-accent)] text-sm font-medium active:opacity-70">
               <ArrowLeft className="h-4 w-4" /> Retour
             </button>
             <h3 className="text-white text-lg font-bold">Vérification d&apos;Identité</h3>
             <div className="vfp-card rounded-2xl p-5 space-y-4">
               <div className="flex items-center gap-4">
-                <div className="w-20 h-20 rounded-full overflow-hidden border-[3px] border-[#34d399]/40">
+                <div className="w-20 h-20 rounded-full overflow-hidden border-[3px] border-[var(--vfp-accent)]/40">
                   {result.member.photo_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={result.member.photo_url} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full bg-emerald-500/10 flex items-center justify-center"><User className="h-9 w-9 text-[#34d399]/60" /></div>
+                    <div className="w-full h-full bg-[var(--vfp-accent)]/10 flex items-center justify-center"><User className="h-9 w-9 text-[var(--vfp-accent)]/60" /></div>
                   )}
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-white">{result.member.first_name ?? ''} <span className="uppercase">{result.member.last_name ?? ''}</span></h2>
-                  <p className="text-[#34d399]/70 text-xs font-mono">{result.card?.card_number}</p>
-                  <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                    <CheckCircle className="h-3 w-3 text-[#34d399]" />
-                    <span className="text-[10px] font-bold text-[#34d399] uppercase">Membre vérifié</span>
+                  <p className="text-[var(--vfp-accent)]/70 text-xs font-mono">{result.card?.card_number}</p>
+                  <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--vfp-accent)]/10 border border-[var(--vfp-accent)]/20">
+                    <CheckCircle className="h-3 w-3 text-[var(--vfp-accent)]" />
+                    <span className="text-[10px] font-bold text-[var(--vfp-accent)] uppercase">Membre vérifié</span>
                   </div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 pt-2">
                 {/* ── Localisation ── */}
                 <div className="col-span-2 flex items-center gap-2 mt-1">
-                  <MapPin className="h-3.5 w-3.5 text-[#34d399]" />
-                  <span className="text-[11px] text-[#34d399] font-semibold uppercase tracking-wider">Localisation</span>
+                  <MapPin className="h-3.5 w-3.5 text-[var(--vfp-accent)]" />
+                  <span className="text-[11px] text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">Localisation</span>
                 </div>
                 <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
                   <span className="text-[9px] text-white/40 uppercase font-semibold tracking-wider">Région</span>
@@ -323,8 +326,8 @@ export default function VerifyCardPage() {
                 </div>
                 {/* ── Organisation ── */}
                 <div className="col-span-2 flex items-center gap-2 mt-2">
-                  <Building2 className="h-3.5 w-3.5 text-[#34d399]" />
-                  <span className="text-[11px] text-[#34d399] font-semibold uppercase tracking-wider">Organisation</span>
+                  <Building2 className="h-3.5 w-3.5 text-[var(--vfp-accent)]" />
+                  <span className="text-[11px] text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">Organisation</span>
                 </div>
                 <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
                   <span className="text-[9px] text-white/40 uppercase font-semibold tracking-wider">Coopérative</span>
@@ -342,7 +345,7 @@ export default function VerifyCardPage() {
         {/* ─── Technicien View ─── */}
         {isValid && activeView === 'technicien' && (
           <div className="space-y-4 vfp-enter">
-            <button onClick={() => setActiveView('menu')} className="flex items-center gap-2 text-[#34d399] text-sm font-medium active:opacity-70">
+            <button onClick={() => setActiveView('menu')} className="flex items-center gap-2 text-[var(--vfp-accent)] text-sm font-medium active:opacity-70">
               <ArrowLeft className="h-4 w-4" /> Retour
             </button>
             <h3 className="text-white text-lg font-bold">Contacter Mon Technicien</h3>
@@ -356,8 +359,8 @@ export default function VerifyCardPage() {
             {contacts && contacts.length > 0 && contacts.map((c, i) => (
               <div key={i} className="vfp-card rounded-2xl p-4 space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-500/15 flex items-center justify-center">
-                    <User className="h-5 w-5 text-[#34d399]" />
+                  <div className="w-10 h-10 rounded-full bg-[var(--vfp-accent)]/15 flex items-center justify-center">
+                    <User className="h-5 w-5 text-[var(--vfp-accent)]" />
                   </div>
                   <div>
                     <p className="text-white font-semibold text-sm">{c.name}</p>
@@ -365,7 +368,7 @@ export default function VerifyCardPage() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <a href={`tel:${c.phone}`} className="flex-1 py-2.5 rounded-xl bg-[#1ed760] text-[#04140b] text-xs font-bold text-center active:scale-95 transition-transform">📞 Appeler</a>
+                  <a href={`tel:${c.phone}`} className="flex-1 py-2.5 rounded-xl bg-[var(--vfp-cta)] text-[var(--vfp-cta-fg)] text-xs font-bold text-center active:scale-95 transition-transform">📞 Appeler</a>
                   <a href={`https://wa.me/${waNumber(c.phone)}`} target="_blank" rel="noopener noreferrer" className="flex-1 py-2.5 rounded-xl bg-[#25D366]/15 text-[#25D366] text-xs font-bold text-center border border-[#25D366]/20 active:scale-95 transition-transform">💬 WhatsApp</a>
                 </div>
               </div>
@@ -385,7 +388,7 @@ export default function VerifyCardPage() {
               <Timer className="h-4 w-4 text-white/30 shrink-0" />
               <div className="flex-1">
                 <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
-                  <div className="h-full rounded-full bg-gradient-to-r from-[#34d399] to-[#10b981] transition-all duration-1000" style={{ width: `${(timeLeft / 600) * 100}%` }} />
+                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${(timeLeft / 600) * 100}%`, background: 'linear-gradient(to right, var(--vfp-accent), var(--vfp-accent-dim))' }} />
                 </div>
               </div>
               <span className="text-white/30 text-[11px] font-mono shrink-0">{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
@@ -400,10 +403,17 @@ export default function VerifyCardPage() {
 
 /* ─── Premium Styles ─── */
 const vfpStyles = `
+  :root {
+    --vfp-accent: oklch(0.72 0.18 142);
+    --vfp-accent-dim: oklch(0.58 0.14 142);
+    --vfp-accent-bright: oklch(0.84 0.16 142);
+    --vfp-cta: oklch(0.75 0.20 142);
+    --vfp-cta-fg: oklch(0.10 0.03 142);
+  }
   .vfp-bg {
     background:
-      radial-gradient(80% 55% at 18% 8%, rgba(16,185,129,.10), transparent 60%),
-      radial-gradient(60% 45% at 85% 90%, rgba(13,155,94,.12), transparent 60%),
+      radial-gradient(80% 55% at 18% 8%, oklch(0.45 0.18 142 / 0.10), transparent 60%),
+      radial-gradient(60% 45% at 85% 90%, oklch(0.40 0.16 142 / 0.12), transparent 60%),
       linear-gradient(180deg, #040f0a 0%, #071a12 45%, #04120b 100%);
   }
   .vfp-bg::before {
@@ -426,14 +436,14 @@ const vfpStyles = `
     transition: transform .2s cubic-bezier(.2,.7,.2,1), border-color .2s, box-shadow .2s;
   }
   .vfp-card:active:not(:disabled) { transform: scale(.97); }
-  .vfp-card:hover:not(:disabled) { border-color: rgba(52,211,153,.25); box-shadow: 0 4px 24px -8px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.06), 0 0 0 1px rgba(52,211,153,.08); }
+  .vfp-card:hover:not(:disabled) { border-color: oklch(0.72 0.18 142 / 0.25); box-shadow: 0 4px 24px -8px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.06), 0 0 0 1px oklch(0.72 0.18 142 / 0.08); }
   .vfp-enter { animation: vfpIn .5s cubic-bezier(.2,.7,.2,1) both; }
   @keyframes vfpIn { from { opacity:0; transform: translateY(12px); } to { opacity:1; transform: none; } }
   .vfp-pop { animation: vfpPop .5s cubic-bezier(.2,1.4,.4,1) .3s both; }
   @keyframes vfpPop { 0% { transform: scale(0); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
   .vfp-loader {
-    width: 32px; height: 32px; border: 2.5px solid rgba(52,211,153,.15);
-    border-top-color: #34d399; border-radius: 50%;
+    width: 32px; height: 32px; border: 2.5px solid oklch(0.72 0.18 142 / 0.15);
+    border-top-color: var(--vfp-accent); border-radius: 50%;
     animation: vfpSpin .7s linear infinite;
   }
   @keyframes vfpSpin { to { transform: rotate(360deg); } }
