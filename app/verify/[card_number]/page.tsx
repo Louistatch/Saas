@@ -300,25 +300,40 @@ export default function VerifyCardPage() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 pt-2">
-                {[
-                  { icon: MapPin, label: 'Village', value: result.member.village ?? '—' },
-                  { icon: MapPin, label: 'Canton', value: result.member.canton ?? '—' },
-                  { icon: MapPin, label: 'Préfecture', value: result.member.prefecture ?? '—' },
-                  { icon: MapPin, label: 'Région', value: result.member.region ?? '—' },
-                  { icon: Building2, label: 'Coopérative', value: result.cooperative?.name ?? '—' },
-                  { icon: Building2, label: 'Faîtière', value: result.cooperative?.faitiere_name ?? '—' },
-                ].map((item, i) => {
-                  const IIcon = item.icon
-                  return (
-                    <div key={i} className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <IIcon className="h-3 w-3 text-white/30" />
-                        <span className="text-[9px] text-white/40 uppercase font-semibold tracking-wider">{item.label}</span>
-                      </div>
-                      <p className="text-white text-sm font-medium leading-tight">{item.value}</p>
-                    </div>
-                  )
-                })}
+                {/* ── Localisation ── */}
+                <div className="col-span-2 flex items-center gap-2 mt-1">
+                  <MapPin className="h-3.5 w-3.5 text-[#34d399]" />
+                  <span className="text-[11px] text-[#34d399] font-semibold uppercase tracking-wider">Localisation</span>
+                </div>
+                <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
+                  <span className="text-[9px] text-white/40 uppercase font-semibold tracking-wider">Région</span>
+                  <p className="text-white text-sm font-semibold mt-0.5">{result.member.region ?? '—'}</p>
+                </div>
+                <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
+                  <span className="text-[9px] text-white/40 uppercase font-semibold tracking-wider">Préfecture</span>
+                  <p className="text-white text-sm font-medium mt-0.5">{result.member.prefecture ?? '—'}</p>
+                </div>
+                <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
+                  <span className="text-[9px] text-white/40 uppercase font-semibold tracking-wider">Canton</span>
+                  <p className="text-white text-sm font-medium mt-0.5">{result.member.canton ?? '—'}</p>
+                </div>
+                <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
+                  <span className="text-[9px] text-white/40 uppercase font-semibold tracking-wider">Village</span>
+                  <p className="text-white text-sm font-medium mt-0.5">{result.member.village ?? '—'}</p>
+                </div>
+                {/* ── Organisation ── */}
+                <div className="col-span-2 flex items-center gap-2 mt-2">
+                  <Building2 className="h-3.5 w-3.5 text-[#34d399]" />
+                  <span className="text-[11px] text-[#34d399] font-semibold uppercase tracking-wider">Organisation</span>
+                </div>
+                <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
+                  <span className="text-[9px] text-white/40 uppercase font-semibold tracking-wider">Coopérative</span>
+                  <p className="text-white text-sm font-semibold mt-0.5">{result.cooperative?.name ?? '—'}</p>
+                </div>
+                <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
+                  <span className="text-[9px] text-white/40 uppercase font-semibold tracking-wider">Faîtière</span>
+                  <p className="text-white text-sm font-semibold mt-0.5">{result.cooperative?.faitiere_name ?? '—'}</p>
+                </div>
               </div>
             </div>
           </div>
