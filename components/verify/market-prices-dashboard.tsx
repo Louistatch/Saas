@@ -90,16 +90,16 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
   }, [])
 
   // Fetch prices for a location
-  const fetchPrices = useCallback(async (regionId: string, marketName?: string) => {
+  const fetchPrices = useCallback(async (regionId: string, cantonId?: string) => {
     setLoading(true)
     const controller = new AbortController()
     try {
-      const res = await fetch(`/api/market-prices?region_id=${regionId}`, { signal: controller.signal })
+      let url = `/api/market-prices?region_id=${regionId}`
+      if (cantonId) url += `&canton_id=${cantonId}`
+      const res = await fetch(url, { signal: controller.signal })
       const data = await res.json()
       if (!controller.signal.aborted) {
-        let filtered = data.prices ?? []
-        if (marketName) filtered = filtered.filter((p: MarketPrice) => p.market_name === marketName)
-        setPrices(filtered)
+        setPrices(data.prices ?? [])
       }
     } catch (e: unknown) { if (!(e instanceof Error && e.name === 'AbortError')) setPrices([]) }
     if (!controller.signal.aborted) setLoading(false)
@@ -120,7 +120,7 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
   const handleSelectCanton = (canton: Canton) => {
     setSelectedCanton(canton)
     setStep('prices')
-    if (selectedRegion) fetchPrices(selectedRegion.id, canton.name)
+    if (selectedRegion) fetchPrices(selectedRegion.id, canton.id)
   }
 
   const handleSubmitPrice = async () => {

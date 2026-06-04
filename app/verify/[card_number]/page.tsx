@@ -6,7 +6,7 @@ import {
   CheckCircle, XCircle, Shield, MapPin, Building2,
   FileText, TrendingUp, PhoneCall, Map, CloudRain,
   ShoppingCart, Coins, Timer, User, ArrowLeft, Bot,
-  Bell, Sparkles,
+  Bell,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/logo'
 import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboard'
@@ -261,30 +261,7 @@ export default function VerifyCardPage() {
           </section>
         )}
 
-        {/* ─── Market Prices Widget (inline on menu) ─── */}
-        {isValid && activeView === 'menu' && (
-          <section className={`transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '400ms' }}>
-            <MarketPricesDashboard compact onSeeMore={() => setActiveView('prices')} />
-          </section>
-        )}
-
-        {/* ─── AI CTA Banner ─── */}
-        {isValid && activeView === 'menu' && (
-          <section className={`transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '500ms' }}>
-            <button onClick={() => setActiveView('ai')} className="vfp-card w-full rounded-2xl p-4 flex items-center gap-4 text-left group">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400/20 to-emerald-500/10 flex items-center justify-center shrink-0">
-                <Sparkles className="h-5 w-5 text-amber-300 group-hover:scale-110 transition-transform" />
-              </div>
-              <div className="flex-1">
-                <p className="text-white font-semibold text-sm">Besoin d&apos;aide ou de conseils ?</p>
-                <p className="text-white/40 text-[11px]">Discutez avec AgriTogo, votre assistant IA.</p>
-              </div>
-              <div className="px-4 py-2 rounded-full bg-[#1ed760] text-[#04140b] font-bold text-xs shrink-0 group-active:scale-95 transition-transform">
-                Commencer
-              </div>
-            </button>
-          </section>
-        )}
+        {/* Market prices and AI accessible via the service grid above — no duplication */}
 
         {/* ─── Prices Full View ─── */}
         {isValid && activeView === 'prices' && (

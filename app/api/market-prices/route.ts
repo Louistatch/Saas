@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
   const regionId = searchParams.get('region_id')
   const cultureId = searchParams.get('culture_id')
   const prefectureId = searchParams.get('prefecture_id')
+  const cantonId = searchParams.get('canton_id')
 
   const supabase = await createClient()
 
@@ -69,28 +70,20 @@ export async function GET(request: NextRequest) {
       .eq('prefecture_id', prefectureId)
       .order('name')
     
-    // Get the region_id for this prefecture
-    const { data: pref } = await supabase
-      .from('prefectures')
-      .select('region_id')
-      .eq('id', prefectureId)
-      .maybeSingle()
-    
-    // Count prices per canton
-    let cantonCounts: { market_name: string }[] = []
-    if (pref?.region_id) {
+    // Count prices per canton using canton_id (reliable, no accent issues)
+    const cantonIds = (data ?? []).map(c => c.id)
+    let cantonCounts: { canton_id: string }[] = []
+    if (cantonIds.length > 0) {
       const { data: prices } = await supabase
         .from('market_prices')
-        .select('market_name')
-        .eq('region_id', pref.region_id)
+        .select('canton_id')
+        .in('canton_id', cantonIds)
       cantonCounts = prices ?? []
     }
     
     const cantonsWithCounts = (data ?? []).map(c => ({
       ...c,
-      priceCount: cantonCounts.filter(pc => 
-        pc.market_name?.toLowerCase() === c.name.toLowerCase()
-      ).length,
+      priceCount: cantonCounts.filter(pc => pc.canton_id === c.id).length,
     }))
     
     return NextResponse.json({ cantons: cantonsWithCounts })
@@ -104,6 +97,7 @@ export async function GET(request: NextRequest) {
 
   if (regionId) query = query.eq('region_id', regionId)
   if (cultureId) query = query.eq('culture_id', cultureId)
+  if (cantonId) query = query.eq('canton_id', cantonId)
 
   const { data, error } = await query.limit(200)
 
