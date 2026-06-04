@@ -169,17 +169,21 @@ export async function enrollNewMemberFromSubmission(
         // Auto-create cooperative
         const { data: faitiereData } = await supabase
           .from('cooperatives')
-          .select('faitiere_name')
+          .select('faitiere_name, name')
           .eq('id', faitiereId)
           .maybeSingle()
 
+        // Use the faitière's own name as label if faitiere_name column is empty
+        const faitiereName = faitiereData?.faitiere_name ?? faitiereData?.name ?? null
+
         let parentUnionId: string | null = faitiereId
         if (region) {
+          // Query unions by parent_id (generic — works for any faîtière)
           const { data: unions } = await supabase
             .from('cooperatives')
             .select('id, name')
             .eq('level', 'union')
-            .eq('faitiere_name', faitiereData?.faitiere_name ?? 'FENOMAT')
+            .eq('parent_id', faitiereId)
           if (unions) {
             const match = (unions as { id: string; name: string }[]).find(
               (u) => u.name.toLowerCase().includes(region.toLowerCase()),
@@ -194,7 +198,7 @@ export async function enrollNewMemberFromSubmission(
             name: parsedName.data,
             level: 'cooperative',
             parent_id: parentUnionId,
-            faitiere_name: faitiereData?.faitiere_name ?? 'FENOMAT',
+            faitiere_name: faitiereName,
           })
           .select('id')
           .single()

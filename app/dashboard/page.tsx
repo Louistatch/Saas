@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { BarChart3, Users, ShoppingCart, CreditCard, ArrowRight } from 'lucide-react'
@@ -95,17 +95,33 @@ export default function DashboardPage() {
     fetchStats()
   }, [fetchStats])
 
+  // Realtime: refresh when members or cards change (Kobo webhooks)
+  const fetchStatsRef = useRef(fetchStats)
+  useEffect(() => { fetchStatsRef.current = fetchStats }, [fetchStats])
+
+  useEffect(() => {
+    if (!currentCooperative) return
+    const coopId = currentCooperative.id
+    const channel = supabase
+      .channel(`dashboard-realtime-${coopId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `cooperative_id=eq.${coopId}` }, () => fetchStatsRef.current())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'member_cards', filter: `cooperative_id=eq.${coopId}` }, () => fetchStatsRef.current())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fiches_techniques', filter: `cooperative_id=eq.${coopId}` }, () => fetchStatsRef.current())
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [currentCooperative?.id, supabase])
+
   const dotColor: Record<RecentItem['type'], string> = {
-    member: 'bg-blue-500',
-    card: 'bg-green-500',
-    exploitation: 'bg-purple-500',
+    member: 'bg-primary',
+    card: 'bg-accent',
+    exploitation: 'bg-muted-foreground',
   }
 
   const statCards = [
-    { title: 'Total membres', value: stats.totalMembers, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', href: '/dashboard/members' },
-    { title: 'Cartes actives', value: stats.activeCards, icon: CreditCard, color: 'text-green-600', bg: 'bg-green-50', href: '/dashboard/cards' },
-    { title: 'Fiches techniques', value: stats.totalExploitations, icon: ShoppingCart, color: 'text-purple-600', bg: 'bg-purple-50', href: '/dashboard/marketplace' },
-    { title: 'Statistiques', value: '→', icon: BarChart3, color: 'text-orange-600', bg: 'bg-orange-50', href: '/dashboard/analytics' },
+    { title: 'Total membres', value: stats.totalMembers, icon: Users, color: 'text-primary', bg: 'bg-primary/10', href: '/dashboard/members' },
+    { title: 'Cartes actives', value: stats.activeCards, icon: CreditCard, color: 'text-primary', bg: 'bg-primary/15', href: '/dashboard/cards' },
+    { title: 'Fiches techniques', value: stats.totalExploitations, icon: ShoppingCart, color: 'text-accent-foreground', bg: 'bg-accent/20', href: '/dashboard/marketplace' },
+    { title: 'Statistiques', value: '→', icon: BarChart3, color: 'text-muted-foreground', bg: 'bg-muted', href: '/dashboard/analytics' },
   ]
 
   return (
