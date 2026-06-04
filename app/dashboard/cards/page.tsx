@@ -52,7 +52,7 @@ export default function CardsPage() {
 
   // Cards/members state
   const [cards, setCards] = useState<MemberCard[]>([])
-  const [members, setMembers] = useState<Pick<Member, 'id' | 'first_name' | 'last_name' | 'photo_url'>[]>([])
+  const [members, setMembers] = useState<(Pick<Member, 'id' | 'first_name' | 'last_name' | 'photo_url'> & { signature_url?: string | null })[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounced(search, 200)
@@ -89,7 +89,7 @@ export default function CardsPage() {
   }, [isFaitiereAdmin, currentCooperative, cooperatives])
 
   // Members filtered by selected cooperative (for faîtière admins)
-  const [allMembers, setAllMembers] = useState<(Pick<Member, 'id' | 'first_name' | 'last_name' | 'photo_url'> & { cooperative_id: string })[]>([])
+  const [allMembers, setAllMembers] = useState<(Pick<Member, 'id' | 'first_name' | 'last_name' | 'photo_url'> & { cooperative_id: string; signature_url?: string | null })[]>([])
   
   const filteredMembersForGenerate = useMemo(() => {
     if (!isFaitiereAdmin) return members
@@ -142,14 +142,14 @@ export default function CardsPage() {
   const fetchMembers = useCallback(async () => {
     let query = supabase
       .from('members')
-      .select('id, first_name, last_name, cooperative_id, photo_url')
+      .select('id, first_name, last_name, cooperative_id, photo_url, signature_url')
     if (currentCooperative && !isFaitiereAdmin) {
       query = query.eq('cooperative_id', currentCooperative.id)
     }
     query = query.eq('status', 'active').order('last_name')
     const { data, error } = await query
     if (!error) {
-      const rows = (data ?? []) as (Pick<Member, 'id' | 'first_name' | 'last_name' | 'photo_url'> & { cooperative_id: string })[]
+      const rows = (data ?? []) as (Pick<Member, 'id' | 'first_name' | 'last_name' | 'photo_url'> & { cooperative_id: string; signature_url?: string | null })[]
       setMembers(rows)
       setAllMembers(rows)
     }

@@ -29,7 +29,6 @@ import { timingSafeEqual, createHmac } from 'node:crypto'
 import { createClient } from '@/lib/supabase/admin'
 import { createLogger } from '@/lib/utils/logger'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
-import { decryptSecret } from '@/lib/utils/crypto'
 import { koboWebhookPayloadSchema } from '@/lib/validators/kobo'
 import {
   enrollNewMemberFromSubmission,
@@ -359,11 +358,7 @@ async function processSubmissionAsync(
           })
         } else {
           // Fetch API token for photo download
-          const encryptedKey = (integ?.config as Record<string, string>)?.api_key ?? null
-          let apiKey: string | null = null
-          if (encryptedKey) {
-            try { apiKey = decryptSecret(encryptedKey) } catch { /* photo téléchargement optionnel */ }
-          }
+          const apiKey = (integ?.config as Record<string, string>)?.api_key ?? null
           await enrollNewMemberFromSubmission(submissionId, cooperativeId, payload, apiKey)
         }
     }

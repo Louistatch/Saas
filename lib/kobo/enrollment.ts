@@ -136,13 +136,32 @@ export async function enrollNewMemberFromSubmission(
         ? (accessible as { id: string }[]).map((r) => r.id)
         : [faitiereId]
 
-      const { data: coop } = await supabase
+      // Try exact ILIKE match first, then fall back to unaccented/normalized comparison
+      let coop: { id: string } | null = null
+      const { data: ilikeCoop } = await supabase
         .from('cooperatives')
         .select('id')
         .ilike('name', `%${safeName}%`)
         .in('id', allowedIds)
         .limit(1)
         .maybeSingle()
+      coop = ilikeCoop
+
+      if (!coop) {
+        // Normalize: strip accents, lowercase, keep only alphanum
+        const normalize = (s: string) =>
+          s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
+        const normalizedInput = normalize(parsedName.data)
+
+        const { data: allCoops } = await supabase
+          .from('cooperatives')
+          .select('id, name')
+          .in('id', allowedIds)
+
+        coop = (allCoops as { id: string; name: string }[] | null)?.find((c) =>
+          normalize(c.name).includes(normalizedInput) || normalizedInput.includes(normalize(c.name)),
+        ) ?? null
+      }
 
       if (coop) {
         targetCooperativeId = coop.id
@@ -228,50 +247,57 @@ export async function enrollNewMemberFromSubmission(
     if (cRow) cantonId = cRow.id
   }
 
-  // ── Download photo from KoboToolbox → Supabase Storage ─────
-  let photoUrl: string | null = null
-  const photoField =
+  // ── Download photo + signature from KoboToolbox → Supabase Storage ──
+  const attachments = (payload._attachments ?? []) as Array<Record<string, string>>
+
+  // xpathKey = Kobo field path (e.g. "S1/photo_membre"), filenameValue = actual filename from payload
+  const downloadAttachment = async (
+    xpathKey: string | null,
+    filenameValue: string | null,
+    bucket: string,
+    prefix: string,
+  ): Promise<string | null> => {
+    if (!attachments.length || !apiToken) return null
+    // Match by question_xpath (reliable) then fall back to filename contains
+    const att =
+      (xpathKey ? attachments.find((a) => a.question_xpath === xpathKey) : null) ??
+      (filenameValue ? attachments.find((a) => a.filename?.includes(filenameValue)) : null)
+    if (!att?.download_url) return null
+    const field = filenameValue ?? xpathKey ?? 'file'
+    try {
+      const resp = await fetch(att.download_url, {
+        headers: { Authorization: `Token ${apiToken}` },
+      })
+      if (!resp.ok) return null
+      const buf = Buffer.from(await resp.arrayBuffer())
+      const ext = field.split('.').pop() ?? 'png'
+      const path = `${prefix}/${Date.now()}_${field.split('/').pop()}`
+      const { error } = await supabase.storage.from(bucket).upload(path, buf, {
+        contentType: `image/${ext}`,
+        upsert: true,
+      })
+      if (error) { log.warn(`${bucket} upload failed`, { error: error.message }); return null }
+      return supabase.storage.from(bucket).getPublicUrl(path).data?.publicUrl ?? null
+    } catch (e) {
+      log.warn(`${bucket} download failed`, { error: String(e) })
+      return null
+    }
+  }
+
+  // Filename values (what Kobo stores as field value = the filename)
+  const photoFilename =
     getPayloadField(payload, 'S1/photo_membre') ??
     getPayloadField(payload, 'photo_membre') ??
     getPayloadField(payload, 'identification/photo')
-  const attachments = (payload._attachments ?? []) as Array<
-    Record<string, string>
-  >
+  const signatureFilename =
+    getPayloadField(payload, 'S7/signature_membre') ??
+    getPayloadField(payload, 'signature_membre') ??
+    getPayloadField(payload, 'signature')
 
-  if (photoField && attachments.length > 0 && apiToken) {
-    const photoAtt = attachments.find((a) =>
-      a.filename?.includes(photoField),
-    )
-    if (photoAtt?.download_url) {
-      try {
-        const photoResp = await fetch(photoAtt.download_url, {
-          headers: { Authorization: `Token ${apiToken}` },
-        })
-        if (photoResp.ok) {
-          const photoBuffer = Buffer.from(await photoResp.arrayBuffer())
-          const ext = photoField.split('.').pop() ?? 'jpg'
-          const storagePath = `member-photos/${Date.now()}_${photoField}`
-          const { error: uploadErr } = await supabase.storage
-            .from('member-photos')
-            .upload(storagePath, photoBuffer, {
-              contentType: `image/${ext}`,
-              upsert: true,
-            })
-          if (!uploadErr) {
-            const { data: urlData } = supabase.storage
-              .from('member-photos')
-              .getPublicUrl(storagePath)
-            photoUrl = urlData?.publicUrl ?? null
-            log.info('Photo uploaded to Storage', { storagePath })
-          } else {
-            log.warn('Photo upload failed', { error: uploadErr.message })
-          }
-        }
-      } catch (photoErr) {
-        log.warn('Photo download/upload failed', { error: String(photoErr) })
-      }
-    }
-  }
+  const [photoUrl, signatureUrl] = await Promise.all([
+    downloadAttachment('S1/photo_membre', photoFilename, 'member-photos', 'member-photos'),
+    downloadAttachment('S7/signature_membre', signatureFilename, 'member-signatures', 'member-signatures'),
+  ])
 
   // ── Create member ───────────────────────────────────────────
   const { data: newMember, error: memberError } = await supabase
@@ -287,6 +313,7 @@ export async function enrollNewMemberFromSubmission(
       canton: canton,
       village: village,
       photo_url: photoUrl,
+      signature_url: signatureUrl,
       faitiere: faitiereCode,
       region_id: regionId,
       prefecture_id: prefectureId,

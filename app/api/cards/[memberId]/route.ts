@@ -90,7 +90,7 @@ export async function GET(
   // Fetch member details
   const { data: member } = await supabase
     .from('members')
-    .select('first_name, last_name, phone, photo_url, village, canton, prefecture, region')
+    .select('first_name, last_name, phone, photo_url, signature_url, village, canton, prefecture, region')
     .eq('id', memberId)
     .maybeSingle()
 
@@ -112,6 +112,7 @@ export async function GET(
       last_name: member.last_name,
       phone: member.phone,
       photo_url: member.photo_url,
+      signature_url: member.signature_url,
       village: member.village,
       canton: member.canton,
       prefecture: member.prefecture,
