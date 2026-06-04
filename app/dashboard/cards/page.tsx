@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Download, QrCode, Trash2, RefreshCw, Users, CheckCircle2, Search, Printer } from 'lucide-react'
+import { Plus, Download, QrCode, Trash2, RefreshCw, Users, CheckCircle2, Search, Printer, User } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -52,7 +52,7 @@ export default function CardsPage() {
 
   // Cards/members state
   const [cards, setCards] = useState<MemberCard[]>([])
-  const [members, setMembers] = useState<Pick<Member, 'id' | 'first_name' | 'last_name'>[]>([])
+  const [members, setMembers] = useState<Pick<Member, 'id' | 'first_name' | 'last_name' | 'photo_url'>[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounced(search, 200)
@@ -89,7 +89,7 @@ export default function CardsPage() {
   }, [isFaitiereAdmin, currentCooperative, cooperatives])
 
   // Members filtered by selected cooperative (for faîtière admins)
-  const [allMembers, setAllMembers] = useState<(Pick<Member, 'id' | 'first_name' | 'last_name'> & { cooperative_id: string })[]>([])
+  const [allMembers, setAllMembers] = useState<(Pick<Member, 'id' | 'first_name' | 'last_name' | 'photo_url'> & { cooperative_id: string })[]>([])
   
   const filteredMembersForGenerate = useMemo(() => {
     if (!isFaitiereAdmin) return members
@@ -142,14 +142,14 @@ export default function CardsPage() {
   const fetchMembers = useCallback(async () => {
     let query = supabase
       .from('members')
-      .select('id, first_name, last_name, cooperative_id')
+      .select('id, first_name, last_name, cooperative_id, photo_url')
     if (currentCooperative && !isFaitiereAdmin) {
       query = query.eq('cooperative_id', currentCooperative.id)
     }
     query = query.eq('status', 'active').order('last_name')
     const { data, error } = await query
     if (!error) {
-      const rows = (data ?? []) as (Pick<Member, 'id' | 'first_name' | 'last_name'> & { cooperative_id: string })[]
+      const rows = (data ?? []) as (Pick<Member, 'id' | 'first_name' | 'last_name' | 'photo_url'> & { cooperative_id: string })[]
       setMembers(rows)
       setAllMembers(rows)
     }
@@ -879,6 +879,27 @@ export default function CardsPage() {
                   Aucun membre actif. Ajoutez des membres d'abord.
                 </p>
               )}
+              {/* Photo preview of selected member */}
+              {selectedMemberId && (() => {
+                const m = filteredMembersForGenerate.find(x => x.id === selectedMemberId)
+                if (!m) return null
+                return (
+                  <div className="flex items-center gap-3 p-2.5 rounded-lg bg-accent/10 border border-border">
+                    {m.photo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={m.photo_url} alt="" className="w-10 h-10 rounded-full object-cover border border-border flex-shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                        <User className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{m.first_name} {m.last_name}</p>
+                      <p className="text-xs text-muted-foreground">{m.photo_url ? '✓ Photo disponible' : '⚠ Pas de photo'}</p>
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
             <div className="space-y-2">
               <Label>Durée de validité (jours)</Label>
@@ -969,9 +990,20 @@ export default function CardsPage() {
                               )
                             }
                           />
+                          {m.photo_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={m.photo_url} alt="" className="w-7 h-7 rounded-full object-cover border border-border flex-shrink-0" />
+                          ) : (
+                            <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                              <User className="h-3.5 w-3.5 text-muted-foreground" />
+                            </div>
+                          )}
                           <span className="text-sm text-foreground">
                             {m.first_name} {m.last_name}
                           </span>
+                          {!m.photo_url && (
+                            <span className="ml-auto text-[10px] text-amber-500/70">sans photo</span>
+                          )}
                         </label>
                       </li>
                     )

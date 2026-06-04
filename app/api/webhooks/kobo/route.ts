@@ -29,12 +29,11 @@ import { timingSafeEqual, createHmac } from 'node:crypto'
 import { createClient } from '@/lib/supabase/admin'
 import { createLogger } from '@/lib/utils/logger'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
+import { koboWebhookPayloadSchema } from '@/lib/validators/kobo'
 import {
-  koboWebhookPayloadSchema,
-  cooperativeNameSchema,
-  escapeIlike,
-} from '@/lib/validators/kobo'
-import { cardPrefix, generateUniqueCardNumber } from '@/lib/utils/card-number'
+  enrollNewMemberFromSubmission,
+  processCooperativeRegistration,
+} from '@/lib/kobo/enrollment'
 import type { KoboWebhookResponse } from '@/lib/kobo/types'
 
 const log = createLogger('webhook:kobo')
@@ -348,6 +347,9 @@ async function processSubmissionAsync(
       case 'plot_survey':
         await processPlotSurveySubmission(supabase, submissionId, cooperativeId, payload)
         break
+      case 'cooperative_registration':
+        await processCooperativeRegistration(submissionId, cooperativeId, payload)
+        break
       default:
         // Default: member enrollment/update (existing behavior)
         if (submission.member_card_number) {
@@ -355,7 +357,9 @@ async function processSubmissionAsync(
             p_submission_id: submissionId,
           })
         } else {
-          await enrollNewMemberFromSubmission(supabase, submissionId, cooperativeId, payload)
+          // Fetch API token for photo download
+          const apiKey = (integ?.config as Record<string, string>)?.api_key ?? null
+          await enrollNewMemberFromSubmission(submissionId, cooperativeId, payload, apiKey)
         }
     }
 
@@ -403,288 +407,6 @@ async function processSubmissionAsync(
 
     throw err
   }
-}
-
-// =========================================================
-// Enrollment: Create new member from Kobo submission
-// =========================================================
-async function enrollNewMemberFromSubmission(
-  supabase: ReturnType<typeof createClient>,
-  submissionId: string,
-  faitiereId: string,
-  payload: Record<string, unknown>,
-): Promise<void> {
-  // Extract fields from payload (KoboCollect uses "group/field" format)
-  const nomComplet = getPayloadField(payload, 'S1/nom_complet') ?? ''
-  const telephone = getPayloadField(payload, 'S1/telephone') ?? ''
-  const email = getPayloadField(payload, 'S1/email') ?? null
-  const region = getPayloadField(payload, 'S3/region') ?? null
-  const prefecture = getPayloadField(payload, 'S3/prefecture') ?? null
-  const canton = getPayloadField(payload, 'S3/canton') ?? null
-  const village = getPayloadField(payload, 'S3/village') ?? null
-  const nomCooperative = getPayloadField(payload, 'S2/nom_cooperative') ?? ''
-
-  // Split nom_complet into first_name + last_name
-  const nameParts = nomComplet.trim().split(/\s+/)
-  const firstName = nameParts[0] ?? ''
-  const lastName = nameParts.slice(1).join(' ') || firstName
-
-  // Resolve cooperative by name — SEC-03.
-  // Validate with Zod, escape ILIKE wildcards, and RESTRICT the search to the
-  // faitière's own hierarchy so a malicious payload cannot attach a member to
-  // an arbitrary cooperative elsewhere in the system.
-  let targetCooperativeId = faitiereId
-  if (nomCooperative) {
-    const parsedName = cooperativeNameSchema.safeParse(nomCooperative)
-    if (parsedName.success) {
-      const safeName = escapeIlike(parsedName.data)
-
-      // Accessible hierarchy from the faitière root (self + descendants).
-      const { data: accessible } = await supabase.rpc(
-        'get_cooperative_descendants',
-        { p_root_id: faitiereId },
-      )
-      const allowedIds: string[] = Array.isArray(accessible)
-        ? (accessible as { id: string }[]).map((r) => r.id)
-        : [faitiereId]
-
-      const { data: coop } = await supabase
-        .from('cooperatives')
-        .select('id')
-        .ilike('name', `%${safeName}%`)
-        .in('id', allowedIds)
-        .limit(1)
-        .maybeSingle()
-
-      if (coop) {
-        targetCooperativeId = coop.id
-      } else {
-        // ── AUTO-CREATE cooperative with proper hierarchy ──────
-        const { data: faitiereData } = await supabase
-          .from('cooperatives').select('faitiere_name')
-          .eq('id', faitiereId).maybeSingle()
-
-        // Find regional union to set as parent
-        let parentUnionId: string | null = faitiereId
-        if (region) {
-          const { data: unions } = await supabase
-            .from('cooperatives').select('id, name')
-            .eq('level', 'union')
-            .eq('faitiere_name', faitiereData?.faitiere_name ?? 'FENOMAT')
-          if (unions) {
-            const match = unions.find(u => u.name.toLowerCase().includes(region.toLowerCase()))
-            if (match) parentUnionId = match.id
-          }
-        }
-
-        const { data: newCoop } = await supabase
-          .from('cooperatives')
-          .insert({
-            name: parsedName.data,
-            level: 'cooperative',
-            parent_id: parentUnionId,
-            faitiere_name: faitiereData?.faitiere_name ?? 'FENOMAT',
-          })
-          .select('id').single()
-
-        if (newCoop) {
-          targetCooperativeId = newCoop.id
-          log.info('New cooperative auto-created', { name: parsedName.data, parentId: parentUnionId })
-        }
-      }
-    } else {
-      log.warn('Invalid cooperative name in payload — defaulting to faitiere', {
-        faitiereId,
-      })
-    }
-  }
-
-  // ── Resolve geographic IDs from text names ──────────────────
-  let regionId: string | null = null
-  let prefectureId: string | null = null
-  let cantonId: string | null = null
-  const dateNaissance = getPayloadField(payload, 'S1/date_naissance') ?? getPayloadField(payload, 'date_naissance') ?? null
-
-  if (region) {
-    const { data: rRow } = await supabase.from('regions').select('id').ilike('name', `%${region}%`).limit(1).maybeSingle()
-    if (rRow) regionId = rRow.id
-  }
-  if (prefecture && regionId) {
-    const { data: pRow } = await supabase.from('prefectures').select('id').ilike('name', `%${prefecture}%`).eq('region_id', regionId).limit(1).maybeSingle()
-    if (pRow) prefectureId = pRow.id
-  }
-  if (canton && prefectureId) {
-    const { data: cRow } = await supabase.from('cantons').select('id').ilike('name', `%${canton}%`).eq('prefecture_id', prefectureId).limit(1).maybeSingle()
-    if (cRow) cantonId = cRow.id
-  }
-
-  // ── Download photo from KoboToolbox attachments → Supabase Storage ──
-  let photoUrl: string | null = null
-  const photoField = getPayloadField(payload, 'S1/photo_membre')
-  const attachments = (payload._attachments ?? []) as Array<Record<string, string>>
-  const faitiereCode = getPayloadField(payload, 'S2/code_faitiere') ?? null
-
-  if (photoField && attachments.length > 0) {
-    // Find the attachment matching the photo filename
-    const photoAtt = attachments.find(a => a.filename?.includes(photoField))
-    if (photoAtt?.download_url) {
-      try {
-        // Get KoboToolbox API key from integration config
-        const { data: integ } = await supabase
-          .from('integrations')
-          .select('config')
-          .eq('cooperative_id', faitiereId)
-          .eq('type', 'kobo')
-          .limit(1)
-          .maybeSingle()
-        const apiKey = (integ?.config as Record<string, string>)?.api_key
-        if (apiKey) {
-          const photoResp = await fetch(photoAtt.download_url, {
-            headers: { 'Authorization': `Token ${apiKey}` },
-          })
-          if (photoResp.ok) {
-            const photoBuffer = Buffer.from(await photoResp.arrayBuffer())
-            const ext = photoField.split('.').pop() ?? 'jpg'
-            const storagePath = `member-photos/${Date.now()}_${photoField}`
-            const { error: uploadErr } = await supabase.storage
-              .from('member-photos')
-              .upload(storagePath, photoBuffer, { contentType: `image/${ext}`, upsert: true })
-            if (!uploadErr) {
-              const { data: urlData } = supabase.storage.from('member-photos').getPublicUrl(storagePath)
-              photoUrl = urlData?.publicUrl ?? null
-              log.info('Photo uploaded to Supabase Storage', { storagePath })
-            } else {
-              log.warn('Photo upload failed', { error: uploadErr.message })
-            }
-          }
-        }
-      } catch (photoErr) {
-        log.warn('Photo download/upload failed', { error: String(photoErr) })
-      }
-    }
-  }
-
-  // Create the member (with photo, faitiere, full location)
-  const { data: newMember, error: memberError } = await supabase
-    .from('members')
-    .insert({
-      cooperative_id: targetCooperativeId,
-      first_name: firstName,
-      last_name: lastName,
-      phone: telephone.trim() || null,
-      email: email,
-      region: region,
-      prefecture: prefecture,
-      canton: canton,
-      village: village,
-      photo_url: photoUrl,
-      faitiere: faitiereCode,
-      region_id: regionId,
-      prefecture_id: prefectureId,
-      canton_id: cantonId,
-      date_of_birth: dateNaissance,
-      status: 'active',
-    })
-    .select('id')
-    .single()
-
-  if (memberError || !newMember) {
-    throw new Error(`Failed to create member: ${memberError?.message ?? 'Unknown'}`)
-  }
-
-  // Generate card number — SEC-02: crypto-secure + uniqueness retry loop.
-  const { data: coopData } = await supabase
-    .from('cooperatives')
-    .select('name, faitiere_name')
-    .eq('id', targetCooperativeId)
-    .single()
-
-  const prefix = cardPrefix(coopData?.faitiere_name ?? coopData?.name ?? 'FEN')
-  const cardNumber = await generateUniqueCardNumber(supabase, prefix)
-
-  // Create member card
-  const expiryDate = new Date()
-  expiryDate.setFullYear(expiryDate.getFullYear() + 1)
-
-  await supabase.from('member_cards').insert({
-    cooperative_id: targetCooperativeId,
-    member_id: newMember.id,
-    card_number: cardNumber,
-    status: 'active',
-    expiry_date: expiryDate.toISOString().split('T')[0],
-    qr_data: `https://www.faitierehub.com/verify/${cardNumber}`,
-  })
-
-  // ── Insert parcelles from S5 repeat group ──
-  const parcelles = (payload.S5 ?? []) as Array<Record<string, unknown>>
-  for (const p of parcelles) {
-    const culture = String(p['S5/culture_principale'] ?? p['culture_principale'] ?? '')
-    const surface = parseFloat(String(p['S5/superficie_ha'] ?? p['superficie_ha'] ?? '0'))
-    const typeSol = String(p['S5/type_sol'] ?? p['type_sol'] ?? '')
-    const irrigation = String(p['S5/irrigation'] ?? p['irrigation'] ?? '')
-    if (culture && surface > 0) {
-      try {
-        await supabase.from('parcelles').insert({
-          member_id: newMember.id,
-          cooperative_id: targetCooperativeId,
-          culture_name: culture,
-          surface_ha: surface,
-          soil_type: typeSol || null,
-          irrigation_type: irrigation || null,
-          source: 'kobo',
-        })
-        log.info('Parcelle inserted', { culture, surface })
-      } catch (e: unknown) { log.warn('Parcelle insert failed', { error: String(e) }) }
-    }
-  }
-
-  // ── Insert productions from S6 repeat group ──
-  const productions = (payload.S6 ?? []) as Array<Record<string, unknown>>
-  for (const p of productions) {
-    const culture = String(p['S6/culture_produite'] ?? p['culture_produite'] ?? '')
-    const quantity = parseFloat(String(p['S6/rendement_kg'] ?? p['rendement_kg'] ?? '0'))
-    const campagne = String(p['S6/campagne_annee'] ?? p['campagne_annee'] ?? '')
-    if (culture && quantity > 0) {
-      try {
-        await supabase.from('productions').insert({
-          member_id: newMember.id,
-          cooperative_id: targetCooperativeId,
-          culture_name: culture,
-          quantity_kg: quantity,
-          campaign_year: campagne || new Date().getFullYear().toString(),
-          source: 'kobo',
-        })
-        log.info('Production inserted', { culture, quantity })
-      } catch (e: unknown) { log.warn('Production insert failed', { error: String(e) }) }
-    }
-  }
-
-  // Update submission as matched
-  await supabase
-    .from('kobo_submissions')
-    .update({
-      status: 'matched' as const,
-      member_id: newMember.id,
-      member_card_number: cardNumber,
-      matched_at: new Date().toISOString(),
-      processed_at: new Date().toISOString(),
-      processed_payload: {
-        mode: 'enrollment',
-        member_id: newMember.id,
-        card_number: cardNumber,
-        cooperative_id: targetCooperativeId,
-        cooperative_name: coopData?.name ?? nomCooperative,
-      } as unknown as Record<string, unknown>,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', submissionId)
-
-  log.info('New member enrolled via KoboCollect', {
-    memberId: newMember.id,
-    cardNumber,
-    cooperativeId: targetCooperativeId,
-    submissionId,
-  })
 }
 
 // =========================================================

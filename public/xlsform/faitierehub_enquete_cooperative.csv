@@ -1,0 +1,28 @@
+survey,,,,,,
+,type,name,label,required,appearance,hint
+,begin_group,C1,🏢 Identification de la coopérative,,field-list,
+,text,nom_cooperative,Nom de la coopérative,yes,,Nom officiel complet (ex: COOPROHORT PLATEAUX)
+,select_one niveau,niveau,Niveau hiérarchique,yes,,Choisissez le niveau de la structure
+,text,nom_union_parente,Nom de l'union parente,no,,Remplir si niveau = Coopérative de base
+,text,description,Description / activité principale,no,multiline,Ex : Culture maraîchère et transformation
+,phonenumber,telephone,Téléphone de la coopérative,no,,Format : 90XXXXXX
+,text,email,Email de contact,no,,Adresse email officielle
+,end_group,,,,,,
+,begin_group,C2,📍 Localisation,,field-list,
+,select_one region,region,Région,yes,,
+,text,prefecture,Préfecture,no,,
+,text,canton,Zone / Canton,no,,
+,end_group,,,,,,
+choices,,,,,,
+,list_name,name,label,,,
+,niveau,faitiere,Faîtière (niveau national),,,
+,niveau,union,Union régionale,,,
+,niveau,cooperative,Coopérative de base,,,
+,region,maritime,Maritime,,,
+,region,plateaux,Plateaux,,,
+,region,centrale,Centrale,,,
+,region,kara,Kara,,,
+,region,savanes,Savanes,,,
+settings,,,,,,
+,form_title,form_id,version,,,
+,Enregistrement Coopérative FaîtiereHub,faitierehub_cooperative,2026.1,,,
