@@ -124,19 +124,26 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
   const qrMatrix = encodeText(qrPayload, 'L')
   const qrModuleCount = qrMatrix.length
 
-  // Name: adapt font size based on length
-  const fullName = `${member.firstName} ${member.lastName.toUpperCase()}`
-  const nameFontSize = fullName.length > 20 ? 42 : fullName.length > 15 ? 50 : 56
+  // Name: two separate lines (firstName / LASTNAME), each dynamically sized
+  // to fit within the dark left area (x=290 to panel edge x=720 → 430px).
+  // Barlow Condensed ≈ 0.52px width per char per 1px font-size.
+  const MAX_NAME_WIDTH = 430
+  const calcFs = (text: string, max: number) =>
+    Math.max(24, Math.min(max, Math.floor(MAX_NAME_WIDTH / Math.max(text.length * 0.52, 1))))
+  const firstFs = calcFs(member.firstName, 52)
+  const lastFs = calcFs(member.lastName.toUpperCase(), 52)
+  const nameBlockHeight = firstFs + lastFs + 12  // gap between lines
 
-  // Photo handling — robust: data URL preferred (export), raw URL fallback
-  // (server side), else an elegant placeholder silhouette. The image is clipped
-  // to the circle and centered via xMidYMid slice (handles portrait & landscape).
+  // Photo: element rect starts 30px above the circle top (y=190) at y=160, height=280.
+  // With xMidYMin slice, the image fills from the top → the circle centre (cy=294)
+  // sits at 134px from element top = ~134/280 ≈ 48% for a 3:4 portrait, which
+  // lands squarely on the nose — exactly what a passport crop should show.
   const resolvedPhotoUrl = photoDataUrl || member.photoUrl
   const photoContent = resolvedPhotoUrl
-    ? `<image href="${escapeXml(resolvedPhotoUrl)}" xlink:href="${escapeXml(resolvedPhotoUrl)}" x="58" y="186" width="216" height="216" preserveAspectRatio="xMidYMid slice" clip-path="url(#photoClip)" />`
+    ? `<g clip-path="url(#photoClip)"><image href="${escapeXml(resolvedPhotoUrl)}" xlink:href="${escapeXml(resolvedPhotoUrl)}" x="58" y="160" width="216" height="280" preserveAspectRatio="xMidYMin slice"/></g>`
     : `<g clip-path="url(#photoClip)">
-        <rect x="58" y="186" width="216" height="216" fill="${darken(accent, 0.55)}"/>
-        <g transform="translate(166 300)" fill="${accentSoft}" opacity="0.55">
+        <rect x="58" y="160" width="216" height="280" fill="${darken(accent, 0.55)}"/>
+        <g transform="translate(166 294)" fill="${accentSoft}" opacity="0.55">
           <circle cx="0" cy="-30" r="34"/>
           <path d="M-66 66 C -66 16, 66 16, 66 66 Z"/>
         </g>
@@ -289,33 +296,32 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
     ${photoContent}
     <circle cx="166" cy="294" r="104" fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-width="2"/>
 
-    <!-- Name + status -->
-    <g transform="translate(290 100)">
-      <text x="0" y="0" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="800" font-size="${nameFontSize}" fill="${escapeXml(onDark)}">${escapeXml(truncate(fullName, 22))}</text>
+    <!-- Name + status: two lines, each sized to stay within the dark area -->
+    <g transform="translate(290 90)" font-family="'Barlow Condensed', Arial, sans-serif">
+      <text x="0" y="${firstFs}" font-weight="800" font-size="${firstFs}" fill="${escapeXml(onDark)}">${escapeXml(member.firstName)}</text>
+      <text x="0" y="${firstFs + lastFs + 8}" font-weight="900" font-size="${lastFs}" fill="${escapeXml(accentSoft)}">${escapeXml(member.lastName.toUpperCase())}</text>
 
-      <!-- Level badge (SVG medallion, no emoji) -->
-      <g transform="translate(0 18)">
+      <!-- Level + active badges -->
+      <g transform="translate(0 ${nameBlockHeight + 16})">
         <rect x="0" y="0" width="172" height="32" rx="16" fill="${level.fill}" filter="url(#shadow)"/>
         ${medallionMark(20, 16, level.ring)}
-        <text x="38" y="22" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="700" font-size="13" fill="${level.textColor}" letter-spacing="1.4">${level.label}</text>
+        <text x="38" y="22" font-weight="700" font-size="13" fill="${level.textColor}" letter-spacing="1.4">${level.label}</text>
+        <g transform="translate(184 0)">
+          <rect x="0" y="0" width="150" height="32" rx="16" fill="${escapeXml(accent)}" fill-opacity="0.18" stroke="${escapeXml(accentSoft)}" stroke-opacity="0.5"/>
+          <circle cx="14" cy="16" r="4" fill="${escapeXml(accentSoft)}"/>
+          <text x="26" y="21" font-weight="700" font-size="12" fill="${escapeXml(accentSoft)}" letter-spacing="1.5">MEMBRE ACTIF</text>
+        </g>
       </g>
 
-      <!-- Active pill -->
-      <g transform="translate(184 18)">
-        <rect x="0" y="0" width="150" height="32" rx="16" fill="${escapeXml(accent)}" fill-opacity="0.18" stroke="${escapeXml(accentSoft)}" stroke-opacity="0.5"/>
-        <circle cx="14" cy="16" r="4" fill="${escapeXml(accentSoft)}"/>
-        <text x="26" y="21" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="700" font-size="12" fill="${escapeXml(accentSoft)}" letter-spacing="1.5">MEMBRE ACTIF</text>
-      </g>
-
-      <text x="0" y="76" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="600" font-size="16" fill="${escapeXml(accentSoft)}" letter-spacing="0.5">COOPÉRATIVE : <tspan fill="${escapeXml(onDark)}" font-weight="700">${escapeXml(truncate(branding.cooperativeName, 25))}</tspan></text>
+      <text x="0" y="${nameBlockHeight + 62}" font-weight="600" font-size="16" fill="${escapeXml(accentSoft)}" letter-spacing="0.5">COOPÉRATIVE : <tspan fill="${escapeXml(onDark)}" font-weight="700">${escapeXml(truncate(branding.cooperativeName, 28))}</tspan></text>
     </g>
 
     <!-- Info pills (2×2) -->
-    <g transform="translate(44 430)">
-      ${infoPill(0, 0, 'LOCALITÉ', truncate(member.locality || '—', 28), accent, accentSoft, 'pin')}
+    <g transform="translate(44 418)">
+      ${infoPill(0, 0, 'LOCALITÉ', truncate(member.locality || '—', 24), accent, accentSoft, 'pin')}
       ${infoPill(334, 0, 'TÉLÉPHONE', member.phone || '—', accent, accentSoft, 'phone')}
-      ${infoPill(0, 80, 'COOPÉRATIVE', truncate(branding.cooperativeName, 28), accent, accentSoft, 'building')}
-      ${infoPill(334, 80, 'FAÎTIÈRE', truncate(branding.faitiereName, 28), accent, accentSoft, 'people')}
+      ${infoPill(0, 88, 'COOPÉRATIVE', truncate(branding.cooperativeName, 24), accent, accentSoft, 'building')}
+      ${infoPill(334, 88, 'FAÎTIÈRE', truncate(branding.faitiereName, 24), accent, accentSoft, 'people')}
     </g>
   </g>
 </svg>`
@@ -338,13 +344,13 @@ function infoPill(
     people: `<circle cx="16" cy="16" r="5" fill="#fff" transform="translate(4 4) scale(0.7)"/><circle cx="28" cy="16" r="5" fill="#fff" transform="translate(4 4) scale(0.7)"/><path d="M6 30c0-4 3-6 6-6s6 2 6 6M20 30c0-4 3-6 6-6s4 1.5 4 4" fill="none" stroke="#fff" stroke-width="1.2" transform="translate(4 4) scale(0.7)"/>`,
   }
   return `<g transform="translate(${x} ${y})">
-    <rect x="0" y="0" width="320" height="68" rx="16" fill="url(#pillGrad)" stroke="${escapeXml(accent)}" stroke-opacity="0.22"/>
-    <g transform="translate(14 12)">
-      <rect x="0" y="0" width="44" height="44" rx="12" fill="url(#iconGrad)"/>
+    <rect x="0" y="0" width="320" height="76" rx="16" fill="url(#pillGrad)" stroke="${escapeXml(accent)}" stroke-opacity="0.22"/>
+    <g transform="translate(14 14)">
+      <rect x="0" y="0" width="48" height="48" rx="12" fill="url(#iconGrad)"/>
       ${icons[icon]}
     </g>
-    <text x="72" y="28" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="600" font-size="10" fill="${escapeXml(accentSoft)}" letter-spacing="1.6">${escapeXml(label)}</text>
-    <text x="72" y="48" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="14" fill="#ffffff">${escapeXml(value)}</text>
+    <text x="72" y="26" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="600" font-size="13" fill="${escapeXml(accentSoft)}" letter-spacing="1.4">${escapeXml(label)}</text>
+    <text x="72" y="52" font-family="'Barlow', Arial, sans-serif" font-weight="700" font-size="19" fill="#ffffff">${escapeXml(value)}</text>
   </g>`
 }
 
