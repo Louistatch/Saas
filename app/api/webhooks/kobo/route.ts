@@ -464,7 +464,53 @@ async function enrollNewMemberFromSubmission(
     }
   }
 
-  // Create the member
+  // ── Download photo from KoboToolbox attachments → Supabase Storage ──
+  let photoUrl: string | null = null
+  const photoField = getPayloadField(payload, 'S1/photo_membre')
+  const attachments = (payload._attachments ?? []) as Array<Record<string, string>>
+  const faitiereCode = getPayloadField(payload, 'S2/code_faitiere') ?? null
+
+  if (photoField && attachments.length > 0) {
+    // Find the attachment matching the photo filename
+    const photoAtt = attachments.find(a => a.filename?.includes(photoField))
+    if (photoAtt?.download_url) {
+      try {
+        // Get KoboToolbox API key from integration config
+        const { data: integ } = await supabase
+          .from('integrations')
+          .select('config')
+          .eq('cooperative_id', faitiereId)
+          .eq('type', 'kobo')
+          .limit(1)
+          .maybeSingle()
+        const apiKey = (integ?.config as Record<string, string>)?.api_key
+        if (apiKey) {
+          const photoResp = await fetch(photoAtt.download_url, {
+            headers: { 'Authorization': `Token ${apiKey}` },
+          })
+          if (photoResp.ok) {
+            const photoBuffer = Buffer.from(await photoResp.arrayBuffer())
+            const ext = photoField.split('.').pop() ?? 'jpg'
+            const storagePath = `member-photos/${Date.now()}_${photoField}`
+            const { error: uploadErr } = await supabase.storage
+              .from('member-photos')
+              .upload(storagePath, photoBuffer, { contentType: `image/${ext}`, upsert: true })
+            if (!uploadErr) {
+              const { data: urlData } = supabase.storage.from('member-photos').getPublicUrl(storagePath)
+              photoUrl = urlData?.publicUrl ?? null
+              log.info('Photo uploaded to Supabase Storage', { storagePath })
+            } else {
+              log.warn('Photo upload failed', { error: uploadErr.message })
+            }
+          }
+        }
+      } catch (photoErr) {
+        log.warn('Photo download/upload failed', { error: String(photoErr) })
+      }
+    }
+  }
+
+  // Create the member (with photo, faitiere, full location)
   const { data: newMember, error: memberError } = await supabase
     .from('members')
     .insert({
@@ -477,6 +523,8 @@ async function enrollNewMemberFromSubmission(
       prefecture: prefecture,
       canton: canton,
       village: village,
+      photo_url: photoUrl,
+      faitiere: faitiereCode,
       status: 'active',
     })
     .select('id')
@@ -508,6 +556,46 @@ async function enrollNewMemberFromSubmission(
     expiry_date: expiryDate.toISOString().split('T')[0],
     qr_data: `https://www.faitierehub.com/verify/${cardNumber}`,
   })
+
+  // ── Insert parcelles from S5 repeat group ──
+  const parcelles = (payload.S5 ?? []) as Array<Record<string, unknown>>
+  for (const p of parcelles) {
+    const culture = String(p['S5/culture_principale'] ?? p['culture_principale'] ?? '')
+    const surface = parseFloat(String(p['S5/superficie_ha'] ?? p['superficie_ha'] ?? '0'))
+    const typeSol = String(p['S5/type_sol'] ?? p['type_sol'] ?? '')
+    const irrigation = String(p['S5/irrigation'] ?? p['irrigation'] ?? '')
+    if (culture && surface > 0) {
+      await supabase.from('parcelles').insert({
+        member_id: newMember.id,
+        cooperative_id: targetCooperativeId,
+        culture_name: culture,
+        surface_ha: surface,
+        soil_type: typeSol || null,
+        irrigation_type: irrigation || null,
+        source: 'kobo',
+      }).then(() => log.info('Parcelle inserted', { culture, surface }))
+       .catch(e => log.warn('Parcelle insert failed', { error: String(e) }))
+    }
+  }
+
+  // ── Insert productions from S6 repeat group ──
+  const productions = (payload.S6 ?? []) as Array<Record<string, unknown>>
+  for (const p of productions) {
+    const culture = String(p['S6/culture_produite'] ?? p['culture_produite'] ?? '')
+    const quantity = parseFloat(String(p['S6/rendement_kg'] ?? p['rendement_kg'] ?? '0'))
+    const campagne = String(p['S6/campagne_annee'] ?? p['campagne_annee'] ?? '')
+    if (culture && quantity > 0) {
+      await supabase.from('productions').insert({
+        member_id: newMember.id,
+        cooperative_id: targetCooperativeId,
+        culture_name: culture,
+        quantity_kg: quantity,
+        campaign_year: campagne || new Date().getFullYear().toString(),
+        source: 'kobo',
+      }).then(() => log.info('Production inserted', { culture, quantity }))
+       .catch(e => log.warn('Production insert failed', { error: String(e) }))
+    }
+  }
 
   // Update submission as matched
   await supabase
