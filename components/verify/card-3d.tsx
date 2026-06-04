@@ -93,7 +93,7 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
               <span className="card3d-brand-accent">Hub</span>
             </div>
             <div className="card3d-verified">
-              <CheckCircle size={13} />
+              <CheckCircle size={16} />
               <span>VÉRIFIÉ</span>
             </div>
           </header>
@@ -108,7 +108,7 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
                   <img src={member.photo_url} alt="" loading="lazy" decoding="async" />
                 ) : (
                   <div className="card3d-photo-empty">
-                    <User size={42} />
+                    <User size={50} />
                   </div>
                 )}
               </div>
@@ -124,7 +124,7 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
               </div>
               {memberLocality(member) && (
                 <div className="card3d-loc">
-                  <MapPin size={12} />
+                  <MapPin size={15} />
                   <span>{memberLocality(member)}</span>
                 </div>
               )}
@@ -214,17 +214,17 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
           font-family: 'Barlow', system-ui, sans-serif;
         }
         .card3d-top { display: flex; align-items: flex-start; justify-content: space-between; }
-        .card3d-brand { font-family: 'Barlow Condensed','Barlow',sans-serif; font-weight: 800; font-size: 1.2rem; line-height: 1; letter-spacing: .3px; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+        .card3d-brand { font-family: 'Barlow Condensed','Barlow',sans-serif; font-weight: 800; font-size: 1.38rem; line-height: 1; letter-spacing: .3px; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
         .card3d-brand-accent { color: #4dffa0; }
         .card3d-verified {
           display: inline-flex; align-items: center; gap: 5px;
           background: rgba(77,255,160,.16); border: 1px solid rgba(77,255,160,.4);
           color: #9bffc8; border-radius: 999px; padding: 4px 10px;
-          font-size: .58rem; font-weight: 800; letter-spacing: 1.5px;
+          font-size: .72rem; font-weight: 800; letter-spacing: 1.5px;
           backdrop-filter: blur(4px);
         }
         .card3d-body { display: flex; gap: 14px; align-items: center; }
-        .card3d-photo { position: relative; width: 84px; height: 84px; flex-shrink: 0; }
+        .card3d-photo { position: relative; width: 100px; height: 100px; flex-shrink: 0; }
         .card3d-photo-ring {
           position: absolute; inset: -4px; border-radius: 50%;
           background: conic-gradient(from 0deg, #4dffa0, #1c7a47, #b48cff, #4dffa0);
@@ -240,9 +240,9 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
         }
         .card3d-name { font-family: 'Barlow Condensed','Barlow',sans-serif; font-weight: 800; line-height: 1; margin: 0 0 6px; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
         .card3d-coop { display: flex; flex-direction: column; line-height: 1.1; }
-        .card3d-coop-label { font-size: .55rem; letter-spacing: 1.4px; color: #7fd9a5; font-weight: 700; }
-        .card3d-coop-value { font-size: .9rem; font-weight: 700; }
-        .card3d-loc { display: inline-flex; align-items: center; gap: 4px; margin-top: 5px; font-size: .68rem; color: #b7e8cb; }
+        .card3d-coop-label { font-size: .72rem; letter-spacing: 1.4px; color: #7fd9a5; font-weight: 700; }
+        .card3d-coop-value { font-size: 1.08rem; font-weight: 700; }
+        .card3d-loc { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; font-size: .85rem; color: #b7e8cb; }
         .card3d-bottom { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; }
         .card3d-chip {
           width: 44px; height: 34px; border-radius: 7px;
@@ -252,8 +252,8 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
         }
         .card3d-chip span { background: rgba(120,80,10,.35); border-radius: 1px; }
         .card3d-meta { display: flex; gap: 16px; text-align: right; flex: 1; justify-content: flex-end; }
-        .card3d-meta-label { display: block; font-size: .52rem; letter-spacing: 1.2px; color: #7fd9a5; font-weight: 700; }
-        .card3d-meta-value { display: block; font-size: .82rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .card3d-meta-label { display: block; font-size: .68rem; letter-spacing: 1.2px; color: #7fd9a5; font-weight: 700; }
+        .card3d-meta-value { display: block; font-size: .98rem; font-weight: 800; font-variant-numeric: tabular-nums; }
         .card3d-shadow {
           width: 78%; height: 26px; margin: -10px auto 0;
           background: radial-gradient(ellipse at center, rgba(0,0,0,.5), transparent 72%);
