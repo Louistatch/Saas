@@ -23,7 +23,7 @@ import { createClient } from '@/lib/supabase/server'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 import { parseQuery } from '@/lib/agritogo/nlp-router'
 import { tryDirectAction } from '@/lib/agritogo/direct-actions'
-import { getGeminiKey, rotateGeminiKey, getKeyCount } from '@/lib/utils/gemini-keys'
+import { getGeminiKey, rotateGeminiKey, getKeyCount, markKeyExhausted, getRecoveryWaitMs, allKeysExhausted } from '@/lib/utils/gemini-keys'
 
 const MAX_HISTORY = 10
 
@@ -129,6 +129,7 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = await createClient()
+  let lastError = ''
 
   // Resolve producer context
   const { data: card } = await supabase
@@ -201,49 +202,68 @@ RÈGLES : Français, concis (3-5 phrases), basé sur les prix réels, honnête s
     parts: [{ text: h.content }],
   }))
 
-  // Gemini call with key rotation
+  // Gemini call with key rotation + cooldown + auto-recovery
   const totalKeys = getKeyCount()
-  let lastError = ''
+  const MAX_ROUNDS = 2 // Try all keys, wait, try again once
 
-  for (let attempt = 0; attempt < totalKeys; attempt++) {
-    const key = attempt === 0 ? firstKey : rotateGeminiKey()
-    if (!key) break
-
-    try {
-      const genAI = new GoogleGenerativeAI(key)
-      const model = genAI.getGenerativeModel({
-        model: 'gemini-2.0-flash',
-        systemInstruction: systemPrompt,
-      })
-      const chat = model.startChat({ history: geminiHistory })
-      const result = await chat.sendMessage(userMessage)
-      const aiResponse = result.response.text()
-
-      await supabase.from('ai_conversations').insert([
-        { card_number: cardNumber, role: 'user', content: userMessage },
-        { card_number: cardNumber, role: 'assistant', content: aiResponse },
-      ])
-
-      return NextResponse.json({
-        response: aiResponse,
-        engine: 'gemini-direct',
-        intent: parsed.intent,
-        produit: parsed.produit,
-        marche: parsed.marche,
-        agent_type: null,
-        model_used: 'gemini-2.0-flash',
-        debate_used: false,
-      })
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erreur inconnue'
-      lastError = msg
-      if (msg.includes('429') || msg.includes('quota')) {
-        console.warn(`[AI Chat] Key ${attempt + 1}/${totalKeys} exhausted, rotating`)
-        rotateGeminiKey()
-        continue
+  for (let round = 0; round < MAX_ROUNDS; round++) {
+    // If all keys are exhausted and this is round 2, wait for recovery
+    if (round > 0 && allKeysExhausted()) {
+      const waitMs = getRecoveryWaitMs()
+      if (waitMs > 0 && waitMs <= 45000) {
+        console.log(`[AI Chat] All keys exhausted. Waiting ${Math.ceil(waitMs / 1000)}s for recovery...`)
+        await new Promise(resolve => setTimeout(resolve, waitMs + 500))
+      } else if (waitMs > 45000) {
+        break // Don't make the user wait more than 45s
       }
-      console.error('[AI Chat] Gemini error:', msg)
-      break
+    }
+
+    for (let attempt = 0; attempt < totalKeys; attempt++) {
+      const key = getGeminiKey()
+      if (!key) break
+
+      try {
+        const genAI = new GoogleGenerativeAI(key)
+        const model = genAI.getGenerativeModel({
+          model: 'gemini-2.0-flash',
+          systemInstruction: systemPrompt,
+        })
+        const chat = model.startChat({ history: geminiHistory })
+        const result = await chat.sendMessage(userMessage)
+        const aiResponse = result.response.text()
+
+        await supabase.from('ai_conversations').insert([
+          { card_number: cardNumber, role: 'user', content: userMessage },
+          { card_number: cardNumber, role: 'assistant', content: aiResponse },
+        ])
+
+        return NextResponse.json({
+          response: aiResponse,
+          engine: 'gemini-direct',
+          intent: parsed.intent,
+          produit: parsed.produit,
+          marche: parsed.marche,
+          agent_type: null,
+          model_used: 'gemini-2.0-flash',
+          debate_used: false,
+        })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Erreur inconnue'
+        lastError = msg
+        if (msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED')) {
+          console.warn(`[AI Chat] Key ${attempt + 1}/${totalKeys} exhausted (round ${round + 1}), cooling down 60s`)
+          markKeyExhausted()
+          rotateGeminiKey()
+          continue
+        }
+        if (msg.includes('503') || msg.includes('overloaded')) {
+          console.warn(`[AI Chat] Key ${attempt + 1}/${totalKeys} overloaded, trying next`)
+          rotateGeminiKey()
+          continue
+        }
+        console.error('[AI Chat] Gemini error:', msg)
+        break
+      }
     }
   }
 
