@@ -353,3 +353,4 @@ Le projet est déployé automatiquement sur **Vercel** :
 ## Licence
 
 Propriétaire — Tous droits réservés © 2025-2026 FaîtiereHub
+
