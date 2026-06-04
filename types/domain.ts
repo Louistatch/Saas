@@ -74,6 +74,7 @@ export interface Member {
   phone: string | null
   address: string | null
   photo_url: string | null
+  signature_url: string | null
   prefecture: string | null
   region: string | null
   village: string | null
@@ -105,7 +106,7 @@ export interface MemberCard {
   expiry_date: string | null
   qr_data: string | null
   created_at: string
-  member?: Pick<Member, 'first_name' | 'last_name' | 'email' | 'phone' | 'photo_url' | 'prefecture' | 'region' | 'village' | 'canton' | 'faitiere'> | null
+  member?: Pick<Member, 'first_name' | 'last_name' | 'email' | 'phone' | 'photo_url' | 'signature_url' | 'prefecture' | 'region' | 'village' | 'canton' | 'faitiere'> | null
 }
 
 export interface CardTemplate {
