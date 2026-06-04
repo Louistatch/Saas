@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
   // -------------------------------------------------------
   let retryResult: { succeeded: number; failed: number } = { succeeded: 0, failed: 0 }
   try {
-    const retry = await syncService.retryFailedSubmissions(cooperativeId)
+    const retry = await syncService.retryFailedSubmissions(cooperativeId, apiToken)
     retryResult = { succeeded: retry.succeeded, failed: retry.failed }
   } catch (err: unknown) {
     log.warn('Retry failed submissions error', {

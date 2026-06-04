@@ -166,7 +166,7 @@ export class KoboSyncService {
   // -----------------------------------------------------------
   // Retry failed submissions from kobo_submissions table
   // -----------------------------------------------------------
-  async retryFailedSubmissions(cooperativeId: string): Promise<RetryResult> {
+  async retryFailedSubmissions(cooperativeId: string, apiToken?: string): Promise<RetryResult> {
     const supabase = await this.getSupabase()
 
     const { data: failed } = await supabase
@@ -234,6 +234,7 @@ export class KoboSyncService {
             submission.id,
             cooperativeId,
             payload,
+            apiToken,
           )
           result.succeeded++
         }
