@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { BarChart3, Users, ShoppingCart, CreditCard, TrendingUp } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -71,30 +71,46 @@ export default function AnalyticsPage() {
     fetchStats()
   }, [fetchStats])
 
+  // Realtime: refresh stats when members, cards or fiches change
+  const fetchStatsRef = useRef(fetchStats)
+  useEffect(() => { fetchStatsRef.current = fetchStats }, [fetchStats])
+
+  useEffect(() => {
+    if (!currentCooperative) return
+    const coopId = currentCooperative.id
+    const channel = supabase
+      .channel(`analytics-realtime-${coopId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `cooperative_id=eq.${coopId}` }, () => fetchStatsRef.current())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'member_cards', filter: `cooperative_id=eq.${coopId}` }, () => fetchStatsRef.current())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fiches_techniques', filter: `cooperative_id=eq.${coopId}` }, () => fetchStatsRef.current())
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [currentCooperative?.id, supabase])
+
   const statCards = [
     {
       label: 'Total membres',
       value: stats.totalMembers,
       sub: `${stats.activeMembers} actif${stats.activeMembers === 1 ? '' : 's'}`,
       icon: Users,
-      color: 'text-blue-600',
-      bg: 'bg-blue-50',
+      color: 'text-primary',
+      bg: 'bg-primary/10',
     },
     {
       label: 'Fiches techniques',
       value: stats.totalExploitations,
       sub: `${stats.activeExploitations} publiées`,
       icon: ShoppingCart,
-      color: 'text-green-600',
-      bg: 'bg-green-50',
+      color: 'text-primary',
+      bg: 'bg-primary/15',
     },
     {
       label: 'Cartes membres',
       value: stats.totalCards,
       sub: `${stats.activeCards} active${stats.activeCards === 1 ? '' : 's'}`,
       icon: CreditCard,
-      color: 'text-purple-600',
-      bg: 'bg-purple-50',
+      color: 'text-accent-foreground',
+      bg: 'bg-accent/20',
     },
     {
       label: 'Taux d\'engagement',
@@ -104,8 +120,8 @@ export default function AnalyticsPage() {
           : '—',
       sub: 'Ratio de membres actifs',
       icon: TrendingUp,
-      color: 'text-orange-600',
-      bg: 'bg-orange-50',
+      color: 'text-muted-foreground',
+      bg: 'bg-muted',
     },
   ]
 
@@ -160,11 +176,11 @@ export default function AnalyticsPage() {
               <BreakdownBars
                 total={stats.totalMembers}
                 items={[
-                  { label: 'Actifs', value: stats.activeMembers, color: 'bg-green-500' },
+                  { label: 'Actifs', value: stats.activeMembers, color: 'bg-primary' },
                   {
                     label: 'Inactifs',
                     value: stats.totalMembers - stats.activeMembers,
-                    color: 'bg-gray-300',
+                    color: 'bg-border',
                   },
                 ]}
               />
@@ -189,11 +205,11 @@ export default function AnalyticsPage() {
               <BreakdownBars
                 total={stats.totalExploitations}
                 items={[
-                  { label: 'Publiées', value: stats.activeExploitations, color: 'bg-green-500' },
+                  { label: 'Publiées', value: stats.activeExploitations, color: 'bg-primary' },
                   {
                     label: 'Non publiées',
                     value: stats.totalExploitations - stats.activeExploitations,
-                    color: 'bg-gray-300',
+                    color: 'bg-border',
                   },
                 ]}
               />

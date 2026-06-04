@@ -377,7 +377,7 @@ export default function MarketplacePage() {
         <Card className="border-border">
           <CardContent className="pt-4 pb-3">
             <p className="text-xs text-muted-foreground">Publiées</p>
-            <p className="text-2xl font-bold text-green-600">{fiches.filter((f) => f.status === 'published').length}</p>
+            <p className="text-2xl font-bold text-primary">{fiches.filter((f) => f.status === 'published').length}</p>
           </CardContent>
         </Card>
         <Card className="border-border">
@@ -445,7 +445,7 @@ export default function MarketplacePage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-semibold text-foreground">{fiche.title}</h3>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${fiche.status === 'published' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${fiche.status === 'published' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
                           {fiche.status === 'published' ? 'Publiée' : 'Archivée'}
                         </span>
                       </div>

@@ -24,7 +24,7 @@ export default function BlogPage() {
           <p className="text-lg text-muted-foreground max-w-xl mx-auto">
             Notre blog est en cours de préparation. Bientôt, vous trouverez ici des articles sur la digitalisation des coopératives agricoles, des guides pratiques et des études de cas.
           </p>
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm font-medium">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 border border-accent/30 text-foreground text-sm font-medium">
             🚧 En cours de développement
           </div>
         </div>
