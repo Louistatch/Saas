@@ -204,6 +204,14 @@ export class KoboSyncService {
             payload,
           )
           result.succeeded++
+        } else if (submission.member_id) {
+          // Member already enrolled — just fix missing photo/signature and mark matched
+          await this.backfillMemberMedia(submission.member_id, payload, apiToken)
+          await supabase
+            .from('kobo_submissions')
+            .update({ status: 'matched', updated_at: new Date().toISOString() })
+            .eq('id', submission.id)
+          result.succeeded++
         } else if (submission.member_card_number) {
           // Has card number — try RPC match
           await supabase.rpc('match_kobo_submission_to_member', {
@@ -229,7 +237,7 @@ export class KoboSyncService {
             })
           }
         } else {
-          // No card number — enroll as new member
+          // No card number and no existing member — enroll as new member
           await enrollNewMemberFromSubmission(
             submission.id,
             cooperativeId,
@@ -742,6 +750,68 @@ export class KoboSyncService {
         return this.fetchWithRetry(url, apiToken, attempt + 1)
       }
       throw err
+    }
+  }
+
+  // -----------------------------------------------------------
+  // Private: Download photo + signature for an already-enrolled member
+  // -----------------------------------------------------------
+  private async backfillMemberMedia(
+    memberId: string,
+    payload: Record<string, unknown>,
+    apiToken?: string,
+  ): Promise<void> {
+    if (!apiToken) return
+    const supabase = await this.getSupabase()
+
+    const attachments = (payload._attachments ?? []) as Array<Record<string, string>>
+    if (!attachments.length) return
+
+    const downloadAndUpload = async (
+      field: string | null,
+      bucket: string,
+      prefix: string,
+    ): Promise<string | null> => {
+      if (!field) return null
+      const att =
+        attachments.find((a) => a.question_xpath?.includes(field.split('/').pop() ?? field)) ??
+        attachments.find((a) => a.filename?.includes(field))
+      if (!att?.download_url) return null
+      try {
+        const resp = await fetch(att.download_url, { headers: { Authorization: `Token ${apiToken}` } })
+        if (!resp.ok) return null
+        const buf = Buffer.from(await resp.arrayBuffer())
+        const ext = field.split('.').pop() ?? 'png'
+        const path = `${prefix}/${Date.now()}_${field.split('/').pop()}`
+        const { error } = await supabase.storage.from(bucket).upload(path, buf, {
+          contentType: `image/${ext}`, upsert: true,
+        })
+        if (error) return null
+        return supabase.storage.from(bucket).getPublicUrl(path).data?.publicUrl ?? null
+      } catch { return null }
+    }
+
+    const getField = (keys: string[]): string | null => {
+      for (const key of keys) {
+        const v = (payload[key] ?? payload[key.split('/').pop() ?? key]) as string | undefined
+        if (v && typeof v === 'string') return v.trim()
+      }
+      return null
+    }
+
+    const photoField = getField(['S1/photo_membre', 'photo_membre', 'identification/photo'])
+    const signatureField = getField(['S7/signature_membre', 'signature_membre', 'signature'])
+
+    const [photoUrl, signatureUrl] = await Promise.all([
+      downloadAndUpload(photoField, 'member-photos', 'member-photos'),
+      downloadAndUpload(signatureField, 'member-signatures', 'member-signatures'),
+    ])
+
+    const updates: Record<string, string> = {}
+    if (photoUrl) updates.photo_url = photoUrl
+    if (signatureUrl) updates.signature_url = signatureUrl
+    if (Object.keys(updates).length) {
+      await supabase.from('members').update(updates).eq('id', memberId)
     }
   }
 
