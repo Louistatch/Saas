@@ -94,7 +94,7 @@ async function imageToDataUrl(url: string): Promise<string | null> {
   }
 }
 
-export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | null): string {
+export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | null, signatureDataUrl?: string | null): string {
   const { branding, member, styles, template } = schema
   const level = getLevelTheme(member.level)
 
@@ -252,7 +252,13 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
       <!-- Signature -->
       <g transform="translate(0 230)">
         <text x="0" y="0" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="10" fill="${escapeXml(darken(accent, 0.35))}" letter-spacing="1.5">SIGNATURE</text>
-        <text x="0" y="32" font-family="'Caveat', 'Segoe Script', cursive" font-weight="600" font-size="30" fill="${escapeXml(darken(accent, 0.6))}">${escapeXml(member.firstName)}</text>
+        ${(() => {
+          const sigUrl = signatureDataUrl || schema.member.signatureUrl
+          if (sigUrl) {
+            return `<image href="${escapeXml(sigUrl)}" xlink:href="${escapeXml(sigUrl)}" x="0" y="10" width="360" height="50" preserveAspectRatio="xMinYMid meet"/>`
+          }
+          return `<text x="0" y="48" font-family="'Caveat', 'Segoe Script', cursive" font-weight="600" font-size="30" fill="${escapeXml(darken(accent, 0.6))}">${escapeXml(member.firstName)}</text>`
+        })()}
       </g>
 
       <!-- QR Code (FR) — enlarged + pure black for reliable A7 print scanning -->
@@ -371,12 +377,11 @@ async function svgToCanvas(svgString: string): Promise<HTMLCanvasElement> {
 // ─── Export Functions ────────────────────────────────────────────────────────
 
 export async function renderToCanvas(schema: CardSchema): Promise<HTMLCanvasElement> {
-  // Convert photo URL to data URL so it renders inside the SVG blob
-  let photoDataUrl: string | null = null
-  if (schema.member.photoUrl) {
-    photoDataUrl = await imageToDataUrl(schema.member.photoUrl)
-  }
-  const svg = renderToSvgString(schema, photoDataUrl)
+  const [photoDataUrl, signatureDataUrl] = await Promise.all([
+    schema.member.photoUrl ? imageToDataUrl(schema.member.photoUrl) : Promise.resolve(null),
+    schema.member.signatureUrl ? imageToDataUrl(schema.member.signatureUrl) : Promise.resolve(null),
+  ])
+  const svg = renderToSvgString(schema, photoDataUrl, signatureDataUrl)
   return svgToCanvas(svg)
 }
 
