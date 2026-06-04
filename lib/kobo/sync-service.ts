@@ -17,6 +17,10 @@ import 'server-only'
 import { createClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/utils/logger'
 import { decryptSecret } from '@/lib/utils/crypto'
+import {
+  enrollNewMemberFromSubmission,
+  processCooperativeRegistration,
+} from './enrollment'
 import type {
   KoboApiSubmission,
   KoboApiDataResponse,
@@ -108,6 +112,9 @@ export class KoboSyncService {
         options.formId,
       )
 
+      // Resolve form type from integration config (determines enrollment vs update routing)
+      const formType = await this.getFormType(options.cooperativeId)
+
       // Process in batches
       const batches = this.chunk(allSubmissions, BATCH_SIZE)
       let processedCount = 0
@@ -118,6 +125,8 @@ export class KoboSyncService {
           options.cooperativeId,
           options.formId,
           mappings,
+          formType,
+          options.apiToken,
         )
 
         result.processed += batchResults.processed
@@ -180,34 +189,53 @@ export class KoboSyncService {
       errors: [],
     }
 
+    const formType = await this.getFormType(cooperativeId)
+
     for (const submission of failed) {
       result.retried++
 
       try {
-        // Re-attempt matching
-        await supabase.rpc('match_kobo_submission_to_member', {
-          p_submission_id: submission.id,
-        })
+        const payload = submission.raw_payload as Record<string, unknown>
 
-        // Check if matched
-        const { data: updated } = await supabase
-          .from('kobo_submissions')
-          .select('status, member_id')
-          .eq('id', submission.id)
-          .single()
-
-        if (updated?.status === 'matched' && updated.member_id) {
-          // Process the submission
-          await supabase.rpc('process_kobo_submission', {
+        if (formType === 'cooperative_registration') {
+          await processCooperativeRegistration(
+            submission.id,
+            cooperativeId,
+            payload,
+          )
+          result.succeeded++
+        } else if (submission.member_card_number) {
+          // Has card number — try RPC match
+          await supabase.rpc('match_kobo_submission_to_member', {
             p_submission_id: submission.id,
           })
-          result.succeeded++
+
+          const { data: updated } = await supabase
+            .from('kobo_submissions')
+            .select('status, member_id')
+            .eq('id', submission.id)
+            .single()
+
+          if (updated?.status === 'matched' && updated.member_id) {
+            await supabase.rpc('process_kobo_submission', {
+              p_submission_id: submission.id,
+            })
+            result.succeeded++
+          } else {
+            result.failed++
+            result.errors.push({
+              instanceId: submission.kobo_instance_id,
+              error: 'Could not match to member',
+            })
+          }
         } else {
-          result.failed++
-          result.errors.push({
-            instanceId: submission.kobo_instance_id,
-            error: 'Could not match to member',
-          })
+          // No card number — enroll as new member
+          await enrollNewMemberFromSubmission(
+            submission.id,
+            cooperativeId,
+            payload,
+          )
+          result.succeeded++
         }
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Retry failed'
@@ -398,6 +426,8 @@ export class KoboSyncService {
     cooperativeId: string,
     formId: string,
     mappings: KoboFieldMappingRow[],
+    formType: string | null,
+    apiToken: string,
   ): Promise<{
     processed: number
     matched: number
@@ -460,26 +490,43 @@ export class KoboSyncService {
           continue
         }
 
-        // Attempt matching
-        await supabase.rpc('match_kobo_submission_to_member', {
-          p_submission_id: inserted.id,
-        })
-
-        // Check result
-        const { data: updated } = await supabase
-          .from('kobo_submissions')
-          .select('status, member_id')
-          .eq('id', inserted.id)
-          .single()
-
-        if (updated?.status === 'matched' && updated.member_id) {
-          // Process (extract parcelles/productions)
-          await supabase.rpc('process_kobo_submission', {
+        // Route by form type
+        if (formType === 'cooperative_registration') {
+          await processCooperativeRegistration(
+            inserted.id,
+            cooperativeId,
+            submission as unknown as Record<string, unknown>,
+          )
+          batchResult.matched++
+        } else if (cardNumber) {
+          // Try to match by card number (update existing member's submission)
+          await supabase.rpc('match_kobo_submission_to_member', {
             p_submission_id: inserted.id,
           })
-          batchResult.matched++
+
+          const { data: updated } = await supabase
+            .from('kobo_submissions')
+            .select('status, member_id')
+            .eq('id', inserted.id)
+            .single()
+
+          if (updated?.status === 'matched' && updated.member_id) {
+            await supabase.rpc('process_kobo_submission', {
+              p_submission_id: inserted.id,
+            })
+            batchResult.matched++
+          } else {
+            batchResult.unmatched++
+          }
         } else {
-          batchResult.unmatched++
+          // No card number — enroll as new member
+          await enrollNewMemberFromSubmission(
+            inserted.id,
+            cooperativeId,
+            submission as unknown as Record<string, unknown>,
+            apiToken,
+          )
+          batchResult.matched++
         }
 
         batchResult.processed++
@@ -568,6 +615,22 @@ export class KoboSyncService {
       default:
         return value.trim()
     }
+  }
+
+  // -----------------------------------------------------------
+  // Private: Get form type from integration config
+  // -----------------------------------------------------------
+  private async getFormType(cooperativeId: string): Promise<string | null> {
+    const supabase = await this.getSupabase()
+    const { data } = await supabase
+      .from('integrations')
+      .select('config')
+      .eq('cooperative_id', cooperativeId)
+      .eq('type', 'kobo')
+      .eq('status', 'connected')
+      .limit(1)
+      .maybeSingle()
+    return (data?.config as Record<string, unknown>)?.form_type as string | null ?? null
   }
 
   // -----------------------------------------------------------
