@@ -190,13 +190,13 @@ export default function VerifyCardPage() {
                   Votre espace,<br/>
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#34d399] to-[#6ee7b7]">votre succès.</span>
                 </h1>
-                <p className="text-white/40 text-xs mt-2">Gérez, développez et prospérez avec FaîtiereHub.</p>
+                <p className="text-white/40 text-sm mt-2">Gérez, développez et prospérez avec FaîtiereHub.</p>
               </div>
               <div className="vfp-glass-subtle rounded-2xl px-4 py-3 text-center shrink-0">
                 <div className="w-10 h-10 rounded-full bg-emerald-500/15 flex items-center justify-center mx-auto mb-1.5">
                   <CheckCircle className="h-5 w-5 text-[#34d399] vfp-pop" />
                 </div>
-                <p className="text-white text-[11px] font-semibold">Compte vérifié</p>
+                <p className="text-white text-sm font-semibold">Compte vérifié</p>
                 <div className="flex items-center gap-1 justify-center mt-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#34d399] animate-pulse" />
                   <span className="text-[#7fd9a5] text-[9px]">Membre actif</span>
@@ -238,7 +238,7 @@ export default function VerifyCardPage() {
                 <span className="w-1.5 h-1.5 rounded-full bg-[#34d399]" />
                 <h3 className="text-white font-semibold text-[15px]">Mes services</h3>
               </div>
-              <span className="text-white/40 text-xs">Tout ce dont vous avez besoin.</span>
+              <span className="text-white/40 text-sm">Tout ce dont vous avez besoin.</span>
             </div>
 
             <div className="grid grid-cols-3 gap-2.5">
@@ -249,7 +249,7 @@ export default function VerifyCardPage() {
                     <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${s.gradient} flex items-center justify-center mb-2 group-active:scale-90 transition-transform`}>
                       <Icon className={`h-5 w-5 ${s.highlight ? 'text-amber-300' : s.available ? 'text-[#5dffaa]' : 'text-white/30'}`} />
                     </div>
-                    <p className={`font-semibold text-[11px] leading-tight mb-0.5 ${s.available ? 'text-white' : 'text-white/40'}`}>{s.title}</p>
+                    <p className={`font-semibold text-[13px] leading-tight mb-0.5 ${s.available ? 'text-white' : 'text-white/40'}`}>{s.title}</p>
                     <p className={`text-[9px] leading-snug ${s.highlight ? 'text-amber-300/50' : 'text-white/30'}`}>{s.description}</p>
                     {!s.available && (
                       <span className="mt-1.5 px-2 py-0.5 rounded-full bg-white/5 text-white/25 text-[7px] font-bold uppercase">Bientôt</span>
