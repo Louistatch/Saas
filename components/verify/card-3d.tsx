@@ -57,7 +57,7 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
   }, [])
 
   const fullName = memberFullName(member)
-  const nameSize = fullName.length > 22 ? '1.35rem' : fullName.length > 16 ? '1.6rem' : '1.85rem'
+  const nameSize = fullName.length > 22 ? '1.55rem' : fullName.length > 16 ? '1.85rem' : '2.1rem'
 
   return (
     <div className="card3d-scene">
@@ -99,7 +99,7 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
           </header>
 
           <div className="card3d-body">
-            {/* Photo with embossed ring */}
+            {/* Photo format passeport — portrait rectangulaire */}
             <div className="card3d-photo">
               <span className="card3d-photo-ring" />
               <div className="card3d-photo-inner">
@@ -108,7 +108,7 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
                   <img src={member.photo_url} alt="" loading="lazy" decoding="async" />
                 ) : (
                   <div className="card3d-photo-empty">
-                    <User size={50} />
+                    <User size={40} />
                   </div>
                 )}
               </div>
@@ -157,14 +157,14 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
         .card3d-scene {
           perspective: 1400px;
           width: 100%;
-          max-width: 420px;
+          max-width: 480px;
           margin: 0 auto;
-          padding: 10px 0 26px;
+          padding: 10px 0 30px;
         }
         .card3d {
           position: relative;
           width: 100%;
-          aspect-ratio: 1.586 / 1; /* ISO ID-1 card ratio */
+          aspect-ratio: 1.586 / 1;
           border-radius: 22px;
           transform-style: preserve-3d;
           transition: transform .15s cubic-bezier(.2,.7,.2,1);
@@ -206,54 +206,89 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
             rgba(255,255,255,.35), rgba(255,255,255,0) 70%);
           mix-blend-mode: soft-light;
         }
+        /* ── Content layer ─────────────────────────────────── */
         .card3d-content {
-          position: absolute; inset: 0; padding: 18px 20px;
+          position: absolute; inset: 0; padding: 16px 18px 14px;
           display: flex; flex-direction: column; justify-content: space-between;
           transform: translateZ(28px);
           color: #eafff2;
           font-family: 'Barlow', system-ui, sans-serif;
         }
+        /* Header */
         .card3d-top { display: flex; align-items: flex-start; justify-content: space-between; }
-        .card3d-brand { font-family: 'Barlow Condensed','Barlow',sans-serif; font-weight: 800; font-size: 1.38rem; line-height: 1; letter-spacing: .3px; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+        .card3d-brand {
+          font-family: 'Barlow Condensed','Barlow',sans-serif;
+          font-weight: 800; font-size: 1.65rem; line-height: 1;
+          letter-spacing: .3px; text-shadow: 0 1px 2px rgba(0,0,0,.4);
+        }
         .card3d-brand-accent { color: #4dffa0; }
         .card3d-verified {
           display: inline-flex; align-items: center; gap: 5px;
           background: rgba(77,255,160,.16); border: 1px solid rgba(77,255,160,.4);
-          color: #9bffc8; border-radius: 999px; padding: 4px 10px;
-          font-size: .72rem; font-weight: 800; letter-spacing: 1.5px;
+          color: #9bffc8; border-radius: 999px; padding: 5px 12px;
+          font-size: .78rem; font-weight: 800; letter-spacing: 1.5px;
           backdrop-filter: blur(4px);
         }
-        .card3d-body { display: flex; gap: 14px; align-items: center; }
-        .card3d-photo { position: relative; width: 100px; height: 100px; flex-shrink: 0; }
+        /* Body */
+        .card3d-body { display: flex; gap: 16px; align-items: flex-start; }
+
+        /* ── Photo format passeport américain ─────────────── */
+        /* US passport: 2×2 in — rendu en portrait 4:5 pour cadrer visage+épaules */
+        .card3d-photo {
+          position: relative;
+          width: 86px;
+          height: 108px; /* ratio ≈ 0.796 ≈ 2:2.5 in */
+          flex-shrink: 0;
+        }
         .card3d-photo-ring {
-          position: absolute; inset: -4px; border-radius: 50%;
+          position: absolute; inset: -3px; border-radius: 10px;
           background: conic-gradient(from 0deg, #4dffa0, #1c7a47, #b48cff, #4dffa0);
           filter: blur(.5px);
         }
         .card3d-photo-inner {
-          position: absolute; inset: 0; border-radius: 50%; overflow: hidden;
-          box-shadow: inset 0 2px 6px rgba(0,0,0,.4);
+          position: absolute; inset: 0; border-radius: 8px; overflow: hidden;
+          box-shadow: inset 0 2px 6px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.5);
         }
-        .card3d-photo-inner img, .card3d-photo-empty {
-          width: 100%; height: 100%; border-radius: 50%; object-fit: cover;
-          background: #0c3d24; display: grid; place-items: center; color: rgba(255,255,255,.4);
+        .card3d-photo-inner img {
+          width: 100%; height: 100%;
+          object-fit: cover;
+          object-position: center top; /* cadre visage en haut */
         }
-        .card3d-name { font-family: 'Barlow Condensed','Barlow',sans-serif; font-weight: 800; line-height: 1; margin: 0 0 6px; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
-        .card3d-coop { display: flex; flex-direction: column; line-height: 1.1; }
-        .card3d-coop-label { font-size: .72rem; letter-spacing: 1.4px; color: #7fd9a5; font-weight: 700; }
-        .card3d-coop-value { font-size: 1.08rem; font-weight: 700; }
-        .card3d-loc { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; font-size: .85rem; color: #b7e8cb; }
+        .card3d-photo-empty {
+          width: 100%; height: 100%;
+          border-radius: 8px;
+          background: #0c3d24;
+          display: grid; place-items: center; color: rgba(255,255,255,.4);
+        }
+
+        /* Identity block */
+        .card3d-identity { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding-top: 2px; }
+        .card3d-name {
+          font-family: 'Barlow Condensed','Barlow',sans-serif;
+          font-weight: 800; line-height: 1.05; margin: 0;
+          text-shadow: 0 1px 3px rgba(0,0,0,.5);
+          text-transform: uppercase; letter-spacing: .5px;
+        }
+        .card3d-coop { display: flex; flex-direction: column; line-height: 1.2; }
+        .card3d-coop-label { font-size: .8rem; letter-spacing: 1.6px; color: #7fd9a5; font-weight: 700; text-transform: uppercase; }
+        .card3d-coop-value { font-size: 1.18rem; font-weight: 700; line-height: 1.2; }
+        .card3d-loc { display: inline-flex; align-items: center; gap: 5px; margin-top: 2px; font-size: .9rem; color: #b7e8cb; }
+
+        /* Footer */
         .card3d-bottom { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; }
         .card3d-chip {
-          width: 44px; height: 34px; border-radius: 7px;
+          width: 48px; height: 37px; border-radius: 7px;
           background: linear-gradient(135deg, #f5d271, #d9a93b 55%, #b07f1e);
           display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 5px;
           box-shadow: inset 0 1px 1px rgba(255,255,255,.6), 0 1px 2px rgba(0,0,0,.4);
+          flex-shrink: 0;
         }
         .card3d-chip span { background: rgba(120,80,10,.35); border-radius: 1px; }
-        .card3d-meta { display: flex; gap: 16px; text-align: right; flex: 1; justify-content: flex-end; }
-        .card3d-meta-label { display: block; font-size: .68rem; letter-spacing: 1.2px; color: #7fd9a5; font-weight: 700; }
-        .card3d-meta-value { display: block; font-size: .98rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .card3d-meta { display: flex; gap: 18px; text-align: right; flex: 1; justify-content: flex-end; }
+        .card3d-meta-label { display: block; font-size: .75rem; letter-spacing: 1.4px; color: #7fd9a5; font-weight: 700; text-transform: uppercase; }
+        .card3d-meta-value { display: block; font-size: 1.08rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+        /* Shadow */
         .card3d-shadow {
           width: 78%; height: 26px; margin: -10px auto 0;
           background: radial-gradient(ellipse at center, rgba(0,0,0,.5), transparent 72%);
