@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { buildCardSchema, renderToSvgString } from '@/lib/card-engine'
 
 interface CardSvgPreviewProps {
@@ -50,6 +50,23 @@ export function CardSvgPreview({
   template,
   className = '',
 }: CardSvgPreviewProps) {
+  // Convert photo URL to base64 so it embeds correctly inside SVG innerHTML
+  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null)
+  useEffect(() => {
+    if (!photoUrl) { setPhotoDataUrl(null); return }
+    let cancelled = false
+    fetch(photoUrl, { mode: 'cors' })
+      .then(r => r.ok ? r.blob() : null)
+      .then(blob => {
+        if (!blob || cancelled) return
+        const reader = new FileReader()
+        reader.onloadend = () => { if (!cancelled) setPhotoDataUrl(reader.result as string) }
+        reader.readAsDataURL(blob)
+      })
+      .catch(() => setPhotoDataUrl(null))
+    return () => { cancelled = true }
+  }, [photoUrl])
+
   const svgString = useMemo(() => {
     const schema = buildCardSchema({
       member: {
@@ -71,8 +88,8 @@ export function CardSvgPreview({
       accentColor: template?.accentColor,
       template,
     })
-    return renderToSvgString(schema)
-  }, [firstName, lastName, phone, photoUrl, village, canton, prefecture, region, cardNumber, expiryDate, createdAt, cooperativeName, faitiereName, level, template])
+    return renderToSvgString(schema, photoDataUrl)
+  }, [firstName, lastName, phone, photoUrl, photoDataUrl, village, canton, prefecture, region, cardNumber, expiryDate, createdAt, cooperativeName, faitiereName, level, template])
 
   return (
     <div
