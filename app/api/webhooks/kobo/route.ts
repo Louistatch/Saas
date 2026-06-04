@@ -456,12 +456,66 @@ async function enrollNewMemberFromSubmission(
         .limit(1)
         .maybeSingle()
 
-      if (coop) targetCooperativeId = coop.id
+      if (coop) {
+        targetCooperativeId = coop.id
+      } else {
+        // ── AUTO-CREATE cooperative with proper hierarchy ──────
+        const { data: faitiereData } = await supabase
+          .from('cooperatives').select('faitiere_name')
+          .eq('id', faitiereId).maybeSingle()
+
+        // Find regional union to set as parent
+        let parentUnionId: string | null = faitiereId
+        if (region) {
+          const { data: unions } = await supabase
+            .from('cooperatives').select('id, name')
+            .eq('level', 'union')
+            .eq('faitiere_name', faitiereData?.faitiere_name ?? 'FENOMAT')
+          if (unions) {
+            const match = unions.find(u => u.name.toLowerCase().includes(region.toLowerCase()))
+            if (match) parentUnionId = match.id
+          }
+        }
+
+        const { data: newCoop } = await supabase
+          .from('cooperatives')
+          .insert({
+            name: parsedName.data,
+            level: 'cooperative',
+            parent_id: parentUnionId,
+            faitiere_name: faitiereData?.faitiere_name ?? 'FENOMAT',
+          })
+          .select('id').single()
+
+        if (newCoop) {
+          targetCooperativeId = newCoop.id
+          log.info('New cooperative auto-created', { name: parsedName.data, parentId: parentUnionId })
+        }
+      }
     } else {
       log.warn('Invalid cooperative name in payload — defaulting to faitiere', {
         faitiereId,
       })
     }
+  }
+
+  // ── Resolve geographic IDs from text names ──────────────────
+  let regionId: string | null = null
+  let prefectureId: string | null = null
+  let cantonId: string | null = null
+  const dateNaissance = getPayloadField(payload, 'S1/date_naissance') ?? getPayloadField(payload, 'date_naissance') ?? null
+
+  if (region) {
+    const { data: rRow } = await supabase.from('regions').select('id').ilike('name', `%${region}%`).limit(1).maybeSingle()
+    if (rRow) regionId = rRow.id
+  }
+  if (prefecture && regionId) {
+    const { data: pRow } = await supabase.from('prefectures').select('id').ilike('name', `%${prefecture}%`).eq('region_id', regionId).limit(1).maybeSingle()
+    if (pRow) prefectureId = pRow.id
+  }
+  if (canton && prefectureId) {
+    const { data: cRow } = await supabase.from('cantons').select('id').ilike('name', `%${canton}%`).eq('prefecture_id', prefectureId).limit(1).maybeSingle()
+    if (cRow) cantonId = cRow.id
   }
 
   // ── Download photo from KoboToolbox attachments → Supabase Storage ──
@@ -525,6 +579,10 @@ async function enrollNewMemberFromSubmission(
       village: village,
       photo_url: photoUrl,
       faitiere: faitiereCode,
+      region_id: regionId,
+      prefecture_id: prefectureId,
+      canton_id: cantonId,
+      date_of_birth: dateNaissance,
       status: 'active',
     })
     .select('id')
@@ -565,16 +623,18 @@ async function enrollNewMemberFromSubmission(
     const typeSol = String(p['S5/type_sol'] ?? p['type_sol'] ?? '')
     const irrigation = String(p['S5/irrigation'] ?? p['irrigation'] ?? '')
     if (culture && surface > 0) {
-      await supabase.from('parcelles').insert({
-        member_id: newMember.id,
-        cooperative_id: targetCooperativeId,
-        culture_name: culture,
-        surface_ha: surface,
-        soil_type: typeSol || null,
-        irrigation_type: irrigation || null,
-        source: 'kobo',
-      }).then(() => log.info('Parcelle inserted', { culture, surface }))
-       .catch(e => log.warn('Parcelle insert failed', { error: String(e) }))
+      try {
+        await supabase.from('parcelles').insert({
+          member_id: newMember.id,
+          cooperative_id: targetCooperativeId,
+          culture_name: culture,
+          surface_ha: surface,
+          soil_type: typeSol || null,
+          irrigation_type: irrigation || null,
+          source: 'kobo',
+        })
+        log.info('Parcelle inserted', { culture, surface })
+      } catch (e: unknown) { log.warn('Parcelle insert failed', { error: String(e) }) }
     }
   }
 
@@ -585,15 +645,17 @@ async function enrollNewMemberFromSubmission(
     const quantity = parseFloat(String(p['S6/rendement_kg'] ?? p['rendement_kg'] ?? '0'))
     const campagne = String(p['S6/campagne_annee'] ?? p['campagne_annee'] ?? '')
     if (culture && quantity > 0) {
-      await supabase.from('productions').insert({
-        member_id: newMember.id,
-        cooperative_id: targetCooperativeId,
-        culture_name: culture,
-        quantity_kg: quantity,
-        campaign_year: campagne || new Date().getFullYear().toString(),
-        source: 'kobo',
-      }).then(() => log.info('Production inserted', { culture, quantity }))
-       .catch(e => log.warn('Production insert failed', { error: String(e) }))
+      try {
+        await supabase.from('productions').insert({
+          member_id: newMember.id,
+          cooperative_id: targetCooperativeId,
+          culture_name: culture,
+          quantity_kg: quantity,
+          campaign_year: campagne || new Date().getFullYear().toString(),
+          source: 'kobo',
+        })
+        log.info('Production inserted', { culture, quantity })
+      } catch (e: unknown) { log.warn('Production insert failed', { error: String(e) }) }
     }
   }
 
