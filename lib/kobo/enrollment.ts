@@ -136,13 +136,32 @@ export async function enrollNewMemberFromSubmission(
         ? (accessible as { id: string }[]).map((r) => r.id)
         : [faitiereId]
 
-      const { data: coop } = await supabase
+      // Try exact ILIKE match first, then fall back to unaccented/normalized comparison
+      let coop: { id: string } | null = null
+      const { data: ilikeCoop } = await supabase
         .from('cooperatives')
         .select('id')
         .ilike('name', `%${safeName}%`)
         .in('id', allowedIds)
         .limit(1)
         .maybeSingle()
+      coop = ilikeCoop
+
+      if (!coop) {
+        // Normalize: strip accents, lowercase, keep only alphanum
+        const normalize = (s: string) =>
+          s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
+        const normalizedInput = normalize(parsedName.data)
+
+        const { data: allCoops } = await supabase
+          .from('cooperatives')
+          .select('id, name')
+          .in('id', allowedIds)
+
+        coop = (allCoops as { id: string; name: string }[] | null)?.find((c) =>
+          normalize(c.name).includes(normalizedInput) || normalizedInput.includes(normalize(c.name)),
+        ) ?? null
+      }
 
       if (coop) {
         targetCooperativeId = coop.id

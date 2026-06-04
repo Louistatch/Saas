@@ -552,12 +552,23 @@ export class KoboSyncService {
     submission: KoboApiSubmission,
     mappings: KoboFieldMappingRow[],
   ): string | null {
+    // Card numbers must match this pattern (e.g. "FEN-46738", "COOP-12345")
+    const CARD_PATTERN = /^[A-Z]{2,6}-\d{4,8}$/
+
+    const validate = (v: string): string | null => {
+      const normalized = v.trim().toUpperCase()
+      return CARD_PATTERN.test(normalized) ? normalized : null
+    }
+
     // Find the key field mapping
     const keyMapping = mappings.find((m) => m.is_key_field)
 
     if (keyMapping) {
       const value = this.getNestedValue(submission, keyMapping.kobo_field)
-      if (value) return this.applyTransform(String(value), keyMapping.transform_fn)
+      if (value) {
+        const transformed = this.applyTransform(String(value), keyMapping.transform_fn)
+        return validate(transformed)
+      }
     }
 
     // Fallback: look for common card number field names
@@ -570,7 +581,7 @@ export class KoboSyncService {
 
     for (const key of fallbackKeys) {
       const value = this.getNestedValue(submission, key)
-      if (value) return String(value).trim().toUpperCase()
+      if (value) return validate(String(value))
     }
 
     return null
