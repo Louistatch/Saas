@@ -348,6 +348,9 @@ async function processSubmissionAsync(
       case 'plot_survey':
         await processPlotSurveySubmission(supabase, submissionId, cooperativeId, payload)
         break
+      case 'cooperative_registration':
+        await processCooperativeRegistration(supabase, submissionId, cooperativeId, payload)
+        break
       default:
         // Default: member enrollment/update (existing behavior)
         if (submission.member_card_number) {
@@ -415,19 +418,29 @@ async function enrollNewMemberFromSubmission(
   payload: Record<string, unknown>,
 ): Promise<void> {
   // Extract fields from payload (KoboCollect uses "group/field" format)
-  const nomComplet = getPayloadField(payload, 'S1/nom_complet') ?? ''
-  const telephone = getPayloadField(payload, 'S1/telephone') ?? ''
-  const email = getPayloadField(payload, 'S1/email') ?? null
-  const region = getPayloadField(payload, 'S3/region') ?? null
-  const prefecture = getPayloadField(payload, 'S3/prefecture') ?? null
-  const canton = getPayloadField(payload, 'S3/canton') ?? null
-  const village = getPayloadField(payload, 'S3/village') ?? null
-  const nomCooperative = getPayloadField(payload, 'S2/nom_cooperative') ?? ''
+  // Supports new format (S1/prenom + S1/nom) and legacy (S1/nom_complet)
+  const prenomField = getPayloadField(payload, 'S1/prenom') ?? getPayloadField(payload, 'prenom') ?? ''
+  const nomField = getPayloadField(payload, 'S1/nom') ?? getPayloadField(payload, 'nom') ?? ''
+  const nomCompletField = getPayloadField(payload, 'S1/nom_complet') ?? getPayloadField(payload, 'nom_complet') ?? ''
+  const telephone = getPayloadField(payload, 'S1/telephone') ?? getPayloadField(payload, 'telephone') ?? ''
+  const email = getPayloadField(payload, 'S1/email') ?? getPayloadField(payload, 'email') ?? null
+  const region = getPayloadField(payload, 'S3/region') ?? getPayloadField(payload, 'region') ?? null
+  const prefecture = getPayloadField(payload, 'S3/prefecture') ?? getPayloadField(payload, 'prefecture') ?? null
+  const canton = getPayloadField(payload, 'S3/canton') ?? getPayloadField(payload, 'canton') ?? null
+  const village = getPayloadField(payload, 'S3/village') ?? getPayloadField(payload, 'village') ?? null
+  const nomCooperative = getPayloadField(payload, 'S2/nom_cooperative') ?? getPayloadField(payload, 'nom_cooperative') ?? getPayloadField(payload, 'cooperative_info/cooperative_name') ?? ''
 
-  // Split nom_complet into first_name + last_name
-  const nameParts = nomComplet.trim().split(/\s+/)
-  const firstName = nameParts[0] ?? ''
-  const lastName = nameParts.slice(1).join(' ') || firstName
+  // Resolve first/last name from separate fields (new format) or nom_complet (legacy)
+  let firstName: string
+  let lastName: string
+  if (prenomField || nomField) {
+    firstName = prenomField.trim()
+    lastName = nomField.trim() || prenomField.trim()
+  } else {
+    const nameParts = nomCompletField.trim().split(/\s+/)
+    firstName = nameParts[0] ?? ''
+    lastName = nameParts.slice(1).join(' ') || firstName
+  }
 
   // Resolve cooperative by name — SEC-03.
   // Validate with Zod, escape ILIKE wildcards, and RESTRICT the search to the
@@ -503,7 +516,8 @@ async function enrollNewMemberFromSubmission(
   let regionId: string | null = null
   let prefectureId: string | null = null
   let cantonId: string | null = null
-  const dateNaissance = getPayloadField(payload, 'S1/date_naissance') ?? getPayloadField(payload, 'date_naissance') ?? null
+  const dateNaissance = getPayloadField(payload, 'S1/date_naissance') ?? getPayloadField(payload, 'date_naissance') ?? getPayloadField(payload, 'S1/age') ?? null
+  const faitiereCode = getPayloadField(payload, 'S2/code_faitiere') ?? getPayloadField(payload, 'code_faitiere') ?? null
 
   if (region) {
     const { data: rRow } = await supabase.from('regions').select('id').ilike('name', `%${region}%`).limit(1).maybeSingle()
@@ -520,9 +534,8 @@ async function enrollNewMemberFromSubmission(
 
   // ── Download photo from KoboToolbox attachments → Supabase Storage ──
   let photoUrl: string | null = null
-  const photoField = getPayloadField(payload, 'S1/photo_membre')
+  const photoField = getPayloadField(payload, 'S1/photo_membre') ?? getPayloadField(payload, 'photo_membre') ?? getPayloadField(payload, 'identification/photo')
   const attachments = (payload._attachments ?? []) as Array<Record<string, string>>
-  const faitiereCode = getPayloadField(payload, 'S2/code_faitiere') ?? null
 
   if (photoField && attachments.length > 0) {
     // Find the attachment matching the photo filename
@@ -685,6 +698,157 @@ async function enrollNewMemberFromSubmission(
     cooperativeId: targetCooperativeId,
     submissionId,
   })
+}
+
+// =========================================================
+// Cooperative Registration: Create or update cooperative from Kobo form
+// =========================================================
+// KoboCollect form fields expected (faitierehub_enquete_cooperative):
+//   C1/nom_cooperative   — official name of the cooperative
+//   C1/niveau            — faitiere | union | cooperative
+//   C1/nom_union_parente — parent union name (when niveau = cooperative)
+//   C1/description       — activity / description
+//   C2/region            — region (for auto-matching parent union)
+async function processCooperativeRegistration(
+  supabase: ReturnType<typeof createClient>,
+  submissionId: string,
+  faitiereId: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const nom = (
+    getPayloadField(payload, 'C1/nom_cooperative') ??
+    getPayloadField(payload, 'nom_cooperative') ??
+    ''
+  ).trim()
+
+  if (!nom) {
+    await supabase.from('kobo_submissions').update({
+      status: 'error' as const,
+      error_message: 'nom_cooperative manquant dans la soumission',
+      updated_at: new Date().toISOString(),
+    }).eq('id', submissionId)
+    return
+  }
+
+  const niveau = (
+    getPayloadField(payload, 'C1/niveau') ??
+    getPayloadField(payload, 'niveau') ??
+    'cooperative'
+  ).toLowerCase().trim()
+
+  const nomParent = getPayloadField(payload, 'C1/nom_union_parente') ?? getPayloadField(payload, 'nom_union_parente') ?? null
+  const description = getPayloadField(payload, 'C1/description') ?? getPayloadField(payload, 'description') ?? null
+  const region = getPayloadField(payload, 'C2/region') ?? getPayloadField(payload, 'region') ?? null
+
+  // Get faitiere context
+  const { data: faitiereData } = await supabase
+    .from('cooperatives')
+    .select('name, faitiere_name')
+    .eq('id', faitiereId)
+    .maybeSingle()
+
+  const faitiereName = faitiereData?.faitiere_name ?? faitiereData?.name ?? ''
+
+  // Determine parent_id based on hierarchy level
+  let parentId: string | null = null
+  if (niveau === 'union') {
+    parentId = faitiereId
+  } else if (niveau === 'cooperative') {
+    // Try to find parent union by explicit name first, then by region
+    if (nomParent) {
+      const { data: parentUnion } = await supabase
+        .from('cooperatives')
+        .select('id')
+        .ilike('name', `%${escapeIlike(nomParent)}%`)
+        .eq('level', 'union')
+        .eq('faitiere_name', faitiereName)
+        .limit(1)
+        .maybeSingle()
+      parentId = parentUnion?.id ?? faitiereId
+    } else if (region) {
+      const { data: unions } = await supabase
+        .from('cooperatives')
+        .select('id, name')
+        .eq('level', 'union')
+        .eq('faitiere_name', faitiereName)
+      const typedUnions = (unions ?? []) as { id: string; name: string }[]
+      const match = typedUnions.find(u =>
+        u.name.toLowerCase().includes(region.toLowerCase()),
+      )
+      parentId = match?.id ?? faitiereId
+    } else {
+      parentId = faitiereId
+    }
+  }
+  // niveau === 'faitiere': parentId stays null
+
+  // Validate name via Zod schema
+  const parsedNom = cooperativeNameSchema.safeParse(nom)
+  if (!parsedNom.success) {
+    await supabase.from('kobo_submissions').update({
+      status: 'error' as const,
+      error_message: `nom_cooperative invalide : ${parsedNom.error.issues[0]?.message}`,
+      updated_at: new Date().toISOString(),
+    }).eq('id', submissionId)
+    return
+  }
+
+  // Check for existing cooperative (idempotent upsert by name + faitiere_name)
+  const { data: existing } = await supabase
+    .from('cooperatives')
+    .select('id')
+    .ilike('name', escapeIlike(parsedNom.data))
+    .eq('faitiere_name', faitiereName)
+    .limit(1)
+    .maybeSingle()
+
+  let coopId: string
+  if (existing) {
+    await supabase
+      .from('cooperatives')
+      .update({
+        level: niveau,
+        parent_id: parentId,
+        ...(description ? { description } : {}),
+      })
+      .eq('id', existing.id)
+    coopId = existing.id
+    log.info('Cooperative updated via KoboCollect', { id: coopId, name: nom })
+  } else {
+    const { data: newCoop, error: coopError } = await supabase
+      .from('cooperatives')
+      .insert({
+        name: parsedNom.data,
+        level: niveau,
+        parent_id: parentId,
+        faitiere_name: faitiereName,
+        description: description ?? null,
+      })
+      .select('id')
+      .single()
+
+    if (coopError || !newCoop) {
+      throw new Error(`Échec création coopérative : ${coopError?.message ?? 'Inconnu'}`)
+    }
+    coopId = newCoop.id
+    log.info('Nouvelle coopérative créée via KoboCollect', { id: coopId, name: nom, niveau })
+  }
+
+  await supabase
+    .from('kobo_submissions')
+    .update({
+      status: 'matched' as const,
+      matched_at: new Date().toISOString(),
+      processed_at: new Date().toISOString(),
+      processed_payload: {
+        mode: 'cooperative_registration',
+        cooperative_id: coopId,
+        cooperative_name: nom,
+        niveau,
+      } as unknown as Record<string, unknown>,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', submissionId)
 }
 
 // =========================================================

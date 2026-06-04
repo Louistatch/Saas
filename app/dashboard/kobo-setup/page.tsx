@@ -135,16 +135,17 @@ export default function KoboSetupPage() {
           {/* Step 1: Download */}
           {activeStep === 0 && (
             <div className="space-y-6">
+              {/* Form 1: Member enrollment */}
               <div className="bg-green-50 border border-green-200 rounded-xl p-6 space-y-4">
                 <div className="flex items-center gap-3">
                   <FileSpreadsheet className="h-8 w-8 text-green-600" />
                   <div>
-                    <p className="font-semibold text-green-900">Formulaire XLSForm — Enquête Membre</p>
-                    <p className="text-sm text-green-700">Pré-configuré avec tous les champs nécessaires</p>
+                    <p className="font-semibold text-green-900">Formulaire 1 — Enquête Membre</p>
+                    <p className="text-sm text-green-700">Enregistrement de nouveaux producteurs sur le terrain</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                  {['📋 Identification', '📍 Localisation', '🏢 Coopérative', '🌿 Exploitation'].map((field) => (
+                  {['📋 Identification', '📍 Localisation', '🏢 Coopérative', '🌿 Parcelles S5/S6'].map((field) => (
                     <div key={field} className="bg-white rounded-lg p-2 text-center text-green-800 border border-green-100">
                       {field}
                     </div>
@@ -153,28 +154,53 @@ export default function KoboSetupPage() {
                 <a href="/xlsform/faitierehub_enquete_membre.csv" download>
                   <Button className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white">
                     <Download className="h-4 w-4" />
-                    Télécharger le XLSForm (.csv)
+                    Télécharger — Enquête Membre (.csv)
                   </Button>
                 </a>
-                <p className="text-xs text-green-600 text-center">
-                  💡 Vous pouvez personnaliser ce fichier dans Excel avant de l'importer dans KoboToolbox
-                </p>
+                <div className="grid grid-cols-2 gap-2 text-xs text-green-700">
+                  <span>✓ Prénom & Nom séparés</span>
+                  <span>✓ Photo d'identité</span>
+                  <span>✓ Téléphone & Date naissance</span>
+                  <span>✓ Région / Préfecture / Canton / Village</span>
+                  <span>✓ Nom + code faîtière</span>
+                  <span>✓ Parcelles & Productions (repeat)</span>
+                </div>
               </div>
 
-              <div className="bg-secondary/30 rounded-xl p-4 space-y-2">
-                <p className="font-medium text-foreground text-sm">📌 Champs inclus dans le formulaire :</p>
-                <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
-                  <span>• Prénom & Nom</span>
-                  <span>• Photo d'identité</span>
-                  <span>• Téléphone</span>
-                  <span>• Sexe & Âge</span>
-                  <span>• Région / Préfecture</span>
-                  <span>• Canton / Village</span>
-                  <span>• Nom de la coopérative</span>
-                  <span>• Culture principale</span>
-                  <span>• Superficie (ha)</span>
-                  <span>• Type d'agriculture</span>
+              {/* Form 2: Cooperative registration */}
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 space-y-4">
+                <div className="flex items-center gap-3">
+                  <FileSpreadsheet className="h-8 w-8 text-blue-600" />
+                  <div>
+                    <p className="font-semibold text-blue-900">Formulaire 2 — Enregistrement Coopérative</p>
+                    <p className="text-sm text-blue-700">Créer une nouvelle coopérative depuis le terrain (faitière / union / coopérative de base)</p>
+                  </div>
                 </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                  {['🏢 Identification', '📊 Niveau hiérarchique', '📍 Localisation'].map((field) => (
+                    <div key={field} className="bg-white rounded-lg p-2 text-center text-blue-800 border border-blue-100">
+                      {field}
+                    </div>
+                  ))}
+                </div>
+                <a href="/xlsform/faitierehub_enquete_cooperative.csv" download>
+                  <Button className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white">
+                    <Download className="h-4 w-4" />
+                    Télécharger — Enregistrement Coopérative (.csv)
+                  </Button>
+                </a>
+                <div className="grid grid-cols-2 gap-2 text-xs text-blue-700">
+                  <span>✓ Nom officiel</span>
+                  <span>✓ Niveau : faitière / union / coopérative</span>
+                  <span>✓ Union parente automatique</span>
+                  <span>✓ Apparaît dans le dashboard immédiatement</span>
+                </div>
+              </div>
+
+              <div className="bg-secondary/30 rounded-xl p-4">
+                <p className="text-sm text-muted-foreground">
+                  💡 Configurez un projet KoboToolbox distinct par formulaire. Dans les <strong>Intégrations → KoboToolbox</strong>, choisissez le type de formulaire (<em>member_enrollment</em> ou <em>cooperative_registration</em>) pour chaque projet.
+                </p>
               </div>
             </div>
           )}
