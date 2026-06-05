@@ -98,25 +98,22 @@ export function SplashScreen() {
         transform: phase === 'in' ? 'scale(.88) translateY(16px)' : 'scale(1) translateY(0)',
         transition: 'opacity .5s cubic-bezier(.2,.7,.2,1), transform .5s cubic-bezier(.2,.7,.2,1)',
       }}>
-        {/* Glass card */}
+        {/* Logo card — fond blanc pour que le logo soit toujours lisible */}
         <div style={{
-          background: 'rgba(13,61,34,.55)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(77,255,160,.18)',
-          borderRadius: 32,
-          padding: '32px 40px',
+          background: '#ffffff',
+          borderRadius: 28,
+          padding: '28px 44px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 32px 80px -20px rgba(0,0,0,.7), inset 0 1px 0 rgba(77,255,160,.12)',
+          boxShadow: '0 0 0 1px rgba(77,255,160,.35), 0 32px 80px -20px rgba(0,0,0,.8), 0 0 60px -10px rgba(30,215,96,.25)',
         }}>
           <Image
             src="/logo.png"
             alt="FaîtiereHub"
-            width={160}
-            height={80}
-            style={{ objectFit: 'contain', filter: 'brightness(1.05)' }}
+            width={180}
+            height={90}
+            style={{ objectFit: 'contain' }}
             priority
           />
         </div>
