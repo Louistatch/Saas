@@ -15,7 +15,7 @@ import { initWasm, Resvg } from '@resvg/resvg-wasm'
 import { createClient } from '@/lib/supabase/server'
 import { assertTenantAccess } from '@/lib/security/assert-access'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
-import { buildCardSchema, renderToSvgString } from '@/lib/card-engine'
+import { buildCardSchema, renderToSvgString, loadEmbeddedFontStyle } from '@/lib/card-engine'
 
 export const runtime = 'nodejs'
 
@@ -105,6 +105,24 @@ export async function GET(
     .eq('id', card.cooperative_id)
     .maybeSingle()
 
+  // Fetch photo + signature as base64 data URIs (resvg cannot load external URLs)
+  async function urlToDataUri(url: string | null | undefined): Promise<string | null> {
+    if (!url) return null
+    try {
+      const resp = await fetch(url)
+      if (!resp.ok) return null
+      const buf = Buffer.from(await resp.arrayBuffer())
+      const mime = resp.headers.get('content-type') || 'image/jpeg'
+      return `data:${mime};base64,${buf.toString('base64')}`
+    } catch { return null }
+  }
+
+  const [photoDataUrl, signatureDataUrl, fontStyle] = await Promise.all([
+    urlToDataUri(member.photo_url),
+    urlToDataUri(member.signature_url),
+    loadEmbeddedFontStyle(),
+  ])
+
   // Build the card schema
   const schema = buildCardSchema({
     member: {
@@ -128,8 +146,8 @@ export async function GET(
       : 'bronze',
   })
 
-  // Render SVG
-  const svg = renderToSvgString(schema)
+  // Render SVG with embedded fonts + pre-fetched images (no external URL deps)
+  const svg = renderToSvgString(schema, photoDataUrl, signatureDataUrl, fontStyle)
 
   // Initialize WASM and rasterize to PNG at 2x resolution (2360×1480)
   await ensureWasm()
