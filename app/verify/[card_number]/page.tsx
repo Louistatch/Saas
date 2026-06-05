@@ -7,12 +7,13 @@ import {
   CheckCircle, XCircle, Shield, MapPin, Building2,
   FileText, TrendingUp, PhoneCall, Map, CloudRain,
   ShoppingCart, Coins, Timer, User, ArrowLeft, Bot,
-  Bell,
+  Bell, Droplets,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/logo'
 import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboard'
 import { Card3D } from '@/components/verify/card-3d'
 import { AiChat } from '@/components/verify/ai-chat'
+import { AgriSmartWater } from '@/components/verify/agrismart-water'
 import { memberFullName, memberLocality as getMemberLocality, waNumber } from '@/components/verify/types'
 
 interface VerifyResult {
@@ -40,7 +41,7 @@ export default function VerifyCardPage() {
   const [showContent, setShowContent] = useState(false)
   const [timeLeft, setTimeLeft] = useState(600)
   const [expired, setExpired] = useState(false)
-  const [activeView, setActiveView] = useState<'menu' | 'identity' | 'prices' | 'technicien' | 'ai'>('menu')
+  const [activeView, setActiveView] = useState<'menu' | 'identity' | 'prices' | 'technicien' | 'ai' | 'agrismart'>('menu')
   const [contacts, setContacts] = useState<{ role: 'technicien' | 'coordo'; name: string; phone: string; canton?: string | null }[] | null>(null)
   const [contactsLoading, setContactsLoading] = useState(false)
 
@@ -140,6 +141,7 @@ export default function VerifyCardPage() {
     { icon: TrendingUp, title: 'Prix du Marché', description: 'Cours en temps réel', available: true, action: () => setActiveView('prices'), gradient: 'from-violet-500/20 to-violet-700/5' },
     { icon: Bot, title: 'Assistant IA', description: 'Conseils & prévisions', available: true, highlight: true, action: () => setActiveView('ai'), gradient: 'from-amber-400/20 to-amber-600/5' },
     { icon: PhoneCall, title: 'Mon Technicien', description: 'Appel & WhatsApp', available: true, action: () => setActiveView('technicien'), gradient: 'from-teal-500/20 to-teal-700/5' },
+    { icon: Droplets, title: 'AgriSmart', description: 'Besoins en eau', available: true, action: () => setActiveView('agrismart'), gradient: 'from-blue-400/20 to-cyan-600/5' },
     { icon: Map, title: 'Parcelles GPS', description: 'Suivi de mes parcelles', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
     { icon: CloudRain, title: 'Alertes Météo', description: 'Prévisions & alertes', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
     { icon: ShoppingCart, title: 'Intrants', description: 'Semences & engrais', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
@@ -202,7 +204,7 @@ export default function VerifyCardPage() {
                 <p className="text-white text-sm font-semibold">Compte vérifié</p>
                 <div className="flex items-center gap-1 justify-center mt-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-[var(--vfp-accent)] animate-pulse" />
-                  <span className="text-[var(--vfp-accent-dim)] text-[9px]">Membre actif</span>
+                  <span className="text-[var(--vfp-accent-dim)] text-xs">Membre actif</span>
                 </div>
               </div>
             </div>
@@ -244,18 +246,18 @@ export default function VerifyCardPage() {
               <span className="text-white/40 text-sm">Tout ce dont vous avez besoin.</span>
             </div>
 
-            <div className="grid grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-2 gap-2.5">
               {services.map((s, i) => {
                 const Icon = s.icon
                 return (
-                  <button key={i} onClick={s.action} className={`vfp-card group text-left rounded-2xl p-3 flex flex-col items-center justify-center text-center min-h-[120px] ${!s.available ? 'opacity-40' : ''}`} disabled={!s.available}>
-                    <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${s.gradient} flex items-center justify-center mb-2 group-active:scale-90 transition-transform`}>
+                  <button key={i} onClick={s.action} className={`vfp-card group text-left rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px] ${!s.available ? 'opacity-40' : ''}`} disabled={!s.available}>
+                    <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${s.gradient} flex items-center justify-center mb-2.5 group-active:scale-90 transition-transform`}>
                       <Icon className={`h-5 w-5 ${s.highlight ? 'text-amber-300' : s.available ? 'text-[var(--vfp-accent-bright)]' : 'text-white/30'}`} />
                     </div>
-                    <p className={`font-semibold text-[13px] leading-tight mb-0.5 ${s.available ? 'text-white' : 'text-white/40'}`}>{s.title}</p>
-                    <p className={`text-[9px] leading-snug ${s.highlight ? 'text-amber-300/50' : 'text-white/30'}`}>{s.description}</p>
+                    <p className={`font-semibold text-sm leading-tight mb-0.5 ${s.available ? 'text-white' : 'text-white/40'}`}>{s.title}</p>
+                    <p className={`text-xs leading-snug ${s.highlight ? 'text-amber-300/50' : 'text-white/30'}`}>{s.description}</p>
                     {!s.available && (
-                      <span className="mt-1.5 px-2 py-0.5 rounded-full bg-white/5 text-white/25 text-[7px] font-bold uppercase">Bientôt</span>
+                      <span className="mt-1.5 px-2 py-0.5 rounded-full bg-white/5 text-white/25 text-[10px] font-bold uppercase">Bientôt</span>
                     )}
                   </button>
                 )
@@ -306,35 +308,35 @@ export default function VerifyCardPage() {
                 {/* ── Localisation ── */}
                 <div className="col-span-2 flex items-center gap-2 mt-1">
                   <MapPin className="h-3.5 w-3.5 text-[var(--vfp-accent)]" />
-                  <span className="text-[11px] text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">Localisation</span>
+                  <span className="text-xs text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">Localisation</span>
                 </div>
                 <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
-                  <span className="text-[9px] text-white/40 uppercase font-semibold tracking-wider">Région</span>
+                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Région</span>
                   <p className="text-white text-sm font-semibold mt-0.5">{result.member.region ?? '—'}</p>
                 </div>
                 <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
-                  <span className="text-[9px] text-white/40 uppercase font-semibold tracking-wider">Préfecture</span>
+                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Préfecture</span>
                   <p className="text-white text-sm font-medium mt-0.5">{result.member.prefecture ?? '—'}</p>
                 </div>
                 <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
-                  <span className="text-[9px] text-white/40 uppercase font-semibold tracking-wider">Canton</span>
+                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Canton</span>
                   <p className="text-white text-sm font-medium mt-0.5">{result.member.canton ?? '—'}</p>
                 </div>
                 <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
-                  <span className="text-[9px] text-white/40 uppercase font-semibold tracking-wider">Village</span>
+                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Village</span>
                   <p className="text-white text-sm font-medium mt-0.5">{result.member.village ?? '—'}</p>
                 </div>
                 {/* ── Organisation ── */}
                 <div className="col-span-2 flex items-center gap-2 mt-2">
                   <Building2 className="h-3.5 w-3.5 text-[var(--vfp-accent)]" />
-                  <span className="text-[11px] text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">Organisation</span>
+                  <span className="text-xs text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">Organisation</span>
                 </div>
                 <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
-                  <span className="text-[9px] text-white/40 uppercase font-semibold tracking-wider">Coopérative</span>
+                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Coopérative</span>
                   <p className="text-white text-sm font-semibold mt-0.5">{result.cooperative?.name ?? '—'}</p>
                 </div>
                 <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
-                  <span className="text-[9px] text-white/40 uppercase font-semibold tracking-wider">Faîtière</span>
+                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Faîtière</span>
                   <p className="text-white text-sm font-semibold mt-0.5">{result.cooperative?.faitiere_name ?? '—'}</p>
                 </div>
               </div>
@@ -379,6 +381,11 @@ export default function VerifyCardPage() {
         {/* ─── AI Chat View ─── */}
         {isValid && activeView === 'ai' && result.member && (
           <AiChat cardNumber={cardNumber} memberName={firstName} onBack={() => setActiveView('menu')} />
+        )}
+
+        {/* ─── AgriSmart Water View ─── */}
+        {isValid && activeView === 'agrismart' && (
+          <AgriSmartWater onBack={() => setActiveView('menu')} />
         )}
 
         {/* ─── Security Timer ─── */}
