@@ -228,12 +228,13 @@ export function renderToSvgString(
   const nameBlockH    = firstFs + lastFs + 12   // 12px gap between lines
 
   // ── Photo ─────────────────────────────────────────────────────────────────
-  // Circular clip (matches the round photo in card-3d.tsx).
+  // Rounded-rectangle clip — portrait format (3:4 ratio), matching card-3d.tsx.
+  // Frame: x=48 y=140, width=236 height=314, rx=20
   const resolvedPhoto = photoDataUrl || member.photoUrl
   const photoContent  = resolvedPhoto
-    ? `<g clip-path="url(#photoClip)"><image href="${escapeXml(resolvedPhoto)}" xlink:href="${escapeXml(resolvedPhoto)}" x="58" y="160" width="216" height="280" preserveAspectRatio="xMidYMid slice"/></g>`
+    ? `<g clip-path="url(#photoClip)"><image href="${escapeXml(resolvedPhoto)}" xlink:href="${escapeXml(resolvedPhoto)}" x="48" y="140" width="236" height="314" preserveAspectRatio="xMidYMin slice"/></g>`
     : `<g clip-path="url(#photoClip)">
-        <rect x="58" y="160" width="216" height="280" fill="${darken(accent, 0.55)}"/>
+        <rect x="48" y="140" width="236" height="314" fill="${darken(accent, 0.55)}"/>
         <g transform="translate(166 294)" fill="${accentSoft}" opacity="0.55">
           <circle cx="0" cy="-30" r="34"/>
           <path d="M-66 66 C -66 16, 66 16, 66 66 Z"/>
@@ -304,7 +305,7 @@ export function renderToSvgString(
       <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
     <clipPath id="cardClip"><rect x="0" y="0" width="1180" height="740" rx="30" ry="30"/></clipPath>
-    <clipPath id="photoClip"><circle cx="166" cy="294" r="104"/></clipPath>
+    <clipPath id="photoClip"><rect x="48" y="140" width="236" height="314" rx="20" ry="20"/></clipPath>
     <pattern id="kente" width="56" height="56" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
       <rect width="56" height="56" fill="none"/>
       <path d="M0 28 H56 M28 0 V56" stroke="${escapeXml(accent)}" stroke-width="2" stroke-opacity="0.10"/>
@@ -397,11 +398,11 @@ export function renderToSvgString(
       <text x="158" y="18" font-family="'Barlow Condensed','Barlow',Arial,sans-serif" font-weight="800" font-size="24" fill="${escapeXml(accentSoft)}">Hub</text>
     </g>
 
-    <!-- Photo circle -->
-    <circle cx="166" cy="294" r="112" fill="url(#ringGrad)" filter="url(#glow)"/>
-    <circle cx="166" cy="294" r="106" fill="${escapeXml(darken(accent, 0.5))}"/>
+    <!-- Photo frame (rounded rect, portrait 3:4) -->
+    <rect x="44" y="136" width="244" height="322" rx="23" ry="23" fill="url(#ringGrad)" filter="url(#glow)"/>
+    <rect x="46" y="138" width="240" height="318" rx="22" ry="22" fill="${escapeXml(darken(accent, 0.5))}"/>
     ${photoContent}
-    <circle cx="166" cy="294" r="104" fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-width="2"/>
+    <rect x="48" y="140" width="236" height="314" rx="20" ry="20" fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-width="2"/>
 
     <!-- Name block -->
     <g transform="translate(290 90)" font-family="'Barlow Condensed','Barlow',Arial,sans-serif">
@@ -424,8 +425,8 @@ export function renderToSvgString(
       <text x="0" y="${nameBlockH + 62}" font-family="'Barlow','Barlow Condensed',Arial,sans-serif" font-weight="700" font-size="16" fill="${escapeXml(accentSoft)}" letter-spacing="0.5">COOPÉRATIVE : <tspan fill="${escapeXml(onDark)}" font-weight="800">${escapeXml(trunc(branding.cooperativeName, 28))}</tspan></text>
     </g>
 
-    <!-- Info pills (2×2 grid, bottom-left) -->
-    <g transform="translate(44 418)">
+    <!-- Info pills (2×2 grid, bottom-left — below photo frame which ends y=454) -->
+    <g transform="translate(44 466)">
       ${infoPill(  0,  0, 'LOCALITÉ',    trunc(member.locality || '—', 24), accent, accentSoft, 'pin')}
       ${infoPill(334,  0, 'TÉLÉPHONE',   member.phone || '—',              accent, accentSoft, 'phone')}
       ${infoPill(  0, 88, 'COOPÉRATIVE', trunc(branding.cooperativeName, 24), accent, accentSoft, 'building')}

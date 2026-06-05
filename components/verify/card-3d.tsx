@@ -230,22 +230,22 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
           backdrop-filter: blur(4px);
         }
         /* Body */
-        .card3d-body { display: flex; gap: 16px; align-items: center; }
+        .card3d-body { display: flex; gap: 16px; align-items: flex-start; }
 
-        /* ── Photo ronde ──────────────────────────────────── */
+        /* ── Photo rectangulaire ─────────────────────────── */
         .card3d-photo {
           position: relative;
-          width: 82px;
-          height: 82px;
+          width: 76px;
+          height: 96px;
           flex-shrink: 0;
         }
         .card3d-photo-ring {
-          position: absolute; inset: -3px; border-radius: 50%;
+          position: absolute; inset: -2px; border-radius: 8px;
           background: conic-gradient(from 0deg, #4dffa0, #1c7a47, #b48cff, #4dffa0);
           filter: blur(.5px);
         }
         .card3d-photo-inner {
-          position: absolute; inset: 0; border-radius: 50%; overflow: hidden;
+          position: absolute; inset: 0; border-radius: 7px; overflow: hidden;
           box-shadow: inset 0 2px 6px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.5);
         }
         .card3d-photo-inner img {
@@ -255,7 +255,7 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
         }
         .card3d-photo-empty {
           width: 100%; height: 100%;
-          border-radius: 50%;
+          border-radius: 7px;
           background: #0c3d24;
           display: grid; place-items: center; color: rgba(255,255,255,.4);
         }
