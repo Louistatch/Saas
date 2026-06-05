@@ -23,9 +23,9 @@ interface Canton { id: string; name: string; priceCount?: number }
 interface MarketPrice { id: string; culture_id: string; market_name: string; price: number; trend: string; verified: boolean; cultures: { name: string } | null }
 
 function TrendBadge({ trend }: { trend: string }) {
-  if (trend === 'up') return <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400 text-[9px] font-bold">↑ Hausse</span>
-  if (trend === 'down') return <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-400 text-[9px] font-bold">↓ Baisse</span>
-  return <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-white/5 text-white/50 text-[9px] font-bold">→ Stable</span>
+  if (trend === 'up') return <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400 text-xs font-bold">↑ Hausse</span>
+  if (trend === 'down') return <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-400 text-xs font-bold">↓ Baisse</span>
+  return <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-white/5 text-white/50 text-xs font-bold">→ Stable</span>
 }
 
 interface Props {
@@ -169,7 +169,7 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
   return (
     <div className="space-y-4">
       {/* Back + Breadcrumb */}
-      <button onClick={goBack} className="flex items-center gap-2 text-[#34d399] text-sm font-medium active:opacity-70">
+      <button onClick={goBack} className="flex items-center gap-2 text-[var(--vfp-accent)] text-sm font-medium active:opacity-70">
         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" /></svg>
         {step === 'regions' ? 'Retour au menu' : 'Retour'}
       </button>
@@ -179,9 +179,9 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-white text-lg font-bold flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-[#34d399]" /> Prix du Marché
+            <TrendingUp className="h-5 w-5 text-[var(--vfp-accent)]" /> Prix du Marché
           </h3>
-          <p className="text-white/40 text-[11px] mt-0.5">
+          <p className="text-white/40 text-xs mt-0.5">
             {step === 'regions' && 'Choisir une région'}
             {step === 'prefectures' && 'Choisir une préfecture'}
             {step === 'cantons' && 'Choisir un canton / marché'}
@@ -194,20 +194,20 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
         </div>
       </div>
 
-      {loading && <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-emerald-500/30 border-t-[#34d399] rounded-full animate-spin" /></div>}
+      {loading && <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-[var(--vfp-accent)]/30 border-t-[var(--vfp-accent)] rounded-full animate-spin" /></div>}
 
       {/* Step 1: Regions */}
       {step === 'regions' && !loading && (
         <div className="space-y-2">
           {REGIONS.map((r) => (
             <button key={r.id} onClick={() => handleSelectRegion(r)} className="w-full rounded-2xl vfp-card p-4 flex items-center gap-4 active:scale-[0.98] transition-transform ">
-              <div className="w-12 h-12 rounded-xl emerald-500/10 flex items-center justify-center text-xl">{r.emoji}</div>
+              <div className="w-12 h-12 rounded-xl bg-[var(--vfp-accent)]/10 flex items-center justify-center text-xl">{r.emoji}</div>
               <div className="flex-1 text-left">
                 <p className="text-sm font-semibold text-white">{r.name}</p>
-                <p className="text-[11px] text-white/40">{regionCounts[r.id] ?? 0} prix enregistrés</p>
+                <p className="text-xs text-white/40">{regionCounts[r.id] ?? 0} prix enregistrés</p>
               </div>
               {(regionCounts[r.id] ?? 0) > 0 && (
-                <span className="px-2 py-0.5 rounded-full emerald-500/10 text-[#34d399] text-[10px] font-bold">{regionCounts[r.id]}</span>
+                <span className="px-2 py-0.5 rounded-full bg-[var(--vfp-accent)]/10 text-[var(--vfp-accent)] text-xs font-bold">{regionCounts[r.id]}</span>
               )}
               <svg className="h-4 w-4 text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
@@ -220,10 +220,10 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
         <div className="space-y-2">
           {prefectures.map((p) => (
             <button key={p.id} onClick={() => handleSelectPrefecture(p)} className="w-full rounded-xl vfp-card p-3.5 flex items-center gap-3 active:scale-[0.98] transition-transform ">
-              <MapPin className="h-4 w-4 text-[#34d399]/60 shrink-0" />
+              <MapPin className="h-4 w-4 text-[var(--vfp-accent)]/60 shrink-0" />
               <span className="text-sm text-white font-medium flex-1 text-left">{p.name}</span>
               {(p.priceCount ?? 0) > 0 && (
-                <span className="px-2 py-0.5 rounded-full emerald-500/10 text-[#34d399] text-[10px] font-bold">{p.priceCount}</span>
+                <span className="px-2 py-0.5 rounded-full bg-[var(--vfp-accent)]/10 text-[var(--vfp-accent)] text-xs font-bold">{p.priceCount}</span>
               )}
               <svg className="h-3.5 w-3.5 text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
@@ -239,7 +239,7 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
               <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center text-sm">🏘️</div>
               <span className="text-sm text-white font-medium flex-1 text-left">{c.name}</span>
               {(c.priceCount ?? 0) > 0 ? (
-                <span className="px-2 py-0.5 rounded-full emerald-500/10 text-[#34d399] text-[10px] font-bold">{c.priceCount} prix</span>
+                <span className="px-2 py-0.5 rounded-full bg-[var(--vfp-accent)]/10 text-[var(--vfp-accent)] text-xs font-bold">{c.priceCount} prix</span>
               ) : (
                 <span className="text-[10px] text-white/25">aucun prix</span>
               )}
@@ -270,7 +270,7 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-bold text-white">{p.price} F</p>
-                    <p className="text-[9px] text-white/30">/kg</p>
+                    <p className="text-[11px] text-white/30">/kg</p>
                   </div>
                 </div>
               ))}
@@ -281,11 +281,11 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
             const memberRegion = REGIONS.find(r => r.name === memberLocality?.region)
             if (memberRegion) setSelectedRegion(memberRegion)
             setStep('submit')
-          }} className="w-full rounded-2xl p-4 bg-gradient-to-r from-emerald-900 to-emerald-800 border border-emerald-500/20 flex items-center gap-3 active:scale-[0.98] transition-transform">
-            <div className="w-10 h-10 rounded-xl emerald-500/15 flex items-center justify-center shrink-0"><TrendingUp className="h-5 w-5 text-[#34d399]" /></div>
+          }} className="w-full rounded-2xl p-4 bg-[var(--vfp-accent)]/[0.08] border border-[var(--vfp-accent)]/20 flex items-center gap-3 active:scale-[0.98] transition-transform">
+            <div className="w-10 h-10 rounded-xl bg-[var(--vfp-accent)]/15 flex items-center justify-center shrink-0"><TrendingUp className="h-5 w-5 text-[var(--vfp-accent)]" /></div>
             <div className="flex-1 text-left">
               <p className="text-sm font-semibold text-white">Renseigner un prix</p>
-              <p className="text-[11px] text-white/50">📍 {memberLocality?.canton ?? memberLocality?.village ?? 'Votre zone'}</p>
+              <p className="text-xs text-white/50">📍 {memberLocality?.canton ?? memberLocality?.village ?? 'Votre zone'}</p>
             </div>
           </button>
         </div>
@@ -295,36 +295,36 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
       {step === 'submit' && (
         <div className="rounded-2xl vfp-card p-5 space-y-4">
           <div className="flex items-center gap-2 mb-1">
-            <div className="w-8 h-8 rounded-lg emerald-500/10 flex items-center justify-center"><TrendingUp className="h-4 w-4 text-[#34d399]" /></div>
+            <div className="w-8 h-8 rounded-lg bg-[var(--vfp-accent)]/10 flex items-center justify-center"><TrendingUp className="h-4 w-4 text-[var(--vfp-accent)]" /></div>
             <div>
               <p className="text-sm font-bold text-white">Renseigner un prix</p>
-              <p className="text-[10px] text-white/40">📍 {[memberLocality?.village, memberLocality?.canton, memberLocality?.prefecture].filter(Boolean).join(', ') || 'Votre zone'}</p>
+              <p className="text-xs text-white/40">📍 {[memberLocality?.village, memberLocality?.canton, memberLocality?.prefecture].filter(Boolean).join(', ') || 'Votre zone'}</p>
             </div>
           </div>
           <div className="rounded-lg bg-white/[0.03] border border-white/[0.05] p-2.5">
-            <p className="text-[9px] text-white/40 uppercase tracking-wider mb-1">Votre localité (carte membre)</p>
+            <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">Votre localité (carte membre)</p>
             <p className="text-xs text-white font-medium">{[memberLocality?.village, memberLocality?.canton, memberLocality?.prefecture, memberLocality?.region].filter(Boolean).join(', ') || '—'}</p>
           </div>
           <div>
-            <label className="text-[10px] text-white/50 uppercase tracking-wider font-semibold block mb-1.5">Culture</label>
+            <label className="text-xs text-white/50 uppercase tracking-wider font-semibold block mb-1.5">Culture</label>
             <div className="grid grid-cols-4 gap-2">
               {CULTURE_LIST.map((c) => (
-                <button key={c.id} onClick={() => setSubmitForm(f => ({ ...f, culture_id: c.id }))} className={`flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all ${submitForm.culture_id === c.id ? 'emerald-500/10 border-emerald-500/40' : 'bg-white/[0.02] border-white/[0.06]'}`}>
+                <button key={c.id} onClick={() => setSubmitForm(f => ({ ...f, culture_id: c.id }))} className={`flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all ${submitForm.culture_id === c.id ? 'bg-[var(--vfp-accent)]/10 border-[var(--vfp-accent)]/40' : 'bg-white/[0.02] border-white/[0.06]'}`}>
                   <span className="text-lg">{c.emoji}</span>
-                  <span className="text-[8px] text-white/60 text-center">{c.name}</span>
+                  <span className="text-[10px] text-white/60 text-center">{c.name}</span>
                 </button>
               ))}
             </div>
           </div>
           <div>
-            <label className="text-[10px] text-white/50 uppercase tracking-wider font-semibold block mb-1.5">Prix (FCFA/kg)</label>
-            <input type="number" inputMode="numeric" placeholder="Ex: 450" value={submitForm.price} onChange={(e) => setSubmitForm(f => ({ ...f, price: e.target.value }))} className="w-full rounded-xl bg-white/[0.04] border border-white/[0.1] px-4 py-3 text-white text-lg font-bold placeholder:text-white/20 focus:outline-none focus:border-emerald-500/40" />
+            <label className="text-xs text-white/50 uppercase tracking-wider font-semibold block mb-1.5">Prix (FCFA/kg)</label>
+            <input type="number" inputMode="numeric" placeholder="Ex: 450" value={submitForm.price} onChange={(e) => setSubmitForm(f => ({ ...f, price: e.target.value }))} className="w-full rounded-xl bg-white/[0.04] border border-white/[0.1] px-4 py-3 text-white text-lg font-bold placeholder:text-white/20 focus:outline-none focus:border-[var(--vfp-accent)]/40" />
           </div>
-          <button onClick={handleSubmitPrice} disabled={!submitForm.culture_id || !submitForm.price || submitting} className="w-full py-3.5 rounded-xl bg-[#1ed760] text-[#04140b] font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-40 active:scale-[0.97] transition-transform">
-            {submitting ? <div className="w-4 h-4 border-2 border-[#04140b]/30 border-t-[#04140b] rounded-full animate-spin" /> : <>✓ Envoyer</>}
+          <button onClick={handleSubmitPrice} disabled={!submitForm.culture_id || !submitForm.price || submitting} className="w-full py-3.5 rounded-xl bg-[var(--vfp-cta)] text-[var(--vfp-cta-fg)] font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-40 active:scale-[0.97] transition-transform">
+            {submitting ? <div className="w-4 h-4 border-2 border-[var(--vfp-cta-fg)]/30 border-t-[var(--vfp-cta-fg)] rounded-full animate-spin" /> : <>✓ Envoyer</>}
           </button>
-          {submitResult && <div className={`rounded-xl p-3 text-center text-xs font-medium ${submitResult.ok ? 'emerald-500/10 text-[#34d399]' : 'bg-red-500/10 text-red-400'}`}>{submitResult.msg}</div>}
-          <p className="text-[9px] text-white/25 text-center">Vérifié par la coopérative avant publication</p>
+          {submitResult && <div className={`rounded-xl p-3 text-center text-xs font-medium ${submitResult.ok ? 'bg-[var(--vfp-accent)]/10 text-[var(--vfp-accent)]' : 'bg-red-500/10 text-red-400'}`}>{submitResult.msg}</div>}
+          <p className="text-[11px] text-white/25 text-center">Vérifié par la coopérative avant publication</p>
         </div>
       )}
     </div>

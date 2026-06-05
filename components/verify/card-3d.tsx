@@ -226,7 +226,7 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
           display: inline-flex; align-items: center; gap: 5px;
           background: rgba(77,255,160,.16); border: 1px solid rgba(77,255,160,.4);
           color: #9bffc8; border-radius: 999px; padding: 5px 12px;
-          font-size: .78rem; font-weight: 800; letter-spacing: 1.5px;
+          font-size: .88rem; font-weight: 800; letter-spacing: 1.5px;
           backdrop-filter: blur(4px);
         }
         /* Body */
@@ -270,7 +270,7 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
           text-transform: uppercase; letter-spacing: .5px;
         }
         .card3d-coop { display: flex; flex-direction: column; line-height: 1.2; }
-        .card3d-coop-label { font-size: .8rem; letter-spacing: 1.6px; color: #7fd9a5; font-weight: 700; text-transform: uppercase; }
+        .card3d-coop-label { font-size: .9rem; letter-spacing: 1.6px; color: #7fd9a5; font-weight: 700; text-transform: uppercase; }
         .card3d-coop-value { font-size: 1.18rem; font-weight: 700; line-height: 1.2; }
         .card3d-loc { display: inline-flex; align-items: center; gap: 5px; margin-top: 2px; font-size: .9rem; color: #b7e8cb; }
 
@@ -285,8 +285,8 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
         }
         .card3d-chip span { background: rgba(120,80,10,.35); border-radius: 1px; }
         .card3d-meta { display: flex; gap: 18px; text-align: right; flex: 1; justify-content: flex-end; }
-        .card3d-meta-label { display: block; font-size: .75rem; letter-spacing: 1.4px; color: #7fd9a5; font-weight: 700; text-transform: uppercase; }
-        .card3d-meta-value { display: block; font-size: 1.08rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .card3d-meta-label { display: block; font-size: .85rem; letter-spacing: 1.4px; color: #7fd9a5; font-weight: 700; text-transform: uppercase; }
+        .card3d-meta-value { display: block; font-size: 1.18rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 
         /* Shadow */
         .card3d-shadow {

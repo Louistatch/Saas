@@ -229,36 +229,36 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
     <path d="M750 0 L1180 0 L1180 740 L750 740 C730 740 720 720 720 700 L720 40 C720 20 730 0 750 0 Z" fill="url(#panelGrad)"/>
 
     <g transform="translate(770 44)" font-family="'Barlow Condensed', Arial, sans-serif">
-      <text x="0" y="24" font-weight="800" font-size="18" fill="${escapeXml(darken(accent, 0.55))}" letter-spacing="3">${escapeXml(truncate(title, 28))}</text>
-      <text x="0" y="44" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="11" fill="${escapeXml(darken(accent, 0.35))}" letter-spacing="1">${escapeXml(truncate(subtitle, 40))}</text>
+      <text x="0" y="26" font-weight="800" font-size="21" fill="${escapeXml(darken(accent, 0.55))}" letter-spacing="3">${escapeXml(truncate(title, 28))}</text>
+      <text x="0" y="48" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="13" fill="${escapeXml(darken(accent, 0.35))}" letter-spacing="1">${escapeXml(truncate(subtitle, 40))}</text>
 
       <!-- Verified badge (FR) -->
       <g transform="translate(0 58)" filter="url(#shadow)">
         <rect x="0" y="0" width="210" height="32" rx="16" fill="url(#iconGrad)"/>
         <circle cx="18" cy="16" r="8" fill="none" stroke="#fff" stroke-width="1.8"/>
         <path d="M14 16 l3 3 l5 -5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        <text x="34" y="21" font-weight="700" font-size="12" fill="#fff" letter-spacing="1.5">MEMBRE CERTIFIÉ</text>
+        <text x="34" y="21" font-weight="700" font-size="14" fill="#fff" letter-spacing="1.5">MEMBRE CERTIFIÉ</text>
       </g>
 
       <!-- N° Membre + Valable jusqu'au -->
       <g transform="translate(0 118)">
-        <text x="0" y="0" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="10" fill="${escapeXml(darken(accent, 0.35))}" letter-spacing="1.5">N° DE MEMBRE</text>
-        <text x="0" y="22" font-weight="800" font-size="20" fill="${escapeXml(darken(accent, 0.6))}">${escapeXml(member.cardNumber)}</text>
-        <text x="210" y="0" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="10" fill="${escapeXml(darken(accent, 0.35))}" letter-spacing="1.5">VALABLE JUSQU'AU</text>
-        <text x="210" y="22" font-weight="800" font-size="20" fill="${escapeXml(darken(accent, 0.6))}">${escapeXml(expiryText)}</text>
+        <text x="0" y="0" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="13" fill="${escapeXml(darken(accent, 0.35))}" letter-spacing="1.5">N° DE MEMBRE</text>
+        <text x="0" y="26" font-weight="800" font-size="23" fill="${escapeXml(darken(accent, 0.6))}">${escapeXml(member.cardNumber)}</text>
+        <text x="210" y="0" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="13" fill="${escapeXml(darken(accent, 0.35))}" letter-spacing="1.5">VALABLE JUSQU'AU</text>
+        <text x="210" y="26" font-weight="800" font-size="23" fill="${escapeXml(darken(accent, 0.6))}">${escapeXml(expiryText)}</text>
       </g>
 
       <!-- Statut + Période -->
       <g transform="translate(0 176)">
-        <text x="0" y="0" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="10" fill="${escapeXml(darken(accent, 0.35))}" letter-spacing="1.5">STATUT</text>
-        <text x="0" y="22" font-weight="800" font-size="20" fill="${escapeXml(darken(accent, 0.15))}">ACTIF</text>
-        <text x="210" y="0" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="10" fill="${escapeXml(darken(accent, 0.35))}" letter-spacing="1.5">PÉRIODE D'ADHÉSION</text>
-        <text x="210" y="22" font-weight="800" font-size="20" fill="${escapeXml(darken(accent, 0.6))}">${escapeXml(periodText)}</text>
+        <text x="0" y="0" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="13" fill="${escapeXml(darken(accent, 0.35))}" letter-spacing="1.5">STATUT</text>
+        <text x="0" y="26" font-weight="800" font-size="23" fill="${escapeXml(darken(accent, 0.15))}">ACTIF</text>
+        <text x="210" y="0" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="13" fill="${escapeXml(darken(accent, 0.35))}" letter-spacing="1.5">PÉRIODE D'ADHÉSION</text>
+        <text x="210" y="26" font-weight="800" font-size="23" fill="${escapeXml(darken(accent, 0.6))}">${escapeXml(periodText)}</text>
       </g>
 
       <!-- Signature -->
       <g transform="translate(0 230)">
-        <text x="0" y="0" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="10" fill="${escapeXml(darken(accent, 0.35))}" letter-spacing="1.5">SIGNATURE</text>
+        <text x="0" y="0" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="13" fill="${escapeXml(darken(accent, 0.35))}" letter-spacing="1.5">SIGNATURE</text>
         ${(() => {
           const sigUrl = signatureDataUrl || schema.member.signatureUrl
           if (sigUrl) {
@@ -277,8 +277,8 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
             <path d="${qrPath}" fill="#000000"/>
           </svg>
         </g>
-        <text x="0" y="244" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="700" font-size="15" fill="${escapeXml(darken(accent, 0.6))}" letter-spacing="1.2">SCANNER POUR VÉRIFIER</text>
-        <text x="0" y="262" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="9" fill="${escapeXml(darken(accent, 0.2))}" letter-spacing="0.8">SÉCURISÉ • CERTIFIÉ</text>
+        <text x="0" y="248" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="700" font-size="17" fill="${escapeXml(darken(accent, 0.6))}" letter-spacing="1.2">SCANNER POUR VÉRIFIER</text>
+        <text x="0" y="268" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="12" fill="${escapeXml(darken(accent, 0.2))}" letter-spacing="0.8">SÉCURISÉ • CERTIFIÉ</text>
       </g>
     </g>
 
@@ -305,11 +305,11 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
       <g transform="translate(0 ${nameBlockHeight + 16})">
         <rect x="0" y="0" width="172" height="32" rx="16" fill="${level.fill}" filter="url(#shadow)"/>
         ${medallionMark(20, 16, level.ring)}
-        <text x="38" y="22" font-weight="700" font-size="13" fill="${level.textColor}" letter-spacing="1.4">${level.label}</text>
+        <text x="38" y="22" font-weight="700" font-size="15" fill="${level.textColor}" letter-spacing="1.4">${level.label}</text>
         <g transform="translate(184 0)">
           <rect x="0" y="0" width="150" height="32" rx="16" fill="${escapeXml(accent)}" fill-opacity="0.18" stroke="${escapeXml(accentSoft)}" stroke-opacity="0.5"/>
           <circle cx="14" cy="16" r="4" fill="${escapeXml(accentSoft)}"/>
-          <text x="26" y="21" font-weight="700" font-size="12" fill="${escapeXml(accentSoft)}" letter-spacing="1.5">MEMBRE ACTIF</text>
+          <text x="26" y="21" font-weight="700" font-size="14" fill="${escapeXml(accentSoft)}" letter-spacing="1.5">MEMBRE ACTIF</text>
         </g>
       </g>
 
@@ -349,8 +349,8 @@ function infoPill(
       <rect x="0" y="0" width="48" height="48" rx="12" fill="url(#iconGrad)"/>
       ${icons[icon]}
     </g>
-    <text x="72" y="26" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="600" font-size="13" fill="${escapeXml(accentSoft)}" letter-spacing="1.4">${escapeXml(label)}</text>
-    <text x="72" y="52" font-family="'Barlow', Arial, sans-serif" font-weight="700" font-size="19" fill="#ffffff">${escapeXml(value)}</text>
+    <text x="72" y="28" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="600" font-size="15" fill="${escapeXml(accentSoft)}" letter-spacing="1.4">${escapeXml(label)}</text>
+    <text x="72" y="56" font-family="'Barlow', Arial, sans-serif" font-weight="700" font-size="22" fill="#ffffff">${escapeXml(value)}</text>
   </g>`
 }
 
