@@ -25,6 +25,8 @@ const securityHeaders = [
       "img-src 'self' data: blob: https://*.supabase.co https:",
       "font-src 'self'",
       `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.vercel-analytics.com https://*.vercel.app`,
+      "worker-src 'self'",
+      "manifest-src 'self'",
       "frame-ancestors 'none'",
       "frame-src 'self' https://*.vercel.app",
       "base-uri 'self'",
@@ -82,6 +84,15 @@ const nextConfig = {
           // Embed: allow framing from any origin (widget use case)
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'no-referrer' },
+        ],
+      },
+      {
+        // Service worker must be served as JS with no caching so updates propagate immediately
+        source: '/sw.js',
+        headers: [
+          { key: 'Content-Type', value: 'application/javascript; charset=utf-8' },
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+          { key: 'Service-Worker-Allowed', value: '/' },
         ],
       },
     ]
