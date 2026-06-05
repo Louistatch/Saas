@@ -14,13 +14,17 @@ import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboa
 import { Card3D } from '@/components/verify/card-3d'
 import { AiChat } from '@/components/verify/ai-chat'
 import { AgriSmartWater } from '@/components/verify/agrismart-water'
+import { OuvrierView } from '@/components/verify/ouvrier-view'
+import { AcheteurView } from '@/components/verify/acheteur-view'
+import { AgronomeView } from '@/components/verify/agronome-view'
 import { memberFullName, memberLocality as getMemberLocality, waNumber } from '@/components/verify/types'
 import { AtsBadge, type AtsBreakdown } from '@/components/shared/ats-badge'
 
 interface VerifyResult {
   valid: boolean
+  card_type?: 'FAITIERE' | 'OUVRIER' | 'ACHETEUR' | 'AGRONOME'
   source?: 'faitierehub' | 'haroo'
-  card?: { card_number: string; status: string; expiry_date: string | null; created_at: string; card_type?: string }
+  card?: { card_number: string; status: string; expiry_date: string | null; created_at: string }
   member?: {
     first_name: string | null; last_name: string | null; photo_url: string | null
     village: string | null; canton: string | null; prefecture: string | null; region: string | null
@@ -28,25 +32,36 @@ interface VerifyResult {
   }
   cooperative?: { name: string; faitiere_name: string | null }
   member_id?: string | null
-  // Haroo-specific
-  card_type?: 'OUVRIER' | 'ACHETEUR' | 'AGRONOME'
   ouvrier?: {
-    first_name: string; last_name: string; phone: string | null; photo_url: string | null
+    first_name: string | null; last_name: string | null; phone: string | null; photo_url: string | null
     competences: string[]; cantons_disponibles: string[]; disponible: boolean
+    disponible_jusqu_au: string | null; tarif_journalier: number | null
     note_moyenne: number; nombre_avis: number
   }
+  offres?: Array<{
+    id: string; titre: string; culture: string | null; description: string | null
+    canton: string; date_debut: string | null; date_fin: string | null
+    tarif_journalier: number | null; nombre_ouvriers: number
+  }>
   acheteur?: {
-    first_name: string; last_name: string; phone: string | null; photo_url: string | null
-    type_acheteur: string; produits_interesses: string[]; cantons_intervention: string[]
+    first_name: string | null; last_name: string | null; phone: string | null; photo_url: string | null
+    type_acheteur: string; nom_organisation: string | null
+    produits_interesses: string[]; cantons_intervention: string[]
   }
+  preventes?: Array<{
+    id: string; culture: string; quantite_estimee: number; prix_par_kg: number
+    date_recolte_prevue: string; canton: string; description: string | null
+  }>
   agronome?: {
-    first_name: string; last_name: string; phone: string | null; photo_url: string | null
+    first_name: string | null; last_name: string | null; phone: string | null; photo_url: string | null
     specialisations: string[]; canton: string | null; prefecture: string | null; region: string | null
-    badge_valide: boolean; statut_validation: string; note_moyenne: number; nombre_missions: number
+    badge_valide: boolean; statut_validation: string; disponible_missions: boolean
+    note_moyenne: number; nombre_missions: number
   }
-  offres?: { id: string; titre: string; description: string; canton: string; date_debut: string; date_fin: string; tarif_journalier: number | null; nombre_ouvriers: number }[]
-  preventes?: { id: string; culture: string; quantite_estimee: number; prix_par_kg: number; date_recolte_prevue: string; canton: string; description: string }[]
-  missions?: { id: string; description: string; statut: string; budget_propose: number | null; date_debut: string | null; date_fin: string | null; exploitant: string | null }[]
+  missions?: Array<{
+    id: string; titre: string; culture: string | null; description: string | null
+    canton: string; budget: number | null; date_souhaitee: string | null
+  }>
   error?: string
 }
 
@@ -162,9 +177,151 @@ export default function VerifyCardPage() {
 
   if (!result) return null
 
-  // ── Haroo card: render dedicated profile UI ──────────────────────────────
-  if (result.source === 'haroo') {
-    return <HarooVerifyPage result={result} cardNumber={cardNumber} />
+  const cardType = result.card_type ?? 'FAITIERE'
+
+  // ── Non-FAITIERE card types: delegate to their own view component ────────
+  if (result.valid && result.card && cardType === 'OUVRIER' && result.ouvrier) {
+    return (
+      <div className="min-h-screen vfp-bg relative overflow-hidden" style={{ isolation: 'isolate' }}>
+        <style>{vfpStyles}</style>
+        <div className="absolute inset-0 pointer-events-none" style={{ transform: 'translateZ(0)', zIndex: 0 }}>
+          <div className="absolute top-[-20%] right-[-15%] w-[500px] h-[500px] rounded-full" style={{ background: 'oklch(0.75 0.20 50 / 0.08)', filter: 'blur(100px)' }} />
+          <div className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full" style={{ background: 'oklch(0.75 0.20 50 / 0.12)', filter: 'blur(80px)' }} />
+        </div>
+        <div className="relative z-10 max-w-md mx-auto px-4 pt-4 pb-8 space-y-5">
+          <header className="flex items-center justify-between vfp-enter">
+            <div className="flex items-center gap-3">
+              <Link href="/" className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Accueil">
+                <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><path d="M1 1h16M1 7h10M1 13h14" stroke="oklch(0.75 0.20 50)" strokeWidth="1.6" strokeLinecap="round"/></svg>
+              </Link>
+              <Link href="/"><Logo size="sm" textClassName="text-white" /></Link>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"><Bell className="h-4 w-4 text-white/60" /></div>
+              <div className="w-10 h-10 rounded-full vfp-glass-subtle flex items-center justify-center border-2" style={{ borderColor: 'oklch(0.75 0.20 50 / 0.30)' }}>
+                {result.ouvrier.photo_url
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={result.ouvrier.photo_url} alt="" className="w-full h-full rounded-full object-cover" />
+                  : <User className="h-4 w-4 text-white/60" />}
+              </div>
+            </div>
+          </header>
+          <OuvrierView
+            cardNumber={cardNumber}
+            ouvrier={result.ouvrier}
+            offres={result.offres ?? []}
+            card={result.card}
+          />
+          <div className={`vfp-card rounded-2xl p-3 transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '600ms' }}>
+            <div className="flex items-center gap-3">
+              <Timer className="h-4 w-4 text-white/30 shrink-0" />
+              <div className="flex-1">
+                <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${(timeLeft / 600) * 100}%`, background: 'linear-gradient(to right, oklch(0.75 0.20 50), oklch(0.60 0.16 50))' }} />
+                </div>
+              </div>
+              <span className="text-white/30 text-[11px] font-mono shrink-0">{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (result.valid && result.card && cardType === 'ACHETEUR' && result.acheteur) {
+    return (
+      <div className="min-h-screen vfp-bg relative overflow-hidden" style={{ isolation: 'isolate' }}>
+        <style>{vfpStyles}</style>
+        <div className="absolute inset-0 pointer-events-none" style={{ transform: 'translateZ(0)', zIndex: 0 }}>
+          <div className="absolute top-[-20%] right-[-15%] w-[500px] h-[500px] rounded-full" style={{ background: 'oklch(0.72 0.18 280 / 0.08)', filter: 'blur(100px)' }} />
+          <div className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full" style={{ background: 'oklch(0.72 0.18 280 / 0.12)', filter: 'blur(80px)' }} />
+        </div>
+        <div className="relative z-10 max-w-md mx-auto px-4 pt-4 pb-8 space-y-5">
+          <header className="flex items-center justify-between vfp-enter">
+            <div className="flex items-center gap-3">
+              <Link href="/" className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Accueil">
+                <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><path d="M1 1h16M1 7h10M1 13h14" stroke="oklch(0.72 0.18 280)" strokeWidth="1.6" strokeLinecap="round"/></svg>
+              </Link>
+              <Link href="/"><Logo size="sm" textClassName="text-white" /></Link>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"><Bell className="h-4 w-4 text-white/60" /></div>
+              <div className="w-10 h-10 rounded-full vfp-glass-subtle flex items-center justify-center border-2" style={{ borderColor: 'oklch(0.72 0.18 280 / 0.30)' }}>
+                {result.acheteur.photo_url
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={result.acheteur.photo_url} alt="" className="w-full h-full rounded-full object-cover" />
+                  : <User className="h-4 w-4 text-white/60" />}
+              </div>
+            </div>
+          </header>
+          <AcheteurView
+            cardNumber={cardNumber}
+            acheteur={result.acheteur}
+            preventes={result.preventes ?? []}
+            card={result.card}
+          />
+          <div className={`vfp-card rounded-2xl p-3 transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '600ms' }}>
+            <div className="flex items-center gap-3">
+              <Timer className="h-4 w-4 text-white/30 shrink-0" />
+              <div className="flex-1">
+                <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${(timeLeft / 600) * 100}%`, background: 'linear-gradient(to right, oklch(0.72 0.18 280), oklch(0.58 0.14 280))' }} />
+                </div>
+              </div>
+              <span className="text-white/30 text-[11px] font-mono shrink-0">{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (result.valid && result.card && cardType === 'AGRONOME' && result.agronome) {
+    return (
+      <div className="min-h-screen vfp-bg relative overflow-hidden" style={{ isolation: 'isolate' }}>
+        <style>{vfpStyles}</style>
+        <div className="absolute inset-0 pointer-events-none" style={{ transform: 'translateZ(0)', zIndex: 0 }}>
+          <div className="absolute top-[-20%] right-[-15%] w-[500px] h-[500px] rounded-full" style={{ background: 'oklch(0.72 0.18 230 / 0.08)', filter: 'blur(100px)' }} />
+          <div className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full" style={{ background: 'oklch(0.72 0.18 230 / 0.12)', filter: 'blur(80px)' }} />
+        </div>
+        <div className="relative z-10 max-w-md mx-auto px-4 pt-4 pb-8 space-y-5">
+          <header className="flex items-center justify-between vfp-enter">
+            <div className="flex items-center gap-3">
+              <Link href="/" className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Accueil">
+                <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><path d="M1 1h16M1 7h10M1 13h14" stroke="oklch(0.72 0.18 230)" strokeWidth="1.6" strokeLinecap="round"/></svg>
+              </Link>
+              <Link href="/"><Logo size="sm" textClassName="text-white" /></Link>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"><Bell className="h-4 w-4 text-white/60" /></div>
+              <div className="w-10 h-10 rounded-full vfp-glass-subtle flex items-center justify-center border-2" style={{ borderColor: 'oklch(0.72 0.18 230 / 0.30)' }}>
+                {result.agronome.photo_url
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={result.agronome.photo_url} alt="" className="w-full h-full rounded-full object-cover" />
+                  : <User className="h-4 w-4 text-white/60" />}
+              </div>
+            </div>
+          </header>
+          <AgronomeView
+            cardNumber={cardNumber}
+            agronome={result.agronome}
+            missions={result.missions ?? []}
+            card={result.card}
+          />
+          <div className={`vfp-card rounded-2xl p-3 transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '600ms' }}>
+            <div className="flex items-center gap-3">
+              <Timer className="h-4 w-4 text-white/30 shrink-0" />
+              <div className="flex-1">
+                <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${(timeLeft / 600) * 100}%`, background: 'linear-gradient(to right, oklch(0.72 0.18 230), oklch(0.58 0.14 230))' }} />
+                </div>
+              </div>
+              <span className="text-white/30 text-[11px] font-mono shrink-0">{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const isValid = result.valid && result.card?.status === 'active'
@@ -347,12 +504,12 @@ export default function VerifyCardPage() {
                       <CheckCircle className="h-3 w-3 text-[var(--vfp-accent)]" />
                       <span className="text-[10px] font-bold text-[var(--vfp-accent)] uppercase">Membre vérifié</span>
                     </div>
-                    {result.card?.card_type && result.card.card_type !== 'FAITIERE' && (
+                    {result.card_type && result.card_type !== 'FAITIERE' && (
                       <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-white/8 border border-white/15 text-white/60 uppercase tracking-wider">
-                        {result.card.card_type}
+                        {result.card_type}
                       </span>
                     )}
-                    {(!result.card?.card_type || result.card.card_type === 'FAITIERE') && (
+                    {(!result.card_type || result.card_type === 'FAITIERE') && (
                       <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-white/8 border border-white/15 text-white/60 uppercase tracking-wider">
                         Producteur
                       </span>
@@ -406,7 +563,7 @@ export default function VerifyCardPage() {
                 <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
                   <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Type de carte</span>
                   <p className="text-white text-sm font-semibold mt-0.5">
-                    {result.card?.card_type === 'FAITIERE' || !result.card?.card_type ? 'Producteur' : result.card.card_type}
+                    {result.card_type === 'FAITIERE' || !result.card_type ? 'Producteur' : result.card_type}
                   </p>
                 </div>
               </div>
@@ -656,7 +813,7 @@ function HarooVerifyPage({ result, cardNumber }: { result: VerifyResult; cardNum
                   {result.offres.map(o => (
                     <div key={o.id} className="rounded-xl bg-white/5 border border-white/8 p-3 space-y-1">
                       <p className="text-sm font-bold text-white">{o.titre}</p>
-                      <p className="text-xs text-white/50">{o.canton} · {new Date(o.date_debut).toLocaleDateString('fr-FR')} → {new Date(o.date_fin).toLocaleDateString('fr-FR')}</p>
+                      <p className="text-xs text-white/50">{o.canton}{o.date_debut ? ` · ${new Date(o.date_debut).toLocaleDateString('fr-FR')}` : ''}{o.date_fin ? ` → ${new Date(o.date_fin).toLocaleDateString('fr-FR')}` : ''}</p>
                       {o.tarif_journalier && <p className="text-xs text-amber-300">{o.tarif_journalier.toLocaleString('fr-FR')} FCFA/j · {o.nombre_ouvriers} poste(s)</p>}
                     </div>
                   ))}
@@ -750,9 +907,10 @@ function HarooVerifyPage({ result, cardNumber }: { result: VerifyResult; cardNum
                 <div className="space-y-2">
                   {result.missions.map(m => (
                     <div key={m.id} className="rounded-xl bg-white/5 border border-white/8 p-3 space-y-1">
-                      <p className="text-sm text-white/80 line-clamp-2">{m.description}</p>
-                      <p className="text-xs text-white/40">{m.exploitant ?? '—'} · {m.statut}</p>
-                      {m.budget_propose && <p className="text-xs text-amber-300">{m.budget_propose.toLocaleString('fr-FR')} FCFA</p>}
+                      <p className="text-sm font-semibold text-white">{m.titre}</p>
+                      <p className="text-xs text-white/80 line-clamp-2">{m.description}</p>
+                      <p className="text-xs text-white/40">{m.canton}{m.date_souhaitee ? ` · ${new Date(m.date_souhaitee).toLocaleDateString('fr-FR')}` : ''}</p>
+                      {m.budget && <p className="text-xs text-amber-300">{m.budget.toLocaleString('fr-FR')} FCFA</p>}
                     </div>
                   ))}
                 </div>
