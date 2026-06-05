@@ -230,39 +230,38 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
           backdrop-filter: blur(4px);
         }
         /* Body */
-        .card3d-body { display: flex; gap: 16px; align-items: flex-start; }
+        .card3d-body { display: flex; gap: 16px; align-items: center; }
 
-        /* ── Photo format passeport américain ─────────────── */
-        /* US passport: 2×2 in — rendu en portrait 4:5 pour cadrer visage+épaules */
+        /* ── Photo ronde ──────────────────────────────────── */
         .card3d-photo {
           position: relative;
-          width: 86px;
-          height: 108px; /* ratio ≈ 0.796 ≈ 2:2.5 in */
+          width: 82px;
+          height: 82px;
           flex-shrink: 0;
         }
         .card3d-photo-ring {
-          position: absolute; inset: -3px; border-radius: 10px;
+          position: absolute; inset: -3px; border-radius: 50%;
           background: conic-gradient(from 0deg, #4dffa0, #1c7a47, #b48cff, #4dffa0);
           filter: blur(.5px);
         }
         .card3d-photo-inner {
-          position: absolute; inset: 0; border-radius: 8px; overflow: hidden;
+          position: absolute; inset: 0; border-radius: 50%; overflow: hidden;
           box-shadow: inset 0 2px 6px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.5);
         }
         .card3d-photo-inner img {
           width: 100%; height: 100%;
           object-fit: cover;
-          object-position: center top; /* cadre visage en haut */
+          object-position: center top;
         }
         .card3d-photo-empty {
           width: 100%; height: 100%;
-          border-radius: 8px;
+          border-radius: 50%;
           background: #0c3d24;
           display: grid; place-items: center; color: rgba(255,255,255,.4);
         }
 
         /* Identity block */
-        .card3d-identity { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding-top: 2px; }
+        .card3d-identity { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
         .card3d-name {
           font-family: 'Barlow Condensed','Barlow',sans-serif;
           font-weight: 800; line-height: 1.05; margin: 0;
