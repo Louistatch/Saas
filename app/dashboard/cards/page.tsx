@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Download, QrCode, Trash2, RefreshCw, Users, CheckCircle2, Search, Printer, User } from 'lucide-react'
+import { Plus, Download, QrCode, Trash2, RefreshCw, Users, CheckCircle2, Search, Printer, User, ImageIcon } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -73,6 +73,7 @@ export default function CardsPage() {
   const [savingSettings, setSavingSettings] = useState(false)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [downloadingAll, setDownloadingAll] = useState(false)
+  const [processingPhotos, setProcessingPhotos] = useState(false)
 
   // Persisted settings
   const [template, setTemplate] = useState<CardTemplate>(DEFAULT_CARD_TEMPLATE)
@@ -530,6 +531,21 @@ export default function CardsPage() {
     return JSON.stringify(sample)
   }, [settings, currentCooperative])
 
+  const handleProcessPhotos = async () => {
+    setProcessingPhotos(true)
+    try {
+      const res = await fetch('/api/photos/process-all', { method: 'POST', credentials: 'include' })
+      if (!res.ok) throw new Error('Échec du traitement')
+      const { processed, failed, total } = (await res.json()) as { processed: number; failed: number; total: number }
+      toast({ title: `Photos traitées : ${processed}/${total}${failed ? ` (${failed} échec${failed > 1 ? 's' : ''})` : ''}` })
+      fetchMembers()
+    } catch (e) {
+      toast({ title: 'Erreur de traitement photos', description: errorMessage(e), variant: 'destructive' })
+    } finally {
+      setProcessingPhotos(false)
+    }
+  }
+
   const activeCount = cards.filter((c) => c.status === 'active').length
 
   return (
@@ -581,6 +597,16 @@ export default function CardsPage() {
               <Button variant="outline" className="gap-2 border-border" onClick={() => setShowBulk(true)}>
                 <Users className="h-4 w-4" />
                 Génération en masse
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-2 border-border"
+                onClick={handleProcessPhotos}
+                disabled={processingPhotos}
+                title="Recadrer toutes les photos pour centrer le visage"
+              >
+                {processingPhotos ? <Spinner className="h-4 w-4" /> : <ImageIcon className="h-4 w-4" />}
+                Traiter photos
               </Button>
               <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setShowGenerate(true)}>
                 <Plus className="h-4 w-4" />
