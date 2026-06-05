@@ -12,6 +12,7 @@ import 'server-only'
 
 import { createClient } from '@/lib/supabase/admin'
 import { createLogger } from '@/lib/utils/logger'
+import { processPhotoFaceCrop } from '@/lib/photos/process-photo'
 import {
   cooperativeNameSchema,
   escapeIlike,
@@ -332,6 +333,22 @@ export async function enrollNewMemberFromSubmission(
     throw new Error(
       `Failed to create member: ${memberError?.message ?? 'Unknown'}`,
     )
+  }
+
+  // ── Face-crop photo async (non-blocking — update photo_url if successful) ──
+  if (photoUrl) {
+    processPhotoFaceCrop(photoUrl, newMember.id).then((faceUrl) => {
+      if (faceUrl && faceUrl !== photoUrl) {
+        supabase
+          .from('members')
+          .update({ photo_url: faceUrl, updated_at: new Date().toISOString() })
+          .eq('id', newMember.id)
+          .then(({ error }) => {
+            if (error) log.warn('Face-crop photo_url update failed', { error: error.message })
+            else log.info('Face-crop applied', { memberId: newMember.id })
+          })
+      }
+    }).catch((e) => log.warn('Face-crop processing error', { error: String(e) }))
   }
 
   // ── Generate card ───────────────────────────────────────────

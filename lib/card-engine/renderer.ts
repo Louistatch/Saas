@@ -140,9 +140,9 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
   // lands squarely on the nose — exactly what a passport crop should show.
   const resolvedPhotoUrl = photoDataUrl || member.photoUrl
   const photoContent = resolvedPhotoUrl
-    ? `<g clip-path="url(#photoClip)"><image href="${escapeXml(resolvedPhotoUrl)}" xlink:href="${escapeXml(resolvedPhotoUrl)}" x="58" y="160" width="216" height="280" preserveAspectRatio="xMidYMin slice"/></g>`
+    ? `<g clip-path="url(#photoClip)"><image href="${escapeXml(resolvedPhotoUrl)}" xlink:href="${escapeXml(resolvedPhotoUrl)}" x="36" y="140" width="260" height="320" preserveAspectRatio="xMidYMin slice"/></g>`
     : `<g clip-path="url(#photoClip)">
-        <rect x="58" y="160" width="216" height="280" fill="${darken(accent, 0.55)}"/>
+        <rect x="36" y="140" width="260" height="320" fill="${darken(accent, 0.55)}"/>
         <g transform="translate(166 294)" fill="${accentSoft}" opacity="0.55">
           <circle cx="0" cy="-30" r="34"/>
           <path d="M-66 66 C -66 16, 66 16, 66 66 Z"/>
@@ -202,7 +202,7 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
       <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
     <clipPath id="cardClip"><rect x="0" y="0" width="1180" height="740" rx="30" ry="30"/></clipPath>
-    <clipPath id="photoClip"><circle cx="166" cy="294" r="104"/></clipPath>
+    <clipPath id="photoClip"><circle cx="166" cy="294" r="130"/></clipPath>
     <!-- West African adinkra-inspired pattern tile (woven motif) -->
     <pattern id="kente" width="56" height="56" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
       <rect width="56" height="56" fill="none"/>
@@ -291,10 +291,10 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
     </g>
 
     <!-- Photo ring -->
-    <circle cx="166" cy="294" r="112" fill="url(#ringGrad)" filter="url(#glow)"/>
-    <circle cx="166" cy="294" r="106" fill="${escapeXml(darken(accent, 0.5))}"/>
+    <circle cx="166" cy="294" r="138" fill="url(#ringGrad)" filter="url(#glow)"/>
+    <circle cx="166" cy="294" r="132" fill="${escapeXml(darken(accent, 0.5))}"/>
     ${photoContent}
-    <circle cx="166" cy="294" r="104" fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-width="2"/>
+    <circle cx="166" cy="294" r="130" fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-width="2"/>
 
     <!-- Name + status: two lines, each sized to stay within the dark area -->
     <g transform="translate(290 90)" font-family="'Barlow Condensed', Arial, sans-serif">
