@@ -7,12 +7,13 @@ import {
   CheckCircle, XCircle, Shield, MapPin, Building2,
   FileText, TrendingUp, PhoneCall, Map, CloudRain,
   ShoppingCart, Coins, Timer, User, ArrowLeft, Bot,
-  Bell,
+  Bell, Droplets,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/logo'
 import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboard'
 import { Card3D } from '@/components/verify/card-3d'
 import { AiChat } from '@/components/verify/ai-chat'
+import { AgriSmartWater } from '@/components/verify/agrismart-water'
 import { memberFullName, memberLocality as getMemberLocality, waNumber } from '@/components/verify/types'
 
 interface VerifyResult {
@@ -40,7 +41,7 @@ export default function VerifyCardPage() {
   const [showContent, setShowContent] = useState(false)
   const [timeLeft, setTimeLeft] = useState(600)
   const [expired, setExpired] = useState(false)
-  const [activeView, setActiveView] = useState<'menu' | 'identity' | 'prices' | 'technicien' | 'ai'>('menu')
+  const [activeView, setActiveView] = useState<'menu' | 'identity' | 'prices' | 'technicien' | 'ai' | 'agrismart'>('menu')
   const [contacts, setContacts] = useState<{ role: 'technicien' | 'coordo'; name: string; phone: string; canton?: string | null }[] | null>(null)
   const [contactsLoading, setContactsLoading] = useState(false)
 
@@ -140,6 +141,7 @@ export default function VerifyCardPage() {
     { icon: TrendingUp, title: 'Prix du Marché', description: 'Cours en temps réel', available: true, action: () => setActiveView('prices'), gradient: 'from-violet-500/20 to-violet-700/5' },
     { icon: Bot, title: 'Assistant IA', description: 'Conseils & prévisions', available: true, highlight: true, action: () => setActiveView('ai'), gradient: 'from-amber-400/20 to-amber-600/5' },
     { icon: PhoneCall, title: 'Mon Technicien', description: 'Appel & WhatsApp', available: true, action: () => setActiveView('technicien'), gradient: 'from-teal-500/20 to-teal-700/5' },
+    { icon: Droplets, title: 'AgriSmart', description: 'Besoins en eau', available: true, action: () => setActiveView('agrismart'), gradient: 'from-blue-400/20 to-cyan-600/5' },
     { icon: Map, title: 'Parcelles GPS', description: 'Suivi de mes parcelles', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
     { icon: CloudRain, title: 'Alertes Météo', description: 'Prévisions & alertes', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
     { icon: ShoppingCart, title: 'Intrants', description: 'Semences & engrais', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
@@ -379,6 +381,11 @@ export default function VerifyCardPage() {
         {/* ─── AI Chat View ─── */}
         {isValid && activeView === 'ai' && result.member && (
           <AiChat cardNumber={cardNumber} memberName={firstName} onBack={() => setActiveView('menu')} />
+        )}
+
+        {/* ─── AgriSmart Water View ─── */}
+        {isValid && activeView === 'agrismart' && (
+          <AgriSmartWater onBack={() => setActiveView('menu')} />
         )}
 
         {/* ─── Security Timer ─── */}
