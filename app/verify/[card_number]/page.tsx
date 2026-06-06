@@ -18,6 +18,7 @@ import { memberFullName, memberLocality as getMemberLocality, waNumber } from '@
 
 interface VerifyResult {
   valid: boolean
+  source?: 'faitierehub' | 'haroo'
   card?: { card_number: string; status: string; expiry_date: string | null; created_at: string }
   member?: {
     first_name: string | null; last_name: string | null; photo_url: string | null
@@ -25,6 +26,25 @@ interface VerifyResult {
     status: string; member_since: string | null
   }
   cooperative?: { name: string; faitiere_name: string | null }
+  // Haroo-specific
+  card_type?: 'OUVRIER' | 'ACHETEUR' | 'AGRONOME'
+  ouvrier?: {
+    first_name: string; last_name: string; phone: string | null; photo_url: string | null
+    competences: string[]; cantons_disponibles: string[]; disponible: boolean
+    note_moyenne: number; nombre_avis: number
+  }
+  acheteur?: {
+    first_name: string; last_name: string; phone: string | null; photo_url: string | null
+    type_acheteur: string; produits_interesses: string[]; cantons_intervention: string[]
+  }
+  agronome?: {
+    first_name: string; last_name: string; phone: string | null; photo_url: string | null
+    specialisations: string[]; canton: string | null; prefecture: string | null; region: string | null
+    badge_valide: boolean; statut_validation: string; note_moyenne: number; nombre_missions: number
+  }
+  offres?: { id: string; titre: string; description: string; canton: string; date_debut: string; date_fin: string; tarif_journalier: number | null; nombre_ouvriers: number }[]
+  preventes?: { id: string; culture: string; quantite_estimee: number; prix_par_kg: number; date_recolte_prevue: string; canton: string; description: string }[]
+  missions?: { id: string; description: string; statut: string; budget_propose: number | null; date_debut: string | null; date_fin: string | null; exploitant: string | null }[]
   error?: string
 }
 
@@ -127,6 +147,11 @@ export default function VerifyCardPage() {
   }
 
   if (!result) return null
+
+  // ── Haroo card: render dedicated profile UI ──────────────────────────────
+  if (result.source === 'haroo') {
+    return <HarooVerifyPage result={result} cardNumber={cardNumber} />
+  }
 
   const isValid = result.valid && result.card?.status === 'active'
   const fullName = memberFullName(result.member as Parameters<typeof memberFullName>[0])
@@ -456,3 +481,236 @@ const vfpStyles = `
   @keyframes vfpSpin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .vfp-enter,.vfp-pop { animation: none; } }
 `
+
+// ── Haroo card verification page ─────────────────────────────────────────────
+
+const HAROO_CARD_LABELS: Record<string, { label: string; color: string; emoji: string }> = {
+  OUVRIER:  { label: 'Ouvrier Agricole',   color: 'oklch(0.65 0.18 55)',  emoji: '🌾' },
+  ACHETEUR: { label: 'Acheteur / Commerce', color: 'oklch(0.65 0.18 240)', emoji: '🛒' },
+  AGRONOME: { label: 'Ingénieur Agronome',  color: 'oklch(0.65 0.20 145)', emoji: '🌱' },
+}
+
+function HarooVerifyPage({ result, cardNumber }: { result: VerifyResult; cardNumber: string }) {
+  const meta = HAROO_CARD_LABELS[result.card_type ?? ''] ?? { label: 'Professionnel', color: 'oklch(0.65 0.12 200)', emoji: '👤' }
+
+  const profile = result.ouvrier ?? result.acheteur ?? result.agronome
+  const fullName = profile ? `${profile.first_name} ${profile.last_name}`.trim() : '—'
+
+  if (!result.valid) {
+    return (
+      <div className="min-h-screen vfp-bg flex items-center justify-center px-6">
+        <style>{vfpStyles}</style>
+        <div className="text-center max-w-xs">
+          <div className="w-16 h-16 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-center justify-center mx-auto mb-4">
+            <XCircle className="h-8 w-8 text-destructive" />
+          </div>
+          <h2 className="text-xl font-bold text-white mb-2">Carte invalide</h2>
+          <p className="text-white/50 text-sm">{result.error ?? 'Cette carte est expirée ou révoquée.'}</p>
+          <p className="text-white/30 text-xs mt-4 font-mono">{cardNumber}</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen vfp-bg relative overflow-x-hidden">
+      <style>{vfpStyles}</style>
+
+      {/* Header */}
+      <header className="flex items-center justify-between px-4 pt-4 pb-2">
+        <Logo className="h-7 w-auto opacity-80" />
+        <span className="text-xs font-bold px-3 py-1 rounded-full border" style={{ color: meta.color, borderColor: `${meta.color}55`, background: `${meta.color}15` }}>
+          {meta.emoji} {meta.label}
+        </span>
+      </header>
+
+      <main className="px-4 pb-8 space-y-4 max-w-lg mx-auto vfp-enter">
+
+        {/* Identity card */}
+        <div className="vfp-card rounded-2xl p-5">
+          <div className="flex gap-4 items-start">
+            {/* Photo */}
+            <div className="flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border border-white/10 bg-white/5">
+              {profile?.photo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={profile.photo_url} alt="" className="w-full h-full object-cover object-top" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <User className="h-8 w-8 text-white/30" />
+                </div>
+              )}
+            </div>
+
+            {/* Name + card info */}
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl font-black text-white uppercase tracking-wide leading-tight truncate">{fullName}</h1>
+              <p className="text-sm font-mono text-white/40 mt-0.5">{result.card?.card_number}</p>
+              {result.card?.expiry_date && (
+                <p className="text-xs text-white/40 mt-1">Valable jusqu&apos;au {new Date(result.card.expiry_date).toLocaleDateString('fr-FR')}</p>
+              )}
+              <div className="flex items-center gap-1.5 mt-2">
+                <CheckCircle className="h-4 w-4 text-green-400" />
+                <span className="text-xs font-bold text-green-400 tracking-wide">CARTE VALIDE</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* OUVRIER: compétences + disponibilité + offres */}
+        {result.card_type === 'OUVRIER' && result.ouvrier && (
+          <>
+            <div className="vfp-card rounded-2xl p-4 space-y-3">
+              <h2 className="text-sm font-bold text-white/60 uppercase tracking-widest">Profil</h2>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${result.ouvrier.disponible ? 'bg-green-500/20 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
+                  {result.ouvrier.disponible ? '✓ Disponible' : '✗ Non disponible'}
+                </span>
+                {result.ouvrier.note_moyenne > 0 && (
+                  <span className="text-xs text-yellow-300/80">★ {result.ouvrier.note_moyenne.toFixed(1)} ({result.ouvrier.nombre_avis} avis)</span>
+                )}
+              </div>
+              {result.ouvrier.competences.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {result.ouvrier.competences.map(c => (
+                    <span key={c} className="text-xs px-2 py-0.5 rounded-full bg-white/8 text-white/70 border border-white/10">{c}</span>
+                  ))}
+                </div>
+              )}
+              {result.ouvrier.cantons_disponibles.length > 0 && (
+                <div className="flex items-start gap-2 text-sm text-white/60">
+                  <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <span>{result.ouvrier.cantons_disponibles.join(', ')}</span>
+                </div>
+              )}
+              {profile?.phone && (
+                <a href={`tel:${profile.phone}`} className="flex items-center gap-2 text-sm font-medium text-green-400 hover:text-green-300">
+                  <PhoneCall className="h-4 w-4" />{profile.phone}
+                </a>
+              )}
+            </div>
+
+            {result.offres && result.offres.length > 0 && (
+              <div className="vfp-card rounded-2xl p-4 space-y-3">
+                <h2 className="text-sm font-bold text-white/60 uppercase tracking-widest">Offres d&apos;emploi proches</h2>
+                <div className="space-y-2">
+                  {result.offres.map(o => (
+                    <div key={o.id} className="rounded-xl bg-white/5 border border-white/8 p-3 space-y-1">
+                      <p className="text-sm font-bold text-white">{o.titre}</p>
+                      <p className="text-xs text-white/50">{o.canton} · {new Date(o.date_debut).toLocaleDateString('fr-FR')} → {new Date(o.date_fin).toLocaleDateString('fr-FR')}</p>
+                      {o.tarif_journalier && <p className="text-xs text-amber-300">{o.tarif_journalier.toLocaleString('fr-FR')} FCFA/j · {o.nombre_ouvriers} poste(s)</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ACHETEUR: type + produits + préventes */}
+        {result.card_type === 'ACHETEUR' && result.acheteur && (
+          <>
+            <div className="vfp-card rounded-2xl p-4 space-y-3">
+              <h2 className="text-sm font-bold text-white/60 uppercase tracking-widest">Profil Acheteur</h2>
+              {result.acheteur.type_acheteur && (
+                <p className="text-sm text-white/70">{result.acheteur.type_acheteur}</p>
+              )}
+              {result.acheteur.produits_interesses.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {result.acheteur.produits_interesses.map(p => (
+                    <span key={p} className="text-xs px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/20">{p}</span>
+                  ))}
+                </div>
+              )}
+              {result.acheteur.cantons_intervention.length > 0 && (
+                <div className="flex items-start gap-2 text-sm text-white/60">
+                  <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <span>{result.acheteur.cantons_intervention.join(', ')}</span>
+                </div>
+              )}
+              {profile?.phone && (
+                <a href={`tel:${profile.phone}`} className="flex items-center gap-2 text-sm font-medium text-blue-300 hover:text-blue-200">
+                  <PhoneCall className="h-4 w-4" />{profile.phone}
+                </a>
+              )}
+            </div>
+
+            {result.preventes && result.preventes.length > 0 && (
+              <div className="vfp-card rounded-2xl p-4 space-y-3">
+                <h2 className="text-sm font-bold text-white/60 uppercase tracking-widest">Préventes disponibles</h2>
+                <div className="space-y-2">
+                  {result.preventes.map(p => (
+                    <div key={p.id} className="rounded-xl bg-white/5 border border-white/8 p-3 space-y-1">
+                      <p className="text-sm font-bold text-white">{p.culture} — {p.quantite_estimee.toLocaleString('fr-FR')} kg</p>
+                      <p className="text-xs text-white/50">{p.canton} · Récolte {new Date(p.date_recolte_prevue).toLocaleDateString('fr-FR')}</p>
+                      {p.prix_par_kg > 0 && <p className="text-xs text-amber-300">{p.prix_par_kg.toFixed(0)} FCFA/kg</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* AGRONOME: spécialisations + badge + missions */}
+        {result.card_type === 'AGRONOME' && result.agronome && (
+          <>
+            <div className="vfp-card rounded-2xl p-4 space-y-3">
+              <h2 className="text-sm font-bold text-white/60 uppercase tracking-widest">Profil Agronome</h2>
+              <div className="flex items-center gap-2">
+                {result.agronome.badge_valide && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 font-bold border border-green-500/30">✓ Badge validé</span>
+                )}
+                {result.agronome.note_moyenne > 0 && (
+                  <span className="text-xs text-yellow-300/80">★ {result.agronome.note_moyenne.toFixed(1)} ({result.agronome.nombre_missions} missions)</span>
+                )}
+              </div>
+              {result.agronome.specialisations.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {result.agronome.specialisations.map(s => (
+                    <span key={s} className="text-xs px-2 py-0.5 rounded-full bg-green-500/15 text-green-300 border border-green-500/20">{s}</span>
+                  ))}
+                </div>
+              )}
+              {(result.agronome.prefecture || result.agronome.region) && (
+                <div className="flex items-start gap-2 text-sm text-white/60">
+                  <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <span>{[result.agronome.canton, result.agronome.prefecture, result.agronome.region].filter(Boolean).join(', ')}</span>
+                </div>
+              )}
+              {profile?.phone && (
+                <a href={`tel:${profile.phone}`} className="flex items-center gap-2 text-sm font-medium text-green-400 hover:text-green-300">
+                  <PhoneCall className="h-4 w-4" />{profile.phone}
+                </a>
+              )}
+            </div>
+
+            {result.missions && result.missions.length > 0 && (
+              <div className="vfp-card rounded-2xl p-4 space-y-3">
+                <h2 className="text-sm font-bold text-white/60 uppercase tracking-widest">Missions en cours</h2>
+                <div className="space-y-2">
+                  {result.missions.map(m => (
+                    <div key={m.id} className="rounded-xl bg-white/5 border border-white/8 p-3 space-y-1">
+                      <p className="text-sm text-white/80 line-clamp-2">{m.description}</p>
+                      <p className="text-xs text-white/40">{m.exploitant ?? '—'} · {m.statut}</p>
+                      {m.budget_propose && <p className="text-xs text-amber-300">{m.budget_propose.toLocaleString('fr-FR')} FCFA</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Footer */}
+        <div className="text-center pt-2">
+          <p className="text-xs text-white/20">Vérifié via <span className="font-bold">Haroo</span> · Plateforme Agricole Togo</p>
+          <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-white/30 hover:text-white/60 mt-2">
+            <ArrowLeft className="h-3 w-3" /> Retour à FaîtiereHub
+          </Link>
+        </div>
+
+      </main>
+    </div>
+  )
+}
+

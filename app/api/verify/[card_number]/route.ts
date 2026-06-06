@@ -98,6 +98,10 @@ export async function GET(
     .maybeSingle()
 
   if (cardError || !card) {
+    // Fallback: try Haroo platform (OUVRIER / ACHETEUR / AGRONOME cards)
+    const harooResult = await tryHarooVerify(decodedCardNumber)
+    if (harooResult) return NextResponse.json(harooResult)
+
     await new Promise(r => setTimeout(r, 100)) // Timing-safe
     return NextResponse.json({ valid: false, error: 'Carte non trouvée' }, { status: 404 })
   }
@@ -141,6 +145,7 @@ export async function GET(
 
   return NextResponse.json({
     valid: isActive,
+    source: 'faitierehub' as const,
     card: {
       card_number: card.card_number,
       status: isActive ? 'active' : (isExpired ? 'expired' : card.status),
@@ -163,4 +168,24 @@ export async function GET(
       faitiere_name: coop?.faitiere_name ?? null,
     },
   })
+}
+
+// ── Haroo fallback ────────────────────────────────────────────────────────────
+
+async function tryHarooVerify(cardNumber: string): Promise<Record<string, unknown> | null> {
+  const harooUrl = process.env.HAROO_API_URL?.replace(/\/$/, '')
+  if (!harooUrl) return null
+
+  try {
+    const res = await fetch(`${harooUrl}/api/cards/verify/${encodeURIComponent(cardNumber)}/`, {
+      signal: AbortSignal.timeout(5000),
+      headers: { Accept: 'application/json' },
+    })
+    if (!res.ok && res.status !== 200) return null
+    const data = await res.json()
+    // Inject source so the frontend can render the right UI
+    return { ...data, source: 'haroo' }
+  } catch {
+    return null
+  }
 }
