@@ -35,18 +35,22 @@ interface Card3DProps {
  */
 export function Card3D({ member, card, cooperative }: Card3DProps) {
   const ref = useRef<HTMLDivElement>(null)
+  const rafRef = useRef<number | null>(null)
   const [tilt, setTilt] = useState({ rx: 0, ry: 0, mx: 50, my: 50 })
 
   const handlePointer = useCallback((clientX: number, clientY: number) => {
-    const el = ref.current
-    if (!el) return
-    const r = el.getBoundingClientRect()
-    const px = (clientX - r.left) / r.width // 0..1
-    const py = (clientY - r.top) / r.height
-    // Map to a gentle tilt range; invert Y so it feels physical.
-    const ry = (px - 0.5) * 22
-    const rx = (0.5 - py) * 16
-    setTilt({ rx, ry, mx: px * 100, my: py * 100 })
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+    rafRef.current = requestAnimationFrame(() => {
+      const el = ref.current
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      const px = (clientX - r.left) / r.width // 0..1
+      const py = (clientY - r.top) / r.height
+      // Map to a gentle tilt range; invert Y so it feels physical.
+      const ry = (px - 0.5) * 22
+      const rx = (0.5 - py) * 16
+      setTilt({ rx, ry, mx: px * 100, my: py * 100 })
+    })
   }, [])
 
   const reset = useCallback(() => setTilt({ rx: 0, ry: 0, mx: 50, my: 50 }), [])
@@ -60,7 +64,10 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
       setTilt((t) => ({ ...t, rx, ry, mx: 50 + ry * 1.5, my: 50 - rx * 1.5 }))
     }
     window.addEventListener('deviceorientation', onOrient)
-    return () => window.removeEventListener('deviceorientation', onOrient)
+    return () => {
+      window.removeEventListener('deviceorientation', onOrient)
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+    }
   }, [])
 
   const fullName = memberFullName(member)
