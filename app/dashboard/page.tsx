@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { BarChart3, Users, ShoppingCart, CreditCard, ArrowRight } from 'lucide-react'
+import { BarChart3, Users, ShoppingCart, CreditCard, ArrowRight, MapPin } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
@@ -17,6 +17,7 @@ interface Stats {
   totalMembers: number
   activeCards: number
   totalExploitations: number
+  totalParcelles: number
 }
 
 interface RecentItem {
@@ -31,7 +32,7 @@ export default function DashboardPage() {
   const { user } = useAuth()
   const supabase = useMemo(() => createClient(), [])
 
-  const [stats, setStats] = useState<Stats>({ totalMembers: 0, activeCards: 0, totalExploitations: 0 })
+  const [stats, setStats] = useState<Stats>({ totalMembers: 0, activeCards: 0, totalExploitations: 0, totalParcelles: 0 })
   const [recent, setRecent] = useState<RecentItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -48,18 +49,20 @@ export default function DashboardPage() {
     let membersQuery = supabase.from('members').select('id', { count: 'exact', head: true }).eq('cooperative_id', coopId)
     let cardsQuery = supabase.from('member_cards').select('id', { count: 'exact', head: true }).eq('status', 'active').eq('cooperative_id', coopId)
     let fichesQuery = supabase.from('fiches_techniques').select('id', { count: 'exact', head: true }).eq('status', 'published').eq('cooperative_id', coopId)
+    let parcellesQuery = supabase.from('parcelles').select('id', { count: 'exact', head: true }).eq('cooperative_id', coopId)
     let recentMembersQuery = supabase.from('members').select('first_name, last_name, created_at').eq('cooperative_id', coopId).order('created_at', { ascending: false }).limit(3)
     let recentCardsQuery = supabase.from('member_cards').select('card_number, created_at').eq('cooperative_id', coopId).order('created_at', { ascending: false }).limit(2)
     let recentFichesQuery = supabase.from('fiches_techniques').select('title, created_at').eq('cooperative_id', coopId).order('created_at', { ascending: false }).limit(2)
 
-    const [membersRes, cardsRes, fichesRes, recentMembersRes, recentCardsRes, recentFichesRes] = await Promise.all([
-      membersQuery, cardsQuery, fichesQuery, recentMembersQuery, recentCardsQuery, recentFichesQuery,
+    const [membersRes, cardsRes, fichesRes, parcellesRes, recentMembersRes, recentCardsRes, recentFichesRes] = await Promise.all([
+      membersQuery, cardsQuery, fichesQuery, parcellesQuery, recentMembersQuery, recentCardsQuery, recentFichesQuery,
     ])
 
     setStats({
       totalMembers: membersRes.count ?? 0,
       activeCards: cardsRes.count ?? 0,
       totalExploitations: fichesRes.count ?? 0,
+      totalParcelles: parcellesRes.count ?? 0,
     })
 
     const activities: RecentItem[] = [
@@ -121,7 +124,7 @@ export default function DashboardPage() {
     { title: 'Total membres', value: stats.totalMembers, icon: Users, color: 'text-primary', bg: 'bg-primary/10', href: '/dashboard/members' },
     { title: 'Cartes actives', value: stats.activeCards, icon: CreditCard, color: 'text-primary', bg: 'bg-primary/15', href: '/dashboard/cards' },
     { title: 'Fiches techniques', value: stats.totalExploitations, icon: ShoppingCart, color: 'text-accent-foreground', bg: 'bg-accent/20', href: '/dashboard/marketplace' },
-    { title: 'Statistiques', value: '→', icon: BarChart3, color: 'text-muted-foreground', bg: 'bg-muted', href: '/dashboard/analytics' },
+    { title: 'Parcelles', value: stats.totalParcelles, icon: MapPin, color: 'text-green-600', bg: 'bg-green-100', href: '/dashboard/parcelles' },
   ]
 
   return (
@@ -168,8 +171,8 @@ export default function DashboardPage() {
           <CardContent className="space-y-2">
             {[
               { href: '/dashboard/members', icon: Users, label: 'Ajouter un membre' },
-              { href: '/dashboard/marketplace', icon: ShoppingCart, label: 'Ajouter un compte d\'exploitation' },
               { href: '/dashboard/cards', icon: CreditCard, label: 'Générer des cartes membres' },
+              { href: '/dashboard/parcelles', icon: MapPin, label: 'Consulter les parcelles' },
               { href: '/dashboard/analytics', icon: BarChart3, label: 'Voir les statistiques' },
             ].map(({ href, icon: Icon, label }) => (
               <Link key={href} href={href} className="block">
