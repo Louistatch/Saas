@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 import { parseQuery } from '@/lib/agritogo/nlp-router'
 import { tryDirectAction } from '@/lib/agritogo/direct-actions'
@@ -28,7 +29,7 @@ import { getGeminiKey, rotateGeminiKey, getKeyCount, markKeyExhausted, getRecove
 const MAX_HISTORY = 10
 
 export async function POST(request: NextRequest) {
-  const rateLimited = await applyRateLimit(request, 'verify')
+  const rateLimited = await applyRateLimit(request, 'ai-chat')
   if (rateLimited) return rateLimited
 
   let body: { card_number?: string; message?: string }
@@ -131,7 +132,9 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient()
   let lastError = ''
 
-  // Resolve producer context
+  // Resolve producer context — FAITIERE cards only; OUVRIER/ACHETEUR/AGRONOME
+  // cards live in AgriTogo and have no Supabase record, so we gracefully
+  // continue with empty context (the AgriTogo path above handles those).
   const { data: card } = await supabase
     .from('member_cards')
     .select('member_id, cooperative_id')
@@ -139,21 +142,17 @@ export async function POST(request: NextRequest) {
     .eq('status', 'active')
     .maybeSingle()
 
-  if (!card) {
-    return NextResponse.json({ error: 'Carte non trouvée ou inactive.' }, { status: 404 })
-  }
-
-  const { data: member } = await supabase
+  const { data: member } = card?.member_id ? await supabase
     .from('members')
     .select('first_name, last_name, region, canton, prefecture, village')
     .eq('id', card.member_id)
-    .maybeSingle()
+    .maybeSingle() : { data: null }
 
-  const { data: coop } = await supabase
+  const { data: coop } = card?.cooperative_id ? await supabase
     .from('cooperatives')
     .select('name, faitiere_name')
     .eq('id', card.cooperative_id)
-    .maybeSingle()
+    .maybeSingle() : { data: null }
 
   // Load market prices for context
   let pricesContext = 'Aucun prix disponible.'
@@ -177,8 +176,10 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Load conversation history
-  const { data: history } = await supabase
+  // Load conversation history — use admin client because SELECT on ai_conversations
+  // requires admin role after the RLS fix (anon reads are blocked)
+  const supabaseAdmin = createAdminClient()
+  const { data: history } = await supabaseAdmin
     .from('ai_conversations')
     .select('role, content')
     .eq('card_number', cardNumber)

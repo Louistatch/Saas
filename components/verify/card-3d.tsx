@@ -11,9 +11,16 @@ import {
   formatFrDate,
 } from './types'
 
+const CARD_TYPE_LABELS: Record<string, string> = {
+  FAITIERE: 'Carte Producteur',
+  OUVRIER:  'Carte Ouvrier',
+  ACHETEUR: 'Carte Acheteur',
+  AGRONOME: 'Carte Agronome',
+}
+
 interface Card3DProps {
   member: VerifyMember
-  card: VerifyCard
+  card: VerifyCard & { card_type?: string }
   cooperative?: VerifyCooperative
 }
 
@@ -88,9 +95,14 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
         {/* ─── CONTENT (raised layer) ─── */}
         <div className="card3d-content">
           <header className="card3d-top">
-            <div className="card3d-brand">
-              <span className="card3d-brand-main">Faîtière</span>
-              <span className="card3d-brand-accent">Hub</span>
+            <div>
+              <div className="card3d-brand">
+                <span className="card3d-brand-main">Faîtière</span>
+                <span className="card3d-brand-accent">Hub</span>
+              </div>
+              <div className="card3d-type-label">
+                {CARD_TYPE_LABELS[card.card_type ?? 'FAITIERE'] ?? 'Carte Membre'}
+              </div>
             </div>
             <div className="card3d-verified">
               <CheckCircle size={16} />
@@ -222,6 +234,7 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
           letter-spacing: .3px; text-shadow: 0 1px 2px rgba(0,0,0,.4);
         }
         .card3d-brand-accent { color: #4dffa0; }
+        .card3d-type-label { font-size: .78rem; letter-spacing: 1.4px; color: #7fd9a5; font-weight: 700; text-transform: uppercase; margin-top: 2px; }
         .card3d-verified {
           display: inline-flex; align-items: center; gap: 5px;
           background: rgba(77,255,160,.16); border: 1px solid rgba(77,255,160,.4);

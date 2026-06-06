@@ -14,10 +14,21 @@ import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboa
 import { Card3D } from '@/components/verify/card-3d'
 import { AiChat } from '@/components/verify/ai-chat'
 import { AgriSmartWater } from '@/components/verify/agrismart-water'
+import { ParcellesInlineView } from '@/components/verify/parcelles-inline-view'
+import { IntrantsInlineView } from '@/components/verify/intrants-inline-view'
+import { CotisationView } from '@/components/verify/cotisation-view'
+import { ExploitationInlineView } from '@/components/verify/exploitation-inline-view'
+import { MeteoInlineView } from '@/components/verify/meteo-inline-view'
+import { OuvrierView } from '@/components/verify/ouvrier-view'
+import { AcheteurView } from '@/components/verify/acheteur-view'
+import { AgronomeView } from '@/components/verify/agronome-view'
 import { memberFullName, memberLocality as getMemberLocality, waNumber } from '@/components/verify/types'
+import { AtsBadge, type AtsBreakdown } from '@/components/shared/ats-badge'
 
 interface VerifyResult {
   valid: boolean
+  card_type?: 'FAITIERE' | 'OUVRIER' | 'ACHETEUR' | 'AGRONOME'
+  source?: 'faitierehub' | 'haroo'
   card?: { card_number: string; status: string; expiry_date: string | null; created_at: string }
   member?: {
     first_name: string | null; last_name: string | null; photo_url: string | null
@@ -25,6 +36,37 @@ interface VerifyResult {
     status: string; member_since: string | null
   }
   cooperative?: { name: string; faitiere_name: string | null }
+  member_id?: string | null
+  ouvrier?: {
+    first_name: string | null; last_name: string | null; phone: string | null; photo_url: string | null
+    competences: string[]; cantons_disponibles: string[]; disponible: boolean
+    disponible_jusqu_au: string | null; tarif_journalier: number | null
+    note_moyenne: number; nombre_avis: number
+  }
+  offres?: Array<{
+    id: string; titre: string; culture: string | null; description: string | null
+    canton: string; date_debut: string | null; date_fin: string | null
+    tarif_journalier: number | null; nombre_ouvriers: number
+  }>
+  acheteur?: {
+    first_name: string | null; last_name: string | null; phone: string | null; photo_url: string | null
+    type_acheteur: string; nom_organisation: string | null
+    produits_interesses: string[]; cantons_intervention: string[]
+  }
+  preventes?: Array<{
+    id: string; culture: string; quantite_estimee: number; prix_par_kg: number
+    date_recolte_prevue: string; canton: string; description: string | null
+  }>
+  agronome?: {
+    first_name: string | null; last_name: string | null; phone: string | null; photo_url: string | null
+    specialisations: string[]; canton: string | null; prefecture: string | null; region: string | null
+    badge_valide: boolean; statut_validation: string; disponible_missions: boolean
+    note_moyenne: number; nombre_missions: number
+  }
+  missions?: Array<{
+    id: string; titre: string; culture: string | null; description: string | null
+    canton: string; budget: number | null; date_souhaitee: string | null
+  }>
   error?: string
 }
 
@@ -41,13 +83,14 @@ export default function VerifyCardPage() {
   const [showContent, setShowContent] = useState(false)
   const [timeLeft, setTimeLeft] = useState(600)
   const [expired, setExpired] = useState(false)
-  const [activeView, setActiveView] = useState<'menu' | 'identity' | 'prices' | 'technicien' | 'ai' | 'agrismart'>('menu')
+  const [activeView, setActiveView] = useState<'menu' | 'identity' | 'prices' | 'technicien' | 'ai' | 'agrismart' | 'parcelles' | 'intrants' | 'cotisation' | 'exploitation' | 'meteo'>('menu')
   const [contacts, setContacts] = useState<{ role: 'technicien' | 'coordo'; name: string; phone: string; canton?: string | null }[] | null>(null)
   const [contactsLoading, setContactsLoading] = useState(false)
+  const [atsData, setAtsData] = useState<{ score: number; level: string; breakdown: AtsBreakdown } | null>(null)
 
   useEffect(() => {
     setResult(null); setLoading(true); setShowContent(false)
-    setTimeLeft(600); setExpired(false); setActiveView('menu')
+    setTimeLeft(600); setExpired(false); setActiveView('menu'); setAtsData(null)
   }, [cardNumber])
 
   useEffect(() => {
@@ -64,6 +107,17 @@ export default function VerifyCardPage() {
         const res = await fetch(`/api/verify/${encodeURIComponent(cardNumber)}`)
         const data: VerifyResult = await res.json()
         setResult(data)
+        // Fetch ATS in background if card is valid and we have a member_id
+        if (data.valid && data.member_id) {
+          fetch(`/api/members/${data.member_id}/ats`)
+            .then(r => r.ok ? r.json() : null)
+            .then(ats => {
+              if (ats && typeof ats.score === 'number') {
+                setAtsData({ score: ats.score, level: ats.level, breakdown: ats.breakdown })
+              }
+            })
+            .catch(() => null)
+        }
       } catch { setResult({ valid: false, error: 'Erreur réseau.' }) }
       finally { setLoading(false); setTimeout(() => setShowContent(true), 120) }
     }
@@ -128,6 +182,153 @@ export default function VerifyCardPage() {
 
   if (!result) return null
 
+  const cardType = result.card_type ?? 'FAITIERE'
+
+  // ── Non-FAITIERE card types: delegate to their own view component ────────
+  if (result.valid && result.card && cardType === 'OUVRIER' && result.ouvrier) {
+    return (
+      <div className="min-h-screen vfp-bg relative overflow-hidden" style={{ isolation: 'isolate' }}>
+        <style>{vfpStyles}</style>
+        <div className="absolute inset-0 pointer-events-none" style={{ transform: 'translateZ(0)', zIndex: 0 }}>
+          <div className="absolute top-[-20%] right-[-15%] w-[500px] h-[500px] rounded-full" style={{ background: 'oklch(0.75 0.20 50 / 0.08)', filter: 'blur(100px)' }} />
+          <div className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full" style={{ background: 'oklch(0.75 0.20 50 / 0.12)', filter: 'blur(80px)' }} />
+        </div>
+        <div className="relative z-10 max-w-md mx-auto px-4 pt-4 pb-8 space-y-5">
+          <header className="flex items-center justify-between vfp-enter">
+            <div className="flex items-center gap-3">
+              <Link href="/" className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Accueil">
+                <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><path d="M1 1h16M1 7h10M1 13h14" stroke="oklch(0.75 0.20 50)" strokeWidth="1.6" strokeLinecap="round"/></svg>
+              </Link>
+              <Link href="/"><Logo size="sm" textClassName="text-white" /></Link>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"><Bell className="h-4 w-4 text-white/60" /></div>
+              <div className="w-10 h-10 rounded-full vfp-glass-subtle flex items-center justify-center border-2" style={{ borderColor: 'oklch(0.75 0.20 50 / 0.30)' }}>
+                {result.ouvrier.photo_url
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={result.ouvrier.photo_url} alt="" className="w-full h-full rounded-full object-cover" />
+                  : <User className="h-4 w-4 text-white/60" />}
+              </div>
+            </div>
+          </header>
+          <OuvrierView
+            cardNumber={cardNumber}
+            ouvrier={result.ouvrier}
+            offres={result.offres ?? []}
+            card={result.card}
+          />
+          <div className={`vfp-card rounded-2xl p-3 transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '600ms' }}>
+            <div className="flex items-center gap-3">
+              <Timer className="h-4 w-4 text-white/30 shrink-0" />
+              <div className="flex-1">
+                <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${(timeLeft / 600) * 100}%`, background: 'linear-gradient(to right, oklch(0.75 0.20 50), oklch(0.60 0.16 50))' }} />
+                </div>
+              </div>
+              <span className="text-white/30 text-[11px] font-mono shrink-0">{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (result.valid && result.card && cardType === 'ACHETEUR' && result.acheteur) {
+    return (
+      <div className="min-h-screen vfp-bg relative overflow-hidden" style={{ isolation: 'isolate' }}>
+        <style>{vfpStyles}</style>
+        <div className="absolute inset-0 pointer-events-none" style={{ transform: 'translateZ(0)', zIndex: 0 }}>
+          <div className="absolute top-[-20%] right-[-15%] w-[500px] h-[500px] rounded-full" style={{ background: 'oklch(0.72 0.18 280 / 0.08)', filter: 'blur(100px)' }} />
+          <div className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full" style={{ background: 'oklch(0.72 0.18 280 / 0.12)', filter: 'blur(80px)' }} />
+        </div>
+        <div className="relative z-10 max-w-md mx-auto px-4 pt-4 pb-8 space-y-5">
+          <header className="flex items-center justify-between vfp-enter">
+            <div className="flex items-center gap-3">
+              <Link href="/" className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Accueil">
+                <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><path d="M1 1h16M1 7h10M1 13h14" stroke="oklch(0.72 0.18 280)" strokeWidth="1.6" strokeLinecap="round"/></svg>
+              </Link>
+              <Link href="/"><Logo size="sm" textClassName="text-white" /></Link>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"><Bell className="h-4 w-4 text-white/60" /></div>
+              <div className="w-10 h-10 rounded-full vfp-glass-subtle flex items-center justify-center border-2" style={{ borderColor: 'oklch(0.72 0.18 280 / 0.30)' }}>
+                {result.acheteur.photo_url
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={result.acheteur.photo_url} alt="" className="w-full h-full rounded-full object-cover" />
+                  : <User className="h-4 w-4 text-white/60" />}
+              </div>
+            </div>
+          </header>
+          <AcheteurView
+            cardNumber={cardNumber}
+            acheteur={result.acheteur}
+            preventes={result.preventes ?? []}
+            card={result.card}
+          />
+          <div className={`vfp-card rounded-2xl p-3 transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '600ms' }}>
+            <div className="flex items-center gap-3">
+              <Timer className="h-4 w-4 text-white/30 shrink-0" />
+              <div className="flex-1">
+                <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${(timeLeft / 600) * 100}%`, background: 'linear-gradient(to right, oklch(0.72 0.18 280), oklch(0.58 0.14 280))' }} />
+                </div>
+              </div>
+              <span className="text-white/30 text-[11px] font-mono shrink-0">{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (result.valid && result.card && cardType === 'AGRONOME' && result.agronome) {
+    return (
+      <div className="min-h-screen vfp-bg relative overflow-hidden" style={{ isolation: 'isolate' }}>
+        <style>{vfpStyles}</style>
+        <div className="absolute inset-0 pointer-events-none" style={{ transform: 'translateZ(0)', zIndex: 0 }}>
+          <div className="absolute top-[-20%] right-[-15%] w-[500px] h-[500px] rounded-full" style={{ background: 'oklch(0.72 0.18 230 / 0.08)', filter: 'blur(100px)' }} />
+          <div className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full" style={{ background: 'oklch(0.72 0.18 230 / 0.12)', filter: 'blur(80px)' }} />
+        </div>
+        <div className="relative z-10 max-w-md mx-auto px-4 pt-4 pb-8 space-y-5">
+          <header className="flex items-center justify-between vfp-enter">
+            <div className="flex items-center gap-3">
+              <Link href="/" className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Accueil">
+                <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><path d="M1 1h16M1 7h10M1 13h14" stroke="oklch(0.72 0.18 230)" strokeWidth="1.6" strokeLinecap="round"/></svg>
+              </Link>
+              <Link href="/"><Logo size="sm" textClassName="text-white" /></Link>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"><Bell className="h-4 w-4 text-white/60" /></div>
+              <div className="w-10 h-10 rounded-full vfp-glass-subtle flex items-center justify-center border-2" style={{ borderColor: 'oklch(0.72 0.18 230 / 0.30)' }}>
+                {result.agronome.photo_url
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={result.agronome.photo_url} alt="" className="w-full h-full rounded-full object-cover" />
+                  : <User className="h-4 w-4 text-white/60" />}
+              </div>
+            </div>
+          </header>
+          <AgronomeView
+            cardNumber={cardNumber}
+            agronome={result.agronome}
+            missions={result.missions ?? []}
+            card={result.card}
+          />
+          <div className={`vfp-card rounded-2xl p-3 transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '600ms' }}>
+            <div className="flex items-center gap-3">
+              <Timer className="h-4 w-4 text-white/30 shrink-0" />
+              <div className="flex-1">
+                <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${(timeLeft / 600) * 100}%`, background: 'linear-gradient(to right, oklch(0.72 0.18 230), oklch(0.58 0.14 230))' }} />
+                </div>
+              </div>
+              <span className="text-white/30 text-[11px] font-mono shrink-0">{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const isValid = result.valid && result.card?.status === 'active'
   const fullName = memberFullName(result.member as Parameters<typeof memberFullName>[0])
   const rawFirst = (result.member?.first_name ?? '').trim()
@@ -137,15 +338,16 @@ export default function VerifyCardPage() {
 
   const services: ServiceItem[] = [
     { icon: Shield, title: 'Vérification', description: 'Détails de ma carte', available: true, action: () => setActiveView('identity'), gradient: 'from-[var(--vfp-accent)]/20 to-[var(--vfp-accent)]/5' },
-    { icon: FileText, title: 'Mon Exploitation', description: 'Fiches techniques', available: true, action: () => window.open('/marketplace', '_blank'), gradient: 'from-cyan-500/20 to-cyan-700/5' },
+    { icon: FileText, title: 'Mon Exploitation', description: 'Fiches techniques', available: true, action: () => setActiveView('exploitation'), gradient: 'from-cyan-500/20 to-cyan-700/5' },
     { icon: TrendingUp, title: 'Prix du Marché', description: 'Cours en temps réel', available: true, action: () => setActiveView('prices'), gradient: 'from-violet-500/20 to-violet-700/5' },
     { icon: Bot, title: 'Assistant IA', description: 'Conseils & prévisions', available: true, highlight: true, action: () => setActiveView('ai'), gradient: 'from-amber-400/20 to-amber-600/5' },
     { icon: PhoneCall, title: 'Mon Technicien', description: 'Appel & WhatsApp', available: true, action: () => setActiveView('technicien'), gradient: 'from-teal-500/20 to-teal-700/5' },
     { icon: Droplets, title: 'AgriSmart', description: 'Besoins en eau', available: true, action: () => setActiveView('agrismart'), gradient: 'from-blue-400/20 to-cyan-600/5' },
-    { icon: Map, title: 'Parcelles GPS', description: 'Suivi de mes parcelles', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
-    { icon: CloudRain, title: 'Alertes Météo', description: 'Prévisions & alertes', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
-    { icon: ShoppingCart, title: 'Intrants', description: 'Semences & engrais', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
-    { icon: Coins, title: 'Cotisation', description: 'Adhérer / Renouveler', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
+    { icon: Map, title: 'Parcelles GPS', description: 'Mes parcelles agricoles', available: true, action: () => setActiveView('parcelles'), gradient: 'from-emerald-500/20 to-emerald-700/5' },
+    { icon: FileText, title: 'Mon Attestation', description: 'Télécharger PDF officiel', available: true, action: () => result.member_id && window.open(`/reports/attestation/${result.member_id}`, '_blank'), gradient: 'from-violet-500/20 to-violet-700/5' },
+    { icon: ShoppingCart, title: 'Intrants', description: 'Semences & engrais', available: true, action: () => setActiveView('intrants'), gradient: 'from-orange-500/20 to-orange-700/5' },
+    { icon: Coins, title: 'Cotisation', description: 'Statut & campagne', available: true, action: () => setActiveView('cotisation'), gradient: 'from-yellow-500/20 to-yellow-700/5' },
+    { icon: CloudRain, title: 'Météo Agricole', description: 'Conditions & prévisions', available: true, action: () => setActiveView('meteo'), gradient: 'from-sky-500/20 to-sky-700/5' },
   ]
 
   return (
@@ -196,6 +398,11 @@ export default function VerifyCardPage() {
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--vfp-accent)] to-[var(--vfp-accent-dim)]">votre succès.</span>
                 </h1>
                 <p className="text-white/40 text-sm mt-2">Gérez, développez et prospérez avec FaîtiereHub.</p>
+                {atsData && (
+                  <div className="mt-3 max-w-[200px]">
+                    <AtsBadge score={atsData.score} level={atsData.level} size="sm" />
+                  </div>
+                )}
               </div>
               <div className="vfp-glass-subtle rounded-2xl px-4 py-3 text-center shrink-0">
                 <div className="w-10 h-10 rounded-full bg-[var(--vfp-accent)]/15 flex items-center justify-center mx-auto mb-1.5">
@@ -298,9 +505,21 @@ export default function VerifyCardPage() {
                 <div>
                   <h2 className="text-xl font-bold text-white">{result.member.first_name ?? ''} <span className="uppercase">{result.member.last_name ?? ''}</span></h2>
                   <p className="text-[var(--vfp-accent)]/70 text-xs font-mono">{result.card?.card_number}</p>
-                  <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--vfp-accent)]/10 border border-[var(--vfp-accent)]/20">
-                    <CheckCircle className="h-3 w-3 text-[var(--vfp-accent)]" />
-                    <span className="text-[10px] font-bold text-[var(--vfp-accent)] uppercase">Membre vérifié</span>
+                  <div className="flex items-center gap-2 flex-wrap mt-1.5">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--vfp-accent)]/10 border border-[var(--vfp-accent)]/20">
+                      <CheckCircle className="h-3 w-3 text-[var(--vfp-accent)]" />
+                      <span className="text-[10px] font-bold text-[var(--vfp-accent)] uppercase">Membre vérifié</span>
+                    </div>
+                    {result.card_type && result.card_type !== 'FAITIERE' && (
+                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-white/8 border border-white/15 text-white/60 uppercase tracking-wider">
+                        {result.card_type}
+                      </span>
+                    )}
+                    {(!result.card_type || result.card_type === 'FAITIERE') && (
+                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-white/8 border border-white/15 text-white/60 uppercase tracking-wider">
+                        Producteur
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -339,7 +558,36 @@ export default function VerifyCardPage() {
                   <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Faîtière</span>
                   <p className="text-white text-sm font-semibold mt-0.5">{result.cooperative?.faitiere_name ?? '—'}</p>
                 </div>
+                {result.member.member_since && (
+                  <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
+                    <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Membre depuis</span>
+                    <p className="text-white text-sm font-semibold mt-0.5">
+                      {new Date(result.member.member_since).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                    </p>
+                  </div>
+                )}
+                <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
+                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Type de carte</span>
+                  <p className="text-white text-sm font-semibold mt-0.5">
+                    {result.card_type === 'FAITIERE' || !result.card_type ? 'Producteur' : result.card_type}
+                  </p>
+                </div>
               </div>
+
+              {/* ATS Score breakdown */}
+              {atsData && (
+                <div className="pt-2 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">Score Agricole (ATS)</span>
+                  </div>
+                  <AtsBadge
+                    score={atsData.score}
+                    level={atsData.level}
+                    breakdown={atsData.breakdown}
+                    size="md"
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -386,6 +634,31 @@ export default function VerifyCardPage() {
         {/* ─── AgriSmart Water View ─── */}
         {isValid && activeView === 'agrismart' && (
           <AgriSmartWater onBack={() => setActiveView('menu')} />
+        )}
+
+        {/* ─── Parcelles View ─── */}
+        {isValid && activeView === 'parcelles' && (
+          <ParcellesInlineView cardNumber={cardNumber} onBack={() => setActiveView('menu')} />
+        )}
+
+        {/* ─── Intrants View ─── */}
+        {isValid && activeView === 'intrants' && (
+          <IntrantsInlineView cardNumber={cardNumber} onBack={() => setActiveView('menu')} />
+        )}
+
+        {/* ─── Cotisation View ─── */}
+        {isValid && activeView === 'cotisation' && (
+          <CotisationView cardNumber={cardNumber} onBack={() => setActiveView('menu')} />
+        )}
+
+        {/* ─── Exploitation View ─── */}
+        {isValid && activeView === 'exploitation' && (
+          <ExploitationInlineView cardNumber={cardNumber} memberId={result.member_id ?? null} onBack={() => setActiveView('menu')} />
+        )}
+
+        {/* ─── Météo View ─── */}
+        {isValid && activeView === 'meteo' && (
+          <MeteoInlineView cardNumber={cardNumber} onBack={() => setActiveView('menu')} />
         )}
 
         {/* ─── Security Timer ─── */}
@@ -456,3 +729,237 @@ const vfpStyles = `
   @keyframes vfpSpin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .vfp-enter,.vfp-pop { animation: none; } }
 `
+
+// ── Haroo card verification page ─────────────────────────────────────────────
+
+const HAROO_CARD_LABELS: Record<string, { label: string; color: string; emoji: string }> = {
+  OUVRIER:  { label: 'Ouvrier Agricole',   color: 'oklch(0.65 0.18 55)',  emoji: '🌾' },
+  ACHETEUR: { label: 'Acheteur / Commerce', color: 'oklch(0.65 0.18 240)', emoji: '🛒' },
+  AGRONOME: { label: 'Ingénieur Agronome',  color: 'oklch(0.65 0.20 145)', emoji: '🌱' },
+}
+
+function HarooVerifyPage({ result, cardNumber }: { result: VerifyResult; cardNumber: string }) {
+  const meta = HAROO_CARD_LABELS[result.card_type ?? ''] ?? { label: 'Professionnel', color: 'oklch(0.65 0.12 200)', emoji: '👤' }
+
+  const profile = result.ouvrier ?? result.acheteur ?? result.agronome
+  const fullName = profile ? `${profile.first_name} ${profile.last_name}`.trim() : '—'
+
+  if (!result.valid) {
+    return (
+      <div className="min-h-screen vfp-bg flex items-center justify-center px-6">
+        <style>{vfpStyles}</style>
+        <div className="text-center max-w-xs">
+          <div className="w-16 h-16 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-center justify-center mx-auto mb-4">
+            <XCircle className="h-8 w-8 text-destructive" />
+          </div>
+          <h2 className="text-xl font-bold text-white mb-2">Carte invalide</h2>
+          <p className="text-white/50 text-sm">{result.error ?? 'Cette carte est expirée ou révoquée.'}</p>
+          <p className="text-white/30 text-xs mt-4 font-mono">{cardNumber}</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen vfp-bg relative overflow-x-hidden">
+      <style>{vfpStyles}</style>
+
+      {/* Header */}
+      <header className="flex items-center justify-between px-4 pt-4 pb-2">
+        <Logo className="h-7 w-auto opacity-80" />
+        <span className="text-xs font-bold px-3 py-1 rounded-full border" style={{ color: meta.color, borderColor: `${meta.color}55`, background: `${meta.color}15` }}>
+          {meta.emoji} {meta.label}
+        </span>
+      </header>
+
+      <main className="px-4 pb-8 space-y-4 max-w-lg mx-auto vfp-enter">
+
+        {/* Identity card */}
+        <div className="vfp-card rounded-2xl p-5">
+          <div className="flex gap-4 items-start">
+            {/* Photo */}
+            <div className="flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border border-white/10 bg-white/5">
+              {profile?.photo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={profile.photo_url} alt="" className="w-full h-full object-cover object-top" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <User className="h-8 w-8 text-white/30" />
+                </div>
+              )}
+            </div>
+
+            {/* Name + card info */}
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl font-black text-white uppercase tracking-wide leading-tight truncate">{fullName}</h1>
+              <p className="text-sm font-mono text-white/40 mt-0.5">{result.card?.card_number}</p>
+              {result.card?.expiry_date && (
+                <p className="text-xs text-white/40 mt-1">Valable jusqu&apos;au {new Date(result.card.expiry_date).toLocaleDateString('fr-FR')}</p>
+              )}
+              <div className="flex items-center gap-1.5 mt-2">
+                <CheckCircle className="h-4 w-4 text-green-400" />
+                <span className="text-xs font-bold text-green-400 tracking-wide">CARTE VALIDE</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* OUVRIER: compétences + disponibilité + offres */}
+        {result.card_type === 'OUVRIER' && result.ouvrier && (
+          <>
+            <div className="vfp-card rounded-2xl p-4 space-y-3">
+              <h2 className="text-sm font-bold text-white/60 uppercase tracking-widest">Profil</h2>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${result.ouvrier.disponible ? 'bg-green-500/20 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
+                  {result.ouvrier.disponible ? '✓ Disponible' : '✗ Non disponible'}
+                </span>
+                {result.ouvrier.note_moyenne > 0 && (
+                  <span className="text-xs text-yellow-300/80">★ {result.ouvrier.note_moyenne.toFixed(1)} ({result.ouvrier.nombre_avis} avis)</span>
+                )}
+              </div>
+              {result.ouvrier.competences.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {result.ouvrier.competences.map(c => (
+                    <span key={c} className="text-xs px-2 py-0.5 rounded-full bg-white/8 text-white/70 border border-white/10">{c}</span>
+                  ))}
+                </div>
+              )}
+              {result.ouvrier.cantons_disponibles.length > 0 && (
+                <div className="flex items-start gap-2 text-sm text-white/60">
+                  <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <span>{result.ouvrier.cantons_disponibles.join(', ')}</span>
+                </div>
+              )}
+              {profile?.phone && (
+                <a href={`tel:${profile.phone}`} className="flex items-center gap-2 text-sm font-medium text-green-400 hover:text-green-300">
+                  <PhoneCall className="h-4 w-4" />{profile.phone}
+                </a>
+              )}
+            </div>
+
+            {result.offres && result.offres.length > 0 && (
+              <div className="vfp-card rounded-2xl p-4 space-y-3">
+                <h2 className="text-sm font-bold text-white/60 uppercase tracking-widest">Offres d&apos;emploi proches</h2>
+                <div className="space-y-2">
+                  {result.offres.map(o => (
+                    <div key={o.id} className="rounded-xl bg-white/5 border border-white/8 p-3 space-y-1">
+                      <p className="text-sm font-bold text-white">{o.titre}</p>
+                      <p className="text-xs text-white/50">{o.canton}{o.date_debut ? ` · ${new Date(o.date_debut).toLocaleDateString('fr-FR')}` : ''}{o.date_fin ? ` → ${new Date(o.date_fin).toLocaleDateString('fr-FR')}` : ''}</p>
+                      {o.tarif_journalier && <p className="text-xs text-amber-300">{o.tarif_journalier.toLocaleString('fr-FR')} FCFA/j · {o.nombre_ouvriers} poste(s)</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ACHETEUR: type + produits + préventes */}
+        {result.card_type === 'ACHETEUR' && result.acheteur && (
+          <>
+            <div className="vfp-card rounded-2xl p-4 space-y-3">
+              <h2 className="text-sm font-bold text-white/60 uppercase tracking-widest">Profil Acheteur</h2>
+              {result.acheteur.type_acheteur && (
+                <p className="text-sm text-white/70">{result.acheteur.type_acheteur}</p>
+              )}
+              {result.acheteur.produits_interesses.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {result.acheteur.produits_interesses.map(p => (
+                    <span key={p} className="text-xs px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/20">{p}</span>
+                  ))}
+                </div>
+              )}
+              {result.acheteur.cantons_intervention.length > 0 && (
+                <div className="flex items-start gap-2 text-sm text-white/60">
+                  <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <span>{result.acheteur.cantons_intervention.join(', ')}</span>
+                </div>
+              )}
+              {profile?.phone && (
+                <a href={`tel:${profile.phone}`} className="flex items-center gap-2 text-sm font-medium text-blue-300 hover:text-blue-200">
+                  <PhoneCall className="h-4 w-4" />{profile.phone}
+                </a>
+              )}
+            </div>
+
+            {result.preventes && result.preventes.length > 0 && (
+              <div className="vfp-card rounded-2xl p-4 space-y-3">
+                <h2 className="text-sm font-bold text-white/60 uppercase tracking-widest">Préventes disponibles</h2>
+                <div className="space-y-2">
+                  {result.preventes.map(p => (
+                    <div key={p.id} className="rounded-xl bg-white/5 border border-white/8 p-3 space-y-1">
+                      <p className="text-sm font-bold text-white">{p.culture} — {p.quantite_estimee.toLocaleString('fr-FR')} kg</p>
+                      <p className="text-xs text-white/50">{p.canton} · Récolte {new Date(p.date_recolte_prevue).toLocaleDateString('fr-FR')}</p>
+                      {p.prix_par_kg > 0 && <p className="text-xs text-amber-300">{p.prix_par_kg.toFixed(0)} FCFA/kg</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* AGRONOME: spécialisations + badge + missions */}
+        {result.card_type === 'AGRONOME' && result.agronome && (
+          <>
+            <div className="vfp-card rounded-2xl p-4 space-y-3">
+              <h2 className="text-sm font-bold text-white/60 uppercase tracking-widest">Profil Agronome</h2>
+              <div className="flex items-center gap-2">
+                {result.agronome.badge_valide && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 font-bold border border-green-500/30">✓ Badge validé</span>
+                )}
+                {result.agronome.note_moyenne > 0 && (
+                  <span className="text-xs text-yellow-300/80">★ {result.agronome.note_moyenne.toFixed(1)} ({result.agronome.nombre_missions} missions)</span>
+                )}
+              </div>
+              {result.agronome.specialisations.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {result.agronome.specialisations.map(s => (
+                    <span key={s} className="text-xs px-2 py-0.5 rounded-full bg-green-500/15 text-green-300 border border-green-500/20">{s}</span>
+                  ))}
+                </div>
+              )}
+              {(result.agronome.prefecture || result.agronome.region) && (
+                <div className="flex items-start gap-2 text-sm text-white/60">
+                  <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <span>{[result.agronome.canton, result.agronome.prefecture, result.agronome.region].filter(Boolean).join(', ')}</span>
+                </div>
+              )}
+              {profile?.phone && (
+                <a href={`tel:${profile.phone}`} className="flex items-center gap-2 text-sm font-medium text-green-400 hover:text-green-300">
+                  <PhoneCall className="h-4 w-4" />{profile.phone}
+                </a>
+              )}
+            </div>
+
+            {result.missions && result.missions.length > 0 && (
+              <div className="vfp-card rounded-2xl p-4 space-y-3">
+                <h2 className="text-sm font-bold text-white/60 uppercase tracking-widest">Missions en cours</h2>
+                <div className="space-y-2">
+                  {result.missions.map(m => (
+                    <div key={m.id} className="rounded-xl bg-white/5 border border-white/8 p-3 space-y-1">
+                      <p className="text-sm font-semibold text-white">{m.titre}</p>
+                      <p className="text-xs text-white/80 line-clamp-2">{m.description}</p>
+                      <p className="text-xs text-white/40">{m.canton}{m.date_souhaitee ? ` · ${new Date(m.date_souhaitee).toLocaleDateString('fr-FR')}` : ''}</p>
+                      {m.budget && <p className="text-xs text-amber-300">{m.budget.toLocaleString('fr-FR')} FCFA</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Footer */}
+        <div className="text-center pt-2">
+          <p className="text-xs text-white/20">Vérifié via <span className="font-bold">Haroo</span> · Plateforme Agricole Togo</p>
+          <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-white/30 hover:text-white/60 mt-2">
+            <ArrowLeft className="h-3 w-3" /> Retour à FaîtiereHub
+          </Link>
+        </div>
+
+      </main>
+    </div>
+  )
+}
+

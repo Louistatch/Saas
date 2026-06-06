@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { BarChart3, Users, ShoppingCart, CreditCard, ArrowRight } from 'lucide-react'
+import { BarChart3, Users, ShoppingCart, CreditCard, ArrowRight, MapPin, ScanLine } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
@@ -17,13 +17,23 @@ interface Stats {
   totalMembers: number
   activeCards: number
   totalExploitations: number
+  totalParcelles: number
+  scansToday: number
 }
+
+type RecentType = 'member' | 'card' | 'exploitation' | 'scan'
 
 interface RecentItem {
   label: string
   time: string
   date: string
-  type: 'member' | 'card' | 'exploitation'
+  type: RecentType
+}
+
+const ACTION_LABEL: Record<string, string> = {
+  scan: 'Carte scannée',
+  login: 'Connexion carte',
+  download: 'Fiche téléchargée',
 }
 
 export default function DashboardPage() {
@@ -31,7 +41,7 @@ export default function DashboardPage() {
   const { user } = useAuth()
   const supabase = useMemo(() => createClient(), [])
 
-  const [stats, setStats] = useState<Stats>({ totalMembers: 0, activeCards: 0, totalExploitations: 0 })
+  const [stats, setStats] = useState<Stats>({ totalMembers: 0, activeCards: 0, totalExploitations: 0, totalParcelles: 0, scansToday: 0 })
   const [recent, setRecent] = useState<RecentItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -41,53 +51,73 @@ export default function DashboardPage() {
       return
     }
     setIsLoading(true)
-
-    // Always filter by the selected cooperative (super_admin uses the switcher)
     const coopId = currentCooperative.id
 
-    let membersQuery = supabase.from('members').select('id', { count: 'exact', head: true }).eq('cooperative_id', coopId)
-    let cardsQuery = supabase.from('member_cards').select('id', { count: 'exact', head: true }).eq('status', 'active').eq('cooperative_id', coopId)
-    let fichesQuery = supabase.from('fiches_techniques').select('id', { count: 'exact', head: true }).eq('status', 'published').eq('cooperative_id', coopId)
-    let recentMembersQuery = supabase.from('members').select('first_name, last_name, created_at').eq('cooperative_id', coopId).order('created_at', { ascending: false }).limit(3)
-    let recentCardsQuery = supabase.from('member_cards').select('card_number, created_at').eq('cooperative_id', coopId).order('created_at', { ascending: false }).limit(2)
-    let recentFichesQuery = supabase.from('fiches_techniques').select('title, created_at').eq('cooperative_id', coopId).order('created_at', { ascending: false }).limit(2)
+    // Début de journée UTC
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
 
-    const [membersRes, cardsRes, fichesRes, recentMembersRes, recentCardsRes, recentFichesRes] = await Promise.all([
-      membersQuery, cardsQuery, fichesQuery, recentMembersQuery, recentCardsQuery, recentFichesQuery,
+    const [
+      membersRes,
+      cardsRes,
+      fichesRes,
+      parcellesRes,
+      scansTodayRes,
+      recentMembersRes,
+      recentCardsRes,
+      recentFichesRes,
+      recentScansRes,
+    ] = await Promise.all([
+      supabase.from('members').select('id', { count: 'exact', head: true }).eq('cooperative_id', coopId),
+      supabase.from('member_cards').select('id', { count: 'exact', head: true }).eq('status', 'active').eq('cooperative_id', coopId),
+      supabase.from('fiches_techniques').select('id', { count: 'exact', head: true }).eq('status', 'published').eq('cooperative_id', coopId),
+      supabase.from('parcelles').select('id', { count: 'exact', head: true }).eq('cooperative_id', coopId),
+      supabase.from('member_access_logs').select('id', { count: 'exact', head: true })
+        .eq('cooperative_id', coopId)
+        .eq('action', 'scan')
+        .gte('created_at', todayStart.toISOString()),
+      supabase.from('members').select('first_name, last_name, created_at').eq('cooperative_id', coopId).order('created_at', { ascending: false }).limit(3),
+      supabase.from('member_cards').select('card_number, created_at').eq('cooperative_id', coopId).order('created_at', { ascending: false }).limit(2),
+      supabase.from('fiches_techniques').select('title, created_at').eq('cooperative_id', coopId).order('created_at', { ascending: false }).limit(2),
+      supabase.from('member_access_logs').select('card_number, action, created_at').eq('cooperative_id', coopId).in('action', ['scan', 'login']).order('created_at', { ascending: false }).limit(3),
     ])
 
     setStats({
       totalMembers: membersRes.count ?? 0,
       activeCards: cardsRes.count ?? 0,
       totalExploitations: fichesRes.count ?? 0,
+      totalParcelles: parcellesRes.count ?? 0,
+      scansToday: scansTodayRes.count ?? 0,
     })
 
     const activities: RecentItem[] = [
-      ...((recentMembersRes.data ?? []) as { first_name: string; last_name: string; created_at: string }[]).map(
-        (m) => ({
-          label: `Membre ajouté : ${m.first_name} ${m.last_name}`,
-          time: timeAgo(m.created_at),
-          type: 'member' as const,
-          date: m.created_at,
-        }),
-      ),
+      ...((recentMembersRes.data ?? []) as { first_name: string; last_name: string; created_at: string }[]).map((m) => ({
+        label: `Membre ajouté : ${m.first_name} ${m.last_name}`,
+        time: timeAgo(m.created_at),
+        type: 'member' as const,
+        date: m.created_at,
+      })),
       ...((recentCardsRes.data ?? []) as { card_number: string; created_at: string }[]).map((c) => ({
         label: `Carte générée : ${c.card_number}`,
         time: timeAgo(c.created_at),
         type: 'card' as const,
         date: c.created_at,
       })),
-      ...((recentFichesRes.data ?? []) as { title: string; created_at: string }[]).map(
-        (e) => ({
-          label: `Fiche publiée: ${e.title}`,
-          time: timeAgo(e.created_at),
-          type: 'exploitation' as const,
-          date: e.created_at,
-        }),
-      ),
+      ...((recentFichesRes.data ?? []) as { title: string; created_at: string }[]).map((e) => ({
+        label: `Fiche publiée : ${e.title}`,
+        time: timeAgo(e.created_at),
+        type: 'exploitation' as const,
+        date: e.created_at,
+      })),
+      ...((recentScansRes.data ?? []) as { card_number: string; action: string; created_at: string }[]).map((s) => ({
+        label: `${ACTION_LABEL[s.action] ?? s.action} : ${s.card_number}`,
+        time: timeAgo(s.created_at),
+        type: 'scan' as const,
+        date: s.created_at,
+      })),
     ]
     activities.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    setRecent(activities.slice(0, 5))
+    setRecent(activities.slice(0, 8))
     setIsLoading(false)
   }, [currentCooperative, user?.role, supabase])
 
@@ -95,10 +125,10 @@ export default function DashboardPage() {
     fetchStats()
   }, [fetchStats])
 
-  // Realtime: refresh when members or cards change (Kobo webhooks)
   const fetchStatsRef = useRef(fetchStats)
   useEffect(() => { fetchStatsRef.current = fetchStats }, [fetchStats])
 
+  // Realtime : membres, cartes, fiches, scans
   useEffect(() => {
     if (!currentCooperative) return
     const coopId = currentCooperative.id
@@ -107,21 +137,24 @@ export default function DashboardPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `cooperative_id=eq.${coopId}` }, () => fetchStatsRef.current())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'member_cards', filter: `cooperative_id=eq.${coopId}` }, () => fetchStatsRef.current())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fiches_techniques', filter: `cooperative_id=eq.${coopId}` }, () => fetchStatsRef.current())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'member_access_logs', filter: `cooperative_id=eq.${coopId}` }, () => fetchStatsRef.current())
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [currentCooperative?.id, supabase])
 
-  const dotColor: Record<RecentItem['type'], string> = {
+  const dotColor: Record<RecentType, string> = {
     member: 'bg-primary',
     card: 'bg-accent',
     exploitation: 'bg-muted-foreground',
+    scan: 'bg-orange-400',
   }
 
   const statCards = [
     { title: 'Total membres', value: stats.totalMembers, icon: Users, color: 'text-primary', bg: 'bg-primary/10', href: '/dashboard/members' },
     { title: 'Cartes actives', value: stats.activeCards, icon: CreditCard, color: 'text-primary', bg: 'bg-primary/15', href: '/dashboard/cards' },
     { title: 'Fiches techniques', value: stats.totalExploitations, icon: ShoppingCart, color: 'text-accent-foreground', bg: 'bg-accent/20', href: '/dashboard/marketplace' },
-    { title: 'Statistiques', value: '→', icon: BarChart3, color: 'text-muted-foreground', bg: 'bg-muted', href: '/dashboard/analytics' },
+    { title: 'Parcelles', value: stats.totalParcelles, icon: MapPin, color: 'text-green-600', bg: 'bg-green-100', href: '/dashboard/parcelles' },
+    { title: 'Scans aujourd\'hui', value: stats.scansToday, icon: ScanLine, color: 'text-orange-600', bg: 'bg-orange-100', href: '#' },
   ]
 
   return (
@@ -131,28 +164,28 @@ export default function DashboardPage() {
         description={`${currentCooperative?.name ?? 'Votre coopérative'} — voici ce qui se passe aujourd'hui`}
       />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
         {statCards.map((stat, i) => {
           const Icon = stat.icon
-          return (
-            <Link key={i} href={stat.href}>
-              <Card className="border-border hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    {stat.title}
-                  </CardTitle>
-                  <div className={`p-1.5 rounded-md ${stat.bg}`}>
-                    <Icon className={`h-4 w-4 ${stat.color}`} aria-hidden />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-foreground">
-                    {isLoading ? <Spinner className="h-5 w-5" /> : stat.value}
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+          const isClickable = stat.href !== '#'
+          const inner = (
+            <Card className={`border-border transition-all ${isClickable ? 'hover:border-primary/40 hover:shadow-sm cursor-pointer' : ''}`}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
+                <div className={`p-1.5 rounded-md ${stat.bg}`}>
+                  <Icon className={`h-4 w-4 ${stat.color}`} aria-hidden />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">
+                  {isLoading ? <Spinner className="h-5 w-5" /> : stat.value}
+                </div>
+              </CardContent>
+            </Card>
           )
+          return isClickable
+            ? <Link key={i} href={stat.href}>{inner}</Link>
+            : <div key={i}>{inner}</div>
         })}
       </div>
 
@@ -168,15 +201,12 @@ export default function DashboardPage() {
           <CardContent className="space-y-2">
             {[
               { href: '/dashboard/members', icon: Users, label: 'Ajouter un membre' },
-              { href: '/dashboard/marketplace', icon: ShoppingCart, label: 'Ajouter un compte d\'exploitation' },
               { href: '/dashboard/cards', icon: CreditCard, label: 'Générer des cartes membres' },
+              { href: '/dashboard/parcelles', icon: MapPin, label: 'Consulter les parcelles' },
               { href: '/dashboard/analytics', icon: BarChart3, label: 'Voir les statistiques' },
             ].map(({ href, icon: Icon, label }) => (
               <Link key={href} href={href} className="block">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start border-border text-foreground hover:bg-accent/10 gap-2"
-                >
+                <Button variant="outline" className="w-full justify-start border-border text-foreground hover:bg-accent/10 gap-2">
                   <Icon className="h-4 w-4" aria-hidden />
                   {label}
                 </Button>
@@ -188,7 +218,7 @@ export default function DashboardPage() {
         <Card className="border-border">
           <CardHeader>
             <CardTitle className="text-foreground">Activité récente</CardTitle>
-            <CardDescription>Dernières modifications dans votre coopérative</CardDescription>
+            <CardDescription>Membres, cartes, fiches et scans QR en temps réel</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -210,10 +240,7 @@ export default function DashboardPage() {
                     className="flex items-center justify-between py-2.5 border-b border-border last:border-0"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className={`h-2 w-2 rounded-full flex-shrink-0 ${dotColor[item.type]}`}
-                        aria-hidden
-                      />
+                      <div className={`h-2 w-2 rounded-full flex-shrink-0 ${dotColor[item.type]}`} aria-hidden />
                       <span className="text-sm text-foreground truncate">{item.label}</span>
                     </div>
                     <span className="text-xs text-muted-foreground whitespace-nowrap ml-3">

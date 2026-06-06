@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button'
 import {
   BarChart3,
   ShoppingCart,
+  ShoppingBag,
+  BookOpen,
+  Handshake,
   Users,
   Settings,
   LogOut,
@@ -27,6 +30,7 @@ import { useAuth } from '@/app/context/auth-context'
 import { performLogout } from '@/lib/auth/logout'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { ProtectedRoute } from '@/app/components/protected-route'
+import { NotificationBell } from '@/components/shared/notification-bell'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -45,6 +49,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard/templates', label: 'Modèles', icon: FolderOpen, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/members', label: 'Membres', icon: Users, roles: ['super_admin', 'cooperative_admin', 'member'] },
     { href: '/dashboard/parcelles', label: 'Parcelles', icon: FileText, roles: ['super_admin', 'cooperative_admin'] },
+    { href: '/dashboard/agrimarket', label: 'AgriMarket', icon: ShoppingBag, roles: ['super_admin', 'cooperative_admin', 'member'] },
+    { href: '/dashboard/carnet', label: 'Carnet Agricole', icon: BookOpen, roles: ['super_admin', 'cooperative_admin', 'member'] },
+    { href: '/dashboard/matching', label: 'Matching', icon: Handshake, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/cotisations', label: 'Cotisations', icon: Banknote, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/techniciens', label: 'Techniciens', icon: PhoneCall, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/cards', label: 'Cartes membres', icon: FileText, roles: ['super_admin', 'cooperative_admin', 'member'] },
@@ -158,6 +165,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   ))}
                 </select>
               )}
+              {currentCooperative && <NotificationBell cooperativeId={currentCooperative.id} />}
             </div>
           </div>
 

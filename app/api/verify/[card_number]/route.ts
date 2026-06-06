@@ -1,12 +1,18 @@
 // [SECURITY FIX - FORGE-001 - Sous-étape B]
 // Route API serveur pour la vérification de carte — utilise la vue restrictive uniquement.
 // Empêche l'énumération en validant le format et en appliquant un délai constant.
+//
+// Routing logic:
+//   1. Check Supabase member_cards (FAITIERE cards only)
+//   2. If not found → proxy to AgriTogo API (OUVRIER / ACHETEUR / AGRONOME)
+//   3. If AgriTogo also returns nothing → 404
 
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { rateLimit, clientKeyFromHeaders } from '@/lib/utils/rate-limit'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
+import { queueInAppNotification } from '@/lib/notifications/queue'
 
 /**
  * Génère toutes les variantes O↔0 et I↔1 du préfixe.
@@ -80,26 +86,64 @@ export async function GET(
     return NextResponse.json({ valid: false, error: 'Carte non trouvée' }, { status: 404 })
   }
 
+  const normalizedCardNumber = parsed.data
+
   // Use server client — the anon RLS policy allows SELECT on active member_cards
   // with embedded joins to members and cooperatives.
   const supabase = await createClient()
 
   // Construire la liste des variantes possibles (O↔0, I↔1) du préfixe.
-  const [prefix, suffix] = parsed.data.split('-')
+  const [prefix, suffix] = normalizedCardNumber.split('-')
   const variants = expandAmbiguousVariants(prefix).map((p) => `${p}-${suffix}`)
 
-  // First: get the card (anon can read active cards)
+  // ── Step 1: Check Supabase (FAITIERE cards) ────────────────────────────────
   const { data: card, error: cardError } = await supabase
     .from('member_cards')
-    .select('card_number, status, expiry_date, created_at, member_id, cooperative_id')
+    .select('id, card_number, status, expiry_date, created_at, member_id, cooperative_id, card_type')
     .in('card_number', variants)
     .eq('status', 'active')
     .limit(1)
     .maybeSingle()
 
   if (cardError || !card) {
-    await new Promise(r => setTimeout(r, 100)) // Timing-safe
-    return NextResponse.json({ valid: false, error: 'Carte non trouvée' }, { status: 404 })
+    // ── Step 2: Not in Supabase → proxy to AgriTogo ─────────────────────────
+    const agritogoUrl = process.env.AGRITOGO_API_URL
+    if (!agritogoUrl) {
+      await new Promise(r => setTimeout(r, 100))
+      return NextResponse.json({ valid: false, error: 'Carte non trouvée' }, { status: 404 })
+    }
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000)
+    try {
+      const agriRes = await fetch(
+        `${agritogoUrl}/api/cards/verify/${encodeURIComponent(normalizedCardNumber)}/`,
+        { signal: controller.signal, headers: { 'Accept': 'application/json' } }
+      )
+      clearTimeout(timeoutId)
+      if (agriRes.ok) {
+        const data: unknown = await agriRes.json()
+        return NextResponse.json(data)
+      }
+      await new Promise(r => setTimeout(r, 100))
+      return NextResponse.json({ valid: false, error: 'Carte non trouvée' }, { status: 404 })
+    } catch {
+      clearTimeout(timeoutId)
+      await new Promise(r => setTimeout(r, 100))
+      return NextResponse.json({ valid: false, error: 'Carte non trouvée' }, { status: 404 })
+    }
+  }
+
+  // ── Step 3: Found in Supabase → handle as FAITIERE ────────────────────────
+  // Vérifier l'expiration
+  const isExpired = card.expiry_date && new Date(card.expiry_date) < new Date()
+  const isActive = card.status === 'active' && !isExpired
+
+  const cardOut = {
+    card_number: card.card_number,
+    status: isActive ? 'active' : (isExpired ? 'expired' : card.status),
+    expiry_date: card.expiry_date,
+    created_at: card.created_at,
   }
 
   // Second: get member info (may fail if anon doesn't have access — graceful fallback)
@@ -121,32 +165,50 @@ export async function GET(
   let member: MemberRow | null = null
   let coop: CoopRow | null = null
 
-  const { data: memberData } = await supabase
-    .from('members')
-    .select('first_name, last_name, photo_url, village, canton, prefecture, region, status, created_at')
-    .eq('id', card.member_id)
-    .maybeSingle<MemberRow>()
-  if (memberData) member = memberData
+  if (card.member_id) {
+    const { data: memberData } = await supabase
+      .from('members')
+      .select('first_name, last_name, photo_url, village, canton, prefecture, region, status, created_at')
+      .eq('id', card.member_id)
+      .maybeSingle<MemberRow>()
+    if (memberData) member = memberData
+  }
 
-  const { data: coopData } = await supabase
-    .from('cooperatives')
-    .select('name, faitiere_name')
-    .eq('id', card.cooperative_id)
-    .maybeSingle<CoopRow>()
-  if (coopData) coop = coopData
+  if (card.cooperative_id) {
+    const { data: coopData } = await supabase
+      .from('cooperatives')
+      .select('name, faitiere_name')
+      .eq('id', card.cooperative_id)
+      .maybeSingle<CoopRow>()
+    if (coopData) coop = coopData
+  }
 
-  // Vérifier l'expiration
-  const isExpired = card.expiry_date && new Date(card.expiry_date) < new Date()
-  const isActive = card.status === 'active' && !isExpired
+  // Log the scan (fire-and-forget — never block the response)
+  void Promise.resolve(supabase.from('member_access_logs').insert({
+    card_number: card.card_number,
+    member_id: card.member_id ?? null,
+    cooperative_id: card.cooperative_id ?? null,
+    action: 'scan',
+  }))
+
+  // In-app notification for cooperative admin (fire-and-forget)
+  if (card.cooperative_id) {
+    void queueInAppNotification({
+      cooperativeId: card.cooperative_id,
+      title: 'Carte scannée',
+      body: `Carte ${card.card_number} scannée à ${new Date().toLocaleTimeString('fr-FR')}`,
+      type: 'info',
+      icon: 'scan-line',
+      link: '/dashboard/analytics',
+    })
+  }
 
   return NextResponse.json({
     valid: isActive,
-    card: {
-      card_number: card.card_number,
-      status: isActive ? 'active' : (isExpired ? 'expired' : card.status),
-      expiry_date: card.expiry_date,
-      created_at: card.created_at,
-    },
+    card_type: 'FAITIERE',
+    source: 'faitierehub' as const,
+    member_id: card.member_id ?? null,
+    card: cardOut,
     member: {
       first_name: member?.first_name ?? null,
       last_name: member?.last_name ?? null,
@@ -163,4 +225,24 @@ export async function GET(
       faitiere_name: coop?.faitiere_name ?? null,
     },
   })
+}
+
+// ── Haroo fallback ────────────────────────────────────────────────────────────
+
+// Passe par AgriTogo (AGRITOGO_API_URL déjà configuré) — pas d'URL Haroo directe.
+// AgriTogo expose GET /api/v1/haroo/verify/<card_number> qui proxy vers Haroo.
+async function tryHarooVerify(cardNumber: string): Promise<Record<string, unknown> | null> {
+  const agritogoUrl = process.env.AGRITOGO_API_URL?.replace(/\/$/, '')
+  if (!agritogoUrl) return null
+
+  try {
+    const res = await fetch(
+      `${agritogoUrl}/api/v1/haroo/verify/${encodeURIComponent(cardNumber)}`,
+      { signal: AbortSignal.timeout(6000), headers: { Accept: 'application/json' } }
+    )
+    if (!res.ok) return null
+    return await res.json()  // source:'haroo' already injected by AgriTogo
+  } catch {
+    return null
+  }
 }

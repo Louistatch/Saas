@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Search, CheckCircle, Clock, AlertTriangle, Banknote, TrendingUp } from 'lucide-react'
+import { Plus, Search, CheckCircle, Clock, AlertTriangle, Banknote, TrendingUp, CreditCard } from 'lucide-react'
+import Link from 'next/link'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
@@ -323,9 +324,20 @@ export default function CotisationsPage() {
                         {cot.paid_date && <p className="text-xs text-green-600">Payé le {cot.paid_date}</p>}
                       </div>
                       {cot.status === 'pending' && (
-                        <Button size="sm" variant="outline" className="shrink-0 gap-1 border-green-300 text-green-700 hover:bg-green-50" onClick={() => markPaid(cot.id)}>
-                          <CheckCircle className="h-3.5 w-3.5" /> Payé
-                        </Button>
+                        <>
+                          <Button size="sm" variant="outline" className="shrink-0 gap-1 border-green-300 text-green-700 hover:bg-green-50" onClick={() => markPaid(cot.id)}>
+                            <CheckCircle className="h-3.5 w-3.5" /> Payé
+                          </Button>
+                          {currentCooperative && cot.member && (
+                            <Link
+                              href={`/dashboard/cotisations/payment?member_id=${cot.member.id}&cotisation_id=${cot.id}&amount=${cot.amount}&cooperative_id=${currentCooperative.id}`}
+                            >
+                              <Button size="sm" variant="outline" className="shrink-0 gap-1 border-orange-300 text-orange-700 hover:bg-orange-50">
+                                <CreditCard className="h-3.5 w-3.5" /> Payer
+                              </Button>
+                            </Link>
+                          )}
+                        </>
                       )}
                     </div>
                   )

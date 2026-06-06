@@ -1,8 +1,15 @@
 /**
- * Member Score — calculates Bronze/Argent/Or level on-the-fly.
- * 
- * Uses the SQL function `get_member_score` which respects RLS.
- * No stored column — always fresh data.
+ * @deprecated — DEAD CODE PATH
+ *
+ * This module calls `get_member_score` RPC which does NOT exist in the database.
+ * All calls silently return null (error path). The canonical scoring system is
+ * `calculate_member_ats` (SQL) exposed via /api/members/[id]/ats and persisted
+ * by `upsert_member_ats` into `member_ats_scores`.
+ *
+ * Components still importing from here (score-badge.tsx, agri-score-widget.tsx via
+ * use-member-score.ts) must be migrated to the ATS API before this file can be removed.
+ *
+ * DO NOT add new imports of this module.
  */
 
 import { createClient } from '@/lib/supabase/client'

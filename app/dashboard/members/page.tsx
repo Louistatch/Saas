@@ -460,6 +460,21 @@ export default function MembersPage() {
                                 <Button
                                   size="sm"
                                   variant="outline"
+                                  className="border-border text-emerald-700 hover:bg-emerald-50"
+                                  asChild
+                                  aria-label={`Attestation de ${member.first_name}`}
+                                >
+                                  <a
+                                    href={`/reports/attestation/${member.id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <FileText className="h-4 w-4" />
+                                  </a>
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
                                   className="border-border"
                                   onClick={() => openEdit(member)}
                                   aria-label={`Modifier ${member.first_name}`}

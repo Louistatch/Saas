@@ -13,6 +13,49 @@ import type { CardSchema } from './schema'
 import { lighten, darken } from './schema'
 import { encodeText } from '@/lib/utils/qr'
 
+// ─── Font embedding ──────────────────────────────────────────────────────────
+let _fontStyleCache: string | null = null
+
+/**
+ * Fetch Barlow Condensed (700/800/900) + Barlow (600/700) from Google Fonts,
+ * convert each woff2 to base64 @font-face, safe to embed in SVG <style>.
+ * Falls back to '' so system fonts render without crashing.
+ */
+export async function loadEmbeddedFontStyle(): Promise<string> {
+  if (_fontStyleCache !== null) return _fontStyleCache
+  try {
+    const cssResp = await fetch(
+      'https://fonts.googleapis.com/css2?' +
+        'family=Barlow+Condensed:wght@700;800;900&family=Barlow:wght@600;700&display=swap',
+      {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36' },
+        cache: 'force-cache',
+      },
+    )
+    if (!cssResp.ok) throw new Error(`Google Fonts ${cssResp.status}`)
+    const css = await cssResp.text()
+    const urlRe = /url\((https:\/\/fonts\.gstatic\.com\/[^)]+)\)/g
+    const fontUrls = [...new Set([...css.matchAll(urlRe)].map((m) => m[1]))]
+    const b64Map = new Map<string, string>()
+    await Promise.all(fontUrls.map(async (url) => {
+      try {
+        const r = await fetch(url, { cache: 'force-cache' })
+        if (!r.ok) return
+        const buf = await r.arrayBuffer()
+        const b64 = typeof Buffer !== 'undefined'
+          ? Buffer.from(buf).toString('base64')
+          : btoa(String.fromCharCode(...new Uint8Array(buf)))
+        b64Map.set(url, `data:font/woff2;base64,${b64}`)
+      } catch { /* skip */ }
+    }))
+    _fontStyleCache = css.replace(/url\((https:\/\/fonts\.gstatic\.com\/[^)]+)\)/g, (_, u) => `url(${b64Map.get(u) ?? u})`)
+    return _fontStyleCache
+  } catch {
+    _fontStyleCache = ''
+    return ''
+  }
+}
+
 // ─── SVG Generation ─────────────────────────────────────────────────────────
 
 function escapeXml(str: string): string {
@@ -94,7 +137,7 @@ async function imageToDataUrl(url: string): Promise<string | null> {
   }
 }
 
-export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | null, signatureDataUrl?: string | null): string {
+export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | null, signatureDataUrl?: string | null, fontStyle?: string): string {
   const { branding, member, styles, template } = schema
   const level = getLevelTheme(member.level)
 
@@ -159,6 +202,7 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
 
   return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1180 740" width="1180" height="740">
   <defs>
+    ${fontStyle ? `<style>${fontStyle}</style>` : ''}
     <radialGradient id="bgGrad" cx="26%" cy="34%" r="92%">${bgStops}</radialGradient>
     <radialGradient id="haloGrad" cx="22%" cy="40%" r="42%">
       <stop offset="0%" stop-color="${escapeXml(accent)}" stop-opacity="0.30"/>
@@ -383,11 +427,12 @@ async function svgToCanvas(svgString: string): Promise<HTMLCanvasElement> {
 // ─── Export Functions ────────────────────────────────────────────────────────
 
 export async function renderToCanvas(schema: CardSchema): Promise<HTMLCanvasElement> {
-  const [photoDataUrl, signatureDataUrl] = await Promise.all([
+  const [photoDataUrl, signatureDataUrl, fontStyle] = await Promise.all([
     schema.member.photoUrl ? imageToDataUrl(schema.member.photoUrl) : Promise.resolve(null),
     schema.member.signatureUrl ? imageToDataUrl(schema.member.signatureUrl) : Promise.resolve(null),
+    loadEmbeddedFontStyle(),
   ])
-  const svg = renderToSvgString(schema, photoDataUrl, signatureDataUrl)
+  const svg = renderToSvgString(schema, photoDataUrl, signatureDataUrl, fontStyle)
   return svgToCanvas(svg)
 }
 
