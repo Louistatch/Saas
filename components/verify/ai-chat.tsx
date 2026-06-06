@@ -22,6 +22,8 @@ interface AiChatProps {
  *
  * Uses the /api/ai/chat endpoint which calls Gemini with the producer's
  * context (region, cooperative, market prices).
+ * Also supports voice input (Web Speech API) and plant disease photo analysis
+ * via /api/ai/vision (Gemini Vision).
  */
 const DEFAULT_SUGGESTIONS = [
   'Quel est le prix du maïs dans ma zone ?',
@@ -42,6 +44,15 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
   const [loading, setLoading] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Voice input state
+  const [isListening, setIsListening] = useState(false)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null)
+
+  // Photo analysis state
+  const photoInputRef = useRef<HTMLInputElement>(null)
+  const [photoLoading, setPhotoLoading] = useState(false)
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -96,6 +107,84 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
 
   const sendText = useCallback((text: string) => sendMessage(text), [sendMessage])
 
+  // Voice input toggle
+  const toggleVoice = useCallback(() => {
+    if (isListening) {
+      recognitionRef.current?.stop()
+      setIsListening(false)
+      return
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition
+    if (!SR) { alert('Votre navigateur ne supporte pas la reconnaissance vocale.'); return }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rec = new SR() as any
+    rec.lang = 'fr-FR'
+    rec.continuous = false
+    rec.interimResults = false
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rec.onresult = (e: any) => {
+      const transcript: string = e.results[0][0].transcript
+      setInput(prev => (prev ? prev + ' ' + transcript : transcript))
+      setIsListening(false)
+    }
+    rec.onerror = () => setIsListening(false)
+    rec.onend = () => setIsListening(false)
+    rec.start()
+    recognitionRef.current = rec
+    setIsListening(true)
+  }, [isListening])
+
+  // Photo analysis handler
+  const handlePhoto = useCallback(async (file: File) => {
+    if (!file) return
+    setPhotoLoading(true)
+
+    // Compress to max 1024px and convert to base64
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      const img = new Image()
+      reader.onload = (e) => {
+        img.src = e.target?.result as string
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          const MAX = 1024
+          const ratio = Math.min(MAX / img.width, MAX / img.height, 1)
+          canvas.width = Math.round(img.width * ratio)
+          canvas.height = Math.round(img.height * ratio)
+          canvas.getContext('2d')?.drawImage(img, 0, 0, canvas.width, canvas.height)
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.82)
+          resolve(dataUrl.split(',')[1]) // base64 only
+        }
+        img.onerror = reject
+      }
+      reader.readAsDataURL(file)
+    })
+
+    // Show user message with photo indicator
+    setMessages(m => [...m, { role: 'user', content: '📸 Photo envoyée — analyse en cours…' }])
+
+    try {
+      const res = await fetch('/api/ai/vision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_base64: base64, mime_type: 'image/jpeg' }),
+      })
+      const data = await res.json()
+      setMessages(m => [...m, {
+        role: 'assistant',
+        content: data.response ?? data.error ?? 'Impossible d\'analyser l\'image.',
+        engine: 'gemini-vision',
+      }])
+    } catch {
+      setMessages(m => [...m, { role: 'assistant', content: 'Erreur lors de l\'analyse photo.' }])
+    } finally {
+      setPhotoLoading(false)
+      if (photoInputRef.current) photoInputRef.current.value = ''
+    }
+  }, [])
+
   return (
     <div className="ai-chat">
       {/* Header */}
@@ -135,8 +224,8 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
               Bonjour{memberName ? ` ${memberName}` : ''} !
             </p>
             <p className="ai-chat-welcome-text">
-              Je suis AgriTogo, votre assistant agricole. Je connais les prix
-              du marché de votre zone et peux vous conseiller.
+              Je suis AgriTogo, votre assistant agricole IA. Je connais votre zone, les prix du marché,
+              et je peux <strong>analyser vos plantes malades en photo</strong> 📷 ou écouter votre voix 🎤.
             </p>
             <div className="ai-chat-suggestions">
               {suggestions.map((s, i) => (
@@ -169,7 +258,8 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
                   {m.role === 'assistant' && m.engine && (
                     <span className="ai-msg-engine">
                       {m.engine === 'direct-data' ? '⚡ Réponse instantanée' :
-                       m.engine === 'agritogo-multiagent' ? '🧠 Multi-Agent' : '💬 Gemini'}
+                       m.engine === 'agritogo-multiagent' ? '🧠 Multi-Agent' :
+                       m.engine === 'gemini-vision' ? '📷 Analyse photo' : '💬 Gemini'}
                       {m.debate ? ' • Débat' : ''}
                     </span>
                   )}
@@ -188,12 +278,12 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
           )
         })}
 
-        {loading && (
+        {(loading || photoLoading) && (
           <div className="ai-msg ai-msg-assistant">
             <div className="ai-msg-avatar"><Bot size={14} /></div>
             <div className="ai-msg-bubble ai-msg-typing">
               <Loader2 size={16} className="animate-spin" />
-              <span>Réflexion en cours…</span>
+              <span>{photoLoading ? 'Analyse de la photo…' : 'Réflexion en cours…'}</span>
             </div>
           </div>
         )}
@@ -201,6 +291,36 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
 
       {/* Input */}
       <div className="ai-chat-input-bar">
+        {/* Hidden file input for photo capture */}
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          style={{ display: 'none' }}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhoto(f) }}
+        />
+        {/* Camera button */}
+        <button
+          type="button"
+          className="ai-chat-cam"
+          onClick={() => photoInputRef.current?.click()}
+          disabled={loading || photoLoading || isListening}
+          aria-label="Photographier une plante malade"
+          title="Analyser une plante (photo)"
+        >
+          {photoLoading ? <Loader2 size={16} className="animate-spin" /> : '📷'}
+        </button>
+        {/* Mic button */}
+        <button
+          type="button"
+          className={`ai-chat-mic ${isListening ? 'ai-chat-mic-active' : ''}`}
+          onClick={toggleVoice}
+          disabled={loading || photoLoading}
+          aria-label={isListening ? 'Arrêter l\'écoute' : 'Dicter un message'}
+        >
+          {isListening ? '🔴' : '🎤'}
+        </button>
         <input
           ref={inputRef}
           type="text"
@@ -210,12 +330,12 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
           maxLength={1000}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && send()}
-          disabled={loading}
+          disabled={loading || photoLoading}
         />
         <button
           className="ai-chat-send"
           onClick={send}
-          disabled={loading || !input.trim()}
+          disabled={loading || photoLoading || !input.trim()}
           aria-label="Envoyer"
         >
           <Send size={18} />
@@ -268,7 +388,7 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
           color:var(--vfp-accent); border-radius:999px; padding:5px 12px; font-size:12px; cursor:pointer;
           white-space:nowrap; transition:background .15s; }
         .ai-followup-chip:active { background:oklch(0.72 0.18 142 / 0.14); }
-        .ai-chat-input-bar { display:flex; gap:8px; padding:12px 14px;
+        .ai-chat-input-bar { display:flex; gap:8px; padding:12px 14px; align-items:center;
           border-top: 1px solid rgba(255,255,255,.06); background:rgba(0,0,0,.15); }
         .ai-chat-input { flex:1; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1);
           border-radius:999px; padding:10px 16px; color:#eafff2; font-size:14px; outline:none; }
@@ -276,13 +396,20 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
         .ai-chat-input:focus { border-color:oklch(0.72 0.18 142 / 0.40); }
         .ai-chat-send { width:42px; height:42px; border:none; border-radius:50%; cursor:pointer;
           background:linear-gradient(135deg, var(--vfp-cta), var(--vfp-accent-dim)); color:var(--vfp-cta-fg); display:grid; place-items:center;
-          transition:transform .15s, opacity .15s; }
+          transition:transform .15s, opacity .15s; flex-shrink:0; }
         .ai-chat-send:disabled { opacity:.4; cursor:default; }
         .ai-chat-send:active:not(:disabled) { transform:scale(.92); }
         .ai-inline-code { background:rgba(0,0,0,.06); padding:1px 5px; border-radius:4px; font-size:.88em; font-family:monospace; }
         .ai-md-li { padding-left:.8em; text-indent:-.8em; }
         .ai-msg-bubble strong { font-weight:600; color:var(--vfp-accent-bright); }
         .ai-msg-bubble em { font-style:italic; color:var(--vfp-accent); }
+        .ai-chat-mic { width:38px; height:38px; border:none; border-radius:50%; cursor:pointer; background:rgba(255,255,255,0.06); color:#eafff2; display:grid; place-items:center; font-size:16px; transition:background .15s, transform .1s; flex-shrink:0; }
+        .ai-chat-mic:disabled { opacity:.4; cursor:default; }
+        .ai-chat-mic-active { background:rgba(239,68,68,0.2); animation:mic-pulse 1s ease-in-out infinite; }
+        @keyframes mic-pulse { 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.12); } }
+        .ai-chat-cam { width:38px; height:38px; border:none; border-radius:50%; cursor:pointer; background:rgba(255,255,255,0.06); display:grid; place-items:center; font-size:16px; transition:background .15s; flex-shrink:0; }
+        .ai-chat-cam:disabled { opacity:.4; cursor:default; }
+        .ai-chat-cam:active:not(:disabled) { background:rgba(255,255,255,0.12); }
       `}
     </style>
     </div>
@@ -330,5 +457,3 @@ function renderMd(text: string) {
     return <p key={i}>{parts}</p>
   })
 }
-
-

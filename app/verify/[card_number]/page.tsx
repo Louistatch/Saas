@@ -653,6 +653,57 @@ export default function VerifyCardPage() {
                     breakdown={atsData.breakdown}
                     size="md"
                   />
+
+                  {/* Haroo ATS Tier Ladder */}
+                  <div className="vfp-card rounded-2xl p-4 space-y-3">
+                    <p className="text-white/60 text-[11px] font-semibold uppercase tracking-wider">Paliers Haroo — Avantages agricoles</p>
+                    <div className="space-y-2">
+                      {([
+                        { min: 0,   max: 199, label: 'Starter',  color: 'text-white/40',   bg: 'bg-white/5',           icon: '🌱', perks: 'Accès Haroo, vérification carte' },
+                        { min: 200, max: 399, label: 'Bronze',   color: 'text-amber-600',   bg: 'bg-amber-900/20',      icon: '🥉', perks: 'Crédit intrants jusqu\'à 50 000 XOF' },
+                        { min: 400, max: 599, label: 'Argent',   color: 'text-slate-300',   bg: 'bg-slate-700/20',      icon: '🥈', perks: 'Crédit 150 000 XOF · Assurance récolte de base' },
+                        { min: 600, max: 799, label: 'Or',       color: 'text-yellow-400',  bg: 'bg-yellow-900/20',     icon: '🥇', perks: 'Crédit 500 000 XOF · Assurance complète · Formation certifiante' },
+                        { min: 800, max: 1000, label: 'Platine', color: 'text-cyan-300',    bg: 'bg-cyan-900/20',       icon: '💎', perks: 'Crédit 2 000 000 XOF · Export UEMOA · Priorité acheteurs' },
+                      ] as const).map(tier => {
+                        const active = atsData.score >= tier.min && atsData.score <= tier.max
+                        const unlocked = atsData.score >= tier.min
+                        return (
+                          <div key={tier.label} className={`flex items-start gap-3 p-2.5 rounded-xl border transition-all ${active ? `${tier.bg} border-white/15` : unlocked ? 'border-white/5 opacity-60' : 'border-white/[0.03] opacity-30'}`}>
+                            <span className="text-base shrink-0 mt-0.5">{tier.icon}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs font-bold ${active ? tier.color : 'text-white/50'}`}>{tier.label}</span>
+                                <span className="text-[10px] text-white/25">{tier.min}–{tier.max === 1000 ? '1000' : tier.max} pts</span>
+                                {active && <span className="ml-auto text-[10px] font-semibold text-[var(--vfp-accent)] shrink-0">← Votre niveau</span>}
+                              </div>
+                              <p className="text-[11px] text-white/40 mt-0.5 leading-tight">{tier.perks}</p>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {/* How to improve */}
+                    {atsData.breakdown && atsData.score < 800 && (() => {
+                      const b = atsData.breakdown
+                      const tips: string[] = []
+                      if (b.cotisation < 270) tips.push('Payer vos cotisations à temps (+pts cotisation)')
+                      if (b.production < 270) tips.push('Déclarer vos récoltes dans Haroo (+pts production)')
+                      if (b.engagement < 180) tips.push('Participer aux formations coopératives (+pts engagement)')
+                      if (tips.length === 0 && atsData.score < 800) tips.push('Enregistrer plus de parcelles pour progresser')
+                      return tips.length > 0 ? (
+                        <div className="border-t border-white/[0.06] pt-2.5">
+                          <p className="text-[10px] font-semibold text-white/35 uppercase tracking-wider mb-1.5">Comment progresser</p>
+                          <ul className="space-y-1">
+                            {tips.slice(0, 3).map((t, i) => (
+                              <li key={i} className="flex items-start gap-1.5 text-[11px] text-white/45">
+                                <span className="text-[var(--vfp-accent)] mt-0.5 shrink-0">›</span>{t}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null
+                    })()}
+                  </div>
                 </div>
               )}
             </div>
@@ -746,7 +797,7 @@ export default function VerifyCardPage() {
 
         {/* ─── AgriSmart Water View ─── */}
         {isValid && activeView === 'agrismart' && (
-          <AgriSmartWater onBack={() => setActiveView('menu')} initialRegion={result.member?.region ?? undefined} />
+          <AgriSmartWater onBack={() => setActiveView('menu')} initialRegion={result.member?.region ?? undefined} cardNumber={cardNumber} />
         )}
 
         {/* ─── Parcelles View ─── */}

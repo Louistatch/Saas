@@ -62,6 +62,13 @@ export const rateLimiters = redis
         limiter: Ratelimit.slidingWindow(20, '60 s'),
         prefix: 'rl:ai-chat',
       }),
+
+      // AI vision : 10/minute per IP — image analysis, heavier than chat
+      'ai-vision': new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(10, '60 s'),
+        prefix: 'rl:ai-vision',
+      }),
     }
   : null
 
@@ -72,7 +79,7 @@ export const rateLimiters = redis
  */
 export async function applyRateLimit(
   request: NextRequest,
-  limiter: 'verify' | 'marketplace' | 'embed' | 'auth' | 'webhook' | 'ai-chat'
+  limiter: 'verify' | 'marketplace' | 'embed' | 'auth' | 'webhook' | 'ai-chat' | 'ai-vision'
 ): Promise<NextResponse | null> {
   if (!rateLimiters) {
     // Upstash not configured — fall through to in-memory rate limiter in route handlers
