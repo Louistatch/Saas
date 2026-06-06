@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { BarChart3, Users, ShoppingCart, CreditCard, TrendingUp } from 'lucide-react'
+import { BarChart3, Users, ShoppingCart, CreditCard, TrendingUp, MapPin } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { useAuth } from '@/app/context/auth-context'
@@ -16,6 +16,8 @@ interface Stats {
   activeExploitations: number
   totalCards: number
   activeCards: number
+  totalParcelles: number
+  totalSurfaceHa: number
 }
 
 const initial: Stats = {
@@ -25,6 +27,8 @@ const initial: Stats = {
   activeExploitations: 0,
   totalCards: 0,
   activeCards: 0,
+  totalParcelles: 0,
+  totalSurfaceHa: 0,
 }
 
 export default function AnalyticsPage() {
@@ -45,16 +49,19 @@ export default function AnalyticsPage() {
     const membersQuery = supabase.from('members').select('status').eq('cooperative_id', coopId)
     const fichesQuery = supabase.from('fiches_techniques').select('status').eq('cooperative_id', coopId)
     const cardsQuery = supabase.from('member_cards').select('status').eq('cooperative_id', coopId)
+    const parcellesQuery = supabase.from('parcelles').select('surface_ha').eq('cooperative_id', coopId)
 
-    const [membersRes, fichesRes, cardsRes] = await Promise.all([
+    const [membersRes, fichesRes, cardsRes, parcellesRes] = await Promise.all([
       membersQuery,
       fichesQuery,
       cardsQuery,
+      parcellesQuery,
     ])
 
     const members = (membersRes.data ?? []) as { status: string }[]
     const fiches = (fichesRes.data ?? []) as { status: string }[]
     const cards = (cardsRes.data ?? []) as { status: string }[]
+    const parcelles = (parcellesRes.data ?? []) as { surface_ha: number }[]
 
     setStats({
       totalMembers: members.length,
@@ -63,6 +70,8 @@ export default function AnalyticsPage() {
       activeExploitations: fiches.filter((e) => e.status === 'published').length,
       totalCards: cards.length,
       activeCards: cards.filter((c) => c.status === 'active').length,
+      totalParcelles: parcelles.length,
+      totalSurfaceHa: parcelles.reduce((acc, p) => acc + (p.surface_ha || 0), 0),
     })
     setIsLoading(false)
   }, [currentCooperative, supabase, user])
@@ -123,6 +132,14 @@ export default function AnalyticsPage() {
       color: 'text-muted-foreground',
       bg: 'bg-muted',
     },
+    {
+      label: 'Parcelles',
+      value: stats.totalParcelles,
+      sub: `${stats.totalSurfaceHa.toFixed(1)} ha enregistrés`,
+      icon: MapPin,
+      color: 'text-green-600',
+      bg: 'bg-green-100',
+    },
   ]
 
   return (
@@ -134,7 +151,7 @@ export default function AnalyticsPage() {
         }`}
       />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {statCards.map((stat, i) => {
           const Icon = stat.icon
           return (
