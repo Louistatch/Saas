@@ -99,7 +99,7 @@ export function AgronomeView({ cardNumber, agronome, missions, card }: AgronomeV
       <section className="vfp-enter">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-white/60 text-sm mb-1">{greeting}, Dr. {firstName} ! 🌱</p>
+            <p className="text-white/60 text-sm mb-1">{greeting}, {firstName} ! 🌱</p>
             <h1 className="text-[24px] font-bold text-white leading-tight">
               Votre espace<br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--vfp-accent)] to-[var(--vfp-accent-dim)]">Ingénieur Agronome</span>

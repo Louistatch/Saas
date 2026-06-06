@@ -55,6 +55,13 @@ export const rateLimiters = redis
         limiter: Ratelimit.slidingWindow(100, '60 s'),
         prefix: 'rl:webhook',
       }),
+
+      // AI chat : 20/minute per IP — prevents LLM quota drain
+      'ai-chat': new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(20, '60 s'),
+        prefix: 'rl:ai-chat',
+      }),
     }
   : null
 
@@ -65,7 +72,7 @@ export const rateLimiters = redis
  */
 export async function applyRateLimit(
   request: NextRequest,
-  limiter: 'verify' | 'marketplace' | 'embed' | 'auth' | 'webhook'
+  limiter: 'verify' | 'marketplace' | 'embed' | 'auth' | 'webhook' | 'ai-chat'
 ): Promise<NextResponse | null> {
   if (!rateLimiters) {
     // Upstash not configured — fall through to in-memory rate limiter in route handlers
