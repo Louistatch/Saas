@@ -18,6 +18,7 @@ import { ParcellesInlineView } from '@/components/verify/parcelles-inline-view'
 import { IntrantsInlineView } from '@/components/verify/intrants-inline-view'
 import { CotisationView } from '@/components/verify/cotisation-view'
 import { ExploitationInlineView } from '@/components/verify/exploitation-inline-view'
+import { MeteoInlineView } from '@/components/verify/meteo-inline-view'
 import { OuvrierView } from '@/components/verify/ouvrier-view'
 import { AcheteurView } from '@/components/verify/acheteur-view'
 import { AgronomeView } from '@/components/verify/agronome-view'
@@ -82,7 +83,7 @@ export default function VerifyCardPage() {
   const [showContent, setShowContent] = useState(false)
   const [timeLeft, setTimeLeft] = useState(600)
   const [expired, setExpired] = useState(false)
-  const [activeView, setActiveView] = useState<'menu' | 'identity' | 'prices' | 'technicien' | 'ai' | 'agrismart' | 'parcelles' | 'intrants' | 'cotisation' | 'exploitation'>('menu')
+  const [activeView, setActiveView] = useState<'menu' | 'identity' | 'prices' | 'technicien' | 'ai' | 'agrismart' | 'parcelles' | 'intrants' | 'cotisation' | 'exploitation' | 'meteo'>('menu')
   const [contacts, setContacts] = useState<{ role: 'technicien' | 'coordo'; name: string; phone: string; canton?: string | null }[] | null>(null)
   const [contactsLoading, setContactsLoading] = useState(false)
   const [atsData, setAtsData] = useState<{ score: number; level: string; breakdown: AtsBreakdown } | null>(null)
@@ -346,6 +347,7 @@ export default function VerifyCardPage() {
     { icon: FileText, title: 'Mon Attestation', description: 'Télécharger PDF officiel', available: true, action: () => result.member_id && window.open(`/reports/attestation/${result.member_id}`, '_blank'), gradient: 'from-violet-500/20 to-violet-700/5' },
     { icon: ShoppingCart, title: 'Intrants', description: 'Semences & engrais', available: true, action: () => setActiveView('intrants'), gradient: 'from-orange-500/20 to-orange-700/5' },
     { icon: Coins, title: 'Cotisation', description: 'Statut & campagne', available: true, action: () => setActiveView('cotisation'), gradient: 'from-yellow-500/20 to-yellow-700/5' },
+    { icon: CloudRain, title: 'Météo Agricole', description: 'Conditions & prévisions', available: true, action: () => setActiveView('meteo'), gradient: 'from-sky-500/20 to-sky-700/5' },
   ]
 
   return (
@@ -652,6 +654,11 @@ export default function VerifyCardPage() {
         {/* ─── Exploitation View ─── */}
         {isValid && activeView === 'exploitation' && (
           <ExploitationInlineView cardNumber={cardNumber} memberId={result.member_id ?? null} onBack={() => setActiveView('menu')} />
+        )}
+
+        {/* ─── Météo View ─── */}
+        {isValid && activeView === 'meteo' && (
+          <MeteoInlineView cardNumber={cardNumber} onBack={() => setActiveView('menu')} />
         )}
 
         {/* ─── Security Timer ─── */}
