@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { rateLimit, clientKeyFromHeaders } from '@/lib/utils/rate-limit'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
+import { queueInAppNotification } from '@/lib/notifications/queue'
 
 /**
  * Génère toutes les variantes O↔0 et I↔1 du préfixe.
@@ -150,6 +151,18 @@ export async function GET(
     cooperative_id: card.cooperative_id ?? null,
     action: 'scan',
   }))
+
+  // In-app notification for cooperative admin (fire-and-forget)
+  if (card.cooperative_id) {
+    void queueInAppNotification({
+      cooperativeId: card.cooperative_id,
+      title: 'Carte scannée',
+      body: `Carte ${card.card_number} scannée à ${new Date().toLocaleTimeString('fr-FR')}`,
+      type: 'info',
+      icon: 'scan-line',
+      link: '/dashboard/analytics',
+    })
+  }
 
   return NextResponse.json({
     valid: isActive,

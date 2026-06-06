@@ -27,6 +27,7 @@ import { useAuth } from '@/app/context/auth-context'
 import { performLogout } from '@/lib/auth/logout'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { ProtectedRoute } from '@/app/components/protected-route'
+import { NotificationBell } from '@/components/shared/notification-bell'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -158,6 +159,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   ))}
                 </select>
               )}
+              {currentCooperative && <NotificationBell cooperativeId={currentCooperative.id} />}
             </div>
           </div>
 
