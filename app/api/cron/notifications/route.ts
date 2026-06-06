@@ -14,6 +14,14 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const processed = { sent: 0, failed: 0, skipped: 0 }
 
+  // Expire overdue market_listings
+  await supabase
+    .from('market_listings')
+    .update({ status: 'expired' })
+    .eq('status', 'active')
+    .lt('expires_at', new Date().toISOString())
+    .not('expires_at', 'is', null)
+
   // Fetch pending notifications scheduled for now or past
   const { data: pending } = await supabase
     .from('notification_queue')

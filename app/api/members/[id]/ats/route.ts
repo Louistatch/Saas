@@ -15,5 +15,8 @@ export async function GET(
     return NextResponse.json({ error: 'Calcul impossible' }, { status: 404 })
   }
 
+  // Persist score asynchronously — fire-and-forget, never blocks response
+  void Promise.resolve(supabase.rpc('upsert_member_ats', { p_member_id: id })).catch(() => null)
+
   return NextResponse.json(data)
 }

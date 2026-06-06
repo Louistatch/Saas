@@ -133,6 +133,17 @@ export async function POST(request: NextRequest) {
           status: 'proposed',
         })),
       )
+
+      // Notify matched parties via notification_queue (fire-and-forget)
+      void Promise.resolve(supabase.from('notification_queue').insert(
+        top5.map((m) => ({
+          type: 'match_found',
+          cooperative_id: cooperative_id ? String(cooperative_id) : null,
+          payload: { match_id: m.listing_id ?? null, request_id: newRequest.id ?? null },
+          status: 'pending',
+          attempts: 0,
+        }))
+      )).catch(() => null)
     }
 
     return NextResponse.json(

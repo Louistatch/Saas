@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 import { parseQuery } from '@/lib/agritogo/nlp-router'
 import { tryDirectAction } from '@/lib/agritogo/direct-actions'
@@ -175,8 +176,10 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Load conversation history
-  const { data: history } = await supabase
+  // Load conversation history — use admin client because SELECT on ai_conversations
+  // requires admin role after the RLS fix (anon reads are blocked)
+  const supabaseAdmin = createAdminClient()
+  const { data: history } = await supabaseAdmin
     .from('ai_conversations')
     .select('role, content')
     .eq('card_number', cardNumber)

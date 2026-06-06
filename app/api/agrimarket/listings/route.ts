@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/server'
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const cooperativeId = searchParams.get('cooperative_id')
+  const memberId = searchParams.get('member_id')
   const culture = searchParams.get('culture')
   const status = searchParams.get('status') ?? 'active'
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'))
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest) {
 
     if (status) query = query.eq('status', status)
     if (cooperativeId) query = query.eq('cooperative_id', cooperativeId)
+    if (memberId) query = query.eq('member_id', memberId)
     if (culture) query = query.eq('culture', culture)
 
     const from = (page - 1) * pageSize

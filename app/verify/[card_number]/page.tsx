@@ -17,6 +17,7 @@ import { AgriSmartWater } from '@/components/verify/agrismart-water'
 import { ParcellesInlineView } from '@/components/verify/parcelles-inline-view'
 import { IntrantsInlineView } from '@/components/verify/intrants-inline-view'
 import { CotisationView } from '@/components/verify/cotisation-view'
+import { ExploitationInlineView } from '@/components/verify/exploitation-inline-view'
 import { OuvrierView } from '@/components/verify/ouvrier-view'
 import { AcheteurView } from '@/components/verify/acheteur-view'
 import { AgronomeView } from '@/components/verify/agronome-view'
@@ -81,7 +82,7 @@ export default function VerifyCardPage() {
   const [showContent, setShowContent] = useState(false)
   const [timeLeft, setTimeLeft] = useState(600)
   const [expired, setExpired] = useState(false)
-  const [activeView, setActiveView] = useState<'menu' | 'identity' | 'prices' | 'technicien' | 'ai' | 'agrismart' | 'parcelles' | 'intrants' | 'cotisation'>('menu')
+  const [activeView, setActiveView] = useState<'menu' | 'identity' | 'prices' | 'technicien' | 'ai' | 'agrismart' | 'parcelles' | 'intrants' | 'cotisation' | 'exploitation'>('menu')
   const [contacts, setContacts] = useState<{ role: 'technicien' | 'coordo'; name: string; phone: string; canton?: string | null }[] | null>(null)
   const [contactsLoading, setContactsLoading] = useState(false)
   const [atsData, setAtsData] = useState<{ score: number; level: string; breakdown: AtsBreakdown } | null>(null)
@@ -336,7 +337,7 @@ export default function VerifyCardPage() {
 
   const services: ServiceItem[] = [
     { icon: Shield, title: 'Vérification', description: 'Détails de ma carte', available: true, action: () => setActiveView('identity'), gradient: 'from-[var(--vfp-accent)]/20 to-[var(--vfp-accent)]/5' },
-    { icon: FileText, title: 'Mon Exploitation', description: 'Fiches techniques', available: true, action: () => window.open('/marketplace', '_blank'), gradient: 'from-cyan-500/20 to-cyan-700/5' },
+    { icon: FileText, title: 'Mon Exploitation', description: 'Fiches techniques', available: true, action: () => setActiveView('exploitation'), gradient: 'from-cyan-500/20 to-cyan-700/5' },
     { icon: TrendingUp, title: 'Prix du Marché', description: 'Cours en temps réel', available: true, action: () => setActiveView('prices'), gradient: 'from-violet-500/20 to-violet-700/5' },
     { icon: Bot, title: 'Assistant IA', description: 'Conseils & prévisions', available: true, highlight: true, action: () => setActiveView('ai'), gradient: 'from-amber-400/20 to-amber-600/5' },
     { icon: PhoneCall, title: 'Mon Technicien', description: 'Appel & WhatsApp', available: true, action: () => setActiveView('technicien'), gradient: 'from-teal-500/20 to-teal-700/5' },
@@ -646,6 +647,11 @@ export default function VerifyCardPage() {
         {/* ─── Cotisation View ─── */}
         {isValid && activeView === 'cotisation' && (
           <CotisationView cardNumber={cardNumber} onBack={() => setActiveView('menu')} />
+        )}
+
+        {/* ─── Exploitation View ─── */}
+        {isValid && activeView === 'exploitation' && (
+          <ExploitationInlineView cardNumber={cardNumber} memberId={result.member_id ?? null} onBack={() => setActiveView('menu')} />
         )}
 
         {/* ─── Security Timer ─── */}

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@/lib/supabase/admin'
 
 export async function GET(
   _request: NextRequest,
@@ -21,7 +22,9 @@ export async function GET(
     return NextResponse.json({ error: 'Carte non trouvée.' }, { status: 404 })
   }
 
-  const { data: cotisations } = await supabase
+  // Use admin client to bypass RLS for member data reads
+  const supabaseAdmin = createAdminClient()
+  const { data: cotisations } = await supabaseAdmin
     .from('cotisations')
     .select('id, campaign, status, amount, currency, type, due_date, paid_date, notes, created_at')
     .eq('member_id', card.member_id)
