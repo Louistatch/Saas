@@ -1,13 +1,29 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { BarChart3, Users, ShoppingCart, CreditCard, TrendingUp, MapPin, ScanLine } from 'lucide-react'
+import { BarChart3, Users, ShoppingCart, CreditCard, TrendingUp, MapPin, ScanLine, Activity } from 'lucide-react'
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { useAuth } from '@/app/context/auth-context'
 import { LoadingBlock } from '@/components/shared/loading'
 import { PageHeader } from '@/components/shared/page-header'
+import { ChartCard } from '@/components/shared/chart-card'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Stats {
   totalMembers: number
@@ -22,6 +38,13 @@ interface Stats {
   scansThisWeek: number
 }
 
+export interface TimeSeriesPoint {
+  month: string
+  value: number
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const initial: Stats = {
   totalMembers: 0,
   activeMembers: 0,
@@ -35,12 +58,82 @@ const initial: Stats = {
   scansThisWeek: 0,
 }
 
+const FR_MONTHS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Groups ISO date strings by month (YYYY-MM) and returns cumulative or per-month counts */
+export function buildMonthlySeries(dates: string[], months: number): TimeSeriesPoint[] {
+  const now = new Date()
+  const series: TimeSeriesPoint[] = []
+
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const label = FR_MONTHS[d.getMonth()]
+    const count = dates.filter((iso) => iso.startsWith(key)).length
+    series.push({ month: label, value: count })
+  }
+
+  // Make it cumulative
+  let running = 0
+  return series.map((pt) => {
+    running += pt.value
+    return { month: pt.month, value: running }
+  })
+}
+
+/** Groups ISO date strings by day (YYYY-MM-DD) for the last `days` days */
+export function buildDailySeries(dates: string[], days: number): { day: string; value: number }[] {
+  const now = new Date()
+  const series: { day: string; value: number }[] = []
+
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(now)
+    d.setDate(d.getDate() - i)
+    const key = d.toISOString().slice(0, 10) // YYYY-MM-DD
+    const label = `${d.getDate()}/${d.getMonth() + 1}`
+    const count = dates.filter((iso) => iso.startsWith(key)).length
+    series.push({ day: label, value: count })
+  }
+
+  return series
+}
+
+/** Groups cotisations by paid month, summing amounts */
+function buildMonthlyAmountSeries(
+  rows: { paid_date: string; amount: number }[],
+  months: number,
+): TimeSeriesPoint[] {
+  const now = new Date()
+  const series: TimeSeriesPoint[] = []
+
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const label = FR_MONTHS[d.getMonth()]
+    const total = rows
+      .filter((r) => r.paid_date && r.paid_date.startsWith(key))
+      .reduce((acc, r) => acc + (r.amount ?? 0), 0)
+    series.push({ month: label, value: total })
+  }
+
+  return series
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function AnalyticsPage() {
   const { currentCooperative } = useCooperative()
   const { user } = useAuth()
   const supabase = useMemo(() => createClient(), [])
   const [stats, setStats] = useState<Stats>(initial)
   const [isLoading, setIsLoading] = useState(true)
+
+  // Time-series state
+  const [membersOverTime, setMembersOverTime] = useState<TimeSeriesPoint[]>([])
+  const [scansOverTime, setScansOverTime] = useState<{ day: string; value: number }[]>([])
+  const [cotisationsOverTime, setCotisationsOverTime] = useState<TimeSeriesPoint[]>([])
 
   const fetchStats = useCallback(async () => {
     if (!currentCooperative) {
@@ -50,26 +143,73 @@ export default function AnalyticsPage() {
     setIsLoading(true)
     const coopId = currentCooperative.id
 
-    const membersQuery = supabase.from('members').select('status').eq('cooperative_id', coopId)
-    const fichesQuery = supabase.from('fiches_techniques').select('status').eq('cooperative_id', coopId)
-    const cardsQuery = supabase.from('member_cards').select('status').eq('cooperative_id', coopId)
-    const parcellesQuery = supabase.from('parcelles').select('surface_ha').eq('cooperative_id', coopId)
+    const now = new Date()
+    const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1)
+    const thirtyDaysAgo = new Date(now)
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29)
 
     const weekAgo = new Date()
     weekAgo.setDate(weekAgo.getDate() - 7)
 
-    const scansAllQuery = supabase.from('member_access_logs').select('id', { count: 'exact', head: true })
-      .eq('cooperative_id', coopId).eq('action', 'scan')
-    const scansWeekQuery = supabase.from('member_access_logs').select('id', { count: 'exact', head: true })
-      .eq('cooperative_id', coopId).eq('action', 'scan').gte('created_at', weekAgo.toISOString())
+    // Existing queries
+    const membersQuery = supabase.from('members').select('status').eq('cooperative_id', coopId)
+    const fichesQuery = supabase.from('fiches_techniques').select('status').eq('cooperative_id', coopId)
+    const cardsQuery = supabase.from('member_cards').select('status').eq('cooperative_id', coopId)
+    const parcellesQuery = supabase.from('parcelles').select('surface_ha').eq('cooperative_id', coopId)
+    const scansAllQuery = supabase
+      .from('member_access_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('cooperative_id', coopId)
+      .eq('action', 'scan')
+    const scansWeekQuery = supabase
+      .from('member_access_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('cooperative_id', coopId)
+      .eq('action', 'scan')
+      .gte('created_at', weekAgo.toISOString())
 
-    const [membersRes, fichesRes, cardsRes, parcellesRes, scansAllRes, scansWeekRes] = await Promise.all([
+    // New time-series queries
+    const membersOverTimeQuery = supabase
+      .from('members')
+      .select('created_at')
+      .eq('cooperative_id', coopId)
+      .gte('created_at', twelveMonthsAgo.toISOString())
+
+    const scansOverTimeQuery = supabase
+      .from('member_access_logs')
+      .select('created_at')
+      .eq('cooperative_id', coopId)
+      .eq('action', 'scan')
+      .gte('created_at', thirtyDaysAgo.toISOString())
+
+    const cotisationsOverTimeQuery = supabase
+      .from('cotisations')
+      .select('paid_date, amount')
+      .eq('cooperative_id', coopId)
+      .eq('status', 'paid')
+      .not('paid_date', 'is', null)
+      .gte('paid_date', twelveMonthsAgo.toISOString())
+
+    const [
+      membersRes,
+      fichesRes,
+      cardsRes,
+      parcellesRes,
+      scansAllRes,
+      scansWeekRes,
+      membersOverTimeRes,
+      scansOverTimeRes,
+      cotisationsOverTimeRes,
+    ] = await Promise.all([
       membersQuery,
       fichesQuery,
       cardsQuery,
       parcellesQuery,
       scansAllQuery,
       scansWeekQuery,
+      membersOverTimeQuery,
+      scansOverTimeQuery,
+      cotisationsOverTimeQuery,
     ])
 
     const members = (membersRes.data ?? []) as { status: string }[]
@@ -89,6 +229,24 @@ export default function AnalyticsPage() {
       totalScans: scansAllRes.count ?? 0,
       scansThisWeek: scansWeekRes.count ?? 0,
     })
+
+    // Process time-series data
+    const memberDates = ((membersOverTimeRes.data ?? []) as { created_at: string }[]).map(
+      (r) => r.created_at,
+    )
+    setMembersOverTime(buildMonthlySeries(memberDates, 12))
+
+    const scanDates = ((scansOverTimeRes.data ?? []) as { created_at: string }[]).map(
+      (r) => r.created_at,
+    )
+    setScansOverTime(buildDailySeries(scanDates, 30))
+
+    const cotisationRows = (cotisationsOverTimeRes.data ?? []) as {
+      paid_date: string
+      amount: number
+    }[]
+    setCotisationsOverTime(buildMonthlyAmountSeries(cotisationRows, 12))
+
     setIsLoading(false)
   }, [currentCooperative, supabase, user])
 
@@ -98,19 +256,54 @@ export default function AnalyticsPage() {
 
   // Realtime: refresh stats when members, cards or fiches change
   const fetchStatsRef = useRef(fetchStats)
-  useEffect(() => { fetchStatsRef.current = fetchStats }, [fetchStats])
+  useEffect(() => {
+    fetchStatsRef.current = fetchStats
+  }, [fetchStats])
 
   useEffect(() => {
     if (!currentCooperative) return
     const coopId = currentCooperative.id
     const channel = supabase
       .channel(`analytics-realtime-${coopId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `cooperative_id=eq.${coopId}` }, () => fetchStatsRef.current())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'member_cards', filter: `cooperative_id=eq.${coopId}` }, () => fetchStatsRef.current())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fiches_techniques', filter: `cooperative_id=eq.${coopId}` }, () => fetchStatsRef.current())
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'member_access_logs', filter: `cooperative_id=eq.${coopId}` }, () => fetchStatsRef.current())
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'members', filter: `cooperative_id=eq.${coopId}` },
+        () => fetchStatsRef.current(),
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'member_cards',
+          filter: `cooperative_id=eq.${coopId}`,
+        },
+        () => fetchStatsRef.current(),
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'fiches_techniques',
+          filter: `cooperative_id=eq.${coopId}`,
+        },
+        () => fetchStatsRef.current(),
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'member_access_logs',
+          filter: `cooperative_id=eq.${coopId}`,
+        },
+        () => fetchStatsRef.current(),
+      )
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [currentCooperative?.id, supabase])
 
   const statCards = [
@@ -139,7 +332,7 @@ export default function AnalyticsPage() {
       bg: 'bg-accent/20',
     },
     {
-      label: 'Taux d\'engagement',
+      label: "Taux d'engagement",
       value:
         stats.totalMembers > 0
           ? `${Math.round((stats.activeMembers / stats.totalMembers) * 100)}%`
@@ -176,6 +369,7 @@ export default function AnalyticsPage() {
         }`}
       />
 
+      {/* ── Stat cards ── */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {statCards.map((stat, i) => {
           const Icon = stat.icon
@@ -200,6 +394,7 @@ export default function AnalyticsPage() {
         })}
       </div>
 
+      {/* ── Breakdown bars ── */}
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="border-border">
           <CardHeader>
@@ -260,6 +455,7 @@ export default function AnalyticsPage() {
         </Card>
       </div>
 
+      {/* ── Summary ── */}
       <Card className="border-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-foreground">
@@ -297,6 +493,172 @@ export default function AnalyticsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ── Time-series charts ── */}
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+        {/* Members over time */}
+        <ChartCard
+          title="Évolution des membres"
+          description="Cumul sur les 12 derniers mois"
+          icon={Users}
+          isLoading={isLoading}
+        >
+          {membersOverTime.every((p) => p.value === 0) ? (
+            <EmptyChart />
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <AreaChart data={membersOverTime} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="membersGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="oklch(0.6 0.18 145)" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="oklch(0.6 0.18 145)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                  }}
+                  labelStyle={{ color: 'hsl(var(--foreground))' }}
+                  itemStyle={{ color: 'oklch(0.6 0.18 145)' }}
+                  formatter={(v: unknown) => [v as number, 'Membres']}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="oklch(0.6 0.18 145)"
+                  strokeWidth={2}
+                  fill="url(#membersGrad)"
+                  dot={false}
+                  activeDot={{ r: 4 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+
+        {/* Scans per day */}
+        <ChartCard
+          title="Activité QR — scans"
+          description="Scans par jour sur 30 jours"
+          icon={ScanLine}
+          isLoading={isLoading}
+        >
+          {scansOverTime.every((p) => p.value === 0) ? (
+            <EmptyChart />
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={scansOverTime} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <XAxis
+                  dataKey="day"
+                  tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                  axisLine={false}
+                  tickLine={false}
+                  interval={4}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                  }}
+                  labelStyle={{ color: 'hsl(var(--foreground))' }}
+                  itemStyle={{ color: 'oklch(0.65 0.2 30)' }}
+                  formatter={(v: unknown) => [v as number, 'Scans']}
+                />
+                <Bar dataKey="value" fill="oklch(0.65 0.2 30)" radius={[3, 3, 0, 0]} maxBarSize={16} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+
+        {/* Cotisations collected */}
+        <ChartCard
+          title="Collecte cotisations"
+          description="Montants perçus par mois (FCFA)"
+          icon={Activity}
+          isLoading={isLoading}
+        >
+          {cotisationsOverTime.every((p) => p.value === 0) ? (
+            <EmptyChart />
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart
+                data={cotisationsOverTime}
+                margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(v: number) =>
+                    v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)
+                  }
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                  }}
+                  labelStyle={{ color: 'hsl(var(--foreground))' }}
+                  itemStyle={{ color: 'oklch(0.55 0.18 250)' }}
+                  formatter={(v: unknown) => [`${(v as number).toLocaleString('fr-FR')} FCFA`, 'Collecte']}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="value"
+                  stroke="oklch(0.55 0.18 250)"
+                  strokeWidth={2}
+                  dot={{ r: 3, fill: 'oklch(0.55 0.18 250)' }}
+                  activeDot={{ r: 5 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+      </div>
+    </div>
+  )
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function EmptyChart() {
+  return (
+    <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
+      Aucune donnée pour la période
     </div>
   )
 }

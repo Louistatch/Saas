@@ -15,6 +15,7 @@ import { Card3D } from '@/components/verify/card-3d'
 import { AiChat } from '@/components/verify/ai-chat'
 import { AgriSmartWater } from '@/components/verify/agrismart-water'
 import { memberFullName, memberLocality as getMemberLocality, waNumber } from '@/components/verify/types'
+import { AtsBadge, type AtsBreakdown } from '@/components/shared/ats-badge'
 
 interface VerifyResult {
   valid: boolean
@@ -26,6 +27,7 @@ interface VerifyResult {
     status: string; member_since: string | null
   }
   cooperative?: { name: string; faitiere_name: string | null }
+  member_id?: string | null
   // Haroo-specific
   card_type?: 'OUVRIER' | 'ACHETEUR' | 'AGRONOME'
   ouvrier?: {
@@ -64,10 +66,11 @@ export default function VerifyCardPage() {
   const [activeView, setActiveView] = useState<'menu' | 'identity' | 'prices' | 'technicien' | 'ai' | 'agrismart'>('menu')
   const [contacts, setContacts] = useState<{ role: 'technicien' | 'coordo'; name: string; phone: string; canton?: string | null }[] | null>(null)
   const [contactsLoading, setContactsLoading] = useState(false)
+  const [atsData, setAtsData] = useState<{ score: number; level: string; breakdown: AtsBreakdown } | null>(null)
 
   useEffect(() => {
     setResult(null); setLoading(true); setShowContent(false)
-    setTimeLeft(600); setExpired(false); setActiveView('menu')
+    setTimeLeft(600); setExpired(false); setActiveView('menu'); setAtsData(null)
   }, [cardNumber])
 
   useEffect(() => {
@@ -84,6 +87,17 @@ export default function VerifyCardPage() {
         const res = await fetch(`/api/verify/${encodeURIComponent(cardNumber)}`)
         const data: VerifyResult = await res.json()
         setResult(data)
+        // Fetch ATS in background if card is valid and we have a member_id
+        if (data.valid && data.member_id) {
+          fetch(`/api/members/${data.member_id}/ats`)
+            .then(r => r.ok ? r.json() : null)
+            .then(ats => {
+              if (ats && typeof ats.score === 'number') {
+                setAtsData({ score: ats.score, level: ats.level, breakdown: ats.breakdown })
+              }
+            })
+            .catch(() => null)
+        }
       } catch { setResult({ valid: false, error: 'Erreur réseau.' }) }
       finally { setLoading(false); setTimeout(() => setShowContent(true), 120) }
     }
@@ -221,6 +235,11 @@ export default function VerifyCardPage() {
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--vfp-accent)] to-[var(--vfp-accent-dim)]">votre succès.</span>
                 </h1>
                 <p className="text-white/40 text-sm mt-2">Gérez, développez et prospérez avec FaîtiereHub.</p>
+                {atsData && (
+                  <div className="mt-3 max-w-[200px]">
+                    <AtsBadge score={atsData.score} level={atsData.level} size="sm" />
+                  </div>
+                )}
               </div>
               <div className="vfp-glass-subtle rounded-2xl px-4 py-3 text-center shrink-0">
                 <div className="w-10 h-10 rounded-full bg-[var(--vfp-accent)]/15 flex items-center justify-center mx-auto mb-1.5">
@@ -391,6 +410,21 @@ export default function VerifyCardPage() {
                   </p>
                 </div>
               </div>
+
+              {/* ATS Score breakdown */}
+              {atsData && (
+                <div className="pt-2 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">Score Agricole (ATS)</span>
+                  </div>
+                  <AtsBadge
+                    score={atsData.score}
+                    level={atsData.level}
+                    breakdown={atsData.breakdown}
+                    size="md"
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}
