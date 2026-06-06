@@ -32,15 +32,22 @@ export async function GET(
 
   const region = member?.region ?? null
 
-  const sevenDaysAgo = new Date()
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-  const dateFrom = sevenDaysAgo.toISOString().split('T')[0]
+  // Center on today: 3 days history + today + 7 days forecast = 11 days max
+  const today = new Date()
+  const threeDaysAgo = new Date(today)
+  threeDaysAgo.setDate(today.getDate() - 3)
+  const tenDaysLater = new Date(today)
+  tenDaysLater.setDate(today.getDate() + 10)
+
+  const dateFrom = threeDaysAgo.toISOString().split('T')[0]
+  const dateTo = tenDaysLater.toISOString().split('T')[0]
 
   let query = supabaseAdmin
     .from('weather_data')
     .select('date, temperature_max, temperature_min, temperature_mean, precipitation_mm, humidity_pct, wind_speed_ms, et0_mm, region')
     .gte('date', dateFrom)
-    .order('date', { ascending: false })
+    .lte('date', dateTo)
+    .order('date', { ascending: true })
     .limit(14)
 
   if (region) {
