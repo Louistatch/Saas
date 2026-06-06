@@ -167,6 +167,7 @@ export async function GET(
   return NextResponse.json({
     valid: isActive,
     source: 'faitierehub' as const,
+    member_id: card.member_id ?? null,
     card: {
       card_number: card.card_number,
       status: isActive ? 'active' : (isExpired ? 'expired' : card.status),

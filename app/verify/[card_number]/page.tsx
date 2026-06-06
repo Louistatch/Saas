@@ -181,8 +181,8 @@ export default function VerifyCardPage() {
     { icon: Bot, title: 'Assistant IA', description: 'Conseils & prévisions', available: true, highlight: true, action: () => setActiveView('ai'), gradient: 'from-amber-400/20 to-amber-600/5' },
     { icon: PhoneCall, title: 'Mon Technicien', description: 'Appel & WhatsApp', available: true, action: () => setActiveView('technicien'), gradient: 'from-teal-500/20 to-teal-700/5' },
     { icon: Droplets, title: 'AgriSmart', description: 'Besoins en eau', available: true, action: () => setActiveView('agrismart'), gradient: 'from-blue-400/20 to-cyan-600/5' },
-    { icon: Map, title: 'Parcelles GPS', description: 'Suivi de mes parcelles', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
-    { icon: CloudRain, title: 'Alertes Météo', description: 'Prévisions & alertes', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
+    { icon: Map, title: 'Parcelles GPS', description: 'Mes parcelles agricoles', available: true, action: () => window.open(`/verify/${cardNumber}/parcelles`, '_self'), gradient: 'from-emerald-500/20 to-emerald-700/5' },
+    { icon: FileText, title: 'Mon Attestation', description: 'Télécharger PDF officiel', available: true, action: () => result.member_id && window.open(`/reports/attestation/${result.member_id}`, '_blank'), gradient: 'from-violet-500/20 to-violet-700/5' },
     { icon: ShoppingCart, title: 'Intrants', description: 'Semences & engrais', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
     { icon: Coins, title: 'Cotisation', description: 'Adhérer / Renouveler', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
   ]
