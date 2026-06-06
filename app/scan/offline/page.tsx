@@ -1,5 +1,3 @@
-'use client'
-
 export default function OfflinePage() {
   return (
     <main style={{
@@ -26,22 +24,23 @@ export default function OfflinePage() {
       <p style={{ color: 'oklch(0.65 0.10 142)', maxWidth: '320px', margin: 0, fontSize: '16px' }}>
         La vérification nécessite une connexion internet. Reconnectez-vous puis réessayez.
       </p>
-      <button
-        onClick={() => window.location.reload()}
+      <a
+        href=""
         style={{
           marginTop: '8px',
           padding: '12px 28px',
           background: '#4dffa0',
           color: '#0a3d24',
-          border: 'none',
           borderRadius: '12px',
           fontWeight: 700,
           fontSize: '16px',
           cursor: 'pointer',
+          textDecoration: 'none',
+          display: 'inline-block',
         }}
       >
         Réessayer
-      </button>
+      </a>
     </main>
   )
 }

@@ -4,6 +4,8 @@ import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { QrScanner } from '@/components/shared/qr-scanner'
+import { PwaRegister } from '@/components/scan/pwa-register'
+import { SplashScreen } from '@/components/scan/splash-screen'
 import { ArrowLeft, ScanLine } from 'lucide-react'
 
 /**
@@ -52,6 +54,8 @@ export default function ScanPage() {
 
   return (
     <main className="scan-root">
+      <SplashScreen />
+      <PwaRegister />
       <div className="scan-glow" aria-hidden />
 
       <header className="scan-header">

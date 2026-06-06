@@ -1,0 +1,19 @@
+{
+  "name": "CoopScan — Vérification de carte",
+  "short_name": "CoopScan",
+  "description": "Scannez et vérifiez les cartes de membres de coopérative",
+  "start_url": "/scan",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0d3d22",
+  "background_color": "#0a1a10",
+  "lang": "fr",
+  "categories": ["utilities"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
