@@ -143,6 +143,14 @@ export async function GET(
   const isExpired = card.expiry_date && new Date(card.expiry_date) < new Date()
   const isActive = card.status === 'active' && !isExpired
 
+  // Log the scan (fire-and-forget — never block the response)
+  supabase.from('member_access_logs').insert({
+    card_number: card.card_number,
+    member_id: card.member_id ?? null,
+    cooperative_id: card.cooperative_id ?? null,
+    action: 'scan',
+  }).then(() => {}).catch(() => {})
+
   return NextResponse.json({
     valid: isActive,
     source: 'faitierehub' as const,

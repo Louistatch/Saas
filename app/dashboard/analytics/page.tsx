@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { BarChart3, Users, ShoppingCart, CreditCard, TrendingUp, MapPin } from 'lucide-react'
+import { BarChart3, Users, ShoppingCart, CreditCard, TrendingUp, MapPin, ScanLine } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { useAuth } from '@/app/context/auth-context'
@@ -18,6 +18,8 @@ interface Stats {
   activeCards: number
   totalParcelles: number
   totalSurfaceHa: number
+  totalScans: number
+  scansThisWeek: number
 }
 
 const initial: Stats = {
@@ -29,6 +31,8 @@ const initial: Stats = {
   activeCards: 0,
   totalParcelles: 0,
   totalSurfaceHa: 0,
+  totalScans: 0,
+  scansThisWeek: 0,
 }
 
 export default function AnalyticsPage() {
@@ -51,11 +55,21 @@ export default function AnalyticsPage() {
     const cardsQuery = supabase.from('member_cards').select('status').eq('cooperative_id', coopId)
     const parcellesQuery = supabase.from('parcelles').select('surface_ha').eq('cooperative_id', coopId)
 
-    const [membersRes, fichesRes, cardsRes, parcellesRes] = await Promise.all([
+    const weekAgo = new Date()
+    weekAgo.setDate(weekAgo.getDate() - 7)
+
+    const scansAllQuery = supabase.from('member_access_logs').select('id', { count: 'exact', head: true })
+      .eq('cooperative_id', coopId).eq('action', 'scan')
+    const scansWeekQuery = supabase.from('member_access_logs').select('id', { count: 'exact', head: true })
+      .eq('cooperative_id', coopId).eq('action', 'scan').gte('created_at', weekAgo.toISOString())
+
+    const [membersRes, fichesRes, cardsRes, parcellesRes, scansAllRes, scansWeekRes] = await Promise.all([
       membersQuery,
       fichesQuery,
       cardsQuery,
       parcellesQuery,
+      scansAllQuery,
+      scansWeekQuery,
     ])
 
     const members = (membersRes.data ?? []) as { status: string }[]
@@ -72,6 +86,8 @@ export default function AnalyticsPage() {
       activeCards: cards.filter((c) => c.status === 'active').length,
       totalParcelles: parcelles.length,
       totalSurfaceHa: parcelles.reduce((acc, p) => acc + (p.surface_ha || 0), 0),
+      totalScans: scansAllRes.count ?? 0,
+      scansThisWeek: scansWeekRes.count ?? 0,
     })
     setIsLoading(false)
   }, [currentCooperative, supabase, user])
@@ -92,6 +108,7 @@ export default function AnalyticsPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `cooperative_id=eq.${coopId}` }, () => fetchStatsRef.current())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'member_cards', filter: `cooperative_id=eq.${coopId}` }, () => fetchStatsRef.current())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fiches_techniques', filter: `cooperative_id=eq.${coopId}` }, () => fetchStatsRef.current())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'member_access_logs', filter: `cooperative_id=eq.${coopId}` }, () => fetchStatsRef.current())
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [currentCooperative?.id, supabase])
@@ -140,6 +157,14 @@ export default function AnalyticsPage() {
       color: 'text-green-600',
       bg: 'bg-green-100',
     },
+    {
+      label: 'Scans QR (total)',
+      value: stats.totalScans,
+      sub: `${stats.scansThisWeek} cette semaine`,
+      icon: ScanLine,
+      color: 'text-orange-600',
+      bg: 'bg-orange-100',
+    },
   ]
 
   return (
@@ -151,7 +176,7 @@ export default function AnalyticsPage() {
         }`}
       />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {statCards.map((stat, i) => {
           const Icon = stat.icon
           return (
