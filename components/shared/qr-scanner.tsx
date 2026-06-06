@@ -64,10 +64,8 @@ export function QrScanner({ onResult, onError, className = '' }: QrScannerProps)
 
   // Started ONLY by a user tap.
   const startCamera = useCallback(async () => {
-    // Reset detection flag — critical for re-scans
     detectedRef.current = false
     setErrorMsg('')
-    setState('idle') // brief reset to clear any stale UI
 
     // Secure-context guard: camera APIs require HTTPS (or localhost).
     const secure =
@@ -154,31 +152,30 @@ export function QrScanner({ onResult, onError, className = '' }: QrScannerProps)
 
       const tick = async () => {
         if (detectedRef.current) return
-        if (video.readyState >= video.HAVE_ENOUGH_DATA) {
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
           const w = video.videoWidth
           const h = video.videoHeight
           if (w && h) {
-            try {
-              if (detector) {
+            if (detector) {
+              try {
                 const codes = await detector.detect(video)
-                if (codes[0]?.rawValue) { handleHit(codes[0].rawValue); return }
-              } else if (jsQR) {
-                const scale = Math.min(1, 480 / Math.max(w, h))
-                const sw = Math.round(w * scale)
-                const sh = Math.round(h * scale)
-                canvas.width = sw
-                canvas.height = sh
-                ctx.drawImage(video, 0, 0, sw, sh)
-                const img = ctx.getImageData(0, 0, sw, sh)
-                const code = jsQR(img.data, sw, sh, { inversionAttempts: 'dontInvert' })
-                if (code?.data) { handleHit(code.data); return }
+                if (codes[0]?.rawValue) return handleHit(codes[0].rawValue)
+              } catch {
+                /* keep scanning */
               }
-            } catch {
-              // Detection error — ignore and keep scanning
+            } else if (jsQR) {
+              const scale = Math.min(1, 480 / Math.max(w, h))
+              const sw = Math.round(w * scale)
+              const sh = Math.round(h * scale)
+              canvas.width = sw
+              canvas.height = sh
+              ctx.drawImage(video, 0, 0, sw, sh)
+              const img = ctx.getImageData(0, 0, sw, sh)
+              const code = jsQR(img.data, sw, sh, { inversionAttempts: 'dontInvert' })
+              if (code?.data) return handleHit(code.data)
             }
           }
         }
-        // Always schedule next frame (never stop the loop unless detected)
         rafRef.current = requestAnimationFrame(tick)
       }
       rafRef.current = requestAnimationFrame(tick)
@@ -192,11 +189,7 @@ export function QrScanner({ onResult, onError, className = '' }: QrScannerProps)
     }
   }, [handleHit, onError])
 
-  useEffect(() => () => {
-    // Cleanup: stop camera and cancel animation frame on unmount
-    stop()
-    detectedRef.current = true // prevent any pending tick from firing
-  }, [stop])
+  useEffect(() => () => stop(), [stop])
 
   const showStartButton = state === 'idle' || state === 'denied' || state === 'error'
 
