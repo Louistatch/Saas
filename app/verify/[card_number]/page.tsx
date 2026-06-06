@@ -19,7 +19,7 @@ import { memberFullName, memberLocality as getMemberLocality, waNumber } from '@
 interface VerifyResult {
   valid: boolean
   source?: 'faitierehub' | 'haroo'
-  card?: { card_number: string; status: string; expiry_date: string | null; created_at: string }
+  card?: { card_number: string; status: string; expiry_date: string | null; created_at: string; card_type?: string }
   member?: {
     first_name: string | null; last_name: string | null; photo_url: string | null
     village: string | null; canton: string | null; prefecture: string | null; region: string | null
@@ -323,9 +323,21 @@ export default function VerifyCardPage() {
                 <div>
                   <h2 className="text-xl font-bold text-white">{result.member.first_name ?? ''} <span className="uppercase">{result.member.last_name ?? ''}</span></h2>
                   <p className="text-[var(--vfp-accent)]/70 text-xs font-mono">{result.card?.card_number}</p>
-                  <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--vfp-accent)]/10 border border-[var(--vfp-accent)]/20">
-                    <CheckCircle className="h-3 w-3 text-[var(--vfp-accent)]" />
-                    <span className="text-[10px] font-bold text-[var(--vfp-accent)] uppercase">Membre vérifié</span>
+                  <div className="flex items-center gap-2 flex-wrap mt-1.5">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--vfp-accent)]/10 border border-[var(--vfp-accent)]/20">
+                      <CheckCircle className="h-3 w-3 text-[var(--vfp-accent)]" />
+                      <span className="text-[10px] font-bold text-[var(--vfp-accent)] uppercase">Membre vérifié</span>
+                    </div>
+                    {result.card?.card_type && result.card.card_type !== 'FAITIERE' && (
+                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-white/8 border border-white/15 text-white/60 uppercase tracking-wider">
+                        {result.card.card_type}
+                      </span>
+                    )}
+                    {(!result.card?.card_type || result.card.card_type === 'FAITIERE') && (
+                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-white/8 border border-white/15 text-white/60 uppercase tracking-wider">
+                        Producteur
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -363,6 +375,20 @@ export default function VerifyCardPage() {
                 <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
                   <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Faîtière</span>
                   <p className="text-white text-sm font-semibold mt-0.5">{result.cooperative?.faitiere_name ?? '—'}</p>
+                </div>
+                {result.member.member_since && (
+                  <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
+                    <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Membre depuis</span>
+                    <p className="text-white text-sm font-semibold mt-0.5">
+                      {new Date(result.member.member_since).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                    </p>
+                  </div>
+                )}
+                <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
+                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Type de carte</span>
+                  <p className="text-white text-sm font-semibold mt-0.5">
+                    {result.card?.card_type === 'FAITIERE' || !result.card?.card_type ? 'Producteur' : result.card.card_type}
+                  </p>
                 </div>
               </div>
             </div>

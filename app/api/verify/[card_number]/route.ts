@@ -91,7 +91,7 @@ export async function GET(
   // First: get the card (anon can read active cards)
   const { data: card, error: cardError } = await supabase
     .from('member_cards')
-    .select('card_number, status, expiry_date, created_at, member_id, cooperative_id')
+    .select('card_number, status, expiry_date, created_at, member_id, cooperative_id, card_type')
     .in('card_number', variants)
     .eq('status', 'active')
     .limit(1)
@@ -159,6 +159,7 @@ export async function GET(
       status: isActive ? 'active' : (isExpired ? 'expired' : card.status),
       expiry_date: card.expiry_date,
       created_at: card.created_at,
+      card_type: (card as { card_type?: string }).card_type ?? 'FAITIERE',
     },
     member: {
       first_name: member?.first_name ?? null,
