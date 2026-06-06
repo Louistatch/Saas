@@ -4,7 +4,7 @@ import { useState } from 'react'
 import {
   ArrowLeft, User, Briefcase, MapPin, Star, Clock,
   TrendingUp, Bot, CheckCircle, XCircle, Calendar,
-  Coins, Award, BookOpen,
+  Coins, Award, BookOpen, Phone, MessageCircle, RefreshCw,
 } from 'lucide-react'
 import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboard'
 import { AiChat } from '@/components/verify/ai-chat'
@@ -47,6 +47,7 @@ type ActiveView = 'menu' | 'profil' | 'offres' | 'prices' | 'ai' | 'evaluation'
 
 export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewProps) {
   const [activeView, setActiveView] = useState<ActiveView>('menu')
+  const [offresKey, setOffresKey] = useState(0)
 
   const rawFirst = (ouvrier.first_name ?? '').trim()
   const firstName = rawFirst
@@ -61,6 +62,9 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
     : ouvrier.disponible_jusqu_au
       ? `Occupé jusqu'au ${new Date(ouvrier.disponible_jusqu_au).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`
       : 'Occupé'
+
+  const phoneDigits = ouvrier.phone ? ouvrier.phone.replace(/\D/g, '') : null
+  const waPhone = phoneDigits ? (phoneDigits.startsWith('228') ? phoneDigits : `228${phoneDigits}`) : null
 
   function renderStars(note: number) {
     return Array.from({ length: 5 }, (_, i) => (
@@ -135,7 +139,7 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
         </div>
         {ouvrier.tarif_journalier && (
           <div className="text-right">
-            <p className="text-[var(--vfp-accent)] text-sm font-bold">{ouvrier.tarif_journalier.toLocaleString('fr-FR')} F</p>
+            <p className="text-[var(--vfp-accent)] text-sm font-bold">{ouvrier.tarif_journalier.toLocaleString('fr-FR')} FCFA</p>
             <p className="text-white/30 text-[10px]">/ jour</p>
           </div>
         )}
@@ -273,12 +277,41 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
               <span className="text-[var(--vfp-accent)] font-bold text-base">{ouvrier.tarif_journalier.toLocaleString('fr-FR')} FCFA</span>
             </div>
           )}
+          {/* Phone contact */}
+          {ouvrier.phone && (
+            <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Phone className="h-3.5 w-3.5 text-[var(--vfp-accent)]" />
+                <span className="text-xs text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">Contact</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={`tel:${ouvrier.phone}`}
+                  className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--vfp-accent)]/10 border border-[var(--vfp-accent)]/20 text-[var(--vfp-accent-bright)] text-sm font-medium active:opacity-70"
+                >
+                  <Phone className="h-4 w-4" />
+                  {ouvrier.phone}
+                </a>
+                {waPhone && (
+                  <a
+                    href={`https://wa.me/${waPhone}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-500/10 border border-green-500/20 text-green-300 text-sm font-medium active:opacity-70"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    WhatsApp
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* ─── Offres expanded ─── */}
       {activeView === 'offres' && (
-        <div className="space-y-3 vfp-enter">
+        <div key={offresKey} className="space-y-3 vfp-enter">
           <div className="flex items-center justify-between px-1">
             <h3 className="text-white font-bold text-base">Offres d&apos;emploi</h3>
             <button onClick={() => setActiveView('menu')} className="text-[var(--vfp-accent)] text-sm font-medium">
@@ -286,9 +319,16 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
             </button>
           </div>
           {offres.length === 0 && (
-            <div className="vfp-card rounded-2xl p-6 text-center">
-              <Briefcase className="h-8 w-8 text-white/20 mx-auto mb-2" />
+            <div className="vfp-card rounded-2xl p-6 text-center space-y-3">
+              <Briefcase className="h-8 w-8 text-white/20 mx-auto" />
               <p className="text-white/50 text-sm">Aucune offre dans vos cantons pour l&apos;instant.</p>
+              <button
+                onClick={() => setOffresKey(k => k + 1)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--vfp-accent)]/10 border border-[var(--vfp-accent)]/20 text-[var(--vfp-accent-bright)] text-sm font-medium active:opacity-70"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Actualiser
+              </button>
             </div>
           )}
           {offres.map((o) => (
@@ -299,7 +339,7 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
                   {o.culture && <p className="text-[var(--vfp-accent-dim)] text-xs mt-0.5">{o.culture}</p>}
                 </div>
                 {o.tarif_journalier && (
-                  <span className="shrink-0 text-[var(--vfp-accent)] font-bold text-sm">{o.tarif_journalier.toLocaleString('fr-FR')} F/j</span>
+                  <span className="shrink-0 text-[var(--vfp-accent)] font-bold text-sm">{o.tarif_journalier.toLocaleString('fr-FR')} FCFA/j</span>
                 )}
               </div>
               <div className="flex items-center gap-3 text-xs text-white/40">

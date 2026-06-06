@@ -87,6 +87,7 @@ export default function VerifyCardPage() {
   const [contacts, setContacts] = useState<{ role: 'technicien' | 'coordo'; name: string; phone: string; canton?: string | null }[] | null>(null)
   const [contactsLoading, setContactsLoading] = useState(false)
   const [atsData, setAtsData] = useState<{ score: number; level: string; breakdown: AtsBreakdown } | null>(null)
+  const [quickStats, setQuickStats] = useState<{ totalHa: number; cotisationStatus: string | null; intrantCount: number } | null>(null)
 
   useEffect(() => {
     setResult(null); setLoading(true); setShowContent(false)
@@ -149,6 +150,22 @@ export default function VerifyCardPage() {
   useEffect(() => {
     if (activeView === 'technicien') loadContacts()
   }, [activeView, loadContacts])
+
+  useEffect(() => {
+    if (!result?.valid || !cardNumber) return
+    const cn = encodeURIComponent(cardNumber)
+    Promise.all([
+      fetch(`/api/verify/${cn}/parcelles`).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`/api/verify/${cn}/cotisation`).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`/api/verify/${cn}/intrants`).then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([parcData, cotData, intData]) => {
+      setQuickStats({
+        totalHa: parcData?.total_ha ?? 0,
+        cotisationStatus: cotData?.summary?.last_status ?? null,
+        intrantCount: intData?.intrants?.length ?? 0,
+      })
+    })
+  }, [result?.valid, cardNumber])
 
   if (loading) {
     return (
@@ -433,6 +450,36 @@ export default function VerifyCardPage() {
         {result.member && result.card && isValid && activeView === 'menu' && (
           <div className={`transition-all duration-600 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`} style={{ transitionDelay: '200ms' }}>
             <Card3D member={result.member} card={result.card} cooperative={result.cooperative} />
+          </div>
+        )}
+
+        {/* ─── Quick Stats ─── */}
+        {isValid && activeView === 'menu' && quickStats && (
+          <div className={`grid grid-cols-3 gap-2 vfp-enter transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '200ms' }}>
+            <div className="vfp-card rounded-2xl p-3 text-center">
+              <p className="text-[var(--vfp-accent)] text-base font-bold leading-tight">{quickStats.totalHa > 0 ? quickStats.totalHa.toFixed(1) : '—'}</p>
+              <p className="text-white/40 text-[10px] mt-0.5">Hectares</p>
+            </div>
+            <div className={`vfp-card rounded-2xl p-3 text-center ${
+              quickStats.cotisationStatus === 'paid' || quickStats.cotisationStatus === 'waived'
+                ? 'border-emerald-500/20 bg-emerald-500/5'
+                : quickStats.cotisationStatus === 'overdue'
+                ? 'border-red-500/20 bg-red-500/5'
+                : ''
+            }`}>
+              <p className="text-base font-bold leading-tight">
+                {quickStats.cotisationStatus === 'paid' || quickStats.cotisationStatus === 'waived'
+                  ? <span className="text-emerald-400">✓</span>
+                  : quickStats.cotisationStatus === 'overdue'
+                  ? <span className="text-red-400">⚠</span>
+                  : <span className="text-amber-400">⏳</span>}
+              </p>
+              <p className="text-white/40 text-[10px] mt-0.5">Cotisation</p>
+            </div>
+            <div className="vfp-card rounded-2xl p-3 text-center">
+              <p className="text-[var(--vfp-accent)] text-base font-bold leading-tight">{quickStats.intrantCount}</p>
+              <p className="text-white/40 text-[10px] mt-0.5">Intrants</p>
+            </div>
           </div>
         )}
 

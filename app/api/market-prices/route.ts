@@ -30,12 +30,15 @@ export async function GET(request: NextRequest) {
     const { data: allPrices } = await supabase
       .from('market_prices')
       .select('region_id')
-    
+      .limit(1000)
+
     const regionCounts: Record<string, number> = {}
     for (const p of allPrices ?? []) {
       regionCounts[p.region_id] = (regionCounts[p.region_id] ?? 0) + 1
     }
-    return NextResponse.json({ regionCounts })
+    return NextResponse.json({ regionCounts }, {
+      headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' }
+    })
   }
 
   // Return prefectures for a region
@@ -59,7 +62,9 @@ export async function GET(request: NextRequest) {
       ).length,
     }))
     
-    return NextResponse.json({ prefectures: prefWithCounts })
+    return NextResponse.json({ prefectures: prefWithCounts }, {
+      headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' }
+    })
   }
 
   // Return cantons for a prefecture
@@ -86,7 +91,9 @@ export async function GET(request: NextRequest) {
       priceCount: cantonCounts.filter(pc => pc.canton_id === c.id).length,
     }))
     
-    return NextResponse.json({ cantons: cantonsWithCounts })
+    return NextResponse.json({ cantons: cantonsWithCounts }, {
+      headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' }
+    })
   }
 
   // Default: return market prices
@@ -105,7 +112,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
 
-  return NextResponse.json({ prices: data ?? [] })
+  return NextResponse.json({ prices: data ?? [] }, {
+    headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' }
+  })
 }
 
 export async function POST(request: NextRequest) {

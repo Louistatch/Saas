@@ -5,6 +5,16 @@ import { ArrowLeft, Droplets, RotateCcw, MapPin, Loader2, AlertTriangle, Plus, T
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+interface SavedCalc {
+  id: string
+  crop: string
+  region: string
+  superficie: number
+  result_et0: number | null
+  result_kc: number | null
+  result_daily_mm: number | null
+}
+
 interface Crop {
   id: string; name: string; emoji: string; kc: number[]; z: number[]
 }
@@ -95,6 +105,15 @@ export function AgriSmartWater({ onBack, initialRegion }: Props) {
   const [calcError, setCalcError]     = useState('')
   const [activeCropIdx, setActiveCropIdx] = useState(0)
 
+  // Historique des calculs récents
+  const [savedCalcs, setSavedCalcs] = useState<SavedCalc[]>(() => {
+    if (typeof window === 'undefined') return []
+    try {
+      const saved = localStorage.getItem('agrismart_history')
+      return saved ? JSON.parse(saved) : []
+    } catch { return [] }
+  })
+
   const cropPickerRef = useRef<HTMLDivElement>(null)
 
   // ── Load crops + soil on mount ────────────────────────────────────────────
@@ -180,6 +199,25 @@ export function AgriSmartWater({ onBack, initialRegion }: Props) {
       setResult(data)
       setActiveCropIdx(0)
       setStep(5)
+
+      // Sauvegarder dans l'historique
+      const firstCropName = entries[0]?.crop.name ?? ''
+      const totalSuperficie = entries.reduce((sum, e) => sum + (parseFloat(e.area_m2) || 0), 0) / 10000
+      const firstCropResult: CropResult | undefined = (data as CalcResult).results?.[0]
+      const newCalc: SavedCalc = {
+        id: new Date().toISOString(),
+        crop: entries.length > 1 ? `${firstCropName} +${entries.length - 1}` : firstCropName,
+        region: region || (gpsCoords ? `GPS ${gpsCoords.lat.toFixed(2)}°N` : ''),
+        superficie: Math.round(totalSuperficie * 100) / 100,
+        result_et0: firstCropResult ? firstCropResult.kpis.avg_etp_mmj : null,
+        result_kc: firstCropResult ? firstCropResult.kpis.avg_kc : null,
+        result_daily_mm: firstCropResult ? firstCropResult.kpis.max_besoin_net : null,
+      }
+      setSavedCalcs(prev => {
+        const updated = [newCalc, ...prev].slice(0, 3)
+        try { localStorage.setItem('agrismart_history', JSON.stringify(updated)) } catch {}
+        return updated
+      })
     } catch (e: unknown) {
       setCalcError(e instanceof Error ? e.message : 'Erreur de calcul')
     } finally {
@@ -290,6 +328,37 @@ export function AgriSmartWater({ onBack, initialRegion }: Props) {
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
+              ))}
+            </div>
+          )}
+
+          {/* Calculs récents */}
+          {savedCalcs.length > 0 && entries.length === 0 && (
+            <div className="space-y-2">
+              <p className="text-white/40 text-[10px] font-bold uppercase tracking-wider">Calculs récents</p>
+              {savedCalcs.map((calc) => (
+                <button
+                  key={calc.id}
+                  onClick={() => {
+                    // Trouver la culture dans allCrops (premier nom avant " +N")
+                    const baseName = calc.crop.replace(/ \+\d+$/, '')
+                    const foundCrop = allCrops.find(c => c.name === baseName)
+                    if (foundCrop) {
+                      const areaMq = Math.round(calc.superficie * 10000)
+                      setEntries([{ crop: foundCrop, area_m2: String(areaMq || 1000) }])
+                    }
+                    // Pré-remplir la région
+                    const matchedRegion = REGIONS.find(r => r.id === calc.region)
+                    if (matchedRegion) setRegion(matchedRegion.id)
+                  }}
+                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 flex items-center justify-between active:scale-[0.98] transition-transform text-left"
+                >
+                  <div>
+                    <p className="text-white text-sm font-medium">{calc.crop} — {calc.region}</p>
+                    <p className="text-white/40 text-xs">{calc.superficie} ha · {calc.result_daily_mm != null ? `${calc.result_daily_mm.toFixed(1)} mm/j` : '—'}</p>
+                  </div>
+                  <span className="text-white/25 text-xs">{new Date(calc.id).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}</span>
+                </button>
               ))}
             </div>
           )}

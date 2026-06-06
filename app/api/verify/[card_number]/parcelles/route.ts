@@ -32,5 +32,5 @@ export async function GET(
 
   const total_ha = (parcelles ?? []).reduce((s, p) => s + (p.superficie_ha ?? 0), 0)
 
-  return NextResponse.json({ parcelles: parcelles ?? [], total_ha })
+  return NextResponse.json({ parcelles: parcelles ?? [], total_ha }, { headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=300' } })
 }

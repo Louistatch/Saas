@@ -56,5 +56,5 @@ export async function GET(
 
   const { data: weather } = await query
 
-  return NextResponse.json({ weather: weather ?? [], region })
+  return NextResponse.json({ weather: weather ?? [], region }, { headers: { 'Cache-Control': 'private, max-age=1800, stale-while-revalidate=300' } })
 }

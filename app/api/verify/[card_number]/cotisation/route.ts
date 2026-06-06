@@ -47,5 +47,5 @@ export async function GET(
       due_date: last?.due_date ?? null,
       paid_date: last?.paid_date ?? null,
     },
-  })
+  }, { headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=300' } })
 }

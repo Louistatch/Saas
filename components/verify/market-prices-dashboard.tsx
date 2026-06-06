@@ -18,6 +18,27 @@ const CULTURE_LIST = [
   { id: '478432bd-83c8-4923-8aa2-ceb686c0bc1e', name: 'Gombo', emoji: '🥒' },
 ]
 
+const getCultureEmoji = (name: string | undefined | null): string => {
+  const n = (name ?? '').toLowerCase()
+  if (n.includes('maïs') || n.includes('mais')) return '🌽'
+  if (n.includes('riz')) return '🌾'
+  if (n.includes('manioc')) return '🥔'
+  if (n.includes('igname')) return '🍠'
+  if (n.includes('soja')) return '🫘'
+  if (n.includes('arachide')) return '🥜'
+  if (n.includes('coton')) return '🌿'
+  if (n.includes('cacao')) return '🍫'
+  if (n.includes('café') || n.includes('cafe')) return '☕'
+  if (n.includes('banane')) return '🍌'
+  if (n.includes('ananas')) return '🍍'
+  if (n.includes('papaye')) return '🍈'
+  if (n.includes('piment')) return '🌶️'
+  if (n.includes('tomate')) return '🍅'
+  if (n.includes('oignon')) return '🧅'
+  if (n.includes('gombo')) return '🥒'
+  return '🌱'
+}
+
 interface Prefecture { id: string; name: string; priceCount?: number }
 interface Canton { id: string; name: string; priceCount?: number }
 interface MarketPrice { id: string; culture_id: string; market_name: string; price: number; trend: string; verified: boolean; created_at: string; cultures: { name: string } | null }
@@ -312,7 +333,7 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
                 return (
                   <div key={p.id} className="rounded-xl vfp-card p-3 flex items-center gap-3">
                     <div className="w-9 h-9 rounded-lg bg-white/[0.04] flex items-center justify-center text-lg shrink-0">
-                      {CULTURE_LIST.find(c => c.id === p.culture_id)?.emoji ?? '🌱'}
+                      {CULTURE_LIST.find(c => c.id === p.culture_id)?.emoji ?? getCultureEmoji(p.cultures?.name)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-white truncate">{CULTURE_LIST.find(c => c.id === p.culture_id)?.name ?? p.cultures?.name ?? '—'}</p>

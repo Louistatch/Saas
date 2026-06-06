@@ -31,5 +31,5 @@ export async function GET(
     .order('purchase_date', { ascending: false })
     .limit(30)
 
-  return NextResponse.json({ intrants: intrants ?? [] })
+  return NextResponse.json({ intrants: intrants ?? [] }, { headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=300' } })
 }

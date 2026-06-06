@@ -20,16 +20,24 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
   const [parcelles, setParcelles] = useState<Parcelle[] | null>(null)
   const [totalHa, setTotalHa] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
-  useEffect(() => {
+  const loadData = () => {
+    setError(false)
+    setLoading(true)
     fetch(`/api/verify/${encodeURIComponent(cardNumber)}/parcelles`)
-      .then(r => r.ok ? r.json() : null)
+      .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => {
         if (d) { setParcelles(d.parcelles ?? []); setTotalHa(d.total_ha ?? 0) }
         else setParcelles([])
       })
-      .catch(() => setParcelles([]))
+      .catch(() => setError(true))
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    loadData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardNumber])
 
   const cultures = new Set((parcelles ?? []).map(p => p.culture_principale).filter(Boolean))
@@ -42,13 +50,42 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
       <h3 className="text-white text-lg font-bold">Mes Parcelles</h3>
 
       {loading && (
-        <div className="vfp-card rounded-2xl p-8 text-center">
-          <div className="vfp-loader mx-auto" />
-          <p className="text-white/40 text-sm mt-3">Chargement...</p>
+        <div className="space-y-3 animate-pulse">
+          <div className="grid grid-cols-3 gap-2">
+            {[1,2,3].map(i => <div key={i} className="vfp-card rounded-2xl p-3 h-16" />)}
+          </div>
+          {[1,2,3].map(i => (
+            <div key={i} className="vfp-card rounded-2xl p-4 flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/10 shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="flex justify-between gap-2">
+                  <div className="h-3.5 rounded-full bg-white/10 w-1/2" />
+                  <div className="h-3 w-12 rounded-full bg-white/8" />
+                </div>
+                <div className="flex gap-2">
+                  <div className="h-5 w-20 rounded-full bg-white/6" />
+                  <div className="h-5 w-16 rounded-full bg-white/6" />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {!loading && (parcelles ?? []).length === 0 && (
+      {error && (
+        <div className="vfp-card rounded-2xl p-6 text-center space-y-3">
+          <Map className="h-8 w-8 text-white/20 mx-auto" />
+          <p className="text-white/50 text-sm">Impossible de charger les données des parcelles.</p>
+          <button
+            onClick={loadData}
+            className="text-[var(--vfp-accent)] text-sm font-semibold underline-offset-2 underline active:opacity-60"
+          >
+            Réessayer
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && (parcelles ?? []).length === 0 && (
         <div className="vfp-card rounded-2xl p-8 text-center">
           <Map className="h-10 w-10 text-white/15 mx-auto mb-3" />
           <p className="text-white/40 text-sm">Aucune parcelle enregistrée.</p>
@@ -56,7 +93,7 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
         </div>
       )}
 
-      {!loading && (parcelles ?? []).length > 0 && (
+      {!loading && !error && (parcelles ?? []).length > 0 && (
         <>
           <div className="grid grid-cols-3 gap-2">
             <div className="vfp-card rounded-2xl p-3 text-center">

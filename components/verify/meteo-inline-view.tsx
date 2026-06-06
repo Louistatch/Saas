@@ -118,16 +118,54 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
       </div>
 
       {loading && (
-        <div className="vfp-card rounded-2xl p-8 text-center">
-          <div className="vfp-loader mx-auto" />
-          <p className="text-white/40 text-sm mt-3">Chargement des données météo...</p>
+        <div className="space-y-4 animate-pulse">
+          {/* Alert placeholder */}
+          <div className="h-14 rounded-xl bg-white/6 border border-white/5" />
+          {/* Main weather card */}
+          <div className="vfp-card rounded-2xl p-5 space-y-4">
+            <div className="flex justify-between items-start">
+              <div className="space-y-1.5">
+                <div className="h-3 rounded-full bg-white/10 w-16" />
+                <div className="h-2.5 rounded-full bg-white/6 w-24" />
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-white/10" />
+            </div>
+            <div className="flex items-end gap-3">
+              <div className="h-12 w-24 rounded-xl bg-white/15" />
+              <div className="space-y-1.5 pb-1">
+                <div className="h-3 w-10 rounded-full bg-white/8" />
+                <div className="h-3 w-10 rounded-full bg-white/8" />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {[1,2,3].map(i => <div key={i} className="h-16 rounded-xl bg-white/6" />)}
+            </div>
+          </div>
+          {/* Forecast */}
+          <div className="vfp-card rounded-2xl p-4 space-y-3">
+            <div className="h-2.5 w-20 rounded-full bg-white/8" />
+            {[1,2,3,4].map(i => (
+              <div key={i} className="flex items-center gap-3 py-1">
+                <div className="w-7 h-7 rounded-lg bg-white/8" />
+                <div className="h-3 rounded-full bg-white/8 w-28" />
+                <div className="flex-1" />
+                <div className="h-3 w-12 rounded-full bg-white/6" />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
       {error && (
-        <div className="vfp-card rounded-2xl p-6 text-center">
-          <CloudRain className="h-8 w-8 text-white/20 mx-auto mb-2" />
+        <div className="vfp-card rounded-2xl p-6 text-center space-y-3">
+          <CloudRain className="h-8 w-8 text-white/20 mx-auto" />
           <p className="text-white/50 text-sm">Données météo indisponibles pour votre région.</p>
+          <button
+            onClick={() => { setError(false); setLoading(true); fetch(`/api/verify/${encodeURIComponent(cardNumber)}/meteo`).then(r => r.ok ? r.json() : Promise.reject()).then(d => { setWeather(d.weather ?? []); setRegion(d.region ?? null) }).catch(() => setError(true)).finally(() => setLoading(false)) }}
+            className="text-[var(--vfp-accent)] text-sm font-semibold underline-offset-2 underline active:opacity-60"
+          >
+            Réessayer
+          </button>
         </div>
       )}
 

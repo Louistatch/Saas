@@ -30,7 +30,14 @@ const DEFAULT_SUGGESTIONS = [
 ]
 
 export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_SUGGESTIONS }: AiChatProps) {
-  const [messages, setMessages] = useState<Message[]>([])
+  const storageKey = `agritogo_chat_${cardNumber}`
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (typeof window === 'undefined') return []
+    try {
+      const saved = sessionStorage.getItem(`agritogo_chat_${cardNumber}`)
+      return saved ? JSON.parse(saved) : []
+    } catch { return [] }
+  })
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -40,6 +47,12 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages])
+
+  // Persist messages in sessionStorage
+  useEffect(() => {
+    if (messages.length === 0) return
+    try { sessionStorage.setItem(storageKey, JSON.stringify(messages.slice(-20))) } catch {}
+  }, [messages, storageKey])
 
   // Focus input on mount
   useEffect(() => {
@@ -99,6 +112,15 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
             <p className="ai-chat-sub">Assistant agricole intelligent</p>
           </div>
         </div>
+        {messages.length > 0 && (
+          <button
+            onClick={() => { setMessages([]); try { sessionStorage.removeItem(storageKey) } catch {} }}
+            className="ml-auto text-[11px] text-white/30 hover:text-white/50 active:opacity-60 transition-colors"
+            title="Effacer la conversation"
+          >
+            ✕ Effacer
+          </button>
+        )}
       </div>
 
       {/* Messages */}
