@@ -82,9 +82,19 @@ export function CotisationView({ cardNumber, onBack, coordoPhone, coordoName, me
       <h3 className="text-white text-lg font-bold">Ma Cotisation</h3>
 
       {loading && (
-        <div className="vfp-card rounded-2xl p-8 text-center">
-          <div className="vfp-loader mx-auto" />
-          <p className="text-white/40 text-sm mt-3">Chargement...</p>
+        <div className="space-y-3 animate-pulse">
+          <div className="vfp-card rounded-2xl p-5 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-6 h-6 rounded-full bg-white/10" />
+              <div className="space-y-1.5 flex-1">
+                <div className="h-3.5 rounded-full bg-white/10 w-2/3" />
+                <div className="h-3 rounded-full bg-white/6 w-1/2" />
+              </div>
+            </div>
+            <div className="h-10 rounded-xl bg-white/6" />
+          </div>
+          <div className="h-16 rounded-2xl bg-white/4" />
+          <div className="h-12 rounded-xl bg-white/4" />
         </div>
       )}
 
@@ -146,6 +156,37 @@ export function CotisationView({ cardNumber, onBack, coordoPhone, coordoName, me
               </div>
             )}
           </div>
+
+          {/* Campaign timeline strip */}
+          {totalCampagnes >= 2 && (
+            <div className="vfp-card rounded-2xl p-4">
+              <p className="text-white/40 text-[10px] font-bold uppercase tracking-wider mb-3">Historique campagnes</p>
+              <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'none' }}>
+                {(cotisations as Cotisation[]).map((c, i) => {
+                  const isOver = !!(c.status === 'pending' && c.due_date && new Date(c.due_date) < new Date())
+                  const si = getStatusInfo(c.status, isOver)
+                  const dotColor = si.color.replace('text-', 'bg-').replace('-400', '-500')
+                  return (
+                    <div key={c.id ?? i} className="flex flex-col items-center gap-1.5 shrink-0 min-w-[52px]">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
+                        c.status === 'paid' || c.status === 'waived'
+                          ? 'border-emerald-500/50 bg-emerald-500/15'
+                          : isOver
+                          ? 'border-red-500/50 bg-red-500/15'
+                          : 'border-amber-500/50 bg-amber-500/15'
+                      }`}>
+                        <div className={`w-2.5 h-2.5 rounded-full ${dotColor}`} />
+                      </div>
+                      <p className="text-[10px] text-white/50 text-center leading-tight">{c.campaign?.replace(/^(Campagne\s+)?/i, '') ?? '—'}</p>
+                      {c.amount != null && (
+                        <p className="text-[9px] text-white/30 font-mono">{(c.amount / 1000).toFixed(0)}k</p>
+                      )}
+                    </div>
+                  )
+                }).reverse()}
+              </div>
+            </div>
+          )}
 
           {/* Taux de régularité */}
           {tauxRegularite !== null && totalCampagnes >= 2 && (

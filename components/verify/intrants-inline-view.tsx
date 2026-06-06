@@ -60,9 +60,25 @@ export function IntrantsInlineView({ cardNumber, onBack }: Props) {
       <h3 className="text-white text-lg font-bold">Mes Intrants</h3>
 
       {loading && (
-        <div className="vfp-card rounded-2xl p-8 text-center">
-          <div className="vfp-loader mx-auto" />
-          <p className="text-white/40 text-sm mt-3">Chargement...</p>
+        <div className="space-y-3 animate-pulse">
+          <div className="vfp-card rounded-2xl p-4 space-y-3">
+            <div className="flex justify-between">
+              <div className="h-3 rounded-full bg-white/10 w-24" />
+              <div className="h-3 rounded-full bg-white/15 w-20" />
+            </div>
+            <div className="flex gap-2">
+              {[1,2,3].map(i => <div key={i} className="h-6 w-20 rounded-full bg-white/8" />)}
+            </div>
+          </div>
+          {[1,2,3].map(i => (
+            <div key={i} className="vfp-card rounded-2xl p-4 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-white/8 shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3.5 rounded-full bg-white/10 w-1/2" />
+                <div className="h-3 rounded-full bg-white/6 w-1/3" />
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

@@ -20,12 +20,32 @@ const CULTURE_LIST = [
 
 interface Prefecture { id: string; name: string; priceCount?: number }
 interface Canton { id: string; name: string; priceCount?: number }
-interface MarketPrice { id: string; culture_id: string; market_name: string; price: number; trend: string; verified: boolean; cultures: { name: string } | null }
+interface MarketPrice { id: string; culture_id: string; market_name: string; price: number; trend: string; verified: boolean; created_at: string; cultures: { name: string } | null }
 
 function TrendBadge({ trend }: { trend: string }) {
   if (trend === 'up') return <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400 text-xs font-bold">↑ Hausse</span>
   if (trend === 'down') return <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-400 text-xs font-bold">↓ Baisse</span>
   return <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-white/5 text-white/50 text-xs font-bold">→ Stable</span>
+}
+
+function SVGSparkline({ values, trend }: { values: number[], trend: string }) {
+  if (values.length < 2) return null
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const range = max - min || 1
+  const W = 52, H = 22
+  const pts = values.map((v, i) => [
+    (i / (values.length - 1)) * W,
+    H - ((v - min) / range) * (H - 4) - 2,
+  ])
+  const d = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ')
+  const color = trend === 'up' ? '#f87171' : trend === 'down' ? '#4ade80' : 'rgba(255,255,255,0.3)'
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="shrink-0 opacity-80">
+      <path d={d} fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r="2.5" fill={color} />
+    </svg>
+  )
 }
 
 interface Props {
@@ -56,6 +76,16 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
   const [submitting, setSubmitting] = useState(false)
   const [submitResult, setSubmitResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [regionCounts, setRegionCounts] = useState<Record<string, number>>({})
+
+  const pricesByCulture = useMemo(() => {
+    const groups: Record<string, number[]> = {}
+    const sorted = [...prices].sort((a, b) => a.created_at.localeCompare(b.created_at))
+    for (const p of sorted) {
+      if (!groups[p.culture_id]) groups[p.culture_id] = []
+      groups[p.culture_id].push(p.price)
+    }
+    return groups
+  }, [prices])
 
   const sortedRegions = useMemo(() => {
     const memberRegionName = memberLocality?.region
@@ -277,21 +307,27 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
             </div>
           ) : (
             <div className="space-y-2">
-              {prices.map((p) => (
-                <div key={p.id} className="rounded-xl vfp-card p-3 flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-white/[0.04] flex items-center justify-center text-lg shrink-0">
-                    {CULTURE_LIST.find(c => c.id === p.culture_id)?.emoji ?? '🌱'}
+              {prices.map((p) => {
+                const sparkValues = pricesByCulture[p.culture_id] ?? []
+                return (
+                  <div key={p.id} className="rounded-xl vfp-card p-3 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-white/[0.04] flex items-center justify-center text-lg shrink-0">
+                      {CULTURE_LIST.find(c => c.id === p.culture_id)?.emoji ?? '🌱'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-white truncate">{CULTURE_LIST.find(c => c.id === p.culture_id)?.name ?? p.cultures?.name ?? '—'}</p>
+                      <TrendBadge trend={p.trend ?? 'stable'} />
+                    </div>
+                    {sparkValues.length >= 2 && (
+                      <SVGSparkline values={sparkValues} trend={p.trend ?? 'stable'} />
+                    )}
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold text-white">{p.price} F</p>
+                      <p className="text-[11px] text-white/30">/kg</p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-white truncate">{CULTURE_LIST.find(c => c.id === p.culture_id)?.name ?? p.cultures?.name ?? '—'}</p>
-                    <TrendBadge trend={p.trend ?? 'stable'} />
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-white">{p.price} F</p>
-                    <p className="text-[11px] text-white/30">/kg</p>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
           <button onClick={() => {

@@ -46,14 +46,11 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
     inputRef.current?.focus()
   }, [])
 
-  const send = useCallback(async () => {
-    const text = input.trim()
+  const sendMessage = useCallback(async (text: string) => {
     if (!text || loading) return
-
     setInput('')
     setMessages((m) => [...m, { role: 'user', content: text }])
     setLoading(true)
-
     try {
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
@@ -61,7 +58,6 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
         body: JSON.stringify({ card_number: cardNumber, message: text }),
       })
       const data = await res.json()
-
       if (data.response) {
         setMessages((m) => [...m, {
           role: 'assistant',
@@ -70,21 +66,22 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
           debate: data.debate_used ?? false,
         }])
       } else {
-        setMessages((m) => [
-          ...m,
-          { role: 'assistant', content: data.error ?? 'Désolé, je n\'ai pas pu répondre.' },
-        ])
+        setMessages((m) => [...m, { role: 'assistant', content: data.error ?? 'Désolé, je n\'ai pas pu répondre.' }])
       }
     } catch {
-      setMessages((m) => [
-        ...m,
-        { role: 'assistant', content: 'Erreur de connexion. Vérifiez votre réseau.' },
-      ])
+      setMessages((m) => [...m, { role: 'assistant', content: 'Erreur de connexion. Vérifiez votre réseau.' }])
     } finally {
       setLoading(false)
       inputRef.current?.focus()
     }
-  }, [input, loading, cardNumber])
+  }, [loading, cardNumber])
+
+  const send = useCallback(() => {
+    const text = input.trim()
+    if (text) sendMessage(text)
+  }, [input, sendMessage])
+
+  const sendText = useCallback((text: string) => sendMessage(text), [sendMessage])
 
   return (
     <div className="ai-chat">
@@ -136,23 +133,38 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
           </div>
         )}
 
-        {messages.map((m, i) => (
-          <div key={i} className={`ai-msg ai-msg-${m.role}`}>
-            <div className="ai-msg-avatar">
-              {m.role === 'assistant' ? <Bot size={14} /> : <User size={14} />}
-            </div>
-            <div className="ai-msg-bubble">
-              {renderMd(m.content)}
-              {m.role === 'assistant' && m.engine && (
-                <span className="ai-msg-engine">
-                  {m.engine === 'direct-data' ? '⚡ Réponse instantanée' :
-                   m.engine === 'agritogo-multiagent' ? '🧠 Multi-Agent' : '💬 Gemini'}
-                  {m.debate ? ' • Débat' : ''}
-                </span>
+        {messages.map((m, i) => {
+          const isLastAssistant = m.role === 'assistant' && i === messages.length - 1 && !loading
+          const followUps = isLastAssistant ? getFollowUpSuggestions(m.content) : []
+          return (
+            <div key={i}>
+              <div className={`ai-msg ai-msg-${m.role}`}>
+                <div className="ai-msg-avatar">
+                  {m.role === 'assistant' ? <Bot size={14} /> : <User size={14} />}
+                </div>
+                <div className="ai-msg-bubble">
+                  {renderMd(m.content)}
+                  {m.role === 'assistant' && m.engine && (
+                    <span className="ai-msg-engine">
+                      {m.engine === 'direct-data' ? '⚡ Réponse instantanée' :
+                       m.engine === 'agritogo-multiagent' ? '🧠 Multi-Agent' : '💬 Gemini'}
+                      {m.debate ? ' • Débat' : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
+              {followUps.length > 0 && (
+                <div className="ai-followups">
+                  {followUps.map((s, j) => (
+                    <button key={j} className="ai-followup-chip" onClick={() => sendText(s)}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
-          </div>
-        ))}
+          )
+        })}
 
         {loading && (
           <div className="ai-msg ai-msg-assistant">
@@ -229,6 +241,11 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
         .ai-msg-user .ai-msg-bubble { background:oklch(0.72 0.18 142 / 0.18); color:#eafff2; border-bottom-right-radius:4px; }
         .ai-msg-typing { display:flex; align-items:center; gap:8px; color:var(--vfp-accent-dim); font-size:13px; }
         .ai-msg-engine { display:block; margin-top:6px; font-size:11px; color:var(--vfp-accent-dim); letter-spacing:.3px; }
+        .ai-followups { display:flex; flex-wrap:wrap; gap:6px; padding:4px 4px 0 34px; }
+        .ai-followup-chip { background:oklch(0.72 0.18 142 / 0.06); border:1px solid oklch(0.72 0.18 142 / 0.18);
+          color:var(--vfp-accent); border-radius:999px; padding:5px 12px; font-size:12px; cursor:pointer;
+          white-space:nowrap; transition:background .15s; }
+        .ai-followup-chip:active { background:oklch(0.72 0.18 142 / 0.14); }
         .ai-chat-input-bar { display:flex; gap:8px; padding:12px 14px;
           border-top: 1px solid rgba(255,255,255,.06); background:rgba(0,0,0,.15); }
         .ai-chat-input { flex:1; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1);
@@ -249,6 +266,20 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
     </div>
   )
 }
+function getFollowUpSuggestions(response: string): string[] {
+  const lo = response.toLowerCase()
+  const picks: string[] = []
+  if (/prix|marché|fcfa|kg/.test(lo)) picks.push('Quand vendre pour le meilleur prix ?')
+  if (/irrigat|eau|et0|mm/.test(lo)) picks.push('Calculer mes besoins en eau')
+  if (/engrais|fertilisan|npk/.test(lo)) picks.push('Quelle dose recommandez-vous ?')
+  if (/semenc|planting|variété/.test(lo)) picks.push('Quelle variété est la meilleure ?')
+  if (/récolte|harvest|maturité/.test(lo)) picks.push('Comment améliorer ma récolte ?')
+  if (/pest|maladie|traitement/.test(lo)) picks.push('Quels traitements appliquer ?')
+  if (/sol|terre|ph/.test(lo)) picks.push('Comment améliorer mon sol ?')
+  if (picks.length === 0) picks.push('Expliquez-moi davantage', 'D\'autres conseils ?')
+  return picks.slice(0, 3)
+}
+
 /** Lightweight markdown → JSX (bold, italic, code, lists) */
 function renderMd(text: string) {
   return text.split('\n').map((line, i) => {
