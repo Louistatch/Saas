@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import {
   ArrowLeft, User, ShoppingCart, TrendingUp, Bot,
-  MapPin, Package, Building2, ExternalLink,
+  MapPin, Package, Building2, ExternalLink, Phone, MessageCircle, RefreshCw,
 } from 'lucide-react'
 import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboard'
 import { AiChat } from '@/components/verify/ai-chat'
@@ -48,6 +48,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 export function AcheteurView({ cardNumber, acheteur, preventes, card }: AcheteurViewProps) {
   const [activeView, setActiveView] = useState<ActiveView>('menu')
+  const [preventesKey, setPreventesKey] = useState(0)
 
   const rawFirst = (acheteur.first_name ?? '').trim()
   const firstName = rawFirst
@@ -58,6 +59,9 @@ export function AcheteurView({ cardNumber, acheteur, preventes, card }: Acheteur
   const greeting = greetHour < 12 ? 'Bonjour' : greetHour < 18 ? 'Bon après-midi' : 'Bonsoir'
 
   const typeLabel = TYPE_LABELS[acheteur.type_acheteur] ?? acheteur.type_acheteur
+
+  const phoneDigits = acheteur.phone ? acheteur.phone.replace(/\D/g, '') : null
+  const waPhone = phoneDigits ? (phoneDigits.startsWith('228') ? phoneDigits : `228${phoneDigits}`) : null
 
   if (activeView === 'prices') {
     return (
@@ -160,14 +164,19 @@ export function AcheteurView({ cardNumber, acheteur, preventes, card }: Acheteur
             <p className="text-xs text-white/30">{preventes.length} disponible{preventes.length > 1 ? 's' : ''}</p>
           </button>
 
-          {/* Fournisseurs */}
-          <button onClick={() => window.open('/fournisseurs', '_blank')} className="vfp-card rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px]">
+          {/* Fournisseurs — external link with noopener */}
+          <a
+            href="/fournisseurs"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="vfp-card rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px]"
+          >
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-500/20 to-teal-700/5 flex items-center justify-center mb-2.5">
               <ExternalLink className="h-5 w-5 text-teal-300" />
             </div>
             <p className="font-semibold text-sm text-white mb-0.5">Fournisseurs</p>
             <p className="text-xs text-white/30">Certifiés &amp; vérifiés</p>
-          </button>
+          </a>
 
           {/* Prix du Marché */}
           <button onClick={() => setActiveView('prices')} className="vfp-card rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px]">
@@ -205,14 +214,19 @@ export function AcheteurView({ cardNumber, acheteur, preventes, card }: Acheteur
             <span className="mt-1 px-2 py-0.5 rounded-full bg-white/5 text-white/25 text-[10px] font-bold uppercase">Bientôt</span>
           </button>
 
-          {/* Marketplace */}
-          <button onClick={() => window.open('/marketplace', '_blank')} className="vfp-card rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px]">
+          {/* Marketplace — external link with noopener */}
+          <a
+            href="/marketplace"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="vfp-card rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px]"
+          >
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-700/5 flex items-center justify-center mb-2.5">
               <ExternalLink className="h-5 w-5 text-cyan-300" />
             </div>
             <p className="font-semibold text-sm text-white mb-0.5">Marketplace</p>
             <p className="text-xs text-white/30">Offres &amp; demandes</p>
-          </button>
+          </a>
 
         </div>
       </section>
@@ -264,12 +278,41 @@ export function AcheteurView({ cardNumber, acheteur, preventes, card }: Acheteur
               </div>
             </div>
           )}
+          {/* Phone contact */}
+          {acheteur.phone && (
+            <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Phone className="h-3.5 w-3.5 text-[var(--vfp-accent)]" />
+                <span className="text-xs text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">Contact</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={`tel:${acheteur.phone}`}
+                  className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--vfp-accent)]/10 border border-[var(--vfp-accent)]/20 text-[var(--vfp-accent-bright)] text-sm font-medium active:opacity-70"
+                >
+                  <Phone className="h-4 w-4" />
+                  {acheteur.phone}
+                </a>
+                {waPhone && (
+                  <a
+                    href={`https://wa.me/${waPhone}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-500/10 border border-green-500/20 text-green-300 text-sm font-medium active:opacity-70"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    WhatsApp
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* ─── Préventes expanded ─── */}
       {activeView === 'preventes' && (
-        <div className="space-y-3 vfp-enter">
+        <div key={preventesKey} className="space-y-3 vfp-enter">
           <div className="flex items-center justify-between px-1">
             <h3 className="text-white font-bold text-base">Préventes disponibles</h3>
             <button onClick={() => setActiveView('menu')} className="text-[var(--vfp-accent)] text-sm font-medium">
@@ -277,9 +320,16 @@ export function AcheteurView({ cardNumber, acheteur, preventes, card }: Acheteur
             </button>
           </div>
           {preventes.length === 0 && (
-            <div className="vfp-card rounded-2xl p-6 text-center">
-              <Package className="h-8 w-8 text-white/20 mx-auto mb-2" />
+            <div className="vfp-card rounded-2xl p-6 text-center space-y-3">
+              <Package className="h-8 w-8 text-white/20 mx-auto" />
               <p className="text-white/50 text-sm">Aucune prévente disponible pour l&apos;instant.</p>
+              <button
+                onClick={() => setPreventesKey(k => k + 1)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--vfp-accent)]/10 border border-[var(--vfp-accent)]/20 text-[var(--vfp-accent-bright)] text-sm font-medium active:opacity-70"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Actualiser
+              </button>
             </div>
           )}
           {preventes.map((p) => (
@@ -292,7 +342,7 @@ export function AcheteurView({ cardNumber, acheteur, preventes, card }: Acheteur
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[var(--vfp-accent)] font-bold text-sm">{p.prix_par_kg.toLocaleString('fr-FR')} F/kg</p>
+                  <p className="text-[var(--vfp-accent)] font-bold text-sm">{p.prix_par_kg.toLocaleString('fr-FR')} FCFA/kg</p>
                   <p className="text-white/30 text-[10px]">Prix indicatif</p>
                 </div>
               </div>
