@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { TrendingUp, MapPin } from 'lucide-react'
 
 const REGIONS = [
@@ -56,6 +56,16 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
   const [submitting, setSubmitting] = useState(false)
   const [submitResult, setSubmitResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [regionCounts, setRegionCounts] = useState<Record<string, number>>({})
+
+  const sortedRegions = useMemo(() => {
+    const memberRegionName = memberLocality?.region
+    if (!memberRegionName) return REGIONS
+    return [...REGIONS].sort((a, b) => {
+      if (a.name === memberRegionName) return -1
+      if (b.name === memberRegionName) return 1
+      return 0
+    })
+  }, [memberLocality?.region])
 
   // Load region counts on mount
   useEffect(() => {
@@ -199,19 +209,27 @@ export function MarketPricesDashboard({ onBack, cooperativeName, cardNumber, mem
       {/* Step 1: Regions */}
       {step === 'regions' && !loading && (
         <div className="space-y-2">
-          {REGIONS.map((r) => (
-            <button key={r.id} onClick={() => handleSelectRegion(r)} className="w-full rounded-2xl vfp-card p-4 flex items-center gap-4 active:scale-[0.98] transition-transform ">
-              <div className="w-12 h-12 rounded-xl bg-[var(--vfp-accent)]/10 flex items-center justify-center text-xl">{r.emoji}</div>
-              <div className="flex-1 text-left">
-                <p className="text-sm font-semibold text-white">{r.name}</p>
-                <p className="text-xs text-white/40">{regionCounts[r.id] ?? 0} prix enregistrés</p>
-              </div>
-              {(regionCounts[r.id] ?? 0) > 0 && (
-                <span className="px-2 py-0.5 rounded-full bg-[var(--vfp-accent)]/10 text-[var(--vfp-accent)] text-xs font-bold">{regionCounts[r.id]}</span>
-              )}
-              <svg className="h-4 w-4 text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </button>
-          ))}
+          {sortedRegions.map((r) => {
+            const isMemberRegion = r.name === memberLocality?.region
+            return (
+              <button key={r.id} onClick={() => handleSelectRegion(r)} className="w-full rounded-2xl vfp-card p-4 flex items-center gap-4 active:scale-[0.98] transition-transform">
+                <div className="w-12 h-12 rounded-xl bg-[var(--vfp-accent)]/10 flex items-center justify-center text-xl">{r.emoji}</div>
+                <div className="flex-1 text-left">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-white">{r.name}</p>
+                    {isMemberRegion && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--vfp-accent)]/15 text-[var(--vfp-accent)] border border-[var(--vfp-accent)]/20 uppercase tracking-wide">Ma région</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-white/40">{regionCounts[r.id] ?? 0} prix enregistrés</p>
+                </div>
+                {(regionCounts[r.id] ?? 0) > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-[var(--vfp-accent)]/10 text-[var(--vfp-accent)] text-xs font-bold">{regionCounts[r.id]}</span>
+                )}
+                <svg className="h-4 w-4 text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+            )
+          })}
         </div>
       )}
 

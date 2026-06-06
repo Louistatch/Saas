@@ -7,7 +7,7 @@ import {
   CheckCircle, XCircle, Shield, MapPin, Building2,
   FileText, TrendingUp, PhoneCall, Map, CloudRain,
   ShoppingCart, Coins, Timer, User, ArrowLeft, Bot,
-  Bell, Droplets,
+  Bell, Droplets, Share2,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/logo'
 import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboard'
@@ -344,7 +344,18 @@ export default function VerifyCardPage() {
     { icon: PhoneCall, title: 'Mon Technicien', description: 'Appel & WhatsApp', available: true, action: () => setActiveView('technicien'), gradient: 'from-teal-500/20 to-teal-700/5' },
     { icon: Droplets, title: 'AgriSmart', description: 'Besoins en eau', available: true, action: () => setActiveView('agrismart'), gradient: 'from-blue-400/20 to-cyan-600/5' },
     { icon: Map, title: 'Parcelles GPS', description: 'Mes parcelles agricoles', available: true, action: () => setActiveView('parcelles'), gradient: 'from-emerald-500/20 to-emerald-700/5' },
-    { icon: FileText, title: 'Mon Attestation', description: 'Télécharger PDF officiel', available: true, action: () => result.member_id && window.open(`/reports/attestation/${result.member_id}`, '_blank'), gradient: 'from-violet-500/20 to-violet-700/5' },
+    {
+      icon: FileText, title: 'Mon Attestation', description: 'Télécharger PDF officiel', available: true, gradient: 'from-violet-500/20 to-violet-700/5',
+      action: () => {
+        if (!result.member_id) return
+        const path = `/reports/attestation/${result.member_id}`
+        if (typeof navigator !== 'undefined' && navigator.share) {
+          navigator.share({ title: 'Mon Attestation Agricole — FaîtiereHub', url: window.location.origin + path }).catch(() => window.open(path, '_blank'))
+        } else {
+          window.open(path, '_blank')
+        }
+      },
+    },
     { icon: ShoppingCart, title: 'Intrants', description: 'Semences & engrais', available: true, action: () => setActiveView('intrants'), gradient: 'from-orange-500/20 to-orange-700/5' },
     { icon: Coins, title: 'Cotisation', description: 'Statut & campagne', available: true, action: () => setActiveView('cotisation'), gradient: 'from-yellow-500/20 to-yellow-700/5' },
     { icon: CloudRain, title: 'Météo Agricole', description: 'Conditions & prévisions', available: true, action: () => setActiveView('meteo'), gradient: 'from-sky-500/20 to-sky-700/5' },
@@ -481,7 +492,16 @@ export default function VerifyCardPage() {
             <button onClick={() => setActiveView('menu')} className="flex items-center gap-2 text-[var(--vfp-accent)] text-sm font-medium active:opacity-70">
               <ArrowLeft className="h-4 w-4" /> Retour
             </button>
-            <MarketPricesDashboard />
+            <MarketPricesDashboard
+              cardNumber={cardNumber}
+              cooperativeName={result.cooperative?.name}
+              memberLocality={result.member ? {
+                village: result.member.village ?? null,
+                canton: result.member.canton ?? null,
+                prefecture: result.member.prefecture ?? null,
+                region: result.member.region ?? null,
+              } : undefined}
+            />
           </div>
         )}
 
@@ -589,6 +609,34 @@ export default function VerifyCardPage() {
                 </div>
               )}
             </div>
+
+            {/* Share + Coordo buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const url = window.location.href
+                  if (navigator.share) {
+                    navigator.share({ title: `${fullName} — Carte Verte FaîtiereHub`, url }).catch(() => {})
+                  } else {
+                    navigator.clipboard?.writeText(url).catch(() => {})
+                  }
+                }}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl border border-[var(--vfp-accent)]/20 bg-[var(--vfp-accent)]/8 text-[var(--vfp-accent)] text-sm font-semibold active:scale-[0.98] transition-transform"
+              >
+                <Share2 className="h-4 w-4" />
+                Partager ma carte
+              </button>
+              {contacts?.find(c => c.role === 'coordo')?.phone && (
+                <a
+                  href={`https://wa.me/${waNumber(contacts.find(c => c.role === 'coordo')!.phone)}?text=${encodeURIComponent(`Bonjour ${contacts.find(c => c.role === 'coordo')!.name}, je suis ${firstName}. J'ai une question concernant ma carte membre.`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-[#25D366]/20 bg-[#25D366]/10 text-[#25D366] text-sm font-semibold active:scale-[0.98] transition-transform"
+                >
+                  💬
+                </a>
+              )}
+            </div>
           </div>
         )}
 
@@ -656,7 +704,7 @@ export default function VerifyCardPage() {
 
         {/* ─── Parcelles View ─── */}
         {isValid && activeView === 'parcelles' && (
-          <ParcellesInlineView cardNumber={cardNumber} onBack={() => setActiveView('menu')} />
+          <ParcellesInlineView cardNumber={cardNumber} onBack={() => setActiveView('menu')} onOpenAgriSmart={() => setActiveView('agrismart')} />
         )}
 
         {/* ─── Intrants View ─── */}
@@ -683,7 +731,7 @@ export default function VerifyCardPage() {
 
         {/* ─── Météo View ─── */}
         {isValid && activeView === 'meteo' && (
-          <MeteoInlineView cardNumber={cardNumber} onBack={() => setActiveView('menu')} />
+          <MeteoInlineView cardNumber={cardNumber} onBack={() => setActiveView('menu')} onOpenAgriSmart={() => setActiveView('agrismart')} />
         )}
 
         {/* ─── Security Timer ─── */}

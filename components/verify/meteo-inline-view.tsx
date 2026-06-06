@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, CloudRain, Droplets, Wind, Thermometer, Sun } from 'lucide-react'
+import { ArrowLeft, CloudRain, Droplets, Wind, Thermometer, Sun, Waves } from 'lucide-react'
 
 interface WeatherDay {
   date: string
@@ -18,6 +18,7 @@ interface WeatherDay {
 interface Props {
   cardNumber: string
   onBack: () => void
+  onOpenAgriSmart?: () => void
 }
 
 function getRainIcon(mm: number | null) {
@@ -77,7 +78,7 @@ function computeAlerts(todayRow: WeatherDay, upcoming: WeatherDay[]): Alert[] {
   return alerts
 }
 
-export function MeteoInlineView({ cardNumber, onBack }: Props) {
+export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) {
   const [weather, setWeather] = useState<WeatherDay[]>([])
   const [region, setRegion] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -257,6 +258,16 @@ export function MeteoInlineView({ cardNumber, onBack }: Props) {
                 ))}
               </div>
             </div>
+          )}
+
+          {onOpenAgriSmart && (
+            <button
+              onClick={onOpenAgriSmart}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-blue-500/25 bg-blue-500/8 text-blue-300 text-sm font-semibold active:scale-[0.98] transition-transform"
+            >
+              <Waves className="h-4 w-4" />
+              Calculer mes besoins en eau
+            </button>
           )}
 
           <p className="text-center text-white/20 text-[11px]">Open-Meteo · NASA POWER · Mis à jour le {fmtDateShort(weather[weather.length - 1]?.date ?? todayStr)}</p>
