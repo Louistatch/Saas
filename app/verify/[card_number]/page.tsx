@@ -651,7 +651,7 @@ export default function VerifyCardPage() {
 
         {/* ─── AgriSmart Water View ─── */}
         {isValid && activeView === 'agrismart' && (
-          <AgriSmartWater onBack={() => setActiveView('menu')} />
+          <AgriSmartWater onBack={() => setActiveView('menu')} initialRegion={result.member?.region ?? undefined} />
         )}
 
         {/* ─── Parcelles View ─── */}

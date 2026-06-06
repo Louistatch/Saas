@@ -50,7 +50,7 @@ const REGIONS = [
   { id: 'Savanes',  name: 'Savanes',   emoji: '🌿', desc: 'Dapaong · Nord' },
 ]
 
-interface Props { onBack: () => void }
+interface Props { onBack: () => void; initialRegion?: string }
 
 // ─── Palette de couleurs par culture ─────────────────────────────────────────
 const CROP_COLORS = [
@@ -62,7 +62,7 @@ const CROP_COLORS = [
   'oklch(0.72 0.18 160)',
 ]
 
-export function AgriSmartWater({ onBack }: Props) {
+export function AgriSmartWater({ onBack, initialRegion }: Props) {
   // ── API data ──────────────────────────────────────────────────────────────
   const [allCrops, setAllCrops]     = useState<Crop[]>([])
   const [systems, setSystems]       = useState<IrrigationSystem[]>([])
@@ -85,7 +85,7 @@ export function AgriSmartWater({ onBack }: Props) {
   const [system, setSystem] = useState<IrrigationSystem | null>(null)
 
   // Step 4 — localisation
-  const [region, setRegion]   = useState('')
+  const [region, setRegion]   = useState(initialRegion ?? '')
   const [gpsCoords, setGpsCoords] = useState<{lat:number;lon:number} | null>(null)
   const [gpsLoading, setGpsLoading] = useState(false)
 

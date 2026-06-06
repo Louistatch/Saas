@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Sprout, Map } from 'lucide-react'
+import { ArrowLeft, Sprout, Map, Droplets } from 'lucide-react'
 
 interface Parcelle {
   name: string | null
@@ -13,9 +13,10 @@ interface Parcelle {
 interface Props {
   cardNumber: string
   onBack: () => void
+  onOpenAgriSmart?: () => void
 }
 
-export function ParcellesInlineView({ cardNumber, onBack }: Props) {
+export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) {
   const [parcelles, setParcelles] = useState<Parcelle[] | null>(null)
   const [totalHa, setTotalHa] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -89,16 +90,35 @@ export function ParcellesInlineView({ cardNumber, onBack }: Props) {
                       </span>
                     )}
                   </div>
-                  {p.culture_principale && p.name && (
-                    <p className="text-xs text-white/50">{p.culture_principale}</p>
-                  )}
-                  {!p.culture_principale && !p.name && (
-                    <p className="text-xs text-white/30">Culture non spécifiée</p>
-                  )}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {p.culture_principale && p.name && (
+                      <span className="text-xs text-white/50">{p.culture_principale}</span>
+                    )}
+                    {p.superficie_ha != null && (
+                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/5 border border-white/8 text-white/35 font-mono">
+                        {Math.round(p.superficie_ha * 10000).toLocaleString('fr-FR')} m²
+                      </span>
+                    )}
+                    {p.created_at && (
+                      <span className="text-[11px] text-white/25">
+                        depuis {new Date(p.created_at).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
           </div>
+
+          {onOpenAgriSmart && (
+            <button
+              onClick={onOpenAgriSmart}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-blue-500/25 bg-blue-500/8 text-blue-300 text-sm font-semibold active:scale-[0.98] transition-transform"
+            >
+              <Droplets className="h-4 w-4" />
+              Calculer mes besoins en eau
+            </button>
+          )}
 
           <p className="text-center text-[11px] text-white/20 pt-1">
             Données collectées via KoboCollect · FaîtiereHub
