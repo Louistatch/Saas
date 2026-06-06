@@ -14,6 +14,7 @@ import { PaginationBar } from '@/components/shared/pagination'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { useDebounced } from '@/hooks/use-debounced'
+import type { Cooperative } from '@/app/context/cooperative-context'
 
 interface Parcelle {
   id: string
@@ -23,6 +24,7 @@ interface Parcelle {
   irrigation_type: string | null
   source: string | null
   created_at: string
+  cooperative_id: string | null
   member: { first_name: string; last_name: string; phone: string | null } | null
 }
 
@@ -32,6 +34,7 @@ interface Production {
   quantity_kg: number
   campaign_year: string
   created_at: string
+  cooperative_id: string | null
   member: { first_name: string; last_name: string } | null
 }
 
@@ -57,9 +60,39 @@ const SOL_COLORS: Record<string, string> = {
   laterite: 'bg-orange-100 text-orange-800',
 }
 
+/** Retourne les IDs de la coopérative sélectionnée + tous ses enfants/petits-enfants. */
+function getScopeIds(current: Cooperative, all: Cooperative[]): string[] {
+  const ids = new Set<string>([current.id])
+  // direct children
+  for (const c of all) {
+    if (c.parentId === current.id) {
+      ids.add(c.id)
+      // grandchildren
+      for (const gc of all) {
+        if (gc.parentId === c.id) ids.add(gc.id)
+      }
+    }
+  }
+  return [...ids]
+}
+
 export default function ParcellesPage() {
-  const { currentCooperative } = useCooperative()
+  const { currentCooperative, cooperatives } = useCooperative()
   const supabase = useMemo(() => createClient(), [])
+
+  // Scope IDs : la coopérative courante + ses enfants si c'est une faîtière/union
+  const scopeIds = useMemo(
+    () => (currentCooperative ? getScopeIds(currentCooperative, cooperatives) : []),
+    [currentCooperative, cooperatives],
+  )
+
+  // Label du périmètre affiché dans le header
+  const scopeLabel = useMemo(() => {
+    if (!currentCooperative) return ''
+    if (scopeIds.length > 1)
+      return `${currentCooperative.name} · ${scopeIds.length} coopératives`
+    return currentCooperative.name
+  }, [currentCooperative, scopeIds])
 
   const [tab, setTab] = useState<'parcelles' | 'productions'>('parcelles')
   const [parcelles, setParcelles] = useState<Parcelle[]>([])
@@ -79,11 +112,11 @@ export default function ParcellesPage() {
   )
 
   const fetchStats = useCallback(async () => {
-    if (!currentCooperative) return
+    if (!scopeIds.length) return
     const { data } = await supabase
       .from('parcelles')
       .select('culture_name, surface_ha, irrigation_type')
-      .eq('cooperative_id', currentCooperative.id)
+      .in('cooperative_id', scopeIds)
 
     if (!data) return
 
@@ -102,18 +135,18 @@ export default function ParcellesPage() {
       .sort((a, b) => b.count - a.count)
 
     setStats({ total_parcelles: data.length, total_surface_ha: totalSurface, cultures: culturesArr, irrigation_count: irrigCount })
-  }, [currentCooperative, supabase])
+  }, [scopeIds, supabase])
 
   const fetchParcelles = useCallback(async () => {
-    if (!currentCooperative) { setIsLoading(false); return }
+    if (!scopeIds.length) { setIsLoading(false); return }
     setIsLoading(true)
     const from = (page - 1) * PAGE_SIZE
     const to = from + PAGE_SIZE - 1
 
     let query = supabase
       .from('parcelles')
-      .select('id, culture_name, surface_ha, soil_type, irrigation_type, source, created_at, member:member_id(first_name, last_name, phone)', { count: 'exact' })
-      .eq('cooperative_id', currentCooperative.id)
+      .select('id, culture_name, surface_ha, soil_type, irrigation_type, source, created_at, cooperative_id, member:member_id(first_name, last_name, phone)', { count: 'exact' })
+      .in('cooperative_id', scopeIds)
       .order('created_at', { ascending: false })
       .range(from, to)
 
@@ -126,18 +159,18 @@ export default function ParcellesPage() {
     setParcelles((data as unknown as Parcelle[]) ?? [])
     setTotal(count ?? 0)
     setIsLoading(false)
-  }, [currentCooperative, supabase, page, filterCulture, filterIrrigation, debouncedSearch])
+  }, [scopeIds, supabase, page, filterCulture, filterIrrigation, debouncedSearch])
 
   const fetchProductions = useCallback(async () => {
-    if (!currentCooperative) { setIsLoading(false); return }
+    if (!scopeIds.length) { setIsLoading(false); return }
     setIsLoading(true)
     const from = (page - 1) * PAGE_SIZE
     const to = from + PAGE_SIZE - 1
 
     let query = supabase
       .from('productions')
-      .select('id, culture_name, quantity_kg, campaign_year, created_at, member:member_id(first_name, last_name)', { count: 'exact' })
-      .eq('cooperative_id', currentCooperative.id)
+      .select('id, culture_name, quantity_kg, campaign_year, created_at, cooperative_id, member:member_id(first_name, last_name)', { count: 'exact' })
+      .in('cooperative_id', scopeIds)
       .order('campaign_year', { ascending: false })
       .range(from, to)
 
@@ -148,7 +181,7 @@ export default function ParcellesPage() {
     setProductions((data as unknown as Production[]) ?? [])
     setTotal(count ?? 0)
     setIsLoading(false)
-  }, [currentCooperative, supabase, page, filterCulture, debouncedSearch])
+  }, [scopeIds, supabase, page, filterCulture, debouncedSearch])
 
   useEffect(() => { fetchStats() }, [fetchStats])
 
@@ -159,11 +192,22 @@ export default function ParcellesPage() {
     else fetchProductions()
   }, [tab, fetchParcelles, fetchProductions])
 
+  // Nom de la coopérative enfant pour une ligne donnée (utile en vue faîtière)
+  const coopName = useCallback(
+    (coopId: string | null) => {
+      if (!coopId || scopeIds.length <= 1) return null
+      const c = cooperatives.find((x) => x.id === coopId)
+      return c?.name ?? null
+    },
+    [cooperatives, scopeIds],
+  )
+
   function exportCSV() {
     const rows = tab === 'parcelles'
       ? [
-          ['Membre', 'Culture', 'Surface (ha)', 'Type de sol', 'Irrigation', 'Date'],
+          ['Coopérative', 'Membre', 'Culture', 'Surface (ha)', 'Type de sol', 'Irrigation', 'Date'],
           ...parcelles.map((p) => [
+            coopName(p.cooperative_id) ?? '',
             p.member ? `${p.member.first_name} ${p.member.last_name}` : '',
             p.culture_name, String(p.surface_ha ?? ''),
             p.soil_type ?? '', p.irrigation_type ?? '',
@@ -171,8 +215,9 @@ export default function ParcellesPage() {
           ]),
         ]
       : [
-          ['Membre', 'Culture', 'Quantité (kg)', 'Campagne', 'Date'],
+          ['Coopérative', 'Membre', 'Culture', 'Quantité (kg)', 'Campagne', 'Date'],
           ...productions.map((p) => [
+            coopName(p.cooperative_id) ?? '',
             p.member ? `${p.member.first_name} ${p.member.last_name}` : '',
             p.culture_name, String(p.quantity_kg ?? ''),
             p.campaign_year ?? '',
@@ -193,7 +238,7 @@ export default function ParcellesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Parcelles & Productions"
-        description="Données collectées via KoboCollect"
+        description={`Données collectées via KoboCollect — ${scopeLabel}`}
       />
 
       {/* KPI Cards */}
@@ -319,6 +364,9 @@ export default function ParcellesPage() {
               <table className="w-full text-sm">
                 <thead className="bg-muted/50">
                   <tr>
+                    {scopeIds.length > 1 && (
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Coopérative</th>
+                    )}
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Membre</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Culture</th>
                     <th className="text-right px-4 py-3 font-medium text-muted-foreground">Surface (ha)</th>
@@ -331,8 +379,14 @@ export default function ParcellesPage() {
                   {parcelles.map((p) => {
                     const solClass = SOL_COLORS[p.soil_type?.toLowerCase() ?? ''] ?? 'bg-gray-100 text-gray-700'
                     const irrig = IRRIGATION_LABELS[p.irrigation_type?.toLowerCase() ?? ''] ?? p.irrigation_type ?? '—'
+                    const childName = coopName(p.cooperative_id)
                     return (
                       <tr key={p.id} className="hover:bg-muted/30 transition-colors">
+                        {scopeIds.length > 1 && (
+                          <td className="px-4 py-3 text-xs text-muted-foreground hidden sm:table-cell whitespace-nowrap">
+                            {childName ?? '—'}
+                          </td>
+                        )}
                         <td className="px-4 py-3 font-medium whitespace-nowrap">
                           {p.member ? `${p.member.first_name} ${p.member.last_name}` : '—'}
                         </td>
@@ -383,6 +437,9 @@ export default function ParcellesPage() {
               <table className="w-full text-sm">
                 <thead className="bg-muted/50">
                   <tr>
+                    {scopeIds.length > 1 && (
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Coopérative</th>
+                    )}
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Membre</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Culture</th>
                     <th className="text-right px-4 py-3 font-medium text-muted-foreground">Quantité (kg)</th>
@@ -391,28 +448,36 @@ export default function ParcellesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {productions.map((p) => (
-                    <tr key={p.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-3 font-medium whitespace-nowrap">
-                        {p.member ? `${p.member.first_name} ${p.member.last_name}` : '—'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1">
-                          <Sprout className="h-3.5 w-3.5 text-green-600 shrink-0" />
-                          {p.culture_name}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono tabular-nums font-medium">
-                        {p.quantity_kg?.toLocaleString('fr-FR') ?? '—'}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
-                        {p.campaign_year || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right text-muted-foreground hidden lg:table-cell">
-                        {new Date(p.created_at).toLocaleDateString('fr-FR')}
-                      </td>
-                    </tr>
-                  ))}
+                  {productions.map((p) => {
+                    const childName = coopName(p.cooperative_id)
+                    return (
+                      <tr key={p.id} className="hover:bg-muted/30 transition-colors">
+                        {scopeIds.length > 1 && (
+                          <td className="px-4 py-3 text-xs text-muted-foreground hidden sm:table-cell whitespace-nowrap">
+                            {childName ?? '—'}
+                          </td>
+                        )}
+                        <td className="px-4 py-3 font-medium whitespace-nowrap">
+                          {p.member ? `${p.member.first_name} ${p.member.last_name}` : '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center gap-1">
+                            <Sprout className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                            {p.culture_name}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono tabular-nums font-medium">
+                          {p.quantity_kg?.toLocaleString('fr-FR') ?? '—'}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
+                          {p.campaign_year || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right text-muted-foreground hidden lg:table-cell">
+                          {new Date(p.created_at).toLocaleDateString('fr-FR')}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
