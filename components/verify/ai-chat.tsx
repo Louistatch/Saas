@@ -14,6 +14,7 @@ interface AiChatProps {
   cardNumber: string
   memberName: string
   onBack: () => void
+  suggestions?: string[]
 }
 
 /**
@@ -22,7 +23,13 @@ interface AiChatProps {
  * Uses the /api/ai/chat endpoint which calls Gemini with the producer's
  * context (region, cooperative, market prices).
  */
-export function AiChat({ cardNumber, memberName, onBack }: AiChatProps) {
+const DEFAULT_SUGGESTIONS = [
+  'Quel est le prix du maïs dans ma zone ?',
+  'Quand vendre mon soja ?',
+  'Quelles cultures pour ma région ?',
+]
+
+export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_SUGGESTIONS }: AiChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -78,12 +85,6 @@ export function AiChat({ cardNumber, memberName, onBack }: AiChatProps) {
       inputRef.current?.focus()
     }
   }, [input, loading, cardNumber])
-
-  const suggestions = [
-    'Quel est le prix du maïs dans ma zone ?',
-    'Quand vendre mon soja ?',
-    'Quelles cultures pour ma région ?',
-  ]
 
   return (
     <div className="ai-chat">

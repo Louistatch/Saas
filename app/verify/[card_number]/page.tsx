@@ -619,7 +619,12 @@ export default function VerifyCardPage() {
                 </div>
                 <div className="flex gap-2">
                   <a href={`tel:${c.phone}`} className="flex-1 py-2.5 rounded-xl bg-[var(--vfp-cta)] text-[var(--vfp-cta-fg)] text-xs font-bold text-center active:scale-95 transition-transform">📞 Appeler</a>
-                  <a href={`https://wa.me/${waNumber(c.phone)}`} target="_blank" rel="noopener noreferrer" className="flex-1 py-2.5 rounded-xl bg-[#25D366]/15 text-[#25D366] text-xs font-bold text-center border border-[#25D366]/20 active:scale-95 transition-transform">💬 WhatsApp</a>
+                  <a
+                    href={`https://wa.me/${waNumber(c.phone)}?text=${encodeURIComponent(`Bonjour ${c.name}, je suis ${firstName} (carte ${cardNumber})${c.canton ? `, canton ${c.canton}` : ''}. J'ai besoin d'une assistance agricole.`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 py-2.5 rounded-xl bg-[#25D366]/15 text-[#25D366] text-xs font-bold text-center border border-[#25D366]/20 active:scale-95 transition-transform"
+                  >💬 WhatsApp</a>
                 </div>
               </div>
             ))}
@@ -628,7 +633,20 @@ export default function VerifyCardPage() {
 
         {/* ─── AI Chat View ─── */}
         {isValid && activeView === 'ai' && result.member && (
-          <AiChat cardNumber={cardNumber} memberName={firstName} onBack={() => setActiveView('menu')} />
+          <AiChat
+            cardNumber={cardNumber}
+            memberName={firstName}
+            onBack={() => setActiveView('menu')}
+            suggestions={[
+              result.member.region
+                ? `Quel est le prix du maïs en région ${result.member.region} ?`
+                : 'Quel est le prix du maïs dans ma zone ?',
+              result.member.canton
+                ? `Quand vendre mes cultures dans le canton ${result.member.canton} ?`
+                : 'Quand vendre mes cultures ?',
+              'Quelles cultures sont les plus rentables pour ma région ?',
+            ]}
+          />
         )}
 
         {/* ─── AgriSmart Water View ─── */}
@@ -648,7 +666,14 @@ export default function VerifyCardPage() {
 
         {/* ─── Cotisation View ─── */}
         {isValid && activeView === 'cotisation' && (
-          <CotisationView cardNumber={cardNumber} onBack={() => setActiveView('menu')} />
+          <CotisationView
+            cardNumber={cardNumber}
+            onBack={() => setActiveView('menu')}
+            coordoPhone={contacts?.find(c => c.role === 'coordo')?.phone ?? null}
+            coordoName={contacts?.find(c => c.role === 'coordo')?.name ?? null}
+            memberName={firstName}
+            memberCanton={result.member?.canton ?? null}
+          />
         )}
 
         {/* ─── Exploitation View ─── */}

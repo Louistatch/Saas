@@ -29,6 +29,10 @@ interface Summary {
 interface Props {
   cardNumber: string
   onBack: () => void
+  coordoPhone?: string | null
+  coordoName?: string | null
+  memberName?: string
+  memberCanton?: string | null
 }
 
 const STATUS_LABEL: Record<string, { label: string; color: string; Icon: typeof CheckCircle }> = {
@@ -43,7 +47,7 @@ function getStatusInfo(status: string | null, isOverdue: boolean) {
   return STATUS_LABEL[status ?? ''] ?? { label: status ?? 'Inconnu', color: 'text-white/40', Icon: Clock }
 }
 
-export function CotisationView({ cardNumber, onBack }: Props) {
+export function CotisationView({ cardNumber, onBack, coordoPhone, coordoName, memberName, memberCanton }: Props) {
   const [cotisations, setCotisations] = useState<Cotisation[] | null>(null)
   const [summary, setSummary] = useState<Summary | null>(null)
   const [loading, setLoading] = useState(true)
@@ -60,6 +64,15 @@ export function CotisationView({ cardNumber, onBack }: Props) {
   }, [cardNumber])
 
   const statusInfo = summary ? getStatusInfo(summary.last_status, summary.is_overdue) : null
+
+  const allCotisations = cotisations ?? []
+  const totalCampagnes = allCotisations.length
+  const payeeCount = allCotisations.filter(c => c.status === 'paid' || c.status === 'waived').length
+  const tauxRegularite = totalCampagnes > 0 ? Math.round((payeeCount / totalCampagnes) * 100) : null
+
+  const waCoordoHref = coordoPhone
+    ? `https://wa.me/${coordoPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Bonjour${coordoName ? ` ${coordoName}` : ''}, je suis ${memberName ?? 'un producteur'}${memberCanton ? ` (canton ${memberCanton})` : ''}. Je souhaite régulariser ma cotisation.`)}`
+    : null
 
   return (
     <div className="space-y-4 vfp-enter">
@@ -111,13 +124,47 @@ export function CotisationView({ cardNumber, onBack }: Props) {
             )}
 
             {(summary.last_status === 'pending' || summary.is_overdue) && (
-              <div className="pt-1">
-                <p className="text-white/40 text-xs text-center">
-                  Pour payer votre cotisation, contactez votre coopérative ou votre coordonnateur.
+              <div className={`rounded-xl border p-3 ${summary.is_overdue ? 'border-red-500/30 bg-red-500/8' : 'border-amber-500/30 bg-amber-500/8'}`}>
+                <p className={`text-xs font-semibold mb-1 ${summary.is_overdue ? 'text-red-300' : 'text-amber-300'}`}>
+                  {summary.is_overdue ? '⚠️ Cotisation en retard' : '💡 Cotisation en attente'}
                 </p>
+                <p className="text-white/50 text-xs mb-2">
+                  {summary.is_overdue
+                    ? 'Votre cotisation est échue. Régularisez pour conserver vos droits.'
+                    : 'Votre cotisation est due. Contactez votre coordonnateur pour payer.'}
+                </p>
+                {waCoordoHref && (
+                  <a
+                    href={waCoordoHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 py-2 rounded-lg bg-[#25D366]/15 border border-[#25D366]/25 text-[#25D366] text-xs font-bold active:scale-95 transition-transform"
+                  >
+                    💬 Contacter {coordoName ?? 'le coordonnateur'} sur WhatsApp
+                  </a>
+                )}
               </div>
             )}
           </div>
+
+          {/* Taux de régularité */}
+          {tauxRegularite !== null && totalCampagnes >= 2 && (
+            <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-white/50 text-xs">Taux de régularité</span>
+                <span className={`text-sm font-bold ${tauxRegularite >= 80 ? 'text-emerald-400' : tauxRegularite >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
+                  {tauxRegularite}%
+                </span>
+              </div>
+              <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${tauxRegularite >= 80 ? 'bg-emerald-400' : tauxRegularite >= 50 ? 'bg-amber-400' : 'bg-red-400'}`}
+                  style={{ width: `${tauxRegularite}%` }}
+                />
+              </div>
+              <p className="text-white/30 text-[11px] mt-1">{payeeCount} payée{payeeCount > 1 ? 's' : ''} sur {totalCampagnes} campagne{totalCampagnes > 1 ? 's' : ''}</p>
+            </div>
+          )}
 
           {/* History */}
           {(cotisations ?? []).length > 1 && (

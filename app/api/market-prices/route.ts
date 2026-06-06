@@ -147,6 +147,23 @@ export async function POST(request: NextRequest) {
       .eq('id', card.member_id)
       .maybeSingle()
 
+    // Compute real trend from last 5 prices for same culture+region
+    let trend: 'up' | 'down' | 'stable' = 'stable'
+    const { data: recentPrices } = await supabase
+      .from('market_prices')
+      .select('price')
+      .eq('culture_id', culture_id)
+      .eq('region_id', region_id)
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    if (recentPrices && recentPrices.length >= 2) {
+      const avg = recentPrices.reduce((s, r) => s + r.price, 0) / recentPrices.length
+      const pctDiff = ((price - avg) / avg) * 100
+      if (pctDiff > 5) trend = 'up'
+      else if (pctDiff < -5) trend = 'down'
+    }
+
     // Insert the price
     const { error: insertError } = await supabase
       .from('market_prices')
@@ -157,7 +174,7 @@ export async function POST(request: NextRequest) {
         price: Math.round(price),
         cooperative_id: card.cooperative_id,
         reported_by: member?.id ?? null,
-        trend: 'stable',
+        trend,
         verified: false,
       })
 

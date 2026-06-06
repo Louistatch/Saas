@@ -176,15 +176,26 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Load conversation history — use admin client because SELECT on ai_conversations
-  // requires admin role after the RLS fix (anon reads are blocked)
+  // Load parcelles, cotisation, and conversation history in parallel
   const supabaseAdmin = createAdminClient()
-  const { data: history } = await supabaseAdmin
-    .from('ai_conversations')
-    .select('role, content')
-    .eq('card_number', cardNumber)
-    .order('created_at', { ascending: true })
-    .limit(MAX_HISTORY)
+
+  const [{ data: parcelles }, { data: cotisations }, { data: history }] = await Promise.all([
+    card?.member_id
+      ? supabaseAdmin.from('parcelles').select('name, culture_principale, superficie_ha').eq('member_id', card.member_id).limit(10)
+      : Promise.resolve({ data: null }),
+    card?.member_id
+      ? supabaseAdmin.from('cotisations').select('campaign, status, amount').eq('member_id', card.member_id).order('created_at', { ascending: false }).limit(3)
+      : Promise.resolve({ data: null }),
+    supabaseAdmin.from('ai_conversations').select('role, content').eq('card_number', cardNumber).order('created_at', { ascending: true }).limit(MAX_HISTORY),
+  ])
+
+  const parcellesContext = parcelles && parcelles.length > 0
+    ? parcelles.map(p => `• ${p.name ?? 'Parcelle'}: ${p.culture_principale ?? '?'}, ${p.superficie_ha ?? '?'} ha`).join('\n')
+    : 'Aucune parcelle enregistrée.'
+
+  const cotisationContext = cotisations && cotisations.length > 0
+    ? cotisations.map(c => `• Campagne ${c.campaign ?? '?'}: ${c.status === 'paid' ? 'Payée ✓' : c.status === 'waived' ? 'Exonérée' : c.status === 'overdue' ? '⚠️ En retard' : 'En attente'}${c.amount ? ` — ${c.amount.toLocaleString('fr-FR')} XOF` : ''}`).join('\n')
+    : 'Aucune cotisation enregistrée.'
 
   const systemPrompt = `Tu es AgriTogo, l'assistant agricole intelligent de FaîtiereHub pour les coopératives du Togo.
 
@@ -193,10 +204,16 @@ CONTEXTE DU PRODUCTEUR :
 - Village : ${member?.village ?? 'non renseigné'}, Canton : ${member?.canton ?? '?'}, Région : ${member?.region ?? '?'}
 - Coopérative : ${coop?.name ?? '?'}, Faîtière : ${coop?.faitiere_name ?? '?'}
 
+PARCELLES AGRICOLES :
+${parcellesContext}
+
+COTISATIONS :
+${cotisationContext}
+
 PRIX DU MARCHÉ :
 ${pricesContext}
 
-RÈGLES : Français, concis (3-5 phrases), basé sur les prix réels, honnête si tu ne sais pas, pas de conseils médicaux/juridiques.`
+RÈGLES : Français, concis (3-5 phrases), basé sur les données réelles du producteur, honnête si tu ne sais pas, pas de conseils médicaux/juridiques. Si le producteur a une cotisation en retard, rappelle-le avec bienveillance.`
 
   const geminiHistory = (history ?? []).map((h) => ({
     role: h.role === 'assistant' ? ('model' as const) : ('user' as const),

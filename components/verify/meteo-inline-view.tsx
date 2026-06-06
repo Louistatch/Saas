@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, CloudRain, Droplets, Wind, Thermometer, Sun } from 'lucide-react'
+import { ArrowLeft, CloudRain, Droplets, Wind, Thermometer, Sun, AlertTriangle, Droplets as IrrigationIcon } from 'lucide-react'
 
 interface WeatherDay {
   date: string
@@ -32,6 +32,32 @@ function fmtDate(dateStr: string) {
   return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
+interface Alert { icon: string; text: string; color: string }
+
+function computeAlerts(today: WeatherDay, week: WeatherDay[]): Alert[] {
+  const alerts: Alert[] = []
+  if (today.et0_mm != null && today.et0_mm >= 5) {
+    alerts.push({ icon: '🚿', text: `ETP élevée (${today.et0_mm.toFixed(1)} mm/j) — irriguez vos cultures dès aujourd'hui`, color: 'border-amber-500/30 bg-amber-500/8 text-amber-300' })
+  }
+  const totalPrecip7d = week.reduce((s, d) => s + (d.precipitation_mm ?? 0), 0)
+  if (totalPrecip7d >= 50) {
+    alerts.push({ icon: '🌧️', text: `Pluies importantes cette semaine (${totalPrecip7d.toFixed(0)} mm) — vérifiez le drainage`, color: 'border-blue-500/30 bg-blue-500/8 text-blue-300' })
+  }
+  if (today.temperature_max != null && today.temperature_max >= 38) {
+    alerts.push({ icon: '🌡️', text: `Chaleur extrême (${Math.round(today.temperature_max)}°C) — protégez vos plants et augmentez l'irrigation`, color: 'border-red-500/30 bg-red-500/8 text-red-300' })
+  }
+  if (today.wind_speed_ms != null && today.wind_speed_ms >= 8) {
+    alerts.push({ icon: '💨', text: `Vent fort (${today.wind_speed_ms.toFixed(1)} m/s) — risque de verse sur les cultures hautes`, color: 'border-teal-500/30 bg-teal-500/8 text-teal-300' })
+  }
+  if (today.precipitation_mm != null && today.precipitation_mm < 0.5 && (today.et0_mm ?? 0) > 3) {
+    const dryDays = week.filter(d => (d.precipitation_mm ?? 0) < 1).length
+    if (dryDays >= 4) {
+      alerts.push({ icon: '☀️', text: `${dryDays} jours sans pluie significative — période de sécheresse probable`, color: 'border-orange-500/30 bg-orange-500/8 text-orange-300' })
+    }
+  }
+  return alerts
+}
+
 export function MeteoInlineView({ cardNumber, onBack }: Props) {
   const [weather, setWeather] = useState<WeatherDay[]>([])
   const [region, setRegion] = useState<string | null>(null)
@@ -47,6 +73,7 @@ export function MeteoInlineView({ cardNumber, onBack }: Props) {
   }, [cardNumber])
 
   const today = weather[0] ?? null
+  const alerts = today ? computeAlerts(today, weather.slice(1)) : []
 
   return (
     <div className="space-y-4 vfp-enter">
@@ -59,6 +86,18 @@ export function MeteoInlineView({ cardNumber, onBack }: Props) {
         <h3 className="text-white text-lg font-bold">Météo Agricole</h3>
         {region && <span className="text-xs text-white/40 font-mono ml-1">— {region}</span>}
       </div>
+
+      {/* Alerts */}
+      {alerts.length > 0 && !loading && !error && (
+        <div className="space-y-2">
+          {alerts.map((a, i) => (
+            <div key={i} className={`rounded-xl border p-3 flex items-start gap-3 ${a.color}`}>
+              <span className="text-lg shrink-0 leading-none mt-0.5">{a.icon}</span>
+              <p className="text-[13px] font-medium leading-snug">{a.text}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {loading && (
         <div className="vfp-card rounded-2xl p-8 text-center">
@@ -135,7 +174,7 @@ export function MeteoInlineView({ cardNumber, onBack }: Props) {
           {/* 7-day list */}
           {weather.length > 1 && (
             <div className="vfp-card rounded-2xl p-4 space-y-1">
-              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-3">7 derniers jours</p>
+              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-3">Conditions récentes</p>
               {weather.slice(1).map(day => (
                 <div key={day.date} className="flex items-center gap-3 py-2 border-b border-white/5 last:border-0">
                   <span className="text-lg w-7 text-center">{getRainIcon(day.precipitation_mm)}</span>
@@ -155,7 +194,7 @@ export function MeteoInlineView({ cardNumber, onBack }: Props) {
             </div>
           )}
 
-          <p className="text-center text-white/20 text-[11px]">Données : Open-Meteo / NASA POWER</p>
+          <p className="text-center text-white/20 text-[11px]">Données historiques · Open-Meteo / NASA POWER</p>
         </>
       )}
     </div>
