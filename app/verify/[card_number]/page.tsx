@@ -14,6 +14,9 @@ import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboa
 import { Card3D } from '@/components/verify/card-3d'
 import { AiChat } from '@/components/verify/ai-chat'
 import { AgriSmartWater } from '@/components/verify/agrismart-water'
+import { ParcellesInlineView } from '@/components/verify/parcelles-inline-view'
+import { IntrantsInlineView } from '@/components/verify/intrants-inline-view'
+import { CotisationView } from '@/components/verify/cotisation-view'
 import { OuvrierView } from '@/components/verify/ouvrier-view'
 import { AcheteurView } from '@/components/verify/acheteur-view'
 import { AgronomeView } from '@/components/verify/agronome-view'
@@ -78,7 +81,7 @@ export default function VerifyCardPage() {
   const [showContent, setShowContent] = useState(false)
   const [timeLeft, setTimeLeft] = useState(600)
   const [expired, setExpired] = useState(false)
-  const [activeView, setActiveView] = useState<'menu' | 'identity' | 'prices' | 'technicien' | 'ai' | 'agrismart'>('menu')
+  const [activeView, setActiveView] = useState<'menu' | 'identity' | 'prices' | 'technicien' | 'ai' | 'agrismart' | 'parcelles' | 'intrants' | 'cotisation'>('menu')
   const [contacts, setContacts] = useState<{ role: 'technicien' | 'coordo'; name: string; phone: string; canton?: string | null }[] | null>(null)
   const [contactsLoading, setContactsLoading] = useState(false)
   const [atsData, setAtsData] = useState<{ score: number; level: string; breakdown: AtsBreakdown } | null>(null)
@@ -338,10 +341,10 @@ export default function VerifyCardPage() {
     { icon: Bot, title: 'Assistant IA', description: 'Conseils & prévisions', available: true, highlight: true, action: () => setActiveView('ai'), gradient: 'from-amber-400/20 to-amber-600/5' },
     { icon: PhoneCall, title: 'Mon Technicien', description: 'Appel & WhatsApp', available: true, action: () => setActiveView('technicien'), gradient: 'from-teal-500/20 to-teal-700/5' },
     { icon: Droplets, title: 'AgriSmart', description: 'Besoins en eau', available: true, action: () => setActiveView('agrismart'), gradient: 'from-blue-400/20 to-cyan-600/5' },
-    { icon: Map, title: 'Parcelles GPS', description: 'Mes parcelles agricoles', available: true, action: () => window.open(`/verify/${cardNumber}/parcelles`, '_self'), gradient: 'from-emerald-500/20 to-emerald-700/5' },
+    { icon: Map, title: 'Parcelles GPS', description: 'Mes parcelles agricoles', available: true, action: () => setActiveView('parcelles'), gradient: 'from-emerald-500/20 to-emerald-700/5' },
     { icon: FileText, title: 'Mon Attestation', description: 'Télécharger PDF officiel', available: true, action: () => result.member_id && window.open(`/reports/attestation/${result.member_id}`, '_blank'), gradient: 'from-violet-500/20 to-violet-700/5' },
-    { icon: ShoppingCart, title: 'Intrants', description: 'Semences & engrais', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
-    { icon: Coins, title: 'Cotisation', description: 'Adhérer / Renouveler', available: false, gradient: 'from-slate-500/10 to-slate-700/5' },
+    { icon: ShoppingCart, title: 'Intrants', description: 'Semences & engrais', available: true, action: () => setActiveView('intrants'), gradient: 'from-orange-500/20 to-orange-700/5' },
+    { icon: Coins, title: 'Cotisation', description: 'Statut & campagne', available: true, action: () => setActiveView('cotisation'), gradient: 'from-yellow-500/20 to-yellow-700/5' },
   ]
 
   return (
@@ -628,6 +631,21 @@ export default function VerifyCardPage() {
         {/* ─── AgriSmart Water View ─── */}
         {isValid && activeView === 'agrismart' && (
           <AgriSmartWater onBack={() => setActiveView('menu')} />
+        )}
+
+        {/* ─── Parcelles View ─── */}
+        {isValid && activeView === 'parcelles' && (
+          <ParcellesInlineView cardNumber={cardNumber} onBack={() => setActiveView('menu')} />
+        )}
+
+        {/* ─── Intrants View ─── */}
+        {isValid && activeView === 'intrants' && (
+          <IntrantsInlineView cardNumber={cardNumber} onBack={() => setActiveView('menu')} />
+        )}
+
+        {/* ─── Cotisation View ─── */}
+        {isValid && activeView === 'cotisation' && (
+          <CotisationView cardNumber={cardNumber} onBack={() => setActiveView('menu')} />
         )}
 
         {/* ─── Security Timer ─── */}
