@@ -60,7 +60,7 @@ const REGIONS = [
   { id: 'Savanes',  name: 'Savanes',   emoji: '🌿', desc: 'Dapaong · Nord' },
 ]
 
-interface Props { onBack: () => void; initialRegion?: string }
+interface Props { onBack: () => void; initialRegion?: string; cardNumber?: string }
 
 // ─── Palette de couleurs par culture ─────────────────────────────────────────
 const CROP_COLORS = [
@@ -72,7 +72,7 @@ const CROP_COLORS = [
   'oklch(0.72 0.18 160)',
 ]
 
-export function AgriSmartWater({ onBack, initialRegion }: Props) {
+export function AgriSmartWater({ onBack, initialRegion, cardNumber }: Props) {
   // ── API data ──────────────────────────────────────────────────────────────
   const [allCrops, setAllCrops]     = useState<Crop[]>([])
   const [systems, setSystems]       = useState<IrrigationSystem[]>([])
@@ -294,6 +294,33 @@ export function AgriSmartWater({ onBack, initialRegion }: Props) {
           <p className="text-white/60 text-sm font-medium">
             Sélectionnez vos cultures et définissez la superficie de chaque parcelle.
           </p>
+
+          {/* Importer les parcelles depuis le profil membre */}
+          {cardNumber && allCrops.length > 0 && (
+            <button
+              onClick={async () => {
+                try {
+                  const res = await fetch(`/api/verify/${encodeURIComponent(cardNumber)}/parcelles`)
+                  if (!res.ok) return
+                  const data = await res.json()
+                  const parcelles: Array<{ culture_principale: string | null; superficie_ha: number | null }> = data.parcelles ?? []
+                  const newEntries = parcelles
+                    .filter(p => p.culture_principale && p.superficie_ha)
+                    .map(p => {
+                      const cropName = (p.culture_principale ?? '').toLowerCase()
+                      const found = allCrops.find(c => c.name.toLowerCase().includes(cropName) || cropName.includes(c.name.toLowerCase()))
+                      return found ? { crop: found, area_m2: String(Math.round((p.superficie_ha ?? 0) * 10000)) } : null
+                    })
+                    .filter(Boolean) as { crop: typeof allCrops[0]; area_m2: string }[]
+                  if (newEntries.length > 0) setEntries(newEntries)
+                  else alert('Aucune culture reconnue dans vos parcelles. Sélectionnez manuellement.')
+                } catch { alert('Impossible de charger vos parcelles.') }
+              }}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-[var(--vfp-accent)]/25 bg-[var(--vfp-accent)]/8 text-[var(--vfp-accent)] text-sm font-semibold active:scale-[0.98] transition-transform"
+            >
+              🌾 Importer mes parcelles enregistrées
+            </button>
+          )}
 
           {/* Cultures ajoutées */}
           {entries.length > 0 && (
@@ -732,6 +759,38 @@ export function AgriSmartWater({ onBack, initialRegion }: Props) {
               <li>• Ajustez selon la pluviométrie réelle — soustrayez la pluie tombée la semaine précédente</li>
             </ul>
           </div>
+
+          {/* Partage WhatsApp */}
+          {result && (
+            <button
+              onClick={() => {
+                const lines: string[] = []
+                lines.push('🌱 *Calcul AgriSmart — FaîtiereHub*')
+                lines.push('')
+                result.results.forEach(r => {
+                  const entry = entries.find(e => e.crop.name === r.crop)
+                  lines.push(`${entry?.crop.emoji ?? '🌿'} *${r.crop}* — ${(r.area_m2 / 10000).toFixed(2)} ha`)
+                })
+                lines.push(`📍 Région : ${region || 'GPS'}`)
+                lines.push(`🌡️ Température moy. : ${result.avg_temp}°C | Pluie : ${result.total_precip} mm/an`)
+                lines.push(`🏔️ Sol : ${result.soil} | Système : ${result.system}`)
+                lines.push('')
+                lines.push('*📊 Bilan hydrique annuel :*')
+                lines.push(`• Survie minimale : ${(result.combined_kpis.total_survival_m3 / 1000).toFixed(1)} k m³`)
+                lines.push(`• Rendement optimal : ${(result.combined_kpis.total_boost_m3 / 1000).toFixed(1)} k m³`)
+                lines.push(`• Total recommandé : ${(result.combined_kpis.total_optimal_m3 / 1000).toFixed(1)} k m³/an`)
+                lines.push(`• Débit pompe : ${result.combined_kpis.debit_pompe_ls.toFixed(2)} L/s`)
+                lines.push(`• Mois de pointe : ${result.combined_kpis.pic_mois}`)
+                lines.push('')
+                lines.push('_Généré par FaîtiereHub AgriSmart · faítierehub.tg_')
+                const text = lines.join('\n')
+                window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer')
+              }}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-[#25D366]/25 bg-[#25D366]/10 text-[#25D366] text-sm font-semibold active:scale-[0.98] transition-transform"
+            >
+              💬 Partager le bilan sur WhatsApp
+            </button>
+          )}
 
           <button onClick={reset} className="w-full py-3 rounded-xl border border-[var(--vfp-accent)]/20 text-[var(--vfp-accent)] text-sm font-semibold active:opacity-70 flex items-center justify-center gap-2">
             <RotateCcw className="h-4 w-4" /> Nouveau calcul
