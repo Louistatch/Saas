@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createHmac } from 'crypto'
+import { createHmac, timingSafeEqual } from 'crypto'
 import { createClient } from '@/lib/supabase/admin'
 import { queueInAppNotification } from '@/lib/notifications/queue'
 
@@ -20,7 +20,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const signature = req.headers.get('x-orange-signature') ?? ''
   const expected = createHmac('sha256', apiKey).update(rawBody).digest('hex')
-  if (signature !== expected) {
+  const sigBuf = Buffer.from(signature)
+  const expBuf = Buffer.from(expected)
+  const valid = sigBuf.length === expBuf.length && timingSafeEqual(sigBuf, expBuf)
+  if (!valid) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
