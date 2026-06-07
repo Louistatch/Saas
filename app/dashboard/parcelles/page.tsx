@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { MapPin, Sprout, Droplets, BarChart3, Search, Download } from 'lucide-react'
+import { MapPin, Sprout, Droplets, BarChart3, Search, Download, ChevronDown, Navigation, CalendarDays, User } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -18,14 +18,28 @@ import type { Cooperative } from '@/app/context/cooperative-context'
 
 interface Parcelle {
   id: string
-  culture_name: string
-  surface_ha: number
+  name: string | null
+  culture_principale: string | null
+  culture_name: string | null
+  superficie_ha: number | null
+  surface_ha: number | null
   soil_type: string | null
   irrigation_type: string | null
+  gps_coordinates: string | null
+  campaign_year: string | null
   source: string | null
   created_at: string
   cooperative_id: string | null
-  member: { first_name: string; last_name: string; phone: string | null } | null
+  member: {
+    first_name: string
+    last_name: string
+    phone: string | null
+    village: string | null
+    canton: string | null
+    prefecture: string | null
+    region: string | null
+    status: string | null
+  } | null
 }
 
 interface Production {
@@ -40,7 +54,7 @@ interface Production {
 
 interface Stats {
   total_parcelles: number
-  total_surface_ha: number
+  total_superficie_ha: number
   cultures: { name: string; count: number; surface: number }[]
   irrigation_count: number
 }
@@ -60,14 +74,11 @@ const SOL_COLORS: Record<string, string> = {
   laterite: 'bg-orange-100 text-orange-800',
 }
 
-/** Retourne les IDs de la coopérative sélectionnée + tous ses enfants/petits-enfants. */
 function getScopeIds(current: Cooperative, all: Cooperative[]): string[] {
   const ids = new Set<string>([current.id])
-  // direct children
   for (const c of all) {
     if (c.parentId === current.id) {
       ids.add(c.id)
-      // grandchildren
       for (const gc of all) {
         if (gc.parentId === c.id) ids.add(gc.id)
       }
@@ -76,21 +87,28 @@ function getScopeIds(current: Cooperative, all: Cooperative[]): string[] {
   return [...ids]
 }
 
+function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
+  if (!value) return null
+  return (
+    <div>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="text-sm font-medium text-foreground">{value}</dd>
+    </div>
+  )
+}
+
 export default function ParcellesPage() {
   const { currentCooperative, cooperatives } = useCooperative()
   const supabase = useMemo(() => createClient(), [])
 
-  // Scope IDs : la coopérative courante + ses enfants si c'est une faîtière/union
   const scopeIds = useMemo(
     () => (currentCooperative ? getScopeIds(currentCooperative, cooperatives) : []),
     [currentCooperative, cooperatives],
   )
 
-  // Label du périmètre affiché dans le header
   const scopeLabel = useMemo(() => {
     if (!currentCooperative) return ''
-    if (scopeIds.length > 1)
-      return `${currentCooperative.name} · ${scopeIds.length} coopératives`
+    if (scopeIds.length > 1) return `${currentCooperative.name} · ${scopeIds.length} coopératives`
     return currentCooperative.name
   }, [currentCooperative, scopeIds])
 
@@ -104,37 +122,33 @@ export default function ParcellesPage() {
   const [search, setSearch] = useState('')
   const [filterCulture, setFilterCulture] = useState('all')
   const [filterIrrigation, setFilterIrrigation] = useState('all')
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const debouncedSearch = useDebounced(search, 300)
 
-  const cultures = useMemo(
-    () => stats?.cultures.map((c) => c.name) ?? [],
-    [stats],
-  )
+  const cultures = useMemo(() => stats?.cultures.map((c) => c.name) ?? [], [stats])
 
   const fetchStats = useCallback(async () => {
     if (!scopeIds.length) return
     const { data } = await supabase
       .from('parcelles')
-      .select('culture_name, surface_ha, irrigation_type')
+      .select('culture_principale, superficie_ha, irrigation_type')
       .in('cooperative_id', scopeIds)
 
     if (!data) return
-
-    const totalSurface = data.reduce((acc, p) => acc + (p.surface_ha || 0), 0)
+    const totalSurface = data.reduce((acc, p) => acc + (p.superficie_ha || 0), 0)
     const cultureMap: Record<string, { count: number; surface: number }> = {}
     let irrigCount = 0
     for (const p of data) {
-      const c = p.culture_name || 'Inconnue'
+      const c = p.culture_principale || 'Inconnue'
       if (!cultureMap[c]) cultureMap[c] = { count: 0, surface: 0 }
       cultureMap[c].count++
-      cultureMap[c].surface += p.surface_ha || 0
+      cultureMap[c].surface += p.superficie_ha || 0
       if (p.irrigation_type && p.irrigation_type.toLowerCase() !== 'non') irrigCount++
     }
     const culturesArr = Object.entries(cultureMap)
       .map(([name, v]) => ({ name, count: v.count, surface: v.surface }))
       .sort((a, b) => b.count - a.count)
-
-    setStats({ total_parcelles: data.length, total_surface_ha: totalSurface, cultures: culturesArr, irrigation_count: irrigCount })
+    setStats({ total_parcelles: data.length, total_superficie_ha: totalSurface, cultures: culturesArr, irrigation_count: irrigCount })
   }, [scopeIds, supabase])
 
   const fetchParcelles = useCallback(async () => {
@@ -145,15 +159,18 @@ export default function ParcellesPage() {
 
     let query = supabase
       .from('parcelles')
-      .select('id, culture_name, surface_ha, soil_type, irrigation_type, source, created_at, cooperative_id, member:member_id(first_name, last_name, phone)', { count: 'exact' })
+      .select(
+        'id, name, culture_principale, culture_name, superficie_ha, surface_ha, soil_type, irrigation_type, gps_coordinates, campaign_year, source, created_at, cooperative_id, member:member_id(first_name, last_name, phone, village, canton, prefecture, region, status)',
+        { count: 'exact' },
+      )
       .in('cooperative_id', scopeIds)
       .order('created_at', { ascending: false })
       .range(from, to)
 
-    if (filterCulture !== 'all') query = query.eq('culture_name', filterCulture)
+    if (filterCulture !== 'all') query = query.eq('culture_principale', filterCulture)
     if (filterIrrigation === 'oui') query = query.not('irrigation_type', 'eq', 'non').not('irrigation_type', 'is', null)
     if (filterIrrigation === 'non') query = query.eq('irrigation_type', 'non')
-    if (debouncedSearch) query = query.ilike('culture_name', `%${debouncedSearch}%`)
+    if (debouncedSearch) query = query.ilike('culture_principale', `%${debouncedSearch}%`)
 
     const { data, count } = await query
     setParcelles((data as unknown as Parcelle[]) ?? [])
@@ -184,15 +201,12 @@ export default function ParcellesPage() {
   }, [scopeIds, supabase, page, filterCulture, debouncedSearch])
 
   useEffect(() => { fetchStats() }, [fetchStats])
-
   useEffect(() => { setPage(1) }, [debouncedSearch, filterCulture, filterIrrigation, tab])
-
   useEffect(() => {
     if (tab === 'parcelles') fetchParcelles()
     else fetchProductions()
   }, [tab, fetchParcelles, fetchProductions])
 
-  // Nom de la coopérative enfant pour une ligne donnée (utile en vue faîtière)
   const coopName = useCallback(
     (coopId: string | null) => {
       if (!coopId || scopeIds.length <= 1) return null
@@ -205,12 +219,23 @@ export default function ParcellesPage() {
   function exportCSV() {
     const rows = tab === 'parcelles'
       ? [
-          ['Coopérative', 'Membre', 'Culture', 'Surface (ha)', 'Type de sol', 'Irrigation', 'Date'],
+          ['Coopérative', 'Membre', 'Téléphone', 'Village', 'Canton', 'Préfecture', 'Région', 'Nom parcelle', 'Culture', 'Surface (ha)', 'Type de sol', 'Irrigation', 'GPS', 'Campagne', 'Source', 'Date'],
           ...parcelles.map((p) => [
             coopName(p.cooperative_id) ?? '',
             p.member ? `${p.member.first_name} ${p.member.last_name}` : '',
-            p.culture_name, String(p.surface_ha ?? ''),
-            p.soil_type ?? '', p.irrigation_type ?? '',
+            p.member?.phone ?? '',
+            p.member?.village ?? '',
+            p.member?.canton ?? '',
+            p.member?.prefecture ?? '',
+            p.member?.region ?? '',
+            p.name ?? '',
+            p.culture_principale ?? '',
+            String(p.superficie_ha ?? p.surface_ha ?? ''),
+            p.soil_type ?? '',
+            p.irrigation_type ?? '',
+            p.gps_coordinates ?? '',
+            p.campaign_year ?? '',
+            p.source ?? '',
             new Date(p.created_at).toLocaleDateString('fr-FR'),
           ]),
         ]
@@ -246,7 +271,7 @@ export default function ParcellesPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { icon: MapPin, color: 'green', label: 'Parcelles', value: stats.total_parcelles },
-            { icon: BarChart3, color: 'blue', label: 'Hectares totaux', value: stats.total_surface_ha.toFixed(1) },
+            { icon: BarChart3, color: 'blue', label: 'Hectares totaux', value: stats.total_superficie_ha.toFixed(1) },
             { icon: Sprout, color: 'emerald', label: 'Cultures', value: stats.cultures.length },
             { icon: Droplets, color: 'cyan', label: 'Irriguées', value: stats.irrigation_count },
           ].map(({ icon: Icon, color, label, value }) => (
@@ -348,7 +373,7 @@ export default function ParcellesPage() {
         </Button>
       </div>
 
-      {/* Data table */}
+      {/* Data */}
       {isLoading ? (
         <LoadingBlock />
       ) : tab === 'parcelles' ? (
@@ -373,6 +398,7 @@ export default function ParcellesPage() {
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Type de sol</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Irrigation</th>
                     <th className="text-right px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">Date</th>
+                    <th className="w-8" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -380,40 +406,116 @@ export default function ParcellesPage() {
                     const solClass = SOL_COLORS[p.soil_type?.toLowerCase() ?? ''] ?? 'bg-gray-100 text-gray-700'
                     const irrig = IRRIGATION_LABELS[p.irrigation_type?.toLowerCase() ?? ''] ?? p.irrigation_type ?? '—'
                     const childName = coopName(p.cooperative_id)
+                    const isExpanded = expandedId === p.id
+                    const surface = p.superficie_ha ?? p.surface_ha
+                    const culture = p.culture_principale ?? p.culture_name ?? '—'
+
                     return (
-                      <tr key={p.id} className="hover:bg-muted/30 transition-colors">
-                        {scopeIds.length > 1 && (
-                          <td className="px-4 py-3 text-xs text-muted-foreground hidden sm:table-cell whitespace-nowrap">
-                            {childName ?? '—'}
+                      <>
+                        <tr
+                          key={p.id}
+                          className="hover:bg-muted/30 transition-colors cursor-pointer"
+                          onClick={() => setExpandedId(isExpanded ? null : p.id)}
+                        >
+                          {scopeIds.length > 1 && (
+                            <td className="px-4 py-3 text-xs text-muted-foreground hidden sm:table-cell whitespace-nowrap">
+                              {childName ?? '—'}
+                            </td>
+                          )}
+                          <td className="px-4 py-3 font-medium whitespace-nowrap">
+                            {p.member ? `${p.member.first_name} ${p.member.last_name}` : '—'}
                           </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center gap-1">
+                              <Sprout className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                              {culture}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono tabular-nums">
+                            {surface?.toFixed(2) ?? '—'}
+                          </td>
+                          <td className="px-4 py-3 hidden md:table-cell">
+                            {p.soil_type ? (
+                              <Badge className={`text-xs font-normal border-0 ${solClass}`}>{p.soil_type}</Badge>
+                            ) : <span className="text-muted-foreground">—</span>}
+                          </td>
+                          <td className="px-4 py-3 hidden md:table-cell">
+                            <span className={`inline-flex items-center gap-1 text-xs ${irrig === 'Irriguée' ? 'text-blue-700' : 'text-muted-foreground'}`}>
+                              {irrig === 'Irriguée' && <Droplets className="h-3 w-3" />}
+                              {irrig}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right text-muted-foreground hidden lg:table-cell">
+                            {new Date(p.created_at).toLocaleDateString('fr-FR')}
+                          </td>
+                          <td className="px-2 py-3 text-muted-foreground">
+                            <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                          </td>
+                        </tr>
+
+                        {/* Expanded detail panel */}
+                        {isExpanded && (
+                          <tr key={`${p.id}-detail`} className="bg-muted/10">
+                            <td colSpan={scopeIds.length > 1 ? 8 : 7} className="px-4 py-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                                {/* Parcelle details */}
+                                <div>
+                                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                    <MapPin className="h-3.5 w-3.5" />
+                                    Informations de la parcelle
+                                  </h4>
+                                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+                                    <InfoRow label="Nom" value={p.name} />
+                                    <InfoRow label="Culture principale" value={culture} />
+                                    <InfoRow label="Surface (ha)" value={surface != null ? `${surface.toFixed(2)} ha` : null} />
+                                    <InfoRow label="Type de sol" value={p.soil_type} />
+                                    <InfoRow label="Irrigation" value={irrig !== '—' ? irrig : null} />
+                                    <InfoRow label="Campagne" value={p.campaign_year} />
+                                    <InfoRow label="Source" value={p.source} />
+                                    <InfoRow label="Créée le" value={new Date(p.created_at).toLocaleDateString('fr-FR')} />
+                                  </dl>
+
+                                  {/* GPS coordinates */}
+                                  {p.gps_coordinates && (
+                                    <div className="mt-3 flex items-center gap-2 text-xs text-primary">
+                                      <Navigation className="h-3.5 w-3.5 shrink-0" />
+                                      <a
+                                        href={`https://maps.google.com/?q=${encodeURIComponent(p.gps_coordinates)}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="hover:underline font-mono"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        {p.gps_coordinates}
+                                      </a>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Member details */}
+                                {p.member && (
+                                  <div>
+                                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                      <User className="h-3.5 w-3.5" />
+                                      Informations du producteur
+                                    </h4>
+                                    <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+                                      <InfoRow label="Nom complet" value={`${p.member.first_name} ${p.member.last_name}`} />
+                                      <InfoRow label="Téléphone" value={p.member.phone} />
+                                      <InfoRow label="Village" value={p.member.village} />
+                                      <InfoRow label="Canton" value={p.member.canton} />
+                                      <InfoRow label="Préfecture" value={p.member.prefecture} />
+                                      <InfoRow label="Région" value={p.member.region} />
+                                      <InfoRow label="Statut membre" value={p.member.status} />
+                                    </dl>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
                         )}
-                        <td className="px-4 py-3 font-medium whitespace-nowrap">
-                          {p.member ? `${p.member.first_name} ${p.member.last_name}` : '—'}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex items-center gap-1">
-                            <Sprout className="h-3.5 w-3.5 text-green-600 shrink-0" />
-                            {p.culture_name}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono tabular-nums">
-                          {p.surface_ha?.toFixed(2) ?? '—'}
-                        </td>
-                        <td className="px-4 py-3 hidden md:table-cell">
-                          {p.soil_type ? (
-                            <Badge className={`text-xs font-normal border-0 ${solClass}`}>{p.soil_type}</Badge>
-                          ) : <span className="text-muted-foreground">—</span>}
-                        </td>
-                        <td className="px-4 py-3 hidden md:table-cell">
-                          <span className={`inline-flex items-center gap-1 text-xs ${irrig === 'Irriguée' ? 'text-blue-700' : 'text-muted-foreground'}`}>
-                            {irrig === 'Irriguée' && <Droplets className="h-3 w-3" />}
-                            {irrig}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right text-muted-foreground hidden lg:table-cell">
-                          {new Date(p.created_at).toLocaleDateString('fr-FR')}
-                        </td>
-                      </tr>
+                      </>
                     )
                   })}
                 </tbody>
