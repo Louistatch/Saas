@@ -239,7 +239,7 @@ export class KoboSyncService {
   private async retrySubmission(
     submission: Record<string, unknown> & { id: string; kobo_instance_id: string; member_id: string | null; member_card_number: string | null; raw_payload: unknown },
     cooperativeId: string,
-    formType: string,
+    formType: string | null,
     apiToken?: string,
   ): Promise<{ ok: true } | { ok: false; error: string }> {
     const supabase = await this.getSupabase()
