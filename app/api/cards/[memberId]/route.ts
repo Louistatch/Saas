@@ -14,8 +14,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { initWasm, Resvg } from '@resvg/resvg-wasm'
 import { createClient } from '@/lib/supabase/server'
 import { assertTenantAccess } from '@/lib/security/assert-access'
-import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
-import { buildCardSchema, renderToSvgString, loadEmbeddedFontStyle } from '@/lib/card-engine'
+import { buildCardSchema, renderToSvgString } from '@/lib/card-engine'
 
 export const runtime = 'nodejs'
 
@@ -45,11 +44,6 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ memberId: string }> }
 ) {
-  // Rate limit: PNG generation is CPU/WASM heavy (~80ms). Without this an
-  // authenticated user could saturate the runtime by hammering this endpoint.
-  const rateLimited = await applyRateLimit(request, 'embed')
-  if (rateLimited) return rateLimited
-
   const { memberId } = await params
 
   if (!memberId || memberId.length < 10) {
@@ -90,7 +84,7 @@ export async function GET(
   // Fetch member details
   const { data: member } = await supabase
     .from('members')
-    .select('first_name, last_name, phone, photo_url, signature_url, village, canton, prefecture, region')
+    .select('first_name, last_name, phone, photo_url, village, canton, prefecture, region')
     .eq('id', memberId)
     .maybeSingle()
 
@@ -105,24 +99,6 @@ export async function GET(
     .eq('id', card.cooperative_id)
     .maybeSingle()
 
-  // Fetch photo + signature as base64 data URIs (resvg cannot load external URLs)
-  async function urlToDataUri(url: string | null | undefined): Promise<string | null> {
-    if (!url) return null
-    try {
-      const resp = await fetch(url)
-      if (!resp.ok) return null
-      const buf = Buffer.from(await resp.arrayBuffer())
-      const mime = resp.headers.get('content-type') || 'image/jpeg'
-      return `data:${mime};base64,${buf.toString('base64')}`
-    } catch { return null }
-  }
-
-  const [photoDataUrl, signatureDataUrl, fontStyle] = await Promise.all([
-    urlToDataUri(member.photo_url),
-    urlToDataUri(member.signature_url),
-    loadEmbeddedFontStyle(),
-  ])
-
   // Build the card schema
   const schema = buildCardSchema({
     member: {
@@ -130,7 +106,6 @@ export async function GET(
       last_name: member.last_name,
       phone: member.phone,
       photo_url: member.photo_url,
-      signature_url: member.signature_url,
       village: member.village,
       canton: member.canton,
       prefecture: member.prefecture,
@@ -146,8 +121,8 @@ export async function GET(
       : 'bronze',
   })
 
-  // Render SVG with embedded fonts + pre-fetched images (no external URL deps)
-  const svg = renderToSvgString(schema, photoDataUrl, signatureDataUrl, fontStyle)
+  // Render SVG
+  const svg = renderToSvgString(schema)
 
   // Initialize WASM and rasterize to PNG at 2x resolution (2360×1480)
   await ensureWasm()

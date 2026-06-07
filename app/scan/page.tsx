@@ -4,8 +4,6 @@ import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { QrScanner } from '@/components/shared/qr-scanner'
-import { PwaRegister } from '@/components/scan/pwa-register'
-import { SplashScreen } from '@/components/scan/splash-screen'
 import { ArrowLeft, ScanLine } from 'lucide-react'
 
 /**
@@ -21,7 +19,6 @@ import { ArrowLeft, ScanLine } from 'lucide-react'
 export default function ScanPage() {
   const router = useRouter()
   const [error, setError] = useState('')
-  const [scanKey, setScanKey] = useState(0) // Force remount of scanner on retry
 
   const extractCardNumber = (raw: string): string | null => {
     const value = raw.trim()
@@ -45,8 +42,6 @@ export default function ScanPage() {
         router.push(`/verify/${encodeURIComponent(card)}`)
       } else {
         setError('QR code non reconnu. Utilisez une carte FaîtiereHub valide.')
-        // Reset scanner after 2s so user can try again
-        setTimeout(() => { setError(''); setScanKey(k => k + 1) }, 2000)
       }
     },
     [router],
@@ -54,8 +49,6 @@ export default function ScanPage() {
 
   return (
     <main className="scan-root">
-      <SplashScreen />
-      <PwaRegister />
       <div className="scan-glow" aria-hidden />
 
       <header className="scan-header">
@@ -65,7 +58,7 @@ export default function ScanPage() {
         </Link>
         <div className="scan-brand">
           <ScanLine className="h-5 w-5" />
-          <span>FaîtiereHub</span>
+          <span>FaîtiereWeb</span>
         </div>
       </header>
 
@@ -76,7 +69,7 @@ export default function ScanPage() {
           dans le cadre, la vérification démarre toute seule.
         </p>
 
-        <QrScanner key={scanKey} onResult={handleResult} className="scan-cam" />
+        <QrScanner onResult={handleResult} className="scan-cam" />
 
         {error && <p className="scan-error">{error}</p>}
 
@@ -89,39 +82,34 @@ export default function ScanPage() {
       </section>
 
       <style>{`
-        :root {
-          --scan-accent: oklch(0.72 0.18 142);
-          --scan-accent-dim: oklch(0.58 0.14 142);
-          --scan-accent-muted: oklch(0.65 0.10 142);
-        }
         .scan-root {
           min-height: 100dvh; position: relative; overflow: hidden;
-          background: radial-gradient(120% 90% at 20% 0%, oklch(0.40 0.18 142) 0%, oklch(0.22 0.10 142) 45%, oklch(0.12 0.06 142) 100%);
+          background: radial-gradient(120% 90% at 20% 0%, #0f5130 0%, #0a2616 45%, #04120a 100%);
           color: #eafff2; display: flex; flex-direction: column;
           font-family: 'Barlow', system-ui, sans-serif;
         }
         .scan-glow {
           position: absolute; width: 520px; height: 520px; top: -160px; right: -120px;
-          background: radial-gradient(circle, oklch(0.72 0.18 142 / 0.22), transparent 70%);
+          background: radial-gradient(circle, rgba(30,215,96,.22), transparent 70%);
           filter: blur(20px); pointer-events: none;
         }
         .scan-header {
           display: flex; align-items: center; justify-content: space-between;
-          padding: 20px 28px; position: relative; z-index: 2;
+          padding: 20px 22px; position: relative; z-index: 2;
         }
         .scan-back {
-          display: inline-flex; align-items: center; gap: 6px; font-size: 15px;
-          color: var(--scan-accent-muted); text-decoration: none; transition: color .2s;
+          display: inline-flex; align-items: center; gap: 6px; font-size: 14px;
+          color: #b8e8c9; text-decoration: none; transition: color .2s;
         }
         .scan-back:hover { color: #fff; }
         .scan-brand {
           display: inline-flex; align-items: center; gap: 8px; font-weight: 700;
-          letter-spacing: .3px; color: var(--scan-accent);
+          letter-spacing: .3px; color: #4dffa0;
         }
         .scan-body {
           flex: 1; display: flex; flex-direction: column; align-items: center;
-          justify-content: center; text-align: center; padding: 16px 32px 48px;
-          gap: 16px; position: relative; z-index: 2;
+          justify-content: center; text-align: center; padding: 8px 22px 48px;
+          gap: 14px; position: relative; z-index: 2;
           animation: rise .6s cubic-bezier(.2,.7,.2,1) both;
         }
         @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
@@ -129,15 +117,15 @@ export default function ScanPage() {
           font-family: 'Barlow Condensed', sans-serif; font-weight: 800;
           font-size: clamp(28px, 6vw, 40px); margin: 0; line-height: 1.05;
         }
-        .scan-sub { max-width: 440px; color: var(--scan-accent-muted); font-size: 16px; margin: 0 0 6px; }
+        .scan-sub { max-width: 420px; color: #aedcbf; font-size: 15px; margin: 0 0 6px; }
         .scan-cam { margin-top: 6px; }
         .scan-error {
           background: rgba(220,60,60,.14); border: 1px solid rgba(255,120,120,.4);
           color: #ffd2d2; padding: 10px 14px; border-radius: 12px; font-size: 14px;
-          max-width: 440px;
+          max-width: 420px;
         }
-        .scan-hint { color: var(--scan-accent-dim); font-size: 15px; margin-top: 4px; }
-        .scan-link { color: var(--scan-accent); text-decoration: underline; text-underline-offset: 3px; }
+        .scan-hint { color: #8fc6a4; font-size: 14px; margin-top: 4px; }
+        .scan-link { color: #4dffa0; text-decoration: underline; text-underline-offset: 3px; }
       `}</style>
     </main>
   )

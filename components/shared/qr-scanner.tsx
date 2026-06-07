@@ -164,6 +164,7 @@ export function QrScanner({ onResult, onError, className = '' }: QrScannerProps)
                 /* keep scanning */
               }
             } else if (jsQR) {
+              // Downscale for speed on low-end phones (max ~480px on the long side).
               const scale = Math.min(1, 480 / Math.max(w, h))
               const sw = Math.round(w * scale)
               const sh = Math.round(h * scale)

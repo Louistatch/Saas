@@ -11,4 +11,4 @@
 
 export { buildCardSchema, PREVIEW_SCHEMA } from './schema'
 export type { CardSchema } from './schema'
-export { renderToCanvas, renderToPng, downloadCard, renderToDataUrl, renderToSvgString, loadEmbeddedFontStyle } from './renderer'
+export { renderToCanvas, renderToPng, downloadCard, renderToDataUrl, renderToSvgString } from './renderer'

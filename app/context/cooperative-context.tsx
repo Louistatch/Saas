@@ -137,26 +137,6 @@ export function CooperativeProvider({ children }: { children: React.ReactNode })
     fetchCooperatives()
   }, [fetchCooperatives])
 
-  // Realtime: auto-add cooperatives inserted by KoboCollect webhooks
-  useEffect(() => {
-    if (!user) return
-    const channel = supabase
-      .channel('cooperatives-realtime')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'cooperatives' },
-        (payload) => {
-          const newCoop = rowToCooperative(payload.new as CooperativeRow)
-          setCooperatives((prev) => {
-            if (prev.find((c) => c.id === newCoop.id)) return prev
-            return [...prev, newCoop].sort((a, b) => a.name.localeCompare(b.name))
-          })
-        },
-      )
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [user, supabase])
-
   const switchCooperative = useCallback(
     (cooperativeId: string) => {
       const coop = cooperatives.find((c) => c.id === cooperativeId)

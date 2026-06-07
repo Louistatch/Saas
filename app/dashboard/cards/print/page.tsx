@@ -32,7 +32,7 @@ export default function PrintCardsPage() {
 
     let query = supabase
       .from('member_cards')
-      .select('*, member:members(first_name, last_name, phone, photo_url, signature_url, prefecture, region, village, canton, faitiere)')
+      .select('*, member:members(first_name, last_name, phone, photo_url, prefecture, region, village, canton, faitiere)')
       .eq('status', 'active')
 
     // For faitiere/union: load cards from all child cooperatives
@@ -149,7 +149,6 @@ function MiniCardSvg({
         last_name: card.member?.last_name ?? '',
         phone: card.member?.phone,
         photo_url: card.member?.photo_url,
-        signature_url: card.member?.signature_url,
         village: card.member?.village,
         canton: card.member?.canton,
         prefecture: card.member?.prefecture,

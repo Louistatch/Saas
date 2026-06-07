@@ -37,7 +37,6 @@ export interface CardSchema {
     lastName: string
     phone: string
     photoUrl: string | null
-    signatureUrl?: string | null
     locality: string
     cardNumber: string
     expiryDate: string
@@ -84,7 +83,6 @@ export function buildCardSchema(opts: {
     last_name: string
     phone?: string | null
     photo_url?: string | null
-    signature_url?: string | null
     village?: string | null
     canton?: string | null
     prefecture?: string | null
@@ -136,7 +134,6 @@ export function buildCardSchema(opts: {
       lastName: opts.member.last_name ?? '',
       phone: opts.member.phone ?? '',
       photoUrl: opts.member.photo_url ?? null,
-      signatureUrl: opts.member.signature_url ?? null,
       locality,
       cardNumber: opts.cardNumber,
       expiryDate: opts.expiryDate ?? '',

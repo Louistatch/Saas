@@ -92,7 +92,6 @@ export function CardSvgPreview({
         last_name: lastName,
         phone,
         photo_url: photoUrl,
-        signature_url: signatureUrl,
         village,
         canton,
         prefecture,
@@ -107,7 +106,7 @@ export function CardSvgPreview({
       accentColor: template?.accentColor,
       template,
     })
-    return renderToSvgString(schema, photoDataUrl, signatureDataUrl)
+    return renderToSvgString(schema, photoDataUrl)
   }, [firstName, lastName, phone, photoUrl, signatureUrl, photoDataUrl, signatureDataUrl, village, canton, prefecture, region, cardNumber, expiryDate, createdAt, cooperativeName, faitiereName, level, template])
 
   return (
