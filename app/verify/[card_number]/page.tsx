@@ -7,7 +7,7 @@ import {
   CheckCircle, XCircle, Shield, MapPin, Building2,
   FileText, TrendingUp, PhoneCall, Map, CloudRain,
   ShoppingCart, Coins, Timer, User, ArrowLeft, Bot,
-  Bell, Droplets, Share2,
+  Bell, Droplets, Share2, ChevronRight,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/logo'
 import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboard'
@@ -70,10 +70,6 @@ interface VerifyResult {
   error?: string
 }
 
-interface ServiceItem {
-  icon: typeof CheckCircle; title: string; description: string
-  available: boolean; action?: () => void; highlight?: boolean; gradient: string
-}
 
 export default function VerifyCardPage() {
   const params = useParams()
@@ -353,30 +349,15 @@ export default function VerifyCardPage() {
   const greetHour = new Date().getHours()
   const greeting = greetHour < 12 ? 'Bonjour' : greetHour < 18 ? 'Bon après-midi' : 'Bonsoir'
 
-  const services: ServiceItem[] = [
-    { icon: Shield, title: 'Vérification', description: 'Détails de ma carte', available: true, action: () => setActiveView('identity'), gradient: 'from-[var(--vfp-accent)]/20 to-[var(--vfp-accent)]/5' },
-    { icon: FileText, title: 'Mon Exploitation', description: 'Fiches techniques', available: true, action: () => setActiveView('exploitation'), gradient: 'from-cyan-500/20 to-cyan-700/5' },
-    { icon: TrendingUp, title: 'Prix du Marché', description: 'Cours en temps réel', available: true, action: () => setActiveView('prices'), gradient: 'from-violet-500/20 to-violet-700/5' },
-    { icon: Bot, title: 'Assistant IA', description: 'Conseils & prévisions', available: true, highlight: true, action: () => setActiveView('ai'), gradient: 'from-amber-400/20 to-amber-600/5' },
-    { icon: PhoneCall, title: 'Mon Technicien', description: 'Appel & WhatsApp', available: true, action: () => setActiveView('technicien'), gradient: 'from-teal-500/20 to-teal-700/5' },
-    { icon: Droplets, title: 'AgriSmart', description: 'Besoins en eau', available: true, action: () => setActiveView('agrismart'), gradient: 'from-blue-400/20 to-cyan-600/5' },
-    { icon: Map, title: 'Parcelles GPS', description: 'Mes parcelles agricoles', available: true, action: () => setActiveView('parcelles'), gradient: 'from-emerald-500/20 to-emerald-700/5' },
-    {
-      icon: FileText, title: 'Mon Attestation', description: 'Télécharger PDF officiel', available: true, gradient: 'from-violet-500/20 to-violet-700/5',
-      action: () => {
-        if (!result.member_id) return
-        const path = `/reports/attestation/${result.member_id}`
-        if (typeof navigator !== 'undefined' && navigator.share) {
-          navigator.share({ title: 'Mon Attestation Agricole — FaîtiereHub', url: window.location.origin + path }).catch(() => window.open(path, '_blank'))
-        } else {
-          window.open(path, '_blank')
-        }
-      },
-    },
-    { icon: ShoppingCart, title: 'Intrants', description: 'Semences & engrais', available: true, action: () => setActiveView('intrants'), gradient: 'from-orange-500/20 to-orange-700/5' },
-    { icon: Coins, title: 'Cotisation', description: 'Statut & campagne', available: true, action: () => setActiveView('cotisation'), gradient: 'from-yellow-500/20 to-yellow-700/5' },
-    { icon: CloudRain, title: 'Météo Agricole', description: 'Conditions & prévisions', available: true, action: () => setActiveView('meteo'), gradient: 'from-sky-500/20 to-sky-700/5' },
-  ]
+  const handleAttestation = () => {
+    if (!result.member_id) return
+    const path = `/reports/attestation/${result.member_id}`
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      navigator.share({ title: 'Mon Attestation Agricole — FaîtiereHub', url: window.location.origin + path }).catch(() => window.open(path, '_blank'))
+    } else {
+      window.open(path, '_blank')
+    }
+  }
 
   return (
     <div className="min-h-screen vfp-bg relative overflow-hidden" style={{ isolation: 'isolate' }}>
@@ -502,32 +483,146 @@ export default function VerifyCardPage() {
 
         {/* ─── Services Grid (2 cols) ─── */}
         {isValid && activeView === 'menu' && (
-          <section className={`transition-all duration-700 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`} style={{ transitionDelay: '300ms' }}>
-            <div className="flex items-center justify-between mb-3 px-1">
+          <section className={`space-y-4 transition-all duration-700 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`} style={{ transitionDelay: '300ms' }}>
+
+            {/* Section header */}
+            <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--vfp-accent)]" />
                 <h3 className="text-white font-semibold text-[15px]">Mes services</h3>
               </div>
-              <span className="text-white/40 text-sm">Tout ce dont vous avez besoin.</span>
+              <span className="text-white/40 text-xs">Tout ce dont vous avez besoin</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5">
-              {services.map((s, i) => {
-                const Icon = s.icon
-                return (
-                  <button key={i} onClick={s.action} className={`vfp-card group text-left rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px] ${!s.available ? 'opacity-40' : ''}`} disabled={!s.available}>
-                    <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${s.gradient} flex items-center justify-center mb-2.5 group-active:scale-90 transition-transform`}>
-                      <Icon className={`h-5 w-5 ${s.highlight ? 'text-amber-300' : s.available ? 'text-[var(--vfp-accent-bright)]' : 'text-white/30'}`} />
-                    </div>
-                    <p className={`font-semibold text-sm leading-tight mb-0.5 ${s.available ? 'text-white' : 'text-white/40'}`}>{s.title}</p>
-                    <p className={`text-xs leading-snug ${s.highlight ? 'text-amber-300/50' : 'text-white/30'}`}>{s.description}</p>
-                    {!s.available && (
-                      <span className="mt-1.5 px-2 py-0.5 rounded-full bg-white/5 text-white/25 text-[10px] font-bold uppercase">Bientôt</span>
-                    )}
-                  </button>
-                )
-              })}
+            {/* ① Featured — Assistant IA AgriTogo */}
+            <button
+              onClick={() => setActiveView('ai')}
+              className="w-full group relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-500/20 via-amber-600/10 to-orange-700/5 border border-amber-400/20 p-5 text-left active:scale-[0.98] transition-transform"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-400/5 to-transparent opacity-0 group-active:opacity-100 transition-opacity" />
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] font-bold tracking-widest text-amber-400/70 uppercase">Recommandé</span>
+                    <span className="w-1 h-1 rounded-full bg-amber-400 animate-pulse" />
+                  </div>
+                  <p className="text-white font-bold text-lg leading-tight">Assistant IA</p>
+                  <p className="text-amber-300/60 text-sm mt-0.5">AgriTogo — Conseils, prix, prévisions</p>
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {['Maladies', 'Intrants', 'Rendement', 'Météo'].map(tag => (
+                      <span key={tag} className="px-2 py-0.5 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-300/70 text-[10px] font-medium">{tag}</span>
+                    ))}
+                  </div>
+                </div>
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400/30 to-orange-500/20 flex items-center justify-center border border-amber-400/20 shrink-0 group-active:scale-90 transition-transform">
+                  <Bot className="h-7 w-7 text-amber-300" />
+                </div>
+              </div>
+              <div className="flex items-center gap-1 mt-4 text-amber-400/60 text-xs font-medium">
+                <span>Démarrer une conversation</span>
+                <ChevronRight className="h-3 w-3" />
+              </div>
+            </button>
+
+            {/* ② Quick row — Prix, Météo, AgriSmart */}
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { icon: TrendingUp, label: 'Marchés', sub: 'Cours live', view: 'prices', color: 'text-violet-300', bg: 'from-violet-500/20 to-violet-700/5', border: 'border-violet-400/15' },
+                { icon: CloudRain, label: 'Météo', sub: 'Prévisions', view: 'meteo', color: 'text-sky-300', bg: 'from-sky-500/20 to-sky-700/5', border: 'border-sky-400/15' },
+                { icon: Droplets, label: 'AgriSmart', sub: 'Irrigation', view: 'agrismart', color: 'text-cyan-300', bg: 'from-cyan-400/20 to-cyan-600/5', border: 'border-cyan-400/15' },
+              ].map(({ icon: Icon, label, sub, view, color, bg, border }) => (
+                <button
+                  key={view}
+                  onClick={() => setActiveView(view as typeof activeView)}
+                  className={`group vfp-card rounded-2xl p-3 flex flex-col items-center text-center gap-2 border ${border} active:scale-95 transition-transform`}
+                >
+                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${bg} flex items-center justify-center group-active:scale-90 transition-transform`}>
+                    <Icon className={`h-5 w-5 ${color}`} />
+                  </div>
+                  <div>
+                    <p className="text-white text-xs font-semibold leading-tight">{label}</p>
+                    <p className="text-white/30 text-[10px]">{sub}</p>
+                  </div>
+                </button>
+              ))}
             </div>
+
+            {/* ③ Mon Exploitation */}
+            <div>
+              <p className="text-white/40 text-[11px] font-semibold uppercase tracking-wider px-1 mb-2">Mon Exploitation</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { icon: Map, label: 'Parcelles GPS', sub: 'Mes parcelles agricoles', view: 'parcelles', color: 'text-emerald-300', bg: 'from-emerald-500/20 to-emerald-700/5', border: 'border-emerald-400/15' },
+                  { icon: ShoppingCart, label: 'Intrants', sub: 'Semences & engrais', view: 'intrants', color: 'text-orange-300', bg: 'from-orange-500/20 to-orange-700/5', border: 'border-orange-400/15' },
+                  { icon: FileText, label: 'Mon Exploitation', sub: 'Fiches techniques', view: 'exploitation', color: 'text-cyan-300', bg: 'from-cyan-500/20 to-cyan-700/5', border: 'border-cyan-400/15' },
+                  { icon: Coins, label: 'Cotisation', sub: 'Statut & campagne', view: 'cotisation', color: 'text-yellow-300', bg: 'from-yellow-500/20 to-yellow-700/5', border: 'border-yellow-400/15' },
+                ].map(({ icon: Icon, label, sub, view, color, bg, border }) => (
+                  <button
+                    key={view}
+                    onClick={() => setActiveView(view as typeof activeView)}
+                    className={`group vfp-card rounded-2xl p-4 flex items-center gap-3 text-left border ${border} active:scale-95 transition-transform`}
+                  >
+                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${bg} flex items-center justify-center shrink-0 group-active:scale-90 transition-transform`}>
+                      <Icon className={`h-5 w-5 ${color}`} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-white text-sm font-semibold leading-tight truncate">{label}</p>
+                      <p className="text-white/30 text-[10px] mt-0.5 truncate">{sub}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ④ Ma Carte Membre */}
+            <div>
+              <p className="text-white/40 text-[11px] font-semibold uppercase tracking-wider px-1 mb-2">Ma Carte Membre</p>
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setActiveView('identity')}
+                    className="group vfp-card rounded-2xl p-4 flex items-center gap-3 text-left border border-[var(--vfp-accent)]/15 active:scale-95 transition-transform"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--vfp-accent)]/20 to-[var(--vfp-accent)]/5 flex items-center justify-center shrink-0 group-active:scale-90 transition-transform">
+                      <Shield className="h-5 w-5 text-[var(--vfp-accent-bright)]" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-white text-sm font-semibold leading-tight">Vérification</p>
+                      <p className="text-white/30 text-[10px] mt-0.5">Détails carte</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setActiveView('technicien')}
+                    className="group vfp-card rounded-2xl p-4 flex items-center gap-3 text-left border border-teal-400/15 active:scale-95 transition-transform"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500/20 to-teal-700/5 flex items-center justify-center shrink-0 group-active:scale-90 transition-transform">
+                      <PhoneCall className="h-5 w-5 text-teal-300" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-white text-sm font-semibold leading-tight">Technicien</p>
+                      <p className="text-white/30 text-[10px] mt-0.5">Appel & WhatsApp</p>
+                    </div>
+                  </button>
+                </div>
+                {/* Attestation — full width, prominent */}
+                <button
+                  onClick={handleAttestation}
+                  className="w-full group vfp-card rounded-2xl p-4 flex items-center justify-between border border-violet-400/15 active:scale-[0.98] transition-transform"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/20 to-violet-700/5 flex items-center justify-center shrink-0 group-active:scale-90 transition-transform">
+                      <Share2 className="h-5 w-5 text-violet-300" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-white text-sm font-semibold leading-tight">Mon Attestation</p>
+                      <p className="text-white/30 text-[10px] mt-0.5">Télécharger le PDF officiel</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-violet-300/50 shrink-0" />
+                </button>
+              </div>
+            </div>
+
           </section>
         )}
 
