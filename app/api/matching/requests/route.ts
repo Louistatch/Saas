@@ -16,12 +16,24 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
     }
 
-    const { data, error } = await supabase
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, cooperative_id')
+      .eq('id', user.id)
+      .single()
+
+    let query = supabase
       .from('buyer_requests')
       .select(
         'id, buyer_name, buyer_phone, buyer_email, culture, quantity_kg_needed, max_price_per_kg_fcfa, quality_grade_min, location_prefecture, needed_by, status, notes, created_at, cooperative_id, buyer_matches(id)',
       )
       .order('created_at', { ascending: false })
+
+    if (profile?.role !== 'super_admin' && profile?.cooperative_id) {
+      query = query.eq('cooperative_id', profile.cooperative_id)
+    }
+
+    const { data, error } = await query
 
     if (error) {
       return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })

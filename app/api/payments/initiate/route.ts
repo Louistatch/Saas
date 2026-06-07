@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { initiateOrangeMoneyPayment, generatePaymentReference } from '@/lib/payments/orange-money'
 import { assertTenantAccess } from '@/lib/security/assert-access'
 
-interface InitiateBody {
-  member_id: string
-  cotisation_id?: string
-  amount_fcfa: number
-  phone: string
-  provider: string
-  cooperative_id: string
-}
-
-const PHONE_RE = /^\+?[0-9]{8,15}$/
+const paymentInitiateSchema = z.object({
+  member_id: z.string().uuid(),
+  cooperative_id: z.string().uuid(),
+  cotisation_id: z.string().uuid().optional(),
+  amount_fcfa: z.number().int().min(1).max(10_000_000),
+  phone: z.string().regex(/^\+?[0-9]{8,15}$/).optional(),
+  provider: z.enum(['cash', 'orange_money', 'moov', 'tmoney']),
+})
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const supabase = await createClient()
@@ -21,33 +20,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  let body: unknown
+  let raw: unknown
   try {
-    body = await req.json()
+    raw = await req.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const {
-    member_id,
-    cotisation_id,
-    amount_fcfa,
-    phone,
-    provider,
-    cooperative_id,
-  } = body as InitiateBody
+  const parsed = paymentInitiateSchema.safeParse(raw)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid payload' }, { status: 400 })
+  }
+
+  const { member_id, cotisation_id, amount_fcfa, phone, provider, cooperative_id } = parsed.data
 
   const tenantCheck = await assertTenantAccess(cooperative_id)
   if (!tenantCheck.ok) return tenantCheck.response
 
-  if (!member_id || !cooperative_id || !provider) {
-    return NextResponse.json({ error: 'member_id, cooperative_id and provider are required' }, { status: 400 })
-  }
-  if (typeof amount_fcfa !== 'number' || amount_fcfa <= 0) {
-    return NextResponse.json({ error: 'amount_fcfa must be a positive number' }, { status: 400 })
-  }
-  if (provider !== 'cash' && (!phone || !PHONE_RE.test(phone))) {
-    return NextResponse.json({ error: 'Invalid phone number format' }, { status: 400 })
+  if (provider !== 'cash' && !phone) {
+    return NextResponse.json({ error: 'Phone required for non-cash payment' }, { status: 400 })
   }
 
   const reference = generatePaymentReference('PAY')
@@ -95,7 +86,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   if (provider === 'orange_money') {
     const result = await initiateOrangeMoneyPayment({
-      phone,
+      phone: phone!,
       amount: amount_fcfa,
       reference,
       description: `Paiement cotisation — réf. ${reference}`,
