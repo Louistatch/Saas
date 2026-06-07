@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/notifications",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/weather-sync",
+      "schedule": "0 6 * * *"
     }
   ]
 }
