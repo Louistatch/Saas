@@ -1,3 +1,48 @@
+import { MAX_CSV_IMPORT_SIZE_BYTES } from '@/lib/constants'
+
+/** MIME types that browsers commonly report for .csv files. */
+const ACCEPTED_CSV_MIME_TYPES = new Set([
+  'text/csv',
+  'application/vnd.ms-excel',
+  'text/plain',
+  'application/csv',
+  'text/x-csv',
+  'application/x-csv',
+  '', // some browsers/OSes send an empty type for .csv
+])
+
+/**
+ * Validate that a File looks like a CSV: correct extension, a plausible
+ * MIME type (clearly non-CSV types like images or executables are rejected),
+ * and a reasonable size. Returns an error message in French, or null if OK.
+ */
+export function validateCsvFile(file: File): string | null {
+  const name = file.name.toLowerCase()
+  if (!name.endsWith('.csv')) {
+    return 'Le fichier doit être au format CSV (.csv)'
+  }
+  if (file.type && !ACCEPTED_CSV_MIME_TYPES.has(file.type.toLowerCase())) {
+    return 'Type de fichier invalide : seuls les fichiers CSV sont acceptés'
+  }
+  if (file.size > MAX_CSV_IMPORT_SIZE_BYTES) {
+    return `Le fichier ne doit pas dépasser ${Math.floor(MAX_CSV_IMPORT_SIZE_BYTES / (1024 * 1024))} Mo`
+  }
+  return null
+}
+
+/**
+ * Neutralize potential CSV/Excel formula injection by prefixing cell values
+ * that start with =, +, -, @ (or tab/CR) with an apostrophe so spreadsheet
+ * applications treat them as plain text rather than formulas.
+ */
+export function sanitizeCsvCell(value: string | undefined): string | undefined {
+  if (value == null) return value
+  if (/^[=+\-@\t\r]/.test(value)) {
+    return `'${value}`
+  }
+  return value
+}
+
 /**
  * Minimal RFC 4180-ish CSV parser.
  * Supports quoted fields, escaped quotes, and \r\n / \n line endings.
@@ -64,7 +109,7 @@ export function parseCsvWithHeaders<T extends Record<string, string | undefined>
     const obj: Record<string, string | undefined> = {}
     grid[i].forEach((value, idx) => {
       const key = headers[idx]
-      if (key) obj[key] = value === '' ? undefined : value
+      if (key) obj[key] = sanitizeCsvCell(value === '' ? undefined : value)
     })
     rows.push(obj as T)
   }

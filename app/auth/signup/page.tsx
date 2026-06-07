@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowLeft, Send, CheckCircle2 } from 'lucide-react'
 import { Spinner } from '@/components/shared/loading'
+import { accessRequestSchema, flattenZodErrors } from '@/lib/validators/schemas'
 
 /**
  * Signup page — replaced by a "Request Access" form.
@@ -30,26 +31,31 @@ export default function SignupPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.organizationName || !formData.contactName || !formData.phone) {
-      setError('Veuillez remplir les champs obligatoires')
+    setError('')
+    setFieldErrors({})
+
+    const parsed = accessRequestSchema.safeParse(formData)
+    if (!parsed.success) {
+      setFieldErrors(flattenZodErrors(parsed.error))
       return
     }
+
     setSubmitting(true)
-    setError('')
     try {
       const res = await fetch('/api/contact-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: formData.contactName,
-          email: formData.email || `${formData.phone}@faitierehub.com`,
-          phone: formData.phone,
-          organization: formData.organizationName,
-          type: formData.type,
-          message: formData.message || `Demande d'accès - ${formData.type} - ${formData.organizationName}`,
+          name: parsed.data.contactName,
+          email: parsed.data.email || `${parsed.data.phone}-${crypto.randomUUID().slice(0, 8)}@faitierehub.com`,
+          phone: parsed.data.phone,
+          organization: parsed.data.organizationName,
+          type: parsed.data.type,
+          message: parsed.data.message || `Demande d'accès - ${parsed.data.type} - ${parsed.data.organizationName}`,
         }),
       })
       if (res.ok) {
@@ -139,6 +145,9 @@ export default function SignupPage() {
                     <option value="union">Union régionale</option>
                     <option value="cooperative">Coopérative</option>
                   </select>
+                  {fieldErrors.type && (
+                    <p className="text-xs text-destructive">{fieldErrors.type}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -148,8 +157,12 @@ export default function SignupPage() {
                     placeholder="Ex: FENOMAT, FNGPC..."
                     value={formData.organizationName}
                     onChange={(e) => setFormData(f => ({ ...f, organizationName: e.target.value }))}
+                    aria-invalid={!!fieldErrors.organizationName}
                     required
                   />
+                  {fieldErrors.organizationName && (
+                    <p className="text-xs text-destructive">{fieldErrors.organizationName}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -159,8 +172,12 @@ export default function SignupPage() {
                     placeholder="Prénom et nom"
                     value={formData.contactName}
                     onChange={(e) => setFormData(f => ({ ...f, contactName: e.target.value }))}
+                    aria-invalid={!!fieldErrors.contactName}
                     required
                   />
+                  {fieldErrors.contactName && (
+                    <p className="text-xs text-destructive">{fieldErrors.contactName}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -171,8 +188,12 @@ export default function SignupPage() {
                     placeholder="+228 90 XX XX XX"
                     value={formData.phone}
                     onChange={(e) => setFormData(f => ({ ...f, phone: e.target.value }))}
+                    aria-invalid={!!fieldErrors.phone}
                     required
                   />
+                  {fieldErrors.phone && (
+                    <p className="text-xs text-destructive">{fieldErrors.phone}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -183,7 +204,11 @@ export default function SignupPage() {
                     placeholder="contact@organisation.tg"
                     value={formData.email}
                     onChange={(e) => setFormData(f => ({ ...f, email: e.target.value }))}
+                    aria-invalid={!!fieldErrors.email}
                   />
+                  {fieldErrors.email && (
+                    <p className="text-xs text-destructive">{fieldErrors.email}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -195,6 +220,9 @@ export default function SignupPage() {
                     onChange={(e) => setFormData(f => ({ ...f, message: e.target.value }))}
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px] resize-none"
                   />
+                  {fieldErrors.message && (
+                    <p className="text-xs text-destructive">{fieldErrors.message}</p>
+                  )}
                 </div>
 
                 {error && (

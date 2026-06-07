@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { PaginationBar } from '@/components/shared/pagination'
 import { errorMessage } from '@/lib/utils/errors'
+import { buildCotisationSchema, flattenZodErrors } from '@/lib/validators/schemas'
 
 interface Cotisation {
   id: string
@@ -76,6 +77,7 @@ export default function CotisationsPage() {
   // Dialog
   const [showAdd, setShowAdd] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [form, setForm] = useState({
     member_id: '',
     amount: '1000',
@@ -153,20 +155,28 @@ export default function CotisationsPage() {
 
   // Add cotisation
   const handleAdd = async () => {
-    if (!currentCooperative || !form.member_id || !form.amount) {
-      toast({ title: 'Membre et montant obligatoires', variant: 'destructive' })
+    if (!currentCooperative) return
+
+    setFieldErrors({})
+    // This dialog only creates new cotisations (no edit mode), so past due
+    // dates are not allowed here.
+    const schema = buildCotisationSchema(false)
+    const parsed = schema.safeParse(form)
+    if (!parsed.success) {
+      setFieldErrors(flattenZodErrors(parsed.error))
       return
     }
+
     setSaving(true)
     const { error } = await supabase.from('cotisations').insert({
       cooperative_id: currentCooperative.id,
-      member_id: form.member_id,
-      amount: parseFloat(form.amount),
-      type: form.type,
+      member_id: parsed.data.member_id,
+      amount: parsed.data.amount,
+      type: parsed.data.type,
       status: 'pending',
-      campaign: form.campaign || null,
-      due_date: form.due_date || null,
-      notes: form.notes || null,
+      campaign: parsed.data.campaign || null,
+      due_date: parsed.data.due_date || null,
+      notes: parsed.data.notes || null,
     })
     setSaving(false)
     if (error) {
@@ -175,6 +185,7 @@ export default function CotisationsPage() {
     }
     toast({ title: 'Cotisation enregistrée' })
     setShowAdd(false)
+    setFieldErrors({})
     setForm({ member_id: '', amount: '1000', type: 'cotisation', campaign: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`, due_date: '', notes: '' })
     fetchCotisations()
   }
@@ -350,7 +361,7 @@ export default function CotisationsPage() {
       </Card>
 
       {/* Add dialog */}
-      <Dialog open={showAdd} onOpenChange={setShowAdd}>
+      <Dialog open={showAdd} onOpenChange={(open) => { setShowAdd(open); if (!open) setFieldErrors({}) }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Nouvelle cotisation</DialogTitle>
@@ -369,11 +380,17 @@ export default function CotisationsPage() {
                   <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
                 ))}
               </select>
+              {fieldErrors.member_id && (
+                <p className="text-xs text-destructive">{fieldErrors.member_id}</p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Montant (FCFA) <span className="text-destructive">*</span></Label>
-                <Input type="number" value={form.amount} onChange={(e) => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="1000" />
+                <Input type="number" min="0" step="any" value={form.amount} onChange={(e) => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="1000" aria-invalid={!!fieldErrors.amount} />
+                {fieldErrors.amount && (
+                  <p className="text-xs text-destructive">{fieldErrors.amount}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Type</Label>
@@ -395,7 +412,10 @@ export default function CotisationsPage() {
               </div>
               <div className="space-y-2">
                 <Label>Date d'échéance</Label>
-                <Input type="date" value={form.due_date} onChange={(e) => setForm(f => ({ ...f, due_date: e.target.value }))} />
+                <Input type="date" value={form.due_date} onChange={(e) => setForm(f => ({ ...f, due_date: e.target.value }))} aria-invalid={!!fieldErrors.due_date} />
+                {fieldErrors.due_date && (
+                  <p className="text-xs text-destructive">{fieldErrors.due_date}</p>
+                )}
               </div>
             </div>
             <div className="space-y-2">
