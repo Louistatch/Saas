@@ -24,6 +24,7 @@ import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 import { parseQuery } from '@/lib/agritogo/nlp-router'
 import { tryDirectAction } from '@/lib/agritogo/direct-actions'
+import { buildProducerContext } from '@/lib/agritogo/producer-context'
 import { getGeminiKey, rotateGeminiKey, getKeyCount, markKeyExhausted, getRecoveryWaitMs, allKeysExhausted } from '@/lib/utils/gemini-keys'
 import { createLogger } from '@/lib/utils/logger'
 
@@ -132,90 +133,19 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = await createClient()
+  const supabaseAdmin = createAdminClient()
   let lastError = ''
 
-  // Resolve producer context — FAITIERE cards only; OUVRIER/ACHETEUR/AGRONOME
-  // cards live in AgriTogo and have no Supabase record, so we gracefully
-  // continue with empty context (the AgriTogo path above handles those).
-  const { data: card } = await supabase
-    .from('member_cards')
-    .select('member_id, cooperative_id')
+  // Build rich producer context (parcelles, cotisations, météo, prix, fiches, paiements, annonces)
+  const { systemPrompt } = await buildProducerContext(cardNumber, supabase, supabaseAdmin)
+
+  // Conversation history
+  const { data: history } = await supabaseAdmin
+    .from('ai_conversations')
+    .select('role, content')
     .eq('card_number', cardNumber)
-    .eq('status', 'active')
-    .maybeSingle()
-
-  const { data: member } = card?.member_id ? await supabase
-    .from('members')
-    .select('first_name, last_name, region, canton, prefecture, village')
-    .eq('id', card.member_id)
-    .maybeSingle() : { data: null }
-
-  const { data: coop } = card?.cooperative_id ? await supabase
-    .from('cooperatives')
-    .select('name, faitiere_name')
-    .eq('id', card.cooperative_id)
-    .maybeSingle() : { data: null }
-
-  // Load market prices for context
-  let pricesContext = 'Aucun prix disponible.'
-  const regionName = member?.region ?? null
-  if (regionName) {
-    const { data: regionRow } = await supabase
-      .from('regions').select('id').eq('name', regionName).maybeSingle()
-    if (regionRow) {
-      const { data: prices } = await supabase
-        .from('market_prices')
-        .select('market_name, price, unit, currency, created_at, culture:cultures(name)')
-        .eq('region_id', regionRow.id)
-        .order('created_at', { ascending: false })
-        .limit(20)
-      if (prices && prices.length > 0) {
-        pricesContext = prices.map((p) => {
-          const cn = Array.isArray(p.culture) ? (p.culture[0] as { name?: string })?.name : (p.culture as { name?: string } | null)?.name
-          return `${cn ?? '?'}: ${p.price} ${p.currency}/${p.unit} à ${p.market_name}`
-        }).join('\n')
-      }
-    }
-  }
-
-  // Load parcelles, cotisation, and conversation history in parallel
-  const supabaseAdmin = createAdminClient()
-
-  const [{ data: parcelles }, { data: cotisations }, { data: history }] = await Promise.all([
-    card?.member_id
-      ? supabaseAdmin.from('parcelles').select('name, culture_principale, superficie_ha').eq('member_id', card.member_id).limit(10)
-      : Promise.resolve({ data: null }),
-    card?.member_id
-      ? supabaseAdmin.from('cotisations').select('campaign, status, amount').eq('member_id', card.member_id).order('created_at', { ascending: false }).limit(3)
-      : Promise.resolve({ data: null }),
-    supabaseAdmin.from('ai_conversations').select('role, content').eq('card_number', cardNumber).order('created_at', { ascending: true }).limit(MAX_HISTORY),
-  ])
-
-  const parcellesContext = parcelles && parcelles.length > 0
-    ? parcelles.map(p => `• ${p.name ?? 'Parcelle'}: ${p.culture_principale ?? '?'}, ${p.superficie_ha ?? '?'} ha`).join('\n')
-    : 'Aucune parcelle enregistrée.'
-
-  const cotisationContext = cotisations && cotisations.length > 0
-    ? cotisations.map(c => `• Campagne ${c.campaign ?? '?'}: ${c.status === 'paid' ? 'Payée ✓' : c.status === 'waived' ? 'Exonérée' : c.status === 'overdue' ? '⚠️ En retard' : 'En attente'}${c.amount ? ` — ${c.amount.toLocaleString('fr-FR')} XOF` : ''}`).join('\n')
-    : 'Aucune cotisation enregistrée.'
-
-  const systemPrompt = `Tu es AgriTogo, l'assistant agricole intelligent de FaîtiereHub pour les coopératives du Togo.
-
-CONTEXTE DU PRODUCTEUR :
-- Nom : ${member?.first_name ?? ''} ${member?.last_name ?? ''}
-- Village : ${member?.village ?? 'non renseigné'}, Canton : ${member?.canton ?? '?'}, Région : ${member?.region ?? '?'}
-- Coopérative : ${coop?.name ?? '?'}, Faîtière : ${coop?.faitiere_name ?? '?'}
-
-PARCELLES AGRICOLES :
-${parcellesContext}
-
-COTISATIONS :
-${cotisationContext}
-
-PRIX DU MARCHÉ :
-${pricesContext}
-
-RÈGLES : Français, concis (3-5 phrases), basé sur les données réelles du producteur, honnête si tu ne sais pas, pas de conseils médicaux/juridiques. Si le producteur a une cotisation en retard, rappelle-le avec bienveillance.`
+    .order('created_at', { ascending: true })
+    .limit(MAX_HISTORY)
 
   const geminiHistory = (history ?? []).map((h) => ({
     role: h.role === 'assistant' ? ('model' as const) : ('user' as const),

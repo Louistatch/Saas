@@ -70,6 +70,13 @@ export const rateLimiters = redis
         prefix: 'rl:ai-vision',
       }),
 
+      // AI voice : 15/minute per IP — audio processing, similar cost to vision
+      'ai-voice': new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(15, '60 s'),
+        prefix: 'rl:ai-voice',
+      }),
+
       // Kobo sync manuelle : 5/minute — anti-spam déclenchement manuel
       'kobo-sync': new Ratelimit({
         redis,
@@ -86,7 +93,7 @@ export const rateLimiters = redis
  */
 export async function applyRateLimit(
   request: NextRequest,
-  limiter: 'verify' | 'marketplace' | 'embed' | 'auth' | 'webhook' | 'ai-chat' | 'ai-vision' | 'kobo-sync'
+  limiter: 'verify' | 'marketplace' | 'embed' | 'auth' | 'webhook' | 'ai-chat' | 'ai-vision' | 'ai-voice' | 'kobo-sync'
 ): Promise<NextResponse | null> {
   if (!rateLimiters) {
     // Upstash not configured — fall through to in-memory rate limiter in route handlers
