@@ -56,7 +56,32 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
 
   useEffect(() => {
     fetchNotifications()
-  }, [fetchNotifications])
+
+    if (!cooperativeId) return
+
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`notifications:${cooperativeId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications_inapp',
+          filter: `cooperative_id=eq.${cooperativeId}`,
+        },
+        (payload) => {
+          setNotifications((prev) =>
+            [payload.new as InAppNotification, ...prev].slice(0, 20)
+          )
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [fetchNotifications, cooperativeId])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -71,16 +96,20 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
 
   const markAsRead = useCallback(
     async (id: string) => {
-      const supabase = createClient()
-      const now = new Date().toISOString()
-      await supabase
-        .from('notifications_inapp')
-        .update({ read_at: now })
-        .eq('id', id)
-        .eq('cooperative_id', cooperativeId)
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, read_at: now } : n))
-      )
+      try {
+        const supabase = createClient()
+        const now = new Date().toISOString()
+        await supabase
+          .from('notifications_inapp')
+          .update({ read_at: now })
+          .eq('id', id)
+          .eq('cooperative_id', cooperativeId)
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === id ? { ...n, read_at: now } : n))
+        )
+      } catch (error) {
+        console.error('Failed to mark notification as read:', error)
+      }
     },
     [cooperativeId]
   )
@@ -88,14 +117,18 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
   const markAllRead = useCallback(async () => {
     const unread = notifications.filter((n) => !n.read_at)
     if (!unread.length) return
-    const supabase = createClient()
-    const now = new Date().toISOString()
-    await supabase
-      .from('notifications_inapp')
-      .update({ read_at: now })
-      .eq('cooperative_id', cooperativeId)
-      .is('read_at', null)
-    setNotifications((prev) => prev.map((n) => ({ ...n, read_at: n.read_at ?? now })))
+    try {
+      const supabase = createClient()
+      const now = new Date().toISOString()
+      await supabase
+        .from('notifications_inapp')
+        .update({ read_at: now })
+        .eq('cooperative_id', cooperativeId)
+        .is('read_at', null)
+      setNotifications((prev) => prev.map((n) => ({ ...n, read_at: n.read_at ?? now })))
+    } catch (error) {
+      console.error('Failed to mark all notifications as read:', error)
+    }
   }, [notifications, cooperativeId])
 
   function formatTime(dateStr: string) {

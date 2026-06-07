@@ -67,13 +67,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Mobile header */}
         <div className="md:hidden sticky top-0 z-50 flex items-center justify-between border-b border-border bg-background p-4">
           <Logo size="sm" />
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-muted-foreground hover:text-foreground">
-            {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </button>
+          <div className="flex items-center gap-2">
+            {currentCooperative && <NotificationBell cooperativeId={currentCooperative.id} />}
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-muted-foreground hover:text-foreground">
+              {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+          </div>
         </div>
 
+        {/* Backdrop */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
         {/* Sidebar */}
-        <aside className={`${sidebarOpen ? 'block' : 'hidden'} md:flex md:flex-col md:sticky md:top-0 w-full md:w-64 h-screen border-r border-border bg-card overflow-y-auto`}>
+        <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-card border-r border-border overflow-y-auto transform transition-transform duration-300 ease-in-out md:relative md:inset-auto md:z-auto md:w-64 md:flex md:flex-col md:sticky md:top-0 md:h-screen md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           <div className="hidden md:flex items-center gap-2 p-6 border-b border-border">
             <Logo size="md" />
           </div>
