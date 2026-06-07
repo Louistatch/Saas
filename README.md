@@ -289,7 +289,7 @@ npm install
 # Supabase (base de données unifiée)
 NEXT_PUBLIC_SUPABASE_URL=https://hhnswekjgbxckluqnszo.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-SUPABASE_SERVICE_KEY=eyJ...          # service_role (server-only)
+SUPABASE_SERVICE_ROLE_KEY=eyJ...          # service_role (server-only)
 
 # Sécurité
 INTEGRATION_SECRET_KEY=              # openssl rand -base64 32
@@ -374,7 +374,7 @@ npm run start
 ### Variables Railway (AgriTogo)
 ```env
 SUPABASE_URL=https://hhnswekjgbxckluqnszo.supabase.co
-SUPABASE_SERVICE_KEY=eyJ...   # ← à configurer
+SUPABASE_SERVICE_ROLE_KEY=eyJ...   # ← à configurer
 GEMINI_API_KEY=...
 DASHSCOPE_API_KEY=...
 ```

@@ -300,7 +300,7 @@ GUEST                → marketplace publique (accès payant fiches)
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://hhnswekjgbxckluqnszo.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-SUPABASE_SERVICE_KEY=eyJ...          # server-only
+SUPABASE_SERVICE_ROLE_KEY=eyJ...          # server-only
 INTEGRATION_SECRET_KEY=              # AES-256-GCM pour API keys Kobo
 KOBO_WEBHOOK_SECRET=                 # timing-safe compare
 AGRITOGO_API_URL=https://agritogo-production.up.railway.app
@@ -312,7 +312,7 @@ UPSTASH_REDIS_REST_TOKEN=
 
 ```env
 SUPABASE_URL=https://hhnswekjgbxckluqnszo.supabase.co
-SUPABASE_SERVICE_KEY=eyJ...          # ← CRITIQUE : même clé que FaîtiereHub
+SUPABASE_SERVICE_ROLE_KEY=eyJ...          # ← CRITIQUE : même clé que FaîtiereHub
 GEMINI_API_KEY=
 GEMINI_API_KEY_1=
 GEMINI_API_KEY_2=

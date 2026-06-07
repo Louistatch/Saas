@@ -226,23 +226,3 @@ export async function GET(
     },
   })
 }
-
-// ── Haroo fallback ────────────────────────────────────────────────────────────
-
-// Passe par AgriTogo (AGRITOGO_API_URL déjà configuré) — pas d'URL Haroo directe.
-// AgriTogo expose GET /api/v1/haroo/verify/<card_number> qui proxy vers Haroo.
-async function tryHarooVerify(cardNumber: string): Promise<Record<string, unknown> | null> {
-  const agritogoUrl = process.env.AGRITOGO_API_URL?.replace(/\/$/, '')
-  if (!agritogoUrl) return null
-
-  try {
-    const res = await fetch(
-      `${agritogoUrl}/api/v1/haroo/verify/${encodeURIComponent(cardNumber)}`,
-      { signal: AbortSignal.timeout(6000), headers: { Accept: 'application/json' } }
-    )
-    if (!res.ok) return null
-    return await res.json()  // source:'haroo' already injected by AgriTogo
-  } catch {
-    return null
-  }
-}
