@@ -58,37 +58,57 @@ export default function DashboardPage() {
     todayStart.setHours(0, 0, 0, 0)
 
     const [
-      membersRes,
-      cardsRes,
-      fichesRes,
-      parcellesRes,
-      scansTodayRes,
+      statsRpcRes,
       recentMembersRes,
       recentCardsRes,
       recentFichesRes,
       recentScansRes,
     ] = await Promise.all([
-      supabase.from('members').select('id', { count: 'exact', head: true }).eq('cooperative_id', coopId),
-      supabase.from('member_cards').select('id', { count: 'exact', head: true }).eq('status', 'active').eq('cooperative_id', coopId),
-      supabase.from('fiches_techniques').select('id', { count: 'exact', head: true }).eq('status', 'published').eq('cooperative_id', coopId),
-      supabase.from('parcelles').select('id', { count: 'exact', head: true }).eq('cooperative_id', coopId),
-      supabase.from('member_access_logs').select('id', { count: 'exact', head: true })
-        .eq('cooperative_id', coopId)
-        .eq('action', 'scan')
-        .gte('created_at', todayStart.toISOString()),
+      // Single round-trip via RPC instead of 5 separate count queries.
+      // Falls back to per-table counts below if the RPC is unavailable
+      // (e.g. migration not yet applied), same pattern as /admin.
+      supabase.rpc('get_dashboard_stats', { p_cooperative_id: coopId }),
       supabase.from('members').select('first_name, last_name, created_at').eq('cooperative_id', coopId).order('created_at', { ascending: false }).limit(3),
       supabase.from('member_cards').select('card_number, created_at').eq('cooperative_id', coopId).order('created_at', { ascending: false }).limit(2),
       supabase.from('fiches_techniques').select('title, created_at').eq('cooperative_id', coopId).order('created_at', { ascending: false }).limit(2),
       supabase.from('member_access_logs').select('card_number, action, created_at').eq('cooperative_id', coopId).in('action', ['scan', 'login']).order('created_at', { ascending: false }).limit(3),
     ])
 
-    setStats({
-      totalMembers: membersRes.count ?? 0,
-      activeCards: cardsRes.count ?? 0,
-      totalExploitations: fichesRes.count ?? 0,
-      totalParcelles: parcellesRes.count ?? 0,
-      scansToday: scansTodayRes.count ?? 0,
-    })
+    if (statsRpcRes.error) {
+      // Fallback: per-table counts (pre-RPC behaviour)
+      const [membersRes, cardsRes, fichesRes, parcellesRes, scansTodayRes] = await Promise.all([
+        supabase.from('members').select('id', { count: 'exact', head: true }).eq('cooperative_id', coopId),
+        supabase.from('member_cards').select('id', { count: 'exact', head: true }).eq('status', 'active').eq('cooperative_id', coopId),
+        supabase.from('fiches_techniques').select('id', { count: 'exact', head: true }).eq('status', 'published').eq('cooperative_id', coopId),
+        supabase.from('parcelles').select('id', { count: 'exact', head: true }).eq('cooperative_id', coopId),
+        supabase.from('member_access_logs').select('id', { count: 'exact', head: true })
+          .eq('cooperative_id', coopId)
+          .eq('action', 'scan')
+          .gte('created_at', todayStart.toISOString()),
+      ])
+      setStats({
+        totalMembers: membersRes.count ?? 0,
+        activeCards: cardsRes.count ?? 0,
+        totalExploitations: fichesRes.count ?? 0,
+        totalParcelles: parcellesRes.count ?? 0,
+        scansToday: scansTodayRes.count ?? 0,
+      })
+    } else {
+      const row = (statsRpcRes.data as Array<{
+        total_members: number | string
+        active_cards: number | string
+        total_exploitations: number | string
+        total_parcelles: number | string
+        scans_today: number | string
+      }> | null)?.[0]
+      setStats({
+        totalMembers: Number(row?.total_members ?? 0),
+        activeCards: Number(row?.active_cards ?? 0),
+        totalExploitations: Number(row?.total_exploitations ?? 0),
+        totalParcelles: Number(row?.total_parcelles ?? 0),
+        scansToday: Number(row?.scans_today ?? 0),
+      })
+    }
 
     const activities: RecentItem[] = [
       ...((recentMembersRes.data ?? []) as { first_name: string; last_name: string; created_at: string }[]).map((m) => ({

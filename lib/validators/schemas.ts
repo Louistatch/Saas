@@ -96,6 +96,50 @@ export const signupSchema = z.object({
 })
 
 /**
+ * Validates the "add cotisation" form. `due_date` must be today or later
+ * unless `allowPastDueDate` is set (e.g. when editing an existing cotisation
+ * that is already overdue, so historical entries aren't blocked).
+ */
+export function buildCotisationSchema(allowPastDueDate = false) {
+  return z.object({
+    member_id: uuidSchema,
+    amount: z
+      .union([z.string(), z.number()])
+      .transform((v: string | number) => (typeof v === 'string' ? Number(v) : v))
+      .pipe(z.number({ invalid_type_error: 'Le montant doit être un nombre' }).positive('Le montant doit être supérieur à 0')),
+    type: z.string().min(1),
+    campaign: z.string().max(60).optional().or(z.literal('')),
+    due_date: z
+      .string()
+      .optional()
+      .or(z.literal(''))
+      .refine((value: string | undefined) => {
+        if (!value || allowPastDueDate) return true
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const due = new Date(value)
+        return due >= today
+      }, "La date d'échéance ne peut pas être dans le passé"),
+    notes: z.string().max(2000).optional().or(z.literal('')),
+  })
+}
+export type CotisationFormInput = z.infer<ReturnType<typeof buildCotisationSchema>>
+
+export const accessRequestSchema = z.object({
+  type: z.enum(['faitiere', 'union', 'cooperative']),
+  organizationName: z.string().min(2, "Le nom de l'organisation est requis").max(120),
+  contactName: z.string().min(2, 'Le nom du responsable est requis').max(120),
+  phone: z
+    .string()
+    .min(1, 'Le téléphone est requis')
+    .max(40)
+    .regex(/^[+0-9 ()\-.]*$/, 'Le téléphone ne peut contenir que des chiffres, espaces et + - ( )'),
+  email: z.string().trim().toLowerCase().email('Adresse email invalide').optional().or(z.literal('')),
+  message: z.string().max(2000).optional().or(z.literal('')),
+})
+export type AccessRequestInput = z.infer<typeof accessRequestSchema>
+
+/**
  * Returns a flat object of `{ field: firstError }` for use with the
  * imperative form patterns already in the app.
  */

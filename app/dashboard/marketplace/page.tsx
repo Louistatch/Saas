@@ -18,6 +18,7 @@ import { PageHeader } from '@/components/shared/page-header'
 import { PaginationBar } from '@/components/shared/pagination'
 import { useConfirm } from '@/components/shared/confirm-dialog'
 import { errorMessage } from '@/lib/utils/errors'
+import { useCascadingLocations } from '@/hooks/use-cascading-locations'
 
 interface FicheTechnique {
   id: string
@@ -63,10 +64,19 @@ export default function MarketplacePage() {
 
   const [fiches, setFiches] = useState<FicheTechnique[]>([])
   const [allCultures, setAllCultures] = useState<Culture[]>([])
-  const [regions, setRegions] = useState<{ id: string; name: string }[]>([])
-  const [prefectures, setPrefectures] = useState<{ id: string; name: string; region_id: string }[]>([])
-  const [allPrefectures, setAllPrefectures] = useState<{ id: string; name: string; region_id: string }[]>([])
-  const [cantons, setCantons] = useState<{ id: string; name: string }[]>([])
+  const {
+    selection: location,
+    setLevel: setLocationLevel,
+    setSelection: setLocationSelection,
+    options: locationOptions,
+  } = useCascadingLocations({
+    levels: ['region_id', 'prefecture_id', 'canton_id'],
+    mode: 'prefetch-filter',
+    prefetchLevels: ['region_id', 'prefecture_id'],
+  })
+  const regions = locationOptions.region_id
+  const prefectures = locationOptions.prefecture_id
+  const cantons = locationOptions.canton_id
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounced(search, 200)
   const [page, setPage] = useState(1)
@@ -82,9 +92,6 @@ export default function MarketplacePage() {
     description: '',
     culture: '',
     type_agriculture: 'maraîchage',
-    region_id: '',
-    canton_id: '',
-    prefecture_id: '',
     campaign: '',
     price_non_member: 500,
   })
@@ -107,28 +114,7 @@ export default function MarketplacePage() {
   // Load reference data
   useEffect(() => {
     supabase.from('cultures').select('id, name, icon, category').order('name').then(({ data }) => setAllCultures(data ?? []))
-    supabase.from('regions').select('id, name').order('name').then(({ data }) => setRegions(data ?? []))
-    supabase.from('prefectures').select('id, name, region_id').order('name').then(({ data }) => setAllPrefectures(data ?? []))
   }, [supabase])
-
-  // Cascade: filter prefectures by selected region
-  useEffect(() => {
-    if (!form.region_id) {
-      setPrefectures(allPrefectures)
-    } else {
-      setPrefectures(allPrefectures.filter((p) => p.region_id === form.region_id))
-    }
-    // Reset prefecture and canton when region changes
-    setForm((f) => ({ ...f, prefecture_id: '', canton_id: '' }))
-    setCantons([])
-  }, [form.region_id, allPrefectures])
-
-  // Load cantons when prefecture changes
-  useEffect(() => {
-    if (!form.prefecture_id) { setCantons([]); setForm((f) => ({ ...f, canton_id: '' })); return }
-    supabase.from('cantons').select('id, name').eq('prefecture_id', form.prefecture_id).order('name')
-      .then(({ data }) => setCantons(data ?? []))
-  }, [form.prefecture_id, supabase])
 
   // Load fiches
   const fetchFiches = useCallback(async () => {
@@ -275,8 +261,8 @@ export default function MarketplacePage() {
       description: form.description || null,
       culture: form.culture,
       type_agriculture: form.type_agriculture,
-      canton_id: form.canton_id || null,
-      prefecture_id: form.prefecture_id || null,
+      canton_id: location.canton_id || null,
+      prefecture_id: location.prefecture_id || null,
       campaign: form.campaign || null,
       price_non_member: form.price_non_member,
       files: pendingFiles,
@@ -292,7 +278,8 @@ export default function MarketplacePage() {
 
     toast({ title: 'Fiche publiée', description: form.title })
     setShowAdd(false)
-    setForm({ title: '', description: '', culture: '', type_agriculture: 'maraîchage', region_id: '', canton_id: '', prefecture_id: '', campaign: '', price_non_member: 500 })
+    setForm({ title: '', description: '', culture: '', type_agriculture: 'maraîchage', campaign: '', price_non_member: 500 })
+    setLocationSelection({ region_id: '', prefecture_id: '', canton_id: '' })
     setPendingFiles([])
     fetchFiches()
   }
@@ -552,8 +539,8 @@ export default function MarketplacePage() {
                   <Label className="text-xs text-muted-foreground">Région</Label>
                   <select
                     className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
-                    value={form.region_id}
-                    onChange={(e) => setForm((f) => ({ ...f, region_id: e.target.value }))}
+                    value={location.region_id}
+                    onChange={(e) => setLocationLevel('region_id', e.target.value)}
                   >
                     <option value="">— Toutes —</option>
                     {regions.map((r) => (
@@ -565,8 +552,8 @@ export default function MarketplacePage() {
                   <Label className="text-xs text-muted-foreground">Préfecture</Label>
                   <select
                     className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
-                    value={form.prefecture_id}
-                    onChange={(e) => setForm((f) => ({ ...f, prefecture_id: e.target.value, canton_id: '' }))}
+                    value={location.prefecture_id}
+                    onChange={(e) => setLocationLevel('prefecture_id', e.target.value)}
                     disabled={prefectures.length === 0}
                   >
                     <option value="">— Toutes —</option>
@@ -579,9 +566,9 @@ export default function MarketplacePage() {
                   <Label className="text-xs text-muted-foreground">Canton</Label>
                   <select
                     className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
-                    value={form.canton_id}
-                    onChange={(e) => setForm((f) => ({ ...f, canton_id: e.target.value }))}
-                    disabled={!form.prefecture_id || cantons.length === 0}
+                    value={location.canton_id}
+                    onChange={(e) => setLocationLevel('canton_id', e.target.value)}
+                    disabled={!location.prefecture_id || cantons.length === 0}
                   >
                     <option value="">— Tous —</option>
                     {cantons.map((c) => (

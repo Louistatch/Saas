@@ -22,7 +22,7 @@ import { PaginationBar } from '@/components/shared/pagination'
 import { useConfirm } from '@/components/shared/confirm-dialog'
 import { PhotoUpload } from '@/components/shared/photo-upload'
 import { LocationPicker } from '@/components/shared/location-picker'
-import { downloadCsv, parseCsvWithHeaders, toCsv } from '@/lib/utils/csv'
+import { downloadCsv, parseCsvWithHeaders, toCsv, validateCsvFile } from '@/lib/utils/csv'
 import { errorMessage } from '@/lib/utils/errors'
 import { memberSchema, flattenZodErrors } from '@/lib/validators/schemas'
 import type { Member } from '@/types/domain'
@@ -274,6 +274,12 @@ export default function MembersPage() {
   }
 
   const handleFile = async (file: File) => {
+    const validationError = validateCsvFile(file)
+    if (validationError) {
+      toast({ title: 'Fichier invalide', description: validationError, variant: 'destructive' })
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
     const text = await file.text()
     const { rows, missing } = parseCsvWithHeaders<Record<string, string | undefined>>(
       text,
