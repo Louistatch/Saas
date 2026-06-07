@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { BarChart3, Users, ShoppingCart, CreditCard, TrendingUp, MapPin, ScanLine, Activity } from 'lucide-react'
+import { BarChart3, Users, ShoppingCart, CreditCard, TrendingUp, MapPin, ScanLine, Activity, Download } from 'lucide-react'
 import {
   AreaChart,
   Area,
@@ -119,6 +119,35 @@ function buildMonthlyAmountSeries(
   }
 
   return series
+}
+
+// ─── CSV Export ───────────────────────────────────────────────────────────────
+
+function exportStatsCsv(stats: Stats, cooperativeName: string) {
+  const rows = [
+    ['Indicateur', 'Valeur'],
+    ['Coopérative', cooperativeName],
+    ['Date export', new Date().toLocaleDateString('fr-FR')],
+    ['', ''],
+    ['Total membres', stats.totalMembers],
+    ['Membres actifs', stats.activeMembers],
+    ['Fiches techniques', stats.totalExploitations],
+    ['Fiches publiées', stats.activeExploitations],
+    ['Cartes membres', stats.totalCards],
+    ['Cartes actives', stats.activeCards],
+    ['Parcelles', stats.totalParcelles],
+    ['Surface totale (ha)', stats.totalSurfaceHa.toFixed(2)],
+    ['Scans QR (total)', stats.totalScans],
+    ['Scans cette semaine', stats.scansThisWeek],
+  ]
+  const csv = rows.map((r) => r.map((cell) => `"${cell}"`).join(',')).join('\n')
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `statistiques-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -362,12 +391,23 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Statistiques"
-        description={`Suivre l'activité des membres et la croissance de ${
-          currentCooperative?.name ?? 'votre coopérative'
-        }`}
-      />
+      <div className="flex items-start justify-between gap-4">
+        <PageHeader
+          title="Statistiques"
+          description={`Suivre l'activité des membres et la croissance de ${
+            currentCooperative?.name ?? 'votre coopérative'
+          }`}
+        />
+        <button
+          onClick={() => exportStatsCsv(stats, currentCooperative?.name ?? 'coopérative')}
+          disabled={isLoading}
+          className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground shadow-sm hover:bg-secondary disabled:opacity-50 shrink-0"
+          aria-label="Exporter les statistiques en CSV"
+        >
+          <Download className="h-4 w-4" aria-hidden />
+          Exporter CSV
+        </button>
+      </div>
 
       {/* ── Stat cards ── */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
