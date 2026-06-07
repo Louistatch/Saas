@@ -13,6 +13,7 @@ export interface PublicAgricultureProfile {
   parcelle_count: number
   production_count: number
   seasons: string[]
+  irrigated_count: number
 }
 
 export interface PublicMemberProfile {
@@ -55,28 +56,36 @@ export async function getPublicMemberProfile(
 
   if (!member) return null
 
-  // Fetch parcelles for agriculture profile
+  // Fetch parcelles for agriculture profile (all public fields)
   const { data: parcelles } = await supabase
     .from('parcelles')
-    .select('id, culture_principale, superficie_ha')
+    .select('id, culture_principale, culture_name, superficie_ha, surface_ha, soil_type, irrigation_type, campaign_year')
     .eq('member_id', memberId)
 
-  // Fetch productions via parcelle IDs
-  const parcelleList = (parcelles ?? []) as { id: string; culture_principale: string; superficie_ha: number }[]
-  const parcelleIds = parcelleList.map((p) => p.id).filter(Boolean)
-  let productionData: { campaign: string }[] = []
-  if (parcelleIds.length > 0) {
-    const { data: prods } = await supabase
-      .from('productions')
-      .select('campaign, parcelle_id')
-      .in('parcelle_id', parcelleIds)
-    productionData = (prods ?? []) as { campaign: string }[]
-  }
+  const parcelleList = (parcelles ?? []) as {
+    id: string
+    culture_principale: string | null
+    culture_name: string | null
+    superficie_ha: number | null
+    surface_ha: number | null
+    soil_type: string | null
+    irrigation_type: string | null
+    campaign_year: string | null
+  }[]
+
+  // Fetch productions directly by member_id (productions now has member_id column)
+  let productionData: { campaign_year: string | null }[] = []
+  const { data: prods } = await supabase
+    .from('productions')
+    .select('campaign_year')
+    .eq('member_id', memberId)
+  productionData = (prods ?? []) as { campaign_year: string | null }[]
 
   // Calculate agriculture profile
-  const cultures = [...new Set(parcelleList.map((p) => p.culture_principale).filter(Boolean))]
-  const superficie_totale = parcelleList.reduce((sum, p) => sum + (p.superficie_ha ?? 0), 0)
-  const seasons = [...new Set(productionData.map((p) => p.campaign).filter(Boolean))]
+  const cultures = [...new Set(parcelleList.map((p) => p.culture_principale ?? p.culture_name).filter((c): c is string => !!c))]
+  const superficie_totale = parcelleList.reduce((sum, p) => sum + (p.superficie_ha ?? p.surface_ha ?? 0), 0)
+  const seasons = [...new Set(productionData.map((p) => p.campaign_year).filter((s): s is string => !!s))]
+  const irrigated_count = parcelleList.filter(p => p.irrigation_type && p.irrigation_type.toLowerCase() !== 'non').length
 
   // Calculate level (simplified — matches get_member_score logic)
   const { data: cotisations } = await supabase
@@ -121,6 +130,7 @@ export async function getPublicMemberProfile(
       parcelle_count: parcelleList.length,
       production_count: productionCount,
       seasons,
+      irrigated_count,
     },
     is_certified_supplier: isCertified,
   }

@@ -57,9 +57,9 @@ export async function GET(request: NextRequest) {
       .from('fiches_techniques')
       .select(
         `id, title, description, culture, type_agriculture, campaign,
-         price_non_member, download_count, created_at, cooperative_id,
-         canton_id, prefecture_id, region_id,
-         cooperatives(name, faitiere_name)`,
+         price_non_member, is_free_for_members, download_count, created_at, cooperative_id,
+         cooperatives(name, faitiere_name),
+         region:region_id(id, name), prefecture:prefecture_id(id, name), canton:canton_id(id, name)`,
         { count: 'exact' },
       )
       .eq('status', 'published')
