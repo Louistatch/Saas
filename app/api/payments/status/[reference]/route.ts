@@ -13,6 +13,12 @@ export async function GET(
 
   const { reference } = await params
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, cooperative_id')
+    .eq('id', user.id)
+    .single()
+
   const { data: payment, error } = await supabase
     .from('payments')
     .select('*')
@@ -21,6 +27,14 @@ export async function GET(
 
   if (error || !payment) {
     return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
+  }
+
+  const isSuperAdmin = profile?.role === 'super_admin'
+  const isCoopAdmin = profile?.role === 'cooperative_admin' && profile?.cooperative_id === payment.cooperative_id
+  const isMemberOwner = payment.member_id === user.id
+
+  if (!isSuperAdmin && !isCoopAdmin && !isMemberOwner) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   return NextResponse.json({ payment })

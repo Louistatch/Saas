@@ -11,6 +11,11 @@ export async function GET(_request: NextRequest) {
   try {
     const supabase = await createClient()
 
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+    }
+
     const { data, error } = await supabase
       .from('buyer_requests')
       .select(

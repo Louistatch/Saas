@@ -17,7 +17,12 @@ import { createClient } from '@/lib/supabase/admin'
 const OLD_HOST = 'txlybwrstklyzcltkjzc.supabase.co'
 const NEW_HOST = 'hhnswekjgbxckluqnszo.supabase.co'
 
-export async function POST() {
+export async function POST(request: Request) {
+  const auth = request.headers.get('authorization')
+  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const supabase = createClient()
 
   // 1. Find all members with photo_url pointing to old project

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 
 /**
  * GET /api/agrimarket/listings
@@ -51,6 +52,9 @@ export async function GET(request: NextRequest) {
  * Create a new listing. Auth required.
  */
 export async function POST(request: NextRequest) {
+  const blocked = await applyRateLimit(request, 'marketplace')
+  if (blocked) return blocked
+
   try {
     const supabase = await createClient()
 
