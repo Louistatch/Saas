@@ -173,17 +173,15 @@ export function KoboConfigForm({ cooperativeId, onSaved }: KoboConfigFormProps) 
     setTestResult(null)
 
     try {
-      // We test by attempting to save (the server tests connection before saving)
-      // For a pure test without saving, we'd need a dedicated endpoint
-      // For now, show a simulated test via the save endpoint behavior
-      const res = await fetch('/api/integrations/kobo', {
+      // Read-only check — never persists the config. If no new token was
+      // typed, the server decrypts and tests the already-saved one.
+      const res = await fetch('/api/integrations/kobo/test-connection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           cooperativeId,
-          apiToken: tokenToTest || 'USE_EXISTING',
           formId,
-          webhookEnabled,
+          ...(tokenToTest ? { apiToken: tokenToTest } : {}),
         }),
       })
 
@@ -195,10 +193,6 @@ export function KoboConfigForm({ cooperativeId, onSaved }: KoboConfigFormProps) 
           formTitle: data.formTitle,
           submissionCount: data.submissionCount,
         })
-        setStatus('connected')
-        setHasExistingToken(true)
-        setApiToken('••••••••••••••••')
-        onSaved?.()
       } else {
         setTestResult({
           valid: false,
@@ -233,12 +227,10 @@ export function KoboConfigForm({ cooperativeId, onSaved }: KoboConfigFormProps) 
         webhookEnabled,
       }
 
-      // Only send token if it's a new one
+      // Only send the token when a new one was typed — omitting it tells
+      // the server to keep the existing encrypted token (apiToken is optional).
       if (tokenToSave) {
         body.apiToken = tokenToSave
-      } else {
-        // Need to send a placeholder — server will keep existing
-        body.apiToken = 'KEEP_EXISTING_TOKEN_PLACEHOLDER_40CHARS'
       }
 
       // Include field mappings

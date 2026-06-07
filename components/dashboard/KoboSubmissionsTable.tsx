@@ -122,18 +122,18 @@ export function KoboSubmissionsTable({ cooperativeId }: KoboSubmissionsTableProp
     async (submissionId: string) => {
       setRetrying(submissionId)
       try {
-        const res = await fetch('/api/integrations/kobo/sync', {
+        const res = await fetch('/api/integrations/kobo/retry', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cooperativeId, mode: 'incremental' }),
+          body: JSON.stringify({ cooperativeId, submissionId }),
         })
 
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}))
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok || !(data as { ok?: boolean }).ok) {
           throw new Error((data as { error?: string }).error ?? 'Retry failed')
         }
 
-        toast({ title: 'Retry lancé', description: 'La soumission sera retraitée.' })
+        toast({ title: 'Retry réussi', description: 'La soumission a été retraitée.' })
         refetch()
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Erreur'

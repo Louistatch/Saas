@@ -37,7 +37,7 @@ import { useCooperative } from '@/app/context/cooperative-context'
 
 interface Parcelle {
   id: string
-  culture_name: string
+  culture_principale: string
 }
 
 interface Campagne {
@@ -67,7 +67,7 @@ interface JournalEntry {
   cost_fcfa: number | null
   photo_url: string | null
   created_at: string
-  parcelle: { id: string; culture_name: string } | null
+  parcelle: { id: string; culture_principale: string } | null
   campagne: { id: string; name: string } | null
 }
 
@@ -368,7 +368,7 @@ function JournalTab({
                     <SelectContent>
                       <SelectItem value="">Aucune</SelectItem>
                       {parcelles.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>{p.culture_name}</SelectItem>
+                        <SelectItem key={p.id} value={p.id}>{p.culture_principale}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -450,7 +450,7 @@ function JournalTab({
                   <TableCell className="whitespace-nowrap">{formatDate(entry.entry_date)}</TableCell>
                   <TableCell><TypeBadge type={entry.type} /></TableCell>
                   <TableCell>{entry.title}</TableCell>
-                  <TableCell>{entry.parcelle?.culture_name ?? '—'}</TableCell>
+                  <TableCell>{entry.parcelle?.culture_principale ?? '—'}</TableCell>
                   <TableCell>
                     {entry.quantity != null ? `${entry.quantity} ${entry.unit ?? ''}` : '—'}
                   </TableCell>
@@ -949,7 +949,7 @@ export default function CarnetAgricolePage() {
         ? `&member_id=eq.${selectedMemberId}`
         : ''
       void fetch(
-        `${supabaseUrl}/rest/v1/parcelles?cooperative_id=eq.${cooperativeId}${parcelleFilter}&select=id,culture_name`,
+        `${supabaseUrl}/rest/v1/parcelles?cooperative_id=eq.${cooperativeId}${parcelleFilter}&select=id,culture_principale`,
         {
           headers: {
             apikey: supabaseKey,

@@ -646,8 +646,8 @@ async function processPlotSurveySubmission(
 
     await supabase.from('parcelles').insert({
       member_id: card.member_id,
-      culture_name: culture,
-      surface_ha: surface,
+      culture_principale: culture,
+      superficie_ha: surface,
       gps_coordinates: gps || null,
       campaign_year: campagne,
       cooperative_id: cooperativeId,

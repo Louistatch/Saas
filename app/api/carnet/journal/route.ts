@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('journal_entries')
       .select(
-        'id, member_id, cooperative_id, campagne_id, parcelle_id, entry_date, type, title, body, quantity, unit, cost_fcfa, photo_url, created_at, parcelle:parcelles(id, culture_name), campagne:campagnes(id, name)',
+        'id, member_id, cooperative_id, campagne_id, parcelle_id, entry_date, type, title, body, quantity, unit, cost_fcfa, photo_url, created_at, parcelle:parcelles(id, culture_principale), campagne:campagnes(id, name)',
       )
       .order('entry_date', { ascending: false })
 

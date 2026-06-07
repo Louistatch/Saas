@@ -52,10 +52,10 @@ export default async function AttestationPage({
 
   const { data: parcelles } = await supabase
     .from('parcelles')
-    .select('surface_ha')
+    .select('superficie_ha')
     .eq('member_id', memberId)
 
-  const totalSurface = (parcelles ?? []).reduce((acc, p) => acc + (p.surface_ha || 0), 0)
+  const totalSurface = (parcelles ?? []).reduce((acc, p) => acc + (p.superficie_ha || 0), 0)
   const totalParcelles = (parcelles ?? []).length
 
   const atsScore = typeof atsData === 'number' ? atsData : (Array.isArray(atsData) ? atsData[0] : null)

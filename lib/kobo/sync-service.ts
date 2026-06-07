@@ -193,70 +193,118 @@ export class KoboSyncService {
 
     for (const submission of failed) {
       result.retried++
-
-      try {
-        const payload = submission.raw_payload as Record<string, unknown>
-
-        if (formType === 'cooperative_registration') {
-          await processCooperativeRegistration(
-            submission.id,
-            cooperativeId,
-            payload,
-          )
-          result.succeeded++
-        } else if (submission.member_id) {
-          // Member already enrolled — just fix missing photo/signature and mark matched
-          await this.backfillMemberMedia(submission.member_id, payload, apiToken)
-          await supabase
-            .from('kobo_submissions')
-            .update({ status: 'matched', updated_at: new Date().toISOString() })
-            .eq('id', submission.id)
-          result.succeeded++
-        } else if (submission.member_card_number) {
-          // Has card number — try RPC match
-          await supabase.rpc('match_kobo_submission_to_member', {
-            p_submission_id: submission.id,
-          })
-
-          const { data: updated } = await supabase
-            .from('kobo_submissions')
-            .select('status, member_id')
-            .eq('id', submission.id)
-            .single()
-
-          if (updated?.status === 'matched' && updated.member_id) {
-            await supabase.rpc('process_kobo_submission', {
-              p_submission_id: submission.id,
-            })
-            result.succeeded++
-          } else {
-            result.failed++
-            result.errors.push({
-              instanceId: submission.kobo_instance_id,
-              error: 'Could not match to member',
-            })
-          }
-        } else {
-          // No card number and no existing member — enroll as new member
-          await enrollNewMemberFromSubmission(
-            submission.id,
-            cooperativeId,
-            payload,
-            apiToken,
-          )
-          result.succeeded++
-        }
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Retry failed'
+      const outcome = await this.retrySubmission(submission, cooperativeId, formType, apiToken)
+      if (outcome.ok) {
+        result.succeeded++
+      } else {
         result.failed++
-        result.errors.push({
-          instanceId: submission.kobo_instance_id,
-          error: message,
-        })
+        result.errors.push({ instanceId: submission.kobo_instance_id, error: outcome.error })
       }
     }
 
     return result
+  }
+
+  /**
+   * Reprocess exactly one submission — used by the per-row "Retenter" action
+   * in the submissions table, instead of triggering a full cooperative sync.
+   */
+  async retrySingleSubmission(cooperativeId: string, submissionId: string, apiToken?: string): Promise<RetryResult> {
+    const supabase = await this.getSupabase()
+
+    const { data: submission } = await supabase
+      .from('kobo_submissions')
+      .select('*')
+      .eq('id', submissionId)
+      .eq('cooperative_id', cooperativeId)
+      .maybeSingle()
+
+    if (!submission) {
+      return { total: 0, retried: 0, succeeded: 0, failed: 0, errors: [{ instanceId: 'unknown', error: 'Submission introuvable' }] }
+    }
+
+    const formType = await this.getFormType(cooperativeId)
+    const outcome = await this.retrySubmission(submission, cooperativeId, formType, apiToken)
+
+    return {
+      total: 1,
+      retried: 1,
+      succeeded: outcome.ok ? 1 : 0,
+      failed: outcome.ok ? 0 : 1,
+      errors: outcome.ok ? [] : [{ instanceId: submission.kobo_instance_id, error: outcome.error }],
+    }
+  }
+
+  /** Routes a single submission through the matching/processing path appropriate for its form type. */
+  private async retrySubmission(
+    submission: Record<string, unknown> & { id: string; kobo_instance_id: string; member_id: string | null; member_card_number: string | null; raw_payload: unknown },
+    cooperativeId: string,
+    formType: string,
+    apiToken?: string,
+  ): Promise<{ ok: true } | { ok: false; error: string }> {
+    const supabase = await this.getSupabase()
+
+    try {
+      const payload = submission.raw_payload as Record<string, unknown>
+
+      if (formType === 'cooperative_registration') {
+        await processCooperativeRegistration(submission.id, cooperativeId, payload)
+        return { ok: true }
+      }
+
+      if (formType === 'harvest' || formType === 'plot_survey' || formType === 'market_price') {
+        // These form types are processed directly from raw_payload (member
+        // matched via card number embedded in the payload), never through the
+        // member-enrollment path — routing them there would create bogus members.
+        const { data: updated } = await supabase.rpc('match_kobo_submission_to_member', {
+          p_submission_id: submission.id,
+        }).then(() => supabase
+          .from('kobo_submissions')
+          .select('status, member_id')
+          .eq('id', submission.id)
+          .single())
+
+        if (updated?.status === 'matched' && updated.member_id) {
+          await supabase.rpc('process_kobo_submission', { p_submission_id: submission.id })
+          return { ok: true }
+        }
+        return { ok: false, error: 'Carte membre introuvable pour cette soumission' }
+      }
+
+      if (submission.member_id) {
+        // Member already enrolled — just fix missing photo/signature and mark matched
+        await this.backfillMemberMedia(submission.member_id, payload, apiToken)
+        await supabase
+          .from('kobo_submissions')
+          .update({ status: 'matched', updated_at: new Date().toISOString() })
+          .eq('id', submission.id)
+        return { ok: true }
+      }
+
+      if (submission.member_card_number) {
+        // Has card number — try RPC match
+        await supabase.rpc('match_kobo_submission_to_member', { p_submission_id: submission.id })
+
+        const { data: updated } = await supabase
+          .from('kobo_submissions')
+          .select('status, member_id')
+          .eq('id', submission.id)
+          .single()
+
+        if (updated?.status === 'matched' && updated.member_id) {
+          await supabase.rpc('process_kobo_submission', { p_submission_id: submission.id })
+          return { ok: true }
+        }
+        return { ok: false, error: 'Could not match to member' }
+      }
+
+      // No card number and no existing member — enroll as new member
+      await enrollNewMemberFromSubmission(submission.id, cooperativeId, payload, apiToken)
+      return { ok: true }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Retry failed'
+      return { ok: false, error: message }
+    }
   }
 
   // -----------------------------------------------------------

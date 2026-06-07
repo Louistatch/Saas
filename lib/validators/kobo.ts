@@ -67,7 +67,8 @@ export const koboFieldMappingSchema = z.object({
 
 export const koboConfigSchema = z.object({
   cooperativeId: uuidParam,
-  apiToken: z.string().min(40, 'API token trop court').max(200),
+  // Optional — omit to keep the cooperative's already-saved (encrypted) token.
+  apiToken: z.string().min(40, 'API token trop court').max(200).optional(),
   formId: z.string().min(5, 'Form ID trop court').max(100),
   webhookEnabled: z.boolean().default(true),
   fieldMappings: z.array(koboFieldMappingSchema).max(50).optional(),
@@ -205,6 +206,17 @@ export const koboTestConnectionSchema = z.object({
   apiToken: z.string().min(40).max(200),
   formId: z.string().min(5).max(100),
 })
+
+// Variant used by the "Tester la connexion" button: apiToken is optional —
+// when omitted, the server decrypts and tests the cooperative's already-saved
+// token, so testing never requires re-entering (or risks overwriting) it.
+export const koboTestConnectionRequestSchema = z.object({
+  cooperativeId: uuidParam,
+  apiToken: z.string().min(40).max(200).optional(),
+  formId: z.string().min(5).max(100),
+})
+
+export type KoboTestConnectionRequestInput = z.infer<typeof koboTestConnectionRequestSchema>
 
 export type KoboTestConnectionInput = z.infer<typeof koboTestConnectionSchema>
 

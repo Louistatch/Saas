@@ -18,7 +18,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { assertAuthenticated, assertTenantAccess, assertFaitiereAccess } from '@/lib/security/assert-access'
-import { encryptSecret, isEncrypted } from '@/lib/utils/crypto'
+import { encryptSecret, decryptSecret, isEncrypted } from '@/lib/utils/crypto'
 import { createLogger } from '@/lib/utils/logger'
 import { KoboSyncService } from '@/lib/kobo/sync-service'
 import {
@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { cooperativeId, apiToken, formId, webhookEnabled, fieldMappings } = parsed.data
+  const { cooperativeId, apiToken: newApiToken, formId, webhookEnabled, fieldMappings } = parsed.data
 
   // Tenant access check
   const tenantResult = await assertTenantAccess(cooperativeId)
@@ -175,9 +175,40 @@ export async function POST(request: NextRequest) {
 
   const { supabase } = ctx
 
+  // Resolve which (plaintext) token to test/save: the freshly-submitted one,
+  // or — when omitted — the cooperative's already-saved encrypted token.
+  let plaintextToken = newApiToken
+  let encryptedToken: string | null = null
+
+  if (!plaintextToken) {
+    const { data: existing } = await supabase
+      .from('integrations')
+      .select('config')
+      .eq('cooperative_id', cooperativeId)
+      .eq('type', 'kobo')
+      .maybeSingle()
+
+    const existingEncrypted = (existing?.config as Record<string, unknown> | null)?.api_key as string | undefined
+    if (!existingEncrypted) {
+      return NextResponse.json(
+        { error: 'Token API requis pour la première configuration' },
+        { status: 400 },
+      )
+    }
+
+    try {
+      plaintextToken = decryptSecret(existingEncrypted)
+      encryptedToken = existingEncrypted
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Decryption failed'
+      log.error('Failed to decrypt stored API token', { error: message })
+      return NextResponse.json({ error: 'Server encryption configuration error' }, { status: 500 })
+    }
+  }
+
   // Test connection to KoboToolbox before saving
   const syncService = new KoboSyncService()
-  const connectionTest = await syncService.testConnection(apiToken, formId)
+  const connectionTest = await syncService.testConnection(plaintextToken, formId)
 
   if (!connectionTest.valid) {
     return NextResponse.json(
@@ -189,17 +220,18 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // Encrypt the API token
-  let encryptedToken: string
-  try {
-    encryptedToken = encryptSecret(apiToken)
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Encryption failed'
-    log.error('Failed to encrypt API token', { error: message })
-    return NextResponse.json(
-      { error: 'Server encryption configuration error' },
-      { status: 500 },
-    )
+  // Encrypt the new token (skip if we're keeping the existing encrypted one)
+  if (!encryptedToken) {
+    try {
+      encryptedToken = encryptSecret(plaintextToken)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Encryption failed'
+      log.error('Failed to encrypt API token', { error: message })
+      return NextResponse.json(
+        { error: 'Server encryption configuration error' },
+        { status: 500 },
+      )
+    }
   }
 
   // Upsert integration config

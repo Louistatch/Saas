@@ -155,7 +155,7 @@ export default function AnalyticsPage() {
     const membersQuery = supabase.from('members').select('status').eq('cooperative_id', coopId)
     const fichesQuery = supabase.from('fiches_techniques').select('status').eq('cooperative_id', coopId)
     const cardsQuery = supabase.from('member_cards').select('status').eq('cooperative_id', coopId)
-    const parcellesQuery = supabase.from('parcelles').select('surface_ha').eq('cooperative_id', coopId)
+    const parcellesQuery = supabase.from('parcelles').select('superficie_ha').eq('cooperative_id', coopId)
     const scansAllQuery = supabase
       .from('member_access_logs')
       .select('id', { count: 'exact', head: true })
@@ -215,7 +215,7 @@ export default function AnalyticsPage() {
     const members = (membersRes.data ?? []) as { status: string }[]
     const fiches = (fichesRes.data ?? []) as { status: string }[]
     const cards = (cardsRes.data ?? []) as { status: string }[]
-    const parcelles = (parcellesRes.data ?? []) as { surface_ha: number }[]
+    const parcelles = (parcellesRes.data ?? []) as { superficie_ha: number }[]
 
     setStats({
       totalMembers: members.length,
@@ -225,7 +225,7 @@ export default function AnalyticsPage() {
       totalCards: cards.length,
       activeCards: cards.filter((c) => c.status === 'active').length,
       totalParcelles: parcelles.length,
-      totalSurfaceHa: parcelles.reduce((acc, p) => acc + (p.surface_ha || 0), 0),
+      totalSurfaceHa: parcelles.reduce((acc, p) => acc + (p.superficie_ha || 0), 0),
       totalScans: scansAllRes.count ?? 0,
       scansThisWeek: scansWeekRes.count ?? 0,
     })
