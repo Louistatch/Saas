@@ -69,6 +69,13 @@ export const rateLimiters = redis
         limiter: Ratelimit.slidingWindow(10, '60 s'),
         prefix: 'rl:ai-vision',
       }),
+
+      // Kobo sync manuelle : 5/minute — anti-spam déclenchement manuel
+      'kobo-sync': new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(5, '60 s'),
+        prefix: 'rl:kobo-sync',
+      }),
     }
   : null
 
@@ -79,7 +86,7 @@ export const rateLimiters = redis
  */
 export async function applyRateLimit(
   request: NextRequest,
-  limiter: 'verify' | 'marketplace' | 'embed' | 'auth' | 'webhook' | 'ai-chat' | 'ai-vision'
+  limiter: 'verify' | 'marketplace' | 'embed' | 'auth' | 'webhook' | 'ai-chat' | 'ai-vision' | 'kobo-sync'
 ): Promise<NextResponse | null> {
   if (!rateLimiters) {
     // Upstash not configured — fall through to in-memory rate limiter in route handlers

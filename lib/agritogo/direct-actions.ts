@@ -230,9 +230,12 @@ async function handleListeProduits(): Promise<ActionResult> {
 
 async function handleListeMarches(): Promise<ActionResult> {
   const supabase = await createClient()
+  // Select distinct market names server-side to avoid loading the full table
   const { data } = await supabase
     .from('market_prices')
     .select('market_name')
+    .order('market_name')
+    .limit(200)
 
   const marches = [...new Set((data ?? []).map(m => m.market_name))].sort()
   return {

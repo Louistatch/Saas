@@ -25,10 +25,12 @@ import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 import { parseQuery } from '@/lib/agritogo/nlp-router'
 import { tryDirectAction } from '@/lib/agritogo/direct-actions'
 import { getGeminiKey, rotateGeminiKey, getKeyCount, markKeyExhausted, getRecoveryWaitMs, allKeysExhausted } from '@/lib/utils/gemini-keys'
+import { createLogger } from '@/lib/utils/logger'
 
 const MAX_HISTORY = 10
 
 export async function POST(request: NextRequest) {
+  const log = createLogger('api:ai:chat')
   const rateLimited = await applyRateLimit(request, 'ai-chat')
   if (rateLimited) return rateLimited
 
@@ -76,7 +78,7 @@ export async function POST(request: NextRequest) {
         })
       }
     } catch (err) {
-      console.warn('[AI Chat] Direct action failed, falling through:', err instanceof Error ? err.message : err)
+      log.warn('Direct action failed, falling through:', err instanceof Error ? err.message : err)
     }
   }
 
@@ -117,9 +119,9 @@ export async function POST(request: NextRequest) {
           })
         }
       }
-      console.warn('[AI Chat] AgriTogo returned non-OK, falling back to Gemini')
+      log.warn('AgriTogo returned non-OK, falling back to Gemini')
     } catch (err) {
-      console.warn('[AI Chat] AgriTogo unreachable:', err instanceof Error ? err.message : err)
+      log.warn('AgriTogo unreachable:', err instanceof Error ? err.message : err)
     }
   }
 
@@ -229,7 +231,7 @@ RÈGLES : Français, concis (3-5 phrases), basé sur les données réelles du pr
     if (round > 0 && allKeysExhausted()) {
       const waitMs = getRecoveryWaitMs()
       if (waitMs > 0 && waitMs <= 45000) {
-        console.log(`[AI Chat] All keys exhausted. Waiting ${Math.ceil(waitMs / 1000)}s for recovery...`)
+        log.info(`All keys exhausted. Waiting ${Math.ceil(waitMs / 1000)}s for recovery...`)
         await new Promise(resolve => setTimeout(resolve, waitMs + 500))
       } else if (waitMs > 45000) {
         break // Don't make the user wait more than 45s
@@ -269,17 +271,17 @@ RÈGLES : Français, concis (3-5 phrases), basé sur les données réelles du pr
         const msg = err instanceof Error ? err.message : 'Erreur inconnue'
         lastError = msg
         if (msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED')) {
-          console.warn(`[AI Chat] Key ${attempt + 1}/${totalKeys} exhausted (round ${round + 1}), cooling down 60s`)
+          log.warn(`Key ${attempt + 1}/${totalKeys} exhausted (round ${round + 1}), cooling down 60s`)
           markKeyExhausted()
           rotateGeminiKey()
           continue
         }
         if (msg.includes('503') || msg.includes('overloaded')) {
-          console.warn(`[AI Chat] Key ${attempt + 1}/${totalKeys} overloaded, trying next`)
+          log.warn(`Key ${attempt + 1}/${totalKeys} overloaded, trying next`)
           rotateGeminiKey()
           continue
         }
-        console.error('[AI Chat] Gemini error:', msg)
+        log.error('Gemini error', msg)
         break
       }
     }

@@ -19,7 +19,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { assertAuthenticated, assertTenantAccess, assertRole } from '@/lib/security/assert-access'
 import { createLogger } from '@/lib/utils/logger'
 import { decryptSecret } from '@/lib/utils/crypto'
-import { rateLimit, clientKeyFromHeaders } from '@/lib/utils/rate-limit'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 import { koboSyncRequestSchema } from '@/lib/validators/kobo'
 import { KoboSyncService } from '@/lib/kobo/sync-service'
@@ -34,17 +33,8 @@ export async function POST(request: NextRequest) {
   // -------------------------------------------------------
   // Rate limiting: 5 req/min/user (anti-spam sync manuelle)
   // -------------------------------------------------------
-  const persistentBlock = await applyRateLimit(request, 'auth')
+  const persistentBlock = await applyRateLimit(request, 'kobo-sync')
   if (persistentBlock) return persistentBlock
-
-  const ip = clientKeyFromHeaders(request.headers)
-  const rl = rateLimit(`sync:kobo:${ip}`, 5, 60_000)
-  if (!rl.ok) {
-    return NextResponse.json(
-      { error: 'Trop de requêtes de synchronisation. Réessayez dans quelques instants.' },
-      { status: 429 },
-    )
-  }
 
   // -------------------------------------------------------
   // Authentication + Role check

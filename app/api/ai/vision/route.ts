@@ -9,8 +9,10 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 import { getGeminiKey, rotateGeminiKey, getKeyCount, markKeyExhausted, getRecoveryWaitMs, allKeysExhausted } from '@/lib/utils/gemini-keys'
+import { createLogger } from '@/lib/utils/logger'
 
 export async function POST(request: NextRequest) {
+  const log = createLogger('api:ai:vision')
   const rateLimited = await applyRateLimit(request, 'ai-vision')
   if (rateLimited) return rateLimited
 
@@ -45,7 +47,7 @@ export async function POST(request: NextRequest) {
       if (round > 0 && allKeysExhausted()) {
         const waitMs = getRecoveryWaitMs()
         if (waitMs > 0 && waitMs <= 45000) {
-          console.log(`[vision] All keys exhausted. Waiting ${Math.ceil(waitMs / 1000)}s for recovery...`)
+          log.info(`All keys exhausted. Waiting ${Math.ceil(waitMs / 1000)}s for recovery...`)
           await new Promise(resolve => setTimeout(resolve, waitMs + 500))
         } else if (waitMs > 45000) {
           break
@@ -72,28 +74,28 @@ export async function POST(request: NextRequest) {
           const msg = err instanceof Error ? err.message : 'Erreur inconnue'
           lastError = msg
           if (msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED')) {
-            console.warn(`[vision] Key ${attempt + 1}/${totalKeys} exhausted (round ${round + 1}), cooling down 60s`)
+            log.warn(`Key ${attempt + 1}/${totalKeys} exhausted (round ${round + 1}), cooling down 60s`)
             markKeyExhausted()
             rotateGeminiKey()
             continue
           }
           if (msg.includes('503') || msg.includes('overloaded')) {
-            console.warn(`[vision] Key ${attempt + 1}/${totalKeys} overloaded, trying next`)
+            log.warn(`Key ${attempt + 1}/${totalKeys} overloaded, trying next`)
             rotateGeminiKey()
             continue
           }
-          console.error('[vision] Gemini error:', msg)
+          log.error('Gemini error', msg)
           break
         }
       }
     }
 
-    console.error('[vision] All retries failed:', lastError)
+    log.error('All retries failed', lastError)
     return NextResponse.json({ error: 'Erreur d\'analyse image' }, { status: 500 })
 
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Erreur inconnue'
-    console.error('[vision]', msg)
+    log.error('Unexpected error', msg)
     return NextResponse.json({ error: 'Erreur d\'analyse image' }, { status: 500 })
   }
 }
