@@ -389,8 +389,9 @@ export async function enrollNewMemberFromSubmission(
         await supabase.from('parcelles').insert({
           member_id: newMember.id,
           cooperative_id: targetCooperativeId,
-          culture_name: culture,
-          surface_ha: surface,
+          name: 'Parcelle ' + culture,
+          culture_principale: culture,
+          superficie_ha: surface,
           soil_type: typeSol || null,
           irrigation_type: irrigation || null,
           source: 'kobo',

@@ -18,8 +18,8 @@ import type { Cooperative } from '@/app/context/cooperative-context'
 
 interface Parcelle {
   id: string
-  culture_name: string
-  surface_ha: number
+  culture_principale: string
+  superficie_ha: number
   soil_type: string | null
   irrigation_type: string | null
   source: string | null
@@ -40,7 +40,7 @@ interface Production {
 
 interface Stats {
   total_parcelles: number
-  total_surface_ha: number
+  total_superficie_ha: number
   cultures: { name: string; count: number; surface: number }[]
   irrigation_count: number
 }
@@ -115,26 +115,26 @@ export default function ParcellesPage() {
     if (!scopeIds.length) return
     const { data } = await supabase
       .from('parcelles')
-      .select('culture_name, surface_ha, irrigation_type')
+      .select('culture_principale, superficie_ha, irrigation_type')
       .in('cooperative_id', scopeIds)
 
     if (!data) return
 
-    const totalSurface = data.reduce((acc, p) => acc + (p.surface_ha || 0), 0)
+    const totalSurface = data.reduce((acc, p) => acc + (p.superficie_ha || 0), 0)
     const cultureMap: Record<string, { count: number; surface: number }> = {}
     let irrigCount = 0
     for (const p of data) {
-      const c = p.culture_name || 'Inconnue'
+      const c = p.culture_principale || 'Inconnue'
       if (!cultureMap[c]) cultureMap[c] = { count: 0, surface: 0 }
       cultureMap[c].count++
-      cultureMap[c].surface += p.surface_ha || 0
+      cultureMap[c].surface += p.superficie_ha || 0
       if (p.irrigation_type && p.irrigation_type.toLowerCase() !== 'non') irrigCount++
     }
     const culturesArr = Object.entries(cultureMap)
       .map(([name, v]) => ({ name, count: v.count, surface: v.surface }))
       .sort((a, b) => b.count - a.count)
 
-    setStats({ total_parcelles: data.length, total_surface_ha: totalSurface, cultures: culturesArr, irrigation_count: irrigCount })
+    setStats({ total_parcelles: data.length, total_superficie_ha: totalSurface, cultures: culturesArr, irrigation_count: irrigCount })
   }, [scopeIds, supabase])
 
   const fetchParcelles = useCallback(async () => {
@@ -145,15 +145,15 @@ export default function ParcellesPage() {
 
     let query = supabase
       .from('parcelles')
-      .select('id, culture_name, surface_ha, soil_type, irrigation_type, source, created_at, cooperative_id, member:member_id(first_name, last_name, phone)', { count: 'exact' })
+      .select('id, culture_principale, superficie_ha, soil_type, irrigation_type, source, created_at, cooperative_id, member:member_id(first_name, last_name, phone)', { count: 'exact' })
       .in('cooperative_id', scopeIds)
       .order('created_at', { ascending: false })
       .range(from, to)
 
-    if (filterCulture !== 'all') query = query.eq('culture_name', filterCulture)
+    if (filterCulture !== 'all') query = query.eq('culture_principale', filterCulture)
     if (filterIrrigation === 'oui') query = query.not('irrigation_type', 'eq', 'non').not('irrigation_type', 'is', null)
     if (filterIrrigation === 'non') query = query.eq('irrigation_type', 'non')
-    if (debouncedSearch) query = query.ilike('culture_name', `%${debouncedSearch}%`)
+    if (debouncedSearch) query = query.ilike('culture_principale', `%${debouncedSearch}%`)
 
     const { data, count } = await query
     setParcelles((data as unknown as Parcelle[]) ?? [])
@@ -209,7 +209,7 @@ export default function ParcellesPage() {
           ...parcelles.map((p) => [
             coopName(p.cooperative_id) ?? '',
             p.member ? `${p.member.first_name} ${p.member.last_name}` : '',
-            p.culture_name, String(p.surface_ha ?? ''),
+            p.culture_principale, String(p.superficie_ha ?? ''),
             p.soil_type ?? '', p.irrigation_type ?? '',
             new Date(p.created_at).toLocaleDateString('fr-FR'),
           ]),
@@ -246,7 +246,7 @@ export default function ParcellesPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { icon: MapPin, color: 'green', label: 'Parcelles', value: stats.total_parcelles },
-            { icon: BarChart3, color: 'blue', label: 'Hectares totaux', value: stats.total_surface_ha.toFixed(1) },
+            { icon: BarChart3, color: 'blue', label: 'Hectares totaux', value: stats.total_superficie_ha.toFixed(1) },
             { icon: Sprout, color: 'emerald', label: 'Cultures', value: stats.cultures.length },
             { icon: Droplets, color: 'cyan', label: 'Irriguées', value: stats.irrigation_count },
           ].map(({ icon: Icon, color, label, value }) => (
@@ -393,11 +393,11 @@ export default function ParcellesPage() {
                         <td className="px-4 py-3">
                           <span className="inline-flex items-center gap-1">
                             <Sprout className="h-3.5 w-3.5 text-green-600 shrink-0" />
-                            {p.culture_name}
+                            {p.culture_principale}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right font-mono tabular-nums">
-                          {p.surface_ha?.toFixed(2) ?? '—'}
+                          {p.superficie_ha?.toFixed(2) ?? '—'}
                         </td>
                         <td className="px-4 py-3 hidden md:table-cell">
                           {p.soil_type ? (

@@ -42,8 +42,8 @@ const vfpStyles = `
 `
 
 interface Parcelle {
-  culture_name: string | null
-  surface_ha: number | null
+  culture_principale: string | null
+  superficie_ha: number | null
   soil_type: string | null
   irrigation_type: string | null
 }
@@ -81,7 +81,7 @@ export default async function ParcellesPage({ params }: Props) {
   // Get parcelles
   const { data: parcelles } = await supabase
     .from('parcelles')
-    .select('culture_name, surface_ha, soil_type, irrigation_type')
+    .select('culture_principale, superficie_ha, soil_type, irrigation_type')
     .eq('member_id', card.member_id)
     .order('created_at', { ascending: false })
 
@@ -102,8 +102,8 @@ export default async function ParcellesPage({ params }: Props) {
 
   const location = [member?.canton, member?.prefecture].filter(Boolean).join(', ')
 
-  const totalHa = (parcelles ?? []).reduce((sum, p) => sum + (p.surface_ha ?? 0), 0)
-  const cultures = new Set((parcelles ?? []).map(p => p.culture_name).filter(Boolean))
+  const totalHa = (parcelles ?? []).reduce((sum, p) => sum + (p.superficie_ha ?? 0), 0)
+  const cultures = new Set((parcelles ?? []).map(p => p.culture_principale).filter(Boolean))
 
   const irrigationIcon = (type: string | null) => {
     if (!type) return null
@@ -192,11 +192,11 @@ export default async function ParcellesPage({ params }: Props) {
                   {/* Culture chip + surface */}
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <span className="text-sm font-semibold text-white truncate">
-                      {p.culture_name ?? 'Culture non spécifiée'}
+                      {p.culture_principale ?? 'Culture non spécifiée'}
                     </span>
-                    {p.surface_ha != null && (
+                    {p.superficie_ha != null && (
                       <span className="text-xs font-mono text-[var(--vfp-accent)] shrink-0">
-                        {p.surface_ha.toFixed(2)} ha
+                        {p.superficie_ha.toFixed(2)} ha
                       </span>
                     )}
                   </div>
