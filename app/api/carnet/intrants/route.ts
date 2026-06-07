@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/utils/logger'
+import { assertTenantAccess } from '@/lib/security/assert-access'
 
 const log = createLogger('api:carnet:intrants')
 
@@ -16,6 +17,11 @@ export async function GET(request: NextRequest) {
     const memberId = searchParams.get('member_id')
     const cooperativeId = searchParams.get('cooperative_id')
     const campagneId = searchParams.get('campagne_id')
+
+    if (cooperativeId) {
+      const tenantCheck = await assertTenantAccess(cooperativeId)
+      if (!tenantCheck.ok) return tenantCheck.response
+    }
 
     let query = supabase
       .from('intrants')
@@ -63,6 +69,9 @@ export async function POST(request: NextRequest) {
 
     const raw: unknown = await request.json()
     const body = raw as IntrantBody
+
+    const tenantCheck = await assertTenantAccess(body.cooperative_id)
+    if (!tenantCheck.ok) return tenantCheck.response
 
     if (!body.cooperative_id || !body.member_id || !body.name || !body.type || body.quantity == null || !body.unit) {
       return NextResponse.json({ error: 'Champs requis manquants' }, { status: 400 })

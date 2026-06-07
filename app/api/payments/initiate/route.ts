@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { initiateOrangeMoneyPayment, generatePaymentReference } from '@/lib/payments/orange-money'
+import { assertTenantAccess } from '@/lib/security/assert-access'
 
 interface InitiateBody {
   member_id: string
@@ -35,6 +36,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     provider,
     cooperative_id,
   } = body as InitiateBody
+
+  const tenantCheck = await assertTenantAccess(cooperative_id)
+  if (!tenantCheck.ok) return tenantCheck.response
 
   if (!member_id || !cooperative_id || !provider) {
     return NextResponse.json({ error: 'member_id, cooperative_id and provider are required' }, { status: 400 })
