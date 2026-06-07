@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Send, Bot, User, Loader2 } from 'lucide-react'
+import { ArrowLeft, Send, Bot, Loader2 } from 'lucide-react'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -30,6 +30,42 @@ const DEFAULT_SUGGESTIONS = [
   'Quand vendre mon soja ?',
   'Quelles cultures pour ma région ?',
 ]
+
+// ─── Typing indicator component ───────────────────────────────────────────────
+function TypingDots() {
+  return (
+    <div className="flex items-center gap-1 px-1 py-0.5">
+      {[0, 1, 2].map(i => (
+        <span
+          key={i}
+          className="w-1.5 h-1.5 rounded-full bg-emerald-400"
+          style={{
+            animation: 'typing-bounce 1.2s ease-in-out infinite',
+            animationDelay: `${i * 0.2}s`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+// ─── Engine badge component ────────────────────────────────────────────────────
+function EngineBadge({ engine, debate }: { engine: string; debate?: boolean }) {
+  const config =
+    engine === 'direct-data'
+      ? { icon: '⚡', label: 'Réponse instantanée', cls: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-300/70' }
+      : engine === 'agritogo-multiagent'
+      ? { icon: '🧠', label: 'Multi-Agent', cls: 'bg-purple-500/10 border-purple-500/20 text-purple-300/70' }
+      : engine === 'gemini-vision'
+      ? { icon: '📷', label: 'Analyse photo', cls: 'bg-blue-500/10 border-blue-500/20 text-blue-300/70' }
+      : { icon: '💬', label: 'Gemini', cls: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300/70' }
+
+  return (
+    <span className={`mt-1.5 inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border ${config.cls}`}>
+      {config.icon} {config.label}{debate ? ' • Débat' : ''}
+    </span>
+  )
+}
 
 export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_SUGGESTIONS }: AiChatProps) {
   const storageKey = `agritogo_chat_${cardNumber}`
@@ -185,26 +221,46 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
     }
   }, [])
 
+  // Derive first name for greeting
+  const firstName = memberName ? memberName.split(' ')[0] : ''
+
   return (
-    <div className="ai-chat">
-      {/* Header */}
-      <div className="ai-chat-header">
-        <button onClick={onBack} className="ai-chat-back" aria-label="Retour">
+    <div className="flex flex-col h-full min-h-[420px] max-h-[calc(100dvh-120px)] rounded-[20px] overflow-hidden"
+      style={{ background: 'linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.02))', border: '1px solid rgba(255,255,255,.08)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+
+      {/* ── HEADER ─────────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-white/[0.06]"
+        style={{ background: 'linear-gradient(to right, rgba(6,35,25,.80), rgba(4,30,28,.60))', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+        {/* Back button */}
+        <button
+          onClick={onBack}
+          className="text-emerald-400 p-1 hover:text-emerald-300 transition-colors flex-shrink-0"
+          aria-label="Retour"
+        >
           <ArrowLeft size={18} />
         </button>
-        <div className="ai-chat-title">
-          <div className="ai-chat-avatar">
-            <Bot size={18} />
+
+        {/* Avatar + identity */}
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+          <div className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, #34d399, #14b8a6)' }}>
+            <Bot size={20} className="text-white" />
           </div>
-          <div>
-            <p className="ai-chat-name">AgriTogo IA</p>
-            <p className="ai-chat-sub">Assistant agricole intelligent</p>
+          <div className="min-w-0">
+            <p className="font-bold text-white text-[15px] leading-none">AgriTogo IA</p>
+            <p className="text-emerald-300/70 text-xs mt-0.5">Assistant agricole intelligent</p>
+            <div className="flex items-center gap-1 mt-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-emerald-400 text-[10px]">En ligne</span>
+            </div>
           </div>
         </div>
+
+        {/* Clear button */}
         {messages.length > 0 && (
           <button
             onClick={() => { setMessages([]); try { sessionStorage.removeItem(storageKey) } catch {} }}
-            className="ml-auto text-[11px] text-white/30 hover:text-white/50 active:opacity-60 transition-colors"
+            className="text-white/25 text-[11px] hover:text-white/50 active:opacity-60 transition-colors flex-shrink-0"
             title="Effacer la conversation"
           >
             ✕ Effacer
@@ -212,63 +268,119 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
         )}
       </div>
 
-      {/* Messages */}
-      <div className="ai-chat-messages" ref={scrollRef}>
-        {/* Welcome message */}
+      {/* ── MESSAGES AREA ──────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3" ref={scrollRef}>
+
+        {/* ── WELCOME SCREEN ── */}
         {messages.length === 0 && (
-          <div className="ai-chat-welcome">
-            <div className="ai-chat-welcome-icon">
-              <Bot size={28} />
+          <div className="flex flex-col items-center text-center px-2 pt-4 pb-2 gap-0">
+            {/* Avatar with halo */}
+            <div
+              className="w-[72px] h-[72px] rounded-2xl flex items-center justify-center mb-4"
+              style={{
+                background: 'linear-gradient(135deg, #34d399, #14b8a6)',
+                animation: 'halo-pulse 2.5s ease-in-out infinite',
+              }}
+            >
+              <Bot size={34} className="text-white" />
             </div>
-            <p className="ai-chat-welcome-title">
-              Bonjour{memberName ? ` ${memberName}` : ''} !
+
+            {/* Greeting */}
+            <p className="text-2xl font-bold text-white mb-1"
+              style={{ animation: 'chat-fade-up 0.4s ease both', animationDelay: '100ms' }}>
+              Bonjour{firstName ? ` ${firstName}` : ''} ! 👋
             </p>
-            <p className="ai-chat-welcome-text">
-              Je suis AgriTogo, votre assistant agricole IA. Je connais votre zone, les prix du marché,
-              et je peux <strong>analyser vos plantes malades en photo</strong> 📷 ou écouter votre voix 🎤.
+            <p className="text-emerald-300/70 text-sm mb-5"
+              style={{ animation: 'chat-fade-up 0.4s ease both', animationDelay: '150ms' }}>
+              Je suis AgriTogo IA
             </p>
-            <div className="ai-chat-suggestions">
+
+            {/* Capability cards */}
+            <div className="grid grid-cols-3 gap-2 w-full max-w-[300px] mb-5"
+              style={{ animation: 'chat-fade-up 0.4s ease both', animationDelay: '200ms' }}>
+              {[
+                { icon: '📊', label: 'Prix Marchés' },
+                { icon: '📷', label: 'Photo Maladie' },
+                { icon: '🎤', label: 'Voix Dictée' },
+              ].map((cap) => (
+                <div key={cap.label}
+                  className="bg-white/5 border border-white/10 rounded-2xl p-3 text-center">
+                  <span className="text-2xl block mb-1">{cap.icon}</span>
+                  <span className="text-white/60 text-xs leading-tight block">{cap.label}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Suggestion pills */}
+            <div className="flex flex-col gap-2 w-full max-w-[320px]"
+              style={{ animation: 'chat-fade-up 0.4s ease both', animationDelay: '350ms' }}>
               {suggestions.map((s, i) => (
                 <button
                   key={i}
-                  className="ai-chat-suggestion"
+                  className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 rounded-full px-4 py-2.5 text-sm text-left flex items-center justify-between hover:bg-emerald-500/15 active:scale-[0.98] transition-all"
                   onClick={() => {
                     setInput(s)
                     inputRef.current?.focus()
                   }}
                 >
-                  {s}
+                  <span>{s}</span>
+                  <span className="text-emerald-400/60 ml-2">→</span>
                 </button>
               ))}
             </div>
           </div>
         )}
 
+        {/* ── MESSAGE LIST ── */}
         {messages.map((m, i) => {
           const isLastAssistant = m.role === 'assistant' && i === messages.length - 1 && !loading
           const followUps = isLastAssistant ? getFollowUpSuggestions(m.content) : []
+          const isUser = m.role === 'user'
+
           return (
             <div key={i}>
-              <div className={`ai-msg ai-msg-${m.role}`}>
-                <div className="ai-msg-avatar">
-                  {m.role === 'assistant' ? <Bot size={14} /> : <User size={14} />}
+              <div className={`flex gap-2 ${isUser ? 'flex-row-reverse self-end ml-auto max-w-[80%]' : 'flex-row self-start mr-auto max-w-[85%]'}`}
+                style={{ animation: isUser ? 'chat-slide-left 0.25s ease both' : 'chat-slide-right 0.25s ease both' }}>
+
+                {/* Avatar */}
+                <div className={`w-7 h-7 flex-shrink-0 flex items-center justify-center text-[11px] font-semibold ${isUser ? 'rounded-full bg-white/15 text-white/80' : 'rounded-xl bg-emerald-500/20 text-emerald-300'}`}>
+                  {isUser
+                    ? (firstName ? firstName[0].toUpperCase() : <span>U</span>)
+                    : <Bot size={13} />}
                 </div>
-                <div className="ai-msg-bubble">
-                  {renderMd(m.content)}
+
+                {/* Bubble */}
+                <div>
+                  <div
+                    className={`px-3.5 py-2.5 text-sm leading-relaxed ${
+                      isUser
+                        ? 'rounded-2xl rounded-tr-sm text-emerald-50'
+                        : 'rounded-2xl rounded-tl-sm text-emerald-50'
+                    }`}
+                    style={isUser
+                      ? { background: 'linear-gradient(135deg, rgba(52,211,153,.25), rgba(20,184,166,.15))', border: '1px solid rgba(52,211,153,.20)' }
+                      : { background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.08)' }
+                    }
+                  >
+                    {renderMd(m.content)}
+                  </div>
+
+                  {/* Engine badge */}
                   {m.role === 'assistant' && m.engine && (
-                    <span className="ai-msg-engine">
-                      {m.engine === 'direct-data' ? '⚡ Réponse instantanée' :
-                       m.engine === 'agritogo-multiagent' ? '🧠 Multi-Agent' :
-                       m.engine === 'gemini-vision' ? '📷 Analyse photo' : '💬 Gemini'}
-                      {m.debate ? ' • Débat' : ''}
-                    </span>
+                    <EngineBadge engine={m.engine} debate={m.debate} />
                   )}
                 </div>
               </div>
+
+              {/* Follow-up chips */}
               {followUps.length > 0 && (
-                <div className="ai-followups">
+                <div className="flex flex-wrap gap-1.5 mt-2 ml-9">
                   {followUps.map((s, j) => (
-                    <button key={j} className="ai-followup-chip" onClick={() => sendText(s)}>
+                    <button
+                      key={j}
+                      className="bg-white/5 border border-white/10 text-white/60 rounded-full px-3 py-1 text-[12px] hover:bg-emerald-500/10 hover:border-emerald-500/20 hover:text-emerald-300 active:scale-95 transition-all"
+                      onClick={() => sendText(s)}
+                    >
                       {s}
                     </button>
                   ))}
@@ -278,19 +390,28 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
           )
         })}
 
+        {/* ── TYPING INDICATOR ── */}
         {(loading || photoLoading) && (
-          <div className="ai-msg ai-msg-assistant">
-            <div className="ai-msg-avatar"><Bot size={14} /></div>
-            <div className="ai-msg-bubble ai-msg-typing">
-              <Loader2 size={16} className="animate-spin" />
-              <span>{photoLoading ? 'Analyse de la photo…' : 'Réflexion en cours…'}</span>
+          <div className="flex gap-2 self-start max-w-[85%]"
+            style={{ animation: 'chat-slide-right 0.25s ease both' }}>
+            <div className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
+              <Bot size={13} />
+            </div>
+            <div className="rounded-2xl rounded-tl-sm px-3.5 py-2.5 flex flex-col gap-1"
+              style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.08)' }}>
+              <TypingDots />
+              <span className="text-emerald-300/50 text-[11px]">
+                {photoLoading ? 'Analyse de la photo…' : 'AgriTogo réfléchit…'}
+              </span>
             </div>
           </div>
         )}
       </div>
 
-      {/* Input */}
-      <div className="ai-chat-input-bar">
+      {/* ── INPUT BAR ──────────────────────────────────────────────────────── */}
+      <div className="flex gap-2 px-3 py-3 items-center border-t border-white/[0.08]"
+        style={{ background: 'rgba(0,0,0,.30)' }}>
+
         {/* Hidden file input for photo capture */}
         <input
           ref={photoInputRef}
@@ -300,10 +421,12 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
           style={{ display: 'none' }}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhoto(f) }}
         />
+
         {/* Camera button */}
         <button
           type="button"
-          className="ai-chat-cam"
+          className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl text-blue-300 transition-all disabled:opacity-40 hover:bg-blue-500/20 active:scale-95"
+          style={{ background: 'rgba(59,130,246,.15)', border: '1px solid rgba(59,130,246,.25)' }}
           onClick={() => photoInputRef.current?.click()}
           disabled={loading || photoLoading || isListening}
           aria-label="Photographier une plante malade"
@@ -311,20 +434,37 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
         >
           {photoLoading ? <Loader2 size={16} className="animate-spin" /> : '📷'}
         </button>
+
         {/* Mic button */}
         <button
           type="button"
-          className={`ai-chat-mic ${isListening ? 'ai-chat-mic-active' : ''}`}
+          className={`w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl text-[17px] transition-all disabled:opacity-40 ${
+            isListening
+              ? 'text-red-300 ring-2 ring-red-500/30 animate-pulse'
+              : 'text-white/60 hover:bg-white/12 active:scale-95'
+          }`}
+          style={isListening
+            ? { background: 'rgba(239,68,68,.20)', border: '1px solid rgba(239,68,68,.40)' }
+            : { background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.12)' }
+          }
           onClick={toggleVoice}
           disabled={loading || photoLoading}
           aria-label={isListening ? 'Arrêter l\'écoute' : 'Dicter un message'}
         >
           {isListening ? '🔴' : '🎤'}
         </button>
+
+        {/* Text input */}
         <input
           ref={inputRef}
           type="text"
-          className="ai-chat-input"
+          className="flex-1 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none transition-colors"
+          style={{
+            background: 'rgba(255,255,255,.06)',
+            border: '1px solid rgba(255,255,255,.10)',
+          }}
+          onFocus={e => (e.currentTarget.style.borderColor = 'rgba(52,211,153,.40)')}
+          onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,.10)')}
           placeholder="Posez votre question…"
           value={input}
           maxLength={1000}
@@ -332,8 +472,18 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
           onKeyDown={(e) => e.key === 'Enter' && send()}
           disabled={loading || photoLoading}
         />
+
+        {/* Send button */}
         <button
-          className="ai-chat-send"
+          className={`w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl transition-all ${
+            input.trim() && !loading && !photoLoading
+              ? 'text-white active:scale-95'
+              : 'text-white/25 cursor-default'
+          }`}
+          style={input.trim() && !loading && !photoLoading
+            ? { background: '#10b981', boxShadow: '0 4px 14px rgba(16,185,129,.25)' }
+            : { background: 'rgba(255,255,255,.08)' }
+          }
           onClick={send}
           disabled={loading || photoLoading || !input.trim()}
           aria-label="Envoyer"
@@ -342,79 +492,35 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
         </button>
       </div>
 
+      {/* ── GLOBAL ANIMATIONS ─────────────────────────────────────────────── */}
       <style>{`
-        .ai-chat { display:flex; flex-direction:column; height: 100%; min-height: 420px; max-height: calc(100dvh - 120px); border-radius: 20px; overflow: hidden;
-          background: linear-gradient(160deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
-          border: 1px solid rgba(255,255,255,.08);
-          backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        @keyframes typing-bounce {
+          0%, 60%, 100% { transform: translateY(0); opacity: 1; }
+          30% { transform: translateY(-6px); opacity: 0.7; }
         }
-        .ai-chat-header { display:flex; align-items:center; gap:10px; padding:14px 16px;
-          border-bottom: 1px solid rgba(255,255,255,.06);
-          background: rgba(0,0,0,.15);
+        @keyframes chat-fade-up {
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
-        .ai-chat-back { background:none; border:none; color:var(--vfp-accent-bright); cursor:pointer; padding:4px; }
-        .ai-chat-title { display:flex; align-items:center; gap:10px; }
-        .ai-chat-avatar { width:36px; height:36px; border-radius:50%; display:grid; place-items:center;
-          background: linear-gradient(135deg, var(--vfp-cta), var(--vfp-accent-dim)); color:var(--vfp-cta-fg); font-weight:700;
+        @keyframes chat-slide-left {
+          from { opacity: 0; transform: translateX(16px); }
+          to   { opacity: 1; transform: translateX(0); }
         }
-        .ai-chat-name { color:#eafff2; font-weight:700; font-size:15px; line-height:1; }
-        .ai-chat-sub { color:var(--vfp-accent-dim); font-size:13px; }
-        .ai-chat-messages { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px; }
-        .ai-chat-welcome { text-align:center; padding:20px 10px; }
-        .ai-chat-welcome-icon { width:52px; height:52px; border-radius:50%; display:grid; place-items:center;
-          background:oklch(0.72 0.18 142 / 0.12); border:1px solid oklch(0.72 0.18 142 / 0.30); color:var(--vfp-accent-bright); margin:0 auto 12px; }
-        .ai-chat-welcome-title { color:#eafff2; font-weight:700; font-size:18px; margin:0 0 6px; }
-        .ai-chat-welcome-text { color:#aedcbf; font-size:14px; margin:0 0 16px; max-width:320px; margin-left:auto; margin-right:auto; }
-        .ai-chat-suggestions { display:flex; flex-direction:column; gap:8px; }
-        .ai-chat-suggestion { background:oklch(0.72 0.18 142 / 0.08); border:1px solid oklch(0.72 0.18 142 / 0.20); color:var(--vfp-accent-bright);
-          border-radius:12px; padding:10px 14px; font-size:14px; cursor:pointer; text-align:left;
-          transition: background .2s; }
-        .ai-chat-suggestion:active { background:oklch(0.72 0.18 142 / 0.18); }
-        .ai-msg { display:flex; gap:8px; max-width:88%; }
-        .ai-msg-user { align-self:flex-end; flex-direction:row-reverse; }
-        .ai-msg-assistant { align-self:flex-start; }
-        .ai-msg-avatar { width:26px; height:26px; border-radius:50%; display:grid; place-items:center; shrink:0;
-          font-size:11px; }
-        .ai-msg-assistant .ai-msg-avatar { background:oklch(0.72 0.18 142 / 0.15); color:var(--vfp-accent-bright); }
-        .ai-msg-user .ai-msg-avatar { background:rgba(255,255,255,.1); color:#ccc; }
-        .ai-msg-bubble { padding:10px 14px; border-radius:16px; font-size:14px; line-height:1.5; }
-        .ai-msg-bubble p { margin:0 0 4px; } .ai-msg-bubble p:last-child { margin:0; }
-        .ai-msg-assistant .ai-msg-bubble { background:rgba(255,255,255,.06); color:#e0f5eb; border-bottom-left-radius:4px; }
-        .ai-msg-user .ai-msg-bubble { background:oklch(0.72 0.18 142 / 0.18); color:#eafff2; border-bottom-right-radius:4px; }
-        .ai-msg-typing { display:flex; align-items:center; gap:8px; color:var(--vfp-accent-dim); font-size:13px; }
-        .ai-msg-engine { display:block; margin-top:6px; font-size:11px; color:var(--vfp-accent-dim); letter-spacing:.3px; }
-        .ai-followups { display:flex; flex-wrap:wrap; gap:6px; padding:4px 4px 0 34px; }
-        .ai-followup-chip { background:oklch(0.72 0.18 142 / 0.06); border:1px solid oklch(0.72 0.18 142 / 0.18);
-          color:var(--vfp-accent); border-radius:999px; padding:5px 12px; font-size:12px; cursor:pointer;
-          white-space:nowrap; transition:background .15s; }
-        .ai-followup-chip:active { background:oklch(0.72 0.18 142 / 0.14); }
-        .ai-chat-input-bar { display:flex; gap:8px; padding:12px 14px; align-items:center;
-          border-top: 1px solid rgba(255,255,255,.06); background:rgba(0,0,0,.15); }
-        .ai-chat-input { flex:1; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1);
-          border-radius:999px; padding:10px 16px; color:#eafff2; font-size:14px; outline:none; }
-        .ai-chat-input::placeholder { color:var(--vfp-accent-dim); }
-        .ai-chat-input:focus { border-color:oklch(0.72 0.18 142 / 0.40); }
-        .ai-chat-send { width:42px; height:42px; border:none; border-radius:50%; cursor:pointer;
-          background:linear-gradient(135deg, var(--vfp-cta), var(--vfp-accent-dim)); color:var(--vfp-cta-fg); display:grid; place-items:center;
-          transition:transform .15s, opacity .15s; flex-shrink:0; }
-        .ai-chat-send:disabled { opacity:.4; cursor:default; }
-        .ai-chat-send:active:not(:disabled) { transform:scale(.92); }
-        .ai-inline-code { background:rgba(0,0,0,.06); padding:1px 5px; border-radius:4px; font-size:.88em; font-family:monospace; }
-        .ai-md-li { padding-left:.8em; text-indent:-.8em; }
-        .ai-msg-bubble strong { font-weight:600; color:var(--vfp-accent-bright); }
-        .ai-msg-bubble em { font-style:italic; color:var(--vfp-accent); }
-        .ai-chat-mic { width:38px; height:38px; border:none; border-radius:50%; cursor:pointer; background:rgba(255,255,255,0.06); color:#eafff2; display:grid; place-items:center; font-size:16px; transition:background .15s, transform .1s; flex-shrink:0; }
-        .ai-chat-mic:disabled { opacity:.4; cursor:default; }
-        .ai-chat-mic-active { background:rgba(239,68,68,0.2); animation:mic-pulse 1s ease-in-out infinite; }
-        @keyframes mic-pulse { 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.12); } }
-        .ai-chat-cam { width:38px; height:38px; border:none; border-radius:50%; cursor:pointer; background:rgba(255,255,255,0.06); display:grid; place-items:center; font-size:16px; transition:background .15s; flex-shrink:0; }
-        .ai-chat-cam:disabled { opacity:.4; cursor:default; }
-        .ai-chat-cam:active:not(:disabled) { background:rgba(255,255,255,0.12); }
-      `}
-    </style>
+        @keyframes chat-slide-right {
+          from { opacity: 0; transform: translateX(-16px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes halo-pulse {
+          0%, 100% { box-shadow: 0 0 0 8px rgba(52,211,153,.15), 0 0 0 16px rgba(52,211,153,.07); }
+          50% { box-shadow: 0 0 0 12px rgba(52,211,153,.20), 0 0 0 22px rgba(52,211,153,.08); }
+        }
+        .ai-inline-code { background: rgba(0,0,0,.18); padding: 1px 5px; border-radius: 4px; font-size: .88em; font-family: monospace; }
+        .ai-md-li { padding-left: .8em; text-indent: -.8em; }
+      `}</style>
     </div>
   )
 }
+
 function getFollowUpSuggestions(response: string): string[] {
   const lo = response.toLowerCase()
   const picks: string[] = []
@@ -447,13 +553,13 @@ function renderMd(text: string) {
     const src = content
     while ((match = regex.exec(src)) !== null) {
       if (match.index > last) parts.push(src.slice(last, match.index))
-      if (match[2]) parts.push(<strong key={`b${i}-${key++}`}>{match[2]}</strong>)
-      else if (match[3]) parts.push(<em key={`i${i}-${key++}`}>{match[3]}</em>)
+      if (match[2]) parts.push(<strong key={`b${i}-${key++}`} className="font-semibold text-emerald-200">{match[2]}</strong>)
+      else if (match[3]) parts.push(<em key={`i${i}-${key++}`} className="italic text-emerald-300">{match[3]}</em>)
       else if (match[4]) parts.push(<code key={`c${i}-${key++}`} className="ai-inline-code">{match[4]}</code>)
       last = match.index + match[0].length
     }
     if (last < src.length) parts.push(src.slice(last))
     if (isBullet) return <p key={i} className="ai-md-li">{'• '}{parts}</p>
-    return <p key={i}>{parts}</p>
+    return <p key={i} className="m-0 last:mb-0 mb-1">{parts}</p>
   })
 }
