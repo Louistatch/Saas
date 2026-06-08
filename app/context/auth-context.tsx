@@ -1,8 +1,9 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createLogger } from '@/lib/utils/logger'
 import { setUserId, setTenantId, onLogoutBroadcast, destroySession } from '@/lib/auth/session'
 import type { AuthUser, UserRole } from '@/types/domain'
@@ -54,8 +55,15 @@ function profileToAuthUser(profile: ProfileRow): AuthUser {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const supabase = useMemo(() => createClient(), [])
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
   const router = useRouter()
+
+  // Initialize the Supabase client only in the browser to avoid throwing
+  // during SSR prerendering when NEXT_PUBLIC env vars are baked in at
+  // Vercel build time but absent in a local build environment.
+  useEffect(() => {
+    setSupabase(createClient())
+  }, [])
 
   // Track user in session for cache namespacing
   useEffect(() => {
@@ -84,6 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = useCallback(
     async (userId: string): Promise<AuthUser | null> => {
+      if (!supabase) return null
       // Try up to 2 times (the profile trigger may not have fired yet on first login)
       for (let attempt = 0; attempt < 2; attempt++) {
         const { data, error } = await supabase
@@ -107,6 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   useEffect(() => {
+    if (!supabase) return
     let mounted = true
 
     const initAuth = async () => {
@@ -185,6 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string): Promise<AuthUser | null> => {
+      if (!supabase) throw new Error('Auth client not initialized')
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
       if (!data.user) return null
@@ -210,6 +221,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       lastName: string,
       cooperativeName?: string,
     ): Promise<{ needsEmailConfirmation: boolean }> => {
+      if (!supabase) throw new Error('Auth client not initialized')
       const { data, error } = await supabase.auth.signUp({
         email,
         password,

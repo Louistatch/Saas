@@ -16,7 +16,6 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState('')
   const [sent, setSent] = useState(false)
   const [loading, setLoading] = useState(false)
-  const supabase = createClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -24,6 +23,7 @@ export default function ForgotPasswordPage() {
     const trimmedEmail = email.trim().toLowerCase()
     if (!trimmedEmail) { setError('L\'email est requis'); return }
     setLoading(true)
+    const supabase = createClient()
     // [SECURITY FIX - PHANTOM-002] Ne jamais révéler si l'email existe ou non
     await supabase.auth.resetPasswordForEmail(trimmedEmail, {
       redirectTo: `${window.location.origin}/auth/reset-password`,

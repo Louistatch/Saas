@@ -18,7 +18,18 @@ export function createClient(): SupabaseClient {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Missing Supabase environment variables')
+    // In the browser the vars MUST be present — throw so misconfiguration is obvious.
+    if (typeof window !== 'undefined') {
+      throw new Error('Missing Supabase environment variables')
+    }
+    // During SSR / static-generation (e.g. local build without .env.local) the
+    // NEXT_PUBLIC_* vars are absent. Return a lightweight placeholder; no Supabase
+    // methods are ever called server-side (they live inside useEffect / event handlers).
+    // In production, Vercel bakes these vars in at build time so this branch is never hit.
+    return createBrowserClient(
+      'https://placeholder.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiJ9.placeholder',
+    )
   }
 
   browserClient = createBrowserClient(supabaseUrl, supabaseAnonKey)
