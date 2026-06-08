@@ -6,6 +6,31 @@ const REGION_COORDS: Record<string, { lat: number; lon: number; city: string }> 
   'Savanes':   { lat: 10.863, lon: 0.207,  city: 'Dapaong' },
 }
 
+// ── In-memory caches (per region, keyed by region name) ──────────────────────
+// Shared across all requests within the same server process.
+// TTLs are intentionally short: hourly data shifts every hour, nowcast every 15 min.
+const TTL_DAILY_MS    = 30 * 60_000   // 30 min  — daily fallback
+const TTL_HOURLY_MS   = 15 * 60_000   // 15 min  — hourly strip
+const TTL_NOWCAST_MS  =  5 * 60_000   //  5 min  — minutely_15 nowcasting
+
+type CacheEntry<T> = { data: T; ts: number }
+
+const dailyCache:   Map<string, CacheEntry<WeatherDayLive[]>>    = new Map()
+const hourlyCache:  Map<string, CacheEntry<WeatherHour[]>>       = new Map()
+const nowcastCache: Map<string, CacheEntry<WeatherMinutely15[]>> = new Map()
+
+function fromCache<T>(cache: Map<string, CacheEntry<T>>, key: string, ttl: number): T | null {
+  const entry = cache.get(key)
+  if (entry && Date.now() - entry.ts < ttl) return entry.data
+  return null
+}
+
+function toCache<T>(cache: Map<string, CacheEntry<T>>, key: string, data: T): void {
+  cache.set(key, { data, ts: Date.now() })
+}
+
+// ── Interfaces ────────────────────────────────────────────────────────────────
+
 export interface WeatherDayLive {
   date: string
   temperature_max: number
@@ -33,6 +58,16 @@ export interface WeatherHour {
   is_day: number
 }
 
+export interface WeatherMinutely15 {
+  time: string        // "YYYY-MM-DDTHH:MM" in Africa/Lagos (UTC+1)
+  precipitation: number
+  rain: number
+  weather_code: number
+  temperature: number
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 export function getRegionCoords(region: string): { lat: number; lon: number; city: string } | null {
   const key = Object.keys(REGION_COORDS).find(
     k => k.toLowerCase() === region.trim().toLowerCase()
@@ -40,7 +75,12 @@ export function getRegionCoords(region: string): { lat: number; lon: number; cit
   return key ? REGION_COORDS[key] : null
 }
 
+// ── Fetch functions ───────────────────────────────────────────────────────────
+
 export async function fetchOpenMeteoForRegion(region: string): Promise<WeatherDayLive[]> {
+  const hit = fromCache(dailyCache, region, TTL_DAILY_MS)
+  if (hit) return hit
+
   const coords = getRegionCoords(region)
   if (!coords) return []
 
@@ -84,7 +124,7 @@ export async function fetchOpenMeteoForRegion(region: string): Promise<WeatherDa
     }
 
     const d = json.daily
-    return d.time.map((date, i) => ({
+    const result: WeatherDayLive[] = d.time.map((date, i) => ({
       date,
       temperature_max: d.temperature_2m_max[i] ?? 0,
       temperature_min: d.temperature_2m_min[i] ?? 0,
@@ -98,20 +138,17 @@ export async function fetchOpenMeteoForRegion(region: string): Promise<WeatherDa
       region,
       city: coords.city,
     }))
+    toCache(dailyCache, region, result)
+    return result
   } catch {
     return []
   }
 }
 
-export interface WeatherMinutely15 {
-  time: string        // "YYYY-MM-DDTHH:MM" in Africa/Lagos (UTC+1)
-  precipitation: number
-  rain: number
-  weather_code: number
-  temperature: number
-}
-
 export async function fetchMinutely15ForRegion(region: string): Promise<WeatherMinutely15[]> {
+  const hit = fromCache(nowcastCache, region, TTL_NOWCAST_MS)
+  if (hit) return hit
+
   const coords = getRegionCoords(region)
   if (!coords) return []
 
@@ -141,19 +178,24 @@ export async function fetchMinutely15ForRegion(region: string): Promise<WeatherM
     }
 
     const m = json.minutely_15
-    return m.time.map((time, i) => ({
+    const result: WeatherMinutely15[] = m.time.map((time, i) => ({
       time,
       precipitation: m.precipitation[i] ?? 0,
       rain: m.rain[i] ?? 0,
       weather_code: m.weather_code[i] ?? 0,
       temperature: m.temperature_2m[i] ?? 0,
     }))
+    toCache(nowcastCache, region, result)
+    return result
   } catch {
     return []
   }
 }
 
 export async function fetchHourlyForRegion(region: string): Promise<WeatherHour[]> {
+  const hit = fromCache(hourlyCache, region, TTL_HOURLY_MS)
+  if (hit) return hit
+
   const coords = getRegionCoords(region)
   if (!coords) return []
 
@@ -196,7 +238,7 @@ export async function fetchHourlyForRegion(region: string): Promise<WeatherHour[
     }
 
     const h = json.hourly
-    return h.time.map((time, i) => ({
+    const result: WeatherHour[] = h.time.map((time, i) => ({
       time,
       temperature: h.temperature_2m[i] ?? 0,
       apparent_temperature: h.apparent_temperature[i] ?? 0,
@@ -207,9 +249,9 @@ export async function fetchHourlyForRegion(region: string): Promise<WeatherHour[
       uv_index: h.uv_index[i] ?? 0,
       is_day: h.is_day[i] ?? 1,
     }))
+    toCache(hourlyCache, region, result)
+    return result
   } catch {
     return []
   }
 }
-
-
