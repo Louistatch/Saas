@@ -10,22 +10,31 @@
  *     Pour les questions simples (prix, tendance, listes) → répond directement
  *     depuis Supabase sans aucun appel LLM. 70% des questions.
  *
- *   NIVEAU 3a — AgriTogo Multi-Agent (Railway, ~5s, rotation clés)
+ *   NIVEAU 3a — AgriTogo Multi-Agent (Railway, ~5s)
  *     Pour les questions complexes (conseil, décision, interprétation) →
  *     appelle le moteur multi-agent avec 6 agents, 14 outils, 5 modèles ML.
  *
- *   NIVEAU 3b — Gemini Direct (fallback, ~3s, rotation clés)
- *     Si AgriTogo est down → fallback contextuel avec Gemini.
+ *   NIVEAU 3b — DeepSeek Direct (fallback, ~2s, rotation clés)
+ *     Si AgriTogo est down → fallback contextuel avec DeepSeek-V3 (ou R1).
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 import { parseQuery } from '@/lib/agritogo/nlp-router'
 import { tryDirectAction } from '@/lib/agritogo/direct-actions'
 import { buildProducerContext } from '@/lib/agritogo/producer-context'
-import { getGeminiKey, rotateGeminiKey, getKeyCount, markKeyExhausted, getRecoveryWaitMs, allKeysExhausted } from '@/lib/utils/gemini-keys'
+import {
+  getDeepSeekKey,
+  rotateDeepSeekKey,
+  getDeepSeekKeyCount,
+  markDeepSeekKeyExhausted,
+  getDeepSeekRecoveryWaitMs,
+  allDeepSeekKeysExhausted,
+  createDeepSeekClient,
+  DEEPSEEK_MODEL,
+} from '@/lib/utils/deepseek-client'
+import OpenAI from 'openai'
 import { createLogger } from '@/lib/utils/logger'
 
 const MAX_HISTORY = 10
@@ -60,7 +69,6 @@ export async function POST(request: NextRequest) {
     try {
       const directResult = await tryDirectAction(parsed)
       if (directResult) {
-        // Save conversation
         const supabase = await createClient()
         await supabase.from('ai_conversations').insert([
           { card_number: cardNumber, role: 'user', content: userMessage },
@@ -101,7 +109,6 @@ export async function POST(request: NextRequest) {
       if (agriRes.ok) {
         const data = await agriRes.json()
         if (data.response) {
-          // Save conversation
           const supabase = await createClient()
           await supabase.from('ai_conversations').insert([
             { card_number: cardNumber, role: 'user', content: userMessage },
@@ -120,26 +127,29 @@ export async function POST(request: NextRequest) {
           })
         }
       }
-      log.warn('AgriTogo returned non-OK, falling back to Gemini')
+      log.warn('AgriTogo returned non-OK, falling back to DeepSeek')
     } catch (err) {
       log.warn('AgriTogo unreachable:', err instanceof Error ? err.message : err)
     }
   }
 
-  // ─── NIVEAU 3b : Gemini Direct (fallback with key rotation) ──
-  const firstKey = getGeminiKey()
+  // ─── NIVEAU 3b : DeepSeek Direct (fallback avec rotation de clés) ──
+  const firstKey = getDeepSeekKey()
   if (!firstKey) {
-    return NextResponse.json({ error: 'Service IA temporairement indisponible.' }, { status: 503 })
+    return NextResponse.json(
+      { error: 'Service IA temporairement indisponible. Configurez DEEPSEEK_API_KEY.' },
+      { status: 503 },
+    )
   }
 
   const supabase = await createClient()
   const supabaseAdmin = createAdminClient()
   let lastError = ''
 
-  // Build rich producer context (parcelles, cotisations, météo, prix, fiches, paiements, annonces)
+  // Construit le contexte riche du producteur (parcelles, météo, prix, cotisations…)
   const { systemPrompt } = await buildProducerContext(cardNumber, supabase, supabaseAdmin)
 
-  // Conversation history
+  // Historique de conversation (format OpenAI)
   const { data: history } = await supabaseAdmin
     .from('ai_conversations')
     .select('role, content')
@@ -147,40 +157,48 @@ export async function POST(request: NextRequest) {
     .order('created_at', { ascending: true })
     .limit(MAX_HISTORY)
 
-  const geminiHistory = (history ?? []).map((h) => ({
-    role: h.role === 'assistant' ? ('model' as const) : ('user' as const),
-    parts: [{ text: h.content }],
+  const historyMessages: OpenAI.Chat.ChatCompletionMessageParam[] = (history ?? []).map((h) => ({
+    role: (h.role === 'assistant' ? 'assistant' : 'user') as 'user' | 'assistant',
+    content: h.content,
   }))
 
-  // Gemini call with key rotation + cooldown + auto-recovery
-  const totalKeys = getKeyCount()
-  const MAX_ROUNDS = 2 // Try all keys, wait, try again once
+  // Appel DeepSeek avec rotation de clés + cooldown + auto-recovery
+  const totalKeys = getDeepSeekKeyCount()
+  const MAX_ROUNDS = 2
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    // If all keys are exhausted and this is round 2, wait for recovery
-    if (round > 0 && allKeysExhausted()) {
-      const waitMs = getRecoveryWaitMs()
+    if (round > 0 && allDeepSeekKeysExhausted()) {
+      const waitMs = getDeepSeekRecoveryWaitMs()
       if (waitMs > 0 && waitMs <= 45000) {
-        log.info(`All keys exhausted. Waiting ${Math.ceil(waitMs / 1000)}s for recovery...`)
+        log.info(`All DeepSeek keys exhausted. Waiting ${Math.ceil(waitMs / 1000)}s…`)
         await new Promise(resolve => setTimeout(resolve, waitMs + 500))
       } else if (waitMs > 45000) {
-        break // Don't make the user wait more than 45s
+        break
       }
     }
 
     for (let attempt = 0; attempt < totalKeys; attempt++) {
-      const key = getGeminiKey()
+      const key = getDeepSeekKey()
       if (!key) break
 
       try {
-        const genAI = new GoogleGenerativeAI(key)
-        const model = genAI.getGenerativeModel({
-          model: 'gemini-2.0-flash',
-          systemInstruction: systemPrompt,
+        const client = createDeepSeekClient(key)
+
+        const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+          { role: 'system', content: systemPrompt },
+          ...historyMessages,
+          { role: 'user', content: userMessage },
+        ]
+
+        const completion = await client.chat.completions.create({
+          model: DEEPSEEK_MODEL,
+          messages,
+          max_tokens: 1500,
+          temperature: 0.7,
         })
-        const chat = model.startChat({ history: geminiHistory })
-        const result = await chat.sendMessage(userMessage)
-        const aiResponse = result.response.text()
+
+        const aiResponse = completion.choices[0]?.message?.content ?? ''
+        if (!aiResponse) throw new Error('Réponse DeepSeek vide')
 
         await supabase.from('ai_conversations').insert([
           { card_number: cardNumber, role: 'user', content: userMessage },
@@ -189,34 +207,40 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
           response: aiResponse,
-          engine: 'gemini-direct',
+          engine: 'deepseek-direct',
           intent: parsed.intent,
           produit: parsed.produit,
           marche: parsed.marche,
           agent_type: null,
-          model_used: 'gemini-2.0-flash',
+          model_used: DEEPSEEK_MODEL,
           debate_used: false,
         })
+
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Erreur inconnue'
         lastError = msg
-        if (msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED')) {
-          log.warn(`Key ${attempt + 1}/${totalKeys} exhausted (round ${round + 1}), cooling down 60s`)
-          markKeyExhausted()
-          rotateGeminiKey()
-          continue
+
+        if (err instanceof OpenAI.APIError) {
+          if (err.status === 429) {
+            log.warn(`DeepSeek key ${attempt + 1}/${totalKeys} exhausted (round ${round + 1}), cooldown 60s`)
+            markDeepSeekKeyExhausted()
+            rotateDeepSeekKey()
+            continue
+          }
+          if (err.status === 503 || err.status === 529) {
+            log.warn(`DeepSeek key ${attempt + 1}/${totalKeys} overloaded, trying next`)
+            rotateDeepSeekKey()
+            continue
+          }
         }
-        if (msg.includes('503') || msg.includes('overloaded')) {
-          log.warn(`Key ${attempt + 1}/${totalKeys} overloaded, trying next`)
-          rotateGeminiKey()
-          continue
-        }
-        log.error('Gemini error', msg)
+
+        log.error('DeepSeek error', msg)
         break
       }
     }
   }
 
+  log.error('All DeepSeek keys exhausted', lastError)
   return NextResponse.json(
     { error: 'Toutes les clés IA sont épuisées. Réessayez dans quelques minutes.' },
     { status: 429 },
