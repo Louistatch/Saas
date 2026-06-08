@@ -16,6 +16,7 @@ const W_ICON  = 0.20
 
 // ── In-memory caches (per region) ────────────────────────────────────────────
 const TTL_DAILY_MS   = 30 * 60_000
+const TTL_SEASONAL_MS = 6 * 60 * 60_000
 const TTL_HOURLY_MS  = 15 * 60_000
 const TTL_NOWCAST_MS =  5 * 60_000
 
@@ -28,6 +29,7 @@ const caches = {
   hourlyGFS:   new Map<string, CE<WeatherHour[]>>(),
   hourlyICON:  new Map<string, CE<WeatherHour[]>>(),
   nowcast:     new Map<string, CE<WeatherMinutely15[]>>(),
+  seasonal:    new Map<string, CE<WeatherSeasonal[]>>(),
 }
 
 function fromCache<T>(map: Map<string, CE<T>>, key: string, ttl: number): T | null {
@@ -73,6 +75,12 @@ export interface WeatherMinutely15 {
   rain: number
   weather_code: number
   temperature: number
+}
+
+export interface WeatherSeasonal {
+  month: string
+  temperature_mean: number
+  precipitation_mm: number
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -426,4 +434,57 @@ export function mergeHourlyModels(
   }
 
   return result.sort((a, b) => a.time.localeCompare(b.time))
+}
+
+// ── Seasonal forecast ─────────────────────────────────────────────────────────
+
+/**
+ * Fetches a 3-month seasonal forecast from the CFS v2 model.
+ * Returns one WeatherSeasonal entry per month, sorted by month.
+ * TTL: 6 hours. Returns [] on any error.
+ */
+export async function fetchSeasonalForRegion(region: string): Promise<WeatherSeasonal[]> {
+  const hit = fromCache(caches.seasonal, region, TTL_SEASONAL_MS)
+  if (hit) return hit
+
+  const coords = getRegionCoords(region)
+  if (!coords) return []
+
+  const params = new URLSearchParams({
+    latitude:       String(coords.lat),
+    longitude:      String(coords.lon),
+    monthly:        'temperature_2m_mean,precipitation_sum',
+    forecast_months: '3',
+    timezone:       'Africa/Lagos',
+    models:         'cfs_v2',
+  })
+
+  try {
+    const res = await fetch(`https://seasonal-api.open-meteo.com/v1/seasonal?${params}`, {
+      signal: AbortSignal.timeout(8000),
+      headers: { 'Accept': 'application/json' },
+    })
+    if (!res.ok) return []
+
+    const json = await res.json() as {
+      monthly: {
+        time: string[]
+        temperature_2m_mean: (number | null)[]
+        precipitation_sum: (number | null)[]
+      }
+    }
+
+    const m = json.monthly
+    const result: WeatherSeasonal[] = m.time.map((month, i) => ({
+      month,
+      temperature_mean: m.temperature_2m_mean[i] ?? 0,
+      precipitation_mm: m.precipitation_sum[i] ?? 0,
+    }))
+
+    const sorted = result.sort((a, b) => a.month.localeCompare(b.month))
+    toCache(caches.seasonal, region, sorted)
+    return sorted
+  } catch {
+    return []
+  }
 }

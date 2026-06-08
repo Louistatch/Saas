@@ -9,6 +9,7 @@ import {
   fetchHourlyGFSForRegion,
   fetchHourlyICONForRegion,
   fetchMinutely15ForRegion,
+  fetchSeasonalForRegion,
   mergeWeatherModels,
   mergeHourlyModels,
   getRegionCoords,
@@ -61,6 +62,7 @@ export async function GET(
     hourlyGFS,
     hourlyICON,
     nowcastRaw,
+    seasonalRaw,
   ] = await Promise.all([
     supabaseAdmin
       .from('weather_data')
@@ -74,6 +76,7 @@ export async function GET(
     fetchHourlyGFSForRegion(region),
     fetchHourlyICONForRegion(region),
     fetchMinutely15ForRegion(region),
+    fetchSeasonalForRegion(region),
   ])
 
   // Merge hourly from 3 models
@@ -138,6 +141,7 @@ export async function GET(
       weather,
       hourly: mergedHourly,
       nowcast: nowcastRaw,
+      seasonal: seasonalRaw,
       region,
       city,
       data_source: dataSource,
