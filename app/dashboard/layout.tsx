@@ -23,6 +23,8 @@ import {
   Banknote,
   Code,
   PhoneCall,
+  MapPin,
+  CreditCard,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Logo } from '@/components/shared/logo'
@@ -31,6 +33,7 @@ import { performLogout } from '@/lib/auth/logout'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { ProtectedRoute } from '@/app/components/protected-route'
 import { NotificationBell } from '@/components/shared/notification-bell'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -48,13 +51,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard/marketplace', label: 'Comptes d\'exploitation', icon: ShoppingCart, roles: ['super_admin', 'cooperative_admin', 'member', 'guest'] },
     { href: '/dashboard/templates', label: 'Modèles', icon: FolderOpen, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/members', label: 'Membres', icon: Users, roles: ['super_admin', 'cooperative_admin', 'member'] },
-    { href: '/dashboard/parcelles', label: 'Parcelles', icon: FileText, roles: ['super_admin', 'cooperative_admin'] },
+    { href: '/dashboard/parcelles', label: 'Parcelles', icon: MapPin, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/agrimarket', label: 'AgriMarket', icon: ShoppingBag, roles: ['super_admin', 'cooperative_admin', 'member'] },
     { href: '/dashboard/carnet', label: 'Carnet Agricole', icon: BookOpen, roles: ['super_admin', 'cooperative_admin', 'member'] },
     { href: '/dashboard/matching', label: 'Matching', icon: Handshake, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/cotisations', label: 'Cotisations', icon: Banknote, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/techniciens', label: 'Techniciens', icon: PhoneCall, roles: ['super_admin', 'cooperative_admin'] },
-    { href: '/dashboard/cards', label: 'Cartes membres', icon: FileText, roles: ['super_admin', 'cooperative_admin', 'member'] },
+    { href: '/dashboard/cards', label: 'Cartes membres', icon: CreditCard, roles: ['super_admin', 'cooperative_admin', 'member'] },
     { href: '/dashboard/analytics', label: 'Statistiques', icon: BarChart3, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/integrations', label: 'Intégrations', icon: Zap, roles: ['super_admin', 'cooperative_admin'] },
     { href: '/dashboard/kobo-setup', label: 'KoboCollect', icon: Smartphone, roles: ['super_admin', 'cooperative_admin'] },
@@ -69,7 +72,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Logo size="sm" />
           <div className="flex items-center gap-2">
             {currentCooperative && <NotificationBell cooperativeId={currentCooperative.id} />}
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-muted-foreground hover:text-foreground">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md p-1"
+              aria-label={sidebarOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+              aria-expanded={sidebarOpen}
+              aria-controls="dashboard-sidebar"
+            >
               {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
           </div>
@@ -85,7 +94,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         )}
 
         {/* Sidebar */}
-        <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-card border-r border-border overflow-y-auto transform transition-transform duration-300 ease-in-out md:relative md:inset-auto md:z-auto md:w-64 md:flex md:flex-col md:sticky md:top-0 md:h-screen md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <aside id="dashboard-sidebar" className={`fixed inset-y-0 left-0 z-50 w-72 bg-card border-r border-border overflow-y-auto transform transition-transform duration-300 ease-in-out md:relative md:inset-auto md:z-auto md:w-64 md:flex md:flex-col md:sticky md:top-0 md:h-screen md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           <div className="hidden md:flex items-center gap-2 p-6 border-b border-border">
             <Logo size="md" />
           </div>
@@ -167,15 +176,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="flex items-center gap-3">
               {/* Cooperative switcher for super_admin */}
               {user?.role === 'super_admin' && cooperatives.length > 1 && (
-                <select
-                  className="text-sm border border-border rounded-md px-3 py-1.5 bg-background text-foreground"
+                <Select
                   value={currentCooperative?.id || ''}
-                  onChange={e => switchCooperative(e.target.value)}
+                  onValueChange={switchCooperative}
                 >
-                  {cooperatives.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                  <SelectTrigger size="sm" className="w-48">
+                    <SelectValue placeholder="Choisir une coopérative" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cooperatives.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
               {currentCooperative && <NotificationBell cooperativeId={currentCooperative.id} />}
             </div>

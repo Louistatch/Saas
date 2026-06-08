@@ -4,36 +4,52 @@ import type { CardStatus, MemberStatus, UserRole } from '@/types/domain'
 import { Shield } from 'lucide-react'
 
 const tone = {
-  green: 'bg-green-100 text-green-800',
-  yellow: 'bg-yellow-100 text-yellow-800',
-  gray: 'bg-gray-100 text-gray-700',
-  red: 'bg-red-100 text-red-800',
-  blue: 'bg-blue-100 text-blue-800',
-  purple: 'bg-purple-100 text-purple-800',
+  green:  'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  yellow: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+  gray:   'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400',
+  red:    'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+  blue:   'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+  purple: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
 }
 
 const CARD_TONE: Record<CardStatus, keyof typeof tone> = {
-  active: 'green',
+  active:  'green',
   pending: 'yellow',
   expired: 'gray',
   revoked: 'red',
 }
 
+const CARD_LABEL: Record<CardStatus, string> = {
+  active:  'Actif',
+  pending: 'En attente',
+  expired: 'Expiré',
+  revoked: 'Révoqué',
+}
+
 const MEMBER_TONE: Record<MemberStatus, keyof typeof tone> = {
-  active: 'green',
-  inactive: 'gray',
+  active:    'green',
+  inactive:  'gray',
   suspended: 'red',
 }
 
-const ROLE_TONE: Record<UserRole, keyof typeof tone> = {
-  super_admin: 'purple',
-  cooperative_admin: 'blue',
-  member: 'green',
-  guest: 'gray',
+const MEMBER_LABEL: Record<MemberStatus, string> = {
+  active:    'Actif',
+  inactive:  'Inactif',
+  suspended: 'Suspendu',
 }
 
-function capitalize(s: string) {
-  return s.charAt(0).toUpperCase() + s.slice(1)
+const ROLE_TONE: Record<UserRole, keyof typeof tone> = {
+  super_admin:       'purple',
+  cooperative_admin: 'blue',
+  member:            'green',
+  guest:             'gray',
+}
+
+const ROLE_LABEL: Record<UserRole, string> = {
+  super_admin:       'Super Admin',
+  cooperative_admin: 'Admin Coop.',
+  member:            'Membre',
+  guest:             'Invité',
 }
 
 function Pill({
@@ -60,12 +76,12 @@ function Pill({
 
 export function CardStatusBadge({ status }: { status: string }) {
   const key = (status in CARD_TONE ? status : 'pending') as CardStatus
-  return <Pill toneKey={CARD_TONE[key]}>{capitalize(key)}</Pill>
+  return <Pill toneKey={CARD_TONE[key]}>{CARD_LABEL[key]}</Pill>
 }
 
 export function MemberStatusBadge({ status }: { status: string }) {
   const key = (status in MEMBER_TONE ? status : 'inactive') as MemberStatus
-  return <Pill toneKey={MEMBER_TONE[key]}>{capitalize(key)}</Pill>
+  return <Pill toneKey={MEMBER_TONE[key]}>{MEMBER_LABEL[key]}</Pill>
 }
 
 export function RoleBadge({ role }: { role: string }) {
@@ -74,13 +90,13 @@ export function RoleBadge({ role }: { role: string }) {
   return (
     <Pill toneKey={ROLE_TONE[key]}>
       {showShield ? <Shield className="h-3 w-3" /> : null}
-      {key.replace('_', ' ')}
+      {ROLE_LABEL[key]}
     </Pill>
   )
 }
 
 export function PublishedBadge({ active }: { active: boolean }) {
   return (
-    <Pill toneKey={active ? 'green' : 'gray'}>{active ? 'Published' : 'Draft'}</Pill>
+    <Pill toneKey={active ? 'green' : 'gray'}>{active ? 'Publié' : 'Brouillon'}</Pill>
   )
 }
