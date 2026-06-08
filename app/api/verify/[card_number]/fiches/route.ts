@@ -25,17 +25,27 @@ export async function GET(
 
   const admin = createAdminClient()
 
-  // Get the coop + its parent (faitière) to include parent fiches too
+  // Get the member's coop + its faitière parent
   const { data: coop } = await admin
     .from('cooperatives')
     .select('id, name, parent_id, level')
     .eq('id', card.cooperative_id)
     .maybeSingle()
 
-  // Collect all cooperative IDs to search fiches for:
-  // own coop + parent (faitière/union) if exists
+  // Collect IDs: own coop + faitière parent
   const coopIds = [card.cooperative_id]
   if (coop?.parent_id) coopIds.push(coop.parent_id)
+
+  // Fetch faitière name for display (fiches are published by the faitière)
+  let faitiereName: string | null = null
+  if (coop?.parent_id) {
+    const { data: parent } = await admin
+      .from('cooperatives')
+      .select('name')
+      .eq('id', coop.parent_id)
+      .maybeSingle()
+    faitiereName = parent?.name ?? null
+  }
 
   const { data: fiches } = await admin
     .from('fiches_techniques')
@@ -48,6 +58,7 @@ export async function GET(
   return NextResponse.json(
     {
       fiches: fiches ?? [],
+      faitiere_name: faitiereName,
       cooperative_name: coop?.name ?? null,
       cooperative_level: coop?.level ?? null,
     },
