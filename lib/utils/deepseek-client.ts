@@ -7,11 +7,13 @@
  * Variables d'environnement :
  *   DEEPSEEK_API_KEY         — clé principale (obligatoire)
  *   DEEPSEEK_API_KEY_1..10   — clés supplémentaires (optionnel, rotation auto)
- *   DEEPSEEK_MODEL           — modèle cible (défaut: deepseek-chat)
+ *   DEEPSEEK_MODEL           — modèle cible (défaut: deepseek-v4-flash)
  *
- * Modèles disponibles :
- *   deepseek-chat      — DeepSeek-V3 : rapide, excellent rapport qualité/prix
- *   deepseek-reasoner  — DeepSeek-R1 : raisonnement approfondi (conseils complexes)
+ * Modèles V4 (depuis avril 2026) :
+ *   deepseek-v4-flash  — 284B MoE, 83 tok/s, $0.14/M — chat, voice, vision
+ *   deepseek-v4-pro    — 1.6T MoE, raisonnement, $1.74/M — décisions complexes
+ *
+ * ⚠️ deepseek-chat et deepseek-reasoner seront supprimés le 24 juillet 2026.
  */
 
 import OpenAI from 'openai'
@@ -114,8 +116,8 @@ export function createDeepSeekClient(apiKey: string): OpenAI {
   })
 }
 
-/**
- * Modèle DeepSeek utilisé pour le chat et les réponses vocales.
- * Remplacer par "deepseek-reasoner" (R1) pour des analyses plus approfondies.
- */
-export const DEEPSEEK_MODEL: string = process.env.DEEPSEEK_MODEL ?? 'deepseek-chat'
+/** Modèle DeepSeek pour chat et voice (Level 3b fallback). */
+export const DEEPSEEK_MODEL: string = process.env.DEEPSEEK_MODEL ?? 'deepseek-v4-flash'
+
+/** Modèle DeepSeek pour l'analyse d'images (vision multimodale). */
+export const DEEPSEEK_VISION_MODEL: string = 'deepseek-v4-flash'
