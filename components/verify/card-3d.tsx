@@ -71,7 +71,8 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
   }, [])
 
   const fullName = memberFullName(member)
-  const nameSize = fullName.length > 22 ? '1.55rem' : fullName.length > 16 ? '1.85rem' : '2.1rem'
+  const nameLen = fullName.length
+  const nameSize = nameLen > 28 ? '1.1rem' : nameLen > 22 ? '1.35rem' : nameLen > 16 ? '1.75rem' : '2.1rem'
 
   return (
     <div className="card3d-scene">
@@ -225,38 +226,64 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
             rgba(255,255,255,.35), rgba(255,255,255,0) 70%);
           mix-blend-mode: soft-light;
         }
+
         /* ── Content layer ─────────────────────────────────── */
         .card3d-content {
-          position: absolute; inset: 0; padding: 16px 18px 14px;
+          position: absolute; inset: 0;
+          padding: clamp(10px, 3.5vw, 16px) clamp(12px, 4vw, 18px) clamp(10px, 3vw, 14px);
           display: flex; flex-direction: column; justify-content: space-between;
           transform: translateZ(28px);
           color: #eafff2;
           font-family: 'Barlow', system-ui, sans-serif;
+          /* Prevent any direct child from escaping */
+          overflow: hidden;
         }
-        /* Header */
-        .card3d-top { display: flex; align-items: flex-start; justify-content: space-between; }
+
+        /* ── Header ────────────────────────────────────────── */
+        .card3d-top {
+          display: flex; align-items: flex-start; justify-content: space-between;
+          gap: 8px; min-width: 0;
+        }
+        /* Left side of header must not overflow into badge */
+        .card3d-top > div:first-child { min-width: 0; overflow: hidden; }
         .card3d-brand {
           font-family: 'Barlow Condensed','Barlow',sans-serif;
-          font-weight: 800; font-size: 1.65rem; line-height: 1;
+          font-weight: 800;
+          font-size: clamp(1.2rem, 3.5vw, 1.65rem);
+          line-height: 1;
           letter-spacing: .3px; text-shadow: 0 1px 2px rgba(0,0,0,.4);
+          white-space: nowrap;
         }
         .card3d-brand-accent { color: #4dffa0; }
-        .card3d-type-label { font-size: .78rem; letter-spacing: 1.4px; color: #7fd9a5; font-weight: 700; text-transform: uppercase; margin-top: 2px; }
+        .card3d-type-label {
+          font-size: clamp(0.6rem, 1.6vw, .78rem);
+          letter-spacing: 1.2px; color: #7fd9a5; font-weight: 700;
+          text-transform: uppercase; margin-top: 2px;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
         .card3d-verified {
           display: inline-flex; align-items: center; gap: 5px;
           background: rgba(77,255,160,.16); border: 1px solid rgba(77,255,160,.4);
-          color: #9bffc8; border-radius: 999px; padding: 5px 12px;
-          font-size: .88rem; font-weight: 800; letter-spacing: 1.5px;
+          color: #9bffc8; border-radius: 999px;
+          padding: clamp(3px, 1vw, 5px) clamp(8px, 2.5vw, 12px);
+          font-size: clamp(0.7rem, 2vw, .88rem); font-weight: 800; letter-spacing: 1.2px;
           backdrop-filter: blur(4px);
+          flex-shrink: 0; white-space: nowrap;
         }
-        /* Body */
-        .card3d-body { display: flex; gap: 16px; align-items: center; }
 
-        /* ── Photo ronde ──────────────────────────────────── */
+        /* ── Body ──────────────────────────────────────────── */
+        .card3d-body {
+          display: flex;
+          gap: clamp(10px, 2.5vw, 16px);
+          align-items: flex-start;
+          min-width: 0;
+        }
+
+        /* ── Photo ─────────────────────────────────────────── */
         .card3d-photo {
           position: relative;
-          width: 82px;
-          height: 82px;
+          width: clamp(62px, 17vw, 82px);
+          height: clamp(62px, 17vw, 82px);
           flex-shrink: 0;
         }
         .card3d-photo-ring {
@@ -270,49 +297,115 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
         }
         .card3d-photo-inner img {
           width: 100%; height: 100%;
-          object-fit: cover;
-          object-position: center top;
+          object-fit: cover; object-position: center top;
         }
         .card3d-photo-empty {
-          width: 100%; height: 100%;
-          border-radius: 50%;
+          width: 100%; height: 100%; border-radius: 50%;
           background: #0c3d24;
           display: grid; place-items: center; color: rgba(255,255,255,.4);
         }
 
-        /* Identity block */
-        .card3d-identity { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+        /* ── Identity block ────────────────────────────────── */
+        /*
+         * min-width: 0 is the critical fix: without it, a flex child
+         * refuses to shrink below its content's intrinsic width and
+         * overflows the card.
+         */
+        .card3d-identity {
+          flex: 1;
+          min-width: 0;
+          display: flex; flex-direction: column; justify-content: center;
+          gap: 4px;
+          overflow: hidden;
+        }
         .card3d-name {
           font-family: 'Barlow Condensed','Barlow',sans-serif;
-          font-weight: 800; line-height: 1.05; margin: 0;
+          font-weight: 800; line-height: 1.1; margin: 0;
           text-shadow: 0 1px 3px rgba(0,0,0,.5);
           text-transform: uppercase; letter-spacing: .5px;
+          /* Allow long words to wrap, cap at 2 lines */
+          word-break: break-word;
+          overflow-wrap: break-word;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
         }
-        .card3d-coop { display: flex; flex-direction: column; line-height: 1.2; }
-        .card3d-coop-label { font-size: .9rem; letter-spacing: 1.6px; color: #7fd9a5; font-weight: 700; text-transform: uppercase; }
-        .card3d-coop-value { font-size: 1.18rem; font-weight: 700; line-height: 1.2; }
-        .card3d-loc { display: inline-flex; align-items: center; gap: 5px; margin-top: 2px; font-size: .9rem; color: #b7e8cb; }
+        .card3d-coop {
+          display: flex; flex-direction: column; line-height: 1.2;
+          min-width: 0; overflow: hidden;
+        }
+        .card3d-coop-label {
+          font-size: clamp(0.62rem, 1.7vw, .9rem);
+          letter-spacing: 1.4px; color: #7fd9a5; font-weight: 700;
+          text-transform: uppercase; white-space: nowrap;
+        }
+        .card3d-coop-value {
+          font-size: clamp(0.82rem, 2.6vw, 1.18rem);
+          font-weight: 700; line-height: 1.25;
+          /* 2-line max for long cooperative names */
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          word-break: break-word;
+        }
+        .card3d-loc {
+          display: flex; align-items: center; gap: 5px;
+          margin-top: 2px;
+          font-size: clamp(0.68rem, 1.9vw, .9rem);
+          color: #b7e8cb;
+          min-width: 0; overflow: hidden;
+        }
+        /* Icon stays visible, text truncates */
+        .card3d-loc svg { flex-shrink: 0; }
+        .card3d-loc span {
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          min-width: 0;
+        }
 
-        /* Footer */
-        .card3d-bottom { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; }
+        /* ── Footer ────────────────────────────────────────── */
+        .card3d-bottom {
+          display: flex; align-items: flex-end;
+          justify-content: space-between;
+          gap: clamp(8px, 2vw, 14px);
+        }
         .card3d-chip {
-          width: 48px; height: 37px; border-radius: 7px;
+          width: clamp(38px, 10vw, 48px);
+          height: clamp(29px, 7.5vw, 37px);
+          border-radius: 7px;
           background: linear-gradient(135deg, #f5d271, #d9a93b 55%, #b07f1e);
           display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 5px;
           box-shadow: inset 0 1px 1px rgba(255,255,255,.6), 0 1px 2px rgba(0,0,0,.4);
           flex-shrink: 0;
         }
         .card3d-chip span { background: rgba(120,80,10,.35); border-radius: 1px; }
-        .card3d-meta { display: flex; gap: 18px; text-align: right; flex: 1; justify-content: flex-end; }
-        .card3d-meta-label { display: block; font-size: .85rem; letter-spacing: 1.4px; color: #7fd9a5; font-weight: 700; text-transform: uppercase; }
-        .card3d-meta-value { display: block; font-size: 1.18rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .card3d-meta {
+          display: flex; gap: clamp(10px, 2.5vw, 18px);
+          text-align: right; flex: 1; justify-content: flex-end;
+          min-width: 0;
+        }
+        .card3d-meta > div { min-width: 0; overflow: hidden; }
+        .card3d-meta-label {
+          display: block;
+          font-size: clamp(0.6rem, 1.6vw, .85rem);
+          letter-spacing: 1.2px; color: #7fd9a5; font-weight: 700;
+          text-transform: uppercase; white-space: nowrap;
+        }
+        .card3d-meta-value {
+          display: block;
+          font-size: clamp(0.82rem, 2.4vw, 1.18rem);
+          font-weight: 800; font-variant-numeric: tabular-nums;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
 
-        /* Shadow */
+        /* ── Shadow ────────────────────────────────────────── */
         .card3d-shadow {
           width: 78%; height: 26px; margin: -10px auto 0;
           background: radial-gradient(ellipse at center, rgba(0,0,0,.5), transparent 72%);
           filter: blur(7px);
         }
+
         @media (prefers-reduced-motion: reduce) {
           .card3d { transition: none; }
         }
