@@ -203,10 +203,10 @@ type AlertLevel = 'critical'|'high'|'moderate'|'low'
 interface AgroAlert { level: AlertLevel; emoji: string; text: string }
 
 const ALERT_COLORS: Record<AlertLevel, string> = {
-  critical: 'bg-red-500/15 border-red-500/30 text-red-300',
-  high:     'bg-orange-500/15 border-orange-500/30 text-orange-300',
-  moderate: 'bg-yellow-500/15 border-yellow-500/30 text-yellow-300',
-  low:      'bg-green-500/15 border-green-500/30 text-green-300',
+  critical: 'bg-red-500/20 border-red-500/50 text-red-300',
+  high:     'bg-orange-500/20 border-orange-500/50 text-orange-300',
+  moderate: 'bg-yellow-500/15 border-yellow-500/40 text-yellow-200',
+  low:      'bg-green-500/15 border-green-500/40 text-green-300',
 }
 
 function buildAlerts(insights: AgroInsights|undefined, today: WeatherDay|null, upcoming: WeatherDay[]): AgroAlert[] {
@@ -485,7 +485,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
             {/* Hourly strip */}
             {hourlyStrip.length > 0 && (
               <div className="border-t border-white/20 relative">
-                <div className="flex overflow-x-auto" style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
+                <div className="flex overflow-x-auto [&::-webkit-scrollbar]:hidden" style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
                   {hourlyStrip.map((slot) => {
                     const isNow = slot.time.slice(0,13) === nowHour
                     const wmo   = getWMO(slot.weather_code, slot.is_day)
@@ -540,7 +540,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
 
           {/* ═══ NOWCAST CHART (6h précipitations) ══════════════════ */}
           {nowcastChartData.length > 0 && (
-            <div className="rounded-2xl bg-white/5 border border-white/8 overflow-hidden">
+            <div className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
               <button
                 onClick={() => setShowNowcastChart(v => !v)}
                 className="w-full flex items-center justify-between px-4 py-3 active:bg-white/5 transition-colors"
@@ -552,7 +552,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
                 <ChevronDown className="h-4 w-4 text-white/30 transition-transform duration-300" style={{ transform: showNowcastChart ? 'rotate(180deg)' : 'rotate(0deg)' }} />
               </button>
               {showNowcastChart && (
-                <div className="border-t border-white/8 px-2 pb-3 pt-2">
+                <div className="border-t border-white/10 px-2 pb-3 pt-2">
                   <ResponsiveContainer width="100%" height={120}>
                     <BarChart data={nowcastChartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                       <XAxis dataKey="time" tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 9 }} axisLine={false} tickLine={false} interval={3} />
@@ -576,7 +576,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
           )}
 
           {/* ═══ RADAR MAP (RainViewer) ══════════════════════════════ */}
-          <div className="rounded-2xl bg-white/5 border border-white/8 overflow-hidden">
+          <div className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
             <button
               onClick={() => setShowRadar(v => !v)}
               className="w-full flex items-center justify-between px-4 py-3 active:bg-white/5 transition-colors"
@@ -588,7 +588,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
               <ChevronDown className="h-4 w-4 text-white/30 transition-transform duration-300" style={{ transform: showRadar ? 'rotate(180deg)' : 'rotate(0deg)' }} />
             </button>
             {showRadar && (
-              <div className="border-t border-white/8 p-3">
+              <div className="border-t border-white/10 p-3">
                 <RainRadar region={region ?? 'Maritime'} city={city ?? 'Lomé'} />
                 <p className="text-white/20 text-[9px] text-center mt-2">RainViewer · OpenStreetMap · Zoom 8</p>
               </div>
@@ -597,7 +597,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
 
           {/* ═══ 7-DAY FORECAST ══════════════════════════════════════ */}
           {futureRows.length > 0 && (
-            <div className="rounded-2xl bg-white/5 border border-white/8 overflow-hidden">
+            <div className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
               <p className="text-white/35 text-[10px] font-semibold uppercase tracking-wider px-4 pt-3 pb-1.5">Prévisions {futureRows.length} jours</p>
               {futureRows.map((day) => {
                 const emoji   = dailyEmoji(day.precipitation_mm, day.temperature_max, day.wind_speed_ms)
@@ -606,7 +606,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
                 const barW    = ((day.temperature_max ?? scaleMax) - (day.temperature_min ?? scaleMin)) / scaleRange
                 const precipPct = day.precipitation_probability != null ? Math.round(day.precipitation_probability) : null
                 return (
-                  <div key={day.date} className={`flex items-center gap-3 px-4 py-2.5 border-b border-white/5 last:border-0 ${isToday ? 'bg-white/5' : ''}`}>
+                  <div key={day.date} className={`flex items-center gap-3 px-4 py-2.5 border-b border-white/8 last:border-b-0 ${isToday ? 'bg-white/5' : ''}`}>
                     <span className={`text-[13px] font-semibold shrink-0 w-14 ${isToday ? 'text-sky-300' : 'text-white/65'}`}>{dayShort(day.date, todayStr)}</span>
                     <span className="text-xl shrink-0" aria-hidden>{emoji}</span>
                     <span className="text-[10px] text-blue-300/65 font-mono shrink-0 w-9 text-right">
@@ -625,47 +625,47 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
 
           {/* ═══ DETAILS GRID ════════════════════════════════════════ */}
           <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-2xl bg-white/5 border border-white/8 p-3 flex flex-col gap-0.5">
-              <p className="text-white/35 text-[9px] uppercase tracking-wide font-semibold">Ressenti</p>
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-3 flex flex-col gap-0.5">
+              <p className="text-white/40 text-[9px] uppercase tracking-wide font-semibold">Ressenti</p>
               <p className="text-white font-bold text-xl leading-none mt-0.5">{feelsLike != null ? `${Math.round(feelsLike)}°` : '—'}</p>
-              <p className="text-white/25 text-[9px]">°Celsius</p>
+              <p className="text-white/30 text-[9px]">°Celsius</p>
             </div>
-            <div className="rounded-2xl bg-white/5 border border-white/8 p-3 flex flex-col gap-0.5">
-              <p className="text-white/35 text-[9px] uppercase tracking-wide font-semibold">Indice UV</p>
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-3 flex flex-col gap-0.5">
+              <p className="text-white/40 text-[9px] uppercase tracking-wide font-semibold">Indice UV</p>
               <p className="font-bold text-xl leading-none mt-0.5" style={{ color: uvInfo?.color ?? 'white' }}>{uvIndex != null ? Math.round(uvIndex) : '—'}</p>
               <p className="text-[9px] font-semibold" style={{ color: uvInfo ? uvInfo.color + '99' : 'rgba(255,255,255,.25)' }}>{uvInfo?.text ?? '—'}</p>
             </div>
-            <div className="rounded-2xl bg-white/5 border border-white/8 p-3 flex flex-col gap-0.5">
-              <p className="text-white/35 text-[9px] uppercase tracking-wide font-semibold">Humidité</p>
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-3 flex flex-col gap-0.5">
+              <p className="text-white/40 text-[9px] uppercase tracking-wide font-semibold">Humidité</p>
               <p className="text-white font-bold text-xl leading-none mt-0.5">{todayRow.humidity_pct != null ? `${Math.round(todayRow.humidity_pct)}%` : '—'}</p>
               <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden mt-1"><div className="h-full rounded-full bg-sky-400/70" style={{ width: `${todayRow.humidity_pct ?? 0}%` }} /></div>
             </div>
-            <div className="rounded-2xl bg-white/5 border border-white/8 p-3 flex flex-col gap-0.5">
-              <p className="text-white/35 text-[9px] uppercase tracking-wide font-semibold">Vent</p>
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-3 flex flex-col gap-0.5">
+              <p className="text-white/40 text-[9px] uppercase tracking-wide font-semibold">Vent</p>
               <p className="text-white font-bold text-xl leading-none mt-0.5">{todayRow.wind_speed_ms != null ? todayRow.wind_speed_ms.toFixed(1) : '—'}</p>
-              <p className="text-white/25 text-[9px]">m/s</p>
+              <p className="text-white/30 text-[9px]">m/s</p>
             </div>
-            <div className="rounded-2xl bg-white/5 border border-white/8 p-3 flex flex-col gap-0.5">
-              <p className="text-white/35 text-[9px] uppercase tracking-wide font-semibold">ETo FAO</p>
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-3 flex flex-col gap-0.5">
+              <p className="text-white/40 text-[9px] uppercase tracking-wide font-semibold">ETo FAO</p>
               <p className="text-emerald-300 font-bold text-xl leading-none mt-0.5">{todayRow.et0_mm != null ? todayRow.et0_mm.toFixed(1) : '—'}</p>
-              <p className="text-white/25 text-[9px]">mm/jour</p>
+              <p className="text-white/30 text-[9px]">mm/jour</p>
             </div>
-            <div className="rounded-2xl bg-white/5 border border-white/8 p-3 flex flex-col gap-0.5">
-              <p className="text-white/35 text-[9px] uppercase tracking-wide font-semibold">Pluie</p>
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-3 flex flex-col gap-0.5">
+              <p className="text-white/40 text-[9px] uppercase tracking-wide font-semibold">Pluie</p>
               <p className="text-blue-300 font-bold text-xl leading-none mt-0.5">{todayRow.precipitation_mm != null ? todayRow.precipitation_mm.toFixed(1) : '—'}</p>
-              <p className="text-white/25 text-[9px]">mm aujourd'hui</p>
+              <p className="text-white/30 text-[9px]">mm aujourd'hui</p>
             </div>
           </div>
 
           {/* ═══ AGRO ALERTS ═════════════════════════════════════════ */}
           {agroAlerts.length > 0 && (
-            <div className="rounded-2xl bg-white/5 border border-white/8 overflow-hidden">
+            <div className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
               <button onClick={() => setShowAlerts(v => !v)} className="w-full flex items-center justify-between px-4 py-3 active:bg-white/5 transition-colors">
                 <span className="text-white/50 text-xs font-semibold uppercase tracking-wider">⚡ Alertes agronomiques ({agroAlerts.length})</span>
                 <ChevronDown className="h-4 w-4 text-white/30 transition-transform duration-300" style={{ transform: showAlerts ? 'rotate(180deg)' : 'rotate(0deg)' }} />
               </button>
               {showAlerts && (
-                <div className="border-t border-white/8 px-4 pb-3 pt-2 space-y-2">
+                <div className="border-t border-white/10 px-4 pb-3 pt-2 space-y-2">
                   {agroAlerts.map((alert, i) => (
                     <div key={i} className={`rounded-xl border p-3 flex items-start gap-2.5 ${ALERT_COLORS[alert.level]}`}>
                       <span className="text-base leading-none shrink-0 mt-0.5">{alert.emoji}</span>
@@ -679,7 +679,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
 
           {/* ═══ SEASONAL OUTLOOK ════════════════════════════════════ */}
           {seasonal.length > 0 && (
-            <div className="rounded-2xl bg-white/5 border border-white/8 overflow-hidden">
+            <div className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
               <button onClick={() => setShowSeasonal(v => !v)} className="w-full flex items-center justify-between px-4 py-3 active:bg-white/5 transition-colors">
                 <span className="text-white/50 text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5">
                   <Leaf className="h-3.5 w-3.5" />
@@ -688,7 +688,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
                 <ChevronDown className="h-4 w-4 text-white/30 transition-transform duration-300" style={{ transform: showSeasonal ? 'rotate(180deg)' : 'rotate(0deg)' }} />
               </button>
               {showSeasonal && (
-                <div className="border-t border-white/8 px-4 pb-3 pt-2 space-y-2">
+                <div className="border-t border-white/10 px-4 pb-3 pt-2 space-y-2">
                   {seasonal.map((s, i) => {
                     const precipTrend = s.precipitation_mm > 150 ? { label: 'Bonne pluviométrie', color: 'text-blue-300' }
                       : s.precipitation_mm > 80  ? { label: 'Normale', color: 'text-sky-300' }
@@ -719,17 +719,17 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
 
           {/* ═══ HISTORY ═════════════════════════════════════════════ */}
           {historyRows.length > 0 && (
-            <div className="rounded-2xl bg-white/5 border border-white/8 overflow-hidden">
+            <div className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
               <button onClick={() => setShowHistory(v => !v)} className="w-full flex items-center justify-between px-4 py-3 active:bg-white/5 transition-colors">
                 <span className="text-white/35 text-xs font-semibold uppercase tracking-wider">Historique ({historyRows.length} jours)</span>
                 <ChevronDown className="h-4 w-4 text-white/25 transition-transform duration-300" style={{ transform: showHistory ? 'rotate(180deg)' : 'rotate(0deg)' }} />
               </button>
               {showHistory && (
-                <div className="border-t border-white/8 px-4 pb-3 pt-2">
+                <div className="border-t border-white/10 px-4 pb-3 pt-2">
                   {historyRows.map(day => {
                     const emoji = dailyEmoji(day.precipitation_mm, day.temperature_max, day.wind_speed_ms)
                     return (
-                      <div key={day.date} className="flex items-center gap-3 py-2.5 border-b border-white/5 last:border-0">
+                      <div key={day.date} className="flex items-center gap-3 py-2.5 border-b border-white/8 last:border-b-0">
                         <span className="text-lg w-7 text-center shrink-0" aria-hidden>{emoji}</span>
                         <p className="text-white/40 text-xs w-28 shrink-0 capitalize">{dayFull(day.date, todayStr)}</p>
                         <span className="text-xs text-orange-400/55">↑{day.temperature_max != null ? Math.round(day.temperature_max) : '—'}°</span>
@@ -749,7 +749,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
             <button
               onClick={handlePdf}
               disabled={pdfLoading}
-              className="flex items-center justify-center gap-2 py-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/8 text-emerald-300 text-sm font-semibold active:scale-[0.98] transition-all disabled:opacity-50"
+              className="flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-emerald-500/40 bg-emerald-500/15 text-emerald-300 text-sm font-semibold active:scale-[0.97] transition-all disabled:opacity-50 hover:bg-emerald-500/20"
             >
               {pdfLoading ? (
                 <div className="h-4 w-4 rounded-full border-2 border-emerald-300 border-t-transparent animate-spin" />
@@ -762,7 +762,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
             {/* WhatsApp share */}
             <button
               onClick={handlePdf}
-              className="flex items-center justify-center gap-2 py-3 rounded-2xl border border-green-500/25 bg-green-500/8 text-green-300 text-sm font-semibold active:scale-[0.98] transition-all"
+              className="flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-green-500/40 bg-green-500/15 text-green-300 text-sm font-semibold active:scale-[0.97] transition-all hover:bg-green-500/20"
             >
               <Share2 className="h-4 w-4" />
               Partager WhatsApp
@@ -773,7 +773,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
           {onOpenAgriSmart && (
             <button
               onClick={onOpenAgriSmart}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-blue-500/25 bg-blue-500/8 text-blue-300 text-sm font-semibold active:scale-[0.98] transition-transform"
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-blue-500/40 bg-blue-500/15 text-blue-300 text-sm font-semibold active:scale-[0.97] transition-all hover:bg-blue-500/20"
             >
               <Waves className="h-4 w-4" />
               Calculer mes besoins en eau
@@ -781,7 +781,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
           )}
 
           {/* Footer */}
-          <div className="flex items-center justify-between px-1 pb-2">
+          <div className="flex items-center justify-between px-1 pb-4">
             <p className="text-white/20 text-[10px]">ECMWF · GFS · ICON · FAO-56 · RainViewer</p>
             <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${isLive ? 'bg-green-500/10 border-green-500/20 text-green-400/65' : 'bg-slate-500/10 border-slate-500/20 text-slate-400/65'}`}>
               {isLive ? '🟢 Temps réel' : '📦 Cache'}
