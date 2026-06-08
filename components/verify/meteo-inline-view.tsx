@@ -30,6 +30,14 @@ interface WeatherHour {
   is_day: number
 }
 
+interface WeatherMinutely15 {
+  time: string
+  precipitation: number
+  rain: number
+  weather_code: number
+  temperature: number
+}
+
 interface AgroInsights {
   drought_risk?: 'low' | 'moderate' | 'high' | 'critical'
   planting_window?: string | null
@@ -41,6 +49,7 @@ interface AgroInsights {
 interface ApiResponse {
   weather?: WeatherDay[]
   hourly?: WeatherHour[]
+  nowcast?: WeatherMinutely15[]
   region?: string | null
   city?: string | null
   data_source?: string
@@ -144,6 +153,57 @@ function fmtTime(iso: string) {
   try { return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) } catch { return '' }
 }
 
+/* ─── Nowcast banner ────────────────────────────────────────────── */
+
+const RAIN_CODES = new Set([51, 53, 55, 61, 63, 65, 71, 73, 75, 80, 81, 82, 95, 96, 99])
+
+interface NowcastBanner {
+  type: 'raining' | 'rain_soon' | 'clearing'
+  text: string
+  minutes: number
+  slots60: { hasRain: boolean; mm: number }[]
+}
+
+function buildNowcastBanner(nowcast: WeatherMinutely15[]): NowcastBanner | null {
+  if (!nowcast.length) return null
+
+  const now = Date.now()
+
+  const enriched = nowcast.map(s => {
+    // Times are in Africa/Lagos (UTC+1) — parse with offset
+    const slotMs = new Date(s.time + ':00+01:00').getTime()
+    const minutesFromNow = Math.round((slotMs - now) / 60000)
+    const hasRain = s.precipitation > 0.05 || RAIN_CODES.has(s.weather_code)
+    return { ...s, minutesFromNow, hasRain }
+  })
+
+  // Current slot = the one whose window includes now (starts up to 15 min ago)
+  const current = enriched.find(s => s.minutesFromNow >= -15 && s.minutesFromNow < 15) ?? enriched[0]
+  const future = enriched.filter(s => s.minutesFromNow >= 0)
+  const slots60 = future.slice(0, 4).map(s => ({ hasRain: s.hasRain, mm: s.precipitation }))
+
+  const isCurrentlyRaining = current && current.minutesFromNow < 15 && current.hasRain
+
+  if (isCurrentlyRaining) {
+    const stopIdx = future.findIndex(s => !s.hasRain)
+    const mm = current.precipitation
+    const intensity = mm > 5 ? 'forte' : mm > 1 ? 'modérée' : 'légère'
+    if (stopIdx > 0 && stopIdx <= 8) {
+      const stopIn = future[stopIdx].minutesFromNow
+      return { type: 'clearing', minutes: stopIn, text: `Pluie ${intensity} · éclaircie dans ~${stopIn} min`, slots60 }
+    }
+    return { type: 'raining', minutes: 0, text: `Pluie ${intensity} en cours`, slots60 }
+  }
+
+  const rainSlot = future.find(s => s.minutesFromNow <= 60 && s.hasRain)
+  if (!rainSlot) return null
+
+  const mm = rainSlot.precipitation
+  const intensity = mm > 5 ? 'forte' : mm > 1 ? 'modérée' : 'légère'
+  const mins = Math.max(rainSlot.minutesFromNow, 5)
+  return { type: 'rain_soon', minutes: mins, text: `Pluie ${intensity} dans ~${mins} min`, slots60 }
+}
+
 /* ─── Agro alerts ───────────────────────────────────────────────── */
 
 type AlertLevel = 'critical' | 'high' | 'moderate' | 'low'
@@ -200,6 +260,7 @@ function SkeletonLoader() {
 export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) {
   const [weather, setWeather]         = useState<WeatherDay[]>([])
   const [hourly, setHourly]           = useState<WeatherHour[]>([])
+  const [nowcast, setNowcast]         = useState<WeatherMinutely15[]>([])
   const [region, setRegion]           = useState<string|null>(null)
   const [city, setCity]               = useState<string|null>(null)
   const [dataSource, setDataSource]   = useState<string>('live')
@@ -217,6 +278,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
       .then((d: ApiResponse) => {
         setWeather(d.weather ?? [])
         setHourly(d.hourly ?? [])
+        setNowcast(d.nowcast ?? [])
         setRegion(d.region ?? null)
         setCity(d.city ?? null)
         setDataSource(d.data_source ?? 'live')
@@ -261,6 +323,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
   const scaleMin = Math.min(...allTMin, scaleMax - 1)
   const scaleRange = scaleMax - scaleMin || 1
 
+  const nowcastBanner = buildNowcastBanner(nowcast)
   const agroAlerts  = buildAlerts(agroInsights, todayRow, futureRows.slice(1))
   const historyRows = [...pastRows].reverse().slice(0, 3)
   const isLive      = dataSource === 'live' || !dataSource || dataSource === ''
@@ -408,6 +471,52 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
               </div>
             )}
           </div>
+
+          {/* ═══ NOWCAST BANNER ════════════════════════════════════════════ */}
+          {nowcastBanner && (
+            <div
+              className="rounded-2xl overflow-hidden border border-blue-400/30"
+              style={{ background: 'linear-gradient(135deg, rgba(37,99,235,0.18) 0%, rgba(79,70,229,0.18) 100%)' }}
+            >
+              <div className="flex items-center gap-3 px-4 py-3">
+                <span
+                  className="text-2xl shrink-0"
+                  style={{ animation: nowcastBanner.type === 'raining' ? 'bounce 1s infinite' : 'none' }}
+                  aria-hidden
+                >
+                  {nowcastBanner.type === 'clearing' ? '🌤️' : '🌧️'}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-blue-100 font-bold text-sm leading-tight">{nowcastBanner.text}</p>
+                  <p className="text-blue-300/55 text-[10px] mt-0.5">Nowcasting · Open-Meteo · 15 min</p>
+                </div>
+                {nowcastBanner.type === 'rain_soon' && (
+                  <div className="shrink-0 text-right">
+                    <p className="text-blue-200 font-mono font-black text-xl leading-none">{nowcastBanner.minutes}</p>
+                    <p className="text-blue-400/60 text-[9px] mt-0.5">min</p>
+                  </div>
+                )}
+              </div>
+              {/* 60-min timeline — 4 slots of 15 min */}
+              {nowcastBanner.slots60.length > 0 && (
+                <div className="px-4 pb-3">
+                  <div className="flex gap-1.5">
+                    {nowcastBanner.slots60.map((slot, i) => (
+                      <div
+                        key={i}
+                        className={`flex-1 h-2 rounded-full transition-all ${slot.hasRain ? 'bg-blue-400' : 'bg-white/15'}`}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex justify-between text-[9px] text-blue-400/45 mt-1">
+                    <span>Maint.</span>
+                    {nowcastBanner.slots60.length > 2 && <span>+{Math.round(nowcastBanner.slots60.length / 2 * 15)} min</span>}
+                    <span>+{nowcastBanner.slots60.length * 15} min</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ═══ 7-DAY FORECAST (vertical list) ═══════════════════════════ */}
           {futureRows.length > 0 && (

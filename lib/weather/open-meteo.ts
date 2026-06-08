@@ -103,6 +103,56 @@ export async function fetchOpenMeteoForRegion(region: string): Promise<WeatherDa
   }
 }
 
+export interface WeatherMinutely15 {
+  time: string        // "YYYY-MM-DDTHH:MM" in Africa/Lagos (UTC+1)
+  precipitation: number
+  rain: number
+  weather_code: number
+  temperature: number
+}
+
+export async function fetchMinutely15ForRegion(region: string): Promise<WeatherMinutely15[]> {
+  const coords = getRegionCoords(region)
+  if (!coords) return []
+
+  const params = new URLSearchParams({
+    latitude: String(coords.lat),
+    longitude: String(coords.lon),
+    minutely_15: ['precipitation', 'rain', 'weather_code', 'temperature_2m'].join(','),
+    forecast_minutely_15: '24',
+    timezone: 'Africa/Lagos',
+  })
+
+  try {
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
+      signal: AbortSignal.timeout(8000),
+      headers: { 'Accept': 'application/json' },
+    })
+    if (!res.ok) return []
+
+    const json = await res.json() as {
+      minutely_15: {
+        time: string[]
+        precipitation: (number | null)[]
+        rain: (number | null)[]
+        weather_code: (number | null)[]
+        temperature_2m: (number | null)[]
+      }
+    }
+
+    const m = json.minutely_15
+    return m.time.map((time, i) => ({
+      time,
+      precipitation: m.precipitation[i] ?? 0,
+      rain: m.rain[i] ?? 0,
+      weather_code: m.weather_code[i] ?? 0,
+      temperature: m.temperature_2m[i] ?? 0,
+    }))
+  } catch {
+    return []
+  }
+}
+
 export async function fetchHourlyForRegion(region: string): Promise<WeatherHour[]> {
   const coords = getRegionCoords(region)
   if (!coords) return []

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
-import { fetchOpenMeteoForRegion, fetchHourlyForRegion, getRegionCoords } from '@/lib/weather/open-meteo'
+import { fetchOpenMeteoForRegion, fetchHourlyForRegion, fetchMinutely15ForRegion, getRegionCoords } from '@/lib/weather/open-meteo'
 
 export async function GET(
   _request: NextRequest,
@@ -43,7 +43,7 @@ export async function GET(
   const dateFrom = threeDaysAgo.toISOString().split('T')[0]
   const dateTo = tenDaysLater.toISOString().split('T')[0]
 
-  const [{ data: cached }, hourlyRaw] = await Promise.all([
+  const [{ data: cached }, hourlyRaw, nowcastRaw] = await Promise.all([
     supabaseAdmin
       .from('weather_data')
       .select('date, temperature_max, temperature_min, temperature_mean, precipitation_mm, humidity_pct, wind_speed_ms, et0_mm, region')
@@ -53,6 +53,7 @@ export async function GET(
       .order('date', { ascending: true })
       .limit(14),
     fetchHourlyForRegion(region),
+    fetchMinutely15ForRegion(region),
   ])
   let weather = (cached ?? []) as Array<{
     date: string
@@ -107,6 +108,7 @@ export async function GET(
     {
       weather,
       hourly: hourlyRaw,
+      nowcast: nowcastRaw,
       region,
       city,
       data_source: dataSource,
