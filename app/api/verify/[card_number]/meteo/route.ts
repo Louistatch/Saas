@@ -1,7 +1,18 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
-import { fetchOpenMeteoForRegion, fetchHourlyForRegion, fetchMinutely15ForRegion, getRegionCoords } from '@/lib/weather/open-meteo'
+import {
+  fetchOpenMeteoForRegion,
+  fetchGFSForRegion,
+  fetchICONForRegion,
+  fetchHourlyForRegion,
+  fetchHourlyGFSForRegion,
+  fetchHourlyICONForRegion,
+  fetchMinutely15ForRegion,
+  mergeWeatherModels,
+  mergeHourlyModels,
+  getRegionCoords,
+} from '@/lib/weather/open-meteo'
 
 export async function GET(
   _request: NextRequest,
@@ -41,9 +52,16 @@ export async function GET(
   tenDaysLater.setDate(today.getDate() + 10)
 
   const dateFrom = threeDaysAgo.toISOString().split('T')[0]
-  const dateTo = tenDaysLater.toISOString().split('T')[0]
+  const dateTo   = tenDaysLater.toISOString().split('T')[0]
 
-  const [{ data: cached }, hourlyRaw, nowcastRaw] = await Promise.all([
+  // All 7 fetches run in parallel — cache hit = instant, first miss = HTTP to Open-Meteo
+  const [
+    { data: cached },
+    hourlyECMWF,
+    hourlyGFS,
+    hourlyICON,
+    nowcastRaw,
+  ] = await Promise.all([
     supabaseAdmin
       .from('weather_data')
       .select('date, temperature_max, temperature_min, temperature_mean, precipitation_mm, humidity_pct, wind_speed_ms, et0_mm, region')
@@ -53,8 +71,14 @@ export async function GET(
       .order('date', { ascending: true })
       .limit(14),
     fetchHourlyForRegion(region),
+    fetchHourlyGFSForRegion(region),
+    fetchHourlyICONForRegion(region),
     fetchMinutely15ForRegion(region),
   ])
+
+  // Merge hourly from 3 models
+  const mergedHourly = mergeHourlyModels(hourlyECMWF, hourlyGFS, hourlyICON)
+
   let weather = (cached ?? []) as Array<{
     date: string
     temperature_max: number | null
@@ -67,26 +91,31 @@ export async function GET(
     region: string | null
   }>
 
-  // Fallback Open-Meteo direct si données insuffisantes
+  // Live fallback: fetch all 3 daily models, merge, fill gaps
   let dataSource: 'cached' | 'live' | 'partial' = 'cached'
   if (weather.length < 3) {
-    const live = await fetchOpenMeteoForRegion(region)
-    if (live.length > 0) {
+    const [liveECMWF, liveGFS, liveICON] = await Promise.all([
+      fetchOpenMeteoForRegion(region),
+      fetchGFSForRegion(region),
+      fetchICONForRegion(region),
+    ])
+    const merged = mergeWeatherModels(liveECMWF, liveGFS, liveICON)
+    if (merged.length > 0) {
       const existingDates = new Set(weather.map(w => w.date))
-      const newDays = live.filter(l => !existingDates.has(l.date))
+      const newDays = merged.filter(l => !existingDates.has(l.date))
       weather = [...weather, ...newDays].sort((a, b) => a.date.localeCompare(b.date))
-      dataSource = weather.length === live.length ? 'live' : 'partial'
+      dataSource = weather.length === merged.length ? 'live' : 'partial'
     }
   }
 
-  // Insights agronomiques
+  // Agronomic insights
   const futureDays = weather.filter(d => d.date >= todayStr)
-  const daysWithoutRain = futureDays.filter(d => (d.precipitation_mm ?? 0) < 1).length
+  const daysWithoutRain  = futureDays.filter(d => (d.precipitation_mm ?? 0) < 1).length
   const avgEto = futureDays.length > 0
     ? futureDays.reduce((s, d) => s + (d.et0_mm ?? 0), 0) / futureDays.length
     : 0
   const waterStressDays = futureDays.filter(d => (d.et0_mm ?? 0) > (d.precipitation_mm ?? 0) + 2).length
-  const heatStressDays = futureDays.filter(d => (d.temperature_max ?? 0) > 36).length
+  const heatStressDays  = futureDays.filter(d => (d.temperature_max ?? 0) > 36).length
 
   let droughtRisk: 'low' | 'moderate' | 'high' | 'critical' = 'low'
   if (daysWithoutRain >= 7 || (daysWithoutRain >= 4 && avgEto > 5)) droughtRisk = 'critical'
@@ -107,11 +136,12 @@ export async function GET(
   return NextResponse.json(
     {
       weather,
-      hourly: hourlyRaw,
+      hourly: mergedHourly,
       nowcast: nowcastRaw,
       region,
       city,
       data_source: dataSource,
+      models: ['ecmwf_ifs025', 'gfs_seamless', 'icon_seamless'],
       updated_at: new Date().toISOString(),
       agro_insights: {
         drought_risk: droughtRisk,

@@ -707,7 +707,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
 
           {/* ═══ Footer ═════════════════════════════════════════════════════ */}
           <div className="flex items-center justify-between px-1 pb-2">
-            <p className="text-white/20 text-[10px]">Open-Meteo · FAO-56 · WMO</p>
+            <p className="text-white/20 text-[10px]">ECMWF · GFS · ICON · FAO-56</p>
             <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${isLive ? 'bg-green-500/10 border-green-500/20 text-green-400/65' : 'bg-slate-500/10 border-slate-500/20 text-slate-400/65'}`}>
               {isLive ? '🟢 Temps réel' : '📦 Cache'}
             </span>
