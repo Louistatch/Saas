@@ -21,6 +21,18 @@ export interface WeatherDayLive {
   city: string
 }
 
+export interface WeatherHour {
+  time: string
+  temperature: number
+  apparent_temperature: number
+  precipitation_probability: number
+  weather_code: number
+  wind_speed_ms: number
+  humidity_pct: number
+  uv_index: number
+  is_day: number
+}
+
 export function getRegionCoords(region: string): { lat: number; lon: number; city: string } | null {
   const key = Object.keys(REGION_COORDS).find(
     k => k.toLowerCase() === region.trim().toLowerCase()
@@ -90,3 +102,64 @@ export async function fetchOpenMeteoForRegion(region: string): Promise<WeatherDa
     return []
   }
 }
+
+export async function fetchHourlyForRegion(region: string): Promise<WeatherHour[]> {
+  const coords = getRegionCoords(region)
+  if (!coords) return []
+
+  const params = new URLSearchParams({
+    latitude: String(coords.lat),
+    longitude: String(coords.lon),
+    hourly: [
+      'temperature_2m',
+      'apparent_temperature',
+      'precipitation_probability',
+      'weather_code',
+      'wind_speed_10m',
+      'relative_humidity_2m',
+      'uv_index',
+      'is_day',
+    ].join(','),
+    forecast_days: '2',
+    timezone: 'Africa/Lagos',
+  })
+
+  try {
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
+      signal: AbortSignal.timeout(8000),
+      headers: { 'Accept': 'application/json' },
+    })
+    if (!res.ok) return []
+
+    const json = await res.json() as {
+      hourly: {
+        time: string[]
+        temperature_2m: (number | null)[]
+        apparent_temperature: (number | null)[]
+        precipitation_probability: (number | null)[]
+        weather_code: (number | null)[]
+        wind_speed_10m: (number | null)[]
+        relative_humidity_2m: (number | null)[]
+        uv_index: (number | null)[]
+        is_day: (number | null)[]
+      }
+    }
+
+    const h = json.hourly
+    return h.time.map((time, i) => ({
+      time,
+      temperature: h.temperature_2m[i] ?? 0,
+      apparent_temperature: h.apparent_temperature[i] ?? 0,
+      precipitation_probability: h.precipitation_probability[i] ?? 0,
+      weather_code: h.weather_code[i] ?? 0,
+      wind_speed_ms: Math.round(((h.wind_speed_10m[i] ?? 0) / 3.6) * 10) / 10,
+      humidity_pct: h.relative_humidity_2m[i] ?? 0,
+      uv_index: h.uv_index[i] ?? 0,
+      is_day: h.is_day[i] ?? 1,
+    }))
+  } catch {
+    return []
+  }
+}
+
+
