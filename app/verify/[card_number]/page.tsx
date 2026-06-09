@@ -7,7 +7,7 @@ import {
   CheckCircle, XCircle, Shield, MapPin, Building2,
   FileText, TrendingUp, PhoneCall, Map, CloudRain,
   ShoppingCart, Coins, Timer, User, ArrowLeft, Bot,
-  Bell, Droplets, Share2, ChevronRight,
+  Bell, Droplets, Share2, ChevronRight, ScanLine,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/logo'
 import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboard'
@@ -84,6 +84,8 @@ export default function VerifyCardPage() {
   const [contactsLoading, setContactsLoading] = useState(false)
   const [atsData, setAtsData] = useState<{ score: number; level: string; breakdown: AtsBreakdown } | null>(null)
   const [quickStats, setQuickStats] = useState<{ totalHa: number; cotisationStatus: string | null; intrantCount: number } | null>(null)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [notifOpen, setNotifOpen] = useState(false)
 
   useEffect(() => {
     setResult(null); setLoading(true); setShowContent(false)
@@ -209,13 +211,26 @@ export default function VerifyCardPage() {
         <div className="relative z-10 max-w-md mx-auto px-4 pt-4 pb-8 space-y-5">
           <header className="flex items-center justify-between vfp-enter">
             <div className="flex items-center gap-3">
-              <Link href="/" className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Accueil">
+              <button onClick={() => setMobileMenuOpen(v => !v)} className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Menu">
                 <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><path d="M1 1h16M1 7h10M1 13h14" stroke="oklch(0.75 0.20 50)" strokeWidth="1.6" strokeLinecap="round"/></svg>
-              </Link>
+              </button>
               <Link href="/"><Logo size="sm" textClassName="text-white" /></Link>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"><Bell className="h-4 w-4 text-white/60" /></div>
+              <div className="relative">
+                <button onClick={() => setNotifOpen(v => !v)} className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Notifications">
+                  <Bell className="h-4 w-4 text-white/60" />
+                </button>
+                {notifOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
+                    <div className="absolute top-12 right-0 z-50 w-60 rounded-2xl border border-white/10 bg-[#040f0a]/95 backdrop-blur-xl p-4 shadow-xl">
+                      <p className="text-white text-sm font-semibold mb-2">Notifications</p>
+                      <p className="text-white/40 text-xs">Aucune notification pour le moment.</p>
+                    </div>
+                  </>
+                )}
+              </div>
               <div className="w-10 h-10 rounded-full vfp-glass-subtle flex items-center justify-center border-2" style={{ borderColor: 'oklch(0.75 0.20 50 / 0.30)' }}>
                 {result.ouvrier.photo_url
                   // eslint-disable-next-line @next/next/no-img-element
@@ -242,6 +257,7 @@ export default function VerifyCardPage() {
             </div>
           </div>
         </div>
+        {mobileMenuOpen && <VerifyMobileMenu onClose={() => setMobileMenuOpen(false)} />}
       </div>
     )
   }
@@ -257,13 +273,26 @@ export default function VerifyCardPage() {
         <div className="relative z-10 max-w-md mx-auto px-4 pt-4 pb-8 space-y-5">
           <header className="flex items-center justify-between vfp-enter">
             <div className="flex items-center gap-3">
-              <Link href="/" className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Accueil">
+              <button onClick={() => setMobileMenuOpen(v => !v)} className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Menu">
                 <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><path d="M1 1h16M1 7h10M1 13h14" stroke="oklch(0.72 0.18 280)" strokeWidth="1.6" strokeLinecap="round"/></svg>
-              </Link>
+              </button>
               <Link href="/"><Logo size="sm" textClassName="text-white" /></Link>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"><Bell className="h-4 w-4 text-white/60" /></div>
+              <div className="relative">
+                <button onClick={() => setNotifOpen(v => !v)} className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Notifications">
+                  <Bell className="h-4 w-4 text-white/60" />
+                </button>
+                {notifOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
+                    <div className="absolute top-12 right-0 z-50 w-60 rounded-2xl border border-white/10 bg-[#040f0a]/95 backdrop-blur-xl p-4 shadow-xl">
+                      <p className="text-white text-sm font-semibold mb-2">Notifications</p>
+                      <p className="text-white/40 text-xs">Aucune notification pour le moment.</p>
+                    </div>
+                  </>
+                )}
+              </div>
               <div className="w-10 h-10 rounded-full vfp-glass-subtle flex items-center justify-center border-2" style={{ borderColor: 'oklch(0.72 0.18 280 / 0.30)' }}>
                 {result.acheteur.photo_url
                   // eslint-disable-next-line @next/next/no-img-element
@@ -290,6 +319,7 @@ export default function VerifyCardPage() {
             </div>
           </div>
         </div>
+        {mobileMenuOpen && <VerifyMobileMenu onClose={() => setMobileMenuOpen(false)} />}
       </div>
     )
   }
@@ -305,13 +335,26 @@ export default function VerifyCardPage() {
         <div className="relative z-10 max-w-md mx-auto px-4 pt-4 pb-8 space-y-5">
           <header className="flex items-center justify-between vfp-enter">
             <div className="flex items-center gap-3">
-              <Link href="/" className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Accueil">
+              <button onClick={() => setMobileMenuOpen(v => !v)} className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Menu">
                 <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><path d="M1 1h16M1 7h10M1 13h14" stroke="oklch(0.72 0.18 230)" strokeWidth="1.6" strokeLinecap="round"/></svg>
-              </Link>
+              </button>
               <Link href="/"><Logo size="sm" textClassName="text-white" /></Link>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"><Bell className="h-4 w-4 text-white/60" /></div>
+              <div className="relative">
+                <button onClick={() => setNotifOpen(v => !v)} className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Notifications">
+                  <Bell className="h-4 w-4 text-white/60" />
+                </button>
+                {notifOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
+                    <div className="absolute top-12 right-0 z-50 w-60 rounded-2xl border border-white/10 bg-[#040f0a]/95 backdrop-blur-xl p-4 shadow-xl">
+                      <p className="text-white text-sm font-semibold mb-2">Notifications</p>
+                      <p className="text-white/40 text-xs">Aucune notification pour le moment.</p>
+                    </div>
+                  </>
+                )}
+              </div>
               <div className="w-10 h-10 rounded-full vfp-glass-subtle flex items-center justify-center border-2" style={{ borderColor: 'oklch(0.72 0.18 230 / 0.30)' }}>
                 {result.agronome.photo_url
                   // eslint-disable-next-line @next/next/no-img-element
@@ -338,6 +381,7 @@ export default function VerifyCardPage() {
             </div>
           </div>
         </div>
+        {mobileMenuOpen && <VerifyMobileMenu onClose={() => setMobileMenuOpen(false)} />}
       </div>
     )
   }
@@ -374,16 +418,47 @@ export default function VerifyCardPage() {
         {/* ─── Premium Header ─── */}
         <header className="flex items-center justify-between vfp-enter">
           <div className="flex items-center gap-3">
-            <Link href="/" className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Accueil">
-              <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><path d="M1 1h16M1 7h10M1 13h14" stroke="var(--vfp-accent)" strokeWidth="1.6" strokeLinecap="round"/></svg>
-            </Link>
+            <button
+              onClick={() => activeView !== 'menu' ? setActiveView('menu') : setMobileMenuOpen(v => !v)}
+              className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"
+              aria-label={activeView !== 'menu' ? 'Retour' : 'Menu'}
+            >
+              {activeView !== 'menu'
+                ? <ArrowLeft className="h-4 w-4" style={{ color: 'var(--vfp-accent)' }} />
+                : <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><path d="M1 1h16M1 7h10M1 13h14" stroke="var(--vfp-accent)" strokeWidth="1.6" strokeLinecap="round"/></svg>
+              }
+            </button>
             <Link href="/">
               <Logo size="sm" textClassName="text-white" />
             </Link>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center relative">
-              <Bell className="h-4.5 w-4.5 text-white/60" />
+            <div className="relative">
+              <button
+                onClick={() => setNotifOpen(v => !v)}
+                className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"
+                aria-label="Notifications"
+              >
+                <Bell className="h-4 w-4 text-white/60" />
+              </button>
+              {notifOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
+                  <div className="absolute top-12 right-0 z-50 w-64 rounded-2xl border border-white/10 bg-[#040f0a]/95 backdrop-blur-xl p-4 shadow-xl">
+                    <p className="text-white text-sm font-semibold mb-3">Notifications</p>
+                    <button
+                      onClick={() => { setActiveView('meteo'); setNotifOpen(false) }}
+                      className="w-full flex items-center gap-3 rounded-xl p-3 bg-white/5 active:bg-white/10 text-left transition-colors"
+                    >
+                      <CloudRain className="h-4 w-4 text-sky-400 shrink-0" />
+                      <div>
+                        <p className="text-white text-xs font-semibold">Alertes météo</p>
+                        <p className="text-white/40 text-[10px] mt-0.5">Pluie, sécheresse, traitement</p>
+                      </div>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
             <div className="w-10 h-10 rounded-full vfp-glass-subtle flex items-center justify-center border-2 border-[var(--vfp-accent)]/30">
               {result.member?.photo_url ? (
@@ -942,6 +1017,40 @@ export default function VerifyCardPage() {
           </div>
         )}
 
+      </div>
+      {mobileMenuOpen && <VerifyMobileMenu onClose={() => setMobileMenuOpen(false)} />}
+    </div>
+  )
+}
+
+function VerifyMobileMenu({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="absolute bottom-0 left-0 right-0 max-w-md mx-auto" onClick={e => e.stopPropagation()}>
+        <div className="bg-[#040f0a]/95 backdrop-blur-xl rounded-t-3xl p-5 space-y-2 border-t border-white/10">
+          <div className="w-8 h-1 rounded-full bg-white/20 mx-auto mb-4" />
+          <button
+            onClick={() => {
+              if (typeof navigator !== 'undefined' && navigator.share) {
+                navigator.share({ title: 'FaîtiereHub', url: window.location.href }).catch(() => {})
+              }
+              onClose()
+            }}
+            className="w-full flex items-center gap-4 rounded-2xl p-4 bg-white/5 active:bg-white/10 text-left transition-colors"
+          >
+            <Share2 className="h-5 w-5 text-[var(--vfp-accent)] shrink-0" />
+            <p className="text-white text-sm font-semibold">Partager cette page</p>
+          </button>
+          <Link href="/scan" onClick={onClose} className="flex items-center gap-4 rounded-2xl p-4 bg-white/5 active:bg-white/10 transition-colors">
+            <ScanLine className="h-5 w-5 text-[var(--vfp-accent)] shrink-0" />
+            <p className="text-white text-sm font-semibold">Scanner une carte</p>
+          </Link>
+          <Link href="/" onClick={onClose} className="flex items-center gap-4 rounded-2xl p-4 bg-white/5 active:bg-white/10 transition-colors">
+            <ArrowLeft className="h-5 w-5 text-white/40 shrink-0" />
+            <p className="text-white text-sm font-semibold">Accueil FaîtiereHub</p>
+          </Link>
+        </div>
       </div>
     </div>
   )
