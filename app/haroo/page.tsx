@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Logo } from '@/components/shared/logo'
 import { Button } from '@/components/ui/button'
@@ -10,11 +10,13 @@ import {
   Briefcase,
   CalendarDays,
   CheckCircle2,
+  Clock,
   CreditCard,
   LogOut,
   MapPin,
   Phone,
   ShoppingBasket,
+  Sparkles,
   Sprout,
   Star,
 } from 'lucide-react'
@@ -29,10 +31,14 @@ import { Spinner } from '@/components/shared/loading'
  * Espace Haroo — tableau de bord des professionnels agricoles
  * (ouvrier / acheteur / agronome).
  *
- * Les profils et l'activité vivent dans les tables haroo_* de la base
- * Supabase partagée (lecture publique via RLS — mêmes données que la
- * vérification de carte). Les utilisateurs des coopératives sont redirigés
- * vers /dashboard.
+ * Chaque acteur voit d'abord ce qui le concerne :
+ *   - ouvrier   → offres d'emploi DANS SES CANTONS en premier, puis les autres,
+ *                 et un bouton pour basculer sa disponibilité (RLS own-update)
+ *   - acheteur  → préventes correspondant à SES PRODUITS en premier
+ *   - agronome  → demandes reçues, puis missions en cours
+ *
+ * Les données vivent dans les tables haroo_* de la base Supabase partagée
+ * (lecture publique via RLS — mêmes données que la vérification de carte).
  */
 
 interface HarooProfile {
@@ -50,11 +56,13 @@ interface HarooProfile {
   // acheteur
   type_acheteur?: string | null
   produits_interesses?: string[]
+  prefectures?: { name: string } | null
   // agronome
   specialisations?: string[]
   badge_valide?: boolean
   statut_validation?: string
   nombre_missions?: number
+  cantons?: { name: string } | null
 }
 
 interface JobRow {
@@ -96,6 +104,13 @@ const ROLE_META = {
 
 type HarooRoleKey = keyof typeof ROLE_META
 
+const MISSION_STATUT_STYLE: Record<string, string> = {
+  DEMANDE: 'bg-amber-100 text-amber-800',
+  EN_COURS: 'bg-primary/10 text-primary',
+  TERMINEE: 'bg-muted text-muted-foreground',
+  ANNULEE: 'bg-destructive/10 text-destructive',
+}
+
 function formatDate(value: string | null): string {
   if (!value) return '—'
   return new Date(value).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -106,15 +121,145 @@ function formatFcfa(value: number | null): string {
   return `${Number(value).toLocaleString('fr-FR')} FCFA`
 }
 
+/** Petite carte d'indicateur (rangée de stats en haut de l'espace). */
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  hint,
+}: {
+  icon: typeof Briefcase
+  label: string
+  value: React.ReactNode
+  hint?: string
+}) {
+  return (
+    <Card className="border-border">
+      <CardContent className="pt-5 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <Icon className="h-5 w-5 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xl font-bold text-foreground leading-tight">{value}</p>
+            <p className="text-xs text-muted-foreground">{label}</p>
+            {hint && <p className="text-[11px] text-muted-foreground/70">{hint}</p>}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+/** Carte d'offre d'emploi — surlignée quand elle est dans un canton de l'ouvrier. */
+function JobCard({ job, highlight }: { job: JobRow; highlight: boolean }) {
+  return (
+    <div
+      className={`rounded-lg border p-4 space-y-2 ${
+        highlight ? 'border-primary/40 bg-primary/5' : 'border-border'
+      }`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold text-foreground">{job.type_travail}</h3>
+          {highlight && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+              <Sparkles className="h-3 w-3" /> Dans votre canton
+            </span>
+          )}
+        </div>
+        <span className="text-sm font-medium text-primary">{formatFcfa(job.salaire_horaire)} / h</span>
+      </div>
+      {job.description && <p className="text-sm text-muted-foreground">{job.description}</p>}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        {job.cantons?.name && (
+          <span className="inline-flex items-center gap-1">
+            <MapPin className="h-3 w-3" /> {job.cantons.name}
+          </span>
+        )}
+        <span className="inline-flex items-center gap-1">
+          <CalendarDays className="h-3 w-3" />
+          {formatDate(job.date_debut)} → {formatDate(job.date_fin)}
+        </span>
+        {job.nombre_postes != null && <span>{job.nombre_postes} poste(s)</span>}
+      </div>
+    </div>
+  )
+}
+
+/** Carte de prévente — surlignée quand la culture intéresse l'acheteur. */
+function PresaleCard({ presale, highlight }: { presale: PresaleRow; highlight: boolean }) {
+  return (
+    <div
+      className={`rounded-lg border p-4 space-y-2 ${
+        highlight ? 'border-primary/40 bg-primary/5' : 'border-border'
+      }`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold text-foreground">{presale.culture}</h3>
+          {highlight && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+              <Sparkles className="h-3 w-3" /> Correspond à vos produits
+            </span>
+          )}
+        </div>
+        <span className="text-sm font-medium text-primary">{formatFcfa(presale.prix_par_tonne)} / tonne</span>
+      </div>
+      {presale.description && <p className="text-sm text-muted-foreground">{presale.description}</p>}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        {presale.cantons?.name && (
+          <span className="inline-flex items-center gap-1">
+            <MapPin className="h-3 w-3" /> {presale.cantons.name}
+          </span>
+        )}
+        {presale.quantite_estimee != null && (
+          <span>{Number(presale.quantite_estimee).toLocaleString('fr-FR')} t estimées</span>
+        )}
+        <span className="inline-flex items-center gap-1">
+          <CalendarDays className="h-3 w-3" /> Récolte : {formatDate(presale.date_recolte_prevue)}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function MissionCard({ mission }: { mission: MissionRow }) {
+  return (
+    <div className="rounded-lg border border-border p-4 space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-semibold text-foreground">{mission.exploitant_name ?? 'Mission'}</h3>
+        <span
+          className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+            MISSION_STATUT_STYLE[mission.statut] ?? 'bg-muted text-muted-foreground'
+          }`}
+        >
+          {mission.statut.replace('_', ' ')}
+        </span>
+      </div>
+      {mission.description && <p className="text-sm text-muted-foreground">{mission.description}</p>}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <span>Budget : {formatFcfa(mission.budget_propose)}</span>
+        <span className="inline-flex items-center gap-1">
+          <CalendarDays className="h-3 w-3" />
+          {formatDate(mission.date_debut)} → {formatDate(mission.date_fin)}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 function HarooSpaceInner() {
   const { user } = useAuth()
   const router = useRouter()
 
   const [profile, setProfile] = useState<HarooProfile | null>(null)
+  const [myCantons, setMyCantons] = useState<string[]>([])
   const [jobs, setJobs] = useState<JobRow[]>([])
   const [presales, setPresales] = useState<PresaleRow[]>([])
   const [missions, setMissions] = useState<MissionRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [togglingDispo, setTogglingDispo] = useState(false)
 
   const role = user?.role
   const harooRole = role && isHarooRole(role) ? (role as HarooRoleKey) : null
@@ -134,30 +279,50 @@ function HarooSpaceInner() {
       setLoading(true)
       const supabase = createClient()
 
+      const profileSelect =
+        harooRole === 'acheteur'
+          ? '*, prefectures(name)'
+          : harooRole === 'agronome'
+            ? '*, cantons(name)'
+            : '*'
+
       const { data: profileData } = await supabase
         .from(ROLE_META[harooRole].table)
-        .select('*')
+        .select(profileSelect)
         .eq('user_id', user.id)
         .maybeSingle<HarooProfile>()
       if (cancelled) return
       setProfile(profileData ?? null)
 
       if (harooRole === 'ouvrier') {
-        const { data } = await supabase
-          .from('haroo_jobs')
-          .select('id, type_travail, description, date_debut, date_fin, salaire_horaire, nombre_postes, cantons(name)')
-          .eq('statut', 'OUVERTE')
-          .order('created_at', { ascending: false })
-          .limit(10)
-          .returns<JobRow[]>()
-        if (!cancelled) setJobs(data ?? [])
+        const [cantonsRes, jobsRes] = await Promise.all([
+          profileData
+            ? supabase
+                .from('haroo_ouvrier_cantons')
+                .select('cantons(name)')
+                .eq('ouvrier_id', profileData.id)
+                .returns<{ cantons: { name: string } | null }[]>()
+            : Promise.resolve({ data: [] as { cantons: { name: string } | null }[] }),
+          supabase
+            .from('haroo_jobs')
+            .select('id, type_travail, description, date_debut, date_fin, salaire_horaire, nombre_postes, cantons(name)')
+            .eq('statut', 'OUVERTE')
+            .order('created_at', { ascending: false })
+            .limit(20)
+            .returns<JobRow[]>(),
+        ])
+        if (cancelled) return
+        setMyCantons(
+          (cantonsRes.data ?? []).map((r) => r.cantons?.name).filter((n): n is string => !!n),
+        )
+        setJobs(jobsRes.data ?? [])
       } else if (harooRole === 'acheteur') {
         const { data } = await supabase
           .from('haroo_presales')
           .select('id, culture, quantite_estimee, prix_par_tonne, date_recolte_prevue, description, cantons(name)')
           .eq('statut', 'DISPONIBLE')
           .order('created_at', { ascending: false })
-          .limit(10)
+          .limit(20)
           .returns<PresaleRow[]>()
         if (!cancelled) setPresales(data ?? [])
       } else if (harooRole === 'agronome' && profileData) {
@@ -166,7 +331,7 @@ function HarooSpaceInner() {
           .select('id, description, statut, budget_propose, date_debut, date_fin, exploitant_name')
           .eq('agronome_id', profileData.id)
           .order('created_at', { ascending: false })
-          .limit(10)
+          .limit(20)
           .returns<MissionRow[]>()
         if (!cancelled) setMissions(data ?? [])
       }
@@ -180,6 +345,44 @@ function HarooSpaceInner() {
     }
   }, [user, harooRole])
 
+  // ── Pertinence : trier ce qui concerne l'acteur en premier ──────────────────
+  const { jobsInMyCantons, otherJobs } = useMemo(() => {
+    const inMine: JobRow[] = []
+    const others: JobRow[] = []
+    for (const job of jobs) {
+      if (job.cantons?.name && myCantons.includes(job.cantons.name)) inMine.push(job)
+      else others.push(job)
+    }
+    return { jobsInMyCantons: inMine, otherJobs: others }
+  }, [jobs, myCantons])
+
+  const { matchingPresales, otherPresales } = useMemo(() => {
+    const interests = (profile?.produits_interesses ?? []).map((p) => p.toLowerCase())
+    const matching: PresaleRow[] = []
+    const others: PresaleRow[] = []
+    for (const presale of presales) {
+      if (interests.includes(presale.culture.toLowerCase())) matching.push(presale)
+      else others.push(presale)
+    }
+    return { matchingPresales: matching, otherPresales: others }
+  }, [presales, profile?.produits_interesses])
+
+  const demandes = useMemo(() => missions.filter((m) => m.statut === 'DEMANDE'), [missions])
+  const enCours = useMemo(() => missions.filter((m) => m.statut === 'EN_COURS'), [missions])
+
+  const toggleDisponible = async () => {
+    if (!profile || togglingDispo) return
+    setTogglingDispo(true)
+    const next = !profile.disponible
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('haroo_ouvrier_profiles')
+      .update({ disponible: next })
+      .eq('id', profile.id)
+    if (!error) setProfile((p) => (p ? { ...p, disponible: next } : p))
+    setTogglingDispo(false)
+  }
+
   if (!harooRole) return null
 
   const meta = ROLE_META[harooRole]
@@ -187,6 +390,7 @@ function HarooSpaceInner() {
   const fullName = profile
     ? `${profile.first_name} ${profile.last_name}`
     : `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim()
+  const tags = profile?.competences ?? profile?.produits_interesses ?? profile?.specialisations ?? []
 
   return (
     <div className="min-h-screen bg-background">
@@ -210,6 +414,86 @@ function HarooSpaceInner() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
+        {/* Accueil personnalisé */}
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">
+            Bonjour{profile?.first_name ? `, ${profile.first_name}` : ''} 👋
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {harooRole === 'ouvrier' && 'Voici les offres d\'emploi du moment, en commençant par vos cantons.'}
+            {harooRole === 'acheteur' && 'Voici les préventes disponibles, en commençant par vos produits.'}
+            {harooRole === 'agronome' && 'Voici vos demandes de mission et vos missions en cours.'}
+          </p>
+        </div>
+
+        {/* Indicateurs clés */}
+        {!loading && (
+          <div className="grid gap-4 sm:grid-cols-3">
+            {harooRole === 'ouvrier' && (
+              <>
+                <StatCard
+                  icon={Briefcase}
+                  label="Offres dans vos cantons"
+                  value={jobsInMyCantons.length}
+                  hint={myCantons.length ? myCantons.join(', ') : 'Aucun canton renseigné'}
+                />
+                <StatCard
+                  icon={Star}
+                  label={`Note moyenne (${profile?.nombre_avis ?? 0} avis)`}
+                  value={`${Number(profile?.note_moyenne ?? 0).toFixed(1)} / 5`}
+                />
+                <Card className="border-border">
+                  <CardContent className="pt-5 pb-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className={`text-xl font-bold leading-tight ${profile?.disponible ? 'text-primary' : 'text-muted-foreground'}`}>
+                          {profile?.disponible ? '● Disponible' : 'Indisponible'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Visible par les recruteurs</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={toggleDisponible}
+                        disabled={togglingDispo || !profile}
+                      >
+                        {togglingDispo ? <Spinner className="h-4 w-4" /> : profile?.disponible ? 'Me retirer' : 'Me rendre dispo'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+            {harooRole === 'acheteur' && (
+              <>
+                <StatCard
+                  icon={Sparkles}
+                  label="Préventes pour vos produits"
+                  value={matchingPresales.length}
+                  hint={(profile?.produits_interesses ?? []).join(', ') || undefined}
+                />
+                <StatCard icon={ShoppingBasket} label="Préventes disponibles" value={presales.length} />
+                <StatCard
+                  icon={MapPin}
+                  label="Préfecture d'intervention"
+                  value={profile?.prefectures?.name ?? '—'}
+                />
+              </>
+            )}
+            {harooRole === 'agronome' && (
+              <>
+                <StatCard icon={Clock} label="Demandes reçues" value={demandes.length} />
+                <StatCard icon={Sprout} label="Missions en cours" value={enCours.length} />
+                <StatCard
+                  icon={Star}
+                  label={`Note moyenne — ${profile?.nombre_missions ?? 0} missions réalisées`}
+                  value={`${Number(profile?.note_moyenne ?? 0).toFixed(1)} / 5`}
+                />
+              </>
+            )}
+          </div>
+        )}
+
         {/* Profil */}
         <Card className="border-border">
           <CardContent className="pt-6">
@@ -223,10 +507,11 @@ function HarooSpaceInner() {
                   .toUpperCase() || '?'}
               </div>
               <div className="flex-1 space-y-1">
-                <h1 className="text-xl font-bold text-foreground">{fullName || 'Mon profil Haroo'}</h1>
+                <h2 className="text-lg font-bold text-foreground">{fullName || 'Mon profil Haroo'}</h2>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                   <span className="inline-flex items-center gap-1.5">
                     <RoleIcon className="h-3.5 w-3.5" /> {meta.label}
+                    {harooRole === 'acheteur' && profile?.type_acheteur ? ` · ${profile.type_acheteur}` : ''}
                   </span>
                   {profile?.phone && (
                     <span className="inline-flex items-center gap-1.5">
@@ -237,53 +522,35 @@ function HarooSpaceInner() {
                     <CreditCard className="h-3.5 w-3.5" />
                     {profile?.card_number ? `Carte ${profile.card_number}` : 'Carte en attente d\'émission'}
                   </span>
+                  {harooRole === 'agronome' && profile?.cantons?.name && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <MapPin className="h-3.5 w-3.5" /> {profile.cantons.name}
+                    </span>
+                  )}
                 </div>
               </div>
-              {harooRole === 'ouvrier' && profile && (
-                <div className="text-sm text-muted-foreground space-y-1 sm:text-right">
-                  <p className="inline-flex items-center gap-1.5">
-                    <Star className="h-3.5 w-3.5 text-primary" />
-                    {Number(profile.note_moyenne ?? 0).toFixed(1)} / 5 ({profile.nombre_avis ?? 0} avis)
-                  </p>
-                  <p className={profile.disponible ? 'text-primary font-medium' : ''}>
-                    {profile.disponible ? '● Disponible' : 'Indisponible'}
-                  </p>
-                </div>
-              )}
               {harooRole === 'agronome' && profile && (
-                <div className="text-sm text-muted-foreground space-y-1 sm:text-right">
-                  <p className="inline-flex items-center gap-1.5">
-                    {profile.badge_valide ? (
-                      <>
-                        <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> Badge validé
-                      </>
-                    ) : (
-                      <>Validation : {profile.statut_validation ?? 'EN_ATTENTE'}</>
-                    )}
-                  </p>
-                  <p>{profile.nombre_missions ?? 0} missions réalisées</p>
+                <div className="text-sm sm:text-right">
+                  {profile.badge_valide ? (
+                    <p className="inline-flex items-center gap-1.5 text-primary font-medium">
+                      <CheckCircle2 className="h-4 w-4" /> Badge validé
+                    </p>
+                  ) : (
+                    <p className="text-muted-foreground">Validation : {profile.statut_validation ?? 'EN_ATTENTE'}</p>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* Tags (compétences / produits / spécialisations) */}
-            {(() => {
-              const tags =
-                profile?.competences ?? profile?.produits_interesses ?? profile?.specialisations ?? []
-              if (tags.length === 0) return null
-              return (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )
-            })()}
+            {tags.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <span key={tag} className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -304,33 +571,20 @@ function HarooSpaceInner() {
                 <CardContent className="space-y-4">
                   {jobs.length === 0 && (
                     <p className="text-sm text-muted-foreground">
-                      Aucune offre ouverte pour le moment. Revenez bientôt.
+                      Aucune offre ouverte pour le moment. Revenez bientôt — les coopératives publient
+                      régulièrement de nouvelles offres.
                     </p>
                   )}
-                  {jobs.map((job) => (
-                    <div key={job.id} className="rounded-lg border border-border p-4 space-y-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h3 className="font-semibold text-foreground">{job.type_travail}</h3>
-                        <span className="text-sm font-medium text-primary">
-                          {formatFcfa(job.salaire_horaire)} / h
-                        </span>
-                      </div>
-                      {job.description && (
-                        <p className="text-sm text-muted-foreground">{job.description}</p>
-                      )}
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                        {job.cantons?.name && (
-                          <span className="inline-flex items-center gap-1">
-                            <MapPin className="h-3 w-3" /> {job.cantons.name}
-                          </span>
-                        )}
-                        <span className="inline-flex items-center gap-1">
-                          <CalendarDays className="h-3 w-3" />
-                          {formatDate(job.date_debut)} → {formatDate(job.date_fin)}
-                        </span>
-                        {job.nombre_postes != null && <span>{job.nombre_postes} poste(s)</span>}
-                      </div>
-                    </div>
+                  {jobsInMyCantons.map((job) => (
+                    <JobCard key={job.id} job={job} highlight />
+                  ))}
+                  {otherJobs.length > 0 && jobsInMyCantons.length > 0 && (
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground pt-2">
+                      Ailleurs au Togo
+                    </p>
+                  )}
+                  {otherJobs.map((job) => (
+                    <JobCard key={job.id} job={job} highlight={false} />
                   ))}
                 </CardContent>
               </Card>
@@ -346,77 +600,67 @@ function HarooSpaceInner() {
                 <CardContent className="space-y-4">
                   {presales.length === 0 && (
                     <p className="text-sm text-muted-foreground">
-                      Aucune prévente disponible pour le moment. Revenez bientôt.
+                      Aucune prévente disponible pour le moment. Revenez bientôt — les producteurs
+                      publient leurs préventes avant chaque récolte.
                     </p>
                   )}
-                  {presales.map((presale) => (
-                    <div key={presale.id} className="rounded-lg border border-border p-4 space-y-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h3 className="font-semibold text-foreground">{presale.culture}</h3>
-                        <span className="text-sm font-medium text-primary">
-                          {formatFcfa(presale.prix_par_tonne)} / tonne
-                        </span>
-                      </div>
-                      {presale.description && (
-                        <p className="text-sm text-muted-foreground">{presale.description}</p>
-                      )}
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                        {presale.cantons?.name && (
-                          <span className="inline-flex items-center gap-1">
-                            <MapPin className="h-3 w-3" /> {presale.cantons.name}
-                          </span>
-                        )}
-                        {presale.quantite_estimee != null && (
-                          <span>{Number(presale.quantite_estimee).toLocaleString('fr-FR')} t estimées</span>
-                        )}
-                        <span className="inline-flex items-center gap-1">
-                          <CalendarDays className="h-3 w-3" /> Récolte : {formatDate(presale.date_recolte_prevue)}
-                        </span>
-                      </div>
-                    </div>
+                  {matchingPresales.map((presale) => (
+                    <PresaleCard key={presale.id} presale={presale} highlight />
+                  ))}
+                  {otherPresales.length > 0 && matchingPresales.length > 0 && (
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground pt-2">
+                      Autres cultures
+                    </p>
+                  )}
+                  {otherPresales.map((presale) => (
+                    <PresaleCard key={presale.id} presale={presale} highlight={false} />
                   ))}
                 </CardContent>
               </Card>
             )}
 
             {harooRole === 'agronome' && (
-              <Card className="border-border">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Sprout className="h-5 w-5 text-primary" /> Mes missions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {missions.length === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      Aucune mission pour le moment. Les exploitants peuvent vous solliciter
-                      via votre carte professionnelle.
-                    </p>
-                  )}
-                  {missions.map((mission) => (
-                    <div key={mission.id} className="rounded-lg border border-border p-4 space-y-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h3 className="font-semibold text-foreground">
-                          {mission.exploitant_name ?? 'Mission'}
-                        </h3>
-                        <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
-                          {mission.statut}
+              <>
+                <Card className="border-border">
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-amber-600" /> Demandes reçues
+                      {demandes.length > 0 && (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
+                          {demandes.length}
                         </span>
-                      </div>
-                      {mission.description && (
-                        <p className="text-sm text-muted-foreground">{mission.description}</p>
                       )}
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                        <span>Budget : {formatFcfa(mission.budget_propose)}</span>
-                        <span className="inline-flex items-center gap-1">
-                          <CalendarDays className="h-3 w-3" />
-                          {formatDate(mission.date_debut)} → {formatDate(mission.date_fin)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {demandes.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        Aucune demande en attente. Les exploitants peuvent vous solliciter via votre
+                        carte professionnelle.
+                      </p>
+                    )}
+                    {demandes.map((mission) => (
+                      <MissionCard key={mission.id} mission={mission} />
+                    ))}
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border">
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Sprout className="h-5 w-5 text-primary" /> Missions en cours
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {enCours.length === 0 && (
+                      <p className="text-sm text-muted-foreground">Aucune mission en cours.</p>
+                    )}
+                    {enCours.map((mission) => (
+                      <MissionCard key={mission.id} mission={mission} />
+                    ))}
+                  </CardContent>
+                </Card>
+              </>
             )}
           </>
         )}
