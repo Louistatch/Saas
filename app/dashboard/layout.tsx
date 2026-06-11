@@ -53,6 +53,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     performLogout() // Enterprise logout — clears everything, broadcasts, redirects
   }
 
+  // Pendant la redirection d'un rôle Haroo, ne jamais rendre l'arbre
+  // coopérative (il suppose un contexte coopérative qui n'existe pas
+  // pour ces comptes).
+  if (user && isHarooRole(user.role)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="space-y-4 text-center">
+          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground text-sm">Redirection vers votre espace Haroo…</p>
+        </div>
+      </div>
+    )
+  }
+
   // Navigation items filtered by role
   const navigationItems = [
     { href: '/dashboard', label: 'Vue d\'ensemble', icon: Home, roles: ['super_admin', 'cooperative_admin', 'member', 'guest'] },
