@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, Users, TrendingUp, BarChart3, Zap, ScanLine } from 'lucide-react'
+import { ArrowRight, Users, TrendingUp, BarChart3, Zap, ScanLine, ExternalLink } from 'lucide-react'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
+import { HAROO_URL } from '@/lib/constants'
 
 export default function Home() {
   return (
@@ -100,6 +101,27 @@ export default function Home() {
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Chaque membre reçoit une carte numérique avec QR code vérifiable, photo d&apos;identité et toutes ses informations.
+            </p>
+            <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
+              Ouvrier agricole, acheteur ou agronome ? Le même scanner vérifie les cartes Haroo —{' '}
+              <a
+                href={`${HAROO_URL}/register`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-primary hover:underline"
+              >
+                créez votre compte Haroo
+              </a>{' '}
+              ou{' '}
+              <a
+                href={`${HAROO_URL}/login`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-primary hover:underline"
+              >
+                connectez-vous
+              </a>{' '}
+              pour accéder à l&apos;emploi saisonnier, aux préventes et aux missions d&apos;agronomes.
             </p>
           </div>
           <div className="flex justify-center">
@@ -236,13 +258,31 @@ export default function Home() {
             Prêt à transformer votre coopérative ?
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Rejoignez les coopératives agricoles de la région qui utilisent FaîtiereHub pour connecter leurs membres et grandir ensemble.
+            Rejoignez les coopératives agricoles de la région qui utilisent FaîtiereHub pour connecter leurs membres et grandir ensemble. Vous cherchez plutôt les services Haroo — emploi saisonnier, préventes, missions d&apos;agronomes ? Inscrivez-vous directement sur Haroo.
           </p>
-          <Link href="/auth/signup" className="mt-8 inline-block">
-            <Button size="lg" className="gap-2 bg-primary hover:bg-primary/90">
-              Commencer votre essai gratuit <ArrowRight className="h-4 w-4" />
-            </Button>
-          </Link>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center sm:gap-4">
+            <Link href="/auth/signup">
+              <Button size="lg" className="gap-2 bg-primary hover:bg-primary/90 w-full sm:w-auto">
+                Commencer votre essai gratuit <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+            <a href={`${HAROO_URL}/register`} target="_blank" rel="noopener noreferrer">
+              <Button size="lg" variant="outline" className="gap-2 w-full sm:w-auto">
+                Créer un compte Haroo <ExternalLink className="h-4 w-4" />
+              </Button>
+            </a>
+          </div>
+          <p className="mt-4 text-sm text-muted-foreground">
+            Déjà inscrit sur Haroo ?{' '}
+            <a
+              href={`${HAROO_URL}/login`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-primary hover:underline"
+            >
+              Se connecter
+            </a>
+          </p>
         </div>
       </section>
     </MarketingLayout>

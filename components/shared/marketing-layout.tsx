@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { Menu, X, ScanLine } from 'lucide-react'
 import { Logo } from '@/components/shared/logo'
 import { AuthButtons } from '@/components/shared/auth-buttons'
+import { HAROO_URL } from '@/lib/constants'
 
 const headerLinks = [
   { href: '/produit', label: 'Produit' },
@@ -24,6 +25,7 @@ const footerColumns = [
       { href: '/pricing', label: 'Tarifs' },
       { href: '/securite', label: 'Sécurité' },
       { href: '/blog', label: 'Blog' },
+      { href: HAROO_URL, label: 'Services Haroo', external: true },
     ],
   },
   {
@@ -133,12 +135,23 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
                 <ul className="space-y-2">
                   {column.links.map((link) => (
                     <li key={link.href}>
-                      <Link
-                        href={link.href}
-                        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        {link.label}
-                      </Link>
+                      {'external' in link && link.external ? (
+                        <a
+                          href={link.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          {link.label}
+                        </a>
+                      ) : (
+                        <Link
+                          href={link.href}
+                          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          {link.label}
+                        </Link>
+                      )}
                     </li>
                   ))}
                 </ul>
