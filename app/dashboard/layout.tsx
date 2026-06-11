@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import {
   BarChart3,
@@ -26,10 +26,11 @@ import {
   MapPin,
   CreditCard,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Logo } from '@/components/shared/logo'
 import { useAuth } from '@/app/context/auth-context'
 import { performLogout } from '@/lib/auth/logout'
+import { isHarooRole } from '@/lib/utils/permissions'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { ProtectedRoute } from '@/app/components/protected-route'
 import { NotificationBell } from '@/components/shared/notification-bell'
@@ -37,9 +38,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { user } = useAuth()
   const { currentCooperative, cooperatives, switchCooperative } = useCooperative()
+
+  // Les professionnels Haroo ont leur propre espace — le dashboard est
+  // réservé aux coopératives.
+  useEffect(() => {
+    if (user && isHarooRole(user.role)) router.replace('/haroo')
+  }, [user, router])
 
   const handleLogout = () => {
     performLogout() // Enterprise logout — clears everything, broadcasts, redirects

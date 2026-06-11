@@ -13,6 +13,7 @@ import { Eye, EyeOff, ArrowLeft } from 'lucide-react'
 import { useAuth } from '@/app/context/auth-context'
 import { Spinner } from '@/components/shared/loading'
 import { errorMessage } from '@/lib/utils/errors'
+import { isHarooRole } from '@/lib/utils/permissions'
 import { flattenZodErrors, loginSchema } from '@/lib/validators/schemas'
 
 /**
@@ -78,7 +79,12 @@ function LoginInner() {
       const safeRedirect =
         redirectTo && /^\/[^/]/.test(redirectTo) ? redirectTo : null
       const target =
-        safeRedirect ?? (user?.role === 'super_admin' ? '/admin' : '/dashboard')
+        safeRedirect ??
+        (user?.role === 'super_admin'
+          ? '/admin'
+          : isHarooRole(user?.role)
+            ? '/haroo'
+            : '/dashboard')
 
       router.replace(target)
     } catch (err: unknown) {

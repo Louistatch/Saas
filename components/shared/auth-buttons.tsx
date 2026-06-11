@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/app/context/auth-context'
 import { performLogout } from '@/lib/auth/logout'
+import { isHarooRole } from '@/lib/utils/permissions'
 import { LayoutDashboard, LogOut } from 'lucide-react'
 
 /**
@@ -17,7 +18,12 @@ export function AuthButtons() {
   // Don't show skeleton — show login buttons immediately
   // They'll be replaced once auth state is resolved
   if (isAuthenticated && user) {
-    const dashboardUrl = user.role === 'super_admin' ? '/admin' : '/dashboard'
+    const dashboardUrl =
+      user.role === 'super_admin'
+        ? '/admin'
+        : isHarooRole(user.role)
+          ? '/haroo'
+          : '/dashboard'
     return (
       <div className="flex items-center gap-3">
         <Link href={dashboardUrl}>
