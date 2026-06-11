@@ -78,11 +78,19 @@ function LoginInner() {
 
       const safeRedirect =
         redirectTo && /^\/[^/]/.test(redirectTo) ? redirectTo : null
+      // Un professionnel Haroo ne doit jamais être renvoyé vers le dashboard
+      // coopérative, même si ?redirect=/dashboard a été posé par le middleware
+      // lors d'une visite déconnectée — son espace est /haroo.
+      const harooUser = isHarooRole(user?.role)
+      const applicableRedirect =
+        harooUser && safeRedirect && (safeRedirect.startsWith('/dashboard') || safeRedirect.startsWith('/admin'))
+          ? null
+          : safeRedirect
       const target =
-        safeRedirect ??
+        applicableRedirect ??
         (user?.role === 'super_admin'
           ? '/admin'
-          : isHarooRole(user?.role)
+          : harooUser
             ? '/haroo'
             : '/dashboard')
 
