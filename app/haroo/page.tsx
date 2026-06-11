@@ -11,7 +11,9 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock,
+  CloudRain,
   CreditCard,
+  LineChart,
   LogOut,
   MapPin,
   Phone,
@@ -19,6 +21,7 @@ import {
   Sparkles,
   Sprout,
   Star,
+  Sun,
 } from 'lucide-react'
 import { ProtectedRoute } from '@/app/components/protected-route'
 import { useAuth } from '@/app/context/auth-context'
@@ -94,6 +97,28 @@ interface MissionRow {
   date_debut: string | null
   date_fin: string | null
   exploitant_name: string | null
+}
+
+/** Payload de /api/haroo/insights — météo 3 modèles + prix du marché régionaux. */
+interface InsightsPayload {
+  region: string
+  weather: {
+    date: string
+    temperature_min: number
+    temperature_max: number
+    precipitation_mm: number
+    precipitation_probability: number
+    humidity_pct: number
+  }[]
+  prices: {
+    id: string
+    culture: string
+    price: number
+    trend: string
+    market: string
+    verified: boolean
+    recorded_at: string
+  }[]
 }
 
 const ROLE_META = {
@@ -258,6 +283,7 @@ function HarooSpaceInner() {
   const [jobs, setJobs] = useState<JobRow[]>([])
   const [presales, setPresales] = useState<PresaleRow[]>([])
   const [missions, setMissions] = useState<MissionRow[]>([])
+  const [insights, setInsights] = useState<InsightsPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [togglingDispo, setTogglingDispo] = useState(false)
 
@@ -340,6 +366,22 @@ function HarooSpaceInner() {
     }
 
     void load()
+    return () => {
+      cancelled = true
+    }
+  }, [user, harooRole])
+
+  // Insights écosystème (météo de la zone + prix du marché de la région) —
+  // un seul appel serveur, indépendant du chargement du profil.
+  useEffect(() => {
+    if (!user || !harooRole) return
+    let cancelled = false
+    fetch('/api/haroo/insights')
+      .then((res) => (res.ok ? (res.json() as Promise<InsightsPayload>) : null))
+      .then((data) => {
+        if (!cancelled && data) setInsights(data)
+      })
+      .catch(() => null)
     return () => {
       cancelled = true
     }
@@ -490,6 +532,147 @@ function HarooSpaceInner() {
                   value={`${Number(profile?.note_moyenne ?? 0).toFixed(1)} / 5`}
                 />
               </>
+            )}
+          </div>
+        )}
+
+        {/* Insights écosystème : météo de la zone + prix du marché régionaux */}
+        {insights && (insights.weather.length > 0 || insights.prices.length > 0) && (
+          <div className="grid gap-4 md:grid-cols-2">
+            {insights.weather.length > 0 && (
+              <Card className="border-border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Sun className="h-4 w-4 text-primary" /> Météo — région {insights.region}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {(() => {
+                    const today = insights.weather[0]
+                    const favorable =
+                      today.precipitation_mm < 2 && today.precipitation_probability < 40
+                    const hint =
+                      harooRole === 'ouvrier'
+                        ? favorable
+                          ? '✅ Conditions favorables aux travaux des champs aujourd\'hui'
+                          : '🌧️ Pluie probable aujourd\'hui — planifiez les travaux en conséquence'
+                        : harooRole === 'acheteur'
+                          ? favorable
+                            ? '✅ Bonne fenêtre pour les collectes et livraisons'
+                            : '🌧️ Pluie probable — anticipez les délais de transport'
+                          : favorable
+                            ? '✅ Bonne fenêtre pour les visites de terrain'
+                            : '🌧️ Pluie probable — privilégiez le conseil à distance'
+                    return (
+                      <p
+                        className={`rounded-md px-3 py-2 text-sm font-medium ${
+                          favorable ? 'bg-primary/10 text-primary' : 'bg-amber-100 text-amber-900'
+                        }`}
+                      >
+                        {hint}
+                      </p>
+                    )
+                  })()}
+                  <div className="grid grid-cols-4 gap-2">
+                    {insights.weather.map((day, i) => {
+                      const rainy = day.precipitation_probability >= 50
+                      const DayIcon = rainy ? CloudRain : Sun
+                      return (
+                        <div
+                          key={day.date}
+                          className="rounded-lg border border-border p-2 text-center space-y-1"
+                        >
+                          <p className="text-[11px] font-medium text-muted-foreground capitalize">
+                            {i === 0
+                              ? 'Aujourd\'hui'
+                              : new Date(day.date).toLocaleDateString('fr-FR', {
+                                  weekday: 'short',
+                                  day: 'numeric',
+                                })}
+                          </p>
+                          <DayIcon
+                            className={`h-4 w-4 mx-auto ${rainy ? 'text-blue-500' : 'text-amber-500'}`}
+                          />
+                          <p className="text-xs font-semibold text-foreground">
+                            {day.temperature_max}° / {day.temperature_min}°
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {day.precipitation_probability}% pluie
+                          </p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Ensemble 3 modèles (ECMWF · GFS · ICON) — module météo AgriSmart
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {insights.prices.length > 0 && (
+              <Card className="border-border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <LineChart className="h-4 w-4 text-primary" /> Prix du marché — région {insights.region}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {(() => {
+                      const interests = (profile?.produits_interesses ?? []).map((p) =>
+                        p.toLowerCase(),
+                      )
+                      const sorted = [...insights.prices].sort((a, b) => {
+                        const am = interests.includes(a.culture.toLowerCase()) ? 0 : 1
+                        const bm = interests.includes(b.culture.toLowerCase()) ? 0 : 1
+                        return am - bm
+                      })
+                      return sorted.slice(0, 6).map((price) => {
+                        const matches = interests.includes(price.culture.toLowerCase())
+                        return (
+                          <div
+                            key={price.id}
+                            className={`flex items-center justify-between gap-2 rounded-md border px-3 py-2 ${
+                              matches ? 'border-primary/40 bg-primary/5' : 'border-border'
+                            }`}
+                          >
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">
+                                {price.culture}
+                                {matches && (
+                                  <span className="ml-2 text-[10px] font-semibold text-primary uppercase">
+                                    vos produits
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground truncate">
+                                {price.market}
+                                {price.verified ? ' · ✓ vérifié' : ''}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="text-sm font-bold text-foreground">
+                                {price.price.toLocaleString('fr-FR')} F/kg
+                              </p>
+                              <p className="text-[11px] text-muted-foreground">
+                                {price.trend === 'up'
+                                  ? '↑ Hausse'
+                                  : price.trend === 'down'
+                                    ? '↓ Baisse'
+                                    : '→ Stable'}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })
+                    })()}
+                  </div>
+                  <p className="mt-3 text-[11px] text-muted-foreground">
+                    Prix collectés sur le terrain via FaîtiereHub
+                  </p>
+                </CardContent>
+              </Card>
             )}
           </div>
         )}
