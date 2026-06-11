@@ -154,7 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initAuth()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (!mounted) return
 
         if (event === 'SIGNED_OUT') {
@@ -169,20 +169,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
-        // AUTH-08: profile/email/role updated server-side — refresh in-memory user
-        // so a role change (e.g. from the admin panel) takes effect without re-login.
-        if (event === 'USER_UPDATED') {
-          if (session?.user) {
-            const profile = await fetchProfile(session.user.id)
-            if (mounted && profile) setUser(profile)
-          }
-          return
-        }
-
+        // Couvre SIGNED_IN, INITIAL_SESSION, TOKEN_REFRESHED et USER_UPDATED :
+        // dans tous les cas on resynchronise le profil.
+        //
+        // IMPORTANT : ne JAMAIS await une requête Supabase directement dans ce
+        // callback. Il s'exécute en détenant le verrou d'auth (navigator.locks)
+        // et toute requête PostgREST attend ce même verrou pour résoudre le
+        // jeton → interblocage → isLoading reste true → « Chargement… » infini
+        // (observé après un refresh ou un changement de compte). Le setTimeout
+        // sort du callback et libère le verrou avant la requête.
         if (session?.user) {
-          const profile = await fetchProfile(session.user.id)
-          if (mounted && profile) setUser(profile)
-          // If profile is null, user stays null — treated as unauthenticated.
+          const userId = session.user.id
+          setTimeout(() => {
+            if (!mounted) return
+            void fetchProfile(userId).then((profile) => {
+              if (mounted && profile) setUser(profile)
+              // If profile is null, user stays null — treated as unauthenticated.
+            })
+          }, 0)
         }
       },
     )
