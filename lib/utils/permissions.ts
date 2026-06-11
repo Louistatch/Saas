@@ -155,6 +155,9 @@ export function roleLabel(role: UserRole): string {
     case 'cooperative_admin': return 'Administrateur'
     case 'member': return 'Membre'
     case 'guest': return 'Invité'
+    case 'ouvrier': return 'Ouvrier Haroo'
+    case 'acheteur': return 'Acheteur Haroo'
+    case 'agronome': return 'Agronome Haroo'
   }
 }
 

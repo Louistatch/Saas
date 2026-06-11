@@ -43,6 +43,9 @@ const ROLE_TONE: Record<UserRole, keyof typeof tone> = {
   cooperative_admin: 'blue',
   member:            'green',
   guest:             'gray',
+  ouvrier:           'yellow',
+  acheteur:          'blue',
+  agronome:          'green',
 }
 
 const ROLE_LABEL: Record<UserRole, string> = {
@@ -50,6 +53,9 @@ const ROLE_LABEL: Record<UserRole, string> = {
   cooperative_admin: 'Admin Coop.',
   member:            'Membre',
   guest:             'Invité',
+  ouvrier:           'Ouvrier Haroo',
+  acheteur:          'Acheteur Haroo',
+  agronome:          'Agronome Haroo',
 }
 
 function Pill({

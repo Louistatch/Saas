@@ -9,10 +9,11 @@ import 'server-only'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { redirect } from 'next/navigation'
+import type { UserRole } from '@/types/domain'
 
 export interface AccessContext {
   userId: string
-  role: 'super_admin' | 'cooperative_admin' | 'member' | 'guest'
+  role: UserRole
   cooperativeId: string | null
   cooperativeLevel: string | null
   supabase: Awaited<ReturnType<typeof createClient>>

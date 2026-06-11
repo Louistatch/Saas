@@ -1,8 +1,7 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, Users, TrendingUp, BarChart3, Zap, ScanLine, ExternalLink } from 'lucide-react'
+import { ArrowRight, Users, TrendingUp, BarChart3, Zap, ScanLine, UserPlus } from 'lucide-react'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
-import { HAROO_URL } from '@/lib/constants'
 
 export default function Home() {
   return (
@@ -104,23 +103,13 @@ export default function Home() {
             </p>
             <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
               Ouvrier agricole, acheteur ou agronome ? Le même scanner vérifie les cartes Haroo —{' '}
-              <a
-                href={`${HAROO_URL}/register`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-primary hover:underline"
-              >
+              <Link href="/auth/signup/haroo" className="font-medium text-primary hover:underline">
                 créez votre compte Haroo
-              </a>{' '}
+              </Link>{' '}
               ou{' '}
-              <a
-                href={`${HAROO_URL}/login`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-primary hover:underline"
-              >
+              <Link href="/auth/login" className="font-medium text-primary hover:underline">
                 connectez-vous
-              </a>{' '}
+              </Link>{' '}
               pour accéder à l&apos;emploi saisonnier, aux préventes et aux missions d&apos;agronomes.
             </p>
           </div>
@@ -266,22 +255,17 @@ export default function Home() {
                 Commencer votre essai gratuit <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
-            <a href={`${HAROO_URL}/register`} target="_blank" rel="noopener noreferrer">
+            <Link href="/auth/signup/haroo">
               <Button size="lg" variant="outline" className="gap-2 w-full sm:w-auto">
-                Créer un compte Haroo <ExternalLink className="h-4 w-4" />
+                Créer un compte Haroo <UserPlus className="h-4 w-4" />
               </Button>
-            </a>
+            </Link>
           </div>
           <p className="mt-4 text-sm text-muted-foreground">
             Déjà inscrit sur Haroo ?{' '}
-            <a
-              href={`${HAROO_URL}/login`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium text-primary hover:underline"
-            >
+            <Link href="/auth/login" className="font-medium text-primary hover:underline">
               Se connecter
-            </a>
+            </Link>
           </p>
         </div>
       </section>
