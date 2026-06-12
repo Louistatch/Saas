@@ -134,6 +134,43 @@ export async function GET(
     }
   }
 
+  // ── Step 2bis: carte Haroo (OUVRIER / ACHETEUR / AGRONOME) ─────────────────
+  // Les cartes Haroo vivent aussi dans member_cards, mais leur profil enrichi
+  // (compétences, offres, préventes, missions) est servi par AgriTogo.
+  if (card.card_type !== 'FAITIERE') {
+    const agritogoUrl = process.env.AGRITOGO_API_URL
+    if (agritogoUrl) {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
+      try {
+        const agriRes = await fetch(
+          `${agritogoUrl}/api/v1/haroo/verify/${encodeURIComponent(card.card_number)}`,
+          { signal: controller.signal, headers: { 'Accept': 'application/json' } }
+        )
+        clearTimeout(timeoutId)
+        if (agriRes.ok) {
+          const data: unknown = await agriRes.json()
+          return NextResponse.json(data)
+        }
+      } catch {
+        clearTimeout(timeoutId)
+      }
+    }
+    // Repli minimal si AgriTogo est indisponible : la carte reste vérifiable.
+    const harooExpired = card.expiry_date && new Date(card.expiry_date) < new Date()
+    return NextResponse.json({
+      valid: card.status === 'active' && !harooExpired,
+      source: 'haroo' as const,
+      card_type: card.card_type,
+      card: {
+        card_number: card.card_number,
+        status: harooExpired ? 'expired' : card.status,
+        expiry_date: card.expiry_date,
+        created_at: card.created_at,
+      },
+    })
+  }
+
   // ── Step 3: Found in Supabase → handle as FAITIERE ────────────────────────
   // Vérifier l'expiration
   const isExpired = card.expiry_date && new Date(card.expiry_date) < new Date()
