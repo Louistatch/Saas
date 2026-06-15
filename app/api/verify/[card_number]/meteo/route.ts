@@ -119,6 +119,12 @@ export async function GET(
         heat_stress_days: heatStressDays,
       },
     },
-    { headers: { 'Cache-Control': 'private, max-age=1800, stale-while-revalidate=300' } }
+    {
+      headers: {
+        // Weather data is regional (not personal) — safe to cache at CDN/shared level
+        // 30 min fresh + serve stale for up to 1h while revalidating in background
+        'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=3600',
+      },
+    }
   )
 }
