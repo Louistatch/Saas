@@ -20,10 +20,10 @@ interface InitiateResponse {
 }
 
 const PROVIDERS = [
-  { value: 'orange_money', label: 'Orange Money' },
-  { value: 'tmoney', label: 'TMoney' },
-  { value: 'moov', label: 'Moov Money' },
-  { value: 'cash', label: 'Espèces' },
+  { value: 'orange_money', label: 'Orange Money', available: true },
+  { value: 'cash', label: 'Espèces', available: true },
+  { value: 'tmoney', label: 'TMoney — Prochainement', available: false },
+  { value: 'moov', label: 'Moov Money — Prochainement', available: false },
 ]
 
 export default function PaymentPage() {
@@ -137,7 +137,7 @@ export default function PaymentPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {PROVIDERS.map((p) => (
-                    <SelectItem key={p.value} value={p.value}>
+                    <SelectItem key={p.value} value={p.value} disabled={!p.available}>
                       {p.label}
                     </SelectItem>
                   ))}
