@@ -1,12 +1,27 @@
+import { timingSafeEqual } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { fetchOpenMeteoForRegion } from '@/lib/weather/open-meteo'
 
 const REGIONS = ['Maritime', 'Plateaux', 'Centrale', 'Kara', 'Savanes']
 
+function verifyCronSecret(request: NextRequest): boolean {
+  const secret = process.env.CRON_SECRET
+  if (!secret) return false
+  const authHeader = request.headers.get('authorization')
+  if (!authHeader?.startsWith('Bearer ')) return false
+  const provided = authHeader.slice(7)
+  try {
+    const a = Buffer.from(provided)
+    const b = Buffer.from(secret)
+    return a.length === b.length && timingSafeEqual(a, b)
+  } catch {
+    return false
+  }
+}
+
 export async function GET(request: NextRequest) {
-  const auth = request.headers.get('authorization')
-  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

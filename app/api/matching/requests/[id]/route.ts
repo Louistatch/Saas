@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 /**
  * GET /api/matching/requests/[id]
  * Fetch a buyer request and all its matches with listing details.
+ * Auth required — only the owning cooperative or super_admin can view.
  */
 export async function GET(
   _request: NextRequest,
@@ -13,6 +14,21 @@ export async function GET(
     const { id } = await params
     const supabase = await createClient()
 
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, cooperative_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile) {
+      return NextResponse.json({ error: 'Profil introuvable' }, { status: 403 })
+    }
+
     const { data: buyerRequest, error: reqError } = await supabase
       .from('buyer_requests')
       .select('*')
@@ -21,6 +37,14 @@ export async function GET(
 
     if (reqError || !buyerRequest) {
       return NextResponse.json({ error: 'Demande introuvable' }, { status: 404 })
+    }
+
+    // Vérification propriété : seule la coopérative propriétaire ou super_admin peut voir
+    const isSuperAdmin = profile.role === 'super_admin'
+    const isOwner = buyerRequest.cooperative_id === profile.cooperative_id
+
+    if (!isSuperAdmin && !isOwner) {
+      return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
 
     const { data: matches, error: matchError } = await supabase

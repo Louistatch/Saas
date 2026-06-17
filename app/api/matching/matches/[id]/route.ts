@@ -6,7 +6,7 @@ type MatchStatus = (typeof VALID_STATUSES)[number]
 
 /**
  * PATCH /api/matching/matches/[id]
- * Update match status: accepted | rejected | completed
+ * Update match status. Auth required + ownership verified via buyer_request.
  */
 export async function PATCH(
   request: NextRequest,
@@ -19,6 +19,16 @@ export async function PATCH(
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, cooperative_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile) {
+      return NextResponse.json({ error: 'Profil introuvable' }, { status: 403 })
     }
 
     const body: unknown = await request.json()
@@ -35,6 +45,25 @@ export async function PATCH(
       )
     }
 
+    // Vérification propriété : récupérer le match + sa requête + la coopérative
+    const { data: match, error: matchFetchError } = await supabase
+      .from('buyer_matches')
+      .select('id, request_id, buyer_requests(cooperative_id)')
+      .eq('id', id)
+      .single()
+
+    if (matchFetchError || !match) {
+      return NextResponse.json({ error: 'Match introuvable' }, { status: 404 })
+    }
+
+    const requestCoopId = (match.buyer_requests as unknown as { cooperative_id: string } | null)?.cooperative_id
+    const isSuperAdmin = profile.role === 'super_admin'
+    const isOwner = requestCoopId === profile.cooperative_id
+
+    if (!isSuperAdmin && !isOwner) {
+      return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
+    }
+
     const { data, error } = await supabase
       .from('buyer_matches')
       .update({ status: status as MatchStatus })
@@ -43,7 +72,7 @@ export async function PATCH(
       .single()
 
     if (error || !data) {
-      return NextResponse.json({ error: error?.message ?? 'Match introuvable' }, { status: 404 })
+      return NextResponse.json({ error: error?.message ?? 'Erreur mise à jour' }, { status: 400 })
     }
 
     return NextResponse.json({ match: data })

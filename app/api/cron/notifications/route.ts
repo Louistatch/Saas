@@ -1,13 +1,27 @@
+import { timingSafeEqual } from 'crypto'
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 // Vercel Cron: runs every hour
 // vercel.json: { "crons": [{ "path": "/api/cron/notifications", "schedule": "0 * * * *" }] }
 
-export async function GET(request: NextRequest) {
-  // Verify cron secret
+function verifyCronSecret(request: NextRequest): boolean {
+  const secret = process.env.CRON_SECRET
+  if (!secret) return false
   const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!authHeader?.startsWith('Bearer ')) return false
+  const provided = authHeader.slice(7)
+  try {
+    const a = Buffer.from(provided)
+    const b = Buffer.from(secret)
+    return a.length === b.length && timingSafeEqual(a, b)
+  } catch {
+    return false
+  }
+}
+
+export async function GET(request: NextRequest) {
+  if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

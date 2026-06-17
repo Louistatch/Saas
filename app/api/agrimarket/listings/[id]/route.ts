@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 
 /**
  * PATCH /api/agrimarket/listings/[id]
- * Update listing status or fields. Auth required.
+ * Update listing status or fields. Auth required + ownership verified.
  */
 export async function PATCH(
   request: NextRequest,
@@ -17,6 +17,35 @@ export async function PATCH(
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, cooperative_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile) {
+      return NextResponse.json({ error: 'Profil introuvable' }, { status: 403 })
+    }
+
+    // Vérification propriété : la annonce doit appartenir à la coopérative de l'utilisateur
+    // (sauf super_admin qui a accès global)
+    const { data: listing, error: fetchError } = await supabase
+      .from('market_listings')
+      .select('id, cooperative_id')
+      .eq('id', id)
+      .single()
+
+    if (fetchError || !listing) {
+      return NextResponse.json({ error: 'Annonce introuvable' }, { status: 404 })
+    }
+
+    const isSuperAdmin = profile.role === 'super_admin'
+    const isOwner = listing.cooperative_id === profile.cooperative_id
+
+    if (!isSuperAdmin && !isOwner) {
+      return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
 
     const body = await request.json()
@@ -45,7 +74,7 @@ export async function PATCH(
 
 /**
  * DELETE /api/agrimarket/listings/[id]
- * Delete a listing. Auth required.
+ * Delete a listing. Auth required + ownership verified.
  */
 export async function DELETE(
   request: NextRequest,
@@ -59,6 +88,34 @@ export async function DELETE(
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, cooperative_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile) {
+      return NextResponse.json({ error: 'Profil introuvable' }, { status: 403 })
+    }
+
+    // Vérification propriété avant suppression
+    const { data: listing, error: fetchError } = await supabase
+      .from('market_listings')
+      .select('id, cooperative_id')
+      .eq('id', id)
+      .single()
+
+    if (fetchError || !listing) {
+      return NextResponse.json({ error: 'Annonce introuvable' }, { status: 404 })
+    }
+
+    const isSuperAdmin = profile.role === 'super_admin'
+    const isOwner = listing.cooperative_id === profile.cooperative_id
+
+    if (!isSuperAdmin && !isOwner) {
+      return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
 
     const { error } = await supabase
