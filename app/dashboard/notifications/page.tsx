@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Bell, CheckCheck, Trash2, Info, CheckCircle, AlertTriangle, AlertCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
@@ -44,10 +44,10 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<InAppNotification[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
+  const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     if (!currentCooperative) return
-    const supabase = createClient()
     setLoading(true)
 
     supabase
@@ -60,8 +60,11 @@ export default function NotificationsPage() {
         if (data) setNotifications(data as InAppNotification[])
         setLoading(false)
       })
+  }, [currentCooperative, supabase])
 
-    // Realtime subscription
+  useEffect(() => {
+    if (!currentCooperative) return
+
     const channel = supabase
       .channel(`notifs-page:${currentCooperative.id}`)
       .on('postgres_changes', {
@@ -75,11 +78,10 @@ export default function NotificationsPage() {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [currentCooperative])
+  }, [currentCooperative, supabase])
 
   const markAsRead = async (id: string) => {
     if (!currentCooperative) return
-    const supabase = createClient()
     const now = new Date().toISOString()
     await supabase
       .from('notifications_inapp')
@@ -91,7 +93,6 @@ export default function NotificationsPage() {
 
   const markAllRead = async () => {
     if (!currentCooperative) return
-    const supabase = createClient()
     const now = new Date().toISOString()
     await supabase
       .from('notifications_inapp')
@@ -103,7 +104,6 @@ export default function NotificationsPage() {
 
   const deleteNotification = async (id: string) => {
     if (!currentCooperative) return
-    const supabase = createClient()
     await supabase
       .from('notifications_inapp')
       .delete()
