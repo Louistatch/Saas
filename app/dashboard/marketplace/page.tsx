@@ -125,7 +125,7 @@ export default function MarketplacePage() {
   const [isLoading, setIsLoading] = useState(true)
 
   // View mode
-  const [viewMode, setViewMode] = useState<'list' | 'locality'>('locality')
+  const [viewMode, setViewMode] = useState<'list' | 'locality'>('list')
 
   // Locality view state
   const [localityFiches, setLocalityFiches] = useState<LocalityFiche[]>([])
@@ -155,8 +155,14 @@ export default function MarketplacePage() {
 
   const cultures = allCultures
 
-  // Helper: build scope cooperative IDs for a given cooperative
+  // Cache scope IDs per cooperative to avoid re-fetching on every render.
+  // Both child+grandchild queries run in parallel instead of sequentially.
+  const scopeIdsCache = useRef<{ id: string; ids: string[] } | null>(null)
+
   const buildScopeIds = useCallback(async (coopId: string, level: string): Promise<string[]> => {
+    if (scopeIdsCache.current?.id === coopId) return scopeIdsCache.current.ids
+
+    let ids: string[]
     if (level === 'faitiere' || level === 'union') {
       const { data: childCoops } = await supabase
         .from('cooperatives')
@@ -168,11 +174,16 @@ export default function MarketplacePage() {
           .from('cooperatives')
           .select('id')
           .in('parent_id', childIds)
-        return [...new Set([...childIds, ...(grandChildCoops ?? []).map((c) => c.id)])]
+        ids = [...new Set([...childIds, ...(grandChildCoops ?? []).map((c) => c.id)])]
+      } else {
+        ids = [coopId]
       }
-      return [coopId]
+    } else {
+      ids = [coopId]
     }
-    return [coopId]
+
+    scopeIdsCache.current = { id: coopId, ids }
+    return ids
   }, [supabase])
 
   // Load reference data

@@ -63,33 +63,14 @@ export function CooperativeProvider({ children }: { children: React.ReactNode })
         // For faitiere/union admins: load the full hierarchy (self + children + grandchildren)
         // For cooperative admins: load only their cooperative
         
-        // First fetch direct children
-        const { data: childIds } = await supabase
-          .from('cooperatives')
-          .select('id')
-          .eq('parent_id', user.cooperativeId)
-        
-        if (childIds && childIds.length > 0) {
-          // Collect all IDs: self + children
-          const allIds = [user.cooperativeId, ...childIds.map(c => c.id)]
-          
-          // Also fetch grandchildren (cooperatives under unions)
-          const { data: grandchildIds } = await supabase
-            .from('cooperatives')
-            .select('id')
-            .in('parent_id', childIds.map(c => c.id))
-          
-          if (grandchildIds && grandchildIds.length > 0) {
-            allIds.push(...grandchildIds.map(c => c.id))
-          }
-          
-          // Use .in() for a clean query
+        // Use the SQL function that already computes the full accessible hierarchy
+        const { data: accessibleIds } = await supabase.rpc('get_accessible_cooperative_ids')
+        if (accessibleIds && accessibleIds.length > 0) {
           query = supabase
             .from('cooperatives')
             .select('id, name, description, logo_url, primary_color, faitiere_name, level, parent_id, created_at')
-            .in('id', [...new Set(allIds)])
+            .in('id', accessibleIds as string[])
         } else {
-          // No children — just load own cooperative
           query = query.eq('id', user.cooperativeId)
         }
       }
