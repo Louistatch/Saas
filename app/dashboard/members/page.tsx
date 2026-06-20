@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Upload, Search, Trash2, Mail, Download, FileText, AlertCircle, Edit2 } from 'lucide-react'
+import { Plus, Upload, Search, Trash2, Mail, Download, FileText, AlertCircle, Edit2, Building2, Users } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -89,49 +89,53 @@ export default function MembersPage() {
   const [importMissing, setImportMissing] = useState<string[]>([])
   const [importing, setImporting] = useState(false)
 
-  const fetchMembers = useCallback(async () => {
-    if (!currentCooperative) {
-      setIsLoading(false)
-      return
-    }
+  // For faîtière/union: show member cooperatives with their stats
+  const isFaitiere = currentCooperative?.level === 'faitiere' || currentCooperative?.level === 'union'
+  const [memberCoops, setMemberCoops] = useState<{ id: string; name: string; level: string; memberCount: number }[]>([])
+
+  const fetchMemberCoops = useCallback(async () => {
+    if (!currentCooperative) { setIsLoading(false); return }
     setIsLoading(true)
-    let query = supabase.from('members').select('*').order('last_name')
-    
-    // For faitiere/union: load members from all child cooperatives
-    if (currentCooperative.level === 'faitiere' || currentCooperative.level === 'union') {
-      const { data: childCoops } = await supabase
-        .from('cooperatives')
-        .select('id')
-        .or(`id.eq.${currentCooperative.id},parent_id.eq.${currentCooperative.id}`)
-      
-      // Also get grandchildren (cooperatives under unions)
-      const childIds = (childCoops ?? []).map(c => c.id)
-      if (childIds.length > 0) {
-        const { data: grandChildCoops } = await supabase
-          .from('cooperatives')
-          .select('id')
-          .in('parent_id', childIds)
-        const allIds = [...new Set([...childIds, ...(grandChildCoops ?? []).map(c => c.id)])]
-        query = query.in('cooperative_id', allIds)
-      } else {
-        query = query.eq('cooperative_id', currentCooperative.id)
-      }
-    } else {
-      query = query.eq('cooperative_id', currentCooperative.id)
+    const { data: children } = await supabase
+      .from('cooperatives')
+      .select('id, name, level')
+      .eq('parent_id', currentCooperative.id)
+      .order('name')
+    if (!children || children.length === 0) { setMemberCoops([]); setIsLoading(false); return }
+
+    // Count members per cooperative in one query
+    const { data: counts } = await supabase
+      .from('members')
+      .select('cooperative_id')
+      .in('cooperative_id', children.map(c => c.id))
+    const countMap: Record<string, number> = {}
+    for (const r of counts ?? []) {
+      countMap[r.cooperative_id] = (countMap[r.cooperative_id] ?? 0) + 1
     }
-    
-    const { data, error } = await query
+    setMemberCoops(children.map(c => ({ ...c, memberCount: countMap[c.id] ?? 0 })))
+    setIsLoading(false)
+  }, [currentCooperative, supabase])
+
+  const fetchMembers = useCallback(async () => {
+    if (!currentCooperative) { setIsLoading(false); return }
+    setIsLoading(true)
+    const { data, error } = await supabase
+      .from('members')
+      .select('*')
+      .eq('cooperative_id', currentCooperative.id)
+      .order('last_name')
     if (error) {
       toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })
     } else {
       setMembers((data ?? []) as Member[])
     }
     setIsLoading(false)
-  }, [currentCooperative, supabase, user?.role]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentCooperative, supabase, toast])
 
   useEffect(() => {
-    fetchMembers()
-  }, [fetchMembers])
+    if (isFaitiere) fetchMemberCoops()
+    else fetchMembers()
+  }, [isFaitiere, fetchMemberCoops, fetchMembers])
 
   const filtered = useMemo(() => {
     const q = debouncedSearch.toLowerCase().trim()
@@ -340,6 +344,75 @@ export default function MembersPage() {
     fetchMembers()
   }
 
+  // ── Vue faîtière : liste des coopératives membres ──────────────────────────
+  if (isFaitiere) {
+    const filteredCoops = memberCoops.filter(c =>
+      c.name.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          title="Coopératives membres"
+          description={`Les coopératives rattachées à ${currentCooperative?.name ?? 'la faîtière'}`}
+        />
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Rechercher une coopérative…"
+              className="pl-10"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+        <Card className="border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <Building2 className="h-5 w-5 text-primary" />
+              {memberCoops.length} coopérative{memberCoops.length !== 1 ? 's' : ''} membre{memberCoops.length !== 1 ? 's' : ''}
+            </CardTitle>
+            <CardDescription>
+              Cliquez sur une coopérative pour consulter ses membres individuels
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <LoadingBlock />
+            ) : filteredCoops.length === 0 ? (
+              <EmptyState
+                title="Aucune coopérative membre"
+                description="Ajoutez des coopératives depuis le panneau d'administration"
+              />
+            ) : (
+              <div className="divide-y divide-border">
+                {filteredCoops.map(coop => (
+                  <div key={coop.id} className="flex items-center justify-between py-4 px-2 hover:bg-muted/30 rounded-lg transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Building2 className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">{coop.name}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{coop.level}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Users className="h-4 w-4" />
+                      <span>{coop.memberCount} membre{coop.memberCount !== 1 ? 's' : ''}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        {confirmNode}
+      </div>
+    )
+  }
+
+  // ── Vue coopérative : membres individuels ───────────────────────────────────
   return (
     <div className="space-y-8">
       <PageHeader
