@@ -93,7 +93,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="md:hidden sticky top-0 z-50 flex items-center justify-between border-b border-border bg-background p-4">
           <Logo size="sm" />
           <div className="flex items-center gap-2">
-            {currentCooperative && <NotificationBell cooperativeId={currentCooperative.id} />}
+            <NotificationBell cooperativeId={currentCooperative?.id ?? ''} className="md:hidden" />
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md p-1"
@@ -212,7 +212,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </SelectContent>
                 </Select>
               )}
-              {currentCooperative && <NotificationBell cooperativeId={currentCooperative.id} />}
+              <NotificationBell cooperativeId={currentCooperative?.id ?? ''} className="hidden md:flex" />
             </div>
           </div>
 
