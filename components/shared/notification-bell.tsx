@@ -34,6 +34,7 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const channelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
 
   const unreadCount = notifications.filter((n) => !n.read_at).length
 
@@ -59,9 +60,16 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
 
     if (!cooperativeId) return
 
+    // Guard against React StrictMode double-invocation or fast re-renders:
+    // if a channel is already subscribed, remove it before creating a new one.
     const supabase = createClient()
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current)
+      channelRef.current = null
+    }
+
     const channel = supabase
-      .channel(`notifications:${cooperativeId}`)
+      .channel(`notifs:${cooperativeId}:${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -78,8 +86,11 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
       )
       .subscribe()
 
+    channelRef.current = channel
+
     return () => {
       supabase.removeChannel(channel)
+      channelRef.current = null
     }
   }, [fetchNotifications, cooperativeId])
 
