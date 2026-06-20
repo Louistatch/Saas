@@ -29,12 +29,15 @@ const TYPE_COLORS: Record<InAppNotification['type'], string> = {
   alert: 'text-red-600',
 }
 
+// Module-level counter — never resets across remounts, HMR or StrictMode
+// double-invocations, so every channel() call gets a truly unique name.
+let _channelSeq = 0
+
 export function NotificationBell({ cooperativeId, className }: NotificationBellProps) {
   const [notifications, setNotifications] = useState<InAppNotification[]>([])
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
-  const mountIdRef = useRef(0)
 
   const unreadCount = notifications.filter((n) => !n.read_at).length
 
@@ -62,13 +65,9 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
   useEffect(() => {
     if (!cooperativeId) return
 
-    // Unique channel name per mount so Supabase always creates a fresh
-    // channel object — prevents "cannot add postgres_changes callbacks after
-    // subscribe()" in React StrictMode (double-invoke) and on fast re-renders.
-    const id = ++mountIdRef.current
     const supabase = createClient()
     const channel = supabase
-      .channel(`notifs-bell:${cooperativeId}:${id}`)
+      .channel(`notifs-bell:${cooperativeId}:${++_channelSeq}`)
       .on(
         'postgres_changes',
         {
