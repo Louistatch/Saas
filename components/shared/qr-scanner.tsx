@@ -132,7 +132,12 @@ export function QrScanner({ onResult, onError, className = '' }: QrScannerProps)
       await video.play()
       setState('scanning')
 
-      // Native BarcodeDetector first (fast); jsQR fallback otherwise.
+      // Always load jsQR as reliable fallback.
+      const jsQR = (await import('jsqr')).default
+
+      // Try native BarcodeDetector — fast on Chrome/Android, but validate it
+      // actually works before committing to it (some builds support the class
+      // but silently fail on detect()).
       const Ctor = (window as unknown as { BarcodeDetector?: BarcodeDetectorCtor }).BarcodeDetector
       let detector: BarcodeDetectorLike | null = null
       if (Ctor) {
@@ -145,7 +150,9 @@ export function QrScanner({ onResult, onError, className = '' }: QrScannerProps)
           detector = null
         }
       }
-      const jsQR = detector ? null : (await import('jsqr')).default
+
+      // If BarcodeDetector silently fails on first real detect(), fall back to jsQR.
+      let detectorFailed = false
 
       const canvas = canvasRef.current!
       const ctx = canvas.getContext('2d', { willReadFrequently: true })!
@@ -156,14 +163,16 @@ export function QrScanner({ onResult, onError, className = '' }: QrScannerProps)
           const w = video.videoWidth
           const h = video.videoHeight
           if (w && h) {
-            if (detector) {
+            if (detector && !detectorFailed) {
               try {
                 const codes = await detector.detect(video)
                 if (codes[0]?.rawValue) return handleHit(codes[0].rawValue)
               } catch {
-                /* keep scanning */
+                // Mark as failed and fall through to jsQR on next tick.
+                detectorFailed = true
               }
-            } else if (jsQR) {
+            }
+            if (!detector || detectorFailed) {
               // Downscale for speed on low-end phones (max ~480px on the long side).
               const scale = Math.min(1, 480 / Math.max(w, h))
               const sw = Math.round(w * scale)
@@ -172,7 +181,7 @@ export function QrScanner({ onResult, onError, className = '' }: QrScannerProps)
               canvas.height = sh
               ctx.drawImage(video, 0, 0, sw, sh)
               const img = ctx.getImageData(0, 0, sw, sh)
-              const code = jsQR(img.data, sw, sh, { inversionAttempts: 'dontInvert' })
+              const code = jsQR(img.data, sw, sh, { inversionAttempts: 'attemptBoth' })
               if (code?.data) return handleHit(code.data)
             }
           }

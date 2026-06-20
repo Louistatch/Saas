@@ -24,6 +24,7 @@ const footerColumns = [
       { href: '/pricing', label: 'Tarifs' },
       { href: '/securite', label: 'Sécurité' },
       { href: '/blog', label: 'Blog' },
+      { href: '/auth/signup/haroo', label: 'Services Haroo' },
     ],
   },
   {

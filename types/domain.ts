@@ -6,13 +6,24 @@
  * is heavily used in CRUD forms).
  */
 
-export type UserRole = 'super_admin' | 'cooperative_admin' | 'member' | 'guest'
+export type UserRole =
+  | 'super_admin'
+  | 'cooperative_admin'
+  | 'member'
+  | 'guest'
+  // Professionnels Haroo — comptes créés via AgriTogo dans la même Supabase
+  | 'ouvrier'
+  | 'acheteur'
+  | 'agronome'
 
 export const USER_ROLES = [
   'super_admin',
   'cooperative_admin',
   'member',
   'guest',
+  'ouvrier',
+  'acheteur',
+  'agronome',
 ] as const satisfies readonly UserRole[]
 
 export type MemberStatus = 'active' | 'inactive' | 'suspended'

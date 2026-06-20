@@ -83,9 +83,12 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Auth pages: if already authenticated, redirect to dashboard (avoid login page when logged in)
+  // Auth pages: if already authenticated, redirect to their space (avoid login page when logged in)
   if (isAuthPage && user && pathname === '/auth/login') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    // Les professionnels Haroo (créés via AgriTogo) portent haroo_type dans
+    // app_metadata — leur espace est /haroo, pas le dashboard coopérative.
+    const isHaroo = !!(user.app_metadata as { haroo_type?: string } | undefined)?.haroo_type
+    return NextResponse.redirect(new URL(isHaroo ? '/haroo' : '/dashboard', request.url))
   }
 
   return supabaseResponse

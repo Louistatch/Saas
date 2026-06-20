@@ -55,7 +55,14 @@ export function AgriScoreWidget({ memberId }: AgriScoreWidgetProps) {
               <span className="ml-auto text-lg" aria-hidden>{meta.icon}</span>
             </div>
             <p className="text-xs font-medium" style={{ color: meta.color }}>{meta.label}</p>
-            <div className="h-2 rounded-full bg-secondary overflow-hidden">
+            <div
+              className="h-2 rounded-full bg-secondary overflow-hidden"
+              role="progressbar"
+              aria-valuenow={data.score}
+              aria-valuemin={0}
+              aria-valuemax={1000}
+              aria-label={`Score agricole : ${data.score} sur 1000 — ${meta.label}`}
+            >
               <div
                 className="h-full rounded-full transition-all"
                 style={{ width: `${Math.min(100, data.score / 10)}%`, backgroundColor: meta.color }}

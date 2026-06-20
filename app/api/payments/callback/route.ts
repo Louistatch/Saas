@@ -72,7 +72,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (isSuccess && payment.cotisation_id) {
     void supabase
       .from('cotisations')
-      .update({ status: 'paid', paid_date: now.split('T')[0] })
+      .update({ status: 'paid', paid_date: now })
       .eq('id', payment.cotisation_id)
       .then(() => undefined)
   }
@@ -87,6 +87,45 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     icon: isSuccess ? '✅' : '❌',
     link: '/dashboard/cotisations',
   })
+
+  // SMS de confirmation au membre (fire-and-forget)
+  if (isSuccess && payment.member_id) {
+    void (async () => {
+      try {
+        const { data: member } = await supabase
+          .from('members')
+          .select('first_name, phone')
+          .eq('id', payment.member_id as string)
+          .single()
+
+        if (member?.phone) {
+          const { data: tpl } = await supabase
+            .from('notification_templates')
+            .select('body_fr')
+            .eq('key', 'cotisation_paid')
+            .eq('channel', 'sms')
+            .maybeSingle()
+
+          const body = (tpl?.body_fr ?? '')
+            .replace('{prenom}', member.first_name ?? '')
+            .replace('{montant}', String(payment.amount_fcfa))
+
+          if (body) {
+            await supabase.from('notification_queue').insert({
+              member_id: payment.member_id as string,
+              cooperative_id: payment.cooperative_id as string,
+              channel: 'sms',
+              template_key: 'cotisation_paid',
+              recipient_phone: member.phone,
+              variables: { prenom: member.first_name ?? '', montant: String(payment.amount_fcfa) },
+              body_rendered: body,
+              scheduled_at: now,
+            })
+          }
+        }
+      } catch { /* non-bloquant */ }
+    })()
+  }
 
   return NextResponse.json({ received: true })
 }

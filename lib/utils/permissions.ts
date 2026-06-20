@@ -102,6 +102,11 @@ export function canManageCooperative(role?: UserRole | null): boolean {
   return role === 'super_admin' || role === 'cooperative_admin'
 }
 
+/** Professionnel Haroo (ouvrier, acheteur ou agronome) — espace dédié /haroo */
+export function isHarooRole(role?: UserRole | null): boolean {
+  return role === 'ouvrier' || role === 'acheteur' || role === 'agronome'
+}
+
 /** Can this user manage the marketplace (fiches techniques)? */
 export function canManageMarketplace(role?: UserRole | null): boolean {
   return role === 'super_admin' || role === 'cooperative_admin'
@@ -155,6 +160,9 @@ export function roleLabel(role: UserRole): string {
     case 'cooperative_admin': return 'Administrateur'
     case 'member': return 'Membre'
     case 'guest': return 'Invité'
+    case 'ouvrier': return 'Ouvrier Haroo'
+    case 'acheteur': return 'Acheteur Haroo'
+    case 'agronome': return 'Agronome Haroo'
   }
 }
 

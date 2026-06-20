@@ -1,6 +1,6 @@
 # Architecture — Écosystème FaîtiereHub / AgriTogo / Haroo
 
-## Version actuelle : v1.4 — Base de données unifiée Supabase
+## Version actuelle : v1.5 — Météo agricole multi-modèles + corrections SSR
 
 ---
 
@@ -324,6 +324,99 @@ FLASK_ENV=production
 
 ---
 
+## Module Météo Agricole (v1.5)
+
+Accessible depuis la page de vérification de carte : `GET /api/verify/[card_number]/meteo`
+
+### Ensemble multi-modèles Open-Meteo (sans API key)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│               lib/weather/open-meteo.ts                          │
+│                                                                  │
+│  Modèles journaliers (fusion pondérée)                           │
+│  ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐   │
+│  │ ECMWF IFS 0.25° │ │  GFS Seamless   │ │  ICON Seamless  │   │
+│  │   (poids 0.45)  │ │   (poids 0.35)  │ │   (poids 0.20)  │   │
+│  │ Précision 3-10j │ │ Tropical, 4×/j  │ │ Modèle européen │   │
+│  └────────┬────────┘ └───────┬─────────┘ └────────┬────────┘   │
+│           └──────────────────┴──────────────────────┘           │
+│                              │ mergeWeatherModels()             │
+│                              │ Temp/vent/humidité = avg pondéré │
+│                              │ Précip = 70% avg + 30% max       │
+│                              ▼                                   │
+│  Données spécialisées                                            │
+│  • Horaire 24h  : fetchHourlyForRegion (ECMWF/GFS/ICON, merge)  │
+│  • Nowcast 6h   : fetchMinutely15ForRegion (intervalles 15 min) │
+│  • Saisonnier 3M: fetchSeasonalForRegion (CFS NOAA, TTL 6h)     │
+│                                                                  │
+│  Cache in-memory par région                                      │
+│  • Journalier : TTL 30 min                                       │
+│  • Horaire    : TTL 15 min                                       │
+│  • Nowcast    : TTL 5 min                                        │
+│  • Saisonnier : TTL 6 h                                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Fonctionnalités UI (`components/verify/meteo-inline-view.tsx`)
+
+| Section | Description |
+|---------|-------------|
+| Hero + bande horaire | Température courante, ressenti, UV, 24 prochaines heures |
+| Bannière nowcast | "Pluie dans ~X min" basé sur `minutely_15` (Bing Weather style) |
+| Graphique précipitations 6h | BarChart Recharts, créneaux 15 min, couleur par intensité |
+| Radar RainViewer | Leaflet + overlay RainViewer (dynamique, client-only via `ssr: false`) |
+| Prévisions 7 jours | Barre température min/max, probabilité, emoji météo |
+| Grille de détails | Ressenti, UV, Humidité, Vent, ETo FAO-56, Pluie |
+| Alertes agronomiques | Sécheresse critique/haute/modérée, fenêtre traitement, semis |
+| Prévision saisonnière | 3 mois CFS NOAA — pluviométrie, température |
+| Historique 3 jours | Données passées depuis Supabase `weather_data` |
+| Bulletin PDF | jsPDF + jspdf-autotable, partage Web Share API → WhatsApp |
+| Alertes pluie navigateur | Notification API + recheck nowcast toutes les 2 min |
+
+### Flux de données météo
+
+```
+API route /api/verify/[card]/meteo
+    │
+    ├── 1. Supabase weather_data (cache BD, ±10 jours)
+    │       → Si ≥3 jours en cache : retourne directement
+    │
+    └── 2. Si insuffisant → fetch live (Promise.all, 6 sources en parallèle)
+            ├── fetchHourlyForRegion (ECMWF)
+            ├── fetchHourlyGFSForRegion
+            ├── fetchHourlyICONForRegion
+            ├── fetchMinutely15ForRegion (nowcast)
+            ├── fetchSeasonalForRegion (CFS NOAA)
+            └── [live fallback] fetchOpenMeteoForRegion + fetchGFSForRegion + fetchICONForRegion
+                    └── mergeWeatherModels() → weather fusionné
+```
+
+### Régions (5 régions du Togo)
+
+| Région | Ville | Latitude | Longitude |
+|--------|-------|----------|-----------|
+| Maritime | Lomé | 6.137 | 1.212 |
+| Plateaux | Atakpamé | 7.530 | 1.150 |
+| Centrale | Sokodé | 8.980 | 1.095 |
+| Kara | Kara | 9.551 | 1.186 |
+| Savanes | Dapaong | 10.863 | 0.207 |
+
+---
+
+## Corrections v1.5 — SSR / Build
+
+### Supabase client browser (lib/supabase/client.ts)
+
+**Problème** : `createClient()` appelé dans `useMemo` de `CooperativeProvider` et `AuthProvider` (présents dans le root layout) lançait une exception lors du prerendering statique en l'absence des variables `NEXT_PUBLIC_*`.
+
+**Solution** :
+- `lib/supabase/client.ts` : retourne un client placeholder pendant le SSR si les vars sont absentes (branch `typeof window === 'undefined'`). En production Vercel, les vars sont intégrées au build time, donc ce chemin n'est jamais emprunté.
+- `auth-context.tsx` : déplace `createClient()` dans un `useEffect` (initialisation browser-only) avec null guards sur tous les appels Supabase.
+- `auth/forgot-password/page.tsx` : déplace `createClient()` à l'intérieur du handler `handleSubmit`.
+
+---
+
 ## Historique des versions
 
 | Version | Date | Changement principal |
@@ -333,6 +426,7 @@ FLASK_ENV=production
 | v1.2 | 23/05/2026 | Audit sécurité #2 — hiérarchie RLS, storage privé (8.5/10) |
 | v1.3 | 24/05/2026 | Audit sécurité #3 — 23 findings ALPHA/BETA/GAMMA (9.2/10) |
 | v1.4 | 06/06/2026 | **Base de données unifiée** — Haroo intégré (8 tables), AgriTogo sur Supabase FaîtiereHub |
+| v1.5 | 08/06/2026 | **Météo agricole** — ensemble 3 modèles (ECMWF+GFS+ICON), nowcast, radar, PDF, fix SSR Supabase |
 
 ---
 

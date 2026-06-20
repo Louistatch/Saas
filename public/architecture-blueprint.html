@@ -1,0 +1,1734 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FaîtiereHub — Blueprint Architecture v1.5</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+  :root {
+    --green: #16a34a;
+    --green-light: #22c55e;
+    --green-dark: #14532d;
+    --green-bg: #f0fdf4;
+    --blue: #2563eb;
+    --blue-light: #3b82f6;
+    --blue-bg: #eff6ff;
+    --orange: #ea580c;
+    --orange-bg: #fff7ed;
+    --purple: #7c3aed;
+    --purple-bg: #f5f3ff;
+    --red: #dc2626;
+    --red-bg: #fef2f2;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+    --border: #e5e7eb;
+    --shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 11pt;
+    line-height: 1.6;
+    color: var(--gray-800);
+    background: white;
+  }
+
+  /* PRINT */
+  @media print {
+    body { font-size: 9.5pt; }
+    .page-break { page-break-before: always; break-before: page; }
+    .no-break { page-break-inside: avoid; break-inside: avoid; }
+    @page { margin: 16mm 14mm; size: A4; }
+    .cover { height: 100vh; }
+  }
+
+  /* SCREEN */
+  @media screen {
+    body { max-width: 900px; margin: 0 auto; padding: 20px; background: #f1f5f9; }
+    .doc-wrapper { background: white; box-shadow: var(--shadow-lg); border-radius: 8px; overflow: hidden; }
+  }
+
+  /* COVER PAGE */
+  .cover {
+    background: linear-gradient(135deg, var(--green-dark) 0%, #166534 40%, #15803d 70%, #16a34a 100%);
+    color: white;
+    padding: 60px 60px 50px;
+    min-height: 200px;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 300px; height: 300px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 50%;
+  }
+  .cover::after {
+    content: '';
+    position: absolute;
+    bottom: -40px; left: 40%;
+    width: 200px; height: 200px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 50%;
+  }
+  .cover-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 9pt;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+  .cover-title {
+    font-size: 34pt;
+    font-weight: 900;
+    line-height: 1.1;
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+  }
+  .cover-subtitle {
+    font-size: 14pt;
+    font-weight: 400;
+    opacity: 0.8;
+    margin-bottom: 40px;
+  }
+  .cover-meta {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+    margin-top: 36px;
+    padding-top: 28px;
+    border-top: 1px solid rgba(255,255,255,0.2);
+  }
+  .cover-meta-item label {
+    display: block;
+    font-size: 7.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.6;
+    margin-bottom: 2px;
+  }
+  .cover-meta-item span {
+    font-weight: 600;
+    font-size: 10pt;
+  }
+  .cover-pills {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 24px;
+  }
+  .pill {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px;
+    padding: 3px 10px;
+    font-size: 8.5pt;
+    font-weight: 500;
+  }
+
+  /* SECTION */
+  .section {
+    padding: 36px 48px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section:last-child { border-bottom: none; }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--green);
+  }
+  .section-num {
+    background: var(--green);
+    color: white;
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11pt;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+  .section-title {
+    font-size: 16pt;
+    font-weight: 800;
+    color: var(--gray-900);
+    letter-spacing: -0.01em;
+  }
+  .section-desc {
+    font-size: 9.5pt;
+    color: var(--gray-500);
+    margin-left: auto;
+    font-style: italic;
+  }
+
+  /* SUB-SECTION */
+  h3 {
+    font-size: 12pt;
+    font-weight: 700;
+    color: var(--gray-800);
+    margin: 24px 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h3::before {
+    content: '';
+    width: 3px; height: 14px;
+    background: var(--green);
+    border-radius: 2px;
+    display: inline-block;
+  }
+  h4 {
+    font-size: 10.5pt;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin: 16px 0 8px;
+  }
+
+  /* ECOSYSTEM DIAGRAM */
+  .ecosystem {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 20px 0;
+  }
+  .eco-box {
+    padding: 20px 16px;
+    border-right: 1px solid var(--border);
+  }
+  .eco-box:last-child { border-right: none; }
+  .eco-box-header {
+    font-size: 7.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+  }
+  .eco-box-name {
+    font-size: 13pt;
+    font-weight: 800;
+    margin-bottom: 6px;
+  }
+  .eco-box-host {
+    font-size: 8pt;
+    padding: 2px 8px;
+    border-radius: 10px;
+    display: inline-block;
+    margin-bottom: 12px;
+    font-weight: 500;
+  }
+  .eco-box-items { list-style: none; }
+  .eco-box-items li {
+    font-size: 9pt;
+    padding: 3px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    color: var(--gray-600);
+    border-bottom: 1px solid var(--gray-100);
+  }
+  .eco-box-items li:last-child { border-bottom: none; }
+  .eco-box-items li::before {
+    content: '▸';
+    font-size: 7pt;
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
+
+  .box-green { background: var(--green-bg); }
+  .box-green .eco-box-header { color: var(--green); }
+  .box-green .eco-box-name { color: var(--green-dark); }
+  .box-green .eco-box-host { background: var(--green); color: white; }
+
+  .box-orange { background: var(--orange-bg); }
+  .box-orange .eco-box-header { color: var(--orange); }
+  .box-orange .eco-box-name { color: #7c2d12; }
+  .box-orange .eco-box-host { background: var(--orange); color: white; }
+
+  .box-blue { background: var(--blue-bg); }
+  .box-blue .eco-box-header { color: var(--blue); }
+  .box-blue .eco-box-name { color: #1e3a8a; }
+  .box-blue .eco-box-host { background: var(--blue); color: white; }
+
+  /* ARROW */
+  .arrow-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin: 8px 0;
+    color: var(--gray-400);
+    font-size: 10pt;
+  }
+  .arrow-label {
+    font-size: 8pt;
+    color: var(--gray-500);
+    background: var(--gray-100);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* FLOW DIAGRAM */
+  .flow {
+    background: var(--gray-50);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 16px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8.5pt;
+    line-height: 2;
+    color: var(--gray-700);
+  }
+  .flow-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-bottom: 4px;
+    background: white;
+    border: 1px solid var(--gray-200);
+  }
+  .flow-step-num {
+    background: var(--green);
+    color: white;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 7.5pt;
+    font-weight: 700;
+    flex-shrink: 0;
+    font-family: 'Inter', sans-serif;
+  }
+  .flow-step-content {
+    flex: 1;
+    font-family: 'Inter', sans-serif;
+    font-size: 9pt;
+  }
+  .flow-step-title {
+    font-weight: 600;
+    color: var(--gray-800);
+  }
+  .flow-step-detail {
+    color: var(--gray-500);
+    font-size: 8.5pt;
+  }
+  .flow-connector {
+    display: flex;
+    align-items: center;
+    padding: 2px 0 2px 28px;
+    color: var(--gray-400);
+    font-size: 14pt;
+  }
+
+  /* TABLE */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 9pt;
+  }
+  thead th {
+    background: var(--gray-800);
+    color: white;
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 8.5pt;
+    letter-spacing: 0.02em;
+  }
+  thead th:first-child { border-radius: 6px 0 0 0; }
+  thead th:last-child { border-radius: 0 6px 0 0; }
+  tbody tr:nth-child(even) { background: var(--gray-50); }
+  tbody td {
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+
+  /* CODE */
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8pt;
+    background: var(--gray-100);
+    border: 1px solid var(--gray-200);
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: var(--green-dark);
+  }
+  pre {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8pt;
+    background: var(--gray-900);
+    color: #d1fae5;
+    border-radius: 8px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    line-height: 1.7;
+    margin: 12px 0;
+  }
+  pre .comment { color: #6b7280; }
+  pre .key { color: #93c5fd; }
+  pre .val { color: #86efac; }
+  pre .route { color: #fcd34d; }
+  pre .method { color: #f9a8d4; }
+
+  /* BADGE */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 7.5pt;
+    font-weight: 600;
+    gap: 4px;
+  }
+  .badge-green { background: #dcfce7; color: #166534; }
+  .badge-blue { background: #dbeafe; color: #1d4ed8; }
+  .badge-orange { background: #fed7aa; color: #9a3412; }
+  .badge-red { background: #fee2e2; color: #991b1b; }
+  .badge-purple { background: #ede9fe; color: #5b21b6; }
+  .badge-gray { background: var(--gray-100); color: var(--gray-600); }
+
+  /* GRID */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 12px 0; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 12px 0; }
+
+  /* CARD */
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    background: white;
+  }
+  .card-title {
+    font-weight: 700;
+    font-size: 10pt;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-icon {
+    width: 24px; height: 24px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11pt;
+  }
+
+  /* LAYER STACK */
+  .layer-stack { margin: 16px 0; }
+  .layer {
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    margin-bottom: -1px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 9pt;
+  }
+  .layer:first-child { border-radius: 8px 8px 0 0; }
+  .layer:last-child { border-radius: 0 0 8px 8px; margin-bottom: 0; }
+  .layer-label {
+    font-size: 7.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    width: 100px;
+    flex-shrink: 0;
+  }
+  .layer-content { flex: 1; color: var(--gray-600); }
+  .layer-tech { font-size: 8pt; color: var(--gray-400); margin-left: auto; font-family: 'JetBrains Mono', monospace; }
+
+  /* WARNING / INFO BOXES */
+  .info-box {
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 9pt;
+    margin: 12px 0;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .info-box-icon { font-size: 13pt; flex-shrink: 0; margin-top: 1px; }
+  .info-green { background: var(--green-bg); border-left: 3px solid var(--green); }
+  .info-orange { background: var(--orange-bg); border-left: 3px solid var(--orange); }
+  .info-blue { background: var(--blue-bg); border-left: 3px solid var(--blue); }
+  .info-red { background: var(--red-bg); border-left: 3px solid var(--red); }
+
+  /* TABLE OF CONTENTS */
+  .toc { padding: 32px 48px; border-bottom: 1px solid var(--border); }
+  .toc-title { font-size: 13pt; font-weight: 800; color: var(--gray-900); margin-bottom: 20px; }
+  .toc-list { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; }
+  .toc-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px dotted var(--gray-200);
+    font-size: 9.5pt;
+  }
+  .toc-num {
+    background: var(--gray-800);
+    color: white;
+    width: 20px; height: 20px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8pt;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .toc-page { margin-left: auto; color: var(--gray-400); font-size: 8.5pt; font-family: 'JetBrains Mono', monospace; }
+
+  /* ROUTE TABLE */
+  .route-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7.5pt;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+  .get { background: #dcfce7; color: #166534; }
+  .post { background: #dbeafe; color: #1d4ed8; }
+  .put { background: #fed7aa; color: #9a3412; }
+  .delete { background: #fee2e2; color: #991b1b; }
+
+  /* DB TABLE */
+  .db-group {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .db-group-header {
+    padding: 8px 14px;
+    font-weight: 700;
+    font-size: 9pt;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .db-group-count {
+    font-size: 8pt;
+    background: rgba(255,255,255,0.3);
+    padding: 1px 6px;
+    border-radius: 8px;
+  }
+
+  /* SECURITY MATRIX */
+  .sec-matrix td { vertical-align: middle; }
+  .check { color: var(--green); font-size: 11pt; }
+  .cross { color: var(--red); font-size: 11pt; }
+
+  /* FOOTER */
+  .doc-footer {
+    background: var(--gray-900);
+    color: white;
+    padding: 24px 48px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 8.5pt;
+  }
+  .doc-footer a { color: var(--green-light); text-decoration: none; }
+  .watermark { opacity: 0.4; font-size: 7.5pt; font-family: 'JetBrains Mono', monospace; }
+
+  /* ARCHITECTURE DIAGRAM CSS */
+  .arch-diagram {
+    background: var(--gray-900);
+    border-radius: 10px;
+    padding: 24px;
+    color: white;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8pt;
+    line-height: 1.5;
+    margin: 16px 0;
+    overflow-x: auto;
+  }
+  .arch-box {
+    border: 1px solid;
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin: 6px 0;
+  }
+  .arch-box-green { border-color: #22c55e; background: rgba(34,197,94,0.08); }
+  .arch-box-orange { border-color: #f97316; background: rgba(249,115,22,0.08); }
+  .arch-box-blue { border-color: #60a5fa; background: rgba(96,165,250,0.08); }
+  .arch-box-purple { border-color: #a78bfa; background: rgba(167,139,250,0.08); }
+  .arch-box-red { border-color: #f87171; background: rgba(248,113,113,0.08); }
+  .arch-row { display: flex; gap: 12px; align-items: stretch; margin: 8px 0; }
+  .arch-row .arch-box { flex: 1; }
+  .arch-label {
+    font-size: 7pt;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.6;
+    margin-bottom: 4px;
+  }
+  .arch-title { font-size: 10pt; font-weight: 700; margin-bottom: 6px; }
+  .arch-items { opacity: 0.75; line-height: 1.8; }
+  .arch-items li { list-style: none; }
+  .arch-items li::before { content: '› '; opacity: 0.5; }
+  .arch-connector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,0.3);
+    font-size: 16pt;
+    padding: 4px 0;
+  }
+  .arch-connector span { font-size: 7.5pt; opacity: 0.5; margin-left: 8px; letter-spacing: 0.05em; }
+
+  /* CASE STUDY */
+  .case-study {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 16px 0;
+  }
+  .case-study-header {
+    background: var(--gray-800);
+    color: white;
+    padding: 10px 16px;
+    font-weight: 700;
+    font-size: 10pt;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .case-study-body { padding: 16px; }
+
+  .scenario-ok { color: var(--green); }
+  .scenario-warn { color: var(--orange); }
+  .scenario-err { color: var(--red); }
+
+  p { margin-bottom: 8px; color: var(--gray-600); font-size: 9.5pt; }
+</style>
+</head>
+<body>
+<div class="doc-wrapper">
+
+<!-- ═══════════════════════════════════════════════════════ COVER ═══ -->
+<div class="cover">
+  <div class="cover-badge">
+    <span>🏗</span> Blueprint Technique — Confidentiel
+  </div>
+  <div class="cover-title">FaîtiereHub</div>
+  <div class="cover-subtitle">Plan Architecte — Backend · Frontend · Base de données · Sécurité</div>
+  <div class="cover-pills">
+    <span class="pill">Next.js 16</span>
+    <span class="pill">Flask 3.1</span>
+    <span class="pill">Supabase PostgreSQL</span>
+    <span class="pill">34 tables</span>
+    <span class="pill">6 agents IA</span>
+    <span class="pill">Vercel Edge</span>
+    <span class="pill">Railway</span>
+  </div>
+  <div class="cover-meta">
+    <div class="cover-meta-item">
+      <label>Version</label>
+      <span>v1.5 — Juin 2026</span>
+    </div>
+    <div class="cover-meta-item">
+      <label>Score sécurité</label>
+      <span>9.2 / 10 (3 audits)</span>
+    </div>
+    <div class="cover-meta-item">
+      <label>Production</label>
+      <span>www.faitierehub.com</span>
+    </div>
+    <div class="cover-meta-item">
+      <label>Auteur</label>
+      <span>TATCHIDA Louis</span>
+    </div>
+    <div class="cover-meta-item">
+      <label>Coût infrastructure</label>
+      <span>~$61 / mois</span>
+    </div>
+    <div class="cover-meta-item">
+      <label>Capacité</label>
+      <span>10 000 membres · 50 coopératives</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ SOMMAIRE ═══ -->
+<div class="toc">
+  <div class="toc-title">Sommaire</div>
+  <ul class="toc-list">
+    <li class="toc-item"><div class="toc-num">1</div> Vue d'ensemble de l'écosystème <span class="toc-page">§1</span></li>
+    <li class="toc-item"><div class="toc-num">2</div> Architecture Frontend (Next.js) <span class="toc-page">§2</span></li>
+    <li class="toc-item"><div class="toc-num">3</div> Architecture Backend (API Routes) <span class="toc-page">§3</span></li>
+    <li class="toc-item"><div class="toc-num">4</div> Moteur IA/ML — AgriTogo <span class="toc-page">§4</span></li>
+    <li class="toc-item"><div class="toc-num">5</div> Base de données — 34 tables <span class="toc-page">§5</span></li>
+    <li class="toc-item"><div class="toc-num">6</div> Flux de données — "le plombier" <span class="toc-page">§6</span></li>
+    <li class="toc-item"><div class="toc-num">7</div> Modèle de sécurité &amp; RBAC <span class="toc-page">§7</span></li>
+    <li class="toc-item"><div class="toc-num">8</div> Module Météo — Ensemble 3 modèles <span class="toc-page">§8</span></li>
+    <li class="toc-item"><div class="toc-num">9</div> Cas de panne — Résilience <span class="toc-page">§9</span></li>
+    <li class="toc-item"><div class="toc-num">10</div> Infrastructure &amp; déploiement <span class="toc-page">§10</span></li>
+  </ul>
+</div>
+
+<!-- ════════════════════════════════════════════════ §1 ÉCOSYSTÈME ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">1</div>
+    <div class="section-title">Vue d'ensemble de l'écosystème</div>
+    <div class="section-desc">3 services · 1 base de données unifiée</div>
+  </div>
+
+  <p>FaîtiereHub est un écosystème à trois services partageant une seule base de données Supabase. Chaque service a un rôle distinct : FaîtiereHub est l'interface utilisateur, AgriTogo est le cerveau IA/ML, et Haroo est la couche de données des professionnels agricoles.</p>
+
+  <div class="ecosystem">
+    <div class="eco-box box-green">
+      <div class="eco-box-header">Service Principal</div>
+      <div class="eco-box-name">FaîtiereHub</div>
+      <div class="eco-box-host">Vercel Edge</div>
+      <ul class="eco-box-items">
+        <li>Next.js 16 — App Router</li>
+        <li>React 19 + TypeScript strict</li>
+        <li>Gestion coopératives</li>
+        <li>Cartes membres QR (×4 types)</li>
+        <li>Marketplace agricole</li>
+        <li>Fiches techniques</li>
+        <li>Widget embeddable SDK</li>
+        <li>Tableau de bord membres</li>
+        <li>Module météo agricole</li>
+        <li>Sync KoboCollect</li>
+      </ul>
+    </div>
+    <div class="eco-box box-orange">
+      <div class="eco-box-header">Moteur IA</div>
+      <div class="eco-box-name">AgriTogo</div>
+      <div class="eco-box-host">Railway</div>
+      <ul class="eco-box-items">
+        <li>Flask 3.1 REST API</li>
+        <li>6 agents IA spécialisés</li>
+        <li>Gemini / Qwen / Claude LLMs</li>
+        <li>5 modèles ML (GARCH, XGB...)</li>
+        <li>Irrigation FAO-56 (AgriSmart)</li>
+        <li>Proxy vérification Haroo</li>
+        <li>/api/v1/forecast</li>
+        <li>/api/v1/risk</li>
+        <li>/api/v1/agent/chat</li>
+        <li>/api/v1/haroo/verify/[card]</li>
+      </ul>
+    </div>
+    <div class="eco-box box-blue">
+      <div class="eco-box-header">Base Unifiée</div>
+      <div class="eco-box-name">Supabase</div>
+      <div class="eco-box-host">Neon PostgreSQL</div>
+      <ul class="eco-box-items">
+        <li>34 tables au total</li>
+        <li>26 tables FaîtiereHub</li>
+        <li>8 tables Haroo</li>
+        <li>RLS sur 100% des tables</li>
+        <li>Auth GoTrue (JWT)</li>
+        <li>Storage (3 buckets privés)</li>
+        <li>5 fonctions SQL</li>
+        <li>1 vue publique sécurisée</li>
+        <li>pg_cron purge auto</li>
+        <li>Migrations versionnées</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="info-box info-blue">
+    <div class="info-box-icon">🔗</div>
+    <div><strong>Connexion inter-services :</strong> FaîtiereHub appelle AgriTogo via <code>AGRITOGO_API_URL</code> (secret côté serveur). AgriTogo accède à Supabase via <code>SUPABASE_SERVICE_ROLE_KEY</code> (même projet, bypass RLS contrôlé). Les deux services ne partagent aucune session — chaque appel est authentifié par clé API.</div>
+  </div>
+
+  <h3>Architecture en couches (vue verticale)</h3>
+  <div class="layer-stack">
+    <div class="layer" style="background:#fef9c3;border-color:#fde047">
+      <div class="layer-label" style="color:#854d0e">Utilisateurs</div>
+      <div class="layer-content">Navigateur web, Application mobile, Scanner QR, Widget externe</div>
+      <div class="layer-tech">Browser / Mobile</div>
+    </div>
+    <div class="layer" style="background:#f0fdf4;border-color:#86efac">
+      <div class="layer-label" style="color:#166534">Edge (Vercel)</div>
+      <div class="layer-content">middleware.ts — refresh session JWT, CSP headers, redirect preview → prod</div>
+      <div class="layer-tech">Vercel Edge Runtime</div>
+    </div>
+    <div class="layer" style="background:#f0fdf4;border-color:#86efac">
+      <div class="layer-label" style="color:#166534">Frontend</div>
+      <div class="layer-content">App Router RSC + Client Components, AuthContext, CooperativeContext, shadcn/ui</div>
+      <div class="layer-tech">Next.js 16 / React 19</div>
+    </div>
+    <div class="layer" style="background:#eff6ff;border-color:#93c5fd">
+      <div class="layer-label" style="color:#1e40af">API Routes</div>
+      <div class="layer-content">Endpoints Next.js : verify, marketplace, fiches, embed, webhooks, integrations</div>
+      <div class="layer-tech">Serverless Functions</div>
+    </div>
+    <div class="layer" style="background:#eff6ff;border-color:#93c5fd">
+      <div class="layer-label" style="color:#1e40af">Sécurité App</div>
+      <div class="layer-content">lib/security/assert-access.ts — assertAuthenticated, assertRole, assertTenant + Rate Limiting</div>
+      <div class="layer-tech">TypeScript + Zod</div>
+    </div>
+    <div class="layer" style="background:#fff7ed;border-color:#fdba74">
+      <div class="layer-label" style="color:#9a3412">AgriTogo IA</div>
+      <div class="layer-content">6 agents décisionnels, 5 modèles ML, module Haroo, irrigation FAO-56</div>
+      <div class="layer-tech">Flask 3.1 / Railway</div>
+    </div>
+    <div class="layer" style="background:#f5f3ff;border-color:#c4b5fd">
+      <div class="layer-label" style="color:#5b21b6">Base de données</div>
+      <div class="layer-content">PostgreSQL 34 tables, RLS, Auth GoTrue, Storage 3 buckets, fonctions SQL</div>
+      <div class="layer-tech">Supabase (Neon PG)</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ §2 FRONTEND ═══ -->
+<div class="section page-break">
+  <div class="section-header">
+    <div class="section-num">2</div>
+    <div class="section-title">Architecture Frontend</div>
+    <div class="section-desc">Next.js 16 App Router · React 19 · shadcn/ui</div>
+  </div>
+
+  <h3>Structure des pages</h3>
+  <table>
+    <thead>
+      <tr><th>Route</th><th>Type</th><th>Accès</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>/</code></td><td><span class="badge badge-gray">Public RSC</span></td><td>Tous</td><td>Page d'accueil marketing</td></tr>
+      <tr><td><code>/marketplace</code></td><td><span class="badge badge-gray">Public RSC</span></td><td>Tous</td><td>Marketplace agricole avec filtres</td></tr>
+      <tr><td><code>/fournisseurs</code></td><td><span class="badge badge-gray">Public RSC</span></td><td>Tous</td><td>Annuaire fournisseurs certifiés Argent/Or</td></tr>
+      <tr><td><code>/verify/[card]</code></td><td><span class="badge badge-orange">Public CC</span></td><td>Tous</td><td>Vérification QR — 4 types, no-cache</td></tr>
+      <tr><td><code>/auth/login</code></td><td><span class="badge badge-orange">Auth CC</span></td><td>Anonyme</td><td>Connexion avec email/password</td></tr>
+      <tr><td><code>/auth/signup</code></td><td><span class="badge badge-orange">Auth CC</span></td><td>Anonyme</td><td>Inscription nouveau compte</td></tr>
+      <tr><td><code>/auth/forgot-password</code></td><td><span class="badge badge-orange">Auth CC</span></td><td>Anonyme</td><td>Réinitialisation mot de passe</td></tr>
+      <tr><td><code>/dashboard</code></td><td><span class="badge badge-green">Protégé</span></td><td>Authentifié</td><td>Tableau de bord — home</td></tr>
+      <tr><td><code>/dashboard/members</code></td><td><span class="badge badge-green">Protégé</span></td><td>Coop Admin+</td><td>Gestion membres + badge niveau</td></tr>
+      <tr><td><code>/dashboard/cards</code></td><td><span class="badge badge-green">Protégé</span></td><td>Coop Admin+</td><td>Cartes membres + impression batch</td></tr>
+      <tr><td><code>/dashboard/analytics</code></td><td><span class="badge badge-green">Protégé</span></td><td>Coop Admin+</td><td>Statistiques coopérative</td></tr>
+      <tr><td><code>/dashboard/integrations/kobo</code></td><td><span class="badge badge-green">Protégé</span></td><td>Coop Admin+</td><td>Config + sync KoboCollect</td></tr>
+      <tr><td><code>/dashboard/cotisations</code></td><td><span class="badge badge-green">Protégé</span></td><td>Coop Admin+</td><td>Gestion cotisations</td></tr>
+      <tr><td><code>/dashboard/parcelles</code></td><td><span class="badge badge-green">Protégé</span></td><td>Membre+</td><td>Parcelles agricoles</td></tr>
+      <tr><td><code>/admin/*</code></td><td><span class="badge badge-red">Admin</span></td><td>super_admin</td><td>Panel administration plateforme</td></tr>
+      <tr><td><code>/embed/widget</code></td><td><span class="badge badge-purple">Embed</span></td><td>iframe</td><td>Widget embarquable (SaaS white-label)</td></tr>
+      <tr><td><code>/reports/attestation/[id]</code></td><td><span class="badge badge-gray">Rapport</span></td><td>Auth</td><td>Attestation membre imprimable</td></tr>
+      <tr><td><code>/scan</code></td><td><span class="badge badge-gray">Mobile</span></td><td>Tous</td><td>Interface scan QR mobile-first</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Contextes globaux (root layout)</h3>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title"><div class="card-icon" style="background:#dcfce7">🔐</div>AuthContext</div>
+      <p style="font-size:8.5pt">Initialisation Supabase en <code>useEffect</code> uniquement (browser-safe). Fournit : <code>user</code>, <code>profile</code>, <code>role</code>, <code>login()</code>, <code>signup()</code>, <code>logout()</code>. Rôles lus depuis <code>app_metadata</code> uniquement.</p>
+      <code style="font-size:7.5pt;display:block;margin-top:8px">app/context/auth-context.tsx</code>
+    </div>
+    <div class="card">
+      <div class="card-title"><div class="card-icon" style="background:#dbeafe">🏢</div>CooperativeContext</div>
+      <p style="font-size:8.5pt">Coopérative courante pour les utilisateurs multi-tenant. Switcher de coopérative. Fournit : <code>cooperative</code>, <code>switchCooperative()</code>, liste des coopératives accessibles.</p>
+      <code style="font-size:7.5pt;display:block;margin-top:8px">app/context/cooperative-context.tsx</code>
+    </div>
+  </div>
+
+  <h3>Composants clés</h3>
+  <table>
+    <thead>
+      <tr><th>Composant</th><th>Chemin</th><th>Rôle</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>ScoreBadge</code></td><td><code>components/members/ScoreBadge</code></td><td>Badge Bronze/Argent/Or calculé via hook</td></tr>
+      <tr><td><code>AgriScoreWidget</code></td><td><code>components/dashboard/AgriScoreWidget</code></td><td>Widget "Votre profil" avec progression</td></tr>
+      <tr><td><code>MeteoInlineView</code></td><td><code>components/verify/meteo-inline-view.tsx</code></td><td>Interface météo complète (radar, PDF, alertes)</td></tr>
+      <tr><td><code>RainRadar</code></td><td><code>components/verify/rain-radar</code></td><td>Carte Leaflet + overlay RainViewer (ssr:false)</td></tr>
+      <tr><td><code>AuthSidePanel</code></td><td><code>components/shared/auth-side-panel</code></td><td>Panneau latéral commun auth pages</td></tr>
+      <tr><td><code>ProtectedRoute</code></td><td><code>app/components/protected-route.tsx</code></td><td>Guard client-side (doublons du middleware)</td></tr>
+      <tr><td><code>EmbedWidget SDK</code></td><td><code>public/embed/</code></td><td>SDK JavaScript iframe white-label</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Hooks personnalisés</h3>
+  <table>
+    <thead>
+      <tr><th>Hook</th><th>Fichier</th><th>Fonctionnement</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>use-member-score</code></td><td><code>hooks/use-member-score.ts</code></td><td>Appelle <code>get_member_score(uuid)</code> avec auto-refresh</td></tr>
+      <tr><td><code>use-marketplace-filters</code></td><td><code>hooks/use-marketplace-filters.ts</code></td><td>Filtres cascade URL-synced (région→préfecture→canton)</td></tr>
+      <tr><td><code>use-marketplace-data</code></td><td><code>hooks/use-marketplace-data.ts</code></td><td>Data + cache côté client, pagination Supabase</td></tr>
+      <tr><td><code>use-paginated-query</code></td><td><code>hooks/use-paginated-query.ts</code></td><td>Pagination générique Supabase server-side</td></tr>
+    </tbody>
+  </table>
+
+  <div class="info-box info-orange">
+    <div class="info-box-icon">⚠️</div>
+    <div><strong>Règle SSR critique :</strong> Ne jamais appeler <code>createClient()</code> au niveau du render d'un composant. Toujours à l'intérieur d'un <code>useEffect</code> ou d'un event handler. Les providers <code>AuthProvider</code> et <code>CooperativeProvider</code> dans le root layout suivent cette règle pour éviter les crashs de prerendering statique.</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ §3 BACKEND ═══ -->
+<div class="section page-break">
+  <div class="section-header">
+    <div class="section-num">3</div>
+    <div class="section-title">Architecture Backend — API Routes</div>
+    <div class="section-desc">Next.js Serverless · Vercel Edge · Supabase</div>
+  </div>
+
+  <h3>Catalogue des endpoints</h3>
+  <table>
+    <thead>
+      <tr><th>Méthode</th><th>Route</th><th>Auth</th><th>Rate Limit</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="route-tag get">GET</span></td>
+        <td><code>/api/verify/[card]</code></td>
+        <td><span class="badge badge-gray">Public</span></td>
+        <td>10/min/IP</td>
+        <td>Vérification carte QR (4 types)</td>
+      </tr>
+      <tr>
+        <td><span class="route-tag get">GET</span></td>
+        <td><code>/api/verify/[card]/meteo</code></td>
+        <td><span class="badge badge-gray">Public</span></td>
+        <td>30/min/IP</td>
+        <td>Données météo 6 sources (ECMWF+GFS+ICON)</td>
+      </tr>
+      <tr>
+        <td><span class="route-tag get">GET</span></td>
+        <td><code>/api/marketplace</code></td>
+        <td><span class="badge badge-gray">Public</span></td>
+        <td>120/min/IP</td>
+        <td>Produits marketplace + full-text search</td>
+      </tr>
+      <tr>
+        <td><span class="route-tag get">GET</span></td>
+        <td><code>/api/fournisseurs</code></td>
+        <td><span class="badge badge-gray">Public</span></td>
+        <td>120/min/IP</td>
+        <td>Annuaire fournisseurs certifiés (Argent/Or)</td>
+      </tr>
+      <tr>
+        <td><span class="route-tag get">GET</span></td>
+        <td><code>/api/fiches</code></td>
+        <td><span class="badge badge-gray">Public</span></td>
+        <td>120/min/IP</td>
+        <td>Catalogue fiches techniques (accès payant non-membres)</td>
+      </tr>
+      <tr>
+        <td><span class="route-tag get">GET</span></td>
+        <td><code>/api/member-access</code></td>
+        <td><span class="badge badge-gray">Public</span></td>
+        <td>60/min/IP</td>
+        <td>Vérification accès carte membre (fiche)</td>
+      </tr>
+      <tr>
+        <td><span class="route-tag get">GET</span></td>
+        <td><code>/api/embed/*</code></td>
+        <td><span class="badge badge-purple">Origin</span></td>
+        <td>200/min/IP</td>
+        <td>API widget (origin validée + CORS whitelist)</td>
+      </tr>
+      <tr>
+        <td><span class="route-tag get">GET</span></td>
+        <td><code>/api/widget/*</code></td>
+        <td><span class="badge badge-purple">Origin</span></td>
+        <td>200/min/IP</td>
+        <td>API widget legacy</td>
+      </tr>
+      <tr>
+        <td><span class="route-tag get">GET</span> <span class="route-tag post">POST</span></td>
+        <td><code>/api/integrations/kobo</code></td>
+        <td><span class="badge badge-green">Auth</span></td>
+        <td>60/min/IP</td>
+        <td>Config KoboCollect + déclenchement sync</td>
+      </tr>
+      <tr>
+        <td><span class="route-tag post">POST</span></td>
+        <td><code>/api/webhooks/kobo</code></td>
+        <td><span class="badge badge-red">HMAC</span></td>
+        <td>—</td>
+        <td>Réception soumissions terrain (timing-safe)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Chaîne de traitement d'une requête API</h3>
+  <div class="flow-step">
+    <div class="flow-step-num">1</div>
+    <div class="flow-step-content">
+      <div class="flow-step-title">Vercel Edge — middleware.ts</div>
+      <div class="flow-step-detail">Refresh session Supabase JWT → inject cookies → CSP + HSTS + X-Frame-Options headers</div>
+    </div>
+  </div>
+  <div class="flow-connector">↓</div>
+  <div class="flow-step">
+    <div class="flow-step-num">2</div>
+    <div class="flow-step-content">
+      <div class="flow-step-title">Rate Limiting — lib/utils/rate-limit.ts</div>
+      <div class="flow-step-detail">Vérification IP : in-memory (toujours) + Upstash Redis (si configuré). HTTP 429 si dépassé.</div>
+    </div>
+  </div>
+  <div class="flow-connector">↓</div>
+  <div class="flow-step">
+    <div class="flow-step-num">3</div>
+    <div class="flow-step-content">
+      <div class="flow-step-title">Validation entrées — lib/validators/schemas.ts (Zod)</div>
+      <div class="flow-step-detail">Schémas Zod stricts sur tous les paramètres. HTTP 400 avec message structuré si invalide.</div>
+    </div>
+  </div>
+  <div class="flow-connector">↓</div>
+  <div class="flow-step">
+    <div class="flow-step-num">4</div>
+    <div class="flow-step-content">
+      <div class="flow-step-title">Assertion d'accès — lib/security/assert-access.ts</div>
+      <div class="flow-step-detail"><code>assertAuthenticated()</code> → 401 si non-auth. <code>assertRole()</code> → 403 si rôle insuffisant. <code>assertTenant()</code> → 403 si hors périmètre.</div>
+    </div>
+  </div>
+  <div class="flow-connector">↓</div>
+  <div class="flow-step">
+    <div class="flow-step-num">5</div>
+    <div class="flow-step-content">
+      <div class="flow-step-title">Logique métier + Supabase</div>
+      <div class="flow-step-detail">Query PostgreSQL via client serveur. RLS appliquée automatiquement côté DB. Service role utilisé uniquement pour webhooks/admin.</div>
+    </div>
+  </div>
+  <div class="flow-connector">↓</div>
+  <div class="flow-step">
+    <div class="flow-step-num">6</div>
+    <div class="flow-step-content">
+      <div class="flow-step-title">Headers de réponse — lib/security/headers.ts</div>
+      <div class="flow-step-detail">Injection X-RateLimit-*, Cache-Control, Content-Type, security headers sur chaque réponse API.</div>
+    </div>
+  </div>
+
+  <h3>Clients Supabase — 3 patterns distincts</h3>
+  <table>
+    <thead>
+      <tr><th>Client</th><th>Fichier</th><th>Contexte</th><th>Particularité</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Browser</strong></td>
+        <td><code>lib/supabase/client.ts</code></td>
+        <td><code>'use client'</code></td>
+        <td>Singleton module. Placeholder SSR-safe pendant prerendering. Init dans <code>useEffect</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>Server</strong></td>
+        <td><code>lib/supabase/server.ts</code></td>
+        <td>API Routes, RSC</td>
+        <td><code>async createClient()</code> — session via cookies. Respecte RLS.</td>
+      </tr>
+      <tr>
+        <td><strong>Admin</strong></td>
+        <td><code>lib/supabase/admin.ts</code></td>
+        <td>Webhooks, crons</td>
+        <td><code>server-only</code> — Service Role Key, bypass RLS. Jamais en client.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════ §4 AGRITOGO IA ═══ -->
+<div class="section page-break">
+  <div class="section-header">
+    <div class="section-num">4</div>
+    <div class="section-title">Moteur IA/ML — AgriTogo</div>
+    <div class="section-desc">Flask 3.1 · Railway · 6 agents · 5 modèles ML</div>
+  </div>
+
+  <h3>Agents IA spécialisés</h3>
+  <div class="grid-3">
+    <div class="card" style="border-color:#fdba74">
+      <div class="card-title">📊 Market Intel</div>
+      <p style="font-size:8.5pt">Analyse marchés agricoles, prix, tendances. <strong>LLM : Gemini</strong>. Input : données prix Supabase.</p>
+    </div>
+    <div class="card" style="border-color:#fdba74">
+      <div class="card-title">📈 Quant Forecast</div>
+      <p style="font-size:8.5pt">Prévision quantitative combinant LLM + XGBoost. <strong>LLM : Gemini</strong>. Horizon : 1–12 semaines.</p>
+    </div>
+    <div class="card" style="border-color:#fdba74">
+      <div class="card-title">⚠️ Risk Agent</div>
+      <p style="font-size:8.5pt">Évaluation risque financier agriculteur. <strong>LLM : Claude</strong> (validation). Modèle GARCH volatilité.</p>
+    </div>
+    <div class="card" style="border-color:#fdba74">
+      <div class="card-title">🧠 Decision Agent</div>
+      <p style="font-size:8.5pt">Débat multi-modèles (Gemini vs Qwen). Décision consensus arbitrée par le Risk Agent.</p>
+    </div>
+    <div class="card" style="border-color:#fdba74">
+      <div class="card-title">💬 UX Agent</div>
+      <p style="font-size:8.5pt">Interface conversationnelle agriculteur. <strong>LLM : Qwen</strong>. Ton adapté aux coopératives.</p>
+    </div>
+    <div class="card" style="border-color:#fdba74">
+      <div class="card-title">💧 AgriSmart</div>
+      <p style="font-size:8.5pt">Calcul besoins irrigation FAO-56. Multi-culture, bilan hydrique. Pas de LLM — calcul déterministe.</p>
+    </div>
+  </div>
+
+  <h3>Modèles ML embarqués</h3>
+  <table>
+    <thead>
+      <tr><th>Modèle</th><th>Bibliothèque</th><th>Usage</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>GARCH volatilité prix</td><td><code>arch</code></td><td>Volatilité conditionnelle des prix agricoles par produit</td></tr>
+      <tr><td>XGBoost prévisions</td><td><code>xgboost</code></td><td>Prévision prix 1–12 semaines avec features météo + saisonnier</td></tr>
+      <tr><td>K-Means segmentation</td><td><code>scikit-learn</code></td><td>Segmentation profils agriculteurs par comportement/production</td></tr>
+      <tr><td>Risque financier</td><td><code>statsmodels</code></td><td>Score risque crédit / assurance pour IMFs partenaires</td></tr>
+      <tr><td>KPI Dashboard</td><td><code>pandas</code></td><td>Agrégation KPIs coopérative (superficies, rendements, revenus)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Module Haroo — Vérification professionnels</h3>
+  <div class="info-box info-orange">
+    <div class="info-box-icon">🪪</div>
+    <div>AgriTogo sert de proxy pour la vérification des cartes Haroo. Il accède directement aux tables Haroo dans Supabase via la clé service_role, et retourne les données enrichies à FaîtiereHub.</div>
+  </div>
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-title">👷 OUVRIER</div>
+      <p style="font-size:8.5pt">Tables : <code>haroo_ouvrier_profiles</code> + <code>haroo_ouvrier_cantons</code> + <code>haroo_jobs</code> (offres OUVERTE dans canton matching)</p>
+    </div>
+    <div class="card">
+      <div class="card-title">🛒 ACHETEUR</div>
+      <p style="font-size:8.5pt">Tables : <code>haroo_acheteur_profiles</code> + <code>haroo_acheteur_cantons</code> + <code>haroo_presales</code> (filtré par préfecture)</p>
+    </div>
+    <div class="card">
+      <div class="card-title">🌱 AGRONOME</div>
+      <p style="font-size:8.5pt">Tables : <code>haroo_agronome_profiles</code> (avec canton) + <code>haroo_missions</code> (statuts DEMANDE|EN_COURS)</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ §5 BASE DONNÉES ═══ -->
+<div class="section page-break">
+  <div class="section-header">
+    <div class="section-num">5</div>
+    <div class="section-title">Base de Données — 34 Tables</div>
+    <div class="section-desc">Supabase · PostgreSQL · RLS 100% · Fonctions SQL</div>
+  </div>
+
+  <div class="db-group">
+    <div class="db-group-header" style="background:#166534;color:white">
+      👤 Identité &amp; Authentification <span class="db-group-count">4 tables</span>
+    </div>
+    <table style="margin:0">
+      <thead>
+        <tr><th>Table</th><th>Colonnes clés</th><th>RLS</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>profiles</code></td><td>id (FK auth.users), full_name, role, cooperative_id, avatar_url</td><td>Own + super_admin</td><td>Rôle lu depuis app_metadata aussi</td></tr>
+        <tr><td><code>cooperatives</code></td><td>id, name, level (faitiere/union/cooperative), parent_id</td><td>Public read, admins write</td><td>Hiérarchie récursive</td></tr>
+        <tr><td><code>members</code></td><td>id, cooperative_id, full_name, phone, photo_url, status</td><td>Accessible coops (hierarchy)</td><td>get_accessible_cooperative_ids()</td></tr>
+        <tr><td><code>member_cards</code></td><td>card_number, member_id, card_type, status, qr_code_url</td><td>Accessible coops + anon (active)</td><td>card_type IN (FAITIERE, OUVRIER, ACHETEUR, AGRONOME)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="db-group">
+    <div class="db-group-header" style="background:#1d4ed8;color:white">
+      🌿 Agriculture &amp; Production <span class="db-group-count">5 tables</span>
+    </div>
+    <table style="margin:0">
+      <thead>
+        <tr><th>Table</th><th>Colonnes clés</th><th>RLS</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>parcelles</code></td><td>id, member_id, cooperative_id, surface_ha, culture_id, gps_lat/lng</td><td>Accessible coops</td><td>Localisation GPS KoboCollect</td></tr>
+        <tr><td><code>productions</code></td><td>id, member_id, parcelle_id, campaign, yield_kg, revenue</td><td>Accessible coops</td><td>Base calcul score Argent/Or</td></tr>
+        <tr><td><code>cotisations</code></td><td>id, member_id, amount, paid_at, campaign_year</td><td>Accessible coops</td><td>Base calcul score Bronze</td></tr>
+        <tr><td><code>fiches_techniques</code></td><td>id, title, culture_id, region_id, file_url, published, price</td><td>Publié=public, admins write</td><td>Storage bucket fiches-techniques</td></tr>
+        <tr><td><code>marketplace_products</code></td><td>id, member_id, type, culture_id, price, available_from</td><td>Publié=public, membre write</td><td>full-text search PostgreSQL</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="db-group">
+    <div class="db-group-header" style="background:#9a3412;color:white">
+      🗺️ Géographie (partagée FaîtiereHub + Haroo) <span class="db-group-count">4 tables</span>
+    </div>
+    <table style="margin:0">
+      <thead>
+        <tr><th>Table</th><th>Contenu</th><th>RLS</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>regions</code></td><td>5 régions du Togo (Maritime, Plateaux, Centrale, Kara, Savanes)</td><td>Public read / super_admin write</td></tr>
+        <tr><td><code>prefectures</code></td><td>37 préfectures avec region_id FK</td><td>Public read / super_admin write</td></tr>
+        <tr><td><code>cantons</code></td><td>38 cantons avec prefecture_id FK</td><td>Public read / super_admin write</td></tr>
+        <tr><td><code>cultures</code></td><td>27 cultures agricoles (maïs, manioc, igname...)</td><td>Public read / super_admin write</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="db-group">
+    <div class="db-group-header" style="background:#5b21b6;color:white">
+      🪪 Haroo — Professionnels agricoles <span class="db-group-count">8 tables</span>
+    </div>
+    <table style="margin:0">
+      <thead>
+        <tr><th>Table</th><th>RLS</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>haroo_ouvrier_profiles</code></td><td>Public read, service_role write</td><td>Compétences, cantons disponibilité</td></tr>
+        <tr><td><code>haroo_acheteur_profiles</code></td><td>Public read, service_role write</td><td>Type acheteur, produits recherchés</td></tr>
+        <tr><td><code>haroo_agronome_profiles</code></td><td>Public read, service_role write</td><td>Spécialisations, badge validé</td></tr>
+        <tr><td><code>haroo_ouvrier_cantons</code></td><td>Public read, service_role write</td><td>M2M ouvrier ↔ cantons</td></tr>
+        <tr><td><code>haroo_acheteur_cantons</code></td><td>Public read, service_role write</td><td>M2M acheteur ↔ cantons</td></tr>
+        <tr><td><code>haroo_jobs</code></td><td>Public read, service_role write</td><td>Offres emploi saisonnier (statut OUVERTE/FERMEE)</td></tr>
+        <tr><td><code>haroo_presales</code></td><td>Public read, service_role write</td><td>Préventes agricoles (filtré par préfecture)</td></tr>
+        <tr><td><code>haroo_missions</code></td><td>Public read, service_role write</td><td>Missions agronome (DEMANDE / EN_COURS / TERMINEE)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Fonctions SQL stratégiques</h3>
+  <table>
+    <thead>
+      <tr><th>Fonction</th><th>Retour</th><th>Usage</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>get_member_score(uuid)</code></td><td>Bronze / Argent / Or</td><td>Calcul niveau membre. Appelée par hook <code>use-member-score</code>.</td></tr>
+      <tr><td><code>get_accessible_cooperative_ids()</code></td><td>UUID[]</td><td>Hiérarchie récursive dans toutes les policies RLS.</td></tr>
+      <tr><td><code>search_marketplace(...)</code></td><td>rows</td><td>Full-text search PostgreSQL en français sur marketplace.</td></tr>
+      <tr><td><code>get_platform_totals()</code></td><td>JSON</td><td>KPIs globaux — super_admin uniquement.</td></tr>
+      <tr><td><code>bootstrap_cooperative_admin()</code></td><td>void</td><td>Création admin coopérative — service_role uniquement.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════════════ §6 FLUX DONNÉES ═══ -->
+<div class="section page-break">
+  <div class="section-header">
+    <div class="section-num">6</div>
+    <div class="section-title">Flux de Données — "Le Plombier"</div>
+    <div class="section-desc">QR Verify · KoboCollect · Auth · Marketplace · Météo</div>
+  </div>
+
+  <h3>Flux 1 — Vérification carte QR (flux principal)</h3>
+  <div class="case-study">
+    <div class="case-study-header">📱 Scan QR → Résultat en &lt; 800ms</div>
+    <div class="case-study-body">
+      <div class="flow-step"><div class="flow-step-num">1</div><div class="flow-step-content"><div class="flow-step-title">Scan QR code</div><div class="flow-step-detail">URL : <code>https://faitierehub.com/verify/FH-001234</code></div></div></div>
+      <div class="flow-connector">↓</div>
+      <div class="flow-step"><div class="flow-step-num">2</div><div class="flow-step-content"><div class="flow-step-title">Rate limit : 10 req/min/IP</div><div class="flow-step-detail">In-memory + Upstash Redis. HTTP 429 si dépassé (protection scraping).</div></div></div>
+      <div class="flow-connector">↓</div>
+      <div class="flow-step"><div class="flow-step-num">3</div><div class="flow-step-content"><div class="flow-step-title">Validation format Zod</div><div class="flow-step-detail">Regex <code>^[A-Z0-9]{2,5}-\d{4,6}$</code>. Expansion variantes O↔0, I↔1 (confusion visuelle)</div></div></div>
+      <div class="flow-connector">↓</div>
+      <div class="flow-step"><div class="flow-step-num">4</div><div class="flow-step-content"><div class="flow-step-title">Lookup Supabase — member_cards</div><div class="flow-step-detail"><code>WHERE card_number IN variants AND status = 'active' AND card_type = 'FAITIERE'</code></div></div></div>
+      <div class="flow-connector">↓ Pas trouvé</div>
+      <div class="flow-step"><div class="flow-step-num">5</div><div class="flow-step-content"><div class="flow-step-title">Fallback AgriTogo — Haroo</div><div class="flow-step-detail"><code>fetch AGRITOGO_API_URL/api/v1/haroo/verify/[card]</code> → OUVRIER / ACHETEUR / AGRONOME</div></div></div>
+      <div class="flow-connector">↓</div>
+      <div class="flow-step"><div class="flow-step-num">6</div><div class="flow-step-content"><div class="flow-step-title">Rendu page vérification</div><div class="flow-step-detail">Profil complet (photo, niveau, coop) + météo région + alertes agronomiques + PDF partage WhatsApp</div></div></div>
+    </div>
+  </div>
+
+  <h3>Flux 2 — Sync KoboCollect (terrain → base)</h3>
+  <div class="case-study">
+    <div class="case-study-header">📋 Collecte terrain → Supabase en temps réel</div>
+    <div class="case-study-body">
+      <div class="flow-step"><div class="flow-step-num">1</div><div class="flow-step-content"><div class="flow-step-title">Agent terrain soumet formulaire KoboCollect</div><div class="flow-step-detail">XLSForm 8 sections : identité, localisation GPS, parcelle, production, photo</div></div></div>
+      <div class="flow-connector">↓ Webhook temps réel</div>
+      <div class="flow-step"><div class="flow-step-num">2</div><div class="flow-step-content"><div class="flow-step-title">POST /api/webhooks/kobo</div><div class="flow-step-detail">Validation HMAC <code>KOBO_WEBHOOK_SECRET</code> timing-safe. Rejet si signature invalide.</div></div></div>
+      <div class="flow-connector">↓</div>
+      <div class="flow-step"><div class="flow-step-num">3</div><div class="flow-step-content"><div class="flow-step-title">Parser + validation Zod (lib/validators/kobo.ts)</div><div class="flow-step-detail">Transformation JSON KoboToolbox → modèle interne membre/parcelle/production</div></div></div>
+      <div class="flow-connector">↓</div>
+      <div class="flow-step"><div class="flow-step-num">4</div><div class="flow-step-content"><div class="flow-step-title">Upsert Supabase (admin client)</div><div class="flow-step-detail">Tables : members, parcelles, productions. Queue de retry avec exponential backoff si timeout.</div></div></div>
+    </div>
+  </div>
+
+  <h3>Flux 3 — Authentification (login → session)</h3>
+  <div class="case-study">
+    <div class="case-study-header">🔐 Login → JWT session Supabase</div>
+    <div class="case-study-body">
+      <div class="flow-step"><div class="flow-step-num">1</div><div class="flow-step-content"><div class="flow-step-title">Saisie email/password dans <code>/auth/login</code></div><div class="flow-step-detail">Composant Client (<code>'use client'</code>). <code>createClient()</code> appelé dans le handler submit.</div></div></div>
+      <div class="flow-connector">↓</div>
+      <div class="flow-step"><div class="flow-step-num">2</div><div class="flow-step-content"><div class="flow-step-title"><code>supabase.auth.signInWithPassword()</code></div><div class="flow-step-detail">GoTrue génère JWT access_token + refresh_token. Persiste dans cookie httpOnly.</div></div></div>
+      <div class="flow-connector">↓</div>
+      <div class="flow-step"><div class="flow-step-num">3</div><div class="flow-step-content"><div class="flow-step-title">onAuthStateChange déclenché</div><div class="flow-step-detail">AuthContext (singleton) reçoit l'event SIGNED_IN. Fetch profil Supabase + rôle app_metadata.</div></div></div>
+      <div class="flow-connector">↓</div>
+      <div class="flow-step"><div class="flow-step-num">4</div><div class="flow-step-content"><div class="flow-step-title">Redirect → /dashboard</div><div class="flow-step-detail">middleware.ts refresh la session sur chaque request suivante pour éviter les JWT périmés.</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ §7 SÉCURITÉ ═══ -->
+<div class="section page-break">
+  <div class="section-header">
+    <div class="section-num">7</div>
+    <div class="section-title">Modèle de Sécurité &amp; RBAC</div>
+    <div class="section-desc">Score 9.2/10 — 3 audits — Defense in depth</div>
+  </div>
+
+  <h3>Hiérarchie des rôles (RBAC)</h3>
+  <div class="arch-diagram">
+    <div class="arch-box arch-box-red" style="text-align:center">
+      <div class="arch-label">Niveau 0 — Dieu</div>
+      <div class="arch-title">SUPER_ADMIN</div>
+      <div class="arch-items">Accès total cross-tenant · Panel /admin · Platform totals · Bootstrap coops</div>
+    </div>
+    <div class="arch-connector">↓ <span>hérite de</span></div>
+    <div class="arch-row">
+      <div class="arch-box arch-box-orange">
+        <div class="arch-label">Niveau 1</div>
+        <div class="arch-title">FAITIERE_ADMIN</div>
+        <div class="arch-items">
+          <li>Hiérarchie complète sous sa faîtière</li>
+          <li>Upload fiches techniques</li>
+          <li>Génération cartes membres</li>
+          <li>Analytics agrégés</li>
+        </div>
+      </div>
+      <div class="arch-box arch-box-orange">
+        <div class="arch-label">Niveau 2</div>
+        <div class="arch-title">UNION_ADMIN</div>
+        <div class="arch-items">
+          <li>Unions + coopératives enfants</li>
+          <li>Vue membres sous union</li>
+          <li>Rapports union</li>
+        </div>
+      </div>
+    </div>
+    <div class="arch-connector">↓</div>
+    <div class="arch-row">
+      <div class="arch-box arch-box-green">
+        <div class="arch-label">Niveau 3</div>
+        <div class="arch-title">COOPERATIVE_ADMIN</div>
+        <div class="arch-items">
+          <li>Coopérative seule</li>
+          <li>Gestion membres + cartes</li>
+          <li>KoboCollect config</li>
+          <li>Cotisations + parcelles</li>
+        </div>
+      </div>
+      <div class="arch-box arch-box-blue">
+        <div class="arch-label">Niveau 4</div>
+        <div class="arch-title">MEMBER</div>
+        <div class="arch-items">
+          <li>Son profil + carte</li>
+          <li>Marketplace (public)</li>
+          <li>Ses parcelles/productions</li>
+          <li>Accès fiches (carte valide)</li>
+        </div>
+      </div>
+      <div class="arch-box arch-box-purple">
+        <div class="arch-label">Niveau 5</div>
+        <div class="arch-title">GUEST</div>
+        <div class="arch-items">
+          <li>Marketplace publique</li>
+          <li>Fiches (accès payant)</li>
+          <li>Vérification QR</li>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Couches de protection</h3>
+  <table class="sec-matrix">
+    <thead>
+      <tr><th>Couche</th><th>Technologie</th><th>Routes protégées</th><th>Que se passe-t-il si fail ?</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>1. Edge Middleware</strong></td><td>Vercel Edge Runtime</td><td>Toutes</td><td>Refresh JWT périmé ou redirect login</td></tr>
+      <tr><td><strong>2. Rate Limiting</strong></td><td>In-memory + Redis</td><td>Tous endpoints publics</td><td>HTTP 429 Too Many Requests</td></tr>
+      <tr><td><strong>3. Validation Zod</strong></td><td>TypeScript strict</td><td>Tous endpoints API</td><td>HTTP 400 Bad Request (message structuré)</td></tr>
+      <tr><td><strong>4. assertAccess()</strong></td><td>lib/security</td><td>Endpoints authentifiés</td><td>HTTP 401 Unauthorized / 403 Forbidden</td></tr>
+      <tr><td><strong>5. RLS PostgreSQL</strong></td><td>Supabase</td><td>Toutes les 34 tables</td><td>Résultat vide ou erreur DB (invisible client)</td></tr>
+      <tr><td><strong>6. CSP Headers</strong></td><td>next.config.mjs</td><td>Toutes les pages</td><td>Blocage navigateur (XSS, injection)</td></tr>
+      <tr><td><strong>7. HMAC Webhook</strong></td><td>timing-safe compare</td><td>/api/webhooks/kobo</td><td>HTTP 401 immédiat (pas de corps retourné)</td></tr>
+      <tr><td><strong>8. AES-256-GCM</strong></td><td>lib/utils/crypto.ts</td><td>Secrets API Kobo</td><td>Décryptage impossible sans INTEGRATION_SECRET_KEY</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Headers de sécurité (next.config.mjs)</h3>
+  <pre><span class="comment"># Headers injectés sur toutes les routes</span>
+<span class="key">Content-Security-Policy</span>:   <span class="val">default-src 'self'; script-src 'self' 'strict-dynamic'; ...</span>
+<span class="key">Strict-Transport-Security</span>: <span class="val">max-age=63072000; includeSubDomains; preload</span>
+<span class="key">X-Frame-Options</span>:           <span class="val">DENY</span>  <span class="comment">(sauf /embed)</span>
+<span class="key">X-Content-Type-Options</span>:    <span class="val">nosniff</span>
+<span class="key">Referrer-Policy</span>:           <span class="val">strict-origin-when-cross-origin</span>
+<span class="key">Permissions-Policy</span>:        <span class="val">camera=(), microphone=(), geolocation=(self)</span>
+<span class="comment"># /verify/* routes uniquement</span>
+<span class="key">Cache-Control</span>:             <span class="val">no-store, no-cache, must-revalidate</span></pre>
+
+  <div class="info-box info-green">
+    <div class="info-box-icon">✅</div>
+    <div><strong>Règle d'or :</strong> Les rôles sont toujours lus depuis <code>app_metadata</code> (contrôlé côté serveur), jamais depuis <code>user_metadata</code> (contrôlé par l'utilisateur). Toute tentative de privilege escalation via user_metadata est ignorée.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ §8 MÉTÉO ═══ -->
+<div class="section page-break">
+  <div class="section-header">
+    <div class="section-num">8</div>
+    <div class="section-title">Module Météo — Ensemble 3 Modèles</div>
+    <div class="section-desc">ECMWF + GFS + ICON · Sans API key · 6 sources parallèles</div>
+  </div>
+
+  <h3>Ensemble de modèles météorologiques</h3>
+  <div class="grid-3">
+    <div class="card" style="border-color:#22c55e">
+      <div class="card-title">🌍 ECMWF IFS 0.25°</div>
+      <p style="font-size:8.5pt"><strong>Poids : 45%</strong> — Modèle européen de référence. Résolution 0.25°. Excellence sur les prévisions 3–10 jours. Source principale pour température et précipitations.</p>
+    </div>
+    <div class="card" style="border-color:#3b82f6">
+      <div class="card-title">🇺🇸 GFS Seamless NOAA</div>
+      <p style="font-size:8.5pt"><strong>Poids : 35%</strong> — Modèle américain. 4 runs/jour. Excellentes performances tropicales (région Togo). Données ETo FAO-56 intégrées.</p>
+    </div>
+    <div class="card" style="border-color:#8b5cf6">
+      <div class="card-title">🇩🇪 ICON Seamless DWD</div>
+      <p style="font-size:8.5pt"><strong>Poids : 20%</strong> — Modèle allemand indépendant. Confirmateur. Haute résolution sur l'Afrique de l'Ouest. Réduction des biais systématiques.</p>
+    </div>
+  </div>
+
+  <h3>Fusion des modèles (mergeWeatherModels)</h3>
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Méthode de fusion</th><th>Justification</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Température</td><td>Moyenne pondérée (45/35/20)</td><td>Variable continue, biais faible entre modèles</td></tr>
+      <tr><td>Vent / Humidité</td><td>Moyenne pondérée (45/35/20)</td><td>Variables continues</td></tr>
+      <tr><td>Précipitations</td><td>70% moyenne pondérée + 30% max des modèles</td><td>Conservatif pour les agriculteurs — mieux vaut surestimer la pluie</td></tr>
+      <tr><td>UV Index</td><td>ECMWF prioritaire</td><td>Meilleure précision ECMWF sur rayonnement</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Sources de données et TTL de cache</h3>
+  <table>
+    <thead>
+      <tr><th>Source</th><th>Fréquence</th><th>Cache TTL</th><th>Usage</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Journalier 7 jours (3 modèles)</td><td>6h/jour</td><td>30 min</td><td>Prévisions j+1 à j+7</td></tr>
+      <tr><td>Horaire 24h (3 modèles)</td><td>1h</td><td>15 min</td><td>Bande horaire interface</td></tr>
+      <tr><td>Nowcast 6h (minutely_15)</td><td>15 min</td><td>5 min</td><td>Alerte pluie imminente</td></tr>
+      <tr><td>Saisonnier 3 mois (CFS NOAA)</td><td>6h</td><td>6 h</td><td>Tendance pluviométrique campagne</td></tr>
+      <tr><td>Historique 10 jours (Supabase weather_data)</td><td>Persisté</td><td>N/A</td><td>Comparaison saisonnière</td></tr>
+    </tbody>
+  </table>
+
+  <h3>5 Régions agricoles du Togo</h3>
+  <table>
+    <thead>
+      <tr><th>Région</th><th>Ville centre</th><th>Latitude</th><th>Longitude</th><th>Cultures dominantes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Maritime</td><td>Lomé</td><td>6.137°N</td><td>1.212°E</td><td>Maraîchage, manioc, palmier</td></tr>
+      <tr><td>Plateaux</td><td>Atakpamé</td><td>7.530°N</td><td>1.150°E</td><td>Cacao, café, igname</td></tr>
+      <tr><td>Centrale</td><td>Sokodé</td><td>8.980°N</td><td>1.095°E</td><td>Coton, maïs, sorgho</td></tr>
+      <tr><td>Kara</td><td>Kara</td><td>9.551°N</td><td>1.186°E</td><td>Soja, mil, sorgho</td></tr>
+      <tr><td>Savanes</td><td>Dapaong</td><td>10.863°N</td><td>0.207°E</td><td>Mil, sorgho, niébé</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════ §9 CAS DE PANNE ═══ -->
+<div class="section page-break">
+  <div class="section-header">
+    <div class="section-num">9</div>
+    <div class="section-title">Cas de Panne — Résilience "Et si ?"</div>
+    <div class="section-desc">Dégradation gracieuse · Fallbacks · Recovery</div>
+  </div>
+
+  <h3>Matrice de résilience</h3>
+
+  <div class="case-study no-break">
+    <div class="case-study-header">
+      <span class="scenario-err">⚠</span> Cas 1 — AgriTogo est hors ligne (Railway down)
+    </div>
+    <div class="case-study-body">
+      <table style="margin:0">
+        <tbody>
+          <tr><td style="width:25%;font-weight:600;color:#dc2626">Impact</td><td>Cartes OUVRIER / ACHETEUR / AGRONOME ne peuvent plus être vérifiées. Cartes FAITIERE non affectées.</td></tr>
+          <tr><td style="font-weight:600;color:#ea580c">Comportement</td><td>FaîtiereHub catch l'erreur fetch → retourne <code>{ source: 'error', message: 'Service temporairement indisponible' }</code></td></tr>
+          <tr><td style="font-weight:600;color:#16a34a">Recovery</td><td>Dès que Railway redémarre (auto-restart activé), les requêtes suivantes fonctionnent. Pas de données perdues.</td></tr>
+          <tr><td style="font-weight:600;color:#2563eb">Prévention</td><td>Timeout configurable (5s) sur <code>fetch</code>. Health check <code>/api/v1/health</code>. Railway restart policy = always.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="case-study no-break" style="margin-top:12px">
+    <div class="case-study-header">
+      <span class="scenario-err">⚠</span> Cas 2 — Supabase hors ligne
+    </div>
+    <div class="case-study-body">
+      <table style="margin:0">
+        <tbody>
+          <tr><td style="width:25%;font-weight:600;color:#dc2626">Impact</td><td>Toutes les pages authentifiées et vérifications QR échouent. Marketplace devient vide.</td></tr>
+          <tr><td style="font-weight:600;color:#ea580c">Comportement</td><td>Erreurs 500 sur les API routes. L'Edge middleware ne peut pas refresh le JWT → redirect login.</td></tr>
+          <tr><td style="font-weight:600;color:#16a34a">Recovery</td><td>Supabase SLA 99.9%. Automatic failover Neon PG. Durée panne &lt; 5 min historiquement.</td></tr>
+          <tr><td style="font-weight:600;color:#2563eb">Prévention</td><td>Sentry capture toutes les erreurs DB. Upstash Redis garde les rate-limits même si Supabase down.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="case-study no-break" style="margin-top:12px">
+    <div class="case-study-header">
+      <span class="scenario-warn">⚡</span> Cas 3 — Dépassement rate limit (attaque DDoS légère)
+    </div>
+    <div class="case-study-body">
+      <table style="margin:0">
+        <tbody>
+          <tr><td style="width:25%;font-weight:600;color:#dc2626">Impact</td><td>Endpoint <code>/api/verify/[card]</code> : 10 req/min/IP. Au-delà : HTTP 429.</td></tr>
+          <tr><td style="font-weight:600;color:#ea580c">Comportement</td><td>In-memory bucket décrémenté. Si Upstash configuré, compteur persistant cross-instance Vercel.</td></tr>
+          <tr><td style="font-weight:600;color:#16a34a">Recovery</td><td>Automatique — la fenêtre de 60s expire. L'utilisateur légitime peut relancer.</td></tr>
+          <tr><td style="font-weight:600;color:#2563eb">Prévention</td><td>Headers <code>X-RateLimit-Remaining</code> retournés. Vercel WAF comme couche supplémentaire possible.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="case-study no-break" style="margin-top:12px">
+    <div class="case-study-header">
+      <span class="scenario-warn">⚡</span> Cas 4 — Webhook KoboCollect avec signature invalide
+    </div>
+    <div class="case-study-body">
+      <table style="margin:0">
+        <tbody>
+          <tr><td style="width:25%;font-weight:600;color:#dc2626">Impact</td><td>Tentative injection de données terrain falsifiées.</td></tr>
+          <tr><td style="font-weight:600;color:#ea580c">Comportement</td><td>HMAC-SHA256 comparaison timing-safe échoue → HTTP 401 immédiat, corps vide. Aucune donnée traitée.</td></tr>
+          <tr><td style="font-weight:600;color:#16a34a">Recovery</td><td>Aucune action nécessaire. Les vraies soumissions KoboCollect ont la bonne signature.</td></tr>
+          <tr><td style="font-weight:600;color:#2563eb">Prévention</td><td><code>KOBO_WEBHOOK_SECRET</code> rotatif. Audit log de toutes les tentatives invalides.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="case-study no-break" style="margin-top:12px">
+    <div class="case-study-header">
+      <span class="scenario-ok">✓</span> Cas 5 — Open-Meteo API lente ou timeout
+    </div>
+    <div class="case-study-body">
+      <table style="margin:0">
+        <tbody>
+          <tr><td style="width:25%;font-weight:600;color:#dc2626">Impact</td><td>Module météo lent ou incomplet sur la page de vérification.</td></tr>
+          <tr><td style="font-weight:600;color:#ea580c">Comportement</td><td>Les 6 sources sont fetched en <code>Promise.all</code>. Si 1 ou 2 sources timeout → fusion partielle avec les modèles disponibles. Si cache Supabase &lt; 3 jours → retourne cache même incomplet.</td></tr>
+          <tr><td style="font-weight:600;color:#16a34a">Recovery</td><td>Cache in-memory par région (TTL 15–30 min) absorbe les piques. Prochaine requête régénère.</td></tr>
+          <tr><td style="font-weight:600;color:#2563eb">Prévention</td><td>Open-Meteo free tier — SLA non garanti. Cache agressif dimensionné pour 30 min sans appel externe.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="case-study no-break" style="margin-top:12px">
+    <div class="case-study-header">
+      <span class="scenario-ok">✓</span> Cas 6 — Build Next.js sans variables d'environnement (.env local manquant)
+    </div>
+    <div class="case-study-body">
+      <table style="margin:0">
+        <tbody>
+          <tr><td style="width:25%;font-weight:600;color:#dc2626">Impact</td><td>Sur Vercel prod : impossible — vars intégrées au build time. En dev local : <code>NEXT_PUBLIC_*</code> absentes.</td></tr>
+          <tr><td style="font-weight:600;color:#ea580c">Comportement</td><td><code>lib/supabase/client.ts</code> détecte <code>typeof window === 'undefined'</code> + vars absentes → retourne client placeholder SSR-safe. Pas de crash de prerendering.</td></tr>
+          <tr><td style="font-weight:600;color:#16a34a">Recovery</td><td>Ajouter <code>.env.local</code> avec les vraies vars. Le placeholder n'est jamais utilisé en production.</td></tr>
+          <tr><td style="font-weight:600;color:#2563eb">Prévention</td><td>Le script <code>npm run security:check</code> vérifie la présence des vars avant déploiement.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ §10 INFRASTRUCTURE ═══ -->
+<div class="section page-break">
+  <div class="section-header">
+    <div class="section-num">10</div>
+    <div class="section-title">Infrastructure &amp; Déploiement</div>
+    <div class="section-desc">$61/mois · 10 000 membres · 50 coopératives</div>
+  </div>
+
+  <h3>Services en production</h3>
+  <table>
+    <thead>
+      <tr><th>Service</th><th>Plateforme</th><th>URL</th><th>Plan</th><th>Coût/mois</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>FaîtiereHub (Next.js)</td><td>Vercel</td><td>www.faitierehub.com</td><td>Pro</td><td>$20</td></tr>
+      <tr><td>AgriTogo (Flask + IA)</td><td>Railway</td><td>agritogo-production.up.railway.app</td><td>Starter</td><td>~$10</td></tr>
+      <tr><td>Base de données</td><td>Supabase</td><td>hhnswekjgbxckluqnszo.supabase.co</td><td>Pro (8 GB)</td><td>$25</td></tr>
+      <tr><td>Rate Limiting distribué</td><td>Upstash Redis</td><td>—</td><td>Pay-as-you-go</td><td>~$5</td></tr>
+      <tr><td>Monitoring/Erreurs</td><td>Sentry</td><td>—</td><td>Free tier</td><td>$0</td></tr>
+      <tr><td>Analytics</td><td>Vercel Analytics + PostHog</td><td>—</td><td>Free tier</td><td>$0</td></tr>
+      <tr><td>Domaine</td><td>.com</td><td>faitierehub.com</td><td>—</td><td>~$1</td></tr>
+      <tr style="background:#f0fdf4;font-weight:700"><td colspan="4">Total mensuel</td><td>~$61</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Variables d'environnement requises</h3>
+  <div class="grid-2">
+    <div>
+      <h4>FaîtiereHub (Vercel)</h4>
+      <pre><span class="comment"># Supabase — OBLIGATOIRES</span>
+<span class="key">NEXT_PUBLIC_SUPABASE_URL</span>=<span class="val">https://...supabase.co</span>
+<span class="key">NEXT_PUBLIC_SUPABASE_ANON_KEY</span>=<span class="val">eyJ...</span>
+<span class="key">SUPABASE_SERVICE_ROLE_KEY</span>=<span class="val">eyJ...</span>  <span class="comment"># server-only</span>
+
+<span class="comment"># Sécurité — OBLIGATOIRES en prod</span>
+<span class="key">INTEGRATION_SECRET_KEY</span>=<span class="val">...</span>  <span class="comment"># AES-256-GCM</span>
+<span class="key">KOBO_WEBHOOK_SECRET</span>=<span class="val">...</span>    <span class="comment"># HMAC-SHA256</span>
+
+<span class="comment"># AgriTogo</span>
+<span class="key">AGRITOGO_API_URL</span>=<span class="val">https://agritogo...</span>
+
+<span class="comment"># Rate limiting distribué (optionnel)</span>
+<span class="key">UPSTASH_REDIS_REST_URL</span>=<span class="val">...</span>
+<span class="key">UPSTASH_REDIS_REST_TOKEN</span>=<span class="val">...</span></pre>
+    </div>
+    <div>
+      <h4>AgriTogo (Railway)</h4>
+      <pre><span class="comment"># Supabase (même projet)</span>
+<span class="key">SUPABASE_URL</span>=<span class="val">https://...supabase.co</span>
+<span class="key">SUPABASE_SERVICE_ROLE_KEY</span>=<span class="val">eyJ...</span>
+
+<span class="comment"># LLMs</span>
+<span class="key">GEMINI_API_KEY</span>=<span class="val">AIza...</span>
+<span class="key">GEMINI_API_KEY_1</span>=<span class="val">AIza...</span>  <span class="comment"># rotation</span>
+<span class="key">GEMINI_API_KEY_2</span>=<span class="val">AIza...</span>
+<span class="key">DASHSCOPE_API_KEY</span>=<span class="val">...</span>    <span class="comment"># Qwen</span>
+
+<span class="comment"># Serveur</span>
+<span class="key">PORT</span>=<span class="val">8000</span>
+<span class="key">FLASK_ENV</span>=<span class="val">production</span></pre>
+    </div>
+  </div>
+
+  <h3>Pipeline CI/CD</h3>
+  <div class="flow-step">
+    <div class="flow-step-num">1</div>
+    <div class="flow-step-content">
+      <div class="flow-step-title">Push git → GitHub</div>
+      <div class="flow-step-detail">Branch main ou feature branch</div>
+    </div>
+  </div>
+  <div class="flow-connector">↓</div>
+  <div class="flow-step">
+    <div class="flow-step-num">2</div>
+    <div class="flow-step-content">
+      <div class="flow-step-title">npm run check (turbo: typecheck + lint)</div>
+      <div class="flow-step-detail">TypeScript strict — 0 erreur requis. Biome linter — noExplicitAny, noUnusedVariables, noDangerouslySetInnerHtml.</div>
+    </div>
+  </div>
+  <div class="flow-connector">↓</div>
+  <div class="flow-step">
+    <div class="flow-step-num">3</div>
+    <div class="flow-step-content">
+      <div class="flow-step-title">npm run security:check</div>
+      <div class="flow-step-detail">11 assertions automatiques pré-déploiement (vars présentes, CSP, headers, secrets)</div>
+    </div>
+  </div>
+  <div class="flow-connector">↓</div>
+  <div class="flow-step">
+    <div class="flow-step-num">4</div>
+    <div class="flow-step-content">
+      <div class="flow-step-title">Vercel build automatique</div>
+      <div class="flow-step-detail">next build — 89 pages générées. Déploiement Edge Functions + Serverless Functions. Preview URL sur PRs.</div>
+    </div>
+  </div>
+
+  <h3>Checklist de production</h3>
+  <div class="grid-2">
+    <div>
+      <table>
+        <thead><tr><th>Check</th><th>Statut</th></tr></thead>
+        <tbody>
+          <tr><td>TypeScript strict (no ignoreBuildErrors)</td><td><span class="check">✓</span></td></tr>
+          <tr><td>RLS sur toutes les tables (34)</td><td><span class="check">✓</span></td></tr>
+          <tr><td>Security headers (CSP, HSTS)</td><td><span class="check">✓</span></td></tr>
+          <tr><td>Rate limiting tous endpoints publics</td><td><span class="check">✓</span></td></tr>
+          <tr><td>Validation Zod toutes les entrées</td><td><span class="check">✓</span></td></tr>
+          <tr><td>Storage privé + signed URLs</td><td><span class="check">✓</span></td></tr>
+          <tr><td>Webhook HMAC timing-safe</td><td><span class="check">✓</span></td></tr>
+          <tr><td>Secrets chiffrés AES-256-GCM</td><td><span class="check">✓</span></td></tr>
+          <tr><td>Leaked password protection</td><td><span class="check">✓</span></td></tr>
+          <tr><td>security.txt publié (RFC 9116)</td><td><span class="check">✓</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <table>
+        <thead><tr><th>Check</th><th>Statut</th></tr></thead>
+        <tbody>
+          <tr><td>pg_cron purge automatique</td><td><span class="check">✓</span></td></tr>
+          <tr><td>Haroo tables RLS configurées</td><td><span class="check">✓</span></td></tr>
+          <tr><td>AgriTogo Supabase connexion</td><td><span class="check">✓</span></td></tr>
+          <tr><td>SUPABASE_SERVICE_KEY Railway</td><td><span class="cross">○</span> À faire</td></tr>
+          <tr><td>Upstash Redis prod configuré</td><td><span class="cross">○</span> À faire</td></tr>
+          <tr><td>MFA admins faîtière + super_admin</td><td><span class="cross">○</span> À faire</td></tr>
+          <tr><td>Nonce-based CSP (sans unsafe-inline)</td><td><span class="cross">○</span> Backlog</td></tr>
+          <tr><td>Backup automatique vérifié</td><td><span class="cross">○</span> Backlog</td></tr>
+          <tr><td>Load testing k6</td><td><span class="cross">○</span> Backlog</td></tr>
+          <tr><td>Pentest externe</td><td><span class="cross">○</span> Backlog</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="info-box info-green" style="margin-top:20px">
+    <div class="info-box-icon">📈</div>
+    <div><strong>Scalabilité :</strong> L'architecture actuelle est dimensionnée pour <strong>10 000 membres et 50 coopératives</strong> sans changement. Pour aller au-delà : activer Supabase Connection Pooler (PgBouncer), passer Vercel Pro → Enterprise, activer Upstash Redis pour toutes les instances (rate limiting distribué déjà codé).</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════ FOOTER ═══ -->
+<div class="doc-footer">
+  <div>
+    <strong>FaîtiereHub</strong> — Blueprint Architecture v1.5<br>
+    <span class="watermark">Propriétaire — Tous droits réservés © 2025-2026 FaîtiereHub · TATCHIDA Louis</span>
+  </div>
+  <div style="text-align:right">
+    <div>Production : <a href="https://www.faitierehub.com">www.faitierehub.com</a></div>
+    <div class="watermark">Généré le 08/06/2026 · Score sécurité : 9.2/10</div>
+  </div>
+</div>
+
+</div><!-- /doc-wrapper -->
+
+<script>
+// Print button for screen view
+if (typeof window !== 'undefined') {
+  const btn = document.createElement('button');
+  btn.textContent = '🖨 Imprimer / Exporter PDF';
+  btn.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:999;background:#16a34a;color:white;border:none;padding:12px 20px;border-radius:8px;font-weight:600;cursor:pointer;font-size:11pt;box-shadow:0 4px 12px rgba(0,0,0,0.3)';
+  btn.onclick = () => window.print();
+  document.body.appendChild(btn);
+}
+</script>
+</body>
+</html>

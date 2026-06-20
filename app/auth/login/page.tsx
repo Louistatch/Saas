@@ -13,6 +13,7 @@ import { Eye, EyeOff, ArrowLeft } from 'lucide-react'
 import { useAuth } from '@/app/context/auth-context'
 import { Spinner } from '@/components/shared/loading'
 import { errorMessage } from '@/lib/utils/errors'
+import { isHarooRole } from '@/lib/utils/permissions'
 import { flattenZodErrors, loginSchema } from '@/lib/validators/schemas'
 
 /**
@@ -77,8 +78,21 @@ function LoginInner() {
 
       const safeRedirect =
         redirectTo && /^\/[^/]/.test(redirectTo) ? redirectTo : null
+      // Un professionnel Haroo ne doit jamais être renvoyé vers le dashboard
+      // coopérative, même si ?redirect=/dashboard a été posé par le middleware
+      // lors d'une visite déconnectée — son espace est /haroo.
+      const harooUser = isHarooRole(user?.role)
+      const applicableRedirect =
+        harooUser && safeRedirect && (safeRedirect.startsWith('/dashboard') || safeRedirect.startsWith('/admin'))
+          ? null
+          : safeRedirect
       const target =
-        safeRedirect ?? (user?.role === 'super_admin' ? '/admin' : '/dashboard')
+        applicableRedirect ??
+        (user?.role === 'super_admin'
+          ? '/admin'
+          : harooUser
+            ? '/haroo'
+            : '/dashboard')
 
       router.replace(target)
     } catch (err: unknown) {

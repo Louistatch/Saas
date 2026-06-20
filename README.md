@@ -37,6 +37,15 @@ Les trois partagent **une seule base de données Supabase**.
 | `ACHETEUR` | AgriTogo → Supabase (Haroo) | Type, produits, préventes disponibles |
 | `AGRONOME` | AgriTogo → Supabase (Haroo) | Spécialisations, badge, missions actives |
 
+### Météo agricole — Ensemble multi-modèles
+- **3 modèles fusionnés** : ECMWF IFS 0.25° (45%) + GFS NOAA (35%) + ICON DWD (20%) — sans API key
+- **Nowcasting 6h** : créneaux 15 min avec alerte "Pluie dans ~X min" (style Bing Weather)
+- **Radar précipitations temps réel** : RainViewer + carte Leaflet centrée sur la région du membre
+- **Prévision saisonnière 3 mois** : modèle CFS NOAA — pluviométrie et température
+- **Alertes navigateur** : notification pluie imminente, recheck toutes les 2 min
+- **Bulletin PDF partage WhatsApp** : jsPDF multi-pages (prévisions, alertes agro, conseils irrigation, saisonnier)
+- **Insights agronomiques** : ETo FAO-56, risque sécheresse (low/moderate/high/critical), fenêtre traitement, semis
+
 ### AgriTogo — Intelligence Décisionnelle
 - **6 agents spécialisés** : Market Intel, Quant Forecast, Risk, Decision, Irrigation, UX
 - **3 modèles LLM** : Gemini (principal), Qwen (débat), Claude (validation)
@@ -163,6 +172,9 @@ Scan QR → FaîtiereHub /api/verify/[card]
 | UI | shadcn/ui (new-york), Tailwind CSS v4, Lucide icons |
 | Backend | Supabase (PostgreSQL, Auth, Storage, RLS) |
 | AI/ML Engine | AgriTogo — Flask 3.1, 6 agents (Gemini/Qwen/Claude), 5 ML models |
+| Météo | Open-Meteo (ECMWF + GFS + ICON), RainViewer, CFS NOAA saisonnier |
+| Chartes | Recharts (nowcast bar chart), Leaflet (radar map) |
+| PDF | jsPDF + jspdf-autotable, Web Share API → WhatsApp |
 | Rate Limiting | Upstash Redis (persistant) + in-memory (fallback) |
 | Déploiement FH | Vercel (Edge + Serverless) |
 | Déploiement AI | Railway |

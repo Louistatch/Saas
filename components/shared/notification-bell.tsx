@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Bell } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -34,7 +34,7 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
-  const channelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
+  const supabase = useMemo(() => createClient(), [])
 
   const unreadCount = notifications.filter((n) => !n.read_at).length
 
@@ -42,7 +42,6 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
     if (!cooperativeId) return
     setLoading(true)
     try {
-      const supabase = createClient()
       const { data } = await supabase
         .from('notifications_inapp')
         .select('id, title, body, type, icon, link, read_at, created_at')
@@ -53,23 +52,17 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
     } finally {
       setLoading(false)
     }
-  }, [cooperativeId])
+  }, [cooperativeId, supabase])
 
   useEffect(() => {
     fetchNotifications()
+  }, [fetchNotifications])
 
+  useEffect(() => {
     if (!cooperativeId) return
 
-    // Guard against React StrictMode double-invocation or fast re-renders:
-    // if a channel is already subscribed, remove it before creating a new one.
-    const supabase = createClient()
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current)
-      channelRef.current = null
-    }
-
     const channel = supabase
-      .channel(`notifs:${cooperativeId}:${Date.now()}`)
+      .channel(`notifs-bell:${cooperativeId}`)
       .on(
         'postgres_changes',
         {
@@ -86,13 +79,10 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
       )
       .subscribe()
 
-    channelRef.current = channel
-
     return () => {
       supabase.removeChannel(channel)
-      channelRef.current = null
     }
-  }, [fetchNotifications, cooperativeId])
+  }, [cooperativeId, supabase])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -108,7 +98,6 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
   const markAsRead = useCallback(
     async (id: string) => {
       try {
-        const supabase = createClient()
         const now = new Date().toISOString()
         await supabase
           .from('notifications_inapp')
@@ -122,14 +111,13 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
         console.error('Failed to mark notification as read:', error)
       }
     },
-    [cooperativeId]
+    [cooperativeId, supabase]
   )
 
   const markAllRead = useCallback(async () => {
     const unread = notifications.filter((n) => !n.read_at)
     if (!unread.length) return
     try {
-      const supabase = createClient()
       const now = new Date().toISOString()
       await supabase
         .from('notifications_inapp')
@@ -140,7 +128,7 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
     } catch (error) {
       console.error('Failed to mark all notifications as read:', error)
     }
-  }, [notifications, cooperativeId])
+  }, [notifications, cooperativeId, supabase])
 
   function formatTime(dateStr: string) {
     const date = new Date(dateStr)

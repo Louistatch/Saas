@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, Users, TrendingUp, BarChart3, Zap, ScanLine } from 'lucide-react'
+import { ArrowRight, Users, TrendingUp, BarChart3, Zap, ScanLine, UserPlus } from 'lucide-react'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
 
 export default function Home() {
@@ -100,6 +100,17 @@ export default function Home() {
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Chaque membre reçoit une carte numérique avec QR code vérifiable, photo d&apos;identité et toutes ses informations.
+            </p>
+            <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
+              Ouvrier agricole, acheteur ou agronome ? Le même scanner vérifie les cartes Haroo —{' '}
+              <Link href="/auth/signup/haroo" className="font-medium text-primary hover:underline">
+                créez votre compte Haroo
+              </Link>{' '}
+              ou{' '}
+              <Link href="/auth/login" className="font-medium text-primary hover:underline">
+                connectez-vous
+              </Link>{' '}
+              pour accéder à l&apos;emploi saisonnier, aux préventes et aux missions d&apos;agronomes.
             </p>
           </div>
           <div className="flex justify-center">
@@ -236,13 +247,26 @@ export default function Home() {
             Prêt à transformer votre coopérative ?
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Rejoignez les coopératives agricoles de la région qui utilisent FaîtiereHub pour connecter leurs membres et grandir ensemble.
+            Rejoignez les coopératives agricoles de la région qui utilisent FaîtiereHub pour connecter leurs membres et grandir ensemble. Vous cherchez plutôt les services Haroo — emploi saisonnier, préventes, missions d&apos;agronomes ? Inscrivez-vous directement sur Haroo.
           </p>
-          <Link href="/auth/signup" className="mt-8 inline-block">
-            <Button size="lg" className="gap-2 bg-primary hover:bg-primary/90">
-              Commencer votre essai gratuit <ArrowRight className="h-4 w-4" />
-            </Button>
-          </Link>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center sm:gap-4">
+            <Link href="/auth/signup">
+              <Button size="lg" className="gap-2 bg-primary hover:bg-primary/90 w-full sm:w-auto">
+                Commencer votre essai gratuit <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+            <Link href="/auth/signup/haroo">
+              <Button size="lg" variant="outline" className="gap-2 w-full sm:w-auto">
+                Créer un compte Haroo <UserPlus className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+          <p className="mt-4 text-sm text-muted-foreground">
+            Déjà inscrit sur Haroo ?{' '}
+            <Link href="/auth/login" className="font-medium text-primary hover:underline">
+              Se connecter
+            </Link>
+          </p>
         </div>
       </section>
     </MarketingLayout>

@@ -165,16 +165,16 @@ export default function DashboardPage() {
   const dotColor: Record<RecentType, string> = {
     member: 'bg-primary',
     card: 'bg-accent',
-    exploitation: 'bg-muted-foreground',
-    scan: 'bg-orange-400',
+    exploitation: 'bg-secondary',
+    scan: 'bg-secondary-foreground',
   }
 
   const statCards = [
     { title: 'Total membres', value: stats.totalMembers, icon: Users, color: 'text-primary', bg: 'bg-primary/10', href: '/dashboard/members' },
-    { title: 'Cartes actives', value: stats.activeCards, icon: CreditCard, color: 'text-primary', bg: 'bg-primary/15', href: '/dashboard/cards' },
-    { title: 'Fiches techniques', value: stats.totalExploitations, icon: ShoppingCart, color: 'text-accent-foreground', bg: 'bg-accent/20', href: '/dashboard/marketplace' },
-    { title: 'Parcelles', value: stats.totalParcelles, icon: MapPin, color: 'text-green-600', bg: 'bg-green-100', href: '/dashboard/parcelles' },
-    { title: 'Scans aujourd\'hui', value: stats.scansToday, icon: ScanLine, color: 'text-orange-600', bg: 'bg-orange-100', href: '#' },
+    { title: 'Cartes actives', value: stats.activeCards, icon: CreditCard, color: 'text-primary', bg: 'bg-primary/10', href: '/dashboard/cards' },
+    { title: 'Fiches techniques', value: stats.totalExploitations, icon: ShoppingCart, color: 'text-accent-foreground', bg: 'bg-accent/15', href: '/dashboard/marketplace' },
+    { title: 'Parcelles', value: stats.totalParcelles, icon: MapPin, color: 'text-accent-foreground', bg: 'bg-accent/15', href: '/dashboard/parcelles' },
+    { title: 'Scans aujourd\'hui', value: stats.scansToday, icon: ScanLine, color: 'text-secondary-foreground', bg: 'bg-secondary/40', href: '#' },
   ]
 
   return (

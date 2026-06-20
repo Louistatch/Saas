@@ -817,7 +817,7 @@ export default function CardsPage() {
                 disabled={savingSettings}
               >
                 {savingSettings ? <Spinner className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
-                Save Settings
+                Enregistrer les paramètres
               </Button>
             </CardContent>
           </Card>
@@ -911,15 +911,15 @@ export default function CardsPage() {
       <Dialog open={showBulk} onOpenChange={setShowBulk}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Bulk Generate Member Cards</DialogTitle>
+            <DialogTitle>Générer des cartes en masse</DialogTitle>
             <DialogDescription>
-              Issuing a new card revokes any existing active card for the selected members.
+              L'émission d'une nouvelle carte révoque toute carte active existante pour les membres sélectionnés.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <Label>
-                Selected: <strong>{bulkSelectedIds.length}</strong> / {members.length}
+                Sélectionnés : <strong>{bulkSelectedIds.length}</strong> / {members.length}
               </Label>
               <div className="flex gap-2">
                 <Button
@@ -928,7 +928,7 @@ export default function CardsPage() {
                   onClick={() => setBulkSelectedIds(filteredBulkMembers.map((m) => m.id))}
                   disabled={filteredBulkMembers.length === 0}
                 >
-                  Select shown
+                  Tout sélectionner
                 </Button>
                 <Button
                   size="sm"
@@ -936,7 +936,7 @@ export default function CardsPage() {
                   onClick={() => setBulkSelectedIds([])}
                   disabled={bulkSelectedIds.length === 0}
                 >
-                  Clear
+                  Effacer
                 </Button>
               </div>
             </div>
@@ -944,7 +944,7 @@ export default function CardsPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 className="pl-10"
-                placeholder="Filter members…"
+                placeholder="Filtrer les membres…"
                 value={bulkSearch}
                 onChange={(e) => setBulkSearch(e.target.value)}
               />
@@ -952,7 +952,7 @@ export default function CardsPage() {
             <div className="border border-border rounded-md p-2 max-h-72 overflow-y-auto">
               {filteredBulkMembers.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-6">
-                  {members.length === 0 ? 'No active members yet' : 'No members match the filter'}
+                  {members.length === 0 ? 'Aucun membre actif' : 'Aucun membre ne correspond au filtre'}
                 </p>
               ) : (
                 <ul className="space-y-1">
@@ -980,7 +980,7 @@ export default function CardsPage() {
               )}
             </div>
             <div className="space-y-2">
-              <Label>Validity (days)</Label>
+              <Label>Validité (jours)</Label>
               <Input
                 type="number"
                 min={1}
@@ -992,7 +992,7 @@ export default function CardsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowBulk(false)} disabled={saving}>
-              Cancel
+              Annuler
             </Button>
             <Button
               className="bg-primary hover:bg-primary/90"
@@ -1000,7 +1000,7 @@ export default function CardsPage() {
               disabled={saving || bulkSelectedIds.length === 0}
             >
               {saving ? <Spinner className="h-4 w-4 mr-2" /> : null}
-              Generate {bulkSelectedIds.length || ''} Card{bulkSelectedIds.length === 1 ? '' : 's'}
+              Générer {bulkSelectedIds.length || ''} carte{bulkSelectedIds.length === 1 ? '' : 's'}
             </Button>
           </DialogFooter>
         </DialogContent>

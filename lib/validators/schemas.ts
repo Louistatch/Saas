@@ -140,6 +140,29 @@ export const accessRequestSchema = z.object({
 export type AccessRequestInput = z.infer<typeof accessRequestSchema>
 
 /**
+ * Inscription d'un professionnel Haroo (OUVRIER / ACHETEUR / AGRONOME).
+ * Le compte est créé dans la Supabase partagée via le backend AgriTogo
+ * (POST /api/v1/haroo/auth/register).
+ */
+export const harooSignupSchema = z.object({
+  profileType: z.enum(['OUVRIER', 'ACHETEUR', 'AGRONOME']),
+  firstName: z.string().trim().min(2, 'Le prénom est requis').max(100),
+  lastName: z.string().trim().min(2, 'Le nom est requis').max(100),
+  phone: z
+    .string()
+    .trim()
+    .min(8, 'Le téléphone est requis')
+    .max(40)
+    .regex(/^[+0-9 ()\-.]*$/, 'Le téléphone ne peut contenir que des chiffres, espaces et + - ( )'),
+  email: emailSchema,
+  password: z
+    .string()
+    .min(8, 'Le mot de passe doit contenir au moins 8 caractères')
+    .max(128),
+})
+export type HarooSignupInput = z.infer<typeof harooSignupSchema>
+
+/**
  * Returns a flat object of `{ field: firstError }` for use with the
  * imperative form patterns already in the app.
  */

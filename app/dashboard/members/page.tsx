@@ -492,7 +492,7 @@ export default function MembersPage() {
                                   variant="outline"
                                   className="border-border text-destructive hover:bg-destructive/10"
                                   onClick={() => handleDelete(member)}
-                                  aria-label={`Delete ${member.first_name}`}
+                                  aria-label={`Supprimer ${member.first_name} ${member.last_name}`}
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>

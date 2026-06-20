@@ -142,6 +142,17 @@ export default function TechniciensPage() {
     return <div className="p-8 text-muted-foreground">Chargement de la coopérative…</div>
   }
 
+  if (currentCooperative.level !== 'faitiere') {
+    return (
+      <div className="p-8 space-y-2">
+        <p className="text-lg font-semibold text-foreground">Accès restreint</p>
+        <p className="text-muted-foreground">
+          La gestion des techniciens est réservée aux faîtières. Votre coopérative n&apos;a pas accès à cette fonctionnalité.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-8 py-2">
       <div className="flex items-center gap-3">

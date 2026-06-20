@@ -450,6 +450,36 @@ export async function enrollNewMemberFromSubmission(
     })
     .eq('id', submissionId)
 
+  // Queue welcome SMS — fire-and-forget, never blocks enrollment
+  if (telephone) {
+    const { data: tpl } = await supabase
+      .from('notification_templates')
+      .select('body_fr')
+      .eq('key', 'enrollment_welcome')
+      .eq('channel', 'sms')
+      .maybeSingle()
+
+    const body = (tpl?.body_fr ?? '')
+      .replace('{prenom}', firstName)
+      .replace('{card_number}', cardNumber)
+      .replace(/{card_number}/g, cardNumber)
+
+    if (body) {
+      await supabase.from('notification_queue').insert({
+        member_id: newMember.id,
+        cooperative_id: targetCooperativeId,
+        channel: 'sms',
+        template_key: 'enrollment_welcome',
+        recipient_phone: telephone.trim(),
+        variables: { prenom: firstName, card_number: cardNumber },
+        body_rendered: body,
+        scheduled_at: new Date().toISOString(),
+      }).then(({ error }) => {
+        if (error) log.warn('Welcome SMS queue failed', { error: error.message })
+      })
+    }
+  }
+
   log.info('New member enrolled via KoboCollect', {
     memberId: newMember.id,
     cardNumber,

@@ -26,11 +26,16 @@ export async function GET(
   const supabaseAdmin = createAdminClient()
   const { data: parcelles } = await supabaseAdmin
     .from('parcelles')
-    .select('name, culture_principale, superficie_ha, created_at')
+    .select('name, culture_principale, culture_name, superficie_ha, surface_ha, soil_type, irrigation_type, gps_coordinates, campaign_year, source, created_at')
     .eq('member_id', card.member_id)
     .order('created_at', { ascending: false })
 
-  const total_ha = (parcelles ?? []).reduce((s, p) => s + (p.superficie_ha ?? 0), 0)
+  const list = parcelles ?? []
+  const total_ha = list.reduce((s, p) => s + (p.superficie_ha ?? p.surface_ha ?? 0), 0)
+  const cultures = [...new Set(list.map((p) => p.culture_principale ?? p.culture_name).filter(Boolean))]
 
-  return NextResponse.json({ parcelles: parcelles ?? [], total_ha }, { headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=300' } })
+  return NextResponse.json(
+    { parcelles: list, total_ha, cultures },
+    { headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=300' } },
+  )
 }
