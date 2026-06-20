@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Bell } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -34,7 +34,7 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
-  const supabase = useMemo(() => createClient(), [])
+  const mountIdRef = useRef(0)
 
   const unreadCount = notifications.filter((n) => !n.read_at).length
 
@@ -42,6 +42,7 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
     if (!cooperativeId) return
     setLoading(true)
     try {
+      const supabase = createClient()
       const { data } = await supabase
         .from('notifications_inapp')
         .select('id, title, body, type, icon, link, read_at, created_at')
@@ -52,7 +53,7 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
     } finally {
       setLoading(false)
     }
-  }, [cooperativeId, supabase])
+  }, [cooperativeId])
 
   useEffect(() => {
     fetchNotifications()
@@ -61,8 +62,13 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
   useEffect(() => {
     if (!cooperativeId) return
 
+    // Unique channel name per mount so Supabase always creates a fresh
+    // channel object — prevents "cannot add postgres_changes callbacks after
+    // subscribe()" in React StrictMode (double-invoke) and on fast re-renders.
+    const id = ++mountIdRef.current
+    const supabase = createClient()
     const channel = supabase
-      .channel(`notifs-bell:${cooperativeId}`)
+      .channel(`notifs-bell:${cooperativeId}:${id}`)
       .on(
         'postgres_changes',
         {
@@ -82,7 +88,7 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [cooperativeId, supabase])
+  }, [cooperativeId])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -98,6 +104,7 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
   const markAsRead = useCallback(
     async (id: string) => {
       try {
+        const supabase = createClient()
         const now = new Date().toISOString()
         await supabase
           .from('notifications_inapp')
@@ -111,13 +118,14 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
         console.error('Failed to mark notification as read:', error)
       }
     },
-    [cooperativeId, supabase]
+    [cooperativeId]
   )
 
   const markAllRead = useCallback(async () => {
     const unread = notifications.filter((n) => !n.read_at)
     if (!unread.length) return
     try {
+      const supabase = createClient()
       const now = new Date().toISOString()
       await supabase
         .from('notifications_inapp')
@@ -128,7 +136,7 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
     } catch (error) {
       console.error('Failed to mark all notifications as read:', error)
     }
-  }, [notifications, cooperativeId, supabase])
+  }, [notifications, cooperativeId])
 
   function formatTime(dateStr: string) {
     const date = new Date(dateStr)
