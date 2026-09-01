@@ -8,6 +8,8 @@ import { useCooperative } from '@/app/context/cooperative-context'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { PageHeader } from '@/components/shared/page-header'
+import { Skeleton } from '@/components/shared/loading'
+import { useToast } from '@/hooks/use-toast'
 
 interface InAppNotification {
   id: string
@@ -47,6 +49,7 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
   const router = useRouter()
+  const { toast } = useToast()
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
@@ -59,11 +62,15 @@ export default function NotificationsPage() {
       .eq('cooperative_id', currentCooperative.id)
       .order('created_at', { ascending: false })
       .limit(100)
-      .then(({ data }) => {
-        if (data) setNotifications(data as InAppNotification[])
+      .then(({ data, error }) => {
+        if (error) {
+          toast({ title: 'Erreur', description: 'Impossible de charger les notifications', variant: 'destructive' })
+        } else if (data) {
+          setNotifications(data as InAppNotification[])
+        }
         setLoading(false)
       })
-  }, [currentCooperative, supabase])
+  }, [currentCooperative, supabase, toast])
 
   useEffect(() => {
     if (!currentCooperative) return
@@ -86,33 +93,53 @@ export default function NotificationsPage() {
   const markAsRead = async (id: string) => {
     if (!currentCooperative) return
     const now = new Date().toISOString()
-    await supabase
+    const { error } = await supabase
       .from('notifications_inapp')
       .update({ read_at: now })
       .eq('id', id)
       .eq('cooperative_id', currentCooperative.id)
+    if (error) {
+      toast({ title: 'Erreur', description: 'Impossible de marquer comme lu', variant: 'destructive' })
+      return
+    }
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read_at: now } : n))
   }
 
   const markAllRead = async () => {
     if (!currentCooperative) return
     const now = new Date().toISOString()
-    await supabase
+    const { error } = await supabase
       .from('notifications_inapp')
       .update({ read_at: now })
       .eq('cooperative_id', currentCooperative.id)
       .is('read_at', null)
+    if (error) {
+      toast({ title: 'Erreur', description: 'Impossible de tout marquer comme lu', variant: 'destructive' })
+      return
+    }
     setNotifications(prev => prev.map(n => ({ ...n, read_at: n.read_at ?? now })))
   }
 
   const deleteNotification = async (id: string) => {
     if (!currentCooperative) return
-    await supabase
+    // Optimistic update
+    setNotifications(prev => prev.filter(n => n.id !== id))
+    const { error } = await supabase
       .from('notifications_inapp')
       .delete()
       .eq('id', id)
       .eq('cooperative_id', currentCooperative.id)
-    setNotifications(prev => prev.filter(n => n.id !== id))
+    if (error) {
+      // Rollback
+      toast({ title: 'Erreur', description: 'Impossible de supprimer la notification', variant: 'destructive' })
+      supabase
+        .from('notifications_inapp')
+        .select('id, title, body, type, icon, link, read_at, created_at')
+        .eq('cooperative_id', currentCooperative.id)
+        .order('created_at', { ascending: false })
+        .limit(100)
+        .then(({ data }) => { if (data) setNotifications(data as InAppNotification[]) })
+    }
   }
 
   const visible = filter === 'unread'
@@ -152,13 +179,23 @@ export default function NotificationsPage() {
         ))}
       </div>
 
-      {/* Notifications list */}
+      {/* Loading skeleton */}
       {loading && (
-        <div className="py-12 text-center text-muted-foreground">
-          Chargement…
+        <div className="space-y-3">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex gap-4 rounded-xl border border-border p-4">
+              <Skeleton className="h-5 w-5 rounded-full flex-shrink-0 mt-0.5" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-48" />
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
+      {/* Empty state */}
       {!loading && visible.length === 0 && (
         <div className="py-16 text-center space-y-2">
           <Bell className="h-10 w-10 text-muted-foreground/40 mx-auto" />
@@ -168,63 +205,66 @@ export default function NotificationsPage() {
         </div>
       )}
 
-      <div className="space-y-2">
-        {visible.map(notif => {
-          const config = TYPE_CONFIG[notif.type] ?? TYPE_CONFIG.info
-          const Icon = config.icon
-          return (
-            <div
-              key={notif.id}
-              className={cn(
-                'group flex gap-4 rounded-xl border border-border p-4 transition-colors',
-                !notif.read_at ? config.bg : 'bg-background',
-                notif.link && 'cursor-pointer hover:bg-muted/50'
-              )}
-              onClick={() => {
-                if (!notif.read_at) markAsRead(notif.id)
-                if (notif.link) router.push(notif.link)
-              }}
-            >
-              <div className="mt-0.5 flex-shrink-0">
-                <Icon className={cn('h-5 w-5', config.className)} />
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <p className={cn('text-sm font-semibold', !notif.read_at ? 'text-foreground' : 'text-muted-foreground')}>
-                    {notif.icon && <span className="mr-1.5">{notif.icon}</span>}
-                    {notif.title}
-                  </p>
-                  {!notif.read_at && (
-                    <span className="mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-primary" />
-                  )}
-                </div>
-                <p className="mt-0.5 text-sm text-muted-foreground line-clamp-2">{notif.body}</p>
-                <p className="mt-1 text-xs text-muted-foreground/60">{formatTime(notif.created_at)}</p>
-              </div>
-
-              <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                {!notif.read_at && (
-                  <button
-                    onClick={e => { e.stopPropagation(); markAsRead(notif.id) }}
-                    className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground"
-                    title="Marquer lu"
-                  >
-                    <CheckCheck className="h-4 w-4" />
-                  </button>
+      {/* Notifications list */}
+      {!loading && (
+        <div className="space-y-2">
+          {visible.map(notif => {
+            const config = TYPE_CONFIG[notif.type] ?? TYPE_CONFIG.info
+            const Icon = config.icon
+            return (
+              <div
+                key={notif.id}
+                className={cn(
+                  'group flex gap-4 rounded-xl border border-border p-4 transition-colors',
+                  !notif.read_at ? config.bg : 'bg-background',
+                  notif.link && 'cursor-pointer hover:bg-muted/50'
                 )}
-                <button
-                  onClick={e => { e.stopPropagation(); deleteNotification(notif.id) }}
-                  className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-600 dark:hover:bg-red-950/30"
-                  title="Supprimer"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                onClick={() => {
+                  if (!notif.read_at) markAsRead(notif.id)
+                  if (notif.link) router.push(notif.link)
+                }}
+              >
+                <div className="mt-0.5 flex-shrink-0">
+                  <Icon className={cn('h-5 w-5', config.className)} />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className={cn('text-sm font-semibold', !notif.read_at ? 'text-foreground' : 'text-muted-foreground')}>
+                      {notif.icon && <span className="mr-1.5">{notif.icon}</span>}
+                      {notif.title}
+                    </p>
+                    {!notif.read_at && (
+                      <span className="mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-primary" />
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-sm text-muted-foreground line-clamp-2">{notif.body}</p>
+                  <p className="mt-1 text-xs text-muted-foreground/60">{formatTime(notif.created_at)}</p>
+                </div>
+
+                <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                  {!notif.read_at && (
+                    <button
+                      onClick={e => { e.stopPropagation(); markAsRead(notif.id) }}
+                      className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground"
+                      title="Marquer lu"
+                    >
+                      <CheckCheck className="h-4 w-4" />
+                    </button>
+                  )}
+                  <button
+                    onClick={e => { e.stopPropagation(); deleteNotification(notif.id) }}
+                    className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-600 dark:hover:bg-red-950/30"
+                    title="Supprimer"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
