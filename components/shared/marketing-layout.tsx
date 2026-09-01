@@ -153,7 +153,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
                 <h4 className="font-semibold text-foreground mb-4">{column.title}</h4>
                 <ul className="space-y-2">
                   {column.links.map((link) => (
-                    <li key={link.href}>
+                    <li key={link.label}>
                       <Link
                         href={link.href}
                         className="text-sm text-muted-foreground hover:text-foreground transition-colors"
