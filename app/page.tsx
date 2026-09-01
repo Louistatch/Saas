@@ -17,6 +17,7 @@ import {
   Briefcase,
   Sprout,
   Network,
+  Link2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
@@ -273,25 +274,14 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Floating member card */}
-            <div className="absolute -bottom-8 -right-4 hidden sm:block w-48 rotate-3 hover:rotate-0 transition-transform duration-500">
-              <div className="rounded-xl overflow-hidden border-2 border-white/20 shadow-2xl">
-                <div className="bg-gradient-to-br from-green-700 to-green-900 p-3.5 text-white">
-                  <div className="flex justify-between items-start mb-3">
-                    <span className="text-[10px] font-bold tracking-wide opacity-80">FaîtiereHub</span>
-                    <span className="rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-semibold">GOLD</span>
-                  </div>
-                  <div className="h-10 w-10 rounded-full bg-white/20 border-2 border-white/30 flex items-center justify-center text-lg mb-2">
-                    👤
-                  </div>
-                  <div className="text-sm font-bold leading-tight">Abla AKWA</div>
-                  <div className="text-[9px] font-mono opacity-60 mt-0.5">ALL-64706</div>
-                  <div className="flex justify-between items-end mt-2.5">
-                    <span className="text-[8px] opacity-50 max-w-[80px] leading-tight">Coop. Agricole d'Allada</span>
-                    <span className="text-lg">⊞</span>
-                  </div>
-                </div>
-              </div>
+            {/* Floating member card — vraie carte du projet, pas un mockup CSS */}
+            <div className="absolute -bottom-10 -right-6 hidden sm:block w-64 md:w-72 rotate-3 hover:rotate-0 transition-transform duration-500">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/showcase-card.webp"
+                alt="Carte membre FaîtiereHub — Abla AKWA, ALL-64706"
+                className="w-full h-auto rounded-xl shadow-2xl border-2 border-white/20"
+              />
             </div>
           </div>
         </div>
@@ -313,7 +303,9 @@ export default function Home() {
             </div>
             <div className="flex items-center justify-center">
               <div className="text-center">
-                <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full border-2 border-border bg-background text-xl">🔗</div>
+                <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full border-2 border-border bg-background">
+                  <Link2 className="h-5 w-5 text-muted-foreground" />
+                </div>
                 <div className="text-xs font-semibold text-muted-foreground">Même scanner QR<br />Même base de données</div>
               </div>
             </div>
