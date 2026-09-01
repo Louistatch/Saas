@@ -125,9 +125,28 @@ export default function CotisationsPage() {
       .from('cotisations')
       .select('*, member:members(id, first_name, last_name, phone)', { count: 'exact' })
       .eq('cooperative_id', currentCooperative.id)
-    query = query.order('created_at', { ascending: false })
+      .order('created_at', { ascending: false })
 
     if (filterStatus) query = query.eq('status', filterStatus)
+
+    // Server-side search: find matching member IDs first, then filter cotisations
+    // (PostgREST does not support ilike on embedded foreign-table columns via .or())
+    if (debouncedSearch.trim()) {
+      const q = `%${debouncedSearch.trim()}%`
+      const { data: matchedMembers } = await supabase
+        .from('members')
+        .select('id')
+        .eq('cooperative_id', currentCooperative.id)
+        .or(`first_name.ilike.${q},last_name.ilike.${q}`)
+      const ids = (matchedMembers ?? []).map(m => m.id)
+      if (ids.length === 0) {
+        setCotisations([])
+        setTotal(0)
+        setIsLoading(false)
+        return
+      }
+      query = query.in('member_id', ids)
+    }
 
     const from = (page - 1) * PAGE_SIZE
     query = query.range(from, from + PAGE_SIZE - 1)
@@ -136,22 +155,14 @@ export default function CotisationsPage() {
     if (error) {
       toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })
     } else {
-      let filtered = (data ?? []) as Cotisation[]
-      if (debouncedSearch.trim()) {
-        const q = debouncedSearch.toLowerCase()
-        filtered = filtered.filter((c) => {
-          const name = c.member ? `${c.member.first_name} ${c.member.last_name}`.toLowerCase() : ''
-          return name.includes(q)
-        })
-      }
-      setCotisations(filtered)
+      setCotisations((data ?? []) as Cotisation[])
       setTotal(count ?? 0)
     }
     setIsLoading(false)
-  }, [currentCooperative, supabase, filterStatus, page, toast])
+  }, [currentCooperative, supabase, filterStatus, debouncedSearch, page, toast])
 
   useEffect(() => { fetchCotisations() }, [fetchCotisations])
-  useEffect(() => { setPage(1) }, [filterStatus])
+  useEffect(() => { setPage(1) }, [filterStatus, debouncedSearch])
 
   // Add cotisation
   const handleAdd = async () => {
