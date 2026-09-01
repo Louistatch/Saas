@@ -3,12 +3,12 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { BarChart3, Users, ShoppingCart, CreditCard, ArrowRight, MapPin, ScanLine } from 'lucide-react'
+import { BarChart3, Users, ShoppingCart, CreditCard, ArrowRight, MapPin, ScanLine, BookOpen, ShoppingBag, GraduationCap } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { useAuth } from '@/app/context/auth-context'
-import { Spinner, LoadingBlock } from '@/components/shared/loading'
+import { Skeleton } from '@/components/shared/loading'
 import { PageHeader } from '@/components/shared/page-header'
 import { AgriScoreWidget } from '@/components/dashboard/agri-score-widget'
 import { timeAgo } from '@/lib/utils/time'
@@ -178,7 +178,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-foreground">
-                  {isLoading ? <Spinner className="h-5 w-5" /> : stat.value}
+                  {isLoading ? <Skeleton className="h-7 w-12" /> : stat.value}
                 </div>
               </CardContent>
             </Card>
@@ -202,7 +202,9 @@ export default function DashboardPage() {
             {[
               { href: '/dashboard/members', icon: Users, label: 'Ajouter un membre' },
               { href: '/dashboard/cards', icon: CreditCard, label: 'Générer des cartes membres' },
-              { href: '/dashboard/parcelles', icon: MapPin, label: 'Consulter les parcelles' },
+              { href: '/dashboard/agrimarket', icon: ShoppingBag, label: 'Publier une offre AgriMarket' },
+              { href: '/dashboard/credit', icon: BookOpen, label: 'Gérer les crédits agricoles' },
+              { href: '/dashboard/academy', icon: GraduationCap, label: 'Modules de formation' },
               { href: '/dashboard/analytics', icon: BarChart3, label: 'Voir les statistiques' },
             ].map(({ href, icon: Icon, label }) => (
               <Link key={href} href={href} className="block">
@@ -222,7 +224,17 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <LoadingBlock />
+              <div className="space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="flex items-center justify-between py-1">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-2 w-2 rounded-full flex-shrink-0" />
+                      <Skeleton className="h-4 w-48" />
+                    </div>
+                    <Skeleton className="h-3 w-12" />
+                  </div>
+                ))}
+              </div>
             ) : recent.length === 0 ? (
               <div className="py-6 text-center space-y-3">
                 <p className="text-muted-foreground text-sm">Aucune activité pour le moment</p>

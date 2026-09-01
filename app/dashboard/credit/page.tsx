@@ -12,6 +12,7 @@ import { Progress } from '@/components/ui/progress'
 import { useAuth } from '@/app/context/auth-context'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { CreditCard, TrendingUp, CheckCircle, Clock, ChevronRight } from 'lucide-react'
+import { Skeleton } from '@/components/shared/loading'
 
 interface CreditApplication {
   id: string
@@ -55,6 +56,7 @@ export default function AgriCreditPage() {
   const { currentCooperative } = useCooperative()
   const [applications, setApplications] = useState<CreditApplication[]>([])
   const [selected, setSelected] = useState<CreditApplication | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [isAdmin] = useState(user?.role === 'super_admin' || user?.role === 'cooperative_admin')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [scoring, setScoring] = useState<ScoringResult | null>(null)
@@ -64,8 +66,10 @@ export default function AgriCreditPage() {
 
   const load = useCallback(async () => {
     if (!currentCooperative) return
+    setIsLoading(true)
     const res = await fetch(`/api/credit/applications`)
     if (res.ok) { const d = await res.json(); setApplications(d.applications) }
+    setIsLoading(false)
   }, [currentCooperative])
 
   useEffect(() => { void load() }, [load])
@@ -153,7 +157,9 @@ export default function AgriCreditPage() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
+        {isLoading ? [...Array(4)].map((_, i) => (
+          <Card key={i}><CardContent className="pt-4"><div className="flex items-center gap-3"><Skeleton className="h-8 w-8 rounded-md" /><div className="space-y-1"><Skeleton className="h-5 w-14" /><Skeleton className="h-3 w-20" /></div></div></CardContent></Card>
+        )) : [
           { label: 'En cours', value: active.length, icon: Clock, color: 'text-blue-600' },
           { label: 'Encours FCFA', value: totalEncours.toLocaleString('fr-FR'), icon: TrendingUp, color: 'text-green-600' },
           { label: 'Taux remboursement', value: `${repayRate}%`, icon: CheckCircle, color: 'text-emerald-600' },
