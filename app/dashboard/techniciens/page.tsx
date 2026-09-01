@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { PhoneCall, Trash2, Plus, UserCog, Save } from 'lucide-react'
+import { PageHeader } from '@/components/shared/page-header'
 
 interface Technicien {
   id: string
@@ -155,17 +156,10 @@ export default function TechniciensPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 py-2">
-      <div className="flex items-center gap-3">
-        <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center">
-          <UserCog className="h-6 w-6 text-primary" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Techniciens</h1>
-          <p className="text-sm text-muted-foreground">
-            Un technicien par canton. Les producteurs de ce canton pourront l&apos;appeler depuis leur carte.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Techniciens"
+        description="Un technicien par canton. Les producteurs pourront l'appeler depuis leur carte membre."
+      />
 
       {/* SE / Coordonnateur */}
       <section className="rounded-xl border border-border bg-card p-5 space-y-4">

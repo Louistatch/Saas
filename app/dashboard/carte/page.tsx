@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { TogoMap } from '@/components/map/togo-map'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { X } from 'lucide-react'
+import { PageHeader } from '@/components/shared/page-header'
 
 type Metric = 'members' | 'parcelles' | 'surface_ha'
 
@@ -69,10 +70,10 @@ export default function CartePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Carte Agricole 🗺️</h1>
-        <p className="text-sm text-muted-foreground">Répartition géographique des membres et parcelles</p>
-      </div>
+      <PageHeader
+        title="Carte Agricole"
+        description="Répartition géographique des membres et parcelles par préfecture"
+      />
 
       <div className="flex gap-2 flex-wrap">
         {(['members','parcelles','surface_ha'] as Metric[]).map(m => (

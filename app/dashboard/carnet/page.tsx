@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/table'
 import { useAuth } from '@/app/context/auth-context'
 import { useCooperative } from '@/app/context/cooperative-context'
+import { PageHeader } from '@/components/shared/page-header'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1005,11 +1006,11 @@ export default function CarnetAgricolePage() {
   }, [cooperativeId, campagnes, selectedMemberId])
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Carnet Agricole 📗</h1>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Carnet Agricole"
+        description="Suivez vos campagnes, activités et intrants agricoles"
+      />
 
       {/* Member selector for admins */}
       {isAdmin && (

@@ -180,7 +180,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title={`Bienvenue${user?.firstName ? `, ${user.firstName}` : ''} 👋`}
+        title={`Bienvenue${user?.firstName ? `, ${user.firstName}` : ''}`}
         description={`${currentCooperative?.name ?? 'Votre coopérative'} — voici ce qui se passe aujourd'hui`}
       />
 

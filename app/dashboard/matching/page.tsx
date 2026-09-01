@@ -24,6 +24,7 @@ import {
 import { Handshake, Plus, CheckCircle, XCircle, Users, Zap } from 'lucide-react'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { useToast } from '@/hooks/use-toast'
+import { PageHeader } from '@/components/shared/page-header'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -257,17 +258,16 @@ export default function MatchingPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Handshake className="h-7 w-7 text-primary" />
-          <h1 className="text-2xl font-bold text-foreground">Matching Acheteurs 🤝</h1>
-        </div>
-        <Button onClick={() => setShowDialog(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nouvelle demande
-        </Button>
-      </div>
+      <PageHeader
+        title="Matching Acheteurs"
+        description="Connectez vos membres aux acheteurs et facilitez les transactions"
+        action={
+          <Button onClick={() => setShowDialog(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Nouvelle demande
+          </Button>
+        }
+      />
 
       {/* Stats row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

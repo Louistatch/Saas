@@ -13,6 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { useAuth } from '@/app/context/auth-context'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { BookOpen, Play, HelpCircle, CheckSquare, GraduationCap, Plus, Clock } from 'lucide-react'
+import { PageHeader } from '@/components/shared/page-header'
 
 interface AcademyModule {
   id: string
@@ -101,12 +102,10 @@ export default function AgriAcademyPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2"><GraduationCap className="h-7 w-7 text-green-600" /> AgriAcademy</h1>
-          <p className="text-sm text-muted-foreground">Formations agricoles pour coopérateurs</p>
-        </div>
-        {isAdmin && (
+      <PageHeader
+        title="AgriAcademy"
+        description="Formations agricoles pour coopérateurs"
+        action={isAdmin ? (
           <Dialog open={moduleDialog} onOpenChange={setModuleDialog}>
             <DialogTrigger asChild><Button className="gap-2"><Plus className="h-4 w-4" /> Créer un module</Button></DialogTrigger>
             <DialogContent>
@@ -128,8 +127,8 @@ export default function AgriAcademyPage() {
               </div>
             </DialogContent>
           </Dialog>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       {/* Filters */}
       <div className="space-y-2">

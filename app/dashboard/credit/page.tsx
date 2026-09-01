@@ -13,6 +13,7 @@ import { useAuth } from '@/app/context/auth-context'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { CreditCard, TrendingUp, CheckCircle, Clock, ChevronRight } from 'lucide-react'
 import { Skeleton } from '@/components/shared/loading'
+import { PageHeader } from '@/components/shared/page-header'
 
 interface CreditApplication {
   id: string
@@ -47,6 +48,17 @@ const STATUS_BADGE: Record<string, string> = {
   repaying: 'bg-teal-100 text-teal-700',
   closed: 'bg-slate-100 text-slate-600',
   defaulted: 'bg-red-200 text-red-900',
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  pending: 'En attente',
+  scoring: 'Analyse',
+  approved: 'Approuvé',
+  rejected: 'Refusé',
+  disbursed: 'Décaissé',
+  repaying: 'Remboursement',
+  closed: 'Clôturé',
+  defaulted: 'Défaut',
 }
 
 const GRADE_COLOR: Record<string, string> = { A: 'bg-green-100 text-green-800', B: 'bg-lime-100 text-lime-800', C: 'bg-yellow-100 text-yellow-800', D: 'bg-orange-100 text-orange-800', F: 'bg-red-100 text-red-800' }
@@ -109,12 +121,10 @@ export default function AgriCreditPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">AgriCredit 💳</h1>
-          <p className="text-sm text-muted-foreground">Crédit agricole et microfinance coopérative</p>
-        </div>
-        {isAdmin && (
+      <PageHeader
+        title="AgriCredit"
+        description="Crédit agricole et microfinance coopérative"
+        action={isAdmin ? (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild><Button className="gap-2"><CreditCard className="h-4 w-4" /> Nouvelle demande</Button></DialogTrigger>
             <DialogContent className="max-w-lg">
@@ -153,8 +163,8 @@ export default function AgriCreditPage() {
               )}
             </DialogContent>
           </Dialog>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {isLoading ? [...Array(4)].map((_, i) => (
@@ -193,7 +203,7 @@ export default function AgriCreditPage() {
                         )}
                       </td>
                       <td className="px-4 py-3">{a.credit_grade && <Badge className={GRADE_COLOR[a.credit_grade] ?? ''}>{a.credit_grade}</Badge>}</td>
-                      <td className="px-4 py-3"><Badge className={STATUS_BADGE[a.status] ?? ''}>{a.status}</Badge></td>
+                      <td className="px-4 py-3"><Badge className={STATUS_BADGE[a.status] ?? ''}>{STATUS_LABEL[a.status] ?? a.status}</Badge></td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1">
                           {isAdmin && a.status === 'scoring' && <>
@@ -227,7 +237,7 @@ export default function AgriCreditPage() {
                         <td className="px-4 py-3">{r.due_date}</td>
                         <td className="px-4 py-3">{r.amount_due_fcfa.toLocaleString('fr-FR')} F</td>
                         <td className="px-4 py-3">{(r.amount_paid_fcfa ?? 0).toLocaleString('fr-FR')} F</td>
-                        <td className="px-4 py-3"><Badge className={r.status === 'paid' ? 'bg-green-100 text-green-700' : r.status === 'overdue' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}>{r.status}</Badge></td>
+                        <td className="px-4 py-3"><Badge className={r.status === 'paid' ? 'bg-green-100 text-green-700' : r.status === 'overdue' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}>{r.status === 'paid' ? 'Payé' : r.status === 'overdue' ? 'En retard' : r.status === 'partial' ? 'Partiel' : 'En attente'}</Badge></td>
                         <td className="px-4 py-3">
                           {r.status !== 'paid' && isAdmin && (
                             <div className="flex gap-2 items-center">

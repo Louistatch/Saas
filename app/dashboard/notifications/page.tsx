@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { Bell, CheckCheck, Trash2, Info, CheckCircle, AlertTriangle, AlertCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { PageHeader } from '@/components/shared/page-header'
 
 interface InAppNotification {
   id: string
@@ -44,6 +46,7 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<InAppNotification[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
+  const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
@@ -120,26 +123,16 @@ export default function NotificationsPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-            <Bell className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-foreground">Notifications</h1>
-            {unreadCount > 0 && (
-              <p className="text-sm text-muted-foreground">{unreadCount} non lue{unreadCount > 1 ? 's' : ''}</p>
-            )}
-          </div>
-        </div>
-        {unreadCount > 0 && (
+      <PageHeader
+        title="Notifications"
+        description={unreadCount > 0 ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}` : 'Toutes vos notifications'}
+        action={unreadCount > 0 ? (
           <Button variant="outline" size="sm" onClick={markAllRead} className="gap-2">
             <CheckCheck className="h-4 w-4" />
             Tout marquer lu
           </Button>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       {/* Filter tabs */}
       <div className="flex gap-2 border-b border-border">
@@ -189,7 +182,7 @@ export default function NotificationsPage() {
               )}
               onClick={() => {
                 if (!notif.read_at) markAsRead(notif.id)
-                if (notif.link) window.location.href = notif.link
+                if (notif.link) router.push(notif.link)
               }}
             >
               <div className="mt-0.5 flex-shrink-0">
