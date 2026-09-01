@@ -8,23 +8,32 @@ import { AuthButtons } from '@/components/shared/auth-buttons'
 
 const headerLinks = [
   { href: '/produit', label: 'Produit' },
-  { href: '/marketplace', label: 'Comptes d\'exploitation' },
+  { href: '/features', label: 'Fonctionnalités' },
   { href: '/pricing', label: 'Tarifs' },
-  { href: '/securite', label: 'Sécurité' },
+  { href: '/#haroo', label: 'Haroo', highlight: true },
   { href: '/a-propos', label: 'À propos' },
   { href: '/contact', label: 'Contact' },
 ]
 
 const footerColumns = [
   {
-    title: 'Produit',
+    title: 'FaîtiereHub',
     links: [
-      { href: '/produit', label: 'Produit' },
-      { href: '/marketplace', label: 'Comptes d\'exploitation' },
+      { href: '/features', label: 'Fonctionnalités' },
       { href: '/pricing', label: 'Tarifs' },
+      { href: '/marketplace', label: "Comptes d'exploitation" },
       { href: '/securite', label: 'Sécurité' },
       { href: '/blog', label: 'Blog' },
-      { href: '/auth/signup/haroo', label: 'Services Haroo' },
+    ],
+  },
+  {
+    title: 'Haroo',
+    links: [
+      { href: '/#haroo', label: "Qu'est-ce que Haroo ?" },
+      { href: '/auth/signup/haroo', label: 'Créer un profil Haroo' },
+      { href: '/auth/signup/haroo', label: 'Ouvrier agricole' },
+      { href: '/auth/signup/haroo', label: 'Acheteur' },
+      { href: '/auth/signup/haroo', label: 'Agronome' },
     ],
   },
   {
@@ -63,7 +72,11 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
               <Link
                 key={link.href}
                 href={link.href}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className={
+                  link.highlight
+                    ? 'text-sm font-semibold text-amber-700 hover:text-amber-900 transition-colors'
+                    : 'text-sm text-muted-foreground hover:text-foreground transition-colors'
+                }
               >
                 {link.label}
               </Link>
@@ -121,7 +134,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
       {/* Footer */}
       <footer className="border-t border-border bg-background">
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <div className="grid gap-8 md:grid-cols-4">
+          <div className="grid gap-8 md:grid-cols-5">
             <div className="space-y-4">
               <Logo size="sm" />
               <p className="text-sm text-muted-foreground">
