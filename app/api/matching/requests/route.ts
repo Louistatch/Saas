@@ -116,9 +116,15 @@ export async function POST(request: NextRequest) {
     // Auto-run matching: fetch active listings for same culture
     const { data: listings } = await supabase
       .from('market_listings')
-      .select('id, culture, quantity_kg, price_per_kg_fcfa, quality_grade, location_prefecture, cooperatives(name)')
+      .select('id, culture, quantity_kg, price_per_kg_fcfa, quality_grade, location_prefecture, cooperative_id, cooperatives(name)')
       .eq('culture', String(culture))
       .eq('status', 'active')
+
+    const listingCooperativeIds = new Map<string, string>(
+      (listings ?? [])
+        .filter((l) => l.cooperative_id)
+        .map((l) => [l.id as string, l.cooperative_id as string]),
+    )
 
     const listingSummaries: ListingSummary[] = (listings ?? []).map((l) => ({
       id: l.id as string,
@@ -151,16 +157,22 @@ export async function POST(request: NextRequest) {
         })),
       )
 
-      // Notify matched parties via notification_queue (fire-and-forget)
-      void Promise.resolve(supabase.from('notification_queue').insert(
-        top5.map((m) => ({
-          type: 'match_found',
-          cooperative_id: cooperative_id ? String(cooperative_id) : null,
-          payload: { match_id: m.listing_id ?? null, request_id: newRequest.id ?? null },
-          status: 'pending',
-          attempts: 0,
-        }))
-      )).catch(() => null)
+      // Notify the seller cooperatives behind each matched listing
+      // (in-app bell notification — fire-and-forget, never blocks the response)
+      const matchedCooperativeIds = [
+        ...new Set(top5.map((m) => listingCooperativeIds.get(m.listing_id)).filter((id): id is string => !!id)),
+      ]
+      const inAppRows = matchedCooperativeIds.map((coopId) => ({
+        cooperative_id: coopId,
+        title: 'Nouvelle demande acheteur',
+        body: `Une demande d'achat pour ${String(culture)} correspond à une de vos annonces.`,
+        type: 'info' as const,
+        link: '/dashboard/matching',
+      }))
+
+      if (inAppRows.length > 0) {
+        void Promise.resolve(supabase.from('notifications_inapp').insert(inAppRows)).catch(() => null)
+      }
     }
 
     return NextResponse.json(
