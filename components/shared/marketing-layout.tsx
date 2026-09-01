@@ -86,12 +86,12 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-3">
             <Link
               href="/scan"
-              className="hidden sm:inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/15 transition-colors"
+              className="hidden md:inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/15 transition-colors"
             >
               <ScanLine className="h-4 w-4" />
               Scanner
             </Link>
-            <AuthButtons />
+            <AuthButtons className="hidden md:flex" />
             {/* Mobile menu toggle */}
             <button
               className="md:hidden p-2 text-muted-foreground hover:text-foreground"
@@ -119,11 +119,18 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent/10 transition-colors"
+                className={
+                  link.highlight
+                    ? 'block px-3 py-2 rounded-md text-sm font-semibold text-amber-700 hover:bg-amber-50 transition-colors'
+                    : 'block px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent/10 transition-colors'
+                }
               >
                 {link.label}
               </Link>
             ))}
+            <div className="pt-2 mt-2 border-t border-border">
+              <AuthButtons stacked />
+            </div>
           </div>
         )}
       </header>
