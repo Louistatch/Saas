@@ -19,7 +19,7 @@ const securityFeatures = [
     icon: Shield,
     title: 'Row Level Security (RLS)',
     description:
-      'Chaque table de la base de données est protégée par des politiques RLS. Un utilisateur ne peut accéder qu\'aux données de sa propre coopérative. L\'isolation des données est garantie au niveau de la base de données.',
+      "Chaque table de la base de données est protégée par des politiques RLS. Un utilisateur ne peut accéder qu'aux données de sa propre coopérative. L'isolation des données est garantie au niveau de la base de données — y compris pour les profils professionnels Haroo (ouvriers, acheteurs, agronomes), qui partagent la même infrastructure sécurisée.",
   },
   {
     icon: KeyRound,
