@@ -19,7 +19,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { useAuth } from '@/app/context/auth-context'
-import { LoadingBlock } from '@/components/shared/loading'
+import { LoadingBlock, Skeleton } from '@/components/shared/loading'
 import { PageHeader } from '@/components/shared/page-header'
 import { ChartCard } from '@/components/shared/chart-card'
 
@@ -425,7 +425,7 @@ export default function AnalyticsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-foreground">
-                  {isLoading ? '—' : stat.value}
+                  {isLoading ? <Skeleton className="h-8 w-16 mt-1" /> : stat.value}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">{stat.sub}</p>
               </CardContent>

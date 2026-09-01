@@ -11,6 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { useAuth } from '@/app/context/auth-context'
 import { useCooperative } from '@/app/context/cooperative-context'
+import { createClient } from '@/lib/supabase/client'
+import { useToast } from '@/hooks/use-toast'
 import { CreditCard, TrendingUp, CheckCircle, Clock, ChevronRight } from 'lucide-react'
 import { Skeleton } from '@/components/shared/loading'
 import { PageHeader } from '@/components/shared/page-header'
@@ -63,10 +65,15 @@ const STATUS_LABEL: Record<string, string> = {
 
 const GRADE_COLOR: Record<string, string> = { A: 'bg-green-100 text-green-800', B: 'bg-lime-100 text-lime-800', C: 'bg-yellow-100 text-yellow-800', D: 'bg-orange-100 text-orange-800', F: 'bg-red-100 text-red-800' }
 
+interface MemberOption { id: string; first_name: string; last_name: string }
+
 export default function AgriCreditPage() {
   const { user } = useAuth()
   const { currentCooperative } = useCooperative()
+  const supabase = createClient()
+  const { toast } = useToast()
   const [applications, setApplications] = useState<CreditApplication[]>([])
+  const [members, setMembers] = useState<MemberOption[]>([])
   const [selected, setSelected] = useState<CreditApplication | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isAdmin] = useState(user?.role === 'super_admin' || user?.role === 'cooperative_admin')
@@ -86,30 +93,56 @@ export default function AgriCreditPage() {
 
   useEffect(() => { void load() }, [load])
 
+  useEffect(() => {
+    if (!currentCooperative) return
+    supabase.from('members').select('id, first_name, last_name')
+      .eq('cooperative_id', currentCooperative.id)
+      .eq('status', 'active')
+      .order('last_name')
+      .then(({ data }) => setMembers(data ?? []))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentCooperative?.id])
+
   const handleSubmit = async () => {
     if (!currentCooperative) return
     setSubmitting(true)
     const res = await fetch('/api/credit/applications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, cooperative_id: currentCooperative.id }) })
     const d = await res.json()
     setSubmitting(false)
-    if (res.ok) { setScoring(d.scoring); void load() }
+    if (res.ok) {
+      setScoring(d.scoring)
+      void load()
+    } else {
+      toast({ title: 'Erreur', description: d.error ?? 'Impossible de soumettre la demande', variant: 'destructive' })
+    }
   }
 
   const handleStatusChange = async (id: string, status: string, amount?: number) => {
     const body: Record<string, unknown> = { status }
     if (amount) body.amount_approved_fcfa = amount
-    await fetch(`/api/credit/applications/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const res = await fetch(`/api/credit/applications/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    if (!res.ok) {
+      toast({ title: 'Erreur', description: 'Impossible de mettre à jour le statut', variant: 'destructive' })
+      return
+    }
     void load()
     if (selected?.id === id) {
-      const r = await fetch(`/api/credit/applications/${id}`); if (r.ok) { const d = await r.json(); setSelected(d.application) }
+      const r = await fetch(`/api/credit/applications/${id}`)
+      if (r.ok) { const d = await r.json(); setSelected(d.application) }
     }
   }
 
   const handlePay = async (repaymentId: string) => {
     if (!selected || !payAmount) return
-    await fetch(`/api/credit/applications/${selected.id}/repayments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repayment_id: repaymentId, amount_paid: Number(payAmount) }) })
-    const r = await fetch(`/api/credit/applications/${selected.id}`); if (r.ok) { const d = await r.json(); setSelected(d.application) }
+    const res = await fetch(`/api/credit/applications/${selected.id}/repayments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repayment_id: repaymentId, amount_paid: Number(payAmount) }) })
+    if (!res.ok) {
+      toast({ title: 'Erreur', description: 'Impossible d\'enregistrer le paiement', variant: 'destructive' })
+      return
+    }
+    const r = await fetch(`/api/credit/applications/${selected.id}`)
+    if (r.ok) { const d = await r.json(); setSelected(d.application) }
     setPayAmount('')
+    toast({ title: 'Paiement enregistré' })
   }
 
   const active = applications.filter(a => ['pending','scoring','approved','disbursed','repaying'].includes(a.status))
@@ -131,7 +164,15 @@ export default function AgriCreditPage() {
               <DialogHeader><DialogTitle>Demande de crédit</DialogTitle></DialogHeader>
               {!scoring ? (
                 <div className="space-y-4">
-                  <div><label className="text-sm font-medium">ID Membre</label><Input value={form.member_id} onChange={e => setForm(f => ({ ...f, member_id: e.target.value }))} placeholder="UUID du membre" /></div>
+                  <div>
+                    <label className="text-sm font-medium">Membre</label>
+                    <Select value={form.member_id} onValueChange={v => setForm(f => ({ ...f, member_id: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Sélectionner un membre" /></SelectTrigger>
+                      <SelectContent>
+                        {members.map(m => <SelectItem key={m.id} value={m.id}>{m.last_name} {m.first_name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div><label className="text-sm font-medium">Montant demandé (FCFA)</label><Input type="number" value={form.amount_requested_fcfa} onChange={e => setForm(f => ({ ...f, amount_requested_fcfa: e.target.value }))} /></div>
                   <div><label className="text-sm font-medium">Objet</label>
                     <Select value={form.purpose} onValueChange={v => setForm(f => ({ ...f, purpose: v }))}>

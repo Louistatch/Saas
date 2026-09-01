@@ -8,6 +8,7 @@ import { TogoMap } from '@/components/map/togo-map'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { X } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
+import { Skeleton } from '@/components/shared/loading'
 
 type Metric = 'members' | 'parcelles' | 'surface_ha'
 
@@ -86,7 +87,13 @@ export default function CartePage() {
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
           <Card><CardContent className="pt-4">
-            {loading ? <div className="h-64 flex items-center justify-center text-muted-foreground">Chargement...</div> : (
+            {loading ? (
+              <div className="space-y-3 p-2">
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-48 w-full rounded-lg" />
+                <div className="flex gap-2"><Skeleton className="h-4 w-16" /><Skeleton className="h-4 w-16" /></div>
+              </div>
+            ) : (
               <TogoMap
                 data={data.byPrefecture}
                 max={data.max}
