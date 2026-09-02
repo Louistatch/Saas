@@ -117,7 +117,7 @@ export async function GET(
     const timeoutId = setTimeout(() => controller.abort(), 5000)
     try {
       const agriRes = await fetch(
-        `${agritogoUrl}/api/cards/verify/${encodeURIComponent(normalizedCardNumber)}/`,
+        `${agritogoUrl}/api/v1/haroo/verify/${encodeURIComponent(normalizedCardNumber)}`,
         { signal: controller.signal, headers: { 'Accept': 'application/json' } }
       )
       clearTimeout(timeoutId)

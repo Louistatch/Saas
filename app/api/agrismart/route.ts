@@ -14,10 +14,17 @@ async function proxy(path: string, init: RequestInit): Promise<Response> {
   if (!AGRITOGO_URL) {
     throw new Error('AGRITOGO_API_URL non configurée')
   }
-  return fetch(`${AGRITOGO_URL}/api/v1/agrismart/${path}`, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) },
-  })
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 15_000)
+  try {
+    return await fetch(`${AGRITOGO_URL}/api/v1/agrismart/${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) },
+    })
+  } finally {
+    clearTimeout(timeoutId)
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -29,8 +36,8 @@ export async function GET(req: NextRequest) {
     const upstream = await proxy(resource, { method: 'GET' })
     const data = await upstream.json()
     return NextResponse.json(data, { status: upstream.status })
-  } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 503 })
+  } catch {
+    return NextResponse.json({ error: 'Service AgriSmart momentanément indisponible' }, { status: 503 })
   }
 }
 
@@ -47,7 +54,7 @@ export async function POST(req: NextRequest) {
     })
     const data = await upstream.json()
     return NextResponse.json(data, { status: upstream.status })
-  } catch (e: unknown) {
-    return NextResponse.json({ error: String(e) }, { status: 503 })
+  } catch {
+    return NextResponse.json({ error: 'Service AgriSmart momentanément indisponible' }, { status: 503 })
   }
 }
