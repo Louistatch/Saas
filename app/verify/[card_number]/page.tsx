@@ -387,7 +387,7 @@ export default function VerifyCardPage() {
   }
 
   const isValid = result.valid && result.card?.status === 'active'
-  const fullName = memberFullName(result.member as Parameters<typeof memberFullName>[0])
+  const fullName = result.member ? memberFullName(result.member as Parameters<typeof memberFullName>[0]) : ''
   const rawFirst = (result.member?.first_name ?? '').trim()
   const firstName = rawFirst ? rawFirst.charAt(0).toUpperCase() + rawFirst.slice(1).toLowerCase() : fullName?.split(' ')[0] || 'Producteur'
   const greetHour = new Date().getHours()
@@ -509,35 +509,62 @@ export default function VerifyCardPage() {
           </div>
         )}
 
-        {/* ─── Quick Stats ─── */}
-        {isValid && activeView === 'menu' && quickStats && (
-          <div className={`grid grid-cols-3 gap-2 vfp-enter transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '200ms' }}>
-            <div className="vfp-card rounded-2xl p-3 text-center">
-              <p className="text-[var(--vfp-accent)] text-base font-bold leading-tight">{quickStats.totalHa > 0 ? quickStats.totalHa.toFixed(1) : '—'}</p>
-              <p className="text-white/40 text-[10px] mt-0.5">Hectares</p>
+        {/* ─── Status instrument strip ───
+            Replaces the 3 flat stat squares with a single glass panel:
+            a circular gauge visualizing the real cotisation status (not
+            decorative — derived from quickStats.cotisationStatus) beside
+            the hectares/intrants metrics. */}
+        {isValid && activeView === 'menu' && quickStats && (() => {
+          const cotisationPct =
+            quickStats.cotisationStatus === 'paid' || quickStats.cotisationStatus === 'waived' ? 100
+            : quickStats.cotisationStatus === 'overdue' ? 15
+            : quickStats.cotisationStatus === 'pending' ? 55
+            : 0
+          const cotisationColor =
+            quickStats.cotisationStatus === 'paid' || quickStats.cotisationStatus === 'waived' ? '#34d399'
+            : quickStats.cotisationStatus === 'overdue' ? '#f87171'
+            : 'var(--vfp-accent)'
+          const cotisationLabel =
+            quickStats.cotisationStatus === 'paid' || quickStats.cotisationStatus === 'waived' ? 'À jour'
+            : quickStats.cotisationStatus === 'overdue' ? 'En retard'
+            : quickStats.cotisationStatus === 'pending' ? 'En cours'
+            : '—'
+          const ringCirc = 2 * Math.PI * 28
+          const ringOffset = ringCirc * (1 - cotisationPct / 100)
+          return (
+            <div className={`vfp-card rounded-2xl p-4 flex items-stretch gap-3.5 vfp-enter transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '200ms' }}>
+              <div className="relative w-[68px] h-[68px] shrink-0">
+                <svg viewBox="0 0 64 64" className="w-full h-full -rotate-90">
+                  <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="5" />
+                  <circle
+                    cx="32" cy="32" r="28" fill="none" stroke={cotisationColor} strokeWidth="5" strokeLinecap="round"
+                    strokeDasharray={ringCirc} strokeDashoffset={ringOffset}
+                    style={{ transition: 'stroke-dashoffset 0.6s ease, stroke 0.3s ease', filter: `drop-shadow(0 0 5px ${cotisationColor}99)` }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-[15px] font-bold leading-none" style={{ color: cotisationColor }}>{cotisationPct}%</span>
+                  <span className="text-[8px] text-white/40 mt-0.5 tracking-wide">COTIS.</span>
+                </div>
+              </div>
+              <div className="w-px bg-white/[0.08] my-0.5" />
+              <div className="flex-1 flex flex-col justify-center gap-2.5 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-white/50 text-[11.5px]">Cotisation</span>
+                  <span className="text-[12.5px] font-bold" style={{ color: cotisationColor }}>{cotisationLabel}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-white/50 text-[11.5px]">Hectares</span>
+                  <span className="text-white text-[13px] font-bold font-mono">{quickStats.totalHa > 0 ? quickStats.totalHa.toFixed(1) : '—'}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-white/50 text-[11.5px]">Intrants</span>
+                  <span className="text-white text-[13px] font-bold font-mono">{quickStats.intrantCount}</span>
+                </div>
+              </div>
             </div>
-            <div className={`vfp-card rounded-2xl p-3 text-center ${
-              quickStats.cotisationStatus === 'paid' || quickStats.cotisationStatus === 'waived'
-                ? 'border-emerald-500/20 bg-emerald-500/5'
-                : quickStats.cotisationStatus === 'overdue'
-                ? 'border-red-500/20 bg-red-500/5'
-                : ''
-            }`}>
-              <p className="text-base font-bold leading-tight">
-                {quickStats.cotisationStatus === 'paid' || quickStats.cotisationStatus === 'waived'
-                  ? <span className="text-emerald-400">✓</span>
-                  : quickStats.cotisationStatus === 'overdue'
-                  ? <span className="text-red-400">⚠</span>
-                  : <span className="text-amber-400">⏳</span>}
-              </p>
-              <p className="text-white/40 text-[10px] mt-0.5">Cotisation</p>
-            </div>
-            <div className="vfp-card rounded-2xl p-3 text-center">
-              <p className="text-[var(--vfp-accent)] text-base font-bold leading-tight">{quickStats.intrantCount}</p>
-              <p className="text-white/40 text-[10px] mt-0.5">Intrants</p>
-            </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* ─── Invalid / Not Found states ─── */}
         {!isValid && result.member && (
@@ -575,6 +602,8 @@ export default function VerifyCardPage() {
               className="w-full group relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-500/20 via-amber-600/10 to-orange-700/5 border border-amber-400/20 p-5 text-left active:scale-[0.98] transition-transform"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-amber-400/5 to-transparent opacity-0 group-active:opacity-100 transition-opacity" />
+              {/* Ambient breathing halo — signals the assistant is live/ready */}
+              <div className="absolute -top-8 -right-8 w-36 h-36 rounded-full bg-amber-400/25 blur-3xl vfp-ai-halo" />
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
@@ -589,8 +618,14 @@ export default function VerifyCardPage() {
                     ))}
                   </div>
                 </div>
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400/30 to-orange-500/20 flex items-center justify-center border border-amber-400/20 shrink-0 group-active:scale-90 transition-transform">
+                <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400/30 to-orange-500/20 flex items-center justify-center border border-amber-400/20 shrink-0 group-active:scale-90 transition-transform">
                   <Bot className="h-7 w-7 text-amber-300" />
+                  {/* Listening waveform */}
+                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex items-end gap-[2px] h-2.5">
+                    {[4, 9, 6, 10, 5].map((h, i) => (
+                      <span key={i} className="w-[2px] rounded-full bg-orange-100 vfp-ai-wavebar" style={{ height: h, animationDelay: `${i * 0.15}s` }} />
+                    ))}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-1 mt-4 text-amber-400/60 text-xs font-medium">
@@ -1102,7 +1137,11 @@ const vfpStyles = `
     animation: vfpSpin .7s linear infinite;
   }
   @keyframes vfpSpin { to { transform: rotate(360deg); } }
-  @media (prefers-reduced-motion: reduce) { .vfp-enter,.vfp-pop { animation: none; } }
+  .vfp-ai-halo { animation: vfpHaloBreathe 3.4s ease-in-out infinite; }
+  @keyframes vfpHaloBreathe { 0%,100% { transform: scale(1); opacity: .7; } 50% { transform: scale(1.18); opacity: 1; } }
+  .vfp-ai-wavebar { animation: vfpWaveBar 1.1s ease-in-out infinite; transform-origin: bottom; }
+  @keyframes vfpWaveBar { 0%,100% { transform: scaleY(.5); } 50% { transform: scaleY(1); } }
+  @media (prefers-reduced-motion: reduce) { .vfp-enter,.vfp-pop,.vfp-ai-halo,.vfp-ai-wavebar { animation: none; } }
 `
 
 // ── Haroo card verification page ─────────────────────────────────────────────
