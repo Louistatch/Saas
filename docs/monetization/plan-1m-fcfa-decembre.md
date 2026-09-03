@@ -17,9 +17,19 @@ chaque itération plutôt que de le refaire de zéro — c'est le rôle du skill
 - Haroo (ouvriers/acheteurs/agronomes) : gratuit, levier d'adoption et de
   réseau, pas un revenu direct pour l'instant
 
-## 2. Le vrai blocage : la collecte de paiement
+## 2. Le vrai blocage : la collecte de paiement — ✅ CORRIGÉ (code)
 
-Le code n'a **qu'Orange Money** (`lib/payments/orange-money.ts`,
+**Statut : intégration CinetPay livrée** (`lib/payments/cinetpay.ts`,
+`app/api/payments/cinetpay-callback/route.ts`). TMoney et Flooz sont
+maintenant des options actives sur `/dashboard/cotisations/payment`
+(elles étaient marquées "Prochainement" et désactivées avant). Il reste
+à **créer un compte marchand CinetPay réel** et renseigner
+`CINETPAY_API_KEY` / `CINETPAY_SITE_ID` en production — le code n'a pas pu
+être testé contre un compte CinetPay réel depuis cet environnement (pas
+d'accès réseau sortant vers l'API CinetPay dans ce sandbox), seulement
+vérifié pour ne pas planter en l'absence de credentials.
+
+Avant, le code n'avait **qu'Orange Money** (`lib/payments/orange-money.ts`,
 `ORANGE_MONEY_API_KEY`). Or au Togo (recherche web, sept. 2026) :
 - TMoney (Togocom/Yas) : ~60% du marché mobile money
 - Flooz (Moov Africa) : ~40%
@@ -52,7 +62,9 @@ Options d'intégration à évaluer (par ordre de rapidité probable) :
       ce qu'un abonnement payant débloquerait)
 - [ ] Identifier le point de contact GIZ / Maison des Coopératives et préparer
       le dossier de candidature au programme 115 coopératives
-- [ ] Choisir et intégrer un moyen de paiement Flooz/TMoney réel
+- [x] Choisir et intégrer un moyen de paiement Flooz/TMoney réel — CinetPay,
+      code livré ; reste à ouvrir le compte marchand et renseigner les clés
+      en production
 - [ ] Définir le tarif du "frais d'installation" et l'ajouter à `/pricing`
 - [ ] Suivre chaque piste dans un tableau simple (nom, canal, statut, montant
       potentiel, prochaine action, date)

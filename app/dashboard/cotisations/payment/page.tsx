@@ -20,10 +20,10 @@ interface InitiateResponse {
 }
 
 const PROVIDERS = [
+  { value: 'tmoney', label: 'TMoney', available: true },
+  { value: 'moov', label: 'Flooz (Moov Money)', available: true },
   { value: 'orange_money', label: 'Orange Money', available: true },
   { value: 'cash', label: 'Espèces', available: true },
-  { value: 'tmoney', label: 'TMoney — Prochainement', available: false },
-  { value: 'moov', label: 'Moov Money — Prochainement', available: false },
 ]
 
 export default function PaymentPage() {
@@ -37,7 +37,7 @@ export default function PaymentPage() {
   const cooperativeId = searchParams.get('cooperative_id') ?? ''
 
   const [phone, setPhone] = useState('')
-  const [provider, setProvider] = useState('orange_money')
+  const [provider, setProvider] = useState('tmoney')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 

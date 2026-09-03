@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { initiateOrangeMoneyPayment, generatePaymentReference } from '@/lib/payments/orange-money'
+import { initiateCinetPayPayment } from '@/lib/payments/cinetpay'
 import { assertTenantAccess } from '@/lib/security/assert-access'
 
 const paymentInitiateSchema = z.object({
@@ -112,6 +113,42 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ success: true, paymentUrl: result.paymentUrl, reference })
   }
 
-  // Other providers (moov, tmoney) — create pending row, await manual confirmation
-  return NextResponse.json({ success: true, reference, provider })
+  if (provider === 'moov' || provider === 'tmoney') {
+    const { data: member } = await supabase
+      .from('members')
+      .select('first_name, last_name')
+      .eq('id', member_id)
+      .maybeSingle()
+
+    const result = await initiateCinetPayPayment({
+      transactionId: reference,
+      amount: amount_fcfa,
+      description: `Paiement cotisation — réf. ${reference}`,
+      customerName: member?.first_name ?? undefined,
+      customerSurname: member?.last_name ?? undefined,
+      customerPhone: phone,
+      notifyUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/api/payments/cinetpay-callback`,
+      returnUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/dashboard/cotisations`,
+    })
+
+    if (!result.success) {
+      void supabase
+        .from('payments')
+        .update({ status: 'failed', failure_reason: result.error ?? 'Initiation failed' })
+        .eq('id', payment.id)
+        .then(() => undefined)
+
+      return NextResponse.json({ error: result.error ?? 'Payment initiation failed' }, { status: 502 })
+    }
+
+    void supabase
+      .from('payments')
+      .update({ status: 'processing', provider_tx_id: result.paymentToken ?? null })
+      .eq('id', payment.id)
+      .then(() => undefined)
+
+    return NextResponse.json({ success: true, paymentUrl: result.paymentUrl, reference })
+  }
+
+  return NextResponse.json({ error: `Unsupported provider: ${provider}` }, { status: 400 })
 }
