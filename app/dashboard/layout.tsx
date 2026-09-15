@@ -37,6 +37,7 @@ import { isHarooRole } from '@/lib/utils/permissions'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { ProtectedRoute } from '@/app/components/protected-route'
 import { NotificationBell } from '@/components/shared/notification-bell'
+import { ServiceLauncher } from '@/components/shared/service-launcher'
 
 interface NavItem {
   href: string
@@ -320,6 +321,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </SelectContent>
                 </Select>
               )}
+              <ServiceLauncher role={user?.role} />
               {currentCooperative && (
                 <NotificationBell cooperativeId={currentCooperative.id} />
               )}
