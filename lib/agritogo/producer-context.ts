@@ -82,13 +82,14 @@ export async function buildProducerContext(
           .limit(5)
       : Promise.resolve({ data: null }),
 
-    // Prix du marché pour la région
+    // Prix du marché pour la région — admin client bypasses RLS which blocks
+    // market_prices reads for the anon/user role on the AI context path.
     regionName
       ? (async () => {
-          const { data: regionRow } = await supabase
+          const { data: regionRow } = await supabaseAdmin
             .from('regions').select('id').eq('name', regionName).maybeSingle()
           if (!regionRow) return { data: null }
-          return supabase
+          return supabaseAdmin
             .from('market_prices')
             .select('market_name, price, unit, currency, created_at, culture:cultures(name)')
             .eq('region_id', regionRow.id)
