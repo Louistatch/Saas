@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
+import { HeroSection } from '@/components/marketing/hero-section'
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -147,145 +148,7 @@ export default function Home() {
     <MarketingLayout>
 
       {/* ── HERO ─────────────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
-        <div className="grid gap-12 lg:grid-cols-2 lg:gap-16 items-center">
-
-          {/* Left copy */}
-          <div className="space-y-8">
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-1.5 text-sm font-semibold text-primary">
-              <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-              Plateforme agricole numérique — Togo &amp; Afrique de l'Ouest
-            </div>
-
-            <div>
-              <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-[3.5rem] leading-[1.08]">
-                L'écosystème numérique des{' '}
-                <span className="text-primary">coopératives agricoles</span>
-              </h1>
-              <p className="mt-5 text-lg text-muted-foreground max-w-lg leading-relaxed">
-                FaîtiereHub organise vos coopératives. Haroo donne une identité professionnelle aux
-                acteurs qui les font vivre. Un seul écosystème, deux expériences complémentaires.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Link href="/auth/signup">
-                <Button size="lg" className="w-full gap-2 sm:w-auto">
-                  Démarrer gratuitement <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-              <Link href="/auth/signup/haroo">
-                <Button size="lg" variant="outline" className="w-full gap-2 sm:w-auto border-amber-300 text-amber-700 hover:bg-amber-50">
-                  <Network className="h-4 w-4" /> Rejoindre Haroo
-                </Button>
-              </Link>
-              <Link href="/scan">
-                <Button size="lg" variant="ghost" className="w-full gap-2 sm:w-auto">
-                  <ScanLine className="h-4 w-4" /> Scanner
-                </Button>
-              </Link>
-            </div>
-
-            {/* Trust signals */}
-            <div className="flex flex-wrap gap-x-6 gap-y-2">
-              {[
-                { dot: 'bg-primary', text: 'Essai gratuit 30 jours' },
-                { dot: 'bg-amber-500', text: 'Sans carte bancaire' },
-                { dot: 'bg-primary', text: 'Scanner QR universel' },
-              ].map(({ dot, text }) => (
-                <div key={text} className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className={`h-2 w-2 rounded-full ${dot}`} />
-                  {text}
-                </div>
-              ))}
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-4 pt-6 border-t border-border">
-              {[
-                { value: '2 400+', label: 'Membres enregistrés' },
-                { value: '12', label: 'Coopératives actives' },
-                { value: '850 ha', label: 'Parcelles gérées' },
-              ].map(({ value, label }) => (
-                <div key={label}>
-                  <div className="text-2xl font-extrabold text-primary">{value}</div>
-                  <div className="mt-0.5 text-xs text-muted-foreground">{label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Right: Visual */}
-          <div className="relative">
-            {/* Glow */}
-            <div className="absolute -inset-4 -z-10 rounded-3xl bg-gradient-to-r from-primary/20 via-amber-500/10 to-primary/20 blur-3xl opacity-40" />
-
-            {/* Browser preview */}
-            <div className="rounded-2xl border border-border bg-card shadow-2xl overflow-hidden">
-              {/* Chrome bar */}
-              <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-4 py-2.5">
-                <div className="flex gap-1.5">
-                  {['bg-red-400', 'bg-yellow-400', 'bg-green-400'].map((c) => (
-                    <div key={c} className={`h-3 w-3 rounded-full ${c}`} />
-                  ))}
-                </div>
-                <div className="flex-1 flex justify-center">
-                  <div className="rounded-md border border-border bg-background px-3 py-1 font-mono text-[10px] text-muted-foreground">
-                    faitierehub.com/dashboard
-                  </div>
-                </div>
-              </div>
-
-              {/* Dashboard mockup */}
-              <div className="bg-muted/30 p-4 space-y-3">
-                {/* KPI row */}
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { label: 'Membres actifs', value: '2 418', sub: '↑ +12%' },
-                    { label: 'Cotisations', value: '1 840', sub: '↑ +8%' },
-                    { label: 'Parcelles', value: '856', sub: '850 ha' },
-                  ].map(({ label, value, sub }) => (
-                    <div key={label} className="rounded-lg border border-border bg-card p-3">
-                      <div className="text-[10px] text-muted-foreground">{label}</div>
-                      <div className="text-xl font-bold text-foreground mt-0.5">{value}</div>
-                      <div className="text-[10px] text-primary mt-0.5">{sub}</div>
-                    </div>
-                  ))}
-                </div>
-                {/* Activity bar */}
-                <div className="rounded-lg border border-border bg-card p-3 space-y-2">
-                  <div className="text-xs font-semibold text-foreground">Répartition régionale</div>
-                  {[
-                    { region: 'Maritime', pct: 82, val: 642 },
-                    { region: 'Plateaux', pct: 55, val: 430 },
-                    { region: 'Kara', pct: 38, val: 298 },
-                    { region: 'Centrale', pct: 26, val: 204 },
-                  ].map(({ region, pct, val }) => (
-                    <div key={region} className="flex items-center gap-2">
-                      <span className="w-14 text-[10px] text-muted-foreground">{region}</span>
-                      <div className="flex-1 h-2 bg-muted rounded-full">
-                        <div className="h-2 bg-primary rounded-full" style={{ width: `${pct}%` }} />
-                      </div>
-                      <span className="text-[10px] text-muted-foreground w-6 text-right">{val}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Floating member card — vraie carte du projet, pas un mockup CSS */}
-            <div className="absolute -bottom-10 -right-6 hidden sm:block w-64 md:w-72 rotate-3 hover:rotate-0 transition-transform duration-500">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/showcase-card.webp"
-                alt="Carte membre FaîtiereHub — Abla AKWA, ALL-64706"
-                className="w-full h-auto rounded-xl shadow-2xl border-2 border-white/20"
-              />
-            </div>
-          </div>
-        </div>
-      </section>
+      <HeroSection />
 
       {/* ── ECOSYSTEM OVERVIEW ───────────────────────────────────────── */}
       <section className="border-y border-border bg-muted/30 py-10">
