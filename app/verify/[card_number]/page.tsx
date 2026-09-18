@@ -35,7 +35,7 @@ interface VerifyResult {
     village: string | null; canton: string | null; prefecture: string | null; region: string | null
     status: string; member_since: string | null
   }
-  cooperative?: { name: string; faitiere_name: string | null }
+  cooperative?: { name: string | null; faitiere_name: string | null }
   member_id?: string | null
   ouvrier?: {
     first_name: string | null; last_name: string | null; phone: string | null; photo_url: string | null
@@ -746,7 +746,7 @@ export default function VerifyCardPage() {
             </button>
             <MarketPricesDashboard
               cardNumber={cardNumber}
-              cooperativeName={result.cooperative?.name}
+              cooperativeName={result.cooperative?.name ?? ''}
               memberLocality={result.member ? {
                 village: result.member.village ?? null,
                 canton: result.member.canton ?? null,
@@ -824,7 +824,7 @@ export default function VerifyCardPage() {
                 </div>
                 <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
                   <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Coopérative</span>
-                  <p className="text-white text-sm font-semibold mt-0.5">{result.cooperative?.name ?? '—'}</p>
+                  <p className="text-white text-sm font-semibold mt-0.5">{result.cooperative?.name ?? 'Coopérative inconnue'}</p>
                 </div>
                 <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
                   <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Faîtière</span>
