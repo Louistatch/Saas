@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/shared/loading'
 import { PageHeader } from '@/components/shared/page-header'
 import { AgriScoreWidget } from '@/components/dashboard/agri-score-widget'
 import { timeAgo } from '@/lib/utils/time'
+import { ActivateHarooCard } from '@/components/account/layer-activation'
 
 interface Stats {
   totalMembers: number
@@ -183,6 +184,10 @@ export default function DashboardPage() {
         title={`Bienvenue${user?.firstName ? `, ${user.firstName}` : ''}`}
         description={`${currentCooperative?.name ?? 'Votre coopérative'} — voici ce qui se passe aujourd'hui`}
       />
+
+      {/* Seconde couche du compte : ne s'affiche que si Haroo n'est pas
+          déjà activé (le composant se masque lui-même). */}
+      <ActivateHarooCard />
 
       <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
         {statCards.map((stat, i) => {

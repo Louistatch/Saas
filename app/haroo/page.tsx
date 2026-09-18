@@ -29,6 +29,7 @@ import { performLogout } from '@/lib/auth/logout'
 import { createClient } from '@/lib/supabase/client'
 import { isHarooRole, effectiveHarooType } from '@/lib/utils/permissions'
 import { Spinner } from '@/components/shared/loading'
+import { RequestOrgCard } from '@/components/account/layer-activation'
 
 /**
  * Espace Haroo — tableau de bord des professionnels agricoles
@@ -459,6 +460,10 @@ function HarooSpaceInner() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
+        {/* Seconde couche du compte : masquée si une organisation est déjà
+            rattachée (le composant se masque lui-même). */}
+        <RequestOrgCard />
+
         {/* Accueil personnalisé */}
         <div>
           <h1 className="text-2xl font-bold text-foreground">
