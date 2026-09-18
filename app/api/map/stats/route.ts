@@ -26,15 +26,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ byPrefecture, total: data?.length ?? 0, max })
   }
 
-  // parcelles / surface_ha
-  let query = supabase.from('parcelles').select('prefecture, surface_ha, culture_name').not('prefecture', 'is', null)
+  // parcelles / surface_ha — join members pour récupérer la préfecture (parcelles n'a pas de colonne prefecture)
+  let query = supabase
+    .from('parcelles')
+    .select('surface_ha, culture_name, members!inner(prefecture)')
+    .not('members.prefecture', 'is', null)
   if (cooperativeId) query = query.eq('cooperative_id', cooperativeId)
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const agg: Record<string, { count: number; surface: number; cultures: Set<string> }> = {}
-  for (const p of data ?? []) {
-    const pref = p.prefecture as string
+  for (const p of (data ?? []) as unknown as { surface_ha: number | null; culture_name: string | null; members: { prefecture: string } }[]) {
+    const pref = p.members?.prefecture as string
     if (!agg[pref]) agg[pref] = { count: 0, surface: 0, cultures: new Set() }
     agg[pref].count++
     agg[pref].surface += p.surface_ha ?? 0
