@@ -63,7 +63,37 @@ Auth flows through two layers:
    - `assertAuthenticated()`, `assertRole()`, `assertTenant()`
    - Always use these in API routes; RLS is the DB layer, these are the app layer.
 
-Roles live in `app_metadata` ONLY — never trust `user_metadata` for authorization.
+**`public.profiles` is the ONLY source of truth for authorization.** Never trust
+`user_metadata`, and treat `app_metadata` as a routing cache, not an authority:
+it is a derived mirror that can be stale or absent.
+
+- `getAccessContext()` reads `profiles`; every RLS policy reads `profiles`.
+- The edge middleware may read JWT claims to pick a landing page, but never to
+  grant access — the server guard (`requireRole` / `assertRole`) decides.
+- `assertRole` **returns** `{ ok, response }`; it does not throw. Always write
+  `const guard = await assertRole(...); if (!guard.ok) return guard.response`.
+  Discarding the result silently disables the guard.
+
+### Two layers per account
+
+A single account carries two independent layers:
+
+- `profiles.role` — organisational layer (`super_admin`, `cooperative_admin`,
+  `member`, `guest`, or `none` when there is no organisation).
+- `profiles.haroo_type` — Haroo layer (`ouvrier`, `acheteur`, `agronome`, or
+  NULL). One at a time.
+
+Both can coexist: a cooperative member may also be an ouvrier. Never write a
+Haroo type into `role` — that erases the organisational layer, which is exactly
+the bug the split fixed. Use `hasOrgLayer()`, `isHarooRole()` and
+`effectiveHarooType()` from `lib/utils/permissions.ts` rather than comparing
+roles by hand; the `ouvrier`/`acheteur`/`agronome` values of `user_role` are
+deprecated and kept only for accounts predating the split.
+
+`role`, `haroo_type` and `cooperative_id` are protected by the
+`protect_profile_privileges` trigger: only `service_role`, `SECURITY DEFINER`
+functions and super_admins may change them. A user editing their own profile
+can change their name, nothing else.
 
 ### QR card verification flow
 
