@@ -15,6 +15,8 @@ import {
   TrendingUp,
   LayoutDashboard,
   Activity,
+  Cpu,
+  Leaf,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/shared/logo'
@@ -26,6 +28,8 @@ const ADMIN_LINKS = [
   { href: '/admin/users', label: 'Utilisateurs', icon: Users },
   { href: '/admin/haroo', label: 'Professionnels Haroo', icon: Briefcase },
   { href: '/admin/analytics', label: 'Statistiques', icon: BarChart3 },
+  { href: '/admin/agritogo', label: 'AgriTogo', icon: Cpu },
+  { href: '/admin/agrismat', label: 'Agrismat', icon: Leaf },
   { href: '/admin/logs', label: "Logs d'audit", icon: Activity },
   { href: '/admin/settings', label: 'Paramètres', icon: Settings },
 ] as const

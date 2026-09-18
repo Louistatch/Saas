@@ -21,21 +21,16 @@ export async function GET(
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> },
-) {
+async function forwardWithBody(method: string, request: NextRequest, pathSegments: string[]) {
   await assertRole('super_admin')
   if (!AGRITOGO) return NextResponse.json({ error: 'AGRITOGO_API_URL non configuré' }, { status: 503 })
-
-  const { path } = await params
   const body = await request.text()
-  const upstream = `${AGRITOGO}/api/v1/${path.join('/')}`
+  const upstream = `${AGRITOGO}/api/v1/${pathSegments.join('/')}${request.nextUrl.search}`
   try {
     const res = await fetch(upstream, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
+      method,
+      headers: { 'Content-Type': request.headers.get('content-type') ?? 'application/json' },
+      body: body || undefined,
       signal: AbortSignal.timeout(30000),
     })
     const data: unknown = await res.json()
@@ -43,4 +38,24 @@ export async function POST(
   } catch {
     return NextResponse.json({ error: 'AgriTogo inaccessible' }, { status: 502 })
   }
+}
+
+export async function POST(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+  const { path } = await params
+  return forwardWithBody('POST', request, path)
+}
+
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+  const { path } = await params
+  return forwardWithBody('DELETE', request, path)
+}
+
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+  const { path } = await params
+  return forwardWithBody('PUT', request, path)
+}
+
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+  const { path } = await params
+  return forwardWithBody('PATCH', request, path)
 }
