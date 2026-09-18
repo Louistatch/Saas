@@ -48,14 +48,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Réservé aux profils Haroo' }, { status: 403 })
   }
 
-  const { supabase, userId, role } = ctx
+  // Le type Haroo fait foi : un compte peut porter un rôle organisationnel
+  // (cooperative_admin, member) ET un profil Haroo. Brancher sur `role`
+  // manquerait le profil de ces comptes doubles.
+  const { supabase, userId, harooType } = ctx
 
   // ── 1. Résoudre la région de l'acteur ──────────────────────────────────────
   let regionId: string | null = null
   let regionName = DEFAULT_REGION
 
   let prefectureId: string | null = null
-  if (role === 'ouvrier') {
+  if (harooType === 'ouvrier') {
     const { data: profile } = await supabase
       .from('haroo_ouvrier_profiles')
       .select('id')
@@ -70,7 +73,7 @@ export async function GET(request: NextRequest) {
         .maybeSingle<{ cantons: { prefecture_id: string } | null }>()
       prefectureId = link?.cantons?.prefecture_id ?? null
     }
-  } else if (role === 'acheteur') {
+  } else if (harooType === 'acheteur') {
     const { data: profile } = await supabase
       .from('haroo_acheteur_profiles')
       .select('prefecture_id')

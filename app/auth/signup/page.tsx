@@ -46,17 +46,14 @@ export default function SignupPage() {
 
     setSubmitting(true)
     try {
-      const res = await fetch('/api/contact-request', {
+      // /api/contact-request sert les demandes de contact fournisseur et exige
+      // member_id + buyer_name : ce formulaire y postait un tout autre corps,
+      // que la validation rejetait systématiquement. Les demandes d'accès ont
+      // désormais leur propre route.
+      const res = await fetch('/api/access-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: parsed.data.contactName,
-          email: parsed.data.email || `${parsed.data.phone}-${crypto.randomUUID().slice(0, 8)}@faitierehub.com`,
-          phone: parsed.data.phone,
-          organization: parsed.data.organizationName,
-          type: parsed.data.type,
-          message: parsed.data.message || `Demande d'accès - ${parsed.data.type} - ${parsed.data.organizationName}`,
-        }),
+        body: JSON.stringify(parsed.data),
       })
       if (res.ok) {
         setSubmitted(true)
