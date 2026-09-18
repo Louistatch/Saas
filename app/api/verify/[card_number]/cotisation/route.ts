@@ -1,11 +1,25 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
+import { rateLimit, clientKeyFromHeaders } from '@/lib/utils/rate-limit'
+import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ card_number: string }> }
 ) {
+  const blocked = await applyRateLimit(request, 'verify')
+  if (blocked) return blocked
+
+  const ip = clientKeyFromHeaders(request.headers)
+  const limit = rateLimit(`verify:${ip}`, 10, 60_000)
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: 'Trop de requêtes. Réessayez dans quelques instants.' },
+      { status: 429 }
+    )
+  }
+
   const { card_number } = await params
   const cardNumber = decodeURIComponent(card_number).toUpperCase().trim()
 
@@ -32,8 +46,9 @@ export async function GET(
     .limit(10)
 
   const last = cotisations?.[0] ?? null
-  const isPaid = last?.status === 'paid'
-  const isOverdue = last?.status === 'pending' && last?.due_date && new Date(last.due_date) < new Date()
+  const status = last?.status ?? null
+  const isPaid = status === 'paid' || status === 'waived'
+  const isOverdue = status === 'overdue' || (status === 'pending' && last?.due_date && new Date(last.due_date) < new Date())
 
   return NextResponse.json({
     cotisations: cotisations ?? [],
@@ -47,5 +62,5 @@ export async function GET(
       due_date: last?.due_date ?? null,
       paid_date: last?.paid_date ?? null,
     },
-  }, { headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=300' } })
+  })
 }
