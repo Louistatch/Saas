@@ -23,7 +23,7 @@ export interface VerifyCard {
 }
 
 export interface VerifyCooperative {
-  name: string
+  name: string | null
   faitiere_name: string | null
 }
 
