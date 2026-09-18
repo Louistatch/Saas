@@ -124,6 +124,7 @@ export default function MembersPage() {
       .select('*')
       .eq('cooperative_id', currentCooperative.id)
       .order('last_name')
+      .range(0, 999)
     if (error) {
       toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })
     } else {
@@ -331,6 +332,10 @@ export default function MembersPage() {
         email: r.email || null,
         phone: r.phone || null,
         address: r.address || null,
+        prefecture: r.prefecture || null,
+        region: r.region || null,
+        village: r.village || null,
+        canton: r.canton || null,
       })),
     )
     setImporting(false)
