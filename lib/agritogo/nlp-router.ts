@@ -66,9 +66,12 @@ const MARCHES: Record<string, string> = {
 }
 
 // ─── Conversational markers → ALWAYS needs LLM ──────────────────
+// H6 FIX: markers are stored in their raw form; matching normalizes BOTH sides
+// (accents via NFD + apostrophe variants ' → ') so "j'aimerais" (straight quote)
+// and "j'aimerais" (typographic quote) both match "j'aimerais" in the list.
 const LLM_MARKERS = [
   'comment', 'pourquoi', 'explique', 'aide', 'conseil',
-  'devrais', 'faut-il', 'est-ce que', 'est-ce qu',
+  'devrais', 'faut-il', 'est-ce que', 'est-ce qu\'',
   'penses', 'pense', 'crois', 'recommande', 'suggère', 'suggere',
   'que faire', 'quoi faire', 'mieux', 'meilleur',
   'améliorer', 'ameliorer', 'optimiser', 'stratégie', 'strategie',
@@ -78,6 +81,14 @@ const LLM_MARKERS = [
   'je veux', 'je souhaite', 'j\'aimerais', 'j\'ai',
   'mon', 'ma', 'mes', 'notre', 'nos', // possessifs = contexte personnel → LLM
 ]
+
+/** Normalize a string for matching: remove accents + unify apostrophe variants. */
+function normalizeForMatch(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // strip diacritics
+    .replace(/[’‘ʼ]/g, "'") // typographic ' → straight '
+}
 
 // ─── Intent rules (only SHORT factual queries are direct) ────────
 const INTENT_RULES: { keywords: string[]; intent: Intent; needsLLM: boolean }[] = [
@@ -125,15 +136,11 @@ const INTENT_RULES: { keywords: string[]; intent: Intent; needsLLM: boolean }[] 
  */
 export function parseQuery(message: string): ParsedQuery {
   const raw = message.trim()
-  const q = raw.toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove accents for matching
-  const qOriginal = raw.toLowerCase()
-
+  const q = normalizeForMatch(raw.toLowerCase())
   // Extract product
   let produit: string | null = null
   for (const [key, val] of Object.entries(PRODUITS)) {
-    const normalizedKey = key.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    if (q.includes(normalizedKey)) {
+    if (q.includes(normalizeForMatch(key))) {
       produit = val
       break
     }
@@ -142,8 +149,7 @@ export function parseQuery(message: string): ParsedQuery {
   // Extract market
   let marche: string | null = null
   for (const [key, val] of Object.entries(MARCHES)) {
-    const normalizedKey = key.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    if (q.includes(normalizedKey)) {
+    if (q.includes(normalizeForMatch(key))) {
       marche = val
       break
     }
@@ -164,10 +170,9 @@ export function parseQuery(message: string): ParsedQuery {
   }
 
   // ─── GUARD 1: Conversational markers → ALWAYS LLM ─────────────
-  const hasConversationalMarker = LLM_MARKERS.some(marker => {
-    const normalizedMarker = marker.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    return q.includes(normalizedMarker)
-  })
+  const hasConversationalMarker = LLM_MARKERS.some(marker =>
+    q.includes(normalizeForMatch(marker))
+  )
 
   // ─── GUARD 2: Long messages (>10 words) → ALWAYS LLM ──────────
   const wordCount = raw.split(/\s+/).length
@@ -184,10 +189,7 @@ export function parseQuery(message: string): ParsedQuery {
   let confidence = 0.3
 
   for (const rule of INTENT_RULES) {
-    const matched = rule.keywords.some(kw => {
-      const normalizedKw = kw.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      return q.includes(normalizedKw)
-    })
+    const matched = rule.keywords.some(kw => q.includes(normalizeForMatch(kw)))
     if (matched) {
       intent = rule.intent
       needsLLM = rule.needsLLM

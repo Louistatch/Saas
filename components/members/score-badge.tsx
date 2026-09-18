@@ -26,12 +26,19 @@ export function ScoreBadge({ memberId, variant = 'inline' }: ScoreBadgeProps) {
 
   useEffect(() => {
     let cancelled = false
-    fetch(`/api/members/${encodeURIComponent(memberId)}/ats`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (!cancelled && d?.score != null) setData({ score: d.score, level: d.level }) })
-      .catch(() => null)
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+    const load = () => {
+      fetch(`/api/members/${encodeURIComponent(memberId)}/ats`)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (!cancelled && d?.score != null) setData({ score: d.score, level: d.level }) })
+        .catch(() => null)
+        .finally(() => { if (!cancelled) setLoading(false) })
+    }
+    load()
+    window.addEventListener('fh:score-refresh', load)
+    return () => {
+      cancelled = true
+      window.removeEventListener('fh:score-refresh', load)
+    }
   }, [memberId])
 
   if (loading) {

@@ -193,7 +193,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<KoboWebho
     })
   }
 
-  const cooperativeId = integration.cooperative_id as string
+  const cooperativeId = integration.cooperative_id as string | null
+  if (!cooperativeId) {
+    log.warn('Integration missing cooperative_id', { formId: payload._xform_id_string })
+    return NextResponse.json({ received: true, status: 'error', message: 'Integration not linked to a cooperative' })
+  }
 
   // -------------------------------------------------------
   // 7. Deduplication — check kobo_instance_id

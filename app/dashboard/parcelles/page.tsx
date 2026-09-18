@@ -14,7 +14,6 @@ import { PaginationBar } from '@/components/shared/pagination'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { useDebounced } from '@/hooks/use-debounced'
-import type { Cooperative } from '@/app/context/cooperative-context'
 
 interface Parcelle {
   id: string
@@ -74,18 +73,6 @@ const SOL_COLORS: Record<string, string> = {
   laterite: 'bg-orange-100 text-orange-800',
 }
 
-function getScopeIds(current: Cooperative, all: Cooperative[]): string[] {
-  const ids = new Set<string>([current.id])
-  for (const c of all) {
-    if (c.parentId === current.id) {
-      ids.add(c.id)
-      for (const gc of all) {
-        if (gc.parentId === c.id) ids.add(gc.id)
-      }
-    }
-  }
-  return [...ids]
-}
 
 function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null
@@ -101,10 +88,13 @@ export default function ParcellesPage() {
   const { currentCooperative, cooperatives } = useCooperative()
   const supabase = useMemo(() => createClient(), [])
 
-  const scopeIds = useMemo(
-    () => (currentCooperative ? getScopeIds(currentCooperative, cooperatives) : []),
-    [currentCooperative, cooperatives],
-  )
+  const [scopeIds, setScopeIds] = useState<string[]>([])
+  useEffect(() => {
+    if (!currentCooperative) { setScopeIds([]); return }
+    supabase.rpc('get_accessible_cooperative_ids').then(({ data }) => {
+      setScopeIds(Array.isArray(data) && data.length > 0 ? data : [currentCooperative.id])
+    }).catch(() => setScopeIds([currentCooperative.id]))
+  }, [currentCooperative, supabase])
 
   const scopeLabel = useMemo(() => {
     if (!currentCooperative) return ''

@@ -23,7 +23,8 @@ export async function GET(
     return NextResponse.json({ error: 'Profil introuvable' }, { status: 403 })
   }
 
-  // Only admins or members of the same cooperative can query ATS
+  // Only admins with access to the member's cooperative can query ATS.
+  // faitiere_admin and union_admin can see child cooperatives via the hierarchy RPC.
   if (profile.role !== 'super_admin') {
     const { data: member } = await supabase
       .from('members')
@@ -31,7 +32,15 @@ export async function GET(
       .eq('id', id)
       .single()
 
-    if (!member || member.cooperative_id !== profile.cooperative_id) {
+    if (!member) {
+      return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
+    }
+
+    const { data: accessibleIds } = await supabase
+      .rpc('get_accessible_cooperative_ids')
+
+    const allowed = Array.isArray(accessibleIds) && accessibleIds.includes(member.cooperative_id)
+    if (!allowed) {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
   }

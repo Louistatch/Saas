@@ -567,14 +567,14 @@ export default function VerifyCardPage() {
         })()}
 
         {/* ─── Invalid / Not Found states ─── */}
-        {!isValid && result.member && (
+        {!isValid && (result.member || result.card?.status === 'expired') && (
           <div className="rounded-2xl bg-red-950/20 border border-red-500/15 p-6 text-center vfp-enter">
             <XCircle className="h-12 w-12 text-red-400/60 mx-auto mb-3" />
             <h2 className="text-lg font-bold text-white">{result.card?.status === 'expired' ? 'Carte Expirée' : 'Carte Invalide'}</h2>
             <p className="text-white/50 text-sm mt-1">Contactez votre coopérative pour renouveler.</p>
           </div>
         )}
-        {!result.member && (
+        {!result.member && result.card?.status !== 'expired' && (
           <div className="rounded-2xl bg-red-950/20 border border-red-500/15 p-6 text-center vfp-enter">
             <XCircle className="h-12 w-12 text-red-400/60 mx-auto mb-3" />
             <h2 className="text-lg font-bold text-white">Carte Non Trouvée</h2>

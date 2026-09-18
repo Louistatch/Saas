@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
+import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 import {
   fetchOpenMeteoForRegion,
   fetchGFSForRegion,
@@ -16,9 +17,13 @@ import {
 } from '@/lib/weather/open-meteo'
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ card_number: string }> }
 ) {
+  // H2 FIX: rate-limit before the 7 parallel Open-Meteo + 2 Supabase calls
+  const blocked = await applyRateLimit(request, 'verify')
+  if (blocked) return blocked
+
   const { card_number } = await params
   const cardNumber = decodeURIComponent(card_number).toUpperCase().trim()
 
@@ -136,31 +141,28 @@ export async function GET(
 
   const city = getRegionCoords(region)?.city ?? region
 
-  return NextResponse.json(
-    {
-      weather,
-      hourly: mergedHourly,
-      nowcast: nowcastRaw,
-      seasonal: seasonalRaw,
-      region,
-      city,
-      data_source: dataSource,
-      models: ['ecmwf_ifs025', 'gfs_seamless', 'icon_seamless'],
-      updated_at: new Date().toISOString(),
-      agro_insights: {
-        drought_risk: droughtRisk,
-        planting_window: plantingOk ? 'Conditions favorables les prochains jours' : null,
-        spray_window: sprayWindow,
-        water_stress_days: waterStressDays,
-        heat_stress_days: heatStressDays,
-      },
+  // H1 FIX: do NOT set an explicit Cache-Control header here.
+  // next.config.mjs already applies 'no-store' to /verify/:path* which covers
+  // this route. An explicit public/s-maxage header would override that and
+  // cause CDN nodes to cache a response that contains the member's region
+  // (personal data tied to the card). Let next.config.mjs be the single source
+  // of truth for caching policy on all /verify/* routes.
+  return NextResponse.json({
+    weather,
+    hourly: mergedHourly,
+    nowcast: nowcastRaw,
+    seasonal: seasonalRaw,
+    region,
+    city,
+    data_source: dataSource,
+    models: ['ecmwf_ifs025', 'gfs_seamless', 'icon_seamless'],
+    updated_at: new Date().toISOString(),
+    agro_insights: {
+      drought_risk: droughtRisk,
+      planting_window: plantingOk ? 'Conditions favorables les prochains jours' : null,
+      spray_window: sprayWindow,
+      water_stress_days: waterStressDays,
+      heat_stress_days: heatStressDays,
     },
-    {
-      headers: {
-        // Weather data is regional (not personal) — safe to cache at CDN/shared level
-        // 30 min fresh + serve stale for up to 1h while revalidating in background
-        'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=3600',
-      },
-    }
-  )
+  })
 }
