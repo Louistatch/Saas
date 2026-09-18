@@ -2,7 +2,7 @@
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Download, FileText, Sprout } from 'lucide-react'
+import { Download, FileText, Sprout, MapPin } from 'lucide-react'
 import type { PublicFiche } from '@/hooks/use-fiches-public'
 
 interface FicheCardProps {
@@ -41,6 +41,18 @@ export function FicheCard({ fiche, cultureIcon, onAccess }: FicheCardProps) {
           <p className="text-sm text-muted-foreground line-clamp-3 mb-3">
             {fiche.description}
           </p>
+        ) : null}
+
+        {/* Locality — découpage administratif */}
+        {(fiche.region || fiche.prefecture || fiche.canton) ? (
+          <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
+            <MapPin className="h-3 w-3 shrink-0 text-primary/70" />
+            <span className="truncate">
+              {[fiche.region?.name, fiche.prefecture?.name, fiche.canton?.name]
+                .filter(Boolean)
+                .join(' › ')}
+            </span>
+          </div>
         ) : null}
 
         {/* Cooperative + campaign */}

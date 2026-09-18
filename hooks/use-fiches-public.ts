@@ -19,6 +19,10 @@ export interface PublicFiche {
   prefecture_id: string | null
   region_id: string | null
   cooperatives: { name: string; faitiere_name: string | null } | null
+  // Joined locality names returned by /api/fiches/public
+  region: { id: string; name: string } | null
+  prefecture: { id: string; name: string } | null
+  canton: { id: string; name: string } | null
 }
 
 interface FichesResult {
