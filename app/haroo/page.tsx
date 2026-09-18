@@ -27,7 +27,7 @@ import { ProtectedRoute } from '@/app/components/protected-route'
 import { useAuth } from '@/app/context/auth-context'
 import { performLogout } from '@/lib/auth/logout'
 import { createClient } from '@/lib/supabase/client'
-import { isHarooRole } from '@/lib/utils/permissions'
+import { isHarooRole, effectiveHarooType } from '@/lib/utils/permissions'
 import { Spinner } from '@/components/shared/loading'
 
 /**
@@ -288,11 +288,14 @@ function HarooSpaceInner() {
   const [togglingDispo, setTogglingDispo] = useState(false)
 
   const role = user?.role
-  const harooRole = role && isHarooRole(role) ? (role as HarooRoleKey) : null
+  // harooType fait foi ; le rôle hérité ne sert que pour les comptes créés
+  // avant que la couche Haroo n'ait sa propre colonne.
+  const harooRole = (effectiveHarooType(role, user?.harooType) as HarooRoleKey | null) ?? null
 
-  // Les utilisateurs non-Haroo ont leur propre espace.
+  // On n'expulse que les comptes SANS couche Haroo. Un membre de coopérative
+  // qui a activé Haroo a parfaitement sa place ici.
   useEffect(() => {
-    if (user && !isHarooRole(user.role)) {
+    if (user && !isHarooRole(user.role, user.harooType)) {
       router.replace(user.role === 'super_admin' ? '/admin' : '/dashboard')
     }
   }, [user, router])

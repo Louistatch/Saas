@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
   if (!ctx) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
-  if (!isHarooRole(ctx.role)) {
+  if (!isHarooRole(ctx.role, ctx.harooType)) {
     return NextResponse.json({ error: 'Réservé aux profils Haroo' }, { status: 403 })
   }
 

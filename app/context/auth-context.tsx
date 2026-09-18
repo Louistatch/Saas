@@ -6,11 +6,12 @@ import { createClient } from '@/lib/supabase/client'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createLogger } from '@/lib/utils/logger'
 import { setUserId, setTenantId, onLogoutBroadcast, destroySession } from '@/lib/auth/session'
-import type { AuthUser, UserRole } from '@/types/domain'
+import type { AuthUser, UserRole, HarooType } from '@/types/domain'
+import { effectiveHarooType } from '@/lib/utils/permissions'
 
 const log = createLogger('auth')
 
-export type { AuthUser, UserRole } from '@/types/domain'
+export type { AuthUser, UserRole, HarooType } from '@/types/domain'
 // Backwards-compat re-export so existing imports of `User` keep working.
 export type User = AuthUser
 
@@ -38,6 +39,7 @@ interface ProfileRow {
   first_name: string | null
   last_name: string | null
   role: UserRole
+  haroo_type: HarooType | null
   cooperative_id: string | null
 }
 
@@ -48,6 +50,9 @@ function profileToAuthUser(profile: ProfileRow): AuthUser {
     firstName: profile.first_name ?? '',
     lastName: profile.last_name ?? '',
     role: profile.role,
+    // La colonne fait foi ; le rôle hérité n'est qu'un repli pour les comptes
+    // créés avant que la couche Haroo n'ait sa propre colonne.
+    harooType: effectiveHarooType(profile.role, profile.haroo_type),
     cooperativeId: profile.cooperative_id ?? undefined,
   }
 }
@@ -101,7 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
         const { data, error } = await supabase
           .from('profiles')
-          .select('id, email, first_name, last_name, role, cooperative_id')
+          .select('id, email, first_name, last_name, role, haroo_type, cooperative_id')
           .eq('id', userId)
           .single<ProfileRow>()
         if (!error && data) {

@@ -73,8 +73,20 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(`${base}/auth/login?error=callback_failed`)
       }
 
-      // Role from app_metadata — the ONLY trusted source
-      const role = (user.app_metadata as { role?: string } | undefined)?.role
+      // `profiles` fait foi. Ce callback ne s'exécute qu'une fois par
+      // connexion : on peut s'offrir la lecture, contrairement au middleware
+      // qui tourne à chaque requête et se contente des claims.
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, haroo_type')
+        .eq('id', user.id)
+        .maybeSingle<{ role: string; haroo_type: string | null }>()
+
+      const role = profile?.role
+      const hasOrg = !!role && !['none', 'ouvrier', 'acheteur', 'agronome'].includes(role)
+      const hasHaroo =
+        !!profile?.haroo_type ||
+        (!!role && ['ouvrier', 'acheteur', 'agronome'].includes(role))
 
       // Validate ?next parameter: must start with '/' and not '//' (open redirect prevention)
       const validNext = next && /^\/[^/]/.test(next) ? next : null
@@ -85,6 +97,12 @@ export async function GET(request: NextRequest) {
 
       if (role === 'super_admin') {
         return NextResponse.redirect(`${base}/admin`)
+      }
+
+      // Couche organisationnelle prioritaire : son dashboard porte la bascule
+      // vers Haroo pour les comptes qui ont les deux.
+      if (!hasOrg && hasHaroo) {
+        return NextResponse.redirect(`${base}/haroo`)
       }
 
       return NextResponse.redirect(`${base}/dashboard`)

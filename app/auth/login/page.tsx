@@ -13,7 +13,7 @@ import { Eye, EyeOff, ArrowLeft } from 'lucide-react'
 import { useAuth } from '@/app/context/auth-context'
 import { Spinner } from '@/components/shared/loading'
 import { errorMessage } from '@/lib/utils/errors'
-import { isHarooRole } from '@/lib/utils/permissions'
+import { isHarooRole, hasOrgLayer } from '@/lib/utils/permissions'
 import { flattenZodErrors, loginSchema } from '@/lib/validators/schemas'
 
 /**
@@ -81,7 +81,9 @@ function LoginInner() {
       // Un professionnel Haroo ne doit jamais être renvoyé vers le dashboard
       // coopérative, même si ?redirect=/dashboard a été posé par le middleware
       // lors d'une visite déconnectée — son espace est /haroo.
-      const harooUser = isHarooRole(user?.role)
+      // Haroo SEUL : un compte qui porte aussi la couche organisationnelle
+      // atterrit sur son dashboard, d'où il bascule vers Haroo.
+      const harooUser = !hasOrgLayer(user?.role) && isHarooRole(user?.role, user?.harooType)
       const applicableRedirect =
         harooUser && safeRedirect && (safeRedirect.startsWith('/dashboard') || safeRedirect.startsWith('/admin'))
           ? null

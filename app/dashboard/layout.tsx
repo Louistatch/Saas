@@ -33,7 +33,7 @@ import { useEffect, useState } from 'react'
 import { Logo } from '@/components/shared/logo'
 import { useAuth } from '@/app/context/auth-context'
 import { performLogout } from '@/lib/auth/logout'
-import { isHarooRole } from '@/lib/utils/permissions'
+import { isHarooRole, hasOrgLayer } from '@/lib/utils/permissions'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { ProtectedRoute } from '@/app/components/protected-route'
 import { NotificationBell } from '@/components/shared/notification-bell'
@@ -108,15 +108,19 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { currentCooperative, cooperatives, switchCooperative } = useCooperative()
   const [gestionOpen, setGestionOpen] = useState(false)
 
-  // Haroo professionals have their own space — redirect them out
+  // Un compte peut porter les deux couches : on ne renvoie vers /haroo que
+  // les profils Haroo SANS couche organisationnelle. Sinon un membre de
+  // coopérative qui active Haroo serait expulsé de son propre dashboard.
+  const harooOnly = !!user && !hasOrgLayer(user.role) && isHarooRole(user.role, user.harooType)
+
   useEffect(() => {
-    if (user && isHarooRole(user.role)) router.replace('/haroo')
-  }, [user, router])
+    if (harooOnly) router.replace('/haroo')
+  }, [harooOnly, router])
 
   const isActive = (href: string) =>
     href === '/dashboard' ? pathname === href : pathname.startsWith(href)
 
-  if (user && isHarooRole(user.role)) {
+  if (harooOnly) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="space-y-4 text-center">

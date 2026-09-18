@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/app/context/auth-context'
 import { performLogout } from '@/lib/auth/logout'
-import { isHarooRole } from '@/lib/utils/permissions'
+import { isHarooRole, hasOrgLayer } from '@/lib/utils/permissions'
 import { cn } from '@/lib/utils'
 import { LayoutDashboard, LogOut } from 'lucide-react'
 
@@ -34,7 +34,7 @@ export function AuthButtons({
     const dashboardUrl =
       user.role === 'super_admin'
         ? '/admin'
-        : isHarooRole(user.role)
+        : !hasOrgLayer(user.role) && isHarooRole(user.role, user.harooType)
           ? '/haroo'
           : '/dashboard'
     return (

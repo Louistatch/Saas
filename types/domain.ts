@@ -6,12 +6,22 @@
  * is heavily used in CRUD forms).
  */
 
+/**
+ * Un compte porte deux couches indépendantes :
+ *   - `role`       : la couche organisationnelle (coopératives)
+ *   - `harooType`  : la couche Haroo (professionnels indépendants)
+ * Chacune peut être absente, et les deux peuvent coexister sur un même compte.
+ */
 export type UserRole =
   | 'super_admin'
   | 'cooperative_admin'
   | 'member'
   | 'guest'
-  // Professionnels Haroo — comptes créés via AgriTogo dans la même Supabase
+  /** Aucune couche organisationnelle — compte Haroo seul, ou en cours d'onboarding. */
+  | 'none'
+  // Dépréciés : la couche Haroo vit désormais dans `harooType`. Ces valeurs
+  // restent typées le temps que les comptes créés avant la bascule soient
+  // migrés, et parce qu'un enum Postgres ne se dégarnit pas.
   | 'ouvrier'
   | 'acheteur'
   | 'agronome'
@@ -21,10 +31,22 @@ export const USER_ROLES = [
   'cooperative_admin',
   'member',
   'guest',
+  'none',
   'ouvrier',
   'acheteur',
   'agronome',
 ] as const satisfies readonly UserRole[]
+
+/** Couche Haroo. `null` = non activée. Un seul profil à la fois. */
+export type HarooType = 'ouvrier' | 'acheteur' | 'agronome'
+
+export const HAROO_TYPES = ['ouvrier', 'acheteur', 'agronome'] as const satisfies readonly HarooType[]
+
+export const HAROO_TYPE_LABELS: Record<HarooType, string> = {
+  ouvrier: 'Ouvrier agricole',
+  acheteur: 'Acheteur',
+  agronome: 'Agronome',
+}
 
 export type MemberStatus = 'active' | 'inactive' | 'suspended'
 export type CardStatus = 'active' | 'pending' | 'expired' | 'revoked'
@@ -37,6 +59,7 @@ export interface Profile {
   first_name: string | null
   last_name: string | null
   role: UserRole
+  haroo_type: HarooType | null
   cooperative_id: string | null
   created_at: string
   cooperative?: { name: string } | null
@@ -48,6 +71,7 @@ export interface AuthUser {
   firstName: string
   lastName: string
   role: UserRole
+  harooType: HarooType | null
   cooperativeId?: string
 }
 

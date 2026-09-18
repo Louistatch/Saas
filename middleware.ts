@@ -75,20 +75,35 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // /admin requires super_admin
+  // Les claims du JWT ne sont qu'un miroir de `profiles`, rafraîchi au
+  // renouvellement du jeton. Ils peuvent être absents (comptes antérieurs au
+  // hook) ou périmés (entre une activation et le refresh). Ils servent donc
+  // au routage, jamais à l'autorisation.
+  const claims = user?.app_metadata as
+    | { role?: string; haroo_type?: string }
+    | undefined
+
+  // /admin : pré-filtre peu coûteux seulement. On ne détourne que sur un claim
+  // présent ET contradictoire — un claim absent laisse passer, et c'est
+  // requireRole('super_admin') dans app/admin/layout.tsx, qui lit `profiles`,
+  // qui trancherait. Bloquer sur un claim manquant fermerait la porte aux
+  // super_admins dont app_metadata n'a jamais été renseigné.
   if (user && pathname.startsWith('/admin')) {
-    const role = (user.app_metadata as { role?: string } | undefined)?.role
-    if (role !== 'super_admin') {
+    if (claims?.role && claims.role !== 'super_admin') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
   }
 
   // Auth pages: if already authenticated, redirect to their space (avoid login page when logged in)
   if (isAuthPage && user && pathname === '/auth/login') {
-    // Les professionnels Haroo (créés via AgriTogo) portent haroo_type dans
-    // app_metadata — leur espace est /haroo, pas le dashboard coopérative.
-    const isHaroo = !!(user.app_metadata as { haroo_type?: string } | undefined)?.haroo_type
-    return NextResponse.redirect(new URL(isHaroo ? '/haroo' : '/dashboard', request.url))
+    // Un compte porte deux couches indépendantes. La couche organisationnelle
+    // prime : son dashboard porte la bascule vers Haroo.
+    const orgRole = claims?.role
+    const hasOrg =
+      !!orgRole && !['none', 'ouvrier', 'acheteur', 'agronome'].includes(orgRole)
+    const hasHaroo = !!claims?.haroo_type
+    const destination = hasOrg ? '/dashboard' : hasHaroo ? '/haroo' : '/dashboard'
+    return NextResponse.redirect(new URL(destination, request.url))
   }
 
   return supabaseResponse

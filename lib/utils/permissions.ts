@@ -38,7 +38,7 @@
  * - Only faîtière/union admins can create child cooperatives
  */
 
-import type { UserRole } from '@/types/domain'
+import type { UserRole, HarooType } from '@/types/domain'
 
 // ─── Effective Role Resolution ───────────────────────────────────────────────
 
@@ -102,9 +102,34 @@ export function canManageCooperative(role?: UserRole | null): boolean {
   return role === 'super_admin' || role === 'cooperative_admin'
 }
 
-/** Professionnel Haroo (ouvrier, acheteur ou agronome) — espace dédié /haroo */
-export function isHarooRole(role?: UserRole | null): boolean {
+/**
+ * Professionnel Haroo (ouvrier, acheteur ou agronome) — espace dédié /haroo.
+ *
+ * `harooType` fait foi. `role` n'est lu qu'en repli, pour les comptes créés
+ * avant que la couche Haroo n'ait sa propre colonne et pas encore migrés.
+ */
+export function isHarooRole(role?: UserRole | null, harooType?: HarooType | null): boolean {
+  if (harooType) return true
   return role === 'ouvrier' || role === 'acheteur' || role === 'agronome'
+}
+
+/** Le compte a-t-il une couche organisationnelle active ? */
+export function hasOrgLayer(role?: UserRole | null): boolean {
+  if (!role || role === 'none') return false
+  return !(role === 'ouvrier' || role === 'acheteur' || role === 'agronome')
+}
+
+/**
+ * Type Haroo effectif du compte : la colonne si elle est posée, sinon le rôle
+ * hérité. Renvoie `null` quand la couche Haroo n'est pas activée.
+ */
+export function effectiveHarooType(
+  role?: UserRole | null,
+  harooType?: HarooType | null,
+): HarooType | null {
+  if (harooType) return harooType
+  if (role === 'ouvrier' || role === 'acheteur' || role === 'agronome') return role
+  return null
 }
 
 /** Can this user manage the marketplace (fiches techniques)? */
@@ -160,6 +185,7 @@ export function roleLabel(role: UserRole): string {
     case 'cooperative_admin': return 'Administrateur'
     case 'member': return 'Membre'
     case 'guest': return 'Invité'
+    case 'none': return 'Sans organisation'
     case 'ouvrier': return 'Ouvrier Haroo'
     case 'acheteur': return 'Acheteur Haroo'
     case 'agronome': return 'Agronome Haroo'

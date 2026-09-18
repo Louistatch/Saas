@@ -9,11 +9,13 @@ import 'server-only'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { redirect } from 'next/navigation'
-import type { UserRole } from '@/types/domain'
+import type { UserRole, HarooType } from '@/types/domain'
+import { effectiveHarooType } from '@/lib/utils/permissions'
 
 export interface AccessContext {
   userId: string
   role: UserRole
+  harooType: HarooType | null
   cooperativeId: string | null
   cooperativeLevel: string | null
   supabase: Awaited<ReturnType<typeof createClient>>
@@ -28,11 +30,14 @@ export async function getAccessContext(): Promise<AccessContext | null> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
+  // `profiles` est la seule source de vérité pour l'autorisation. Les claims
+  // du JWT ne servent qu'au routage côté edge : ils peuvent être périmés
+  // entre une activation et le renouvellement du jeton.
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, cooperative_id')
+    .select('role, haroo_type, cooperative_id')
     .eq('id', user.id)
-    .single<{ role: string; cooperative_id: string | null }>()
+    .single<{ role: string; haroo_type: string | null; cooperative_id: string | null }>()
 
   if (!profile) return null
 
@@ -50,6 +55,10 @@ export async function getAccessContext(): Promise<AccessContext | null> {
   return {
     userId: user.id,
     role: profile.role as AccessContext['role'],
+    harooType: effectiveHarooType(
+      profile.role as UserRole,
+      profile.haroo_type as HarooType | null,
+    ),
     cooperativeId: profile.cooperative_id,
     cooperativeLevel,
     supabase,
