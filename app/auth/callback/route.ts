@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
               .eq('id', cbUser.id)
               .maybeSingle()
             if (!cbProfile?.cooperative_id) {
-              return NextResponse.redirect(`${base}/auth/onboarding?welcome=1`)
+              return NextResponse.redirect(`${base}/dashboard?welcome=1`)
             }
           }
         }

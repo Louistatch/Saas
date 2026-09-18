@@ -1,11 +1,25 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
+import { rateLimit, clientKeyFromHeaders } from '@/lib/utils/rate-limit'
+import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ card_number: string }> }
 ) {
+  const blocked = await applyRateLimit(request, 'verify')
+  if (blocked) return blocked
+
+  const ip = clientKeyFromHeaders(request.headers)
+  const limit = rateLimit(`verify:${ip}`, 10, 60_000)
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: 'Trop de requêtes. Réessayez dans quelques instants.' },
+      { status: 429 }
+    )
+  }
+
   const { card_number } = await params
   const cardNumber = decodeURIComponent(card_number).toUpperCase().trim()
 
@@ -34,8 +48,5 @@ export async function GET(
   const total_ha = list.reduce((s, p) => s + (p.superficie_ha ?? p.surface_ha ?? 0), 0)
   const cultures = [...new Set(list.map((p) => p.culture_principale ?? p.culture_name).filter(Boolean))]
 
-  return NextResponse.json(
-    { parcelles: list, total_ha, cultures },
-    { headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=300' } },
-  )
+  return NextResponse.json({ parcelles: list, total_ha, cultures })
 }
