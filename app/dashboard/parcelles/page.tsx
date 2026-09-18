@@ -92,7 +92,8 @@ export default function ParcellesPage() {
   useEffect(() => {
     if (!currentCooperative) { setScopeIds([]); return }
     supabase.rpc('get_accessible_cooperative_ids').then(({ data }) => {
-      setScopeIds(Array.isArray(data) && data.length > 0 ? data : [currentCooperative.id])
+      const ids = Array.isArray(data) ? (data as string[]) : []
+      setScopeIds(ids.length > 0 ? ids : [currentCooperative.id])
     }).catch(() => setScopeIds([currentCooperative.id]))
   }, [currentCooperative, supabase])
 
