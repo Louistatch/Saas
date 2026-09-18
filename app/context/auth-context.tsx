@@ -93,8 +93,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchProfile = useCallback(
     async (userId: string): Promise<AuthUser | null> => {
       if (!supabase) return null
-      // Try up to 2 times (the profile trigger may not have fired yet on first login)
-      for (let attempt = 0; attempt < 2; attempt++) {
+      // C3 FIX: retry up to 6 times / 800 ms each = 4.8 s total.
+      // This must exceed the server-side trigger wait (MAX_PROFILE_WAIT × 400 ms = 3.2 s)
+      // to avoid zombie-session false-positives on slow DB triggers.
+      const MAX_ATTEMPTS = 6
+      const RETRY_MS = 800
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
         const { data, error } = await supabase
           .from('profiles')
           .select('id, email, first_name, last_name, role, cooperative_id')
@@ -103,11 +107,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!error && data) {
           return profileToAuthUser(data)
         }
-        if (attempt === 0) {
-          // Wait 1s and retry — gives the trigger time to create the profile
-          await new Promise((r) => setTimeout(r, 1000))
+        if (attempt < MAX_ATTEMPTS - 1) {
+          await new Promise((r) => setTimeout(r, RETRY_MS))
         } else {
-          log.debug('Profile not available after retry', { code: error?.code })
+          log.debug('Profile not available after retries', { code: error?.code })
         }
       }
       return null
@@ -226,11 +229,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       cooperativeName?: string,
     ): Promise<{ needsEmailConfirmation: boolean }> => {
       if (!supabase) throw new Error('Auth client not initialized')
+      // C1 FIX: encode cooperativeName in the email redirect URL so the callback
+      // can run complete-signup after email confirmation (when no session exists yet).
+      const callbackUrl = new URL(`${window.location.origin}/auth/callback`)
+      if (cooperativeName) {
+        callbackUrl.searchParams.set('cooperative', cooperativeName)
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: callbackUrl.toString(),
           data: {
             first_name: firstName,
             last_name: lastName,
@@ -241,9 +251,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error
       if (!data.user) return { needsEmailConfirmation: false }
 
-      // When email confirmation is ON, there is no active session yet, so the
-      // cooperative bootstrap can't run here — it will run after the user
-      // confirms and lands authenticated. Signal the UI to show a check-email screen.
+      // When email confirmation is ON, hasSession=false → complete-signup will
+      // run in the callback route after the user clicks the confirmation link.
+      // When confirmation is OFF, the session is immediately available → run now.
       const hasSession = !!data.session
       if (cooperativeName && hasSession) {
         // AUTH-03: cooperative creation + role assignment happen SERVER-SIDE.

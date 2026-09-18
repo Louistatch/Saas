@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { runCompleteSignup } from '@/lib/auth/complete-signup'
+import { createLogger } from '@/lib/utils/logger'
+
+const log = createLogger('auth:callback')
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
   const next = searchParams.get('next')
   const type = searchParams.get('type')
+  // cooperative name encoded by signup() in auth-context when email confirmation is ON
+  const cooperativeParam = searchParams.get('cooperative')
 
   // Use request.nextUrl.origin as the trusted base URL
   // NEVER trust x-forwarded-host for redirect targets (open redirect risk)
@@ -16,19 +22,35 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error) {
-      // AUTH-05: password-recovery links carry type=recovery. After exchanging
-      // the code (which creates the recovery session), route the user to the
-      // set-new-password screen instead of the dashboard.
+      // AUTH-05: password-recovery links carry type=recovery.
       if (type === 'recovery') {
         return NextResponse.redirect(`${base}/auth/reset-password`)
       }
 
-      // Email-confirmation links (type=signup) → welcome the user.
+      // C1+C2 FIX: Email-confirmation links (type=signup or type=email).
+      // The session is now active — if a cooperativeName was encoded in the
+      // redirect URL, run complete-signup now before sending to the dashboard.
       if (type === 'signup' || type === 'email') {
+        if (cooperativeParam) {
+          const cooperativeName = decodeURIComponent(cooperativeParam)
+          const result = await runCompleteSignup(supabase, cooperativeName)
+          if (!result.ok && result.status !== 409) {
+            // 409 = already linked (idempotent), treat as success.
+            // Any other error → send to a recoverable error page so the user
+            // can retry rather than silently land on a broken dashboard.
+            log.error('complete-signup failed in callback', {
+              status: result.status,
+              error: result.error,
+            })
+            return NextResponse.redirect(
+              `${base}/auth/login?error=setup_failed&retry=1`,
+            )
+          }
+        }
         return NextResponse.redirect(`${base}/dashboard?welcome=1`)
       }
 
-      // Check user role from app_metadata ONLY (server-controlled, never user_metadata)
+      // All other events (magic link, OAuth, etc.) — route by role.
       const { data: { user }, error: userError } = await supabase.auth.getUser()
 
       if (userError || !user) {
