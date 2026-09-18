@@ -101,7 +101,7 @@ export async function GET(
     .from('member_cards')
     .select('id, card_number, status, expiry_date, created_at, member_id, cooperative_id, card_type')
     .in('card_number', variants)
-    .eq('status', 'active')
+    .in('status', ['active', 'expired'])
     .limit(1)
     .maybeSingle()
 

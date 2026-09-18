@@ -46,6 +46,22 @@ export async function GET(request: NextRequest) {
               `${base}/auth/login?error=setup_failed&retry=1`,
             )
           }
+        } else {
+          // cooperativeParam may have been stripped by an email client.
+          // Check if the profile already has a cooperative; if not, send to
+          // onboarding so the user can finish setup instead of landing on a
+          // broken dashboard with no cooperative context.
+          const { data: { user: cbUser } } = await supabase.auth.getUser()
+          if (cbUser) {
+            const { data: cbProfile } = await supabase
+              .from('profiles')
+              .select('cooperative_id')
+              .eq('id', cbUser.id)
+              .maybeSingle()
+            if (!cbProfile?.cooperative_id) {
+              return NextResponse.redirect(`${base}/auth/onboarding?welcome=1`)
+            }
+          }
         }
         return NextResponse.redirect(`${base}/dashboard?welcome=1`)
       }
