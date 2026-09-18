@@ -338,12 +338,12 @@ export default function CotisationsPage() {
                         <p className="text-sm text-muted-foreground">
                           {typeInfo?.label ?? cot.type}
                           {cot.campaign ? ` • ${cot.campaign}` : ''}
-                          {cot.due_date ? ` • Échéance: ${cot.due_date}` : ''}
+                          {cot.due_date ? ` • Échéance: ${new Date(cot.due_date).toLocaleDateString('fr-FR')}` : ''}
                         </p>
                       </div>
                       <div className="text-right shrink-0">
                         <p className="font-bold text-foreground">{formatAmount(cot.amount)}</p>
-                        {cot.paid_date && <p className="text-xs text-green-600">Payé le {cot.paid_date}</p>}
+                        {cot.paid_date && <p className="text-xs text-green-600">Payé le {new Date(cot.paid_date).toLocaleDateString('fr-FR')}</p>}
                       </div>
                       {cot.status === 'pending' && (
                         <>
