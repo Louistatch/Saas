@@ -91,10 +91,15 @@ export default function ParcellesPage() {
   const [scopeIds, setScopeIds] = useState<string[]>([])
   useEffect(() => {
     if (!currentCooperative) { setScopeIds([]); return }
-    supabase.rpc('get_accessible_cooperative_ids').then(({ data }) => {
-      const ids = Array.isArray(data) ? (data as string[]) : []
-      setScopeIds(ids.length > 0 ? ids : [currentCooperative.id])
-    }).catch(() => setScopeIds([currentCooperative.id]))
+    ;(async () => {
+      try {
+        const { data } = await supabase.rpc('get_accessible_cooperative_ids')
+        const ids = Array.isArray(data) ? (data as string[]) : []
+        setScopeIds(ids.length > 0 ? ids : [currentCooperative.id])
+      } catch {
+        setScopeIds([currentCooperative.id])
+      }
+    })()
   }, [currentCooperative, supabase])
 
   const scopeLabel = useMemo(() => {
