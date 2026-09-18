@@ -2,30 +2,71 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { ArrowRight, ScanLine, Network, CheckCircle, CreditCard, Users, QrCode } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-/* ── Animated counter ── */
+interface PlatformStats {
+  members: number
+  cooperatives: number
+  hectares: number
+  cards: number
+}
+
+const REFRESH_MS = 5 * 60 * 1000 // 5 min
+
+/* ── Live stats hook ── */
+function usePlatformStats() {
+  const [stats, setStats] = useState<PlatformStats | null>(null)
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await fetch('/api/stats', { cache: 'no-store' })
+      if (res.ok) {
+        const data = (await res.json()) as PlatformStats
+        setStats(data)
+      }
+    } catch {
+      // keep previous value on network error
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchStats()
+    const id = setInterval(fetchStats, REFRESH_MS)
+    return () => clearInterval(id)
+  }, [fetchStats])
+
+  return stats
+}
+
+/* ── Animated counter (re-animates when target changes) ── */
 function useCountUp(target: number, duration = 1400) {
   const [value, setValue] = useState(0)
   const [done, setDone] = useState(false)
   const rafRef = useRef<number | null>(null)
+  const prevTarget = useRef(0)
 
   useEffect(() => {
+    if (target === prevTarget.current) return
+    prevTarget.current = target
+    setDone(false)
+    const from = value
     const start = performance.now()
     const tick = (now: number) => {
       const p = Math.min((now - start) / duration, 1)
       const eased = 1 - (1 - p) ** 3
-      setValue(Math.round(eased * target))
+      setValue(Math.round(from + eased * (target - from)))
       if (p < 1) {
         rafRef.current = requestAnimationFrame(tick)
       } else {
         setDone(true)
       }
     }
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
     rafRef.current = requestAnimationFrame(tick)
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target, duration])
 
   return { value, done }
@@ -33,13 +74,9 @@ function useCountUp(target: number, duration = 1400) {
 
 function Stat({ target, suffix, label }: { target: number; suffix: string; label: string }) {
   const { value, done } = useCountUp(target)
-  const display = done
-    ? target >= 1000
-      ? `${(target / 1000).toFixed(1).replace('.0', '').replace('.', ',')} ${target >= 1000 ? 'k' : ''}${suffix}`
-      : `${target}${suffix}`
-    : value >= 1000
-      ? `${(value / 1000).toFixed(1).replace('.', ',')} k${suffix}`
-      : `${value}${suffix}`
+  const fmt = (n: number) =>
+    n >= 1000 ? `${(n / 1000).toFixed(1).replace('.0', '').replace('.', ',')} k` : `${n}`
+  const display = (done ? fmt(target) : fmt(value)) + suffix
 
   return (
     <div className="text-center sm:text-left">
@@ -62,7 +99,11 @@ function TrustChip({ icon: Icon, label }: { icon: React.ElementType; label: stri
 }
 
 /* ── Floating UI card: Coopérative ── */
-function CoopCard() {
+function CoopCard({ members }: { members: number }) {
+  const label = members >= 1000
+    ? `${(members / 1000).toFixed(1).replace('.0', '').replace('.', ',')} k+`
+    : members > 0 ? `${members}+` : '—'
+
   return (
     <div
       className="absolute top-6 left-2 sm:left-6 w-44 sm:w-52 rounded-2xl bg-white/95 backdrop-blur-md shadow-2xl border border-white/60 p-4 z-10"
@@ -70,14 +111,14 @@ function CoopCard() {
     >
       <div className="flex items-center gap-2.5 mb-3">
         <div className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">
-          <Users className="h-4.5 w-4.5 text-white h-[18px] w-[18px]" />
+          <Users className="h-[18px] w-[18px] text-white" />
         </div>
         <div>
           <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Coopérative</div>
         </div>
       </div>
       <div className="text-[11px] text-muted-foreground mb-0.5">Membres</div>
-      <div className="text-3xl font-extrabold text-primary tracking-tight leading-none">2 400+</div>
+      <div className="text-3xl font-extrabold text-primary tracking-tight leading-none">{label}</div>
       <div className="mt-2 h-1.5 bg-primary/10 rounded-full overflow-hidden">
         <div className="h-full bg-primary rounded-full" style={{ width: '82%', animation: 'heroBar 1.2s ease-out 0.6s both' }} />
       </div>
@@ -109,6 +150,13 @@ function QrCard() {
 
 /* ── Main hero ── */
 export function HeroSection() {
+  const stats = usePlatformStats()
+
+  // Fallback to 0 while loading — counters animate up from 0 once real data arrives
+  const members = stats?.members ?? 0
+  const coops = stats?.cooperatives ?? 0
+  const hectares = stats?.hectares ?? 0
+
   return (
     <>
       {/* Global keyframes injected once */}
@@ -222,11 +270,11 @@ export function HeroSection() {
                 <TrustChip icon={QrCode} label="Scanner QR universel" />
               </div>
 
-              {/* Stats */}
+              {/* Stats — live depuis Supabase, refresh toutes les 5 min */}
               <div className="hero-a6 grid grid-cols-3 gap-4 border-t pt-5" style={{ borderColor: 'rgba(0,0,0,0.08)' }}>
-                <Stat target={2400} suffix="+" label="Membres enregistrés" />
-                <Stat target={12} suffix="" label="Coopératives actives" />
-                <Stat target={850} suffix=" ha" label="Parcelles gérées" />
+                <Stat target={members} suffix="+" label="Membres enregistrés" />
+                <Stat target={coops} suffix="" label="Coopératives actives" />
+                <Stat target={hectares} suffix=" ha" label="Parcelles gérées" />
               </div>
             </div>
 
@@ -261,7 +309,7 @@ export function HeroSection() {
                 </div>
 
                 {/* Floating cards */}
-                <CoopCard />
+                <CoopCard members={members} />
                 <QrCard />
               </div>
             </div>
