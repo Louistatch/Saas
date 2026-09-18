@@ -2,11 +2,13 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Building2, Users, ShoppingCart, CreditCard, Briefcase, Activity } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Building2, Users, ShoppingCart, CreditCard, Briefcase, Activity, BarChart3 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { LoadingBlock, Spinner } from '@/components/shared/loading'
+import { EmptyState } from '@/components/shared/empty-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { timeAgo } from '@/lib/utils/time'
 import { createLogger } from '@/lib/utils/logger'
@@ -53,6 +55,14 @@ interface PlatformTotals {
   total_active_cards: number | string
 }
 
+interface CoopStat {
+  id: string
+  name: string
+  member_count: number
+  exploitation_count: number
+  card_count: number
+}
+
 /** Événement de workflow (génération de carte, création de membre, inscription Haroo). */
 interface ActivityItem {
   label: string
@@ -86,6 +96,7 @@ export default function AdminOverview() {
     totalUsers: 0,
   })
   const [coops, setCoops] = useState<CoopRow[]>([])
+  const [coopStats, setCoopStats] = useState<CoopStat[]>([])
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -171,18 +182,33 @@ export default function AdminOverview() {
     })
 
     if (!statsView.error && statsView.data) {
-      setCoops(
-        (statsView.data as StatsView[]).map((c) => ({
-          id: c.id,
-          name: c.name,
-          level: c.level,
-          created_at: c.created_at,
-          member_count: Number(c.member_count ?? 0),
-          exploitation_count: Number(c.exploitation_count ?? 0),
-          hierarchy_member_count: Number(c.hierarchy_member_count ?? 0),
-          hierarchy_card_count: Number(c.hierarchy_card_count ?? 0),
-        })),
-      )
+      const mapped = (statsView.data as StatsView[]).map((c) => ({
+        id: c.id,
+        name: c.name,
+        level: c.level,
+        created_at: c.created_at,
+        member_count: Number(c.member_count ?? 0),
+        exploitation_count: Number(c.exploitation_count ?? 0),
+        hierarchy_member_count: Number(c.hierarchy_member_count ?? 0),
+        hierarchy_card_count: Number(c.hierarchy_card_count ?? 0),
+      }))
+      setCoops(mapped)
+      // also build full list for analytics tab (sorted by member count)
+      const allStats = await supabase
+        .from('cooperative_stats')
+        .select('id, name, member_count, exploitation_count, active_card_count')
+        .order('member_count', { ascending: false })
+      if (!allStats.error && allStats.data) {
+        setCoopStats(
+          (allStats.data as StatsView[]).map((c) => ({
+            id: c.id,
+            name: c.name,
+            member_count: Number(c.member_count ?? 0),
+            exploitation_count: Number(c.exploitation_count ?? 0),
+            card_count: Number(c.active_card_count ?? 0),
+          })),
+        )
+      }
     } else if (statsView.error) {
       log.warn('cooperative_stats view unavailable', statsView.error.code)
     }
@@ -238,10 +264,24 @@ export default function AdminOverview() {
     haroo: 'bg-secondary-foreground',
   }
 
+  const analyticsMetrics = [
+    { title: 'Total coopératives', value: coopStats.length, icon: Building2 },
+    { title: 'Total membres', value: coopStats.reduce((s, r) => s + r.member_count, 0), icon: Users },
+    { title: 'Exploitations', value: coopStats.reduce((s, r) => s + r.exploitation_count, 0), icon: ShoppingCart },
+    { title: 'Cartes actives', value: coopStats.reduce((s, r) => s + r.card_count, 0), icon: CreditCard },
+  ]
+
   return (
     <div className="space-y-8">
       <PageHeader title="Tableau de bord admin" description="Vue d'ensemble et gestion de la plateforme" />
 
+      <Tabs defaultValue="overview">
+        <TabsList>
+          <TabsTrigger value="overview" className="gap-2"><Activity className="h-4 w-4" />Vue d&apos;ensemble</TabsTrigger>
+          <TabsTrigger value="analytics" className="gap-2"><BarChart3 className="h-4 w-4" />Analytiques</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="mt-6 space-y-8">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         {statCards.map((stat, i) => {
           const Icon = stat.icon
@@ -387,14 +427,120 @@ export default function AdminOverview() {
                 </div>
               ))}
             </div>
-            <Link href="/admin/analytics" className="block mt-4">
-              <Button variant="outline" size="sm" className="w-full border-border">
-                Voir toutes les statistiques
-              </Button>
-            </Link>
           </CardContent>
         </Card>
       </div>
+        </TabsContent>
+
+        <TabsContent value="analytics" className="mt-6 space-y-8">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {analyticsMetrics.map((m, i) => {
+              const Icon = m.icon
+              return (
+                <Card key={i} className="border-border">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <p className="text-sm text-muted-foreground font-medium">{m.title}</p>
+                        <p className="text-2xl font-bold text-foreground mt-2">
+                          {isLoading ? <Spinner className="h-5 w-5" /> : m.value.toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <Icon className="h-6 w-6 text-primary" aria-hidden />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+
+          <Card className="border-border">
+            <CardHeader>
+              <CardTitle className="text-foreground">Performance des coopératives</CardTitle>
+              <CardDescription>Toutes les coopératives classées par nombre de membres</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <LoadingBlock />
+              ) : coopStats.length === 0 ? (
+                <EmptyState title="Aucune coopérative pour le moment" />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-3 px-4 font-semibold text-foreground">#</th>
+                        <th className="text-left py-3 px-4 font-semibold text-foreground">Coopérative</th>
+                        <th className="text-right py-3 px-4 font-semibold text-foreground">Membres</th>
+                        <th className="text-right py-3 px-4 font-semibold text-foreground">Exploitations</th>
+                        <th className="text-right py-3 px-4 font-semibold text-foreground">Cartes actives</th>
+                        <th className="text-right py-3 px-4 font-semibold text-foreground">Taux cartes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {coopStats.map((coop, i) => {
+                        const rate = coop.member_count > 0 ? coop.card_count / coop.member_count : 0
+                        return (
+                          <tr key={coop.id} className="border-b border-border hover:bg-accent/5 transition-colors">
+                            <td className="py-3 px-4">
+                              <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-semibold text-xs">
+                                {i + 1}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 font-medium text-foreground">{coop.name}</td>
+                            <td className="py-3 px-4 text-right text-foreground">{coop.member_count}</td>
+                            <td className="py-3 px-4 text-right text-muted-foreground">{coop.exploitation_count}</td>
+                            <td className="py-3 px-4 text-right text-muted-foreground">{coop.card_count}</td>
+                            <td className="py-3 px-4 text-right">
+                              <span className={`text-sm font-medium ${rate > 0.5 ? 'text-green-600' : 'text-muted-foreground'}`}>
+                                {coop.member_count > 0 ? `${Math.round(rate * 100)}%` : '—'}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-6 md:grid-cols-3">
+            {[
+              {
+                label: 'Moy. membres / Coopérative',
+                value: coopStats.length > 0
+                  ? (coopStats.reduce((s, r) => s + r.member_count, 0) / coopStats.length).toFixed(1)
+                  : '—',
+              },
+              {
+                label: 'Moy. exploitations / Coopérative',
+                value: coopStats.length > 0
+                  ? (coopStats.reduce((s, r) => s + r.exploitation_count, 0) / coopStats.length).toFixed(1)
+                  : '—',
+              },
+              {
+                label: 'Couverture cartes globale',
+                value: (() => {
+                  const totalMembers = coopStats.reduce((s, r) => s + r.member_count, 0)
+                  const totalCards = coopStats.reduce((s, r) => s + r.card_count, 0)
+                  return totalMembers > 0 ? `${Math.round((totalCards / totalMembers) * 100)}%` : '—'
+                })(),
+              },
+            ].map((item, i) => (
+              <Card key={i} className="border-border">
+                <CardContent className="pt-6">
+                  <p className="text-sm text-muted-foreground">{item.label}</p>
+                  <p className="text-3xl font-bold text-foreground mt-2">{isLoading ? '—' : item.value}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

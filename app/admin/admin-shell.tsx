@@ -14,6 +14,7 @@ import {
   Building2,
   TrendingUp,
   LayoutDashboard,
+  Activity,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/shared/logo'
@@ -25,7 +26,7 @@ const ADMIN_LINKS = [
   { href: '/admin/users', label: 'Utilisateurs', icon: Users },
   { href: '/admin/haroo', label: 'Professionnels Haroo', icon: Briefcase },
   { href: '/admin/analytics', label: 'Statistiques', icon: BarChart3 },
-  { href: '/admin/logs', label: "Logs d'audit", icon: BarChart3 },
+  { href: '/admin/logs', label: "Logs d'audit", icon: Activity },
   { href: '/admin/settings', label: 'Paramètres', icon: Settings },
 ] as const
 

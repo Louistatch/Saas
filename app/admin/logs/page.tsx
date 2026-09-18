@@ -15,8 +15,8 @@ import { timeAgo } from '@/lib/utils/time'
 interface AuditLog {
   id: string
   action: string
-  entity_type: string | null
-  metadata: Record<string, unknown> | null
+  resource: string | null
+  details: Record<string, unknown> | null
   ip_address: string | null
   created_at: string
   cooperative: { name: string } | null
@@ -37,7 +37,7 @@ export default function AuditLogsPage() {
     setIsLoading(true)
     let query = supabase
       .from('audit_logs')
-      .select('id, action, entity_type, metadata, ip_address, created_at, cooperative:cooperatives(name)', { count: 'exact' })
+      .select('id, action, resource, details, ip_address, created_at, cooperative:cooperatives(name)', { count: 'exact' })
       .order('created_at', { ascending: false })
 
     if (debouncedSearch.trim()) {
@@ -110,7 +110,7 @@ export default function AuditLogsPage() {
                       <p className="text-sm font-medium text-foreground">{actionLabel(log.action)}</p>
                       <p className="text-xs text-muted-foreground">
                         {log.cooperative?.name ?? 'Plateforme'}
-                        {log.entity_type ? ` • ${log.entity_type}` : ''}
+                        {log.resource ? ` • ${log.resource}` : ''}
                         {log.ip_address ? ` • ${log.ip_address}` : ''}
                       </p>
                     </div>
