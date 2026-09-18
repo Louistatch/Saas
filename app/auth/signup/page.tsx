@@ -3,23 +3,65 @@
 import { Logo } from '@/components/shared/logo'
 import { AuthSidePanel } from '@/components/shared/auth-side-panel'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ArrowLeft, Send, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Send, CheckCircle2, Building2, Sprout, TrendingUp, BookOpen } from 'lucide-react'
 import { Spinner } from '@/components/shared/loading'
 import { accessRequestSchema, flattenZodErrors } from '@/lib/validators/schemas'
 
 /**
- * Signup page — replaced by a "Request Access" form.
- * 
- * On FaîtiereHub, accounts are created by the platform admin.
- * Users (faîtières, coopératives) submit a request here,
- * and the admin creates their account manually.
+ * Inscription — le profil se choisit d'abord, puis chaque choix enchaîne sur
+ * son itinéraire déjà établi.
+ *
+ *   organisation → demande d'accès : une coopérative est une entité réelle,
+ *                  le compte est créé par l'administrateur après vérification
+ *   ouvrier /
+ *   acheteur /
+ *   agronome     → inscription Haroo directe, avec le type pré-sélectionné
+ *
+ * Le choix n'enferme personne : la seconde couche s'active plus tard depuis
+ * son espace, sur le même compte (cf. components/account/layer-activation).
  */
+type ProfileChoice = 'organisation' | 'ouvrier' | 'acheteur' | 'agronome'
+
+const PROFILE_CHOICES: {
+  value: ProfileChoice
+  label: string
+  blurb: string
+  icon: React.ElementType
+}[] = [
+  {
+    value: 'organisation',
+    label: 'Une organisation',
+    blurb: 'Faîtière, union ou coopérative — gérez vos membres et vos parcelles',
+    icon: Building2,
+  },
+  {
+    value: 'ouvrier',
+    label: 'Ouvrier agricole',
+    blurb: "Trouvez des offres d'emploi saisonnier près de chez vous",
+    icon: Sprout,
+  },
+  {
+    value: 'acheteur',
+    label: 'Acheteur',
+    blurb: 'Accédez aux préventes de production de votre zone',
+    icon: TrendingUp,
+  },
+  {
+    value: 'agronome',
+    label: 'Agronome',
+    blurb: 'Recevez des demandes de mission de conseil',
+    icon: BookOpen,
+  },
+]
+
 export default function SignupPage() {
+  const router = useRouter()
   const [formData, setFormData] = useState({
     organizationName: '',
     contactName: '',
@@ -28,6 +70,10 @@ export default function SignupPage() {
     type: 'faitiere',
     message: '',
   })
+  // Étape 1 : le profil se choisit avant tout, puis chaque choix enchaîne
+  // sur son itinéraire déjà établi — demande d'accès pour une organisation,
+  // inscription directe pour un professionnel Haroo.
+  const [profileChoice, setProfileChoice] = useState<ProfileChoice | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
@@ -97,6 +143,74 @@ export default function SignupPage() {
     )
   }
 
+  if (!profileChoice) {
+    return (
+      <div className="min-h-screen flex">
+        <AuthSidePanel
+          title="Rejoignez FaîtiereHub"
+          description="Un seul compte pour la gestion coopérative et l'identité professionnelle"
+          benefits={[
+            'Gestion centralisée de vos membres',
+            'Cartes numériques avec QR code',
+            'Prix du marché en temps réel',
+            'Fiches techniques par culture',
+          ]}
+        />
+        <div className="flex-1 flex items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
+          <div className="w-full max-w-md space-y-6">
+            <div className="flex items-center justify-between">
+              <Link href="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <ArrowLeft className="h-4 w-4" /> Accueil
+              </Link>
+              <Logo size="sm" />
+            </div>
+
+            <Card className="border-border">
+              <CardHeader className="space-y-1">
+                <CardTitle className="text-2xl font-bold text-foreground">Quel est votre profil ?</CardTitle>
+                <CardDescription>
+                  Vous pourrez activer la seconde couche plus tard depuis votre espace, sans créer
+                  de second compte.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {PROFILE_CHOICES.map(({ value, label, blurb, icon: Icon }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+                      if (value === 'organisation') {
+                        setProfileChoice(value)
+                      } else {
+                        // Itinéraire Haroo déjà établi, avec le type pré-sélectionné.
+                        router.push(`/auth/signup/haroo?type=${value.toUpperCase()}`)
+                      }
+                    }}
+                    className="flex w-full items-start gap-3 rounded-xl border border-border p-4 text-left transition-colors hover:border-primary/50 hover:bg-muted/50"
+                  >
+                    <Icon className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium text-foreground">{label}</span>
+                      <span className="block text-xs text-muted-foreground">{blurb}</span>
+                    </span>
+                    <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />
+                  </button>
+                ))}
+              </CardContent>
+            </Card>
+
+            <p className="text-center text-sm text-muted-foreground">
+              Vous avez déjà un compte ?{' '}
+              <Link href="/auth/login" className="font-medium text-primary hover:underline">
+                Se connecter
+              </Link>
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen flex">
       {/* Side panel */}
@@ -115,9 +229,13 @@ export default function SignupPage() {
       <div className="flex-1 flex items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
         <div className="w-full max-w-md space-y-6">
           <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-              <ArrowLeft className="h-4 w-4" /> Accueil
-            </Link>
+            <button
+              type="button"
+              onClick={() => setProfileChoice(null)}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" /> Changer de profil
+            </button>
             <Logo size="sm" />
           </div>
 

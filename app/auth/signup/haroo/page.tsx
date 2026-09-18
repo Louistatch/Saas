@@ -3,7 +3,8 @@
 import { Logo } from '@/components/shared/logo'
 import { AuthSidePanel } from '@/components/shared/auth-side-panel'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { Suspense, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -26,9 +27,18 @@ const PROFILE_TYPES = [
  * backend AgriTogo (proxy /api/haroo/auth/register). La connexion se fait
  * ensuite sur /auth/login comme pour tout utilisateur de la plateforme.
  */
-export default function HarooSignupPage() {
+function HarooSignupForm() {
+  // Le profil choisi à l'étape 1 de /auth/signup arrive par ?type= : sans
+  // cela l'utilisateur qui a cliqué « Agronome » retomberait sur un
+  // formulaire pré-réglé sur « Ouvrier ».
+  const searchParams = useSearchParams()
+  const requestedType = searchParams.get('type')?.toUpperCase()
+  const initialType = PROFILE_TYPES.some((t) => t.value === requestedType)
+    ? (requestedType as string)
+    : 'OUVRIER'
+
   const [formData, setFormData] = useState({
-    profileType: 'OUVRIER',
+    profileType: initialType,
     firstName: '',
     lastName: '',
     phone: '',
@@ -255,5 +265,23 @@ export default function HarooSignupPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * useSearchParams impose une frontière Suspense en App Router, sans quoi la
+ * page entière bascule en rendu client au build.
+ */
+export default function HarooSignupPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <Spinner />
+        </div>
+      }
+    >
+      <HarooSignupForm />
+    </Suspense>
   )
 }
