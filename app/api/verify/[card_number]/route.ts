@@ -105,7 +105,15 @@ export async function GET(
     .limit(1)
     .maybeSingle()
 
-  if (cardError || !card) {
+  // H3 FIX: distinguish a DB error (→ 503) from an absent card (→ proxy AgriTogo).
+  // Merging both into the same branch caused Supabase timeouts/RLS failures to be
+  // silently swallowed and treated as "card not found", proxying to AgriTogo instead
+  // of surfacing the real infrastructure error.
+  if (cardError) {
+    return NextResponse.json({ valid: false, error: 'Service temporairement indisponible' }, { status: 503 })
+  }
+
+  if (!card) {
     // ── Step 2: Not in Supabase → proxy to AgriTogo ─────────────────────────
     const agritogoUrl = process.env.AGRITOGO_API_URL
     if (!agritogoUrl) {

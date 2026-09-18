@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
+import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 import {
   fetchOpenMeteoForRegion,
   fetchGFSForRegion,
@@ -16,9 +17,13 @@ import {
 } from '@/lib/weather/open-meteo'
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ card_number: string }> }
 ) {
+  // H2 FIX: rate-limit before the 7 parallel Open-Meteo + 2 Supabase calls
+  const blocked = await applyRateLimit(request, 'verify')
+  if (blocked) return blocked
+
   const { card_number } = await params
   const cardNumber = decodeURIComponent(card_number).toUpperCase().trim()
 
