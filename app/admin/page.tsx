@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Building2, Users, ShoppingCart, CreditCard, Briefcase, Activity, BarChart3 } from 'lucide-react'
+import { Building2, Users, ShoppingCart, CreditCard, Briefcase, Activity, BarChart3, Leaf, Cpu, CheckCircle2, XCircle, RefreshCw, ExternalLink } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -63,6 +63,27 @@ interface CoopStat {
   card_count: number
 }
 
+interface AgriTogoHealth {
+  status: string
+  version: string
+  agents: number
+  models: string[]
+}
+
+interface AgriTogoProduit {
+  id: number
+  nom: string
+  unite: string
+  categorie: string
+}
+
+interface AgriTogoStats {
+  total_produits?: number
+  total_prix?: number
+  total_marches?: number
+  [key: string]: unknown
+}
+
 /** Événement de workflow (génération de carte, création de membre, inscription Haroo). */
 interface ActivityItem {
   label: string
@@ -99,6 +120,13 @@ export default function AdminOverview() {
   const [coopStats, setCoopStats] = useState<CoopStat[]>([])
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
+
+  // AgriTogo
+  const [agriHealth, setAgriHealth] = useState<AgriTogoHealth | null>(null)
+  const [agriStats, setAgriStats] = useState<AgriTogoStats | null>(null)
+  const [agriProduits, setAgriProduits] = useState<AgriTogoProduit[]>([])
+  const [agriLoading, setAgriLoading] = useState(false)
+  const [agriError, setAgriError] = useState<string | null>(null)
 
   const fetchStats = useCallback(async () => {
     setIsLoading(true)
@@ -246,6 +274,30 @@ export default function AdminOverview() {
     setIsLoading(false)
   }, [supabase])
 
+  const fetchAgriTogo = useCallback(async () => {
+    setAgriLoading(true)
+    setAgriError(null)
+    try {
+      const [healthRes, statsRes, produitsRes] = await Promise.all([
+        fetch('/api/admin/agritogo/health'),
+        fetch('/api/admin/agritogo/stats'),
+        fetch('/api/admin/agritogo/produits'),
+      ])
+      if (!healthRes.ok) throw new Error('AgriTogo inaccessible')
+      const [health, stats, produits] = await Promise.all([
+        healthRes.json() as Promise<AgriTogoHealth>,
+        statsRes.json() as Promise<AgriTogoStats>,
+        produitsRes.json() as Promise<AgriTogoProduit[]>,
+      ])
+      setAgriHealth(health)
+      setAgriStats(stats)
+      setAgriProduits(Array.isArray(produits) ? produits : [])
+    } catch (e: unknown) {
+      setAgriError(e instanceof Error ? e.message : 'Erreur inconnue')
+    }
+    setAgriLoading(false)
+  }, [])
+
   useEffect(() => {
     fetchStats()
   }, [fetchStats])
@@ -279,6 +331,8 @@ export default function AdminOverview() {
         <TabsList>
           <TabsTrigger value="overview" className="gap-2"><Activity className="h-4 w-4" />Vue d&apos;ensemble</TabsTrigger>
           <TabsTrigger value="analytics" className="gap-2"><BarChart3 className="h-4 w-4" />Analytiques</TabsTrigger>
+          <TabsTrigger value="agritogo" className="gap-2" onClick={() => { if (!agriHealth && !agriLoading) fetchAgriTogo() }}><Cpu className="h-4 w-4" />AgriTogo</TabsTrigger>
+          <TabsTrigger value="agrismat" className="gap-2"><Leaf className="h-4 w-4" />Agrismat</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-6 space-y-8">
@@ -540,6 +594,240 @@ export default function AdminOverview() {
             ))}
           </div>
         </TabsContent>
+
+        {/* ─── AgriTogo ──────────────────────────────────────────────────────── */}
+        <TabsContent value="agritogo" className="mt-6 space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">AgriTogo — Moteur IA &amp; données marché</h2>
+              <p className="text-sm text-muted-foreground">Flask 3.1 · 6 agents IA · 5 modèles ML</p>
+            </div>
+            <Button variant="outline" size="sm" className="gap-2" onClick={fetchAgriTogo} disabled={agriLoading}>
+              <RefreshCw className={`h-4 w-4 ${agriLoading ? 'animate-spin' : ''}`} />
+              Actualiser
+            </Button>
+          </div>
+
+          {agriError && (
+            <Card className="border-destructive/40 bg-destructive/5">
+              <CardContent className="pt-4 flex items-center gap-3">
+                <XCircle className="h-5 w-5 text-destructive shrink-0" />
+                <div>
+                  <p className="font-medium text-destructive">Service inaccessible</p>
+                  <p className="text-sm text-muted-foreground">{agriError}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Vérifiez que <code>AGRITOGO_API_URL</code> est défini et que le service Railway est actif.</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {agriLoading && !agriHealth ? (
+            <LoadingBlock />
+          ) : agriHealth ? (
+            <>
+              {/* Statut */}
+              <div className="grid gap-4 md:grid-cols-3">
+                <Card className="border-border">
+                  <CardContent className="pt-6 flex items-center gap-4">
+                    <div className={`p-3 rounded-full ${agriHealth.status === 'ok' ? 'bg-green-100' : 'bg-destructive/10'}`}>
+                      {agriHealth.status === 'ok'
+                        ? <CheckCircle2 className="h-6 w-6 text-green-600" />
+                        : <XCircle className="h-6 w-6 text-destructive" />}
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Statut</p>
+                      <p className="font-bold text-foreground capitalize">{agriHealth.status === 'ok' ? 'En ligne' : agriHealth.status}</p>
+                      <p className="text-xs text-muted-foreground">v{agriHealth.version}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="border-border">
+                  <CardContent className="pt-6 flex items-center gap-4">
+                    <div className="p-3 rounded-full bg-primary/10">
+                      <Cpu className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Agents IA actifs</p>
+                      <p className="font-bold text-foreground">{agriHealth.agents}</p>
+                      <p className="text-xs text-muted-foreground">{agriHealth.models.join(' · ')}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="border-border">
+                  <CardContent className="pt-6 flex items-center gap-4">
+                    <div className="p-3 rounded-full bg-accent/20">
+                      <ShoppingCart className="h-6 w-6 text-accent-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Produits suivis</p>
+                      <p className="font-bold text-foreground">{agriStats?.total_produits ?? agriProduits.length}</p>
+                      {agriStats?.total_prix && <p className="text-xs text-muted-foreground">{String(agriStats.total_prix)} prix enregistrés</p>}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Produits */}
+              <Card className="border-border">
+                <CardHeader>
+                  <CardTitle className="text-foreground">Produits agricoles</CardTitle>
+                  <CardDescription>Catalogue géré par AgriTogo ({agriProduits.length} produits)</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {agriProduits.length === 0 ? (
+                    <EmptyState title="Aucun produit" />
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-border">
+                            <th className="text-left py-2 px-3 text-sm font-semibold text-foreground">Produit</th>
+                            <th className="text-left py-2 px-3 text-sm font-semibold text-foreground">Catégorie</th>
+                            <th className="text-left py-2 px-3 text-sm font-semibold text-foreground">Unité</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {agriProduits.map((p) => (
+                            <tr key={p.id} className="border-b border-border hover:bg-accent/5">
+                              <td className="py-2 px-3 font-medium text-foreground">{p.nom}</td>
+                              <td className="py-2 px-3 text-muted-foreground">
+                                <span className="px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary">{p.categorie}</span>
+                              </td>
+                              <td className="py-2 px-3 text-muted-foreground text-sm">{p.unite}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Actions rapides */}
+              <Card className="border-border">
+                <CardHeader>
+                  <CardTitle className="text-foreground">Actions rapides</CardTitle>
+                  <CardDescription>Accès direct aux fonctionnalités AgriTogo</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                  {[
+                    { label: 'Prévision GARCH', desc: 'Volatilité des prix (IA)', icon: BarChart3, path: 'forecast' },
+                    { label: 'Segmentation agriculteurs', desc: 'K-Means ML', icon: Users, path: 'segmentation' },
+                    { label: 'Évaluation des risques', desc: 'Score financier IA', icon: Activity, path: 'risk' },
+                    { label: 'Chat agents IA', desc: '6 agents · Gemini / Claude', icon: Cpu, path: 'agent/chat' },
+                    { label: 'Calcul irrigation', desc: 'FAO-56 / AgriSmart', icon: Leaf, path: 'agrismart/calculate' },
+                    { label: 'Vérifier carte Haroo', desc: 'OUVRIER / ACHETEUR / AGRONOME', icon: CreditCard, path: 'haroo/verify' },
+                  ].map((action) => {
+                    const Icon = action.icon
+                    return (
+                      <div key={action.path} className="flex items-center gap-3 p-3 border border-border rounded-lg bg-card">
+                        <div className="p-2 rounded-lg bg-primary/10 shrink-0">
+                          <Icon className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground">{action.label}</p>
+                          <p className="text-xs text-muted-foreground">{action.desc}</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </CardContent>
+              </Card>
+            </>
+          ) : !agriError ? (
+            <Card className="border-border">
+              <CardContent className="pt-6 text-center py-12">
+                <Cpu className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground">Cliquez sur &laquo;&nbsp;Actualiser&nbsp;&raquo; pour charger les données AgriTogo</p>
+              </CardContent>
+            </Card>
+          ) : null}
+        </TabsContent>
+
+        {/* ─── Agrismat ──────────────────────────────────────────────────────── */}
+        <TabsContent value="agrismat" className="mt-6 space-y-6">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Agrismat — Expert irrigation FAO-56</h2>
+            <p className="text-sm text-muted-foreground">Application Streamlit autonome · Calcul des besoins en eau par culture</p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[
+              { label: 'Cultures supportées', value: '20+', desc: 'Maïs, riz, manioc, café, cacao…', icon: Leaf, color: 'bg-green-100 text-green-700' },
+              { label: 'Types de sol', value: '6', desc: 'Argileux, limoneux, sableux…', icon: Activity, color: 'bg-amber-100 text-amber-700' },
+              { label: 'Systèmes d\'irrigation', value: '5', desc: 'Goutte-à-goutte, aspersion, gravitaire…', icon: ShoppingCart, color: 'bg-blue-100 text-blue-700' },
+            ].map((item, i) => {
+              const Icon = item.icon
+              return (
+                <Card key={i} className="border-border">
+                  <CardContent className="pt-6 flex items-center gap-4">
+                    <div className={`p-3 rounded-full ${item.color}`}>
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-foreground">{item.value}</p>
+                      <p className="text-sm font-medium text-foreground">{item.label}</p>
+                      <p className="text-xs text-muted-foreground">{item.desc}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+
+          <Card className="border-border">
+            <CardHeader>
+              <CardTitle className="text-foreground">Fonctionnalités Agrismat</CardTitle>
+              <CardDescription>Outil expert de calcul des besoins en eau (méthode FAO-56)</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {[
+                { feature: 'Calcul ETP via données climatiques NASA POWER / Open-Meteo', status: true },
+                { feature: 'Besoins mensuels par culture (coefficients Kc)', status: true },
+                { feature: 'Ajustement selon type de sol (capacité de rétention)', status: true },
+                { feature: 'Comparaison multi-cultures sur un même calendrier', status: true },
+                { feature: 'Export rapport PDF automatique', status: true },
+                { feature: 'API REST intégrée dans AgriTogo (/api/v1/agrismart/calculate)', status: true },
+              ].map((item, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <CheckCircle2 className={`h-4 w-4 shrink-0 ${item.status ? 'text-green-600' : 'text-muted-foreground'}`} />
+                  <p className="text-sm text-foreground">{item.feature}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card className="border-border">
+            <CardHeader>
+              <CardTitle className="text-foreground">Accès à l&apos;application</CardTitle>
+              <CardDescription>Agrismat tourne en Streamlit, indépendamment de cette plateforme</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                <p className="text-sm font-medium text-foreground mb-1">Calcul via AgriTogo (recommandé)</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  L&apos;API AgriTogo expose <code className="bg-muted px-1 rounded">/api/v1/agrismart/calculate</code> — utilisez-la directement depuis les tableaux de bord membres ou via le chat IA.
+                </p>
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => {
+                  const el = document.querySelector('[data-value="agritogo"]') as HTMLElement | null
+                  el?.click()
+                }}>
+                  <Cpu className="h-4 w-4" /> Aller à AgriTogo
+                </Button>
+              </div>
+              <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                <p className="text-sm font-medium text-foreground mb-1">Application Streamlit standalone</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  L&apos;interface Streamlit est déployée séparément sur Railway/Render. Configurez <code className="bg-muted px-1 rounded">AGRISMAT_URL</code> pour ajouter un lien direct ici.
+                </p>
+                <Button variant="outline" size="sm" className="gap-2" disabled>
+                  <ExternalLink className="h-4 w-4" /> Ouvrir Agrismat
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
       </Tabs>
     </div>
   )
