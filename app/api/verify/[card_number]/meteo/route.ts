@@ -136,31 +136,28 @@ export async function GET(
 
   const city = getRegionCoords(region)?.city ?? region
 
-  return NextResponse.json(
-    {
-      weather,
-      hourly: mergedHourly,
-      nowcast: nowcastRaw,
-      seasonal: seasonalRaw,
-      region,
-      city,
-      data_source: dataSource,
-      models: ['ecmwf_ifs025', 'gfs_seamless', 'icon_seamless'],
-      updated_at: new Date().toISOString(),
-      agro_insights: {
-        drought_risk: droughtRisk,
-        planting_window: plantingOk ? 'Conditions favorables les prochains jours' : null,
-        spray_window: sprayWindow,
-        water_stress_days: waterStressDays,
-        heat_stress_days: heatStressDays,
-      },
+  // H1 FIX: do NOT set an explicit Cache-Control header here.
+  // next.config.mjs already applies 'no-store' to /verify/:path* which covers
+  // this route. An explicit public/s-maxage header would override that and
+  // cause CDN nodes to cache a response that contains the member's region
+  // (personal data tied to the card). Let next.config.mjs be the single source
+  // of truth for caching policy on all /verify/* routes.
+  return NextResponse.json({
+    weather,
+    hourly: mergedHourly,
+    nowcast: nowcastRaw,
+    seasonal: seasonalRaw,
+    region,
+    city,
+    data_source: dataSource,
+    models: ['ecmwf_ifs025', 'gfs_seamless', 'icon_seamless'],
+    updated_at: new Date().toISOString(),
+    agro_insights: {
+      drought_risk: droughtRisk,
+      planting_window: plantingOk ? 'Conditions favorables les prochains jours' : null,
+      spray_window: sprayWindow,
+      water_stress_days: waterStressDays,
+      heat_stress_days: heatStressDays,
     },
-    {
-      headers: {
-        // Weather data is regional (not personal) — safe to cache at CDN/shared level
-        // 30 min fresh + serve stale for up to 1h while revalidating in background
-        'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=3600',
-      },
-    }
-  )
+  })
 }
