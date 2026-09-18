@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { MapPin, Sprout, Droplets, BarChart3, Search, Download, ChevronDown, Navigation, CalendarDays, User } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -59,6 +59,17 @@ interface Stats {
 }
 
 const PAGE_SIZE = 20
+
+const COLOR_CLASSES: Record<string, { bg: string; text: string }> = {
+  green:   { bg: 'bg-green-100',   text: 'text-green-700' },
+  blue:    { bg: 'bg-blue-100',    text: 'text-blue-700' },
+  emerald: { bg: 'bg-emerald-100', text: 'text-emerald-700' },
+  cyan:    { bg: 'bg-cyan-100',    text: 'text-cyan-700' },
+  orange:  { bg: 'bg-orange-100',  text: 'text-orange-700' },
+  red:     { bg: 'bg-red-100',     text: 'text-red-700' },
+  yellow:  { bg: 'bg-yellow-100',  text: 'text-yellow-700' },
+  gray:    { bg: 'bg-gray-100',    text: 'text-gray-700' },
+}
 
 const IRRIGATION_LABELS: Record<string, string> = {
   oui: 'Irriguée',
@@ -125,11 +136,12 @@ export default function ParcellesPage() {
 
   const fetchStats = useCallback(async () => {
     if (!scopeIds.length) return
-    const { data } = await supabase
+    const { data, error: statsError } = await supabase
       .from('parcelles')
       .select('culture_principale, superficie_ha, irrigation_type')
       .in('cooperative_id', scopeIds)
 
+    if (statsError) console.error('[fetchStats]', statsError)
     if (!data) return
     const totalSurface = data.reduce((acc, p) => acc + (p.superficie_ha || 0), 0)
     const cultureMap: Record<string, { count: number; surface: number }> = {}
@@ -168,7 +180,8 @@ export default function ParcellesPage() {
     if (filterIrrigation === 'non') query = query.eq('irrigation_type', 'non')
     if (debouncedSearch) query = query.ilike('culture_principale', `%${debouncedSearch}%`)
 
-    const { data, count } = await query
+    const { data, count, error: parcellesError } = await query
+    if (parcellesError) console.error('[fetchParcelles]', parcellesError)
     setParcelles((data as unknown as Parcelle[]) ?? [])
     setTotal(count ?? 0)
     setIsLoading(false)
@@ -190,7 +203,8 @@ export default function ParcellesPage() {
     if (filterCulture !== 'all') query = query.eq('culture_name', filterCulture)
     if (debouncedSearch) query = query.ilike('culture_name', `%${debouncedSearch}%`)
 
-    const { data, count } = await query
+    const { data, count, error: productionsError } = await query
+    if (productionsError) console.error('[fetchProductions]', productionsError)
     setProductions((data as unknown as Production[]) ?? [])
     setTotal(count ?? 0)
     setIsLoading(false)
@@ -274,8 +288,8 @@ export default function ParcellesPage() {
             <Card key={label}>
               <CardContent className="pt-5 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg bg-${color}-100`}>
-                    <Icon className={`h-5 w-5 text-${color}-700`} />
+                  <div className={`p-2 rounded-lg ${COLOR_CLASSES[color]?.bg ?? 'bg-gray-100'}`}>
+                    <Icon className={`h-5 w-5 ${COLOR_CLASSES[color]?.text ?? 'text-gray-700'}`} />
                   </div>
                   <div>
                     <p className="text-2xl font-bold">{value}</p>
@@ -407,9 +421,8 @@ export default function ParcellesPage() {
                     const culture = p.culture_principale ?? p.culture_name ?? '—'
 
                     return (
-                      <>
+                      <React.Fragment key={p.id}>
                         <tr
-                          key={p.id}
                           className="hover:bg-muted/30 transition-colors cursor-pointer"
                           onClick={() => setExpandedId(isExpanded ? null : p.id)}
                         >
@@ -511,7 +524,7 @@ export default function ParcellesPage() {
                             </td>
                           </tr>
                         )}
-                      </>
+                      </React.Fragment>
                     )
                   })}
                 </tbody>
