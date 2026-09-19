@@ -350,3 +350,104 @@ export interface PartnerOrganizationAssignment {
   /** Chargé séparément (table de jointure `partner_assignment_scopes`) ; absent tant que non demandé. */
   scopes?: PartnerAccessScope[]
 }
+
+// ─── Facturation Opérateur — portefeuille PAYG ───────────────────────────────
+//
+// cf. supabase/migrations/20260921_100000_partner_billing_wallet.sql.
+// Domaine strictement séparé de `payments`/`cotisations` : un Partenaire n'a
+// ni coopérative, ni cotisation, ni forcément de membre.
+
+export type PartnerLedgerEntryType =
+  | 'CREDIT'
+  | 'DEBIT'
+  | 'REFUND'
+  | 'REVERSAL'
+  | 'ADJUSTMENT'
+  | 'BONUS'
+
+export type PartnerPaymentPurpose = 'wallet_topup' | 'certification' | 'operator_subscription'
+
+export type PartnerPaymentIntentStatus =
+  | 'pending'
+  | 'processing'
+  | 'success'
+  | 'failed'
+  | 'cancelled'
+  | 'expired'
+
+export interface BillingRule {
+  id: string
+  code: string
+  label: string
+  unit: string
+  price_xof: number
+  active: boolean
+  effective_from: string
+  effective_to: string | null
+  metadata: Record<string, unknown>
+}
+
+export interface PartnerWallet {
+  id: string
+  partner_id: string
+  balance_fcfa: number
+  created_at: string
+  updated_at: string
+}
+
+export interface PartnerWalletLedgerEntry {
+  id: string
+  wallet_id: string
+  partner_id: string
+  entry_type: PartnerLedgerEntryType
+  amount_fcfa: number
+  balance_after: number
+  usage_event_id: string | null
+  payment_intent_id: string | null
+  reversed_ledger_id: string | null
+  idempotency_key: string
+  note: string | null
+  created_by: string | null
+  created_at: string
+}
+
+export interface UsageEvent {
+  id: string
+  partner_id: string
+  cooperative_id: string | null
+  billing_rule_id: string
+  quantity: number
+  unit_price_fcfa: number
+  amount_fcfa: number
+  idempotency_key: string
+  created_at: string
+}
+
+export interface PartnerPaymentIntent {
+  id: string
+  partner_id: string
+  purpose: PartnerPaymentPurpose
+  amount_fcfa: number
+  provider: string
+  provider_reference: string
+  status: PartnerPaymentIntentStatus
+  phone: string | null
+  metadata: Record<string, unknown>
+  created_by: string | null
+  paid_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Résultat renvoyé par les fonctions SQL debit_partner_wallet()/credit_partner_wallet(). */
+export type WalletDebitOutcome =
+  | { outcome: 'charged'; usage_event_id: string; amount_fcfa: number; balance_fcfa: number }
+  | { outcome: 'already_charged'; usage_event_id: string; amount_fcfa: number }
+  | { outcome: 'insufficient_funds'; balance_fcfa: number; required_fcfa: number }
+  | { outcome: 'no_active_rule' }
+  | { outcome: 'no_wallet' }
+
+export type WalletCreditOutcome =
+  | { outcome: 'applied'; ledger_id: string; balance_fcfa: number }
+  | { outcome: 'already_applied'; ledger_id: string; balance_fcfa: number }
+  | { outcome: 'no_wallet' }

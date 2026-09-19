@@ -26,8 +26,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { performLogout } from '@/lib/auth/logout'
-import type { PartnerStatus } from '@/types/domain'
+import type { PartnerLedgerEntryType, PartnerStatus } from '@/types/domain'
 import {
+  ArrowDownCircle,
+  ArrowUpCircle,
   Award,
   Briefcase,
   CheckCircle2,
@@ -35,6 +37,7 @@ import {
   GraduationCap,
   LogOut,
   ShieldAlert,
+  Wallet,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -47,6 +50,21 @@ interface PartnerStatusResponse {
   training_completed_at?: string | null
   exam_passed_at?: string | null
   certified_at?: string | null
+}
+
+interface WalletLedgerRow {
+  id: string
+  entry_type: PartnerLedgerEntryType
+  amount_fcfa: number
+  balance_after: number
+  note: string | null
+  created_at: string
+}
+
+interface WalletResponse {
+  balance_fcfa: number
+  updated_at: string | null
+  ledger: WalletLedgerRow[]
 }
 
 const STATUS_LABEL: Record<PartnerStatus, string> = {
@@ -115,6 +133,205 @@ function CertificationProgress({ status }: { status: PartnerStatus }) {
         )
       })}
     </ol>
+  )
+}
+
+/**
+ * Bouton de paiement de certification — n'apparaît que si formation et examen
+ * sont déjà validés (§9, §24 du plan). Redirige vers la page de paiement
+ * hébergée CinetPay ; le statut ne changera qu'au retour du callback.
+ */
+function CertificationPayment({ eligible }: { eligible: boolean }) {
+  const [phone, setPhone] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  if (!eligible) return null
+
+  const pay = async () => {
+    if (!phone.trim()) {
+      setError('Indiquez le numéro mobile money à utiliser.')
+      return
+    }
+    setSubmitting(true)
+    setError('')
+    try {
+      const res = await fetch('/api/partner/certification/pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phone.trim() }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || !body.payment_url) {
+        setError(body.error ?? 'Paiement impossible pour le moment.')
+        setSubmitting(false)
+        return
+      }
+      window.location.href = body.payment_url
+    } catch {
+      setError('Erreur de connexion. Vérifiez votre internet.')
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="space-y-3 rounded-xl border border-amber-300/60 bg-amber-50/40 p-4">
+      <p className="text-sm font-medium text-foreground">
+        Formation et examen validés — reste le paiement des frais de certification (15 000 XOF).
+      </p>
+      <div className="space-y-2">
+        <Label htmlFor="cert-phone">Numéro mobile money</Label>
+        <Input
+          id="cert-phone"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="+228 90 00 00 00"
+        />
+      </div>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      <Button onClick={pay} disabled={submitting} className="w-full">
+        {submitting ? <Spinner className="h-4 w-4" /> : 'Payer 15 000 XOF'}
+      </Button>
+    </div>
+  )
+}
+
+const ENTRY_LABEL: Record<PartnerLedgerEntryType, string> = {
+  CREDIT: 'Rechargement',
+  DEBIT: 'Débit',
+  REFUND: 'Remboursement',
+  REVERSAL: 'Correction',
+  ADJUSTMENT: 'Ajustement',
+  BONUS: 'Bonus',
+}
+
+/**
+ * Portefeuille PAYG — n'affiche que le solde et les dernières écritures.
+ * Le tableau de bord complet (filtres, export, rechargement en plusieurs
+ * montants prédéfinis) reste un chantier PR 4 ; ceci prouve seulement que le
+ * crédit/débit atomique posé par la migration fonctionne de bout en bout.
+ */
+function WalletCard() {
+  const [wallet, setWallet] = useState<WalletResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [amount, setAmount] = useState('5000')
+  const [phone, setPhone] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  const load = () => {
+    setLoading(true)
+    fetch('/api/partner/wallet')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: WalletResponse | null) => setWallet(d))
+      .catch(() => setWallet(null))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(load, [])
+
+  const topup = async () => {
+    const amountFcfa = Number.parseInt(amount, 10)
+    if (!Number.isFinite(amountFcfa) || amountFcfa < 1000) {
+      setError('Montant minimum : 1 000 FCFA.')
+      return
+    }
+    if (!wallet) return
+    if (!phone.trim()) {
+      setError('Indiquez le numéro mobile money à utiliser.')
+      return
+    }
+    setSubmitting(true)
+    setError('')
+    try {
+      const res = await fetch('/api/partner/wallet/topup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount_fcfa: amountFcfa, phone: phone.trim() }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || !body.payment_url) {
+        setError(body.error ?? 'Rechargement impossible pour le moment.')
+        setSubmitting(false)
+        return
+      }
+      window.location.href = body.payment_url
+    } catch {
+      setError('Erreur de connexion. Vérifiez votre internet.')
+      setSubmitting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-8">
+        <Spinner className="h-5 w-5" />
+      </div>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-foreground">
+          <Wallet className="h-5 w-5 text-primary" /> Portefeuille PAYG
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <p className="text-3xl font-bold text-foreground">
+          {(wallet?.balance_fcfa ?? 0).toLocaleString('fr-FR')}{' '}
+          <span className="text-base font-normal text-muted-foreground">FCFA</span>
+        </p>
+
+        <div className="flex gap-2">
+          <Input
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            inputMode="numeric"
+            className="w-28"
+            aria-label="Montant à recharger (FCFA)"
+          />
+          <Input
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+228 90 00 00 00"
+            className="flex-1"
+            aria-label="Numéro mobile money"
+          />
+          <Button onClick={topup} disabled={submitting}>
+            {submitting ? <Spinner className="h-4 w-4" /> : 'Recharger'}
+          </Button>
+        </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+
+        {wallet && wallet.ledger.length > 0 && (
+          <ul className="divide-y divide-border">
+            {wallet.ledger.map((entry) => (
+              <li key={entry.id} className="flex items-center justify-between py-2 text-sm">
+                <span className="flex items-center gap-2">
+                  {entry.amount_fcfa >= 0 ? (
+                    <ArrowUpCircle className="h-4 w-4 text-primary" />
+                  ) : (
+                    <ArrowDownCircle className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  {ENTRY_LABEL[entry.entry_type]}
+                </span>
+                <span
+                  className={
+                    entry.amount_fcfa >= 0
+                      ? 'font-medium text-primary'
+                      : 'font-medium text-foreground'
+                  }
+                >
+                  {entry.amount_fcfa >= 0 ? '+' : ''}
+                  {entry.amount_fcfa.toLocaleString('fr-FR')} FCFA
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -249,13 +466,30 @@ function OperatorPageContent() {
                   d'informations.
                 </p>
               ) : (
-                <CertificationProgress status={status.status} />
+                <>
+                  <CertificationProgress status={status.status} />
+                  <CertificationPayment
+                    eligible={
+                      !!status.training_completed_at &&
+                      !!status.exam_passed_at &&
+                      !status.certified_at
+                    }
+                  />
+                </>
               )}
             </CardContent>
           </Card>
         ) : (
           <ApplicationForm onApplied={load} />
         )}
+
+        {status?.has_applied &&
+          status.status &&
+          (status.status === 'certified' || status.status === 'active') && (
+            <div className="mt-6">
+              <WalletCard />
+            </div>
+          )}
       </main>
     </div>
   )
