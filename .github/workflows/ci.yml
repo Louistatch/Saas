@@ -1,0 +1,52 @@
+name: CI
+
+# Jusqu'ici rien ne vérifiait le code avant un déploiement : Vercel construisait,
+# et c'était tout. C'est ce qui a permis à une configuration Biome invalide de
+# passer inaperçue et de neutraliser le linter du dépôt entier.
+#
+# typecheck bloque — c'est le garde-fou que CLAUDE.md déclare déjà obligatoire
+# (« zero errors required ») et il ne demande ni secret ni service.
+# lint est informatif : il remonte 695 diagnostics accumulés pendant qu'il était
+# hors service. Le passer bloquant maintenant mettrait la CI au rouge en
+# permanence ; il le deviendra quand la dette sera épongée.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Une poussée rapprochée annule la précédente : inutile de valider un commit
+# déjà dépassé.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck & lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # npm ci plutôt que npm install : installation reproductible depuis le
+      # package-lock.json, et échec si le lock diverge du package.json.
+      - name: Installer les dépendances
+        run: npm ci
+
+      # tsc --noEmit n'exécute aucun code et ne lit aucune variable
+      # d'environnement : il tourne tel quel, sans secret.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint (informatif, ne bloque pas)
+        run: npm run lint
+        continue-on-error: true
