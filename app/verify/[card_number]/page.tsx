@@ -630,6 +630,7 @@ export default function VerifyCardPage() {
                   {/* Listening waveform */}
                   <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex items-end gap-[2px] h-2.5">
                     {[4, 9, 6, 10, 5].map((h, i) => (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: barres décoratives d'un indicateur, valeurs littérales figées
                       <span key={i} className="w-[2px] rounded-full bg-orange-100 vfp-ai-wavebar" style={{ height: h, animationDelay: `${i * 0.15}s` }} />
                     ))}
                   </div>

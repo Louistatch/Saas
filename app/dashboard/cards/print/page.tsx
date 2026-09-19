@@ -91,6 +91,7 @@ export default function PrintCardsPage() {
           const pageCards = cards.slice(pageIdx * 8, (pageIdx + 1) * 8)
           return (
             <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: pages d'impression et emplacements vides : une grille figée, rien à réordonner
               key={pageIdx}
               className="w-[210mm] mx-auto mb-8 print:mb-0 print:break-after-page bg-white grid grid-cols-2 grid-rows-4 gap-[3mm] p-[5mm]"
               style={{ height: '297mm', pageBreakAfter: 'always' }}
@@ -109,6 +110,7 @@ export default function PrintCardsPage() {
               {/* Fill remaining slots with placeholder */}
               {Array.from({ length: 8 - pageCards.length }).map((_, i) => (
                 <div
+                  // biome-ignore lint/suspicious/noArrayIndexKey: pages d'impression et emplacements vides : une grille figée, rien à réordonner
                   key={`empty-${i}`}
                   className="border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center"
                 >

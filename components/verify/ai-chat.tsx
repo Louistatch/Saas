@@ -610,9 +610,9 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
               ))}
             </div>
             <div className="flex flex-col gap-2 w-full max-w-[320px]" style={{ animation: 'chat-fade-up 0.4s ease both', animationDelay: '350ms' }}>
-              {suggestions.map((s, i) => (
+              {suggestions.map((s) => (
                 <button
-                  key={i}
+                  key={s}
                   className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 rounded-full px-4 py-2.5 text-sm text-left flex items-center justify-between hover:bg-emerald-500/15 active:scale-[0.98] transition-all"
                   onClick={() => { setInput(s); inputRef.current?.focus() }}
                 >
@@ -629,6 +629,7 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
           const followUps = isLastAssistant ? getFollowUpSuggestions(m.content) : []
           const isUser = m.role === 'user'
           return (
+            // biome-ignore lint/suspicious/noArrayIndexKey: fragments de rendu Markdown d'un même message, régénérés ensemble à chaque rendu
             <div key={i}>
               <div
                 className={`flex gap-2 ${isUser ? 'flex-row-reverse self-end ml-auto max-w-[80%]' : 'flex-row self-start mr-auto max-w-[85%]'}`}
@@ -652,9 +653,9 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
               </div>
               {followUps.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-2 ml-9">
-                  {followUps.map((s, j) => (
+                  {followUps.map((s) => (
                     <button
-                      key={j}
+                      key={s}
                       className="bg-white/5 border border-white/10 text-white/60 rounded-full px-3 py-1 text-[12px] hover:bg-emerald-500/10 hover:border-emerald-500/20 hover:text-emerald-300 active:scale-95 transition-all"
                       onClick={() => sendText(s)}
                     >
@@ -799,6 +800,7 @@ function getFollowUpSuggestions(response: string): string[] {
 function renderMd(text: string) {
   return text.split('\n').map((line, i) => {
     const trimmed = line.trim()
+    // biome-ignore lint/suspicious/noArrayIndexKey: fragments de rendu Markdown d'un même message, régénérés ensemble à chaque rendu
     if (!trimmed) return <br key={i} />
     const isBullet = /^[-*•]\s+/.test(trimmed)
     const content = isBullet ? trimmed.replace(/^[-*•]\s+/, '') : trimmed
@@ -817,7 +819,9 @@ function renderMd(text: string) {
       match = regex.exec(src)
     }
     if (last < src.length) parts.push(src.slice(last))
+    // biome-ignore lint/suspicious/noArrayIndexKey: fragments de rendu Markdown d'un même message, régénérés ensemble à chaque rendu
     if (isBullet) return <p key={i} className="ai-md-li">{'• '}{parts}</p>
+    // biome-ignore lint/suspicious/noArrayIndexKey: fragments de rendu Markdown d'un même message, régénérés ensemble à chaque rendu
     return <p key={i} className="m-0 last:mb-0 mb-1">{parts}</p>
   })
 }

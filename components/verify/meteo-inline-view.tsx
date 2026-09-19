@@ -529,6 +529,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
                 <div className="px-4 pb-3">
                   <div className="flex gap-1.5">
                     {nowcastBanner.slots60.map((slot, i) => (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: créneaux de prévision à 15 minutes : suite ordonnée de longueur fixe
                       <div key={i} className={`flex-1 h-2 rounded-full transition-all ${slot.hasRain ? 'bg-blue-400' : 'bg-white/15'}`} />
                     ))}
                   </div>
@@ -568,6 +569,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
                       />
                       <Bar dataKey="mm" radius={[2, 2, 0, 0]} maxBarSize={12}>
                         {nowcastChartData.map((entry, index) => (
+                          // biome-ignore lint/suspicious/noArrayIndexKey: créneaux de prévision à 15 minutes : suite ordonnée de longueur fixe
                           <Cell key={`cell-${index}`} fill={entry.fill} />
                         ))}
                       </Bar>
@@ -693,12 +695,12 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
               </button>
               {showSeasonal && (
                 <div className="border-t border-white/10 px-4 pb-3 pt-2 space-y-2">
-                  {seasonal.map((s, i) => {
+                  {seasonal.map((s) => {
                     const precipTrend = s.precipitation_mm > 150 ? { label: 'Bonne pluviométrie', color: 'text-blue-300' }
                       : s.precipitation_mm > 80  ? { label: 'Normale', color: 'text-sky-300' }
                       : { label: 'Sèche', color: 'text-orange-300' }
                     return (
-                      <div key={i} className="rounded-xl bg-white/5 border border-white/8 p-3">
+                      <div key={s.month} className="rounded-xl bg-white/5 border border-white/8 p-3">
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <p className="text-white/80 text-sm font-semibold capitalize">{frMonth(s.month)}</p>

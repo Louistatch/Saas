@@ -179,7 +179,7 @@ export default function AgrismatAdminPage() {
                   {monthly.map((val, i) => {
                     const pct = monthlyMax > 0 ? (val / monthlyMax) * 100 : 0
                     return (
-                      <div key={i} className="flex flex-col items-center gap-1">
+                      <div key={MOIS[i]} className="flex flex-col items-center gap-1">
                         <div className="w-full bg-muted rounded-sm overflow-hidden" style={{ height: 60 }}>
                           <div className="w-full bg-primary rounded-sm transition-all" style={{ height: `${pct}%`, marginTop: `${100 - pct}%` }} />
                         </div>

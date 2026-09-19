@@ -195,7 +195,7 @@ export default function AgriCreditPage() {
                     <Badge className={GRADE_COLOR[scoring.grade] ?? ''}>{scoring.grade} — {scoring.grade === 'F' ? 'Refusé' : 'Approuvable'}</Badge>
                     <div className="text-sm text-green-700 mt-1">Max: {scoring.maxLoanFcfa.toLocaleString('fr-FR')} FCFA · Taux: {scoring.interestRatePct}%</div>
                   </div>
-                  <ul className="text-sm space-y-1">{scoring.reasons.map((r, i) => <li key={i} className="text-muted-foreground">• {r}</li>)}</ul>
+                  <ul className="text-sm space-y-1">{scoring.reasons.map((r) => <li key={r} className="text-muted-foreground">• {r}</li>)}</ul>
                   <div className="flex gap-2">
                     <Button variant="outline" className="flex-1" onClick={() => setScoring(null)}>Modifier</Button>
                     <Button className="flex-1" onClick={() => { setDialogOpen(false); setScoring(null) }}>Fermer</Button>
@@ -209,6 +209,7 @@ export default function AgriCreditPage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {isLoading ? [...Array(4)].map((_, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: squelette de chargement : aucun contenu, donc aucune identité
           <Card key={i}><CardContent className="pt-4"><div className="flex items-center gap-3"><Skeleton className="h-8 w-8 rounded-md" /><div className="space-y-1"><Skeleton className="h-5 w-14" /><Skeleton className="h-3 w-20" /></div></div></CardContent></Card>
         )) : [
           { label: 'En cours', value: active.length, icon: Clock, color: 'text-blue-600' },

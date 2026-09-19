@@ -183,6 +183,7 @@ export default function NotificationsPage() {
       {loading && (
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: squelette de chargement : aucun contenu, donc aucune identité
             <div key={i} className="flex gap-4 rounded-xl border border-border p-4">
               <Skeleton className="h-5 w-5 rounded-full flex-shrink-0 mt-0.5" />
               <div className="flex-1 space-y-2">

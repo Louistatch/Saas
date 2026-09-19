@@ -252,6 +252,7 @@ export default function DashboardPage() {
             {isLoading ? (
               <div className="space-y-3">
                 {[...Array(5)].map((_, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: squelette de chargement : aucun contenu, donc aucune identité
                   <div key={i} className="flex items-center justify-between py-1">
                     <div className="flex items-center gap-3">
                       <Skeleton className="h-2 w-2 rounded-full flex-shrink-0" />

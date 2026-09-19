@@ -231,6 +231,7 @@ export default function DemoPage() {
                       <tr key={String(feature)} className="border-b border-border last:border-0 hover:bg-accent/5">
                         <td className="py-2 px-3 text-foreground font-medium">{feature}</td>
                         {cols.map((val, j) => (
+                          // biome-ignore lint/suspicious/noArrayIndexKey: colonnes d'un tableau comparatif littéral, jamais réordonnées
                           <td key={`${feature}-${j}`} className={`py-2 px-3 text-center ${val === '✗' ? 'text-muted-foreground' : val.startsWith('✓') ? 'text-green-600 font-medium' : 'text-muted-foreground'}`}>
                             {val}
                           </td>

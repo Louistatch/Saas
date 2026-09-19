@@ -137,6 +137,7 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
               const isExpanded = expandedIdx === i
 
               return (
+                // biome-ignore lint/suspicious/noArrayIndexKey: l'API de vérification ne renvoie pas d'identifiant de parcelle ; une clé composite inviterait les collisions
                 <div key={i} className="vfp-card rounded-2xl overflow-hidden">
                   <button
                     className="w-full p-4 flex items-start gap-3 text-left active:opacity-70"

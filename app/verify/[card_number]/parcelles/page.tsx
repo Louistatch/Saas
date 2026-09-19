@@ -181,6 +181,7 @@ export default async function ParcellesPage({ params }: Props) {
               const irrigLabel = IRRIG_LABEL[p.irrigation_type?.toLowerCase() ?? ''] ?? p.irrigation_type
 
               return (
+                // biome-ignore lint/suspicious/noArrayIndexKey: l'API de vérification ne renvoie pas d'identifiant de parcelle ; une clé composite inviterait les collisions
                 <div key={i} className="vfp-card rounded-2xl p-4 space-y-3">
                   {/* Top row */}
                   <div className="flex items-start gap-3">

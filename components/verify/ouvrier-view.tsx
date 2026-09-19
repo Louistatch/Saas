@@ -68,6 +68,7 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
 
   function renderStars(note: number) {
     return Array.from({ length: 5 }, (_, i) => (
+      // biome-ignore lint/suspicious/noArrayIndexKey: étoiles de notation : cinq positions fixes
       <span key={i} className={i < Math.round(note) ? 'text-[var(--vfp-accent)]' : 'text-white/20'}>★</span>
     ))
   }

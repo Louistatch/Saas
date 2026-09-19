@@ -676,6 +676,7 @@ export default function MembersPage() {
                       </thead>
                       <tbody>
                         {importPreview.slice(0, 50).map((r, i) => (
+                          // biome-ignore lint/suspicious/noArrayIndexKey: aperçu d'import CSV : lignes sans identifiant, liste figée le temps de l'aperçu
                           <tr key={i} className="border-t border-border">
                             {CSV_HEADERS.map((h) => (
                               <td key={h} className="py-1.5 px-3 text-muted-foreground truncate max-w-[160px]">
