@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/admin'
 import { checkCinetPayTransaction } from '@/lib/payments/cinetpay'
 import { queueInAppNotification } from '@/lib/notifications/queue'
+import { claimPaymentForSettlement } from '@/lib/payments/settle'
 
 /**
  * CinetPay notify_url — called after every transaction status change.
@@ -41,17 +42,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const { data: payment, error: fetchError } = await supabase
     .from('payments')
-    .select('id, cooperative_id, cotisation_id, amount_fcfa, member_id, status')
+    .select('id, cooperative_id, cotisation_id, amount_fcfa, member_id')
     .eq('reference', transactionId)
     .single()
 
   if (fetchError || !payment) {
     return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
-  }
-
-  // Already settled — CinetPay may re-send notifications; don't double-process.
-  if (payment.status === 'success' || payment.status === 'failed') {
-    return NextResponse.json({ received: true })
   }
 
   const now = new Date().toISOString()
@@ -63,19 +59,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ received: true })
   }
 
-  const { error: updateError } = await supabase
-    .from('payments')
-    .update({
-      status: isSuccess ? 'success' : 'failed',
-      paid_at: isSuccess ? now : null,
-      failure_reason: isSuccess ? null : `CinetPay: ${check.status}`,
-      metadata: { payment_method: check.paymentMethod, operator_id: check.operatorId },
-      updated_at: now,
-    })
-    .eq('id', payment.id)
+  // L'écriture conditionnelle est le point de sérialisation : un seul appel la
+  // gagne. Un `if` sur le statut lu plus haut ne suffirait pas — deux
+  // livraisons simultanées le franchiraient toutes les deux et le membre
+  // recevrait deux SMS. Tous les effets de bord restent donc SOUS ce garde.
+  const settlement = await claimPaymentForSettlement(supabase, payment.id, {
+    status: isSuccess ? 'success' : 'failed',
+    paid_at: isSuccess ? now : null,
+    failure_reason: isSuccess ? null : `CinetPay: ${check.status}`,
+    metadata: { payment_method: check.paymentMethod, operator_id: check.operatorId },
+    updated_at: now,
+  })
 
-  if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 })
+  if (!settlement.claimed) {
+    if (settlement.reason === 'error') {
+      return NextResponse.json({ error: settlement.message }, { status: 500 })
+    }
+    // Déjà réglé par une livraison précédente ou concurrente : on acquitte sans
+    // rejouer quoi que ce soit.
+    return NextResponse.json({ received: true, duplicate: true })
   }
 
   if (isSuccess && payment.cotisation_id) {

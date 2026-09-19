@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHmac, timingSafeEqual } from 'crypto'
 import { createClient } from '@/lib/supabase/admin'
 import { queueInAppNotification } from '@/lib/notifications/queue'
+import { claimPaymentForSettlement } from '@/lib/payments/settle'
 
 interface OrangeCallbackBody {
   reference: string
@@ -54,19 +55,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const now = new Date().toISOString()
   const isSuccess = status === 'SUCCESS'
 
-  const { error: updateError } = await supabase
-    .from('payments')
-    .update({
-      status: isSuccess ? 'success' : 'failed',
-      provider_tx_id: tx_id ?? null,
-      paid_at: isSuccess ? now : null,
-      failure_reason: isSuccess ? null : (failure_reason ?? 'Payment failed'),
-      updated_at: now,
-    })
-    .eq('id', payment.id)
+  // Cette route n'avait aucun contrôle d'idempotence : chaque rejeu remarquait
+  // la cotisation payée et réexpédiait un SMS au membre. La signature HMAC
+  // authentifie l'émetteur, elle n'empêche pas la répétition — Orange Money
+  // rejoue ses notifications par conception.
+  // L'écriture conditionnelle sérialise : un seul appel la gagne, et les effets
+  // de bord ci-dessous lui sont réservés.
+  const settlement = await claimPaymentForSettlement(supabase, payment.id, {
+    status: isSuccess ? 'success' : 'failed',
+    provider_tx_id: tx_id ?? null,
+    paid_at: isSuccess ? now : null,
+    failure_reason: isSuccess ? null : (failure_reason ?? 'Payment failed'),
+    updated_at: now,
+  })
 
-  if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 })
+  if (!settlement.claimed) {
+    if (settlement.reason === 'error') {
+      return NextResponse.json({ error: settlement.message }, { status: 500 })
+    }
+    return NextResponse.json({ received: true, duplicate: true })
   }
 
   if (isSuccess && payment.cotisation_id) {
