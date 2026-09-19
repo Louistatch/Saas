@@ -1,17 +1,26 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Search, Activity } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
-import { useDebounced } from '@/hooks/use-debounced'
-import { LoadingBlock } from '@/components/shared/loading'
+/**
+ * Suivi du site pour l'admin : actions (audit_logs, existant), connexions
+ * (user_login_events, § demande « qui s'est connecté, combien ») et état du
+ * suivi d'erreurs (Sentry — déjà intégré au code, actif dès que
+ * NEXT_PUBLIC_SENTRY_DSN est configuré côté Vercel).
+ */
+
 import { EmptyState } from '@/components/shared/empty-state'
+import { LoadingBlock } from '@/components/shared/loading'
 import { PageHeader } from '@/components/shared/page-header'
 import { PaginationBar } from '@/components/shared/pagination'
-import { timeAgo } from '@/lib/utils/time'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useDebounced } from '@/hooks/use-debounced'
 import { useResetPageOnChange } from '@/hooks/use-reset-page'
+import { createClient } from '@/lib/supabase/client'
+import { timeAgo } from '@/lib/utils/time'
+import { Activity, AlertTriangle, ExternalLink, LogIn, Search } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 interface AuditLog {
   id: string
@@ -23,9 +32,20 @@ interface AuditLog {
   cooperative: { name: string } | null
 }
 
+interface LoginEvent {
+  id: string
+  user_id: string
+  full_name: string | null
+  email: string | null
+  ip_address: string | null
+  user_agent: string | null
+  created_at: string
+  logins_last_30d: number
+}
+
 const PAGE_SIZE = 30
 
-export default function AuditLogsPage() {
+function ActionsTab() {
   const supabase = useMemo(() => createClient(), [])
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [total, setTotal] = useState(0)
@@ -38,7 +58,10 @@ export default function AuditLogsPage() {
     setIsLoading(true)
     let query = supabase
       .from('audit_logs')
-      .select('id, action, resource, details, ip_address, created_at, cooperative:cooperatives(name)', { count: 'exact' })
+      .select(
+        'id, action, resource, details, ip_address, created_at, cooperative:cooperatives(name)',
+        { count: 'exact' },
+      )
       .order('created_at', { ascending: false })
 
     if (debouncedSearch.trim()) {
@@ -54,7 +77,9 @@ export default function AuditLogsPage() {
     setIsLoading(false)
   }, [supabase, debouncedSearch, page])
 
-  useEffect(() => { fetchLogs() }, [fetchLogs])
+  useEffect(() => {
+    fetchLogs()
+  }, [fetchLogs])
   useResetPageOnChange(setPage, [debouncedSearch])
 
   const actionLabel = (action: string) => {
@@ -72,12 +97,7 @@ export default function AuditLogsPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <PageHeader
-        title="Logs d'audit"
-        description="Historique de toutes les actions effectuées sur la plateforme"
-      />
-
+    <div className="space-y-4">
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
@@ -91,7 +111,9 @@ export default function AuditLogsPage() {
       <Card className="border-border">
         <CardHeader>
           <CardTitle className="text-foreground">Activité récente</CardTitle>
-          <CardDescription>{total} événement{total !== 1 ? 's' : ''} enregistré{total !== 1 ? 's' : ''}</CardDescription>
+          <CardDescription>
+            {total} événement{total !== 1 ? 's' : ''} enregistré{total !== 1 ? 's' : ''}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -106,9 +128,14 @@ export default function AuditLogsPage() {
             <>
               <div className="space-y-2">
                 {logs.map((log) => (
-                  <div key={log.id} className="flex items-center gap-4 p-3 border border-border rounded-lg">
+                  <div
+                    key={log.id}
+                    className="flex items-center gap-4 p-3 border border-border rounded-lg"
+                  >
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground">{actionLabel(log.action)}</p>
+                      <p className="text-sm font-medium text-foreground">
+                        {actionLabel(log.action)}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {log.cooperative?.name ?? 'Plateforme'}
                         {log.resource ? ` • ${log.resource}` : ''}
@@ -121,11 +148,172 @@ export default function AuditLogsPage() {
                   </div>
                 ))}
               </div>
-              <PaginationBar page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+              <PaginationBar
+                page={page}
+                pageSize={PAGE_SIZE}
+                total={total}
+                onPageChange={setPage}
+              />
             </>
           )}
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+function LoginsTab() {
+  const [logins, setLogins] = useState<LoginEvent[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [isLoading, setIsLoading] = useState(true)
+
+  const fetchLogins = useCallback(async () => {
+    setIsLoading(true)
+    const res = await fetch(`/api/admin/activity/logins?page=${page}`)
+    const data = await res.json().catch(() => ({}))
+    setLogins(data.logins ?? [])
+    setTotal(data.total ?? 0)
+    setIsLoading(false)
+  }, [page])
+
+  useEffect(() => {
+    fetchLogins()
+  }, [fetchLogins])
+
+  return (
+    <Card className="border-border">
+      <CardHeader>
+        <CardTitle className="text-foreground">Connexions récentes</CardTitle>
+        <CardDescription>
+          {total} connexion{total !== 1 ? 's' : ''} enregistrée{total !== 1 ? 's' : ''} — comptage
+          sur 30 jours par personne
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <LoadingBlock />
+        ) : logins.length === 0 ? (
+          <EmptyState
+            icon={LogIn}
+            title="Aucune connexion enregistrée"
+            description="Les connexions seront enregistrées ici automatiquement"
+          />
+        ) : (
+          <>
+            <div className="space-y-2">
+              {logins.map((l) => (
+                <div
+                  key={l.id}
+                  className="flex items-center gap-4 p-3 border border-border rounded-lg"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">{l.full_name ?? '—'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {l.email ?? '—'}
+                      {l.ip_address ? ` • ${l.ip_address}` : ''}
+                      {` • ${l.logins_last_30d} connexion${l.logins_last_30d !== 1 ? 's' : ''} (30j)`}
+                    </p>
+                  </div>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {timeAgo(l.created_at)}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <PaginationBar page={page} pageSize={30} total={total} onPageChange={setPage} />
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function ErrorsTab() {
+  const [status, setStatus] = useState<{ configured: boolean; dashboardUrl: string | null } | null>(
+    null,
+  )
+
+  useEffect(() => {
+    fetch('/api/admin/activity/error-tracking-status')
+      .then((res) => res.json())
+      .then(setStatus)
+      .catch(() => setStatus({ configured: false, dashboardUrl: null }))
+  }, [])
+
+  return (
+    <Card className="border-border">
+      <CardHeader>
+        <CardTitle className="text-foreground flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+          Suivi des erreurs
+        </CardTitle>
+        <CardDescription>
+          Le suivi des erreurs (Sentry) est déjà intégré au code de la plateforme — les erreurs
+          serveur et navigateur y remontent automatiquement une fois activé.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {status === null ? (
+          <LoadingBlock />
+        ) : status.configured ? (
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm text-foreground">Suivi des erreurs actif.</p>
+            {status.dashboardUrl && (
+              <Button variant="outline" size="sm" asChild>
+                <a href={status.dashboardUrl} target="_blank" rel="noopener noreferrer">
+                  Ouvrir Sentry <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+                </a>
+              </Button>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Pas encore activé. Créez un projet sur{' '}
+            <a
+              href="https://sentry.io"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              sentry.io
+            </a>{' '}
+            puis renseignez <code className="text-xs">NEXT_PUBLIC_SENTRY_DSN</code>,{' '}
+            <code className="text-xs">SENTRY_ORG</code> et{' '}
+            <code className="text-xs">SENTRY_PROJECT</code> dans les variables d'environnement
+            Vercel — aucun changement de code nécessaire.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+export default function ActivityAdminPage() {
+  return (
+    <div className="space-y-8">
+      <PageHeader
+        title="Suivi du site"
+        description="Actions, connexions et suivi des erreurs — tout ce qui bouge sur la plateforme"
+      />
+
+      <Tabs defaultValue="actions" className="w-full">
+        <TabsList className="grid w-full max-w-lg grid-cols-3 border-b border-border bg-transparent">
+          <TabsTrigger value="actions">Actions</TabsTrigger>
+          <TabsTrigger value="logins">Connexions</TabsTrigger>
+          <TabsTrigger value="errors">Erreurs</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="actions" className="mt-6">
+          <ActionsTab />
+        </TabsContent>
+        <TabsContent value="logins" className="mt-6">
+          <LoginsTab />
+        </TabsContent>
+        <TabsContent value="errors" className="mt-6">
+          <ErrorsTab />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

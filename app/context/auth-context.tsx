@@ -1,14 +1,14 @@
 'use client'
 
-import type React from 'react'
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { destroySession, onLogoutBroadcast, setTenantId, setUserId } from '@/lib/auth/session'
 import { createClient } from '@/lib/supabase/client'
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { createLogger } from '@/lib/utils/logger'
-import { setUserId, setTenantId, onLogoutBroadcast, destroySession } from '@/lib/auth/session'
-import type { AuthUser, UserRole, HarooType } from '@/types/domain'
 import { effectiveHarooType } from '@/lib/utils/permissions'
+import type { AuthUser, HarooType, UserRole } from '@/types/domain'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { useRouter } from 'next/navigation'
+import type React from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 
 const log = createLogger('auth')
 
@@ -123,12 +123,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initAuth = async () => {
       try {
-        const { data: { user: sbUser }, error: authError } = await supabase.auth.getUser()
-        
+        const {
+          data: { user: sbUser },
+          error: authError,
+        } = await supabase.auth.getUser()
+
         // If auth error (expired token, etc.) → clean up silently
         if (authError) {
           log.debug('Auth error on init, cleaning up', authError.message)
-          try { await supabase.auth.signOut({ scope: 'local' }) } catch {}
+          try {
+            await supabase.auth.signOut({ scope: 'local' })
+          } catch {}
           if (mounted) setIsLoading(false)
           return
         }
@@ -141,7 +146,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } else {
               // User exists in auth but no profile → zombie session
               log.debug('Zombie session detected (no profile), cleaning up')
-              try { await supabase.auth.signOut({ scope: 'local' }) } catch {}
+              try {
+                await supabase.auth.signOut({ scope: 'local' })
+              } catch {}
             }
           }
         }
@@ -155,43 +162,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initAuth()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (!mounted) return
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return
 
-        if (event === 'SIGNED_OUT') {
-          setUser(null)
-          return
-        }
+      if (event === 'SIGNED_OUT') {
+        setUser(null)
+        return
+      }
 
-        // AUTH-08: password recovery flow — Supabase emits this when the user
-        // lands from a reset-password email link. Route them to set a new password.
-        if (event === 'PASSWORD_RECOVERY') {
-          router.replace('/auth/reset-password')
-          return
-        }
+      // AUTH-08: password recovery flow — Supabase emits this when the user
+      // lands from a reset-password email link. Route them to set a new password.
+      if (event === 'PASSWORD_RECOVERY') {
+        router.replace('/auth/reset-password')
+        return
+      }
 
-        // Couvre SIGNED_IN, INITIAL_SESSION, TOKEN_REFRESHED et USER_UPDATED :
-        // dans tous les cas on resynchronise le profil.
-        //
-        // IMPORTANT : ne JAMAIS await une requête Supabase directement dans ce
-        // callback. Il s'exécute en détenant le verrou d'auth (navigator.locks)
-        // et toute requête PostgREST attend ce même verrou pour résoudre le
-        // jeton → interblocage → isLoading reste true → « Chargement… » infini
-        // (observé après un refresh ou un changement de compte). Le setTimeout
-        // sort du callback et libère le verrou avant la requête.
-        if (session?.user) {
-          const userId = session.user.id
-          setTimeout(() => {
-            if (!mounted) return
-            void fetchProfile(userId).then((profile) => {
-              if (mounted && profile) setUser(profile)
-              // If profile is null, user stays null — treated as unauthenticated.
-            })
-          }, 0)
-        }
-      },
-    )
+      // Connexion réelle uniquement (jamais INITIAL_SESSION/TOKEN_REFRESHED,
+      // qui se déclenchent à chaque rechargement de page) — § suivi admin
+      // « qui s'est connecté ». Fire-and-forget, ne bloque jamais l'UI.
+      if (event === 'SIGNED_IN') {
+        void fetch('/api/auth/log-login', { method: 'POST' }).catch(() => {})
+      }
+
+      // Couvre SIGNED_IN, INITIAL_SESSION, TOKEN_REFRESHED et USER_UPDATED :
+      // dans tous les cas on resynchronise le profil.
+      //
+      // IMPORTANT : ne JAMAIS await une requête Supabase directement dans ce
+      // callback. Il s'exécute en détenant le verrou d'auth (navigator.locks)
+      // et toute requête PostgREST attend ce même verrou pour résoudre le
+      // jeton → interblocage → isLoading reste true → « Chargement… » infini
+      // (observé après un refresh ou un changement de compte). Le setTimeout
+      // sort du callback et libère le verrou avant la requête.
+      if (session?.user) {
+        const userId = session.user.id
+        setTimeout(() => {
+          if (!mounted) return
+          void fetchProfile(userId).then((profile) => {
+            if (mounted && profile) setUser(profile)
+            // If profile is null, user stays null — treated as unauthenticated.
+          })
+        }, 0)
+      }
+    })
 
     return () => {
       mounted = false

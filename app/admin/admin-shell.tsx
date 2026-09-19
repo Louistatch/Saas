@@ -37,7 +37,7 @@ const ADMIN_LINKS = [
   { href: '/admin/analytics', label: 'Statistiques', icon: BarChart3 },
   { href: '/admin/agritogo', label: 'AgriTogo', icon: Cpu },
   { href: '/admin/agrismat', label: 'Agrismat', icon: Leaf },
-  { href: '/admin/logs', label: "Logs d'audit", icon: Activity },
+  { href: '/admin/logs', label: 'Suivi du site', icon: Activity },
   { href: '/admin/demo-accounts', label: 'Comptes de démo', icon: Users2 },
   { href: '/admin/settings', label: 'Paramètres', icon: Settings },
 ] as const
