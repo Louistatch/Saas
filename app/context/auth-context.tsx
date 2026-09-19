@@ -20,13 +20,6 @@ export interface AuthContextType {
   isLoading: boolean
   isAuthenticated: boolean
   login: (email: string, password: string) => Promise<AuthUser | null>
-  signup: (
-    email: string,
-    password: string,
-    firstName: string,
-    lastName: string,
-    cooperativeName?: string,
-  ) => Promise<{ needsEmailConfirmation: boolean }>
   logout: () => Promise<void>
   refreshProfile: () => Promise<void>
 }
@@ -225,62 +218,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (profile) setUser(profile)
   }, [fetchProfile, user])
 
-  const signup = useCallback(
-    async (
-      email: string,
-      password: string,
-      firstName: string,
-      lastName: string,
-      cooperativeName?: string,
-    ): Promise<{ needsEmailConfirmation: boolean }> => {
-      if (!supabase) throw new Error('Auth client not initialized')
-      // C1 FIX: encode cooperativeName in the email redirect URL so the callback
-      // can run complete-signup after email confirmation (when no session exists yet).
-      const callbackUrl = new URL(`${window.location.origin}/auth/callback`)
-      if (cooperativeName) {
-        callbackUrl.searchParams.set('cooperative', cooperativeName)
-      }
-
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: callbackUrl.toString(),
-          data: {
-            first_name: firstName,
-            last_name: lastName,
-            // role is decided by the DB trigger; we don't trust user_metadata
-          },
-        },
-      })
-      if (error) throw error
-      if (!data.user) return { needsEmailConfirmation: false }
-
-      // When email confirmation is ON, hasSession=false → complete-signup will
-      // run in the callback route after the user clicks the confirmation link.
-      // When confirmation is OFF, the session is immediately available → run now.
-      const hasSession = !!data.session
-      if (cooperativeName && hasSession) {
-        // AUTH-03: cooperative creation + role assignment happen SERVER-SIDE.
-        const res = await fetch('/api/auth/complete-signup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ cooperativeName }),
-        })
-        if (!res.ok) {
-          const { error: msg } = (await res.json().catch(() => ({}))) as { error?: string }
-          log.error('complete-signup failed', { status: res.status, msg })
-          throw new Error(msg ?? 'Failed to finalize cooperative setup')
-        }
-        await refreshProfile()
-      }
-
-      return { needsEmailConfirmation: !hasSession }
-    },
-    [supabase, refreshProfile],
-  )
-
   const logout = useCallback(async () => {
     // Use the enterprise logout procedure for complete session destruction
     const { performLogout } = await import('@/lib/auth/logout')
@@ -292,7 +229,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     isAuthenticated: !!user,
     login,
-    signup,
     logout,
     refreshProfile,
   }

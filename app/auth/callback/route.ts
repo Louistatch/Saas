@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { runCompleteSignup } from '@/lib/auth/complete-signup'
 import { createLogger } from '@/lib/utils/logger'
 
 const log = createLogger('auth:callback')
@@ -10,8 +9,6 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get('code')
   const next = searchParams.get('next')
   const type = searchParams.get('type')
-  // cooperative name encoded by signup() in auth-context when email confirmation is ON
-  const cooperativeParam = searchParams.get('cooperative')
 
   // Use request.nextUrl.origin as the trusted base URL
   // NEVER trust x-forwarded-host for redirect targets (open redirect risk)
@@ -27,42 +24,11 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(`${base}/auth/reset-password`)
       }
 
-      // C1+C2 FIX: Email-confirmation links (type=signup or type=email).
-      // The session is now active — if a cooperativeName was encoded in the
-      // redirect URL, run complete-signup now before sending to the dashboard.
+      // Confirmation d'email (type=signup ou type=email).
+      // La création autonome de coopérative n'existe plus : les comptes
+      // organisationnels sont créés par l'administration après demande
+      // d'accès (/api/access-request). On se contente donc d'orienter.
       if (type === 'signup' || type === 'email') {
-        if (cooperativeParam) {
-          const cooperativeName = decodeURIComponent(cooperativeParam)
-          const result = await runCompleteSignup(supabase, cooperativeName)
-          if (!result.ok && result.status !== 409) {
-            // 409 = already linked (idempotent), treat as success.
-            // Any other error → send to a recoverable error page so the user
-            // can retry rather than silently land on a broken dashboard.
-            log.error('complete-signup failed in callback', {
-              status: result.status,
-              error: result.error,
-            })
-            return NextResponse.redirect(
-              `${base}/auth/login?error=setup_failed&retry=1`,
-            )
-          }
-        } else {
-          // cooperativeParam may have been stripped by an email client.
-          // Check if the profile already has a cooperative; if not, send to
-          // onboarding so the user can finish setup instead of landing on a
-          // broken dashboard with no cooperative context.
-          const { data: { user: cbUser } } = await supabase.auth.getUser()
-          if (cbUser) {
-            const { data: cbProfile } = await supabase
-              .from('profiles')
-              .select('cooperative_id')
-              .eq('id', cbUser.id)
-              .maybeSingle()
-            if (!cbProfile?.cooperative_id) {
-              return NextResponse.redirect(`${base}/dashboard?welcome=1`)
-            }
-          }
-        }
         return NextResponse.redirect(`${base}/dashboard?welcome=1`)
       }
 

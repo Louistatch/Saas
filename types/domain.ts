@@ -16,9 +16,10 @@ export type UserRole =
   | 'super_admin'
   | 'cooperative_admin'
   | 'member'
-  | 'guest'
   /** Aucune couche organisationnelle — compte Haroo seul, ou en cours d'onboarding. */
   | 'none'
+  /** Déprécié : disait la même chose que `none`. Conservé, jamais écrit. */
+  | 'guest'
   // Dépréciés : la couche Haroo vit désormais dans `harooType`. Ces valeurs
   // restent typées le temps que les comptes créés avant la bascule soient
   // migrés, et parce qu'un enum Postgres ne se dégarnit pas.

@@ -79,7 +79,8 @@ it is a derived mirror that can be stale or absent.
 A single account carries two independent layers:
 
 - `profiles.role` — organisational layer (`super_admin`, `cooperative_admin`,
-  `member`, `guest`, or `none` when there is no organisation).
+  `member`, or `none` when there is no organisation). `guest` is deprecated:
+  it meant the same as `none` and no RLS policy references it.
 - `profiles.haroo_type` — Haroo layer (`ouvrier`, `acheteur`, `agronome`, or
   NULL). One at a time.
 
@@ -87,8 +88,9 @@ Both can coexist: a cooperative member may also be an ouvrier. Never write a
 Haroo type into `role` — that erases the organisational layer, which is exactly
 the bug the split fixed. Use `hasOrgLayer()`, `isHarooRole()` and
 `effectiveHarooType()` from `lib/utils/permissions.ts` rather than comparing
-roles by hand; the `ouvrier`/`acheteur`/`agronome` values of `user_role` are
-deprecated and kept only for accounts predating the split.
+roles by hand; the `ouvrier`/`acheteur`/`agronome` and `guest` values of
+`user_role` are deprecated and kept only because Postgres cannot drop an enum
+label — never write them.
 
 `role`, `haroo_type` and `cooperative_id` are protected by the
 `protect_profile_privileges` trigger: only `service_role`, `SECURITY DEFINER`
