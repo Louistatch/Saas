@@ -82,10 +82,12 @@ export default function OperatorSignupPage() {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen flex-col bg-[#f7f8f5] md:flex-row">
       <AuthSidePanel
-        title="Devenez Opérateur FaîtiereHub"
-        description="Un compte dédié pour se former, être évalué et exercer auprès des organisations agricoles."
+        imageSrc="/images/auth/operator-field-agent.webp"
+        eyebrow="Académie Opérateur"
+        title="Formez-vous. Soyez certifié. Agissez sur le terrain."
+        description="Rejoignez le réseau d’opérateurs FaîtiereHub et accompagnez les organisations agricoles avec des outils professionnels."
         benefits={[
           'Formation professionnelle gratuite',
           'Évaluation pratique obligatoire',
@@ -93,8 +95,8 @@ export default function OperatorSignupPage() {
           'Accès aux missions après validation',
         ]}
       />
-      <div className="flex flex-1 items-center justify-center px-4 py-8 sm:px-6">
-        <div className="w-full max-w-md space-y-6">
+      <main className="flex flex-1 items-center justify-center px-4 py-8 sm:px-8 lg:px-12">
+        <div className="w-full max-w-md space-y-5">
           <div className="flex items-center justify-between">
             <Link
               href="/auth/signup"
@@ -104,10 +106,13 @@ export default function OperatorSignupPage() {
             </Link>
             <Logo size="sm" />
           </div>
-          <Card>
-            <CardHeader>
+          <Card className="border-black/[0.07] bg-white shadow-xl shadow-black/[0.06]">
+            <CardHeader className="space-y-3 pb-5">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
+                <ShieldCheck className="h-5 w-5 text-primary" />
+              </div>
               <CardTitle className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-primary" /> Créer un compte Opérateur
+                Créer votre compte Opérateur
               </CardTitle>
               <CardDescription>
                 Ce compte est réservé au parcours Opérateur. Il ne donne aucun accès aux données
@@ -176,7 +181,7 @@ export default function OperatorSignupPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

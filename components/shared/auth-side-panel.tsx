@@ -1,14 +1,17 @@
 'use client'
 
-import Link from 'next/link'
 import { Logo } from '@/components/shared/logo'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, BadgeCheck, BookOpenCheck, BriefcaseBusiness } from 'lucide-react'
+import Image from 'next/image'
+import Link from 'next/link'
 
 interface AuthSidePanelProps {
   title: string
   description: string
   benefits: string[]
   footer?: string
+  imageSrc?: string
+  eyebrow?: string
 }
 
 /**
@@ -19,7 +22,85 @@ interface AuthSidePanelProps {
  * - Benefits list
  * - Responsive (hidden on mobile)
  */
-export function AuthSidePanel({ title, description, benefits, footer }: AuthSidePanelProps) {
+export function AuthSidePanel({
+  title,
+  description,
+  benefits,
+  footer,
+  imageSrc,
+  eyebrow,
+}: AuthSidePanelProps) {
+  if (imageSrc) {
+    return (
+      <aside className="relative flex min-h-[300px] w-full flex-col overflow-hidden bg-[#063d24] text-white md:min-h-screen md:w-[46%] md:max-w-[720px] md:shrink-0">
+        <Image
+          src={imageSrc}
+          alt="Opératrice agricole utilisant une tablette dans un champ"
+          fill
+          priority
+          sizes="(max-width: 768px) 100vw, 46vw"
+          className="object-cover object-[52%_38%] md:object-center"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#052f1f] via-[#063d24]/25 to-black/15 md:bg-gradient-to-b md:from-black/20 md:via-transparent md:to-[#052f1f]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_30%,transparent_0,transparent_30%,rgba(3,35,22,.18)_100%)]" />
+
+        <div className="relative z-10 flex items-center justify-between p-5 md:p-8">
+          <Link
+            href="/"
+            className="rounded-xl bg-white/95 px-3 py-2 shadow-sm backdrop-blur transition-transform hover:scale-[1.02]"
+          >
+            <Logo size="sm" />
+          </Link>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 rounded-full bg-black/25 px-3 py-2 text-xs font-medium text-white backdrop-blur-md hover:bg-black/35"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Accueil
+          </Link>
+        </div>
+
+        <div className="relative z-10 mt-auto p-5 pt-20 md:p-8 lg:p-10">
+          <div className="mb-5 hidden md:block">
+            <MemberCardVisual />
+          </div>
+          <div className="max-w-xl">
+            {eyebrow ? (
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
+                {eyebrow}
+              </p>
+            ) : null}
+            <h1 className="max-w-lg text-3xl font-bold leading-tight tracking-tight md:text-4xl lg:text-5xl">
+              {title}
+            </h1>
+            <p className="mt-3 max-w-lg text-sm leading-relaxed text-white/80 md:text-base">
+              {description}
+            </p>
+            <div className="mt-5 hidden grid-cols-3 gap-2 lg:grid">
+              {[
+                [BookOpenCheck, benefits[0]],
+                [BadgeCheck, benefits[2]],
+                [BriefcaseBusiness, benefits[3]],
+              ].map(([Icon, label]) => (
+                <div
+                  key={String(label)}
+                  className="rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur-md"
+                >
+                  <Icon className="mb-2 h-5 w-5 text-emerald-300" />
+                  <p className="text-xs font-medium leading-snug text-white/90">
+                    {label as string}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <p className="mt-5 hidden text-xs text-white/55 md:block">
+            {footer ?? 'Plateforme de gestion pour coopératives agricoles.'}
+          </p>
+        </div>
+      </aside>
+    )
+  }
+
   return (
     <div className="hidden md:flex flex-col justify-between bg-gradient-to-br from-primary/5 via-primary/10 to-accent/5 border-r border-border p-8 relative overflow-hidden">
       {/* Background decorative elements */}
@@ -172,6 +253,22 @@ export function AuthSidePanel({ title, description, benefits, footer }: AuthSide
       <p className="relative z-10 text-xs text-muted-foreground">
         {footer ?? 'Plateforme de gestion pour coopératives agricoles.'}
       </p>
+    </div>
+  )
+}
+
+function MemberCardVisual() {
+  return (
+    <div className="relative ml-auto w-[310px] rotate-[-3deg] transition-transform duration-500 hover:rotate-0 lg:w-[360px]">
+      <div className="absolute inset-2 translate-y-3 rounded-[22px] bg-black/35 blur-xl" />
+      <Image
+        src="/showcase-card.webp"
+        alt="Carte membre vérifiable FaîtiereHub"
+        width={1536}
+        height={1024}
+        sizes="(max-width: 1024px) 310px, 360px"
+        className="relative rounded-[18px] border border-white/25 shadow-2xl"
+      />
     </div>
   )
 }
