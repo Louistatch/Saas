@@ -314,8 +314,8 @@ export function AgronomeView({ cardNumber, agronome, missions, card }: AgronomeV
                 <span className="text-xs text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">Spécialisations</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {agronome.specialisations.map((s, i) => (
-                  <span key={i} className="px-2.5 py-1 rounded-full bg-[var(--vfp-accent)]/10 border border-[var(--vfp-accent)]/20 text-[var(--vfp-accent-bright)] text-xs font-medium">{s}</span>
+                {agronome.specialisations.map((s) => (
+                  <span key={s} className="px-2.5 py-1 rounded-full bg-[var(--vfp-accent)]/10 border border-[var(--vfp-accent)]/20 text-[var(--vfp-accent-bright)] text-xs font-medium">{s}</span>
                 ))}
               </div>
             </div>

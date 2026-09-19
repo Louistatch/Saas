@@ -227,11 +227,11 @@ export default function DemoPage() {
                       ['Cartes membres', '✓ (tout)', '✓ (propre)', '✓', '✗'],
                       ['Statistiques', '✓ (tout)', '✓ (propre)', '✓', '✗'],
                       ['Paramètres', '✓', '✓ (propre)', '✗', '✗'],
-                    ].map(([feature, ...cols], i) => (
-                      <tr key={i} className="border-b border-border last:border-0 hover:bg-accent/5">
+                    ].map(([feature, ...cols]) => (
+                      <tr key={String(feature)} className="border-b border-border last:border-0 hover:bg-accent/5">
                         <td className="py-2 px-3 text-foreground font-medium">{feature}</td>
                         {cols.map((val, j) => (
-                          <td key={j} className={`py-2 px-3 text-center ${val === '✗' ? 'text-muted-foreground' : val.startsWith('✓') ? 'text-green-600 font-medium' : 'text-muted-foreground'}`}>
+                          <td key={`${feature}-${j}`} className={`py-2 px-3 text-center ${val === '✗' ? 'text-muted-foreground' : val.startsWith('✓') ? 'text-green-600 font-medium' : 'text-muted-foreground'}`}>
                             {val}
                           </td>
                         ))}
@@ -247,8 +247,8 @@ export default function DemoPage() {
           <div>
             <h2 className="text-2xl font-bold text-foreground mb-6">Tous les comptes de démo</h2>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {demoAccounts.map((account, i) => (
-                <AccountCard key={i} account={account} />
+              {demoAccounts.map((account) => (
+                <AccountCard key={account.email} account={account} />
               ))}
             </div>
           </div>

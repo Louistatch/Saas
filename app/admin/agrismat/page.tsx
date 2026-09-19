@@ -83,10 +83,10 @@ export default function AgrismatAdminPage() {
           { icon: Leaf, label: '20+ cultures', desc: 'Maïs, riz, manioc, café, cacao…', color: 'bg-green-100 text-green-700' },
           { icon: Droplets, label: '6 types de sol', desc: 'Argileux, limoneux, sableux…', color: 'bg-blue-100 text-blue-700' },
           { icon: CheckCircle2, label: 'FAO-56 certifié', desc: 'Méthode Penman-Monteith internationale', color: 'bg-primary/10 text-primary' },
-        ].map((item, i) => {
+        ].map((item) => {
           const Icon = item.icon
           return (
-            <Card key={i} className="border-border">
+            <Card key={item.label} className="border-border">
               <CardContent className="pt-5 flex items-center gap-4">
                 <div className={`p-3 rounded-full ${item.color}`}><Icon className="h-6 w-6" /></div>
                 <div>
@@ -163,8 +163,8 @@ export default function AgrismatAdminPage() {
                   { label: 'Volume total annuel', value: cropResult.kpis.total_m3 !== undefined ? `${cropResult.kpis.total_m3.toFixed(0)} m³` : '—' },
                   { label: 'Mois de pointe', value: cropResult.kpis.peak_month ?? '—' },
                   { label: 'Moyenne mensuelle', value: cropResult.kpis.avg_monthly_mm !== undefined ? `${cropResult.kpis.avg_monthly_mm.toFixed(1)} mm` : '—' },
-                ].map((kpi, i) => (
-                  <div key={i} className="p-4 rounded-lg border border-border bg-primary/5 text-center">
+                ].map((kpi) => (
+                  <div key={kpi.label} className="p-4 rounded-lg border border-border bg-primary/5 text-center">
                     <p className="text-2xl font-bold text-primary">{kpi.value}</p>
                     <p className="text-xs text-muted-foreground mt-1">{kpi.label}</p>
                   </div>

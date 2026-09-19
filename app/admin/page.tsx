@@ -337,10 +337,10 @@ export default function AdminOverview() {
 
         <TabsContent value="overview" className="mt-6 space-y-8">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        {statCards.map((stat, i) => {
+        {statCards.map((stat) => {
           const Icon = stat.icon
           return (
-            <Link key={i} href={stat.href}>
+            <Link key={stat.title} href={stat.href}>
               <Card className="border-border hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer">
                 <CardContent className="pt-6">
                   <div className="flex items-start justify-between">
@@ -422,8 +422,8 @@ export default function AdminOverview() {
               <p className="text-center py-8 text-muted-foreground text-sm">Aucune activité récente</p>
             ) : (
               <div className="space-y-0">
-                {activity.map((item, i) => (
-                  <div key={i} className="flex items-center gap-3 py-2.5 border-b border-border last:border-0">
+                {activity.map((item) => (
+                  <div key={`${item.kind}-${item.label}-${item.detail}`} className="flex items-center gap-3 py-2.5 border-b border-border last:border-0">
                     <span className={`h-2 w-2 rounded-full shrink-0 ${dotColor[item.kind]}`} />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm text-foreground truncate">
@@ -471,9 +471,9 @@ export default function AdminOverview() {
                 },
                 { label: 'Professionnels Haroo inscrits', value: stats.totalHarooPros },
                 { label: 'Total utilisateurs plateforme', value: stats.totalUsers },
-              ].map((item, i) => (
+              ].map((item) => (
                 <div
-                  key={i}
+                  key={item.label}
                   className="flex items-center justify-between py-3 border-b border-border last:border-0"
                 >
                   <p className="text-sm text-muted-foreground">{item.label}</p>
@@ -488,10 +488,10 @@ export default function AdminOverview() {
 
         <TabsContent value="analytics" className="mt-6 space-y-8">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {analyticsMetrics.map((m, i) => {
+            {analyticsMetrics.map((m) => {
               const Icon = m.icon
               return (
-                <Card key={i} className="border-border">
+                <Card key={m.title} className="border-border">
                   <CardContent className="pt-6">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -584,8 +584,8 @@ export default function AdminOverview() {
                   return totalMembers > 0 ? `${Math.round((totalCards / totalMembers) * 100)}%` : '—'
                 })(),
               },
-            ].map((item, i) => (
-              <Card key={i} className="border-border">
+            ].map((item) => (
+              <Card key={item.label} className="border-border">
                 <CardContent className="pt-6">
                   <p className="text-sm text-muted-foreground">{item.label}</p>
                   <p className="text-3xl font-bold text-foreground mt-2">{isLoading ? '—' : item.value}</p>
@@ -756,10 +756,10 @@ export default function AdminOverview() {
               { label: 'Cultures supportées', value: '20+', desc: 'Maïs, riz, manioc, café, cacao…', icon: Leaf, color: 'bg-green-100 text-green-700' },
               { label: 'Types de sol', value: '6', desc: 'Argileux, limoneux, sableux…', icon: Activity, color: 'bg-amber-100 text-amber-700' },
               { label: 'Systèmes d\'irrigation', value: '5', desc: 'Goutte-à-goutte, aspersion, gravitaire…', icon: ShoppingCart, color: 'bg-blue-100 text-blue-700' },
-            ].map((item, i) => {
+            ].map((item) => {
               const Icon = item.icon
               return (
-                <Card key={i} className="border-border">
+                <Card key={item.label} className="border-border">
                   <CardContent className="pt-6 flex items-center gap-4">
                     <div className={`p-3 rounded-full ${item.color}`}>
                       <Icon className="h-6 w-6" />
@@ -788,8 +788,8 @@ export default function AdminOverview() {
                 { feature: 'Comparaison multi-cultures sur un même calendrier', status: true },
                 { feature: 'Export rapport PDF automatique', status: true },
                 { feature: 'API REST intégrée dans AgriTogo (/api/v1/agrismart/calculate)', status: true },
-              ].map((item, i) => (
-                <div key={i} className="flex items-center gap-3">
+              ].map((item) => (
+                <div key={item.feature} className="flex items-center gap-3">
                   <CheckCircle2 className={`h-4 w-4 shrink-0 ${item.status ? 'text-green-600' : 'text-muted-foreground'}`} />
                   <p className="text-sm text-foreground">{item.feature}</p>
                 </div>

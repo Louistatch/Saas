@@ -283,7 +283,7 @@ function GuideTab() {
         <CardContent>
           <div className="space-y-6">
             {steps.map((step, index) => (
-              <div key={index} className="flex gap-4">
+              <div key={step.title} className="flex gap-4">
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-semibold">
                   {index + 1}
                 </div>

@@ -259,8 +259,8 @@ export function AcheteurView({ cardNumber, acheteur, preventes, card }: Acheteur
                 <span className="text-xs text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">Produits d&apos;intérêt</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {acheteur.produits_interesses.map((p, i) => (
-                  <span key={i} className="px-2.5 py-1 rounded-full bg-[var(--vfp-accent)]/10 border border-[var(--vfp-accent)]/20 text-[var(--vfp-accent-bright)] text-xs font-medium">{p}</span>
+                {acheteur.produits_interesses.map((p) => (
+                  <span key={p} className="px-2.5 py-1 rounded-full bg-[var(--vfp-accent)]/10 border border-[var(--vfp-accent)]/20 text-[var(--vfp-accent-bright)] text-xs font-medium">{p}</span>
                 ))}
               </div>
             </div>
@@ -272,8 +272,8 @@ export function AcheteurView({ cardNumber, acheteur, preventes, card }: Acheteur
                 <span className="text-xs text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">Zones d&apos;intervention</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {acheteur.cantons_intervention.map((c, i) => (
-                  <span key={i} className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/70 text-xs">{c}</span>
+                {acheteur.cantons_intervention.map((c) => (
+                  <span key={c} className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/70 text-xs">{c}</span>
                 ))}
               </div>
             </div>

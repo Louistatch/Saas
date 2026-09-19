@@ -132,8 +132,8 @@ export function AuthSidePanel({ title, description, benefits, footer }: AuthSide
           </div>
 
           <ul className="space-y-3">
-            {benefits.map((benefit, i) => (
-              <li key={i} className="flex gap-3 items-start">
+            {benefits.map((benefit) => (
+              <li key={benefit} className="flex gap-3 items-start">
                 <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/15 mt-0.5 shrink-0">
                   <svg className="h-3 w-3 text-primary" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M2 6l3 3 5-5" strokeLinecap="round" strokeLinejoin="round" />

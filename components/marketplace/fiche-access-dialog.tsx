@@ -128,9 +128,9 @@ export function FicheAccessDialog({ fiche, open, onOpenChange }: FicheAccessDial
               {files.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Aucun fichier disponible.</p>
               ) : (
-                files.map((f, i) => (
+                files.map((f) => (
                   <a
-                    key={i}
+                    key={f.url}
                     href={f.url}
                     target="_blank"
                     rel="noopener noreferrer"

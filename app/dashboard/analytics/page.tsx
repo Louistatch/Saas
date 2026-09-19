@@ -409,10 +409,10 @@ export default function AnalyticsPage() {
 
       {/* ── Stat cards ── */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        {statCards.map((stat, i) => {
+        {statCards.map((stat) => {
           const Icon = stat.icon
           return (
-            <Card key={i} className="border-border">
+            <Card key={stat.label} className="border-border">
               <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   {stat.label}
@@ -710,10 +710,10 @@ function BreakdownBars({
 }) {
   return (
     <div className="space-y-3">
-      {items.map((item, i) => {
+      {items.map((item) => {
         const pct = total > 0 ? (item.value / total) * 100 : 0
         return (
-          <div key={i} className="space-y-1">
+          <div key={item.label} className="space-y-1">
             <div className="flex justify-between text-sm">
               <span className="text-foreground">{item.label}</span>
               <span className="text-muted-foreground">

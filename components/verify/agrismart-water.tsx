@@ -281,7 +281,7 @@ export function AgriSmartWater({ onBack, initialRegion, cardNumber }: Props) {
         </div>
         <div className="flex gap-1">
           {STEP_LABELS.map((label, i) => (
-            <p key={i} className={`flex-1 text-center text-[9px] font-semibold transition-colors ${i + 1 === step ? 'text-[var(--vfp-accent)]' : 'text-white/20'}`}>
+            <p key={label} className={`flex-1 text-center text-[9px] font-semibold transition-colors ${i + 1 === step ? 'text-[var(--vfp-accent)]' : 'text-white/20'}`}>
               {label}
             </p>
           ))}

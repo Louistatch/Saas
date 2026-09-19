@@ -670,8 +670,8 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
               </button>
               {showAlerts && (
                 <div className="border-t border-white/10 px-4 pb-3 pt-2 space-y-2">
-                  {agroAlerts.map((alert, i) => (
-                    <div key={i} className={`rounded-xl border p-3 flex items-start gap-2.5 ${ALERT_COLORS[alert.level]}`}>
+                  {agroAlerts.map((alert) => (
+                    <div key={alert.text} className={`rounded-xl border p-3 flex items-start gap-2.5 ${ALERT_COLORS[alert.level]}`}>
                       <span className="text-base leading-none shrink-0 mt-0.5">{alert.emoji}</span>
                       <p className="text-[12px] font-medium leading-snug">{alert.text}</p>
                     </div>

@@ -597,9 +597,9 @@ export default function MarketplacePage() {
                                                 <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{fiche.description}</p>
                                               )}
                                               <div className="flex flex-wrap gap-1.5 mt-2">
-                                                {fiche.files.map((f, i) => (
+                                                {fiche.files.map((f) => (
                                                   <button
-                                                    key={i}
+                                                    key={f.url}
                                                     onClick={() => handleDownload(f)}
                                                     className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors font-medium"
                                                   >
@@ -683,9 +683,9 @@ export default function MarketplacePage() {
                           {fiche.campaign ? ` • ${fiche.campaign}` : ''}
                         </p>
                         <div className="flex flex-wrap gap-2 mt-2">
-                          {fiche.files.map((f, i) => (
+                          {fiche.files.map((f) => (
                             <button
-                              key={i}
+                              key={f.url}
                               onClick={() => handleDownload(f)}
                               className="inline-flex items-center gap-1 text-xs bg-secondary/50 px-2 py-1 rounded hover:bg-primary/10 hover:text-primary transition-colors"
                             >

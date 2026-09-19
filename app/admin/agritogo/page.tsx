@@ -478,10 +478,10 @@ export default function AgriTogoAdminPage() {
                 { name: 'Crop Yield', desc: 'Prédiction des rendements par culture', file: 'yield_df' },
                 { name: 'KPI Dashboard', desc: 'Indicateurs clés agrégés', file: null },
                 { name: 'AgriSmart Irrigation', desc: 'Calcul FAO-56 des besoins en eau', file: null },
-              ].map((m, i) => {
+              ].map((m) => {
                 const fileOk = !m.file || pipeline?.files[m.file]
                 return (
-                  <div key={i} className="flex items-center gap-3 p-3 border border-border rounded-lg">
+                  <div key={m.name} className="flex items-center gap-3 p-3 border border-border rounded-lg">
                     <div className={`h-2 w-2 rounded-full shrink-0 ${fileOk ? 'bg-green-500' : 'bg-amber-500'}`} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground">{m.name}</p>
@@ -511,8 +511,8 @@ export default function AgriTogoAdminPage() {
                     { label: 'Version', value: `v${health.version}` },
                     { label: 'Agents IA', value: String(health.agents) },
                     { label: 'Modèles LLM', value: health.models.join(', ') },
-                  ].map((item, i) => (
-                    <div key={i} className="flex justify-between p-3 border border-border rounded-lg">
+                  ].map((item) => (
+                    <div key={item.label} className="flex justify-between p-3 border border-border rounded-lg">
                       <p className="text-sm text-muted-foreground">{item.label}</p>
                       <p className="text-sm font-medium text-foreground">{item.value}</p>
                     </div>

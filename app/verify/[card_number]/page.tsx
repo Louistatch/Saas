@@ -906,8 +906,8 @@ export default function VerifyCardPage() {
                         <div className="border-t border-white/[0.06] pt-2.5">
                           <p className="text-[10px] font-semibold text-white/35 uppercase tracking-wider mb-1.5">Comment progresser</p>
                           <ul className="space-y-1">
-                            {tips.slice(0, 3).map((t, i) => (
-                              <li key={i} className="flex items-start gap-1.5 text-[11px] text-white/45">
+                            {tips.slice(0, 3).map((t) => (
+                              <li key={t} className="flex items-start gap-1.5 text-[11px] text-white/45">
                                 <span className="text-[var(--vfp-accent)] mt-0.5 shrink-0">›</span>{t}
                               </li>
                             ))}
