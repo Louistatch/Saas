@@ -97,6 +97,10 @@ export default function CotisationsPage() {
   }, [currentCooperative, supabase])
 
   // Load stats
+  // Recalculer les totaux après chaque rechargement de la liste : `cotisations`
+  // est le déclencheur, l'agrégat étant relu côté serveur et non dérivé de la
+  // liste en mémoire.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: cotisations est le déclencheur voulu
   useEffect(() => {
     if (!currentCooperative) return
     supabase.from('cotisations').select('amount, status')

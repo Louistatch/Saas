@@ -18,7 +18,6 @@ import {
 } from 'recharts'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
-import { useAuth } from '@/app/context/auth-context'
 import { LoadingBlock, Skeleton } from '@/components/shared/loading'
 import { PageHeader } from '@/components/shared/page-header'
 import { ChartCard } from '@/components/shared/chart-card'
@@ -154,7 +153,6 @@ function exportStatsCsv(stats: Stats, cooperativeName: string) {
 
 export default function AnalyticsPage() {
   const { currentCooperative } = useCooperative()
-  const { user } = useAuth()
   const supabase = useMemo(() => createClient(), [])
   const [stats, setStats] = useState<Stats>(initial)
   const [isLoading, setIsLoading] = useState(true)
@@ -277,7 +275,7 @@ export default function AnalyticsPage() {
     setCotisationsOverTime(buildMonthlyAmountSeries(cotisationRows, 12))
 
     setIsLoading(false)
-  }, [currentCooperative, supabase, user])
+  }, [currentCooperative, supabase])
 
   useEffect(() => {
     fetchStats()

@@ -36,6 +36,10 @@ export default function RainRadar({ region, city, className }: Props) {
   const [label, setLabel] = useState<string>('Live')
   const [refreshKey, setRefreshKey] = useState(0)
 
+  // `refreshKey` n'est pas lu par le corps : c'est le bouton « actualiser »
+  // qui l'incrémente pour forcer la reconstruction de la carte. Le retirer
+  // des dépendances désactiverait ce bouton.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshKey est le déclencheur voulu, pas une capture
   useEffect(() => {
     if (!mapRef.current) return
 

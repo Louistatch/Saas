@@ -12,7 +12,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Checkbox } from '@/components/ui/checkbox'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
-import { useAuth } from '@/app/context/auth-context'
 import { useToast } from '@/hooks/use-toast'
 import { useDebounced } from '@/hooks/use-debounced'
 import { LoadingBlock, Spinner } from '@/components/shared/loading'
@@ -45,7 +44,6 @@ interface SettingsRow {
 
 export default function CardsPage() {
   const { currentCooperative, cooperatives } = useCooperative()
-  const { user } = useAuth()
   const { toast } = useToast()
   const { confirm, confirmNode } = useConfirm()
   const supabase = useMemo(() => createClient(), [])
@@ -153,7 +151,7 @@ export default function CardsPage() {
       setMembers(rows)
       setAllMembers(rows)
     }
-  }, [currentCooperative, supabase, user, isFaitiereAdmin])
+  }, [currentCooperative, supabase, isFaitiereAdmin])
 
   const loadCooperativeSettings = useCallback(async () => {
     if (!currentCooperative) return

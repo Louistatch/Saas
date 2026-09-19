@@ -87,6 +87,10 @@ export default function VerifyCardPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
 
+  // Scan d'une autre carte : tout remettre à zéro. `cardNumber` est le
+  // déclencheur ; sans lui, la carte précédente resterait affichée le temps
+  // du chargement — sur une page de vérification, c'est inacceptable.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: cardNumber est le déclencheur voulu
   useEffect(() => {
     setResult(null); setLoading(true); setShowContent(false)
     setTimeLeft(600); setExpired(false); setActiveView('menu'); setAtsData(null)

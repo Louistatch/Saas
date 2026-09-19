@@ -55,12 +55,24 @@ export function useMarketplaceFilters() {
   const [localSearch, setLocalSearch] = useState(filters.search)
   const debouncedSearch = useDebounced(localSearch, 300)
 
-  // Sync debounced search to URL
+  // L'URL fait foi : quand elle change de l'extérieur (retour navigateur, lien
+  // partagé, réinitialisation des filtres), le champ de recherche doit suivre.
+  // Sans cela il conservait l'ancien texte pendant que les résultats, eux,
+  // avaient déjà changé.
+  useEffect(() => {
+    setLocalSearch(filters.search)
+  }, [filters.search])
+
+  // Sens inverse : la saisie, une fois stabilisée, se propage à l'URL.
+  // Ajouter `filters.search` aux dépendances ferait rejouer l'effet sur un
+  // retour navigateur, avec un `debouncedSearch` encore périmé : il
+  // repousserait l'ancienne recherche dans l'URL et casserait le bouton
+  // Retour. La garde interne suffit à empêcher la boucle.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: dépendre seulement de la saisie stabilisée est délibéré — voir ci-dessus
   useEffect(() => {
     if (debouncedSearch !== filters.search) {
       updateFilters({ search: debouncedSearch, page: 1 })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch])
 
   // Build URL from filters

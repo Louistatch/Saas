@@ -164,6 +164,14 @@ export function useCascadingLocations(
 
   // --- 'query' mode: load each level's options from Supabase whenever its
   // parent selection changes, scoped via `.eq(parentColumn, parentId)`. ---
+  // Liste de dépendances réglée à la main, volontairement plus étroite que ce
+  // que la règle déduit : le corps lit `selection[parentLevel]` et
+  // `optionsByLevel[level]` par clé calculée, que Biome ne sait pas suivre.
+  // Dépendre de `selection` entier rechargerait toute la cascade au moindre
+  // changement de village ; dépendre de `optionsByLevel` bouclerait, l'effet
+  // appelant lui-même `setOptionsByLevel`. Les identifiants listés sont
+  // exactement les parents d'un niveau.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: dépendances réglées à la main — voir ci-dessus
   useEffect(() => {
     if (mode !== 'query') return
 
@@ -215,7 +223,6 @@ export function useCascadingLocations(
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     mode,
     supabase,
@@ -251,6 +258,9 @@ export function useCascadingLocations(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, supabase, prefetchLevels])
 
+  // Même raisonnement que pour le mode 'query' ci-dessus : clés calculées, et
+  // une liste élargie relancerait la cascade sans raison.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: dépendances réglées à la main — voir ci-dessus
   useEffect(() => {
     if (mode !== 'prefetch-filter') return
 
@@ -290,7 +300,6 @@ export function useCascadingLocations(
           setLoadingLevel((curr) => (curr === level ? null : curr))
         })
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     mode,
     supabase,

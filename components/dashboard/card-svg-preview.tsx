@@ -8,7 +8,6 @@ interface CardSvgPreviewProps {
   lastName?: string
   phone?: string
   photoUrl?: string | null
-  signatureUrl?: string | null
   village?: string
   canton?: string
   prefecture?: string
@@ -54,7 +53,6 @@ export function CardSvgPreview({
   lastName = 'NOM',
   phone = '+228 90 XX XX XX',
   photoUrl = null,
-  signatureUrl = null,
   village = 'Village',
   canton = 'Canton',
   prefecture = 'Préfecture',
@@ -69,7 +67,6 @@ export function CardSvgPreview({
   className = '',
 }: CardSvgPreviewProps) {
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null)
-  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -77,13 +74,6 @@ export function CardSvgPreview({
     urlToDataUrl(photoUrl).then((v) => { if (!cancelled) setPhotoDataUrl(v) })
     return () => { cancelled = true }
   }, [photoUrl])
-
-  useEffect(() => {
-    let cancelled = false
-    if (!signatureUrl) { setSignatureDataUrl(null); return }
-    urlToDataUrl(signatureUrl).then((v) => { if (!cancelled) setSignatureDataUrl(v) })
-    return () => { cancelled = true }
-  }, [signatureUrl])
 
   const svgString = useMemo(() => {
     const schema = buildCardSchema({
@@ -107,7 +97,7 @@ export function CardSvgPreview({
       template,
     })
     return renderToSvgString(schema, photoDataUrl)
-  }, [firstName, lastName, phone, photoUrl, signatureUrl, photoDataUrl, signatureDataUrl, village, canton, prefecture, region, cardNumber, expiryDate, createdAt, cooperativeName, faitiereName, level, template])
+  }, [firstName, lastName, phone, photoUrl, photoDataUrl, village, canton, prefecture, region, cardNumber, expiryDate, createdAt, cooperativeName, faitiereName, level, template])
 
   return (
     <div

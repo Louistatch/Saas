@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
 import { errorMessage } from '@/lib/utils/errors'
+import { useResetPageOnChange } from './use-reset-page'
 
 interface UsePaginatedQueryOptions {
   /** Supabase table name */
@@ -72,9 +73,7 @@ export function usePaginatedQuery<T = Record<string, unknown>>(
   const stableFilters = useMemo(() => filters, [filtersKey])
 
   // Revenir à la première page dès que le filtrage ou la recherche change
-  useEffect(() => {
-    setPage(1)
-  }, [searchTerm, filtersKey])
+  useResetPageOnChange(setPage, [searchTerm, filtersKey])
 
   const fetchPage = useCallback(async () => {
     if (!enabled) {

@@ -112,7 +112,7 @@ export function useKoboSync(cooperativeId: string | null): UseKoboSyncReturn {
         setIsSyncing(false)
       }
     },
-    [cooperativeId, isSyncing, cleanup],
+    [cooperativeId, isSyncing],
   )
 
   const connectToSSE = useCallback(

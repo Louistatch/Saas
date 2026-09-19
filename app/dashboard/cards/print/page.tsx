@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Printer, ArrowLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
-import { useAuth } from '@/app/context/auth-context'
 import { LoadingBlock } from '@/components/shared/loading'
 import { buildCardSchema, renderToSvgString } from '@/lib/card-engine'
 import Link from 'next/link'
@@ -18,7 +17,6 @@ import type { MemberCard } from '@/types/domain'
  */
 export default function PrintCardsPage() {
   const { currentCooperative, cooperatives } = useCooperative()
-  const { user } = useAuth()
   const supabase = useMemo(() => createClient(), [])
   const [cards, setCards] = useState<MemberCard[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -60,7 +58,7 @@ export default function PrintCardsPage() {
     const { data } = await query
     setCards((data ?? []) as MemberCard[])
     setIsLoading(false)
-  }, [currentCooperative, supabase, user])
+  }, [currentCooperative, supabase])
 
   useEffect(() => { fetchCards() }, [fetchCards])
 

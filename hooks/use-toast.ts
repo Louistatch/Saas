@@ -171,6 +171,8 @@ function toast({ ...props }: Toast) {
 function useToast() {
   const [state, setState] = React.useState<State>(memoryState)
 
+  // L'abonnement ne dépend que de `setState`, dont l'identité est stable.
+  // Dépendre de `state` défaisait et refaisait l'abonnement à chaque toast.
   React.useEffect(() => {
     listeners.push(setState)
     return () => {
@@ -179,7 +181,7 @@ function useToast() {
         listeners.splice(index, 1)
       }
     }
-  }, [state])
+  }, [])
 
   return {
     ...state,

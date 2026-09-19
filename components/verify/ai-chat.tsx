@@ -233,6 +233,9 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
   const autoLoopRef = useRef(false)
 
   // Auto-scroll
+  // Défiler en bas à chaque nouveau message. `messages` est le déclencheur,
+  // pas une capture — sans lui, le fil resterait figé en haut.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: messages est le déclencheur voulu
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages])

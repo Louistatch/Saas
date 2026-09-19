@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ArrowLeft, Sprout, Map as MapIcon, Droplets, Navigation, CalendarDays } from 'lucide-react'
 
 interface Parcelle {
@@ -38,7 +38,7 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
   const [error, setError] = useState(false)
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null)
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     setError(false)
     setLoading(true)
     fetch(`/api/verify/${encodeURIComponent(cardNumber)}/parcelles`)
@@ -49,12 +49,11 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false))
-  }
+  }, [cardNumber])
 
   useEffect(() => {
     loadData()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cardNumber])
+  }, [loadData])
 
   const list = parcelles ?? []
   const cultures = new Set(list.map(p => p.culture_principale ?? p.culture_name).filter(Boolean))
