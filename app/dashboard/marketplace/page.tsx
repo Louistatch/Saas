@@ -878,7 +878,7 @@ export default function MarketplacePage() {
               {pendingFiles.length > 0 && (
                 <div className="space-y-2 mt-3">
                   {pendingFiles.map((f, i) => (
-                    <div key={i} className="flex items-center justify-between p-2 bg-secondary/30 rounded-lg">
+                    <div key={f.url} className="flex items-center justify-between p-2 bg-secondary/30 rounded-lg">
                       <div className="flex items-center gap-2">
                         <span>{fileIcon(f.type)}</span>
                         <span className="text-sm text-foreground">{f.name}</span>

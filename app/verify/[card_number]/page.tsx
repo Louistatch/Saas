@@ -957,8 +957,8 @@ export default function VerifyCardPage() {
                 <p className="text-white/50 text-sm">Aucun technicien trouvé pour votre zone.</p>
               </div>
             )}
-            {contacts && contacts.length > 0 && contacts.map((c, i) => (
-              <div key={i} className="vfp-card rounded-2xl p-4 space-y-3">
+            {contacts && contacts.length > 0 && contacts.map((c) => (
+              <div key={`${c.role}-${c.phone}`} className="vfp-card rounded-2xl p-4 space-y-3">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-[var(--vfp-accent)]/15 flex items-center justify-center">
                     <User className="h-5 w-5 text-[var(--vfp-accent)]" />

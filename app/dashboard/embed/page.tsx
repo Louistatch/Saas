@@ -231,7 +231,7 @@ export default function EmbedConfigPage() {
               </div>
               <div className="flex flex-wrap gap-2">
                 {config.allowed_origins.map((origin, i) => (
-                  <Badge key={i} variant="secondary" className="gap-1 cursor-pointer" onClick={() => {
+                  <Badge key={origin} variant="secondary" className="gap-1 cursor-pointer" onClick={() => {
                     setConfig(c => ({ ...c, allowed_origins: c.allowed_origins.filter((_, j) => j !== i) }))
                   }}>
                     {origin} ×
