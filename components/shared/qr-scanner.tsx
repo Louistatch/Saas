@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 type ScanState =
-  | 'idle'        // waiting for the user to tap "Activer la caméra"
-  | 'starting'    // permission prompt / camera warming up
-  | 'scanning'    // live, looking for a QR
-  | 'detected'    // QR found
-  | 'denied'      // permission refused
-  | 'insecure'    // not HTTPS → camera impossible
-  | 'error'       // other failure
+  | 'idle' // waiting for the user to tap "Activer la caméra"
+  | 'starting' // permission prompt / camera warming up
+  | 'scanning' // live, looking for a QR
+  | 'detected' // QR found
+  | 'denied' // permission refused
+  | 'insecure' // not HTTPS → camera impossible
+  | 'error' // other failure
 
 interface QrScannerProps {
   onResult: (value: string) => void
@@ -109,7 +109,7 @@ export function QrScanner({ onResult, onError, className = '' }: QrScannerProps)
           setState('error')
           setErrorMsg(
             name === 'NotFoundError'
-              ? "Aucune caméra détectée sur cet appareil."
+              ? 'Aucune caméra détectée sur cet appareil.'
               : `Caméra inaccessible (${name}).`,
           )
           onError?.('camera-error')
@@ -195,7 +195,7 @@ export function QrScanner({ onResult, onError, className = '' }: QrScannerProps)
       // for permissions, but we surface a generic error and stop the stream.
       streamRef.current?.getTracks().forEach((t) => t.stop())
       setState('error')
-      setErrorMsg('Le flux vidéo n\'a pas pu démarrer. Réessayez.')
+      setErrorMsg("Le flux vidéo n'a pas pu démarrer. Réessayez.")
       onError?.('camera-error')
     }
   }, [handleHit, onError])
@@ -227,9 +227,20 @@ export function QrScanner({ onResult, onError, className = '' }: QrScannerProps)
         {(showStartButton || state === 'insecure') && (
           <div className="qr-cta">
             <div className="qr-cta-icon" aria-hidden>
-              <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 9V7a2 2 0 0 1 2-2h2" /><path d="M17 5h2a2 2 0 0 1 2 2v2" />
-                <path d="M21 15v2a2 2 0 0 1-2 2h-2" /><path d="M7 19H5a2 2 0 0 1-2-2v-2" />
+              <svg
+                viewBox="0 0 24 24"
+                width="34"
+                height="34"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M3 9V7a2 2 0 0 1 2-2h2" />
+                <path d="M17 5h2a2 2 0 0 1 2 2v2" />
+                <path d="M21 15v2a2 2 0 0 1-2 2h-2" />
+                <path d="M7 19H5a2 2 0 0 1-2-2v-2" />
                 <circle cx="12" cy="12" r="3.2" />
               </svg>
             </div>
@@ -238,33 +249,38 @@ export function QrScanner({ onResult, onError, className = '' }: QrScannerProps)
               <>
                 <p className="qr-cta-title">Caméra indisponible</p>
                 <p className="qr-cta-text">
-                  Le scan nécessite une connexion sécurisée (https). Ouvrez le site
-                  en <strong>https://</strong> pour activer la caméra.
+                  Le scan nécessite une connexion sécurisée (https). Ouvrez le site en{' '}
+                  <strong>https://</strong> pour activer la caméra.
                 </p>
               </>
             ) : state === 'denied' ? (
               <>
                 <p className="qr-cta-title">Caméra bloquée</p>
                 <p className="qr-cta-text">
-                  La caméra a été bloquée pour ce site. Pour la débloquer :
-                  touchez le <strong>cadenas 🔒</strong> à gauche de l'adresse en
-                  haut → <strong>Autorisations</strong> →{' '}
-                  <strong>Caméra</strong> → <strong>Autoriser</strong>, puis
-                  rechargez la page.
+                  La caméra a été bloquée pour ce site. Pour la débloquer : touchez le{' '}
+                  <strong>cadenas 🔒</strong> à gauche de l'adresse en haut →{' '}
+                  <strong>Autorisations</strong> → <strong>Caméra</strong> →{' '}
+                  <strong>Autoriser</strong>, puis rechargez la page.
                 </p>
-                <button className="qr-cta-btn" onClick={startCamera}>Réessayer</button>
+                <button type="button" className="qr-cta-btn" onClick={startCamera}>
+                  Réessayer
+                </button>
               </>
             ) : state === 'error' ? (
               <>
                 <p className="qr-cta-title">Une erreur est survenue</p>
                 <p className="qr-cta-text">{errorMsg}</p>
-                <button className="qr-cta-btn" onClick={startCamera}>Réessayer</button>
+                <button type="button" className="qr-cta-btn" onClick={startCamera}>
+                  Réessayer
+                </button>
               </>
             ) : (
               <>
                 <p className="qr-cta-title">Prêt à scanner</p>
                 <p className="qr-cta-text">Touchez le bouton pour activer la caméra.</p>
-                <button className="qr-cta-btn" onClick={startCamera}>Activer la caméra</button>
+                <button type="button" className="qr-cta-btn" onClick={startCamera}>
+                  Activer la caméra
+                </button>
               </>
             )}
           </div>

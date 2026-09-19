@@ -2,7 +2,15 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Bell, CheckCheck, Trash2, Info, CheckCircle, AlertTriangle, AlertCircle } from 'lucide-react'
+import {
+  Bell,
+  CheckCheck,
+  Trash2,
+  Info,
+  CheckCircle,
+  AlertTriangle,
+  AlertCircle,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { Button } from '@/components/ui/button'
@@ -23,10 +31,18 @@ interface InAppNotification {
 }
 
 const TYPE_CONFIG = {
-  info:    { icon: Info,          className: 'text-blue-600',  bg: 'bg-blue-50 dark:bg-blue-950/30' },
-  success: { icon: CheckCircle,   className: 'text-green-600', bg: 'bg-green-50 dark:bg-green-950/30' },
-  warning: { icon: AlertTriangle, className: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950/30' },
-  alert:   { icon: AlertCircle,   className: 'text-red-600',   bg: 'bg-red-50 dark:bg-red-950/30' },
+  info: { icon: Info, className: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950/30' },
+  success: {
+    icon: CheckCircle,
+    className: 'text-green-600',
+    bg: 'bg-green-50 dark:bg-green-950/30',
+  },
+  warning: {
+    icon: AlertTriangle,
+    className: 'text-amber-600',
+    bg: 'bg-amber-50 dark:bg-amber-950/30',
+  },
+  alert: { icon: AlertCircle, className: 'text-red-600', bg: 'bg-red-50 dark:bg-red-950/30' },
 }
 
 function formatTime(dateStr: string) {
@@ -64,7 +80,11 @@ export default function NotificationsPage() {
       .limit(100)
       .then(({ data, error }) => {
         if (error) {
-          toast({ title: 'Erreur', description: 'Impossible de charger les notifications', variant: 'destructive' })
+          toast({
+            title: 'Erreur',
+            description: 'Impossible de charger les notifications',
+            variant: 'destructive',
+          })
         } else if (data) {
           setNotifications(data as InAppNotification[])
         }
@@ -77,17 +97,23 @@ export default function NotificationsPage() {
 
     const channel = supabase
       .channel(`notifs-page:${currentCooperative.id}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notifications_inapp',
-        filter: `cooperative_id=eq.${currentCooperative.id}`,
-      }, (payload) => {
-        setNotifications(prev => [payload.new as InAppNotification, ...prev])
-      })
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications_inapp',
+          filter: `cooperative_id=eq.${currentCooperative.id}`,
+        },
+        (payload) => {
+          setNotifications((prev) => [payload.new as InAppNotification, ...prev])
+        },
+      )
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [currentCooperative, supabase])
 
   const markAsRead = async (id: string) => {
@@ -99,10 +125,14 @@ export default function NotificationsPage() {
       .eq('id', id)
       .eq('cooperative_id', currentCooperative.id)
     if (error) {
-      toast({ title: 'Erreur', description: 'Impossible de marquer comme lu', variant: 'destructive' })
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de marquer comme lu',
+        variant: 'destructive',
+      })
       return
     }
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read_at: now } : n))
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: now } : n)))
   }
 
   const markAllRead = async () => {
@@ -114,16 +144,20 @@ export default function NotificationsPage() {
       .eq('cooperative_id', currentCooperative.id)
       .is('read_at', null)
     if (error) {
-      toast({ title: 'Erreur', description: 'Impossible de tout marquer comme lu', variant: 'destructive' })
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de tout marquer comme lu',
+        variant: 'destructive',
+      })
       return
     }
-    setNotifications(prev => prev.map(n => ({ ...n, read_at: n.read_at ?? now })))
+    setNotifications((prev) => prev.map((n) => ({ ...n, read_at: n.read_at ?? now })))
   }
 
   const deleteNotification = async (id: string) => {
     if (!currentCooperative) return
     // Optimistic update
-    setNotifications(prev => prev.filter(n => n.id !== id))
+    setNotifications((prev) => prev.filter((n) => n.id !== id))
     const { error } = await supabase
       .from('notifications_inapp')
       .delete()
@@ -131,47 +165,58 @@ export default function NotificationsPage() {
       .eq('cooperative_id', currentCooperative.id)
     if (error) {
       // Rollback
-      toast({ title: 'Erreur', description: 'Impossible de supprimer la notification', variant: 'destructive' })
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de supprimer la notification',
+        variant: 'destructive',
+      })
       supabase
         .from('notifications_inapp')
         .select('id, title, body, type, icon, link, read_at, created_at')
         .eq('cooperative_id', currentCooperative.id)
         .order('created_at', { ascending: false })
         .limit(100)
-        .then(({ data }) => { if (data) setNotifications(data as InAppNotification[]) })
+        .then(({ data }) => {
+          if (data) setNotifications(data as InAppNotification[])
+        })
     }
   }
 
-  const visible = filter === 'unread'
-    ? notifications.filter(n => !n.read_at)
-    : notifications
+  const visible = filter === 'unread' ? notifications.filter((n) => !n.read_at) : notifications
 
-  const unreadCount = notifications.filter(n => !n.read_at).length
+  const unreadCount = notifications.filter((n) => !n.read_at).length
 
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-6">
       <PageHeader
         title="Notifications"
-        description={unreadCount > 0 ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}` : 'Toutes vos notifications'}
-        action={unreadCount > 0 ? (
-          <Button variant="outline" size="sm" onClick={markAllRead} className="gap-2">
-            <CheckCheck className="h-4 w-4" />
-            Tout marquer lu
-          </Button>
-        ) : undefined}
+        description={
+          unreadCount > 0
+            ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}`
+            : 'Toutes vos notifications'
+        }
+        action={
+          unreadCount > 0 ? (
+            <Button variant="outline" size="sm" onClick={markAllRead} className="gap-2">
+              <CheckCheck className="h-4 w-4" />
+              Tout marquer lu
+            </Button>
+          ) : undefined
+        }
       />
 
       {/* Filter tabs */}
       <div className="flex gap-2 border-b border-border">
-        {(['all', 'unread'] as const).map(tab => (
+        {(['all', 'unread'] as const).map((tab) => (
           <button
+            type="button"
             key={tab}
             onClick={() => setFilter(tab)}
             className={cn(
               'pb-2 px-1 text-sm font-medium border-b-2 transition-colors',
               filter === tab
                 ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
           >
             {tab === 'all' ? 'Toutes' : `Non lues${unreadCount > 0 ? ` (${unreadCount})` : ''}`}
@@ -201,7 +246,9 @@ export default function NotificationsPage() {
         <div className="py-16 text-center space-y-2">
           <Bell className="h-10 w-10 text-muted-foreground/40 mx-auto" />
           <p className="text-muted-foreground">
-            {filter === 'unread' ? 'Toutes les notifications ont été lues.' : 'Aucune notification.'}
+            {filter === 'unread'
+              ? 'Toutes les notifications ont été lues.'
+              : 'Aucune notification.'}
           </p>
         </div>
       )}
@@ -209,7 +256,7 @@ export default function NotificationsPage() {
       {/* Notifications list */}
       {!loading && (
         <div className="space-y-2">
-          {visible.map(notif => {
+          {visible.map((notif) => {
             const config = TYPE_CONFIG[notif.type] ?? TYPE_CONFIG.info
             const Icon = config.icon
             return (
@@ -218,7 +265,7 @@ export default function NotificationsPage() {
                 className={cn(
                   'group flex gap-4 rounded-xl border border-border p-4 transition-colors',
                   !notif.read_at ? config.bg : 'bg-background',
-                  notif.link && 'cursor-pointer hover:bg-muted/50'
+                  notif.link && 'cursor-pointer hover:bg-muted/50',
                 )}
                 onClick={() => {
                   if (!notif.read_at) markAsRead(notif.id)
@@ -231,7 +278,12 @@ export default function NotificationsPage() {
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
-                    <p className={cn('text-sm font-semibold', !notif.read_at ? 'text-foreground' : 'text-muted-foreground')}>
+                    <p
+                      className={cn(
+                        'text-sm font-semibold',
+                        !notif.read_at ? 'text-foreground' : 'text-muted-foreground',
+                      )}
+                    >
                       {notif.icon && <span className="mr-1.5">{notif.icon}</span>}
                       {notif.title}
                     </p>
@@ -240,13 +292,19 @@ export default function NotificationsPage() {
                     )}
                   </div>
                   <p className="mt-0.5 text-sm text-muted-foreground line-clamp-2">{notif.body}</p>
-                  <p className="mt-1 text-xs text-muted-foreground/60">{formatTime(notif.created_at)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground/60">
+                    {formatTime(notif.created_at)}
+                  </p>
                 </div>
 
                 <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                   {!notif.read_at && (
                     <button
-                      onClick={e => { e.stopPropagation(); markAsRead(notif.id) }}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        markAsRead(notif.id)
+                      }}
                       className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground"
                       title="Marquer lu"
                     >
@@ -254,7 +312,11 @@ export default function NotificationsPage() {
                     </button>
                   )}
                   <button
-                    onClick={e => { e.stopPropagation(); deleteNotification(notif.id) }}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      deleteNotification(notif.id)
+                    }}
                     className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-600 dark:hover:bg-red-950/30"
                     title="Supprimer"
                   >

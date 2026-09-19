@@ -4,10 +4,27 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
-  CheckCircle, XCircle, Shield, MapPin, Building2,
-  FileText, TrendingUp, PhoneCall, Map as MapIcon, CloudRain,
-  ShoppingCart, Coins, Timer, User, ArrowLeft, Bot,
-  Bell, Droplets, Share2, ChevronRight, ScanLine,
+  CheckCircle,
+  XCircle,
+  Shield,
+  MapPin,
+  Building2,
+  FileText,
+  TrendingUp,
+  PhoneCall,
+  Map as MapIcon,
+  CloudRain,
+  ShoppingCart,
+  Coins,
+  Timer,
+  User,
+  ArrowLeft,
+  Bot,
+  Bell,
+  Droplets,
+  Share2,
+  ChevronRight,
+  ScanLine,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/logo'
 import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboard'
@@ -31,45 +48,87 @@ interface VerifyResult {
   source?: 'faitierehub' | 'haroo'
   card?: { card_number: string; status: string; expiry_date: string | null; created_at: string }
   member?: {
-    first_name: string | null; last_name: string | null; photo_url: string | null
-    village: string | null; canton: string | null; prefecture: string | null; region: string | null
-    status: string; member_since: string | null
+    first_name: string | null
+    last_name: string | null
+    photo_url: string | null
+    village: string | null
+    canton: string | null
+    prefecture: string | null
+    region: string | null
+    status: string
+    member_since: string | null
   }
   cooperative?: { name: string | null; faitiere_name: string | null }
   member_id?: string | null
   ouvrier?: {
-    first_name: string | null; last_name: string | null; phone: string | null; photo_url: string | null
-    competences: string[]; cantons_disponibles: string[]; disponible: boolean
-    disponible_jusqu_au: string | null; tarif_journalier: number | null
-    note_moyenne: number; nombre_avis: number
+    first_name: string | null
+    last_name: string | null
+    phone: string | null
+    photo_url: string | null
+    competences: string[]
+    cantons_disponibles: string[]
+    disponible: boolean
+    disponible_jusqu_au: string | null
+    tarif_journalier: number | null
+    note_moyenne: number
+    nombre_avis: number
   }
   offres?: Array<{
-    id: string; titre: string; culture: string | null; description: string | null
-    canton: string; date_debut: string | null; date_fin: string | null
-    tarif_journalier: number | null; nombre_ouvriers: number
+    id: string
+    titre: string
+    culture: string | null
+    description: string | null
+    canton: string
+    date_debut: string | null
+    date_fin: string | null
+    tarif_journalier: number | null
+    nombre_ouvriers: number
   }>
   acheteur?: {
-    first_name: string | null; last_name: string | null; phone: string | null; photo_url: string | null
-    type_acheteur: string; nom_organisation: string | null
-    produits_interesses: string[]; cantons_intervention: string[]
+    first_name: string | null
+    last_name: string | null
+    phone: string | null
+    photo_url: string | null
+    type_acheteur: string
+    nom_organisation: string | null
+    produits_interesses: string[]
+    cantons_intervention: string[]
   }
   preventes?: Array<{
-    id: string; culture: string; quantite_estimee: number; prix_par_kg: number
-    date_recolte_prevue: string; canton: string; description: string | null
+    id: string
+    culture: string
+    quantite_estimee: number
+    prix_par_kg: number
+    date_recolte_prevue: string
+    canton: string
+    description: string | null
   }>
   agronome?: {
-    first_name: string | null; last_name: string | null; phone: string | null; photo_url: string | null
-    specialisations: string[]; canton: string | null; prefecture: string | null; region: string | null
-    badge_valide: boolean; statut_validation: string; disponible_missions: boolean
-    note_moyenne: number; nombre_missions: number
+    first_name: string | null
+    last_name: string | null
+    phone: string | null
+    photo_url: string | null
+    specialisations: string[]
+    canton: string | null
+    prefecture: string | null
+    region: string | null
+    badge_valide: boolean
+    statut_validation: string
+    disponible_missions: boolean
+    note_moyenne: number
+    nombre_missions: number
   }
   missions?: Array<{
-    id: string; titre: string; culture: string | null; description: string | null
-    canton: string; budget: number | null; date_souhaitee: string | null
+    id: string
+    titre: string
+    culture: string | null
+    description: string | null
+    canton: string
+    budget: number | null
+    date_souhaitee: string | null
   }>
   error?: string
 }
-
 
 export default function VerifyCardPage() {
   const params = useParams()
@@ -79,14 +138,36 @@ export default function VerifyCardPage() {
   const [showContent, setShowContent] = useState(false)
   const [timeLeft, setTimeLeft] = useState(600)
   const [expired, setExpired] = useState(false)
-  const [activeView, setActiveView] = useState<'menu' | 'identity' | 'prices' | 'technicien' | 'ai' | 'agrismart' | 'parcelles' | 'intrants' | 'cotisation' | 'exploitation' | 'meteo'>('menu')
-  const [contacts, setContacts] = useState<{ role: 'technicien' | 'coordo'; name: string; phone: string; canton?: string | null }[] | null>(null)
+  const [activeView, setActiveView] = useState<
+    | 'menu'
+    | 'identity'
+    | 'prices'
+    | 'technicien'
+    | 'ai'
+    | 'agrismart'
+    | 'parcelles'
+    | 'intrants'
+    | 'cotisation'
+    | 'exploitation'
+    | 'meteo'
+  >('menu')
+  const [contacts, setContacts] = useState<
+    { role: 'technicien' | 'coordo'; name: string; phone: string; canton?: string | null }[] | null
+  >(null)
   // Le coordinateur sert au lien WhatsApp et à la carte de contact : on le
   // cherche une fois, plutôt que de rebalayer la liste à chaque usage.
   const coordo = contacts?.find((c) => c.role === 'coordo') ?? null
   const [contactsLoading, setContactsLoading] = useState(false)
-  const [atsData, setAtsData] = useState<{ score: number; level: string; breakdown: AtsBreakdown } | null>(null)
-  const [quickStats, setQuickStats] = useState<{ totalHa: number; cotisationStatus: string | null; intrantCount: number } | null>(null)
+  const [atsData, setAtsData] = useState<{
+    score: number
+    level: string
+    breakdown: AtsBreakdown
+  } | null>(null)
+  const [quickStats, setQuickStats] = useState<{
+    totalHa: number
+    cotisationStatus: string | null
+    intrantCount: number
+  } | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
 
@@ -95,8 +176,13 @@ export default function VerifyCardPage() {
   // du chargement — sur une page de vérification, c'est inacceptable.
   // biome-ignore lint/correctness/useExhaustiveDependencies: cardNumber est le déclencheur voulu
   useEffect(() => {
-    setResult(null); setLoading(true); setShowContent(false)
-    setTimeLeft(600); setExpired(false); setActiveView('menu'); setAtsData(null)
+    setResult(null)
+    setLoading(true)
+    setShowContent(false)
+    setTimeLeft(600)
+    setExpired(false)
+    setActiveView('menu')
+    setAtsData(null)
   }, [cardNumber])
 
   useEffect(() => {
@@ -104,7 +190,9 @@ export default function VerifyCardPage() {
     meta.httpEquiv = 'Cache-Control'
     meta.content = 'no-store, no-cache, must-revalidate'
     document.head.appendChild(meta)
-    return () => { document.head.removeChild(meta) }
+    return () => {
+      document.head.removeChild(meta)
+    }
   }, [])
 
   useEffect(() => {
@@ -116,16 +204,20 @@ export default function VerifyCardPage() {
         // Fetch ATS in background if card is valid and we have a member_id
         if (data.valid && data.member_id) {
           fetch(`/api/members/${data.member_id}/ats`)
-            .then(r => r.ok ? r.json() : null)
-            .then(ats => {
+            .then((r) => (r.ok ? r.json() : null))
+            .then((ats) => {
               if (ats && typeof ats.score === 'number') {
                 setAtsData({ score: ats.score, level: ats.level, breakdown: ats.breakdown })
               }
             })
             .catch(() => null)
         }
-      } catch { setResult({ valid: false, error: 'Erreur réseau.' }) }
-      finally { setLoading(false); setTimeout(() => setShowContent(true), 120) }
+      } catch {
+        setResult({ valid: false, error: 'Erreur réseau.' })
+      } finally {
+        setLoading(false)
+        setTimeout(() => setShowContent(true), 120)
+      }
     }
     fetchCard()
   }, [cardNumber])
@@ -133,8 +225,12 @@ export default function VerifyCardPage() {
   useEffect(() => {
     if (!result?.valid || expired) return
     const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) { setExpired(true); clearInterval(timer); return 0 }
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          setExpired(true)
+          clearInterval(timer)
+          return 0
+        }
         return prev - 1
       })
     }, 1000)
@@ -146,10 +242,15 @@ export default function VerifyCardPage() {
     setContactsLoading(true)
     try {
       const res = await fetch(`/api/technicien/${encodeURIComponent(cardNumber)}`)
-      if (res.ok) { const d = await res.json(); setContacts(d.contacts ?? []) }
-      else setContacts([])
-    } catch { setContacts([]) }
-    finally { setContactsLoading(false) }
+      if (res.ok) {
+        const d = await res.json()
+        setContacts(d.contacts ?? [])
+      } else setContacts([])
+    } catch {
+      setContacts([])
+    } finally {
+      setContactsLoading(false)
+    }
   }, [cardNumber, contacts, contactsLoading])
 
   useEffect(() => {
@@ -160,9 +261,15 @@ export default function VerifyCardPage() {
     if (!result?.valid || !cardNumber) return
     const cn = encodeURIComponent(cardNumber)
     Promise.all([
-      fetch(`/api/verify/${cn}/parcelles`).then(r => r.ok ? r.json() : null).catch(() => null),
-      fetch(`/api/verify/${cn}/cotisation`).then(r => r.ok ? r.json() : null).catch(() => null),
-      fetch(`/api/verify/${cn}/intrants`).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`/api/verify/${cn}/parcelles`)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
+      fetch(`/api/verify/${cn}/cotisation`)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
+      fetch(`/api/verify/${cn}/intrants`)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
     ]).then(([parcData, cotData, intData]) => {
       setQuickStats({
         totalHa: parcData?.total_ha ?? 0,
@@ -178,7 +285,9 @@ export default function VerifyCardPage() {
         <style>{vfpStyles}</style>
         <div className="text-center">
           <div className="vfp-loader mx-auto mb-4" />
-          <p className="text-[var(--vfp-accent-dim)] text-sm font-medium tracking-wide">Vérification en cours...</p>
+          <p className="text-[var(--vfp-accent-dim)] text-sm font-medium tracking-wide">
+            Vérification en cours...
+          </p>
         </div>
       </div>
     )
@@ -193,8 +302,13 @@ export default function VerifyCardPage() {
             <Timer className="h-7 w-7 text-destructive" />
           </div>
           <h2 className="text-xl font-bold text-white mb-2">Session expirée</h2>
-          <p className="text-white/50 text-sm mb-6">Scannez à nouveau la carte pour accéder aux services.</p>
-          <a href={`/verify/${cardNumber}`} className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[var(--vfp-cta)] text-[var(--vfp-cta-fg)] font-bold text-sm">
+          <p className="text-white/50 text-sm mb-6">
+            Scannez à nouveau la carte pour accéder aux services.
+          </p>
+          <a
+            href={`/verify/${cardNumber}`}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[var(--vfp-cta)] text-[var(--vfp-cta-fg)] font-bold text-sm"
+          >
             Rescanner la carte
           </a>
         </div>
@@ -209,23 +323,54 @@ export default function VerifyCardPage() {
   // ── Non-FAITIERE card types: delegate to their own view component ────────
   if (result.valid && result.card && cardType === 'OUVRIER' && result.ouvrier) {
     return (
-      <div className="min-h-screen vfp-bg relative overflow-hidden" style={{ isolation: 'isolate' }}>
+      <div
+        className="min-h-screen vfp-bg relative overflow-hidden"
+        style={{ isolation: 'isolate' }}
+      >
         <style>{vfpStyles}</style>
-        <div className="absolute inset-0 pointer-events-none" style={{ transform: 'translateZ(0)', zIndex: 0 }}>
-          <div className="absolute top-[-20%] right-[-15%] w-[500px] h-[500px] rounded-full" style={{ background: 'oklch(0.75 0.20 50 / 0.08)', filter: 'blur(100px)' }} />
-          <div className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full" style={{ background: 'oklch(0.75 0.20 50 / 0.12)', filter: 'blur(80px)' }} />
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ transform: 'translateZ(0)', zIndex: 0 }}
+        >
+          <div
+            className="absolute top-[-20%] right-[-15%] w-[500px] h-[500px] rounded-full"
+            style={{ background: 'oklch(0.75 0.20 50 / 0.08)', filter: 'blur(100px)' }}
+          />
+          <div
+            className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full"
+            style={{ background: 'oklch(0.75 0.20 50 / 0.12)', filter: 'blur(80px)' }}
+          />
         </div>
         <div className="relative z-10 max-w-md mx-auto px-4 pt-4 pb-8 space-y-5">
           <header className="flex items-center justify-between vfp-enter">
             <div className="flex items-center gap-3">
-              <button onClick={() => setMobileMenuOpen(v => !v)} className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Menu">
-                <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><path d="M1 1h16M1 7h10M1 13h14" stroke="oklch(0.75 0.20 50)" strokeWidth="1.6" strokeLinecap="round"/></svg>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen((v) => !v)}
+                className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"
+                aria-label="Menu"
+              >
+                <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+                  <path
+                    d="M1 1h16M1 7h10M1 13h14"
+                    stroke="oklch(0.75 0.20 50)"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                </svg>
               </button>
-              <Link href="/"><Logo size="sm" textClassName="text-white" /></Link>
+              <Link href="/">
+                <Logo size="sm" textClassName="text-white" />
+              </Link>
             </div>
             <div className="flex items-center gap-2">
               <div className="relative">
-                <button onClick={() => setNotifOpen(v => !v)} className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Notifications">
+                <button
+                  type="button"
+                  onClick={() => setNotifOpen((v) => !v)}
+                  className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"
+                  aria-label="Notifications"
+                >
                   <Bell className="h-4 w-4 text-white/60" />
                 </button>
                 {notifOpen && (
@@ -238,11 +383,20 @@ export default function VerifyCardPage() {
                   </>
                 )}
               </div>
-              <div className="w-10 h-10 rounded-full vfp-glass-subtle flex items-center justify-center border-2" style={{ borderColor: 'oklch(0.75 0.20 50 / 0.30)' }}>
-                {result.ouvrier.photo_url
+              <div
+                className="w-10 h-10 rounded-full vfp-glass-subtle flex items-center justify-center border-2"
+                style={{ borderColor: 'oklch(0.75 0.20 50 / 0.30)' }}
+              >
+                {result.ouvrier.photo_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={result.ouvrier.photo_url} alt="" className="w-full h-full rounded-full object-cover" />
-                  : <User className="h-4 w-4 text-white/60" />}
+                  <img
+                    src={result.ouvrier.photo_url}
+                    alt=""
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                ) : (
+                  <User className="h-4 w-4 text-white/60" />
+                )}
               </div>
             </div>
           </header>
@@ -252,15 +406,27 @@ export default function VerifyCardPage() {
             offres={result.offres ?? []}
             card={result.card}
           />
-          <div className={`vfp-card rounded-2xl p-3 transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '600ms' }}>
+          <div
+            className={`vfp-card rounded-2xl p-3 transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`}
+            style={{ transitionDelay: '600ms' }}
+          >
             <div className="flex items-center gap-3">
               <Timer className="h-4 w-4 text-white/30 shrink-0" />
               <div className="flex-1">
                 <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
-                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${(timeLeft / 600) * 100}%`, background: 'linear-gradient(to right, oklch(0.75 0.20 50), oklch(0.60 0.16 50))' }} />
+                  <div
+                    className="h-full rounded-full transition-all duration-1000"
+                    style={{
+                      width: `${(timeLeft / 600) * 100}%`,
+                      background:
+                        'linear-gradient(to right, oklch(0.75 0.20 50), oklch(0.60 0.16 50))',
+                    }}
+                  />
                 </div>
               </div>
-              <span className="text-white/30 text-[11px] font-mono shrink-0">{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
+              <span className="text-white/30 text-[11px] font-mono shrink-0">
+                {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+              </span>
             </div>
           </div>
         </div>
@@ -271,23 +437,54 @@ export default function VerifyCardPage() {
 
   if (result.valid && result.card && cardType === 'ACHETEUR' && result.acheteur) {
     return (
-      <div className="min-h-screen vfp-bg relative overflow-hidden" style={{ isolation: 'isolate' }}>
+      <div
+        className="min-h-screen vfp-bg relative overflow-hidden"
+        style={{ isolation: 'isolate' }}
+      >
         <style>{vfpStyles}</style>
-        <div className="absolute inset-0 pointer-events-none" style={{ transform: 'translateZ(0)', zIndex: 0 }}>
-          <div className="absolute top-[-20%] right-[-15%] w-[500px] h-[500px] rounded-full" style={{ background: 'oklch(0.72 0.18 280 / 0.08)', filter: 'blur(100px)' }} />
-          <div className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full" style={{ background: 'oklch(0.72 0.18 280 / 0.12)', filter: 'blur(80px)' }} />
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ transform: 'translateZ(0)', zIndex: 0 }}
+        >
+          <div
+            className="absolute top-[-20%] right-[-15%] w-[500px] h-[500px] rounded-full"
+            style={{ background: 'oklch(0.72 0.18 280 / 0.08)', filter: 'blur(100px)' }}
+          />
+          <div
+            className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full"
+            style={{ background: 'oklch(0.72 0.18 280 / 0.12)', filter: 'blur(80px)' }}
+          />
         </div>
         <div className="relative z-10 max-w-md mx-auto px-4 pt-4 pb-8 space-y-5">
           <header className="flex items-center justify-between vfp-enter">
             <div className="flex items-center gap-3">
-              <button onClick={() => setMobileMenuOpen(v => !v)} className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Menu">
-                <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><path d="M1 1h16M1 7h10M1 13h14" stroke="oklch(0.72 0.18 280)" strokeWidth="1.6" strokeLinecap="round"/></svg>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen((v) => !v)}
+                className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"
+                aria-label="Menu"
+              >
+                <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+                  <path
+                    d="M1 1h16M1 7h10M1 13h14"
+                    stroke="oklch(0.72 0.18 280)"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                </svg>
               </button>
-              <Link href="/"><Logo size="sm" textClassName="text-white" /></Link>
+              <Link href="/">
+                <Logo size="sm" textClassName="text-white" />
+              </Link>
             </div>
             <div className="flex items-center gap-2">
               <div className="relative">
-                <button onClick={() => setNotifOpen(v => !v)} className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Notifications">
+                <button
+                  type="button"
+                  onClick={() => setNotifOpen((v) => !v)}
+                  className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"
+                  aria-label="Notifications"
+                >
                   <Bell className="h-4 w-4 text-white/60" />
                 </button>
                 {notifOpen && (
@@ -300,11 +497,20 @@ export default function VerifyCardPage() {
                   </>
                 )}
               </div>
-              <div className="w-10 h-10 rounded-full vfp-glass-subtle flex items-center justify-center border-2" style={{ borderColor: 'oklch(0.72 0.18 280 / 0.30)' }}>
-                {result.acheteur.photo_url
+              <div
+                className="w-10 h-10 rounded-full vfp-glass-subtle flex items-center justify-center border-2"
+                style={{ borderColor: 'oklch(0.72 0.18 280 / 0.30)' }}
+              >
+                {result.acheteur.photo_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={result.acheteur.photo_url} alt="" className="w-full h-full rounded-full object-cover" />
-                  : <User className="h-4 w-4 text-white/60" />}
+                  <img
+                    src={result.acheteur.photo_url}
+                    alt=""
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                ) : (
+                  <User className="h-4 w-4 text-white/60" />
+                )}
               </div>
             </div>
           </header>
@@ -314,15 +520,27 @@ export default function VerifyCardPage() {
             preventes={result.preventes ?? []}
             card={result.card}
           />
-          <div className={`vfp-card rounded-2xl p-3 transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '600ms' }}>
+          <div
+            className={`vfp-card rounded-2xl p-3 transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`}
+            style={{ transitionDelay: '600ms' }}
+          >
             <div className="flex items-center gap-3">
               <Timer className="h-4 w-4 text-white/30 shrink-0" />
               <div className="flex-1">
                 <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
-                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${(timeLeft / 600) * 100}%`, background: 'linear-gradient(to right, oklch(0.72 0.18 280), oklch(0.58 0.14 280))' }} />
+                  <div
+                    className="h-full rounded-full transition-all duration-1000"
+                    style={{
+                      width: `${(timeLeft / 600) * 100}%`,
+                      background:
+                        'linear-gradient(to right, oklch(0.72 0.18 280), oklch(0.58 0.14 280))',
+                    }}
+                  />
                 </div>
               </div>
-              <span className="text-white/30 text-[11px] font-mono shrink-0">{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
+              <span className="text-white/30 text-[11px] font-mono shrink-0">
+                {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+              </span>
             </div>
           </div>
         </div>
@@ -333,23 +551,54 @@ export default function VerifyCardPage() {
 
   if (result.valid && result.card && cardType === 'AGRONOME' && result.agronome) {
     return (
-      <div className="min-h-screen vfp-bg relative overflow-hidden" style={{ isolation: 'isolate' }}>
+      <div
+        className="min-h-screen vfp-bg relative overflow-hidden"
+        style={{ isolation: 'isolate' }}
+      >
         <style>{vfpStyles}</style>
-        <div className="absolute inset-0 pointer-events-none" style={{ transform: 'translateZ(0)', zIndex: 0 }}>
-          <div className="absolute top-[-20%] right-[-15%] w-[500px] h-[500px] rounded-full" style={{ background: 'oklch(0.72 0.18 230 / 0.08)', filter: 'blur(100px)' }} />
-          <div className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full" style={{ background: 'oklch(0.72 0.18 230 / 0.12)', filter: 'blur(80px)' }} />
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ transform: 'translateZ(0)', zIndex: 0 }}
+        >
+          <div
+            className="absolute top-[-20%] right-[-15%] w-[500px] h-[500px] rounded-full"
+            style={{ background: 'oklch(0.72 0.18 230 / 0.08)', filter: 'blur(100px)' }}
+          />
+          <div
+            className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full"
+            style={{ background: 'oklch(0.72 0.18 230 / 0.12)', filter: 'blur(80px)' }}
+          />
         </div>
         <div className="relative z-10 max-w-md mx-auto px-4 pt-4 pb-8 space-y-5">
           <header className="flex items-center justify-between vfp-enter">
             <div className="flex items-center gap-3">
-              <button onClick={() => setMobileMenuOpen(v => !v)} className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Menu">
-                <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><path d="M1 1h16M1 7h10M1 13h14" stroke="oklch(0.72 0.18 230)" strokeWidth="1.6" strokeLinecap="round"/></svg>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen((v) => !v)}
+                className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"
+                aria-label="Menu"
+              >
+                <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+                  <path
+                    d="M1 1h16M1 7h10M1 13h14"
+                    stroke="oklch(0.72 0.18 230)"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                </svg>
               </button>
-              <Link href="/"><Logo size="sm" textClassName="text-white" /></Link>
+              <Link href="/">
+                <Logo size="sm" textClassName="text-white" />
+              </Link>
             </div>
             <div className="flex items-center gap-2">
               <div className="relative">
-                <button onClick={() => setNotifOpen(v => !v)} className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center" aria-label="Notifications">
+                <button
+                  type="button"
+                  onClick={() => setNotifOpen((v) => !v)}
+                  className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"
+                  aria-label="Notifications"
+                >
                   <Bell className="h-4 w-4 text-white/60" />
                 </button>
                 {notifOpen && (
@@ -362,11 +611,20 @@ export default function VerifyCardPage() {
                   </>
                 )}
               </div>
-              <div className="w-10 h-10 rounded-full vfp-glass-subtle flex items-center justify-center border-2" style={{ borderColor: 'oklch(0.72 0.18 230 / 0.30)' }}>
-                {result.agronome.photo_url
+              <div
+                className="w-10 h-10 rounded-full vfp-glass-subtle flex items-center justify-center border-2"
+                style={{ borderColor: 'oklch(0.72 0.18 230 / 0.30)' }}
+              >
+                {result.agronome.photo_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={result.agronome.photo_url} alt="" className="w-full h-full rounded-full object-cover" />
-                  : <User className="h-4 w-4 text-white/60" />}
+                  <img
+                    src={result.agronome.photo_url}
+                    alt=""
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                ) : (
+                  <User className="h-4 w-4 text-white/60" />
+                )}
               </div>
             </div>
           </header>
@@ -376,15 +634,27 @@ export default function VerifyCardPage() {
             missions={result.missions ?? []}
             card={result.card}
           />
-          <div className={`vfp-card rounded-2xl p-3 transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '600ms' }}>
+          <div
+            className={`vfp-card rounded-2xl p-3 transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`}
+            style={{ transitionDelay: '600ms' }}
+          >
             <div className="flex items-center gap-3">
               <Timer className="h-4 w-4 text-white/30 shrink-0" />
               <div className="flex-1">
                 <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
-                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${(timeLeft / 600) * 100}%`, background: 'linear-gradient(to right, oklch(0.72 0.18 230), oklch(0.58 0.14 230))' }} />
+                  <div
+                    className="h-full rounded-full transition-all duration-1000"
+                    style={{
+                      width: `${(timeLeft / 600) * 100}%`,
+                      background:
+                        'linear-gradient(to right, oklch(0.72 0.18 230), oklch(0.58 0.14 230))',
+                    }}
+                  />
                 </div>
               </div>
-              <span className="text-white/30 text-[11px] font-mono shrink-0">{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
+              <span className="text-white/30 text-[11px] font-mono shrink-0">
+                {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+              </span>
             </div>
           </div>
         </div>
@@ -394,9 +664,13 @@ export default function VerifyCardPage() {
   }
 
   const isValid = result.valid && result.card?.status === 'active'
-  const fullName = result.member ? memberFullName(result.member as Parameters<typeof memberFullName>[0]) : ''
+  const fullName = result.member
+    ? memberFullName(result.member as Parameters<typeof memberFullName>[0])
+    : ''
   const rawFirst = (result.member?.first_name ?? '').trim()
-  const firstName = rawFirst ? rawFirst.charAt(0).toUpperCase() + rawFirst.slice(1).toLowerCase() : fullName?.split(' ')[0] || 'Producteur'
+  const firstName = rawFirst
+    ? rawFirst.charAt(0).toUpperCase() + rawFirst.slice(1).toLowerCase()
+    : fullName?.split(' ')[0] || 'Producteur'
   const greetHour = new Date().getHours()
   const greeting = greetHour < 12 ? 'Bonjour' : greetHour < 18 ? 'Bon après-midi' : 'Bonsoir'
 
@@ -404,7 +678,12 @@ export default function VerifyCardPage() {
     if (!result.member_id) return
     const path = `/reports/attestation/${result.member_id}`
     if (typeof navigator !== 'undefined' && navigator.share) {
-      navigator.share({ title: 'Mon Attestation Agricole — FaîtiereHub', url: window.location.origin + path }).catch(() => window.open(path, '_blank'))
+      navigator
+        .share({
+          title: 'Mon Attestation Agricole — FaîtiereHub',
+          url: window.location.origin + path,
+        })
+        .catch(() => window.open(path, '_blank'))
     } else {
       window.open(path, '_blank')
     }
@@ -415,25 +694,38 @@ export default function VerifyCardPage() {
       <style>{vfpStyles}</style>
 
       {/* Ambient glow */}
-      <div className="absolute inset-0 pointer-events-none" style={{ transform: 'translateZ(0)', zIndex: 0 }}>
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{ transform: 'translateZ(0)', zIndex: 0 }}
+      >
         <div className="absolute top-[-20%] right-[-15%] w-[500px] h-[500px] rounded-full bg-[var(--vfp-accent)]/[0.08] blur-[100px]" />
         <div className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full bg-[var(--vfp-accent)]/[0.12] blur-[80px]" />
       </div>
 
       <div className="relative z-10 max-w-md mx-auto px-4 pt-4 pb-8 space-y-5">
-
         {/* ─── Premium Header ─── */}
         <header className="flex items-center justify-between vfp-enter">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => activeView !== 'menu' ? setActiveView('menu') : setMobileMenuOpen(v => !v)}
+              type="button"
+              onClick={() =>
+                activeView !== 'menu' ? setActiveView('menu') : setMobileMenuOpen((v) => !v)
+              }
               className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"
               aria-label={activeView !== 'menu' ? 'Retour' : 'Menu'}
             >
-              {activeView !== 'menu'
-                ? <ArrowLeft className="h-4 w-4" style={{ color: 'var(--vfp-accent)' }} />
-                : <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><path d="M1 1h16M1 7h10M1 13h14" stroke="var(--vfp-accent)" strokeWidth="1.6" strokeLinecap="round"/></svg>
-              }
+              {activeView !== 'menu' ? (
+                <ArrowLeft className="h-4 w-4" style={{ color: 'var(--vfp-accent)' }} />
+              ) : (
+                <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+                  <path
+                    d="M1 1h16M1 7h10M1 13h14"
+                    stroke="var(--vfp-accent)"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              )}
             </button>
             <Link href="/">
               <Logo size="sm" textClassName="text-white" />
@@ -442,7 +734,8 @@ export default function VerifyCardPage() {
           <div className="flex items-center gap-2">
             <div className="relative">
               <button
-                onClick={() => setNotifOpen(v => !v)}
+                type="button"
+                onClick={() => setNotifOpen((v) => !v)}
                 className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"
                 aria-label="Notifications"
               >
@@ -454,13 +747,19 @@ export default function VerifyCardPage() {
                   <div className="absolute top-12 right-0 z-50 w-64 rounded-2xl border border-white/10 bg-[#040f0a]/95 backdrop-blur-xl p-4 shadow-xl">
                     <p className="text-white text-sm font-semibold mb-3">Notifications</p>
                     <button
-                      onClick={() => { setActiveView('meteo'); setNotifOpen(false) }}
+                      type="button"
+                      onClick={() => {
+                        setActiveView('meteo')
+                        setNotifOpen(false)
+                      }}
                       className="w-full flex items-center gap-3 rounded-xl p-3 bg-white/5 active:bg-white/10 text-left transition-colors"
                     >
                       <CloudRain className="h-4 w-4 text-sky-400 shrink-0" />
                       <div>
                         <p className="text-white text-xs font-semibold">Alertes météo</p>
-                        <p className="text-white/40 text-[10px] mt-0.5">Pluie, sécheresse, traitement</p>
+                        <p className="text-white/40 text-[10px] mt-0.5">
+                          Pluie, sécheresse, traitement
+                        </p>
                       </div>
                     </button>
                   </div>
@@ -470,7 +769,11 @@ export default function VerifyCardPage() {
             <div className="w-10 h-10 rounded-full vfp-glass-subtle flex items-center justify-center border-2 border-[var(--vfp-accent)]/30">
               {result.member?.photo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={result.member.photo_url} alt="" className="w-full h-full rounded-full object-cover" />
+                <img
+                  src={result.member.photo_url}
+                  alt=""
+                  className="w-full h-full rounded-full object-cover"
+                />
               ) : (
                 <User className="h-4.5 w-4.5 text-white/60" />
               )}
@@ -480,15 +783,25 @@ export default function VerifyCardPage() {
 
         {/* ─── Hero Section ─── */}
         {isValid && activeView === 'menu' && (
-          <section className={`vfp-enter transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '100ms' }}>
+          <section
+            className={`vfp-enter transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`}
+            style={{ transitionDelay: '100ms' }}
+          >
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-white/60 text-sm mb-1">{greeting}, {firstName} ! 👋</p>
+                <p className="text-white/60 text-sm mb-1">
+                  {greeting}, {firstName} ! 👋
+                </p>
                 <h1 className="text-[26px] font-bold text-white leading-tight">
-                  Votre espace,<br/>
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--vfp-accent)] to-[var(--vfp-accent-dim)]">votre succès.</span>
+                  Votre espace,
+                  <br />
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--vfp-accent)] to-[var(--vfp-accent-dim)]">
+                    votre succès.
+                  </span>
                 </h1>
-                <p className="text-white/40 text-sm mt-2">Gérez, développez et prospérez avec FaîtiereHub.</p>
+                <p className="text-white/40 text-sm mt-2">
+                  Gérez, développez et prospérez avec FaîtiereHub.
+                </p>
                 {atsData && (
                   <div className="mt-3 max-w-[200px]">
                     <AtsBadge score={atsData.score} level={atsData.level} size="sm" />
@@ -511,7 +824,10 @@ export default function VerifyCardPage() {
 
         {/* ─── 3D Member Card ─── */}
         {result.member && result.card && isValid && activeView === 'menu' && (
-          <div className={`transition-all duration-600 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`} style={{ transitionDelay: '200ms' }}>
+          <div
+            className={`transition-all duration-600 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+            style={{ transitionDelay: '200ms' }}
+          >
             <Card3D member={result.member} card={result.card} cooperative={result.cooperative} />
           </div>
         )}
@@ -521,64 +837,110 @@ export default function VerifyCardPage() {
             a circular gauge visualizing the real cotisation status (not
             decorative — derived from quickStats.cotisationStatus) beside
             the hectares/intrants metrics. */}
-        {isValid && activeView === 'menu' && quickStats && (() => {
-          const cotisationPct =
-            quickStats.cotisationStatus === 'paid' || quickStats.cotisationStatus === 'waived' ? 100
-            : quickStats.cotisationStatus === 'overdue' ? 15
-            : quickStats.cotisationStatus === 'pending' ? 55
-            : 0
-          const cotisationColor =
-            quickStats.cotisationStatus === 'paid' || quickStats.cotisationStatus === 'waived' ? '#34d399'
-            : quickStats.cotisationStatus === 'overdue' ? '#f87171'
-            : 'var(--vfp-accent)'
-          const cotisationLabel =
-            quickStats.cotisationStatus === 'paid' || quickStats.cotisationStatus === 'waived' ? 'À jour'
-            : quickStats.cotisationStatus === 'overdue' ? 'En retard'
-            : quickStats.cotisationStatus === 'pending' ? 'En cours'
-            : '—'
-          const ringCirc = 2 * Math.PI * 28
-          const ringOffset = ringCirc * (1 - cotisationPct / 100)
-          return (
-            <div className={`vfp-card rounded-2xl p-4 flex items-stretch gap-3.5 vfp-enter transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '200ms' }}>
-              <div className="relative w-[68px] h-[68px] shrink-0">
-                <svg viewBox="0 0 64 64" className="w-full h-full -rotate-90">
-                  <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="5" />
-                  <circle
-                    cx="32" cy="32" r="28" fill="none" stroke={cotisationColor} strokeWidth="5" strokeLinecap="round"
-                    strokeDasharray={ringCirc} strokeDashoffset={ringOffset}
-                    style={{ transition: 'stroke-dashoffset 0.6s ease, stroke 0.3s ease', filter: `drop-shadow(0 0 5px ${cotisationColor}99)` }}
-                  />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-[15px] font-bold leading-none" style={{ color: cotisationColor }}>{cotisationPct}%</span>
-                  <span className="text-[8px] text-white/40 mt-0.5 tracking-wide">COTIS.</span>
+        {isValid &&
+          activeView === 'menu' &&
+          quickStats &&
+          (() => {
+            const cotisationPct =
+              quickStats.cotisationStatus === 'paid' || quickStats.cotisationStatus === 'waived'
+                ? 100
+                : quickStats.cotisationStatus === 'overdue'
+                  ? 15
+                  : quickStats.cotisationStatus === 'pending'
+                    ? 55
+                    : 0
+            const cotisationColor =
+              quickStats.cotisationStatus === 'paid' || quickStats.cotisationStatus === 'waived'
+                ? '#34d399'
+                : quickStats.cotisationStatus === 'overdue'
+                  ? '#f87171'
+                  : 'var(--vfp-accent)'
+            const cotisationLabel =
+              quickStats.cotisationStatus === 'paid' || quickStats.cotisationStatus === 'waived'
+                ? 'À jour'
+                : quickStats.cotisationStatus === 'overdue'
+                  ? 'En retard'
+                  : quickStats.cotisationStatus === 'pending'
+                    ? 'En cours'
+                    : '—'
+            const ringCirc = 2 * Math.PI * 28
+            const ringOffset = ringCirc * (1 - cotisationPct / 100)
+            return (
+              <div
+                className={`vfp-card rounded-2xl p-4 flex items-stretch gap-3.5 vfp-enter transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`}
+                style={{ transitionDelay: '200ms' }}
+              >
+                <div className="relative w-[68px] h-[68px] shrink-0">
+                  <svg viewBox="0 0 64 64" className="w-full h-full -rotate-90">
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r="28"
+                      fill="none"
+                      stroke="rgba(255,255,255,.08)"
+                      strokeWidth="5"
+                    />
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r="28"
+                      fill="none"
+                      stroke={cotisationColor}
+                      strokeWidth="5"
+                      strokeLinecap="round"
+                      strokeDasharray={ringCirc}
+                      strokeDashoffset={ringOffset}
+                      style={{
+                        transition: 'stroke-dashoffset 0.6s ease, stroke 0.3s ease',
+                        filter: `drop-shadow(0 0 5px ${cotisationColor}99)`,
+                      }}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span
+                      className="text-[15px] font-bold leading-none"
+                      style={{ color: cotisationColor }}
+                    >
+                      {cotisationPct}%
+                    </span>
+                    <span className="text-[8px] text-white/40 mt-0.5 tracking-wide">COTIS.</span>
+                  </div>
+                </div>
+                <div className="w-px bg-white/[0.08] my-0.5" />
+                <div className="flex-1 flex flex-col justify-center gap-2.5 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-white/50 text-[11.5px]">Cotisation</span>
+                    <span className="text-[12.5px] font-bold" style={{ color: cotisationColor }}>
+                      {cotisationLabel}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-white/50 text-[11.5px]">Hectares</span>
+                    <span className="text-white text-[13px] font-bold font-mono">
+                      {quickStats.totalHa > 0 ? quickStats.totalHa.toFixed(1) : '—'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-white/50 text-[11.5px]">Intrants</span>
+                    <span className="text-white text-[13px] font-bold font-mono">
+                      {quickStats.intrantCount}
+                    </span>
+                  </div>
                 </div>
               </div>
-              <div className="w-px bg-white/[0.08] my-0.5" />
-              <div className="flex-1 flex flex-col justify-center gap-2.5 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-white/50 text-[11.5px]">Cotisation</span>
-                  <span className="text-[12.5px] font-bold" style={{ color: cotisationColor }}>{cotisationLabel}</span>
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-white/50 text-[11.5px]">Hectares</span>
-                  <span className="text-white text-[13px] font-bold font-mono">{quickStats.totalHa > 0 ? quickStats.totalHa.toFixed(1) : '—'}</span>
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-white/50 text-[11.5px]">Intrants</span>
-                  <span className="text-white text-[13px] font-bold font-mono">{quickStats.intrantCount}</span>
-                </div>
-              </div>
-            </div>
-          )
-        })()}
+            )
+          })()}
 
         {/* ─── Invalid / Not Found states ─── */}
         {!isValid && (result.member || result.card?.status === 'expired') && (
           <div className="rounded-2xl bg-red-950/20 border border-red-500/15 p-6 text-center vfp-enter">
             <XCircle className="h-12 w-12 text-red-400/60 mx-auto mb-3" />
-            <h2 className="text-lg font-bold text-white">{result.card?.status === 'expired' ? 'Carte Expirée' : 'Carte Invalide'}</h2>
-            <p className="text-white/50 text-sm mt-1">Contactez votre coopérative pour renouveler.</p>
+            <h2 className="text-lg font-bold text-white">
+              {result.card?.status === 'expired' ? 'Carte Expirée' : 'Carte Invalide'}
+            </h2>
+            <p className="text-white/50 text-sm mt-1">
+              Contactez votre coopérative pour renouveler.
+            </p>
           </div>
         )}
         {!result.member && result.card?.status !== 'expired' && (
@@ -592,8 +954,10 @@ export default function VerifyCardPage() {
 
         {/* ─── Services Grid (2 cols) ─── */}
         {isValid && activeView === 'menu' && (
-          <section className={`space-y-4 transition-all duration-700 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`} style={{ transitionDelay: '300ms' }}>
-
+          <section
+            className={`space-y-4 transition-all duration-700 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+            style={{ transitionDelay: '300ms' }}
+          >
             {/* Section header */}
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-2">
@@ -605,6 +969,7 @@ export default function VerifyCardPage() {
 
             {/* ① Featured — Assistant IA AgriTogo */}
             <button
+              type="button"
               onClick={() => setActiveView('ai')}
               className="w-full group relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-500/20 via-amber-600/10 to-orange-700/5 border border-amber-400/20 p-5 text-left active:scale-[0.98] transition-transform"
             >
@@ -614,14 +979,23 @@ export default function VerifyCardPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] font-bold tracking-widest text-amber-400/70 uppercase">Recommandé</span>
+                    <span className="text-[10px] font-bold tracking-widest text-amber-400/70 uppercase">
+                      Recommandé
+                    </span>
                     <span className="w-1 h-1 rounded-full bg-amber-400 animate-pulse" />
                   </div>
                   <p className="text-white font-bold text-lg leading-tight">Assistant IA</p>
-                  <p className="text-amber-300/60 text-sm mt-0.5">AgriTogo — Conseils, prix, prévisions</p>
+                  <p className="text-amber-300/60 text-sm mt-0.5">
+                    AgriTogo — Conseils, prix, prévisions
+                  </p>
                   <div className="flex flex-wrap gap-1.5 mt-3">
-                    {['Maladies', 'Intrants', 'Rendement', 'Météo'].map(tag => (
-                      <span key={tag} className="px-2 py-0.5 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-300/70 text-[10px] font-medium">{tag}</span>
+                    {['Maladies', 'Intrants', 'Rendement', 'Météo'].map((tag) => (
+                      <span
+                        key={tag}
+                        className="px-2 py-0.5 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-300/70 text-[10px] font-medium"
+                      >
+                        {tag}
+                      </span>
                     ))}
                   </div>
                 </div>
@@ -631,7 +1005,11 @@ export default function VerifyCardPage() {
                   <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex items-end gap-[2px] h-2.5">
                     {[4, 9, 6, 10, 5].map((h, i) => (
                       // biome-ignore lint/suspicious/noArrayIndexKey: barres décoratives d'un indicateur, valeurs littérales figées
-                      <span key={i} className="w-[2px] rounded-full bg-orange-100 vfp-ai-wavebar" style={{ height: h, animationDelay: `${i * 0.15}s` }} />
+                      <span
+                        key={i}
+                        className="w-[2px] rounded-full bg-orange-100 vfp-ai-wavebar"
+                        style={{ height: h, animationDelay: `${i * 0.15}s` }}
+                      />
                     ))}
                   </div>
                 </div>
@@ -645,16 +1023,43 @@ export default function VerifyCardPage() {
             {/* ② Quick row — Prix, Météo, AgriSmart */}
             <div className="grid grid-cols-3 gap-2">
               {[
-                { icon: TrendingUp, label: 'Marchés', sub: 'Cours live', view: 'prices', color: 'text-violet-300', bg: 'from-violet-500/20 to-violet-700/5', border: 'border-violet-400/15' },
-                { icon: CloudRain, label: 'Météo', sub: 'Prévisions', view: 'meteo', color: 'text-sky-300', bg: 'from-sky-500/20 to-sky-700/5', border: 'border-sky-400/15' },
-                { icon: Droplets, label: 'AgriSmart', sub: 'Irrigation', view: 'agrismart', color: 'text-cyan-300', bg: 'from-cyan-400/20 to-cyan-600/5', border: 'border-cyan-400/15' },
+                {
+                  icon: TrendingUp,
+                  label: 'Marchés',
+                  sub: 'Cours live',
+                  view: 'prices',
+                  color: 'text-violet-300',
+                  bg: 'from-violet-500/20 to-violet-700/5',
+                  border: 'border-violet-400/15',
+                },
+                {
+                  icon: CloudRain,
+                  label: 'Météo',
+                  sub: 'Prévisions',
+                  view: 'meteo',
+                  color: 'text-sky-300',
+                  bg: 'from-sky-500/20 to-sky-700/5',
+                  border: 'border-sky-400/15',
+                },
+                {
+                  icon: Droplets,
+                  label: 'AgriSmart',
+                  sub: 'Irrigation',
+                  view: 'agrismart',
+                  color: 'text-cyan-300',
+                  bg: 'from-cyan-400/20 to-cyan-600/5',
+                  border: 'border-cyan-400/15',
+                },
               ].map(({ icon: Icon, label, sub, view, color, bg, border }) => (
                 <button
+                  type="button"
                   key={view}
                   onClick={() => setActiveView(view as typeof activeView)}
                   className={`group vfp-card rounded-2xl p-3 flex flex-col items-center text-center gap-2 border ${border} active:scale-95 transition-transform`}
                 >
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${bg} flex items-center justify-center group-active:scale-90 transition-transform`}>
+                  <div
+                    className={`w-10 h-10 rounded-xl bg-gradient-to-br ${bg} flex items-center justify-center group-active:scale-90 transition-transform`}
+                  >
                     <Icon className={`h-5 w-5 ${color}`} />
                   </div>
                   <div>
@@ -667,24 +1072,63 @@ export default function VerifyCardPage() {
 
             {/* ③ Mon Exploitation */}
             <div>
-              <p className="text-white/40 text-[11px] font-semibold uppercase tracking-wider px-1 mb-2">Mon Exploitation</p>
+              <p className="text-white/40 text-[11px] font-semibold uppercase tracking-wider px-1 mb-2">
+                Mon Exploitation
+              </p>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { icon: MapIcon, label: 'Parcelles GPS', sub: 'Mes parcelles agricoles', view: 'parcelles', color: 'text-emerald-300', bg: 'from-emerald-500/20 to-emerald-700/5', border: 'border-emerald-400/15' },
-                  { icon: ShoppingCart, label: 'Intrants', sub: 'Semences & engrais', view: 'intrants', color: 'text-orange-300', bg: 'from-orange-500/20 to-orange-700/5', border: 'border-orange-400/15' },
-                  { icon: FileText, label: 'Mon Exploitation', sub: 'Fiches techniques', view: 'exploitation', color: 'text-cyan-300', bg: 'from-cyan-500/20 to-cyan-700/5', border: 'border-cyan-400/15' },
-                  { icon: Coins, label: 'Cotisation', sub: 'Statut & campagne', view: 'cotisation', color: 'text-yellow-300', bg: 'from-yellow-500/20 to-yellow-700/5', border: 'border-yellow-400/15' },
+                  {
+                    icon: MapIcon,
+                    label: 'Parcelles GPS',
+                    sub: 'Mes parcelles agricoles',
+                    view: 'parcelles',
+                    color: 'text-emerald-300',
+                    bg: 'from-emerald-500/20 to-emerald-700/5',
+                    border: 'border-emerald-400/15',
+                  },
+                  {
+                    icon: ShoppingCart,
+                    label: 'Intrants',
+                    sub: 'Semences & engrais',
+                    view: 'intrants',
+                    color: 'text-orange-300',
+                    bg: 'from-orange-500/20 to-orange-700/5',
+                    border: 'border-orange-400/15',
+                  },
+                  {
+                    icon: FileText,
+                    label: 'Mon Exploitation',
+                    sub: 'Fiches techniques',
+                    view: 'exploitation',
+                    color: 'text-cyan-300',
+                    bg: 'from-cyan-500/20 to-cyan-700/5',
+                    border: 'border-cyan-400/15',
+                  },
+                  {
+                    icon: Coins,
+                    label: 'Cotisation',
+                    sub: 'Statut & campagne',
+                    view: 'cotisation',
+                    color: 'text-yellow-300',
+                    bg: 'from-yellow-500/20 to-yellow-700/5',
+                    border: 'border-yellow-400/15',
+                  },
                 ].map(({ icon: Icon, label, sub, view, color, bg, border }) => (
                   <button
+                    type="button"
                     key={view}
                     onClick={() => setActiveView(view as typeof activeView)}
                     className={`group vfp-card rounded-2xl p-4 flex items-center gap-3 text-left border ${border} active:scale-95 transition-transform`}
                   >
-                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${bg} flex items-center justify-center shrink-0 group-active:scale-90 transition-transform`}>
+                    <div
+                      className={`w-10 h-10 rounded-xl bg-gradient-to-br ${bg} flex items-center justify-center shrink-0 group-active:scale-90 transition-transform`}
+                    >
                       <Icon className={`h-5 w-5 ${color}`} />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-white text-sm font-semibold leading-tight truncate">{label}</p>
+                      <p className="text-white text-sm font-semibold leading-tight truncate">
+                        {label}
+                      </p>
                       <p className="text-white/30 text-[10px] mt-0.5 truncate">{sub}</p>
                     </div>
                   </button>
@@ -694,10 +1138,13 @@ export default function VerifyCardPage() {
 
             {/* ④ Ma Carte Membre */}
             <div>
-              <p className="text-white/40 text-[11px] font-semibold uppercase tracking-wider px-1 mb-2">Ma Carte Membre</p>
+              <p className="text-white/40 text-[11px] font-semibold uppercase tracking-wider px-1 mb-2">
+                Ma Carte Membre
+              </p>
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">
                   <button
+                    type="button"
                     onClick={() => setActiveView('identity')}
                     className="group vfp-card rounded-2xl p-4 flex items-center gap-3 text-left border border-[var(--vfp-accent)]/15 active:scale-95 transition-transform"
                   >
@@ -710,6 +1157,7 @@ export default function VerifyCardPage() {
                     </div>
                   </button>
                   <button
+                    type="button"
                     onClick={() => setActiveView('technicien')}
                     className="group vfp-card rounded-2xl p-4 flex items-center gap-3 text-left border border-teal-400/15 active:scale-95 transition-transform"
                   >
@@ -724,6 +1172,7 @@ export default function VerifyCardPage() {
                 </div>
                 {/* Attestation — full width, prominent */}
                 <button
+                  type="button"
                   onClick={handleAttestation}
                   className="w-full group vfp-card rounded-2xl p-4 flex items-center justify-between border border-violet-400/15 active:scale-[0.98] transition-transform"
                 >
@@ -732,15 +1181,18 @@ export default function VerifyCardPage() {
                       <Share2 className="h-5 w-5 text-violet-300" />
                     </div>
                     <div className="text-left">
-                      <p className="text-white text-sm font-semibold leading-tight">Mon Attestation</p>
-                      <p className="text-white/30 text-[10px] mt-0.5">Télécharger le PDF officiel</p>
+                      <p className="text-white text-sm font-semibold leading-tight">
+                        Mon Attestation
+                      </p>
+                      <p className="text-white/30 text-[10px] mt-0.5">
+                        Télécharger le PDF officiel
+                      </p>
                     </div>
                   </div>
                   <ChevronRight className="h-4 w-4 text-violet-300/50 shrink-0" />
                 </button>
               </div>
             </div>
-
           </section>
         )}
 
@@ -749,18 +1201,26 @@ export default function VerifyCardPage() {
         {/* ─── Prices Full View ─── */}
         {isValid && activeView === 'prices' && (
           <div className="space-y-4 vfp-enter">
-            <button onClick={() => setActiveView('menu')} className="flex items-center gap-2 text-[var(--vfp-accent)] text-sm font-medium active:opacity-70">
+            <button
+              type="button"
+              onClick={() => setActiveView('menu')}
+              className="flex items-center gap-2 text-[var(--vfp-accent)] text-sm font-medium active:opacity-70"
+            >
               <ArrowLeft className="h-4 w-4" /> Retour
             </button>
             <MarketPricesDashboard
               cardNumber={cardNumber}
               cooperativeName={result.cooperative?.name ?? ''}
-              memberLocality={result.member ? {
-                village: result.member.village ?? null,
-                canton: result.member.canton ?? null,
-                prefecture: result.member.prefecture ?? null,
-                region: result.member.region ?? null,
-              } : undefined}
+              memberLocality={
+                result.member
+                  ? {
+                      village: result.member.village ?? null,
+                      canton: result.member.canton ?? null,
+                      prefecture: result.member.prefecture ?? null,
+                      region: result.member.region ?? null,
+                    }
+                  : undefined
+              }
             />
           </div>
         )}
@@ -768,7 +1228,11 @@ export default function VerifyCardPage() {
         {/* ─── Identity View ─── */}
         {isValid && activeView === 'identity' && result.member && (
           <div className="space-y-4 vfp-enter">
-            <button onClick={() => setActiveView('menu')} className="flex items-center gap-2 text-[var(--vfp-accent)] text-sm font-medium active:opacity-70">
+            <button
+              type="button"
+              onClick={() => setActiveView('menu')}
+              className="flex items-center gap-2 text-[var(--vfp-accent)] text-sm font-medium active:opacity-70"
+            >
               <ArrowLeft className="h-4 w-4" /> Retour
             </button>
             <h3 className="text-white text-lg font-bold">Vérification d&apos;Identité</h3>
@@ -777,18 +1241,31 @@ export default function VerifyCardPage() {
                 <div className="w-20 h-20 rounded-full overflow-hidden border-[3px] border-[var(--vfp-accent)]/40">
                   {result.member.photo_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={result.member.photo_url} alt="" className="w-full h-full object-cover" />
+                    <img
+                      src={result.member.photo_url}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
-                    <div className="w-full h-full bg-[var(--vfp-accent)]/10 flex items-center justify-center"><User className="h-9 w-9 text-[var(--vfp-accent)]/60" /></div>
+                    <div className="w-full h-full bg-[var(--vfp-accent)]/10 flex items-center justify-center">
+                      <User className="h-9 w-9 text-[var(--vfp-accent)]/60" />
+                    </div>
                   )}
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-white">{result.member.first_name ?? ''} <span className="uppercase">{result.member.last_name ?? ''}</span></h2>
-                  <p className="text-[var(--vfp-accent)]/70 text-xs font-mono">{result.card?.card_number}</p>
+                  <h2 className="text-xl font-bold text-white">
+                    {result.member.first_name ?? ''}{' '}
+                    <span className="uppercase">{result.member.last_name ?? ''}</span>
+                  </h2>
+                  <p className="text-[var(--vfp-accent)]/70 text-xs font-mono">
+                    {result.card?.card_number}
+                  </p>
                   <div className="flex items-center gap-2 flex-wrap mt-1.5">
                     <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--vfp-accent)]/10 border border-[var(--vfp-accent)]/20">
                       <CheckCircle className="h-3 w-3 text-[var(--vfp-accent)]" />
-                      <span className="text-[10px] font-bold text-[var(--vfp-accent)] uppercase">Membre vérifié</span>
+                      <span className="text-[10px] font-bold text-[var(--vfp-accent)] uppercase">
+                        Membre vérifié
+                      </span>
                     </div>
                     {result.card_type && result.card_type !== 'FAITIERE' && (
                       <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-white/8 border border-white/15 text-white/60 uppercase tracking-wider">
@@ -807,49 +1284,87 @@ export default function VerifyCardPage() {
                 {/* ── Localisation ── */}
                 <div className="col-span-2 flex items-center gap-2 mt-1">
                   <MapPin className="h-3.5 w-3.5 text-[var(--vfp-accent)]" />
-                  <span className="text-xs text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">Localisation</span>
+                  <span className="text-xs text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">
+                    Localisation
+                  </span>
                 </div>
                 <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
-                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Région</span>
-                  <p className="text-white text-sm font-semibold mt-0.5">{result.member.region ?? '—'}</p>
+                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">
+                    Région
+                  </span>
+                  <p className="text-white text-sm font-semibold mt-0.5">
+                    {result.member.region ?? '—'}
+                  </p>
                 </div>
                 <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
-                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Préfecture</span>
-                  <p className="text-white text-sm font-medium mt-0.5">{result.member.prefecture ?? '—'}</p>
+                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">
+                    Préfecture
+                  </span>
+                  <p className="text-white text-sm font-medium mt-0.5">
+                    {result.member.prefecture ?? '—'}
+                  </p>
                 </div>
                 <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
-                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Canton</span>
-                  <p className="text-white text-sm font-medium mt-0.5">{result.member.canton ?? '—'}</p>
+                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">
+                    Canton
+                  </span>
+                  <p className="text-white text-sm font-medium mt-0.5">
+                    {result.member.canton ?? '—'}
+                  </p>
                 </div>
                 <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
-                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Village</span>
-                  <p className="text-white text-sm font-medium mt-0.5">{result.member.village ?? '—'}</p>
+                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">
+                    Village
+                  </span>
+                  <p className="text-white text-sm font-medium mt-0.5">
+                    {result.member.village ?? '—'}
+                  </p>
                 </div>
                 {/* ── Organisation ── */}
                 <div className="col-span-2 flex items-center gap-2 mt-2">
                   <Building2 className="h-3.5 w-3.5 text-[var(--vfp-accent)]" />
-                  <span className="text-xs text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">Organisation</span>
+                  <span className="text-xs text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">
+                    Organisation
+                  </span>
                 </div>
                 <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
-                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Coopérative</span>
-                  <p className="text-white text-sm font-semibold mt-0.5">{result.cooperative?.name ?? 'Coopérative inconnue'}</p>
+                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">
+                    Coopérative
+                  </span>
+                  <p className="text-white text-sm font-semibold mt-0.5">
+                    {result.cooperative?.name ?? 'Coopérative inconnue'}
+                  </p>
                 </div>
                 <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
-                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Faîtière</span>
-                  <p className="text-white text-sm font-semibold mt-0.5">{result.cooperative?.faitiere_name ?? '—'}</p>
+                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">
+                    Faîtière
+                  </span>
+                  <p className="text-white text-sm font-semibold mt-0.5">
+                    {result.cooperative?.faitiere_name ?? '—'}
+                  </p>
                 </div>
                 {result.member.member_since && (
                   <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
-                    <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Membre depuis</span>
+                    <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">
+                      Membre depuis
+                    </span>
                     <p className="text-white text-sm font-semibold mt-0.5">
-                      {new Date(result.member.member_since).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                      {new Date(result.member.member_since).toLocaleDateString('fr-FR', {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric',
+                      })}
                     </p>
                   </div>
                 )}
                 <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
-                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">Type de carte</span>
+                  <span className="text-[11px] text-white/40 uppercase font-semibold tracking-wider">
+                    Type de carte
+                  </span>
                   <p className="text-white text-sm font-semibold mt-0.5">
-                    {result.card_type === 'FAITIERE' || !result.card_type ? 'Producteur' : result.card_type}
+                    {result.card_type === 'FAITIERE' || !result.card_type
+                      ? 'Producteur'
+                      : result.card_type}
                   </p>
                 </div>
               </div>
@@ -858,7 +1373,9 @@ export default function VerifyCardPage() {
               {atsData && (
                 <div className="pt-2 space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">Score Agricole (ATS)</span>
+                    <span className="text-xs text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">
+                      Score Agricole (ATS)
+                    </span>
                   </div>
                   <AtsBadge
                     score={atsData.score}
@@ -869,53 +1386,127 @@ export default function VerifyCardPage() {
 
                   {/* Haroo ATS Tier Ladder */}
                   <div className="vfp-card rounded-2xl p-4 space-y-3">
-                    <p className="text-white/60 text-[11px] font-semibold uppercase tracking-wider">Paliers Haroo — Avantages agricoles</p>
+                    <p className="text-white/60 text-[11px] font-semibold uppercase tracking-wider">
+                      Paliers Haroo — Avantages agricoles
+                    </p>
                     <div className="space-y-2">
-                      {([
-                        { min: 0,   max: 199, label: 'Starter',  color: 'text-white/40',   bg: 'bg-white/5',           icon: '🌱', perks: 'Accès Haroo, vérification carte' },
-                        { min: 200, max: 399, label: 'Bronze',   color: 'text-amber-600',   bg: 'bg-amber-900/20',      icon: '🥉', perks: 'Crédit intrants jusqu\'à 50 000 XOF' },
-                        { min: 400, max: 599, label: 'Argent',   color: 'text-slate-300',   bg: 'bg-slate-700/20',      icon: '🥈', perks: 'Crédit 150 000 XOF · Assurance récolte de base' },
-                        { min: 600, max: 799, label: 'Or',       color: 'text-yellow-400',  bg: 'bg-yellow-900/20',     icon: '🥇', perks: 'Crédit 500 000 XOF · Assurance complète · Formation certifiante' },
-                        { min: 800, max: 1000, label: 'Platine', color: 'text-cyan-300',    bg: 'bg-cyan-900/20',       icon: '💎', perks: 'Crédit 2 000 000 XOF · Export UEMOA · Priorité acheteurs' },
-                      ] as const).map(tier => {
+                      {(
+                        [
+                          {
+                            min: 0,
+                            max: 199,
+                            label: 'Starter',
+                            color: 'text-white/40',
+                            bg: 'bg-white/5',
+                            icon: '🌱',
+                            perks: 'Accès Haroo, vérification carte',
+                          },
+                          {
+                            min: 200,
+                            max: 399,
+                            label: 'Bronze',
+                            color: 'text-amber-600',
+                            bg: 'bg-amber-900/20',
+                            icon: '🥉',
+                            perks: "Crédit intrants jusqu'à 50 000 XOF",
+                          },
+                          {
+                            min: 400,
+                            max: 599,
+                            label: 'Argent',
+                            color: 'text-slate-300',
+                            bg: 'bg-slate-700/20',
+                            icon: '🥈',
+                            perks: 'Crédit 150 000 XOF · Assurance récolte de base',
+                          },
+                          {
+                            min: 600,
+                            max: 799,
+                            label: 'Or',
+                            color: 'text-yellow-400',
+                            bg: 'bg-yellow-900/20',
+                            icon: '🥇',
+                            perks:
+                              'Crédit 500 000 XOF · Assurance complète · Formation certifiante',
+                          },
+                          {
+                            min: 800,
+                            max: 1000,
+                            label: 'Platine',
+                            color: 'text-cyan-300',
+                            bg: 'bg-cyan-900/20',
+                            icon: '💎',
+                            perks: 'Crédit 2 000 000 XOF · Export UEMOA · Priorité acheteurs',
+                          },
+                        ] as const
+                      ).map((tier) => {
                         const active = atsData.score >= tier.min && atsData.score <= tier.max
                         const unlocked = atsData.score >= tier.min
                         return (
-                          <div key={tier.label} className={`flex items-start gap-3 p-2.5 rounded-xl border transition-all ${active ? `${tier.bg} border-white/15` : unlocked ? 'border-white/5 opacity-60' : 'border-white/[0.03] opacity-30'}`}>
+                          <div
+                            key={tier.label}
+                            className={`flex items-start gap-3 p-2.5 rounded-xl border transition-all ${active ? `${tier.bg} border-white/15` : unlocked ? 'border-white/5 opacity-60' : 'border-white/[0.03] opacity-30'}`}
+                          >
                             <span className="text-base shrink-0 mt-0.5">{tier.icon}</span>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
-                                <span className={`text-xs font-bold ${active ? tier.color : 'text-white/50'}`}>{tier.label}</span>
-                                <span className="text-[10px] text-white/25">{tier.min}–{tier.max === 1000 ? '1000' : tier.max} pts</span>
-                                {active && <span className="ml-auto text-[10px] font-semibold text-[var(--vfp-accent)] shrink-0">← Votre niveau</span>}
+                                <span
+                                  className={`text-xs font-bold ${active ? tier.color : 'text-white/50'}`}
+                                >
+                                  {tier.label}
+                                </span>
+                                <span className="text-[10px] text-white/25">
+                                  {tier.min}–{tier.max === 1000 ? '1000' : tier.max} pts
+                                </span>
+                                {active && (
+                                  <span className="ml-auto text-[10px] font-semibold text-[var(--vfp-accent)] shrink-0">
+                                    ← Votre niveau
+                                  </span>
+                                )}
                               </div>
-                              <p className="text-[11px] text-white/40 mt-0.5 leading-tight">{tier.perks}</p>
+                              <p className="text-[11px] text-white/40 mt-0.5 leading-tight">
+                                {tier.perks}
+                              </p>
                             </div>
                           </div>
                         )
                       })}
                     </div>
                     {/* How to improve */}
-                    {atsData.breakdown && atsData.score < 800 && (() => {
-                      const b = atsData.breakdown
-                      const tips: string[] = []
-                      if (b.cotisation < 270) tips.push('Payer vos cotisations à temps (+pts cotisation)')
-                      if (b.production < 270) tips.push('Déclarer vos récoltes dans Haroo (+pts production)')
-                      if (b.engagement < 180) tips.push('Participer aux formations coopératives (+pts engagement)')
-                      if (tips.length === 0 && atsData.score < 800) tips.push('Enregistrer plus de parcelles pour progresser')
-                      return tips.length > 0 ? (
-                        <div className="border-t border-white/[0.06] pt-2.5">
-                          <p className="text-[10px] font-semibold text-white/35 uppercase tracking-wider mb-1.5">Comment progresser</p>
-                          <ul className="space-y-1">
-                            {tips.slice(0, 3).map((t) => (
-                              <li key={t} className="flex items-start gap-1.5 text-[11px] text-white/45">
-                                <span className="text-[var(--vfp-accent)] mt-0.5 shrink-0">›</span>{t}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : null
-                    })()}
+                    {atsData.breakdown &&
+                      atsData.score < 800 &&
+                      (() => {
+                        const b = atsData.breakdown
+                        const tips: string[] = []
+                        if (b.cotisation < 270)
+                          tips.push('Payer vos cotisations à temps (+pts cotisation)')
+                        if (b.production < 270)
+                          tips.push('Déclarer vos récoltes dans Haroo (+pts production)')
+                        if (b.engagement < 180)
+                          tips.push('Participer aux formations coopératives (+pts engagement)')
+                        if (tips.length === 0 && atsData.score < 800)
+                          tips.push('Enregistrer plus de parcelles pour progresser')
+                        return tips.length > 0 ? (
+                          <div className="border-t border-white/[0.06] pt-2.5">
+                            <p className="text-[10px] font-semibold text-white/35 uppercase tracking-wider mb-1.5">
+                              Comment progresser
+                            </p>
+                            <ul className="space-y-1">
+                              {tips.slice(0, 3).map((t) => (
+                                <li
+                                  key={t}
+                                  className="flex items-start gap-1.5 text-[11px] text-white/45"
+                                >
+                                  <span className="text-[var(--vfp-accent)] mt-0.5 shrink-0">
+                                    ›
+                                  </span>
+                                  {t}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null
+                      })()}
                   </div>
                 </div>
               )}
@@ -924,10 +1515,13 @@ export default function VerifyCardPage() {
             {/* Share + Coordo buttons */}
             <div className="flex gap-2">
               <button
+                type="button"
                 onClick={() => {
                   const url = window.location.href
                   if (navigator.share) {
-                    navigator.share({ title: `${fullName} — Carte Verte FaîtiereHub`, url }).catch(() => {})
+                    navigator
+                      .share({ title: `${fullName} — Carte Verte FaîtiereHub`, url })
+                      .catch(() => {})
                   } else {
                     navigator.clipboard?.writeText(url).catch(() => {})
                   }
@@ -954,39 +1548,61 @@ export default function VerifyCardPage() {
         {/* ─── Technicien View ─── */}
         {isValid && activeView === 'technicien' && (
           <div className="space-y-4 vfp-enter">
-            <button onClick={() => setActiveView('menu')} className="flex items-center gap-2 text-[var(--vfp-accent)] text-sm font-medium active:opacity-70">
+            <button
+              type="button"
+              onClick={() => setActiveView('menu')}
+              className="flex items-center gap-2 text-[var(--vfp-accent)] text-sm font-medium active:opacity-70"
+            >
               <ArrowLeft className="h-4 w-4" /> Retour
             </button>
             <h3 className="text-white text-lg font-bold">Contacter Mon Technicien</h3>
-            {contactsLoading && <div className="vfp-card rounded-2xl p-8 text-center"><div className="vfp-loader mx-auto" /><p className="text-white/40 text-sm mt-3">Recherche...</p></div>}
+            {contactsLoading && (
+              <div className="vfp-card rounded-2xl p-8 text-center">
+                <div className="vfp-loader mx-auto" />
+                <p className="text-white/40 text-sm mt-3">Recherche...</p>
+              </div>
+            )}
             {contacts && contacts.length === 0 && (
               <div className="vfp-card rounded-2xl p-6 text-center">
                 <PhoneCall className="h-8 w-8 text-white/20 mx-auto mb-2" />
                 <p className="text-white/50 text-sm">Aucun technicien trouvé pour votre zone.</p>
               </div>
             )}
-            {contacts && contacts.length > 0 && contacts.map((c) => (
-              <div key={`${c.role}-${c.phone}`} className="vfp-card rounded-2xl p-4 space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[var(--vfp-accent)]/15 flex items-center justify-center">
-                    <User className="h-5 w-5 text-[var(--vfp-accent)]" />
+            {contacts &&
+              contacts.length > 0 &&
+              contacts.map((c) => (
+                <div key={`${c.role}-${c.phone}`} className="vfp-card rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[var(--vfp-accent)]/15 flex items-center justify-center">
+                      <User className="h-5 w-5 text-[var(--vfp-accent)]" />
+                    </div>
+                    <div>
+                      <p className="text-white font-semibold text-sm">{c.name}</p>
+                      <p className="text-white/40 text-[10px] uppercase tracking-wider">
+                        {c.role === 'technicien'
+                          ? `Technicien${c.canton ? ` — ${c.canton}` : ''}`
+                          : 'Coordonnateur Faîtière'}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-white font-semibold text-sm">{c.name}</p>
-                    <p className="text-white/40 text-[10px] uppercase tracking-wider">{c.role === 'technicien' ? `Technicien${c.canton ? ` — ${c.canton}` : ''}` : 'Coordonnateur Faîtière'}</p>
+                  <div className="flex gap-2">
+                    <a
+                      href={`tel:${c.phone}`}
+                      className="flex-1 py-2.5 rounded-xl bg-[var(--vfp-cta)] text-[var(--vfp-cta-fg)] text-xs font-bold text-center active:scale-95 transition-transform"
+                    >
+                      📞 Appeler
+                    </a>
+                    <a
+                      href={`https://wa.me/${waNumber(c.phone)}?text=${encodeURIComponent(`Bonjour ${c.name}, je suis ${firstName} (carte ${cardNumber})${c.canton ? `, canton ${c.canton}` : ''}. J'ai besoin d'une assistance agricole.`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 py-2.5 rounded-xl bg-[#25D366]/15 text-[#25D366] text-xs font-bold text-center border border-[#25D366]/20 active:scale-95 transition-transform"
+                    >
+                      💬 WhatsApp
+                    </a>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <a href={`tel:${c.phone}`} className="flex-1 py-2.5 rounded-xl bg-[var(--vfp-cta)] text-[var(--vfp-cta-fg)] text-xs font-bold text-center active:scale-95 transition-transform">📞 Appeler</a>
-                  <a
-                    href={`https://wa.me/${waNumber(c.phone)}?text=${encodeURIComponent(`Bonjour ${c.name}, je suis ${firstName} (carte ${cardNumber})${c.canton ? `, canton ${c.canton}` : ''}. J'ai besoin d'une assistance agricole.`)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 py-2.5 rounded-xl bg-[#25D366]/15 text-[#25D366] text-xs font-bold text-center border border-[#25D366]/20 active:scale-95 transition-transform"
-                  >💬 WhatsApp</a>
-                </div>
-              </div>
-            ))}
+              ))}
           </div>
         )}
 
@@ -1010,12 +1626,20 @@ export default function VerifyCardPage() {
 
         {/* ─── AgriSmart Water View ─── */}
         {isValid && activeView === 'agrismart' && (
-          <AgriSmartWater onBack={() => setActiveView('menu')} initialRegion={result.member?.region ?? undefined} cardNumber={cardNumber} />
+          <AgriSmartWater
+            onBack={() => setActiveView('menu')}
+            initialRegion={result.member?.region ?? undefined}
+            cardNumber={cardNumber}
+          />
         )}
 
         {/* ─── Parcelles View ─── */}
         {isValid && activeView === 'parcelles' && (
-          <ParcellesInlineView cardNumber={cardNumber} onBack={() => setActiveView('menu')} onOpenAgriSmart={() => setActiveView('agrismart')} />
+          <ParcellesInlineView
+            cardNumber={cardNumber}
+            onBack={() => setActiveView('menu')}
+            onOpenAgriSmart={() => setActiveView('agrismart')}
+          />
         )}
 
         {/* ─── Intrants View ─── */}
@@ -1037,29 +1661,48 @@ export default function VerifyCardPage() {
 
         {/* ─── Exploitation View ─── */}
         {isValid && activeView === 'exploitation' && (
-          <ExploitationInlineView cardNumber={cardNumber} memberId={result.member_id ?? null} onBack={() => setActiveView('menu')} />
+          <ExploitationInlineView
+            cardNumber={cardNumber}
+            memberId={result.member_id ?? null}
+            onBack={() => setActiveView('menu')}
+          />
         )}
 
         {/* ─── Météo View ─── */}
         {isValid && activeView === 'meteo' && (
-          <MeteoInlineView cardNumber={cardNumber} onBack={() => setActiveView('menu')} onOpenAgriSmart={() => setActiveView('agrismart')} />
+          <MeteoInlineView
+            cardNumber={cardNumber}
+            onBack={() => setActiveView('menu')}
+            onOpenAgriSmart={() => setActiveView('agrismart')}
+          />
         )}
 
         {/* ─── Security Timer ─── */}
         {isValid && activeView === 'menu' && (
-          <div className={`vfp-card rounded-2xl p-3 transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '600ms' }}>
+          <div
+            className={`vfp-card rounded-2xl p-3 transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`}
+            style={{ transitionDelay: '600ms' }}
+          >
             <div className="flex items-center gap-3">
               <Timer className="h-4 w-4 text-white/30 shrink-0" />
               <div className="flex-1">
                 <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
-                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${(timeLeft / 600) * 100}%`, background: 'linear-gradient(to right, var(--vfp-accent), var(--vfp-accent-dim))' }} />
+                  <div
+                    className="h-full rounded-full transition-all duration-1000"
+                    style={{
+                      width: `${(timeLeft / 600) * 100}%`,
+                      background:
+                        'linear-gradient(to right, var(--vfp-accent), var(--vfp-accent-dim))',
+                    }}
+                  />
                 </div>
               </div>
-              <span className="text-white/30 text-[11px] font-mono shrink-0">{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
+              <span className="text-white/30 text-[11px] font-mono shrink-0">
+                {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+              </span>
             </div>
           </div>
         )}
-
       </div>
       {mobileMenuOpen && <VerifyMobileMenu onClose={() => setMobileMenuOpen(false)} />}
     </div>
@@ -1070,10 +1713,14 @@ function VerifyMobileMenu({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div className="absolute bottom-0 left-0 right-0 max-w-md mx-auto" onClick={e => e.stopPropagation()}>
+      <div
+        className="absolute bottom-0 left-0 right-0 max-w-md mx-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="bg-[#040f0a]/95 backdrop-blur-xl rounded-t-3xl p-5 space-y-2 border-t border-white/10">
           <div className="w-8 h-1 rounded-full bg-white/20 mx-auto mb-4" />
           <button
+            type="button"
             onClick={() => {
               if (typeof navigator !== 'undefined' && navigator.share) {
                 navigator.share({ title: 'FaîtiereHub', url: window.location.href }).catch(() => {})
@@ -1085,11 +1732,19 @@ function VerifyMobileMenu({ onClose }: { onClose: () => void }) {
             <Share2 className="h-5 w-5 text-[var(--vfp-accent)] shrink-0" />
             <p className="text-white text-sm font-semibold">Partager cette page</p>
           </button>
-          <Link href="/scan" onClick={onClose} className="flex items-center gap-4 rounded-2xl p-4 bg-white/5 active:bg-white/10 transition-colors">
+          <Link
+            href="/scan"
+            onClick={onClose}
+            className="flex items-center gap-4 rounded-2xl p-4 bg-white/5 active:bg-white/10 transition-colors"
+          >
             <ScanLine className="h-5 w-5 text-[var(--vfp-accent)] shrink-0" />
             <p className="text-white text-sm font-semibold">Scanner une carte</p>
           </Link>
-          <Link href="/" onClick={onClose} className="flex items-center gap-4 rounded-2xl p-4 bg-white/5 active:bg-white/10 transition-colors">
+          <Link
+            href="/"
+            onClick={onClose}
+            className="flex items-center gap-4 rounded-2xl p-4 bg-white/5 active:bg-white/10 transition-colors"
+          >
             <ArrowLeft className="h-5 w-5 text-white/40 shrink-0" />
             <p className="text-white text-sm font-semibold">Accueil FaîtiereHub</p>
           </Link>

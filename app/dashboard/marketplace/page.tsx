@@ -6,10 +6,27 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
-  Plus, Upload, Search, FileText, Download, Trash2, Eye, EyeOff,
-  ChevronDown, ChevronRight, MapPin, List,
+  Plus,
+  Upload,
+  Search,
+  FileText,
+  Download,
+  Trash2,
+  Eye,
+  EyeOff,
+  ChevronDown,
+  ChevronRight,
+  MapPin,
+  List,
 } from 'lucide-react'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { useAuth } from '@/app/context/auth-context'
@@ -88,7 +105,11 @@ const TYPES_AGRICULTURE = [
 ]
 
 const FILE_ICON: Record<string, string> = {
-  xlsx: '📊', xls: '📊', docx: '📄', doc: '📄', pdf: '📕',
+  xlsx: '📊',
+  xls: '📊',
+  docx: '📄',
+  doc: '📄',
+  pdf: '📕',
 }
 
 function fileIcon(type: string) {
@@ -146,7 +167,9 @@ export default function MarketplacePage() {
     campaign: '',
     price_non_member: 500,
   })
-  const [pendingFiles, setPendingFiles] = useState<{ name: string; url: string; type: string; size: number }[]>([])
+  const [pendingFiles, setPendingFiles] = useState<
+    { name: string; url: string; type: string; size: number }[]
+  >([])
 
   // Only show faitieres in the cooperative switcher for super_admin
   const faitiereCooperatives = useMemo(() => {
@@ -160,42 +183,52 @@ export default function MarketplacePage() {
   // Both child+grandchild queries run in parallel instead of sequentially.
   const scopeIdsCache = useRef<{ id: string; ids: string[] } | null>(null)
 
-  const buildScopeIds = useCallback(async (coopId: string, level: string): Promise<string[]> => {
-    if (scopeIdsCache.current?.id === coopId) return scopeIdsCache.current.ids
+  const buildScopeIds = useCallback(
+    async (coopId: string, level: string): Promise<string[]> => {
+      if (scopeIdsCache.current?.id === coopId) return scopeIdsCache.current.ids
 
-    let ids: string[]
-    if (level === 'faitiere' || level === 'union') {
-      const { data: childCoops } = await supabase
-        .from('cooperatives')
-        .select('id')
-        .or(`id.eq.${coopId},parent_id.eq.${coopId}`)
-      const childIds = (childCoops ?? []).map((c) => c.id)
-      if (childIds.length > 0) {
-        const { data: grandChildCoops } = await supabase
+      let ids: string[]
+      if (level === 'faitiere' || level === 'union') {
+        const { data: childCoops } = await supabase
           .from('cooperatives')
           .select('id')
-          .in('parent_id', childIds)
-        ids = [...new Set([...childIds, ...(grandChildCoops ?? []).map((c) => c.id)])]
+          .or(`id.eq.${coopId},parent_id.eq.${coopId}`)
+        const childIds = (childCoops ?? []).map((c) => c.id)
+        if (childIds.length > 0) {
+          const { data: grandChildCoops } = await supabase
+            .from('cooperatives')
+            .select('id')
+            .in('parent_id', childIds)
+          ids = [...new Set([...childIds, ...(grandChildCoops ?? []).map((c) => c.id)])]
+        } else {
+          ids = [coopId]
+        }
       } else {
         ids = [coopId]
       }
-    } else {
-      ids = [coopId]
-    }
 
-    scopeIdsCache.current = { id: coopId, ids }
-    return ids
-  }, [supabase])
+      scopeIdsCache.current = { id: coopId, ids }
+      return ids
+    },
+    [supabase],
+  )
 
   // Load reference data
   useEffect(() => {
-    supabase.from('cultures').select('id, name, icon, category').order('name').then(({ data }) => setAllCultures(data ?? []))
+    supabase
+      .from('cultures')
+      .select('id, name, icon, category')
+      .order('name')
+      .then(({ data }) => setAllCultures(data ?? []))
   }, [supabase])
 
   // Load list-view fiches
   const fetchFiches = useCallback(async () => {
     if (!currentCooperative) {
-      setFiches([]); setTotal(0); setIsLoading(false); return
+      setFiches([])
+      setTotal(0)
+      setIsLoading(false)
+      return
     }
     setIsLoading(true)
 
@@ -208,7 +241,9 @@ export default function MarketplacePage() {
       .order('created_at', { ascending: false })
 
     if (debouncedSearch.trim()) {
-      query = query.or(`title.ilike.%${debouncedSearch.trim()}%,culture.ilike.%${debouncedSearch.trim()}%`)
+      query = query.or(
+        `title.ilike.%${debouncedSearch.trim()}%,culture.ilike.%${debouncedSearch.trim()}%`,
+      )
     }
 
     const from = (page - 1) * PAGE_SIZE
@@ -216,7 +251,8 @@ export default function MarketplacePage() {
 
     const { data, error, count } = await query
     if (error) {
-      setFiches([]); setTotal(0)
+      setFiches([])
+      setTotal(0)
     } else {
       setFiches((data ?? []) as FicheTechnique[])
       setTotal(count ?? 0)
@@ -226,14 +262,19 @@ export default function MarketplacePage() {
 
   // Load locality-view fiches (with region/prefecture/canton names)
   const fetchLocalityFiches = useCallback(async () => {
-    if (!currentCooperative) { setLocalityFiches([]); return }
+    if (!currentCooperative) {
+      setLocalityFiches([])
+      return
+    }
     setLoadingLocality(true)
 
     const scopeIds = await buildScopeIds(currentCooperative.id, currentCooperative.level ?? '')
 
     const { data } = await supabase
       .from('fiches_techniques')
-      .select('id, title, description, culture, type_agriculture, campaign, files, price_non_member, is_free_for_members, download_count, region:region_id(name), prefecture:prefecture_id(name), canton:canton_id(name)')
+      .select(
+        'id, title, description, culture, type_agriculture, campaign, files, price_non_member, is_free_for_members, download_count, region:region_id(name), prefecture:prefecture_id(name), canton:canton_id(name)',
+      )
       .in('cooperative_id', scopeIds)
       .eq('status', 'published')
       .order('title')
@@ -242,7 +283,9 @@ export default function MarketplacePage() {
     setLoadingLocality(false)
   }, [currentCooperative, supabase, buildScopeIds])
 
-  useEffect(() => { fetchFiches() }, [fetchFiches])
+  useEffect(() => {
+    fetchFiches()
+  }, [fetchFiches])
   useResetPageOnChange(setPage, [debouncedSearch])
   useEffect(() => {
     if (viewMode === 'locality') fetchLocalityFiches()
@@ -282,45 +325,76 @@ export default function MarketplacePage() {
   }
 
   // Download file via signed URL
-  const handleDownload = useCallback(async (file: FicheFile) => {
-    const { data, error } = await supabase.storage.from('fiches-techniques').createSignedUrl(file.url, 3600)
-    if (error || !data?.signedUrl) {
-      toast({ title: 'Erreur de téléchargement', description: error?.message ?? 'Lien expiré', variant: 'destructive' })
-      return
-    }
-    const a = document.createElement('a')
-    a.href = data.signedUrl
-    a.download = file.name
-    a.click()
-  }, [supabase, toast])
+  const handleDownload = useCallback(
+    async (file: FicheFile) => {
+      const { data, error } = await supabase.storage
+        .from('fiches-techniques')
+        .createSignedUrl(file.url, 3600)
+      if (error || !data?.signedUrl) {
+        toast({
+          title: 'Erreur de téléchargement',
+          description: error?.message ?? 'Lien expiré',
+          variant: 'destructive',
+        })
+        return
+      }
+      const a = document.createElement('a')
+      a.href = data.signedUrl
+      a.download = file.name
+      a.click()
+    },
+    [supabase, toast],
+  )
 
   // File upload
   const handleFileUpload = async (files: FileList) => {
     if (!currentCooperative) {
-      toast({ title: 'Erreur', description: 'Aucune coopérative sélectionnée', variant: 'destructive' })
+      toast({
+        title: 'Erreur',
+        description: 'Aucune coopérative sélectionnée',
+        variant: 'destructive',
+      })
       return
     }
     if (user?.role !== 'super_admin' && currentCooperative.level !== 'faitiere') {
-      toast({ title: 'Accès refusé', description: 'Seules les faîtières peuvent uploader des fiches', variant: 'destructive' })
+      toast({
+        title: 'Accès refusé',
+        description: 'Seules les faîtières peuvent uploader des fiches',
+        variant: 'destructive',
+      })
       return
     }
     setUploadingFiles(true)
     const uploaded: typeof pendingFiles = []
     for (const file of Array.from(files)) {
       if (file.size > 20 * 1024 * 1024) {
-        toast({ title: `Fichier trop volumineux: ${file.name}`, description: 'Maximum 20 Mo', variant: 'destructive' })
+        toast({
+          title: `Fichier trop volumineux: ${file.name}`,
+          description: 'Maximum 20 Mo',
+          variant: 'destructive',
+        })
         continue
       }
       const ext = file.name.split('.').pop()?.toLowerCase() ?? 'bin'
       if (!['pdf', 'docx', 'doc', 'xlsx', 'xls'].includes(ext)) {
-        toast({ title: `Type non supporté: ${file.name}`, description: 'Formats acceptés: PDF, DOCX, XLSX', variant: 'destructive' })
+        toast({
+          title: `Type non supporté: ${file.name}`,
+          description: 'Formats acceptés: PDF, DOCX, XLSX',
+          variant: 'destructive',
+        })
         continue
       }
       const path = `${currentCooperative.id}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`
       try {
-        const { error } = await supabase.storage.from('fiches-techniques').upload(path, file, { cacheControl: '3600', upsert: false })
+        const { error } = await supabase.storage
+          .from('fiches-techniques')
+          .upload(path, file, { cacheControl: '3600', upsert: false })
         if (error) {
-          toast({ title: `Échec upload: ${file.name}`, description: error.message || 'Erreur de téléversement', variant: 'destructive' })
+          toast({
+            title: `Échec upload: ${file.name}`,
+            description: error.message || 'Erreur de téléversement',
+            variant: 'destructive',
+          })
           continue
         }
         uploaded.push({ name: file.name, url: path, type: ext, size: file.size })
@@ -332,7 +406,12 @@ export default function MarketplacePage() {
     setPendingFiles((prev) => [...prev, ...uploaded])
     setUploadingFiles(false)
     if (uploaded.length > 0) toast({ title: `${uploaded.length} fichier(s) uploadé(s)` })
-    else if (Array.from(files).length > 0) toast({ title: 'Aucun fichier uploadé', description: 'Vérifiez le format et la taille', variant: 'destructive' })
+    else if (Array.from(files).length > 0)
+      toast({
+        title: 'Aucun fichier uploadé',
+        description: 'Vérifiez le format et la taille',
+        variant: 'destructive',
+      })
   }
 
   // Save fiche
@@ -369,7 +448,14 @@ export default function MarketplacePage() {
     }
     toast({ title: 'Fiche publiée', description: form.title })
     setShowAdd(false)
-    setForm({ title: '', description: '', culture: '', type_agriculture: 'maraîchage', campaign: '', price_non_member: 500 })
+    setForm({
+      title: '',
+      description: '',
+      culture: '',
+      type_agriculture: 'maraîchage',
+      campaign: '',
+      price_non_member: 500,
+    })
     setLocationSelection({ region_id: '', prefecture_id: '', canton_id: '' })
     setPendingFiles([])
     fetchFiches()
@@ -378,8 +464,14 @@ export default function MarketplacePage() {
 
   const toggleStatus = async (fiche: FicheTechnique) => {
     const newStatus = fiche.status === 'published' ? 'archived' : 'published'
-    const { error } = await supabase.from('fiches_techniques').update({ status: newStatus }).eq('id', fiche.id)
-    if (error) { toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' }); return }
+    const { error } = await supabase
+      .from('fiches_techniques')
+      .update({ status: newStatus })
+      .eq('id', fiche.id)
+    if (error) {
+      toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })
+      return
+    }
     toast({ title: newStatus === 'published' ? 'Publiée' : 'Archivée' })
     fetchFiches()
     if (viewMode === 'locality') fetchLocalityFiches()
@@ -410,7 +502,10 @@ export default function MarketplacePage() {
         description="Fiches techniques et itinéraires de culture classés par canton, préfecture et région"
         action={
           isAdmin ? (
-            <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setShowAdd(true)}>
+            <Button
+              className="gap-2 bg-primary hover:bg-primary/90"
+              onClick={() => setShowAdd(true)}
+            >
               <Plus className="h-4 w-4" />
               Nouvelle fiche
             </Button>
@@ -428,7 +523,9 @@ export default function MarketplacePage() {
             onChange={(e) => switchCooperative(e.target.value)}
           >
             {faitiereCooperatives.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
             ))}
           </select>
         </div>
@@ -439,25 +536,35 @@ export default function MarketplacePage() {
         <Card className="border-border">
           <CardContent className="pt-4 pb-3">
             <p className="text-xs text-muted-foreground">Total fiches</p>
-            <p className="text-2xl font-bold text-foreground">{viewMode === 'locality' ? totalLocalityFiches : total}</p>
+            <p className="text-2xl font-bold text-foreground">
+              {viewMode === 'locality' ? totalLocalityFiches : total}
+            </p>
           </CardContent>
         </Card>
         <Card className="border-border">
           <CardContent className="pt-4 pb-3">
             <p className="text-xs text-muted-foreground">Régions couvertes</p>
-            <p className="text-2xl font-bold text-primary">{Object.keys(localityTree).filter(r => r !== 'Toutes régions').length || '—'}</p>
+            <p className="text-2xl font-bold text-primary">
+              {Object.keys(localityTree).filter((r) => r !== 'Toutes régions').length || '—'}
+            </p>
           </CardContent>
         </Card>
         <Card className="border-border">
           <CardContent className="pt-4 pb-3">
             <p className="text-xs text-muted-foreground">Téléchargements</p>
-            <p className="text-2xl font-bold text-foreground">{localityFiches.reduce((s, f) => s + f.download_count, 0) || fiches.reduce((s, f) => s + f.download_count, 0)}</p>
+            <p className="text-2xl font-bold text-foreground">
+              {localityFiches.reduce((s, f) => s + f.download_count, 0) ||
+                fiches.reduce((s, f) => s + f.download_count, 0)}
+            </p>
           </CardContent>
         </Card>
         <Card className="border-border">
           <CardContent className="pt-4 pb-3">
             <p className="text-xs text-muted-foreground">Cultures</p>
-            <p className="text-2xl font-bold text-foreground">{new Set([...localityFiches.map(f => f.culture), ...fiches.map(f => f.culture)]).size || '—'}</p>
+            <p className="text-2xl font-bold text-foreground">
+              {new Set([...localityFiches.map((f) => f.culture), ...fiches.map((f) => f.culture)])
+                .size || '—'}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -467,6 +574,7 @@ export default function MarketplacePage() {
         {/* View toggle */}
         <div className="flex gap-1 p-1 rounded-lg bg-muted shrink-0">
           <button
+            type="button"
             onClick={() => setViewMode('locality')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'locality' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
           >
@@ -474,6 +582,7 @@ export default function MarketplacePage() {
             Par localité
           </button>
           <button
+            type="button"
             onClick={() => setViewMode('list')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'list' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
           >
@@ -497,8 +606,8 @@ export default function MarketplacePage() {
       </div>
 
       {/* ── LOCALITY VIEW ──────────────────────────────────────────── */}
-      {viewMode === 'locality' && (
-        loadingLocality ? (
+      {viewMode === 'locality' &&
+        (loadingLocality ? (
           <LoadingBlock />
         ) : localityFiches.length === 0 ? (
           <EmptyState
@@ -507,7 +616,10 @@ export default function MarketplacePage() {
             description="Les comptes d'exploitation apparaîtront ici organisés par région, préfecture et canton."
             action={
               isAdmin ? (
-                <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setShowAdd(true)}>
+                <Button
+                  className="gap-2 bg-primary hover:bg-primary/90"
+                  onClick={() => setShowAdd(true)}
+                >
                   <Upload className="h-4 w-4" />
                   Ajouter une fiche
                 </Button>
@@ -516,129 +628,168 @@ export default function MarketplacePage() {
           />
         ) : (
           <div className="space-y-3">
-            {Object.entries(localityTree).sort(([a], [b]) => a.localeCompare(b, 'fr')).map(([region, prefectureMap]) => {
-              const isOpen = expandedRegions.has(region)
-              const regionTotal = Object.values(prefectureMap).flatMap((pm) => Object.values(pm)).flat().length
-              return (
-                <div key={region} className="border border-border rounded-xl overflow-hidden shadow-sm">
-                  {/* Region header */}
-                  <button
-                    onClick={() => toggleRegion(region)}
-                    className="w-full flex items-center justify-between px-5 py-4 bg-muted/40 hover:bg-muted/60 transition-colors text-left"
+            {Object.entries(localityTree)
+              .sort(([a], [b]) => a.localeCompare(b, 'fr'))
+              .map(([region, prefectureMap]) => {
+                const isOpen = expandedRegions.has(region)
+                const regionTotal = Object.values(prefectureMap)
+                  .flatMap((pm) => Object.values(pm))
+                  .flat().length
+                return (
+                  <div
+                    key={region}
+                    className="border border-border rounded-xl overflow-hidden shadow-sm"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="p-1.5 rounded-lg bg-primary/10">
-                        <MapPin className="h-4 w-4 text-primary" />
+                    {/* Region header */}
+                    <button
+                      type="button"
+                      onClick={() => toggleRegion(region)}
+                      className="w-full flex items-center justify-between px-5 py-4 bg-muted/40 hover:bg-muted/60 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-1.5 rounded-lg bg-primary/10">
+                          <MapPin className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <span className="font-semibold text-foreground">{region}</span>
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            {regionTotal} fiche{regionTotal > 1 ? 's' : ''} ·{' '}
+                            {Object.keys(prefectureMap).length} préfecture
+                            {Object.keys(prefectureMap).length > 1 ? 's' : ''}
+                          </span>
+                        </div>
                       </div>
-                      <div>
-                        <span className="font-semibold text-foreground">{region}</span>
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          {regionTotal} fiche{regionTotal > 1 ? 's' : ''} · {Object.keys(prefectureMap).length} préfecture{Object.keys(prefectureMap).length > 1 ? 's' : ''}
-                        </span>
-                      </div>
-                    </div>
-                    <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
-                  </button>
+                      <ChevronDown
+                        className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                      />
+                    </button>
 
-                  {/* Prefectures */}
-                  {isOpen && (
-                    <div className="divide-y divide-border/60">
-                      {Object.entries(prefectureMap).sort(([a], [b]) => a.localeCompare(b, 'fr')).map(([prefecture, cantonMap]) => {
-                        const prefKey = `${region}__${prefecture}`
-                        const isPrefOpen = expandedPrefectures.has(prefKey)
-                        const prefTotal = Object.values(cantonMap).flat().length
-                        return (
-                          <div key={prefecture}>
-                            {/* Prefecture header */}
-                            <button
-                              onClick={() => togglePrefecture(prefKey)}
-                              className="w-full flex items-center justify-between px-6 py-3 bg-background hover:bg-muted/20 transition-colors text-left"
-                            >
-                              <div className="flex items-center gap-2">
-                                <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${isPrefOpen ? 'rotate-90' : ''}`} />
-                                <span className="text-sm font-medium text-foreground">{prefecture}</span>
-                                <span className="text-xs text-muted-foreground">({prefTotal} fiche{prefTotal > 1 ? 's' : ''})</span>
-                              </div>
-                            </button>
-
-                            {/* Cantons + fiches */}
-                            {isPrefOpen && (
-                              <div className="px-8 pb-4 pt-2 bg-background space-y-5">
-                                {Object.entries(cantonMap).sort(([a], [b]) => a.localeCompare(b, 'fr')).map(([canton, fichesInCanton]) => (
-                                  <div key={canton}>
-                                    {canton !== 'Tous cantons' && (
-                                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 pl-0.5">
-                                        Canton {canton}
-                                      </p>
-                                    )}
-                                    <div className="space-y-2">
-                                      {fichesInCanton.map((fiche) => {
-                                        const icon = cultures.find((c) => c.name === fiche.culture)?.icon ?? '🌿'
-                                        return (
-                                          <div
-                                            key={fiche.id}
-                                            className="flex items-start gap-3 p-3.5 border border-border rounded-lg bg-card hover:bg-accent/5 transition-colors"
-                                          >
-                                            <span className="text-2xl shrink-0 leading-tight">{icon}</span>
-                                            <div className="flex-1 min-w-0">
-                                              <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="font-medium text-foreground text-sm">{fiche.title}</span>
-                                                {fiche.is_free_for_members ? (
-                                                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">Gratuit membres</span>
-                                                ) : (
-                                                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">{fiche.price_non_member} FCFA</span>
-                                                )}
-                                              </div>
-                                              <p className="text-xs text-muted-foreground mt-0.5">
-                                                {fiche.culture} · {fiche.type_agriculture}
-                                                {fiche.campaign ? ` · Campagne ${fiche.campaign}` : ''}
-                                              </p>
-                                              {fiche.description && (
-                                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{fiche.description}</p>
-                                              )}
-                                              <div className="flex flex-wrap gap-1.5 mt-2">
-                                                {fiche.files.map((f) => (
-                                                  <button
-                                                    key={f.url}
-                                                    onClick={() => handleDownload(f)}
-                                                    className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors font-medium"
-                                                  >
-                                                    <Download className="h-3 w-3" />
-                                                    {fileIcon(f.type)} {f.name}
-                                                  </button>
-                                                ))}
-                                              </div>
-                                            </div>
-                                            <div className="text-xs text-muted-foreground shrink-0 text-right">
-                                              <span>{fiche.download_count}</span>
-                                              <Download className="h-3 w-3 inline ml-0.5" />
-                                            </div>
-                                          </div>
-                                        )
-                                      })}
-                                    </div>
+                    {/* Prefectures */}
+                    {isOpen && (
+                      <div className="divide-y divide-border/60">
+                        {Object.entries(prefectureMap)
+                          .sort(([a], [b]) => a.localeCompare(b, 'fr'))
+                          .map(([prefecture, cantonMap]) => {
+                            const prefKey = `${region}__${prefecture}`
+                            const isPrefOpen = expandedPrefectures.has(prefKey)
+                            const prefTotal = Object.values(cantonMap).flat().length
+                            return (
+                              <div key={prefecture}>
+                                {/* Prefecture header */}
+                                <button
+                                  type="button"
+                                  onClick={() => togglePrefecture(prefKey)}
+                                  className="w-full flex items-center justify-between px-6 py-3 bg-background hover:bg-muted/20 transition-colors text-left"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <ChevronRight
+                                      className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${isPrefOpen ? 'rotate-90' : ''}`}
+                                    />
+                                    <span className="text-sm font-medium text-foreground">
+                                      {prefecture}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                      ({prefTotal} fiche{prefTotal > 1 ? 's' : ''})
+                                    </span>
                                   </div>
-                                ))}
+                                </button>
+
+                                {/* Cantons + fiches */}
+                                {isPrefOpen && (
+                                  <div className="px-8 pb-4 pt-2 bg-background space-y-5">
+                                    {Object.entries(cantonMap)
+                                      .sort(([a], [b]) => a.localeCompare(b, 'fr'))
+                                      .map(([canton, fichesInCanton]) => (
+                                        <div key={canton}>
+                                          {canton !== 'Tous cantons' && (
+                                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 pl-0.5">
+                                              Canton {canton}
+                                            </p>
+                                          )}
+                                          <div className="space-y-2">
+                                            {fichesInCanton.map((fiche) => {
+                                              const icon =
+                                                cultures.find((c) => c.name === fiche.culture)
+                                                  ?.icon ?? '🌿'
+                                              return (
+                                                <div
+                                                  key={fiche.id}
+                                                  className="flex items-start gap-3 p-3.5 border border-border rounded-lg bg-card hover:bg-accent/5 transition-colors"
+                                                >
+                                                  <span className="text-2xl shrink-0 leading-tight">
+                                                    {icon}
+                                                  </span>
+                                                  <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                      <span className="font-medium text-foreground text-sm">
+                                                        {fiche.title}
+                                                      </span>
+                                                      {fiche.is_free_for_members ? (
+                                                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
+                                                          Gratuit membres
+                                                        </span>
+                                                      ) : (
+                                                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
+                                                          {fiche.price_non_member} FCFA
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                                      {fiche.culture} · {fiche.type_agriculture}
+                                                      {fiche.campaign
+                                                        ? ` · Campagne ${fiche.campaign}`
+                                                        : ''}
+                                                    </p>
+                                                    {fiche.description && (
+                                                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                                        {fiche.description}
+                                                      </p>
+                                                    )}
+                                                    <div className="flex flex-wrap gap-1.5 mt-2">
+                                                      {fiche.files.map((f) => (
+                                                        <button
+                                                          type="button"
+                                                          key={f.url}
+                                                          onClick={() => handleDownload(f)}
+                                                          className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors font-medium"
+                                                        >
+                                                          <Download className="h-3 w-3" />
+                                                          {fileIcon(f.type)} {f.name}
+                                                        </button>
+                                                      ))}
+                                                    </div>
+                                                  </div>
+                                                  <div className="text-xs text-muted-foreground shrink-0 text-right">
+                                                    <span>{fiche.download_count}</span>
+                                                    <Download className="h-3 w-3 inline ml-0.5" />
+                                                  </div>
+                                                </div>
+                                              )
+                                            })}
+                                          </div>
+                                        </div>
+                                      ))}
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+                            )
+                          })}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
           </div>
-        )
-      )}
+        ))}
 
       {/* ── LIST VIEW ──────────────────────────────────────────────── */}
       {viewMode === 'list' && (
         <Card className="border-border">
           <CardHeader>
             <CardTitle className="text-foreground">Fiches techniques</CardTitle>
-            <CardDescription>Comptes d'exploitation et itinéraires techniques uploadés</CardDescription>
+            <CardDescription>
+              Comptes d'exploitation et itinéraires techniques uploadés
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -647,10 +798,17 @@ export default function MarketplacePage() {
               <EmptyState
                 icon={FileText}
                 title={search ? 'Aucune fiche trouvée' : 'Aucune fiche technique'}
-                description={search ? 'Essayez un autre terme' : "Uploadez vos premiers comptes d'exploitation (DOCX, Excel)"}
+                description={
+                  search
+                    ? 'Essayez un autre terme'
+                    : "Uploadez vos premiers comptes d'exploitation (DOCX, Excel)"
+                }
                 action={
                   !search && isAdmin ? (
-                    <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setShowAdd(true)}>
+                    <Button
+                      className="gap-2 bg-primary hover:bg-primary/90"
+                      onClick={() => setShowAdd(true)}
+                    >
                       <Upload className="h-4 w-4" />
                       Ajouter une fiche
                     </Button>
@@ -671,11 +829,15 @@ export default function MarketplacePage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-semibold text-foreground">{fiche.title}</h3>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${fiche.status === 'published' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${fiche.status === 'published' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}
+                          >
                             {fiche.status === 'published' ? 'Publiée' : 'Archivée'}
                           </span>
                           {fiche.is_free_for_members && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">Gratuit membres</span>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                              Gratuit membres
+                            </span>
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground mt-0.5">
@@ -685,6 +847,7 @@ export default function MarketplacePage() {
                         <div className="flex flex-wrap gap-2 mt-2">
                           {fiche.files.map((f) => (
                             <button
+                              type="button"
                               key={f.url}
                               onClick={() => handleDownload(f)}
                               className="inline-flex items-center gap-1 text-xs bg-secondary/50 px-2 py-1 rounded hover:bg-primary/10 hover:text-primary transition-colors"
@@ -695,7 +858,9 @@ export default function MarketplacePage() {
                           ))}
                         </div>
                         <p className="text-xs text-muted-foreground mt-2">
-                          {fiche.download_count} téléchargement{fiche.download_count !== 1 ? 's' : ''} • {fiche.price_non_member} FCFA (non-membres)
+                          {fiche.download_count} téléchargement
+                          {fiche.download_count !== 1 ? 's' : ''} • {fiche.price_non_member} FCFA
+                          (non-membres)
                         </p>
                       </div>
                       {isAdmin && (
@@ -706,7 +871,11 @@ export default function MarketplacePage() {
                             onClick={() => toggleStatus(fiche)}
                             title={fiche.status === 'published' ? 'Archiver' : 'Publier'}
                           >
-                            {fiche.status === 'published' ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            {fiche.status === 'published' ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
                           </Button>
                           <Button
                             size="sm"
@@ -721,7 +890,12 @@ export default function MarketplacePage() {
                     </div>
                   ))}
                 </div>
-                <PaginationBar page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+                <PaginationBar
+                  page={page}
+                  pageSize={PAGE_SIZE}
+                  total={total}
+                  onPageChange={setPage}
+                />
               </>
             )}
           </CardContent>
@@ -740,7 +914,9 @@ export default function MarketplacePage() {
 
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Titre <span className="text-destructive">*</span></Label>
+              <Label>
+                Titre <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.title}
                 onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
@@ -750,7 +926,9 @@ export default function MarketplacePage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Culture <span className="text-destructive">*</span></Label>
+                <Label>
+                  Culture <span className="text-destructive">*</span>
+                </Label>
                 <select
                   className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
                   value={form.culture}
@@ -758,7 +936,9 @@ export default function MarketplacePage() {
                 >
                   <option value="">— Choisir —</option>
                   {cultures.map((c) => (
-                    <option key={c.id} value={c.name}>{c.icon} {c.name}</option>
+                    <option key={c.id} value={c.name}>
+                      {c.icon} {c.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -770,7 +950,9 @@ export default function MarketplacePage() {
                   onChange={(e) => setForm((f) => ({ ...f, type_agriculture: e.target.value }))}
                 >
                   {TYPES_AGRICULTURE.map((t) => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -788,7 +970,11 @@ export default function MarketplacePage() {
                     onChange={(e) => setLocationLevel('region_id', e.target.value)}
                   >
                     <option value="">— Toutes —</option>
-                    {regions.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    {regions.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="space-y-1.5">
@@ -800,7 +986,11 @@ export default function MarketplacePage() {
                     disabled={prefectures.length === 0}
                   >
                     <option value="">— Toutes —</option>
-                    {prefectures.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    {prefectures.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="space-y-1.5">
@@ -812,7 +1002,11 @@ export default function MarketplacePage() {
                     disabled={!location.prefecture_id || cantons.length === 0}
                   >
                     <option value="">— Tous —</option>
-                    {cantons.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {cantons.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -832,7 +1026,12 @@ export default function MarketplacePage() {
                 <Input
                   type="number"
                   value={form.price_non_member}
-                  onChange={(e) => setForm((f) => ({ ...f, price_non_member: Number.parseInt(e.target.value) || 500 }))}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      price_non_member: Number.parseInt(e.target.value) || 500,
+                    }))
+                  }
                 />
               </div>
             </div>
@@ -848,7 +1047,9 @@ export default function MarketplacePage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Fichiers <span className="text-destructive">*</span></Label>
+              <Label>
+                Fichiers <span className="text-destructive">*</span>
+              </Label>
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -860,8 +1061,12 @@ export default function MarketplacePage() {
                 ) : (
                   <>
                     <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-foreground font-medium">Cliquez pour ajouter des fichiers</p>
-                    <p className="text-xs text-muted-foreground mt-1">DOCX, Excel (.xlsx), PDF — max 20 Mo</p>
+                    <p className="text-sm text-foreground font-medium">
+                      Cliquez pour ajouter des fichiers
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      DOCX, Excel (.xlsx), PDF — max 20 Mo
+                    </p>
                   </>
                 )}
               </button>
@@ -879,11 +1084,16 @@ export default function MarketplacePage() {
               {pendingFiles.length > 0 && (
                 <div className="space-y-2 mt-3">
                   {pendingFiles.map((f, i) => (
-                    <div key={f.url} className="flex items-center justify-between p-2 bg-secondary/30 rounded-lg">
+                    <div
+                      key={f.url}
+                      className="flex items-center justify-between p-2 bg-secondary/30 rounded-lg"
+                    >
                       <div className="flex items-center gap-2">
                         <span>{fileIcon(f.type)}</span>
                         <span className="text-sm text-foreground">{f.name}</span>
-                        <span className="text-xs text-muted-foreground">({(f.size / 1024).toFixed(0)} Ko)</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({(f.size / 1024).toFixed(0)} Ko)
+                        </span>
                       </div>
                       <Button
                         size="sm"
@@ -901,7 +1111,9 @@ export default function MarketplacePage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAdd(false)} disabled={saving}>Annuler</Button>
+            <Button variant="outline" onClick={() => setShowAdd(false)} disabled={saving}>
+              Annuler
+            </Button>
             <Button
               className="bg-primary hover:bg-primary/90 gap-2"
               onClick={handleSave}

@@ -15,10 +15,13 @@ import { getVisibleServices, type ServiceDefinition } from '@/lib/services/regis
 
 function StatusDot({ status }: { status: ServiceDefinition['status'] }) {
   const color =
-    status === 'healthy' ? 'bg-primary'
-    : status === 'degraded' ? 'bg-amber-500'
-    : status === 'broken' ? 'bg-destructive'
-    : 'bg-muted-foreground/40'
+    status === 'healthy'
+      ? 'bg-primary'
+      : status === 'degraded'
+        ? 'bg-amber-500'
+        : status === 'broken'
+          ? 'bg-destructive'
+          : 'bg-muted-foreground/40'
   return <span className={`h-1.5 w-1.5 rounded-full ${color} shrink-0`} aria-hidden="true" />
 }
 
@@ -33,10 +36,7 @@ export function ServiceLauncher({ role }: { role: string | undefined }) {
   const router = useRouter()
 
   const services = useMemo(() => getVisibleServices(role), [role])
-  const categories = useMemo(
-    () => [...new Set(services.map((s) => s.category))],
-    [services],
-  )
+  const categories = useMemo(() => [...new Set(services.map((s) => s.category))], [services])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -57,6 +57,7 @@ export function ServiceLauncher({ role }: { role: string | undefined }) {
   return (
     <>
       <button
+        type="button"
         onClick={() => setOpen(true)}
         className="flex items-center gap-1.5 h-8 rounded-full border border-border bg-background px-3 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors"
         aria-label="Ouvrir le lanceur de services"

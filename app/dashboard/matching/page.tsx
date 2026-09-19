@@ -68,32 +68,49 @@ interface BuyerMatchRow {
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const CULTURES = [
-  'Maïs', 'Riz', 'Manioc', 'Igname', 'Sorgho', 'Mil', 'Arachide', 'Soja',
-  'Niébé', 'Coton', 'Café', 'Cacao', 'Palmier à huile', 'Hévéa', 'Ananas',
-  'Banane', 'Plantain', 'Mangue', 'Tomate', 'Oignon', 'Piment', 'Gombo',
-  'Aubergine', 'Pastèque', 'Concombre', 'Haricot vert', 'Autre',
+  'Maïs',
+  'Riz',
+  'Manioc',
+  'Igname',
+  'Sorgho',
+  'Mil',
+  'Arachide',
+  'Soja',
+  'Niébé',
+  'Coton',
+  'Café',
+  'Cacao',
+  'Palmier à huile',
+  'Hévéa',
+  'Ananas',
+  'Banane',
+  'Plantain',
+  'Mangue',
+  'Tomate',
+  'Oignon',
+  'Piment',
+  'Gombo',
+  'Aubergine',
+  'Pastèque',
+  'Concombre',
+  'Haricot vert',
+  'Autre',
 ]
 
 const PREFECTURES = ['Maritime', 'Plateaux', 'Centrale', 'Kara', 'Savanes']
 
-const REQUEST_STATUS_CONFIG: Record<
-  string,
-  { bg: string; text: string; label: string }
-> = {
-  open:      { bg: 'bg-blue-100',   text: 'text-blue-800',   label: 'Ouverte' },
-  matched:   { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Matchée' },
-  fulfilled: { bg: 'bg-green-100',  text: 'text-green-800',  label: 'Complétée' },
-  cancelled: { bg: 'bg-gray-100',   text: 'text-gray-600',   label: 'Annulée' },
+const REQUEST_STATUS_CONFIG: Record<string, { bg: string; text: string; label: string }> = {
+  open: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Ouverte' },
+  matched: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Matchée' },
+  fulfilled: { bg: 'bg-green-100', text: 'text-green-800', label: 'Complétée' },
+  cancelled: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Annulée' },
 }
 
-const MATCH_STATUS_CONFIG: Record<
-  string,
-  { bg: string; text: string; label: string }
-> = {
-  proposed:  { bg: 'bg-blue-100',   text: 'text-blue-800',   label: 'Proposé' },
-  accepted:  { bg: 'bg-green-100',  text: 'text-green-800',  label: 'Accepté' },
-  rejected:  { bg: 'bg-red-100',    text: 'text-red-800',    label: 'Rejeté' },
-  completed: { bg: 'bg-emerald-100',text: 'text-emerald-800',label: 'Complété' },
+const MATCH_STATUS_CONFIG: Record<string, { bg: string; text: string; label: string }> = {
+  proposed: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Proposé' },
+  accepted: { bg: 'bg-green-100', text: 'text-green-800', label: 'Accepté' },
+  rejected: { bg: 'bg-red-100', text: 'text-red-800', label: 'Rejeté' },
+  completed: { bg: 'bg-emerald-100', text: 'text-emerald-800', label: 'Complété' },
 }
 
 const formatNum = (n: number) => new Intl.NumberFormat('fr-FR').format(n)
@@ -155,7 +172,7 @@ export default function MatchingPage() {
     setLoadingRequests(true)
     try {
       const res = await fetch('/api/matching/requests')
-      const json = await res.json() as { requests?: BuyerRequestRow[] }
+      const json = (await res.json()) as { requests?: BuyerRequestRow[] }
       setRequests(json.requests ?? [])
     } catch {
       toast({ title: 'Erreur chargement des demandes', variant: 'destructive' })
@@ -165,18 +182,21 @@ export default function MatchingPage() {
   }, [toast])
 
   // Load matches for selected request
-  const loadMatches = useCallback(async (requestId: string) => {
-    setLoadingMatches(true)
-    try {
-      const res = await fetch(`/api/matching/requests/${requestId}`)
-      const json = await res.json() as { matches?: BuyerMatchRow[] }
-      setMatches(json.matches ?? [])
-    } catch {
-      toast({ title: 'Erreur chargement des matches', variant: 'destructive' })
-    } finally {
-      setLoadingMatches(false)
-    }
-  }, [toast])
+  const loadMatches = useCallback(
+    async (requestId: string) => {
+      setLoadingMatches(true)
+      try {
+        const res = await fetch(`/api/matching/requests/${requestId}`)
+        const json = (await res.json()) as { matches?: BuyerMatchRow[] }
+        setMatches(json.matches ?? [])
+      } catch {
+        toast({ title: 'Erreur chargement des matches', variant: 'destructive' })
+      } finally {
+        setLoadingMatches(false)
+      }
+    },
+    [toast],
+  )
 
   useEffect(() => {
     void loadRequests()
@@ -199,9 +219,7 @@ export default function MatchingPage() {
           body: JSON.stringify({ status }),
         })
         if (!res.ok) throw new Error('Échec')
-        setMatches((prev) =>
-          prev.map((m) => (m.id === matchId ? { ...m, status } : m)),
-        )
+        setMatches((prev) => prev.map((m) => (m.id === matchId ? { ...m, status } : m)))
         toast({ title: 'Statut mis à jour' })
       } catch {
         toast({ title: 'Erreur mise à jour', variant: 'destructive' })
@@ -226,7 +244,9 @@ export default function MatchingPage() {
           buyer_phone: form.buyer_phone || null,
           culture: form.culture,
           quantity_kg_needed: Number(form.quantity_kg_needed),
-          max_price_per_kg_fcfa: form.max_price_per_kg_fcfa ? Number(form.max_price_per_kg_fcfa) : null,
+          max_price_per_kg_fcfa: form.max_price_per_kg_fcfa
+            ? Number(form.max_price_per_kg_fcfa)
+            : null,
           quality_grade_min: form.quality_grade_min || null,
           location_prefecture: form.location_prefecture || null,
           needed_by: form.needed_by || null,
@@ -235,7 +255,7 @@ export default function MatchingPage() {
         }),
       })
 
-      const json = await res.json() as { matches_found?: number; error?: string }
+      const json = (await res.json()) as { matches_found?: number; error?: string }
 
       if (!res.ok) {
         toast({ title: json.error ?? 'Erreur création', variant: 'destructive' })
@@ -325,6 +345,7 @@ export default function MatchingPage() {
                 const isSelected = selectedRequest?.id === req.id
                 return (
                   <button
+                    type="button"
                     key={req.id}
                     onClick={() => handleSelectRequest(req)}
                     className={`w-full text-left rounded-lg border p-3 transition-colors ${
@@ -535,7 +556,9 @@ export default function MatchingPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {CULTURES.map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -596,7 +619,9 @@ export default function MatchingPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {PREFECTURES.map((p) => (
-                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

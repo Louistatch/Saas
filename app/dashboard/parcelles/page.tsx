@@ -1,12 +1,28 @@
 'use client'
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
-import { MapPin, Sprout, Droplets, BarChart3, Search, Download, ChevronDown, Navigation, User } from 'lucide-react'
+import {
+  MapPin,
+  Sprout,
+  Droplets,
+  BarChart3,
+  Search,
+  Download,
+  ChevronDown,
+  Navigation,
+  User,
+} from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { PageHeader } from '@/components/shared/page-header'
 import { LoadingBlock } from '@/components/shared/loading'
 import { EmptyState } from '@/components/shared/empty-state'
@@ -62,14 +78,14 @@ interface Stats {
 const PAGE_SIZE = 20
 
 const COLOR_CLASSES: Record<string, { bg: string; text: string }> = {
-  green:   { bg: 'bg-green-100',   text: 'text-green-700' },
-  blue:    { bg: 'bg-blue-100',    text: 'text-blue-700' },
+  green: { bg: 'bg-green-100', text: 'text-green-700' },
+  blue: { bg: 'bg-blue-100', text: 'text-blue-700' },
   emerald: { bg: 'bg-emerald-100', text: 'text-emerald-700' },
-  cyan:    { bg: 'bg-cyan-100',    text: 'text-cyan-700' },
-  orange:  { bg: 'bg-orange-100',  text: 'text-orange-700' },
-  red:     { bg: 'bg-red-100',     text: 'text-red-700' },
-  yellow:  { bg: 'bg-yellow-100',  text: 'text-yellow-700' },
-  gray:    { bg: 'bg-gray-100',    text: 'text-gray-700' },
+  cyan: { bg: 'bg-cyan-100', text: 'text-cyan-700' },
+  orange: { bg: 'bg-orange-100', text: 'text-orange-700' },
+  red: { bg: 'bg-red-100', text: 'text-red-700' },
+  yellow: { bg: 'bg-yellow-100', text: 'text-yellow-700' },
+  gray: { bg: 'bg-gray-100', text: 'text-gray-700' },
 }
 
 const IRRIGATION_LABELS: Record<string, string> = {
@@ -84,7 +100,6 @@ const SOL_COLORS: Record<string, string> = {
   sableux: 'bg-yellow-100 text-yellow-800',
   laterite: 'bg-orange-100 text-orange-800',
 }
-
 
 function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null
@@ -102,7 +117,10 @@ export default function ParcellesPage() {
 
   const [scopeIds, setScopeIds] = useState<string[]>([])
   useEffect(() => {
-    if (!currentCooperative) { setScopeIds([]); return }
+    if (!currentCooperative) {
+      setScopeIds([])
+      return
+    }
     ;(async () => {
       try {
         const { data } = await supabase.rpc('get_accessible_cooperative_ids')
@@ -157,11 +175,19 @@ export default function ParcellesPage() {
     const culturesArr = Object.entries(cultureMap)
       .map(([name, v]) => ({ name, count: v.count, surface: v.surface }))
       .sort((a, b) => b.count - a.count)
-    setStats({ total_parcelles: data.length, total_superficie_ha: totalSurface, cultures: culturesArr, irrigation_count: irrigCount })
+    setStats({
+      total_parcelles: data.length,
+      total_superficie_ha: totalSurface,
+      cultures: culturesArr,
+      irrigation_count: irrigCount,
+    })
   }, [scopeIds, supabase])
 
   const fetchParcelles = useCallback(async () => {
-    if (!scopeIds.length) { setIsLoading(false); return }
+    if (!scopeIds.length) {
+      setIsLoading(false)
+      return
+    }
     setIsLoading(true)
     const from = (page - 1) * PAGE_SIZE
     const to = from + PAGE_SIZE - 1
@@ -177,7 +203,8 @@ export default function ParcellesPage() {
       .range(from, to)
 
     if (filterCulture !== 'all') query = query.eq('culture_principale', filterCulture)
-    if (filterIrrigation === 'oui') query = query.not('irrigation_type', 'eq', 'non').not('irrigation_type', 'is', null)
+    if (filterIrrigation === 'oui')
+      query = query.not('irrigation_type', 'eq', 'non').not('irrigation_type', 'is', null)
     if (filterIrrigation === 'non') query = query.eq('irrigation_type', 'non')
     if (debouncedSearch) query = query.ilike('culture_principale', `%${debouncedSearch}%`)
 
@@ -189,14 +216,20 @@ export default function ParcellesPage() {
   }, [scopeIds, supabase, page, filterCulture, filterIrrigation, debouncedSearch])
 
   const fetchProductions = useCallback(async () => {
-    if (!scopeIds.length) { setIsLoading(false); return }
+    if (!scopeIds.length) {
+      setIsLoading(false)
+      return
+    }
     setIsLoading(true)
     const from = (page - 1) * PAGE_SIZE
     const to = from + PAGE_SIZE - 1
 
     let query = supabase
       .from('productions')
-      .select('id, culture_name, quantity_kg, campaign_year, created_at, cooperative_id, member:member_id(first_name, last_name)', { count: 'exact' })
+      .select(
+        'id, culture_name, quantity_kg, campaign_year, created_at, cooperative_id, member:member_id(first_name, last_name)',
+        { count: 'exact' },
+      )
       .in('cooperative_id', scopeIds)
       .order('campaign_year', { ascending: false })
       .range(from, to)
@@ -211,7 +244,9 @@ export default function ParcellesPage() {
     setIsLoading(false)
   }, [scopeIds, supabase, page, filterCulture, debouncedSearch])
 
-  useEffect(() => { fetchStats() }, [fetchStats])
+  useEffect(() => {
+    fetchStats()
+  }, [fetchStats])
   useResetPageOnChange(setPage, [debouncedSearch, filterCulture, filterIrrigation, tab])
   useEffect(() => {
     if (tab === 'parcelles') fetchParcelles()
@@ -228,38 +263,57 @@ export default function ParcellesPage() {
   )
 
   function exportCSV() {
-    const rows = tab === 'parcelles'
-      ? [
-          ['Coopérative', 'Membre', 'Téléphone', 'Village', 'Canton', 'Préfecture', 'Région', 'Nom parcelle', 'Culture', 'Surface (ha)', 'Type de sol', 'Irrigation', 'GPS', 'Campagne', 'Source', 'Date'],
-          ...parcelles.map((p) => [
-            coopName(p.cooperative_id) ?? '',
-            p.member ? `${p.member.first_name} ${p.member.last_name}` : '',
-            p.member?.phone ?? '',
-            p.member?.village ?? '',
-            p.member?.canton ?? '',
-            p.member?.prefecture ?? '',
-            p.member?.region ?? '',
-            p.name ?? '',
-            p.culture_principale ?? '',
-            String(p.superficie_ha ?? p.surface_ha ?? ''),
-            p.soil_type ?? '',
-            p.irrigation_type ?? '',
-            p.gps_coordinates ?? '',
-            p.campaign_year ?? '',
-            p.source ?? '',
-            new Date(p.created_at).toLocaleDateString('fr-FR'),
-          ]),
-        ]
-      : [
-          ['Coopérative', 'Membre', 'Culture', 'Quantité (kg)', 'Campagne', 'Date'],
-          ...productions.map((p) => [
-            coopName(p.cooperative_id) ?? '',
-            p.member ? `${p.member.first_name} ${p.member.last_name}` : '',
-            p.culture_name, String(p.quantity_kg ?? ''),
-            p.campaign_year ?? '',
-            new Date(p.created_at).toLocaleDateString('fr-FR'),
-          ]),
-        ]
+    const rows =
+      tab === 'parcelles'
+        ? [
+            [
+              'Coopérative',
+              'Membre',
+              'Téléphone',
+              'Village',
+              'Canton',
+              'Préfecture',
+              'Région',
+              'Nom parcelle',
+              'Culture',
+              'Surface (ha)',
+              'Type de sol',
+              'Irrigation',
+              'GPS',
+              'Campagne',
+              'Source',
+              'Date',
+            ],
+            ...parcelles.map((p) => [
+              coopName(p.cooperative_id) ?? '',
+              p.member ? `${p.member.first_name} ${p.member.last_name}` : '',
+              p.member?.phone ?? '',
+              p.member?.village ?? '',
+              p.member?.canton ?? '',
+              p.member?.prefecture ?? '',
+              p.member?.region ?? '',
+              p.name ?? '',
+              p.culture_principale ?? '',
+              String(p.superficie_ha ?? p.surface_ha ?? ''),
+              p.soil_type ?? '',
+              p.irrigation_type ?? '',
+              p.gps_coordinates ?? '',
+              p.campaign_year ?? '',
+              p.source ?? '',
+              new Date(p.created_at).toLocaleDateString('fr-FR'),
+            ]),
+          ]
+        : [
+            ['Coopérative', 'Membre', 'Culture', 'Quantité (kg)', 'Campagne', 'Date'],
+            ...productions.map((p) => [
+              coopName(p.cooperative_id) ?? '',
+              p.member ? `${p.member.first_name} ${p.member.last_name}` : '',
+              p.culture_name,
+              String(p.quantity_kg ?? ''),
+              p.campaign_year ?? '',
+              new Date(p.created_at).toLocaleDateString('fr-FR'),
+            ]),
+          ]
     const csv = rows.map((r) => r.map((v) => `"${v}"`).join(',')).join('\n')
     const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -282,7 +336,12 @@ export default function ParcellesPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { icon: MapPin, color: 'green', label: 'Parcelles', value: stats.total_parcelles },
-            { icon: BarChart3, color: 'blue', label: 'Hectares totaux', value: stats.total_superficie_ha.toFixed(1) },
+            {
+              icon: BarChart3,
+              color: 'blue',
+              label: 'Hectares totaux',
+              value: stats.total_superficie_ha.toFixed(1),
+            },
             { icon: Sprout, color: 'emerald', label: 'Cultures', value: stats.cultures.length },
             { icon: Droplets, color: 'cyan', label: 'Irriguées', value: stats.irrigation_count },
           ].map(({ icon: Icon, color, label, value }) => (
@@ -307,12 +366,15 @@ export default function ParcellesPage() {
       {stats && stats.cultures.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Cultures principales</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Cultures principales
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
               {stats.cultures.slice(0, 10).map((c) => (
                 <button
+                  type="button"
                   key={c.name}
                   onClick={() => setFilterCulture(filterCulture === c.name ? 'all' : c.name)}
                   className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border transition-colors ${
@@ -335,10 +397,13 @@ export default function ParcellesPage() {
       <div className="flex gap-1 p-1 rounded-lg bg-muted w-fit">
         {(['parcelles', 'productions'] as const).map((t) => (
           <button
+            type="button"
             key={t}
             onClick={() => setTab(t)}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              tab === t ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+              tab === t
+                ? 'bg-background shadow-sm text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             {t === 'parcelles' ? 'Parcelles' : 'Productions'}
@@ -363,7 +428,11 @@ export default function ParcellesPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Toutes les cultures</SelectItem>
-            {cultures.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            {cultures.map((c) => (
+              <SelectItem key={c} value={c}>
+                {c}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         {tab === 'parcelles' && (
@@ -401,21 +470,39 @@ export default function ParcellesPage() {
                 <thead className="bg-muted/50">
                   <tr>
                     {scopeIds.length > 1 && (
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Coopérative</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">
+                        Coopérative
+                      </th>
                     )}
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Membre</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Culture</th>
-                    <th className="text-right px-4 py-3 font-medium text-muted-foreground">Surface (ha)</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Type de sol</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Irrigation</th>
-                    <th className="text-right px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">Date</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">
+                      Membre
+                    </th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">
+                      Culture
+                    </th>
+                    <th className="text-right px-4 py-3 font-medium text-muted-foreground">
+                      Surface (ha)
+                    </th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">
+                      Type de sol
+                    </th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">
+                      Irrigation
+                    </th>
+                    <th className="text-right px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">
+                      Date
+                    </th>
                     <th className="w-8" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {parcelles.map((p) => {
-                    const solClass = SOL_COLORS[p.soil_type?.toLowerCase() ?? ''] ?? 'bg-gray-100 text-gray-700'
-                    const irrig = IRRIGATION_LABELS[p.irrigation_type?.toLowerCase() ?? ''] ?? p.irrigation_type ?? '—'
+                    const solClass =
+                      SOL_COLORS[p.soil_type?.toLowerCase() ?? ''] ?? 'bg-gray-100 text-gray-700'
+                    const irrig =
+                      IRRIGATION_LABELS[p.irrigation_type?.toLowerCase() ?? ''] ??
+                      p.irrigation_type ??
+                      '—'
                     const childName = coopName(p.cooperative_id)
                     const isExpanded = expandedId === p.id
                     const surface = p.superficie_ha ?? p.surface_ha
@@ -446,11 +533,17 @@ export default function ParcellesPage() {
                           </td>
                           <td className="px-4 py-3 hidden md:table-cell">
                             {p.soil_type ? (
-                              <Badge className={`text-xs font-normal border-0 ${solClass}`}>{p.soil_type}</Badge>
-                            ) : <span className="text-muted-foreground">—</span>}
+                              <Badge className={`text-xs font-normal border-0 ${solClass}`}>
+                                {p.soil_type}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </td>
                           <td className="px-4 py-3 hidden md:table-cell">
-                            <span className={`inline-flex items-center gap-1 text-xs ${irrig === 'Irriguée' ? 'text-blue-700' : 'text-muted-foreground'}`}>
+                            <span
+                              className={`inline-flex items-center gap-1 text-xs ${irrig === 'Irriguée' ? 'text-blue-700' : 'text-muted-foreground'}`}
+                            >
                               {irrig === 'Irriguée' && <Droplets className="h-3 w-3" />}
                               {irrig}
                             </span>
@@ -459,7 +552,9 @@ export default function ParcellesPage() {
                             {new Date(p.created_at).toLocaleDateString('fr-FR')}
                           </td>
                           <td className="px-2 py-3 text-muted-foreground">
-                            <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                            <ChevronDown
+                              className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                            />
                           </td>
                         </tr>
 
@@ -468,7 +563,6 @@ export default function ParcellesPage() {
                           <tr key={`${p.id}-detail`} className="bg-muted/10">
                             <td colSpan={scopeIds.length > 1 ? 8 : 7} className="px-4 py-4">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
                                 {/* Parcelle details */}
                                 <div>
                                   <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
@@ -478,12 +572,21 @@ export default function ParcellesPage() {
                                   <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
                                     <InfoRow label="Nom" value={p.name} />
                                     <InfoRow label="Culture principale" value={culture} />
-                                    <InfoRow label="Surface (ha)" value={surface != null ? `${surface.toFixed(2)} ha` : null} />
+                                    <InfoRow
+                                      label="Surface (ha)"
+                                      value={surface != null ? `${surface.toFixed(2)} ha` : null}
+                                    />
                                     <InfoRow label="Type de sol" value={p.soil_type} />
-                                    <InfoRow label="Irrigation" value={irrig !== '—' ? irrig : null} />
+                                    <InfoRow
+                                      label="Irrigation"
+                                      value={irrig !== '—' ? irrig : null}
+                                    />
                                     <InfoRow label="Campagne" value={p.campaign_year} />
                                     <InfoRow label="Source" value={p.source} />
-                                    <InfoRow label="Créée le" value={new Date(p.created_at).toLocaleDateString('fr-FR')} />
+                                    <InfoRow
+                                      label="Créée le"
+                                      value={new Date(p.created_at).toLocaleDateString('fr-FR')}
+                                    />
                                   </dl>
 
                                   {/* GPS coordinates */}
@@ -511,7 +614,10 @@ export default function ParcellesPage() {
                                       Informations du producteur
                                     </h4>
                                     <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
-                                      <InfoRow label="Nom complet" value={`${p.member.first_name} ${p.member.last_name}`} />
+                                      <InfoRow
+                                        label="Nom complet"
+                                        value={`${p.member.first_name} ${p.member.last_name}`}
+                                      />
                                       <InfoRow label="Téléphone" value={p.member.phone} />
                                       <InfoRow label="Village" value={p.member.village} />
                                       <InfoRow label="Canton" value={p.member.canton} />
@@ -532,72 +638,83 @@ export default function ParcellesPage() {
               </table>
             </div>
             <div className="px-4 py-3 border-t bg-muted/20">
-              <PaginationBar page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+              <PaginationBar
+                page={page}
+                pageSize={PAGE_SIZE}
+                total={total}
+                onPageChange={setPage}
+              />
             </div>
           </div>
         )
+      ) : productions.length === 0 ? (
+        <EmptyState
+          icon={Sprout}
+          title="Aucune production enregistrée"
+          description="Les données de production sont collectées via KoboCollect lors de la synchronisation."
+        />
       ) : (
-        productions.length === 0 ? (
-          <EmptyState
-            icon={Sprout}
-            title="Aucune production enregistrée"
-            description="Les données de production sont collectées via KoboCollect lors de la synchronisation."
-          />
-        ) : (
-          <div className="border rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50">
-                  <tr>
-                    {scopeIds.length > 1 && (
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Coopérative</th>
-                    )}
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Membre</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Culture</th>
-                    <th className="text-right px-4 py-3 font-medium text-muted-foreground">Quantité (kg)</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Campagne</th>
-                    <th className="text-right px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {productions.map((p) => {
-                    const childName = coopName(p.cooperative_id)
-                    return (
-                      <tr key={p.id} className="hover:bg-muted/30 transition-colors">
-                        {scopeIds.length > 1 && (
-                          <td className="px-4 py-3 text-xs text-muted-foreground hidden sm:table-cell whitespace-nowrap">
-                            {childName ?? '—'}
-                          </td>
-                        )}
-                        <td className="px-4 py-3 font-medium whitespace-nowrap">
-                          {p.member ? `${p.member.first_name} ${p.member.last_name}` : '—'}
+        <div className="border rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50">
+                <tr>
+                  {scopeIds.length > 1 && (
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">
+                      Coopérative
+                    </th>
+                  )}
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Membre</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Culture</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">
+                    Quantité (kg)
+                  </th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">
+                    Campagne
+                  </th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">
+                    Date
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {productions.map((p) => {
+                  const childName = coopName(p.cooperative_id)
+                  return (
+                    <tr key={p.id} className="hover:bg-muted/30 transition-colors">
+                      {scopeIds.length > 1 && (
+                        <td className="px-4 py-3 text-xs text-muted-foreground hidden sm:table-cell whitespace-nowrap">
+                          {childName ?? '—'}
                         </td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex items-center gap-1">
-                            <Sprout className="h-3.5 w-3.5 text-green-600 shrink-0" />
-                            {p.culture_name}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono tabular-nums font-medium">
-                          {p.quantity_kg?.toLocaleString('fr-FR') ?? '—'}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
-                          {p.campaign_year || '—'}
-                        </td>
-                        <td className="px-4 py-3 text-right text-muted-foreground hidden lg:table-cell">
-                          {new Date(p.created_at).toLocaleDateString('fr-FR')}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <div className="px-4 py-3 border-t bg-muted/20">
-              <PaginationBar page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
-            </div>
+                      )}
+                      <td className="px-4 py-3 font-medium whitespace-nowrap">
+                        {p.member ? `${p.member.first_name} ${p.member.last_name}` : '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center gap-1">
+                          <Sprout className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                          {p.culture_name}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono tabular-nums font-medium">
+                        {p.quantity_kg?.toLocaleString('fr-FR') ?? '—'}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
+                        {p.campaign_year || '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right text-muted-foreground hidden lg:table-cell">
+                        {new Date(p.created_at).toLocaleDateString('fr-FR')}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
-        )
+          <div className="px-4 py-3 border-t bg-muted/20">
+            <PaginationBar page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+          </div>
+        </div>
       )}
     </div>
   )

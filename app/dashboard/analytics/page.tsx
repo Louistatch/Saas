@@ -2,7 +2,17 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { BarChart3, Users, ShoppingCart, CreditCard, TrendingUp, MapPin, ScanLine, Activity, Download } from 'lucide-react'
+import {
+  BarChart3,
+  Users,
+  ShoppingCart,
+  CreditCard,
+  TrendingUp,
+  MapPin,
+  ScanLine,
+  Activity,
+  Download,
+} from 'lucide-react'
 import {
   AreaChart,
   Area,
@@ -57,7 +67,20 @@ const initial: Stats = {
   scansThisWeek: 0,
 }
 
-const FR_MONTHS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
+const FR_MONTHS = [
+  'Jan',
+  'Fév',
+  'Mar',
+  'Avr',
+  'Mai',
+  'Jun',
+  'Jul',
+  'Aoû',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Déc',
+]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -180,9 +203,15 @@ export default function AnalyticsPage() {
 
     // Existing queries
     const membersQuery = supabase.from('members').select('status').eq('cooperative_id', coopId)
-    const fichesQuery = supabase.from('fiches_techniques').select('status').eq('cooperative_id', coopId)
+    const fichesQuery = supabase
+      .from('fiches_techniques')
+      .select('status')
+      .eq('cooperative_id', coopId)
     const cardsQuery = supabase.from('member_cards').select('status').eq('cooperative_id', coopId)
-    const parcellesQuery = supabase.from('parcelles').select('superficie_ha').eq('cooperative_id', coopId)
+    const parcellesQuery = supabase
+      .from('parcelles')
+      .select('superficie_ha')
+      .eq('cooperative_id', coopId)
     const scansAllQuery = supabase
       .from('member_access_logs')
       .select('id', { count: 'exact', head: true })
@@ -397,6 +426,7 @@ export default function AnalyticsPage() {
           }`}
         />
         <button
+          type="button"
           onClick={() => exportStatsCsv(stats, currentCooperative?.name ?? 'coopérative')}
           disabled={isLoading}
           className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground shadow-sm hover:bg-secondary disabled:opacity-50 shrink-0"
@@ -507,9 +537,7 @@ export default function AnalyticsPage() {
             <RésuméCell
               label="Cartes par membre"
               value={
-                stats.totalMembers > 0
-                  ? (stats.totalCards / stats.totalMembers).toFixed(1)
-                  : '—'
+                stats.totalMembers > 0 ? (stats.totalCards / stats.totalMembers).toFixed(1) : '—'
               }
             />
             <RésuméCell
@@ -627,7 +655,12 @@ export default function AnalyticsPage() {
                   itemStyle={{ color: 'oklch(0.65 0.2 30)' }}
                   formatter={(v: unknown) => [v as number, 'Scans']}
                 />
-                <Bar dataKey="value" fill="oklch(0.65 0.2 30)" radius={[3, 3, 0, 0]} maxBarSize={16} />
+                <Bar
+                  dataKey="value"
+                  fill="oklch(0.65 0.2 30)"
+                  radius={[3, 3, 0, 0]}
+                  maxBarSize={16}
+                />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -672,7 +705,10 @@ export default function AnalyticsPage() {
                   }}
                   labelStyle={{ color: 'hsl(var(--foreground))' }}
                   itemStyle={{ color: 'oklch(0.55 0.18 250)' }}
-                  formatter={(v: unknown) => [`${(v as number).toLocaleString('fr-FR')} FCFA`, 'Collecte']}
+                  formatter={(v: unknown) => [
+                    `${(v as number).toLocaleString('fr-FR')} FCFA`,
+                    'Collecte',
+                  ]}
                 />
                 <Line
                   type="monotone"

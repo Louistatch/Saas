@@ -36,7 +36,7 @@ const CATEGORIES = [
 const SEASONS = [
   { value: 'saison_seche', label: 'Saison sèche' },
   { value: 'saison_pluies', label: 'Saison des pluies' },
-  { value: 'toute_annee', label: 'Toute l\'année' },
+  { value: 'toute_annee', label: "Toute l'année" },
   { value: 'contre_saison', label: 'Contre-saison' },
 ]
 
@@ -67,7 +67,9 @@ function FilterSelect({
 }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</label>
+      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        {label}
+      </label>
       <select
         className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
         value={value}
@@ -76,7 +78,8 @@ function FilterSelect({
         <option value="">Tous</option>
         {options.map((o) => (
           <option key={o.value} value={o.value}>
-            {o.icon ? `${o.icon} ` : ''}{o.label}
+            {o.icon ? `${o.icon} ` : ''}
+            {o.label}
           </option>
         ))}
       </select>
@@ -99,10 +102,13 @@ export function MarketplaceFilterBar({
     <div className="space-y-5">
       {/* Category chips */}
       <div className="space-y-1.5">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Catégorie</label>
+        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          Catégorie
+        </label>
         <div className="flex flex-wrap gap-2">
           {CATEGORIES.map((cat) => (
             <button
+              type="button"
               key={cat.value}
               onClick={() => setFilter('category', filters.category === cat.value ? '' : cat.value)}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
@@ -122,21 +128,21 @@ export function MarketplaceFilterBar({
       <FilterSelect
         label="Région"
         value={filters.region_id}
-        options={referenceData.regions.map(r => ({ value: r.id, label: r.name }))}
+        options={referenceData.regions.map((r) => ({ value: r.id, label: r.name }))}
         onChange={(v) => setFilter('region_id', v)}
       />
 
       <FilterSelect
         label="Préfecture"
         value={filters.prefecture_id}
-        options={referenceData.prefectures.map(p => ({ value: p.id, label: p.name }))}
+        options={referenceData.prefectures.map((p) => ({ value: p.id, label: p.name }))}
         onChange={(v) => setFilter('prefecture_id', v)}
       />
 
       <FilterSelect
         label="Canton"
         value={filters.canton_id}
-        options={referenceData.cantons.map(c => ({ value: c.id, label: c.name }))}
+        options={referenceData.cantons.map((c) => ({ value: c.id, label: c.name }))}
         onChange={(v) => setFilter('canton_id', v)}
       />
 
@@ -144,7 +150,11 @@ export function MarketplaceFilterBar({
       <FilterSelect
         label="Culture"
         value={filters.culture}
-        options={referenceData.cultures.map(c => ({ value: c.name, label: c.name, icon: c.icon }))}
+        options={referenceData.cultures.map((c) => ({
+          value: c.name,
+          label: c.name,
+          icon: c.icon,
+        }))}
         onChange={(v) => setFilter('culture', v)}
       />
 
@@ -152,13 +162,15 @@ export function MarketplaceFilterBar({
       <FilterSelect
         label="Coopérative"
         value={filters.cooperative_id}
-        options={referenceData.cooperatives.map(c => ({ value: c.id, label: c.name }))}
+        options={referenceData.cooperatives.map((c) => ({ value: c.id, label: c.name }))}
         onChange={(v) => setFilter('cooperative_id', v)}
       />
 
       {/* Price range */}
       <div className="space-y-1.5">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Prix (FCFA)</label>
+        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          Prix (FCFA)
+        </label>
         <div className="flex gap-2 items-center">
           <Input
             type="number"
@@ -233,6 +245,7 @@ export function MarketplaceFilterBar({
           />
           {localSearch && (
             <button
+              type="button"
               onClick={() => setLocalSearch('')}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
@@ -269,30 +282,47 @@ export function MarketplaceFilterBar({
       {activeFilterCount > 0 && (
         <div className="flex flex-wrap gap-2 items-center">
           {filters.category && (
-            <Badge variant="secondary" className="gap-1 cursor-pointer" onClick={() => setFilter('category', '')}>
-              {CATEGORIES.find(c => c.value === filters.category)?.label}
+            <Badge
+              variant="secondary"
+              className="gap-1 cursor-pointer"
+              onClick={() => setFilter('category', '')}
+            >
+              {CATEGORIES.find((c) => c.value === filters.category)?.label}
               <X className="h-3 w-3" />
             </Badge>
           )}
           {filters.culture && (
-            <Badge variant="secondary" className="gap-1 cursor-pointer" onClick={() => setFilter('culture', '')}>
+            <Badge
+              variant="secondary"
+              className="gap-1 cursor-pointer"
+              onClick={() => setFilter('culture', '')}
+            >
               {filters.culture}
               <X className="h-3 w-3" />
             </Badge>
           )}
           {filters.region_id && (
-            <Badge variant="secondary" className="gap-1 cursor-pointer" onClick={() => setFilter('region_id', '')}>
-              {referenceData.regions.find(r => r.id === filters.region_id)?.name}
+            <Badge
+              variant="secondary"
+              className="gap-1 cursor-pointer"
+              onClick={() => setFilter('region_id', '')}
+            >
+              {referenceData.regions.find((r) => r.id === filters.region_id)?.name}
               <X className="h-3 w-3" />
             </Badge>
           )}
           {filters.season && (
-            <Badge variant="secondary" className="gap-1 cursor-pointer" onClick={() => setFilter('season', '')}>
-              {SEASONS.find(s => s.value === filters.season)?.label}
+            <Badge
+              variant="secondary"
+              className="gap-1 cursor-pointer"
+              onClick={() => setFilter('season', '')}
+            >
+              {SEASONS.find((s) => s.value === filters.season)?.label}
               <X className="h-3 w-3" />
             </Badge>
           )}
           <button
+            type="button"
             onClick={resetFilters}
             className="text-xs text-muted-foreground hover:text-foreground underline"
           >

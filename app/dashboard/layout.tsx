@@ -3,7 +3,13 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   BarChart3,
   ShoppingCart,
@@ -54,39 +60,129 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Coopérative',
     items: [
-      { href: '/dashboard', label: 'Vue d\'ensemble', icon: Home, roles: ['super_admin', 'cooperative_admin', 'member', 'guest'] },
-      { href: '/dashboard/members', label: 'Membres', icon: Users, roles: ['super_admin', 'cooperative_admin', 'member'] },
-      { href: '/dashboard/cards', label: 'Cartes membres', icon: IdCard, roles: ['super_admin', 'cooperative_admin', 'member'] },
-      { href: '/dashboard/cotisations', label: 'Cotisations', icon: Banknote, roles: ['super_admin', 'cooperative_admin'] },
-      { href: '/dashboard/parcelles', label: 'Parcelles', icon: Leaf, roles: ['super_admin', 'cooperative_admin'] },
+      {
+        href: '/dashboard',
+        label: "Vue d'ensemble",
+        icon: Home,
+        roles: ['super_admin', 'cooperative_admin', 'member', 'guest'],
+      },
+      {
+        href: '/dashboard/members',
+        label: 'Membres',
+        icon: Users,
+        roles: ['super_admin', 'cooperative_admin', 'member'],
+      },
+      {
+        href: '/dashboard/cards',
+        label: 'Cartes membres',
+        icon: IdCard,
+        roles: ['super_admin', 'cooperative_admin', 'member'],
+      },
+      {
+        href: '/dashboard/cotisations',
+        label: 'Cotisations',
+        icon: Banknote,
+        roles: ['super_admin', 'cooperative_admin'],
+      },
+      {
+        href: '/dashboard/parcelles',
+        label: 'Parcelles',
+        icon: Leaf,
+        roles: ['super_admin', 'cooperative_admin'],
+      },
     ],
   },
   {
     label: 'Agricole',
     items: [
-      { href: '/dashboard/agrimarket', label: 'AgriMarket', icon: ShoppingBag, roles: ['super_admin', 'cooperative_admin', 'member'] },
-      { href: '/dashboard/carnet', label: 'Carnet Agricole', icon: BookOpen, roles: ['super_admin', 'cooperative_admin', 'member'] },
-      { href: '/dashboard/matching', label: 'Matching', icon: Handshake, roles: ['super_admin', 'cooperative_admin'] },
-      { href: '/dashboard/credit', label: 'AgriCredit', icon: BarChart3, roles: ['super_admin', 'cooperative_admin'] },
+      {
+        href: '/dashboard/agrimarket',
+        label: 'AgriMarket',
+        icon: ShoppingBag,
+        roles: ['super_admin', 'cooperative_admin', 'member'],
+      },
+      {
+        href: '/dashboard/carnet',
+        label: 'Carnet Agricole',
+        icon: BookOpen,
+        roles: ['super_admin', 'cooperative_admin', 'member'],
+      },
+      {
+        href: '/dashboard/matching',
+        label: 'Matching',
+        icon: Handshake,
+        roles: ['super_admin', 'cooperative_admin'],
+      },
+      {
+        href: '/dashboard/credit',
+        label: 'AgriCredit',
+        icon: BarChart3,
+        roles: ['super_admin', 'cooperative_admin'],
+      },
     ],
   },
   {
     label: 'Analyse',
     items: [
-      { href: '/dashboard/analytics', label: 'Statistiques', icon: BarChart3, roles: ['super_admin', 'cooperative_admin'] },
-      { href: '/dashboard/carte', label: 'Carte Agricole', icon: MapIcon, roles: ['super_admin', 'cooperative_admin'] },
-      { href: '/dashboard/academy', label: 'AgriAcademy', icon: GraduationCap, roles: ['super_admin', 'cooperative_admin', 'member'] },
+      {
+        href: '/dashboard/analytics',
+        label: 'Statistiques',
+        icon: BarChart3,
+        roles: ['super_admin', 'cooperative_admin'],
+      },
+      {
+        href: '/dashboard/carte',
+        label: 'Carte Agricole',
+        icon: MapIcon,
+        roles: ['super_admin', 'cooperative_admin'],
+      },
+      {
+        href: '/dashboard/academy',
+        label: 'AgriAcademy',
+        icon: GraduationCap,
+        roles: ['super_admin', 'cooperative_admin', 'member'],
+      },
     ],
   },
   {
     label: 'Gestion',
     items: [
-      { href: '/dashboard/marketplace', label: 'Exploitations', icon: ShoppingCart, roles: ['super_admin', 'cooperative_admin', 'member', 'guest'] },
-      { href: '/dashboard/templates', label: 'Modèles', icon: FolderOpen, roles: ['super_admin', 'cooperative_admin'] },
-      { href: '/dashboard/techniciens', label: 'Techniciens', icon: PhoneCall, roles: ['super_admin', 'cooperative_admin'] },
-      { href: '/dashboard/integrations', label: 'Intégrations', icon: Zap, roles: ['super_admin', 'cooperative_admin'] },
-      { href: '/dashboard/kobo-setup', label: 'KoboCollect', icon: Smartphone, roles: ['super_admin', 'cooperative_admin'] },
-      { href: '/dashboard/embed', label: 'Widget Embed', icon: Code, roles: ['super_admin', 'cooperative_admin'] },
+      {
+        href: '/dashboard/marketplace',
+        label: 'Exploitations',
+        icon: ShoppingCart,
+        roles: ['super_admin', 'cooperative_admin', 'member', 'guest'],
+      },
+      {
+        href: '/dashboard/templates',
+        label: 'Modèles',
+        icon: FolderOpen,
+        roles: ['super_admin', 'cooperative_admin'],
+      },
+      {
+        href: '/dashboard/techniciens',
+        label: 'Techniciens',
+        icon: PhoneCall,
+        roles: ['super_admin', 'cooperative_admin'],
+      },
+      {
+        href: '/dashboard/integrations',
+        label: 'Intégrations',
+        icon: Zap,
+        roles: ['super_admin', 'cooperative_admin'],
+      },
+      {
+        href: '/dashboard/kobo-setup',
+        label: 'KoboCollect',
+        icon: Smartphone,
+        roles: ['super_admin', 'cooperative_admin'],
+      },
+      {
+        href: '/dashboard/embed',
+        label: 'Widget Embed',
+        icon: Code,
+        roles: ['super_admin', 'cooperative_admin'],
+      },
     ],
   },
 ]
@@ -146,16 +242,24 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               {user?.firstName} {user?.lastName}
             </p>
             <p className="truncate text-xs text-muted-foreground">
-              {currentCooperative?.level === 'faitiere' ? 'Admin Faîtière' :
-               currentCooperative?.level === 'union' ? 'Admin Union' :
-               user?.role === 'super_admin' ? 'Super Admin' :
-               user?.role === 'cooperative_admin' ? 'Admin Coopérative' :
-               user?.role === 'member' ? 'Membre' : 'Visiteur'}
+              {currentCooperative?.level === 'faitiere'
+                ? 'Admin Faîtière'
+                : currentCooperative?.level === 'union'
+                  ? 'Admin Union'
+                  : user?.role === 'super_admin'
+                    ? 'Super Admin'
+                    : user?.role === 'cooperative_admin'
+                      ? 'Admin Coopérative'
+                      : user?.role === 'member'
+                        ? 'Membre'
+                        : 'Visiteur'}
             </p>
           </div>
         </div>
         {currentCooperative && (
-          <p className="mt-2 truncate text-xs font-medium text-primary/80">{currentCooperative.name}</p>
+          <p className="mt-2 truncate text-xs font-medium text-primary/80">
+            {currentCooperative.name}
+          </p>
         )}
         {/* Cooperative switcher for super_admin */}
         {user?.role === 'super_admin' && cooperatives.length > 1 && (
@@ -164,8 +268,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               <SelectValue placeholder="Choisir une coopérative" />
             </SelectTrigger>
             <SelectContent>
-              {cooperatives.map(c => (
-                <SelectItem key={c.id} value={c.id} className="text-xs">{c.name}</SelectItem>
+              {cooperatives.map((c) => (
+                <SelectItem key={c.id} value={c.id} className="text-xs">
+                  {c.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -174,9 +280,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
-        {NAV_SECTIONS.map(section => {
+        {NAV_SECTIONS.map((section) => {
           const visibleItems = section.items.filter(
-            item => user?.role && item.roles.includes(user.role)
+            (item) => user?.role && item.roles.includes(user.role),
           )
           if (visibleItems.length === 0) return null
 
@@ -186,13 +292,16 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             <div key={section.label}>
               {isGestion ? (
                 <button
-                  onClick={() => setGestionOpen(o => !o)}
+                  type="button"
+                  onClick={() => setGestionOpen((o) => !o)}
                   className="flex w-full items-center justify-between px-2 mb-1"
                 >
                   <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
                     {section.label}
                   </span>
-                  <ChevronDown className={`h-3 w-3 text-muted-foreground/60 transition-transform ${gestionOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown
+                    className={`h-3 w-3 text-muted-foreground/60 transition-transform ${gestionOpen ? 'rotate-180' : ''}`}
+                  />
                 </button>
               ) : (
                 <p className="px-2 mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
@@ -202,7 +311,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
               {(!isGestion || gestionOpen) && (
                 <div className="space-y-0.5">
-                  {visibleItems.map(item => {
+                  {visibleItems.map((item) => {
                     const active = isActive(item.href)
                     const Icon = item.icon
                     return (
@@ -216,11 +325,11 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                             : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                         }`}
                       >
-                        <Icon className={`h-4 w-4 shrink-0 ${active ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`} />
+                        <Icon
+                          className={`h-4 w-4 shrink-0 ${active ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`}
+                        />
                         <span className="truncate">{item.label}</span>
-                        {active && (
-                          <div className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
-                        )}
+                        {active && <div className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />}
                       </Link>
                     )
                   })}
@@ -254,6 +363,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           </Link>
         )}
         <button
+          type="button"
           onClick={performLogout}
           className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
         >
@@ -273,7 +383,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <ProtectedRoute>
       <div className="min-h-screen flex bg-background">
-
         {/* Desktop sidebar — fixed */}
         <aside className="hidden md:flex md:flex-col md:w-60 lg:w-64 shrink-0 border-r border-border bg-card sticky top-0 h-screen">
           <SidebarContent />
@@ -282,7 +391,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Mobile: Sheet overlay */}
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild>
-            <button className="md:hidden fixed top-3 left-3 z-50 flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background shadow-sm text-muted-foreground hover:text-foreground">
+            <button
+              type="button"
+              className="md:hidden fixed top-3 left-3 z-50 flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background shadow-sm text-muted-foreground hover:text-foreground"
+            >
               <Menu className="h-5 w-5" />
             </button>
           </SheetTrigger>
@@ -318,23 +430,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <SelectValue placeholder="Coopérative" />
                   </SelectTrigger>
                   <SelectContent>
-                    {cooperatives.map(c => (
-                      <SelectItem key={c.id} value={c.id} className="text-xs">{c.name}</SelectItem>
+                    {cooperatives.map((c) => (
+                      <SelectItem key={c.id} value={c.id} className="text-xs">
+                        {c.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               )}
               <ServiceLauncher role={user?.role} />
-              {currentCooperative && (
-                <NotificationBell cooperativeId={currentCooperative.id} />
-              )}
+              {currentCooperative && <NotificationBell cooperativeId={currentCooperative.id} />}
             </div>
           </header>
 
           {/* Page content */}
-          <div className="flex-1 p-4 md:p-6 lg:p-8">
-            {children}
-          </div>
+          <div className="flex-1 p-4 md:p-6 lg:p-8">{children}</div>
         </main>
       </div>
     </ProtectedRoute>

@@ -49,9 +49,7 @@ export default function AdminSettingsPage() {
 
   const loadSettings = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('platform_settings')
-      .select('key, value')
+    const { data, error } = await supabase.from('platform_settings').select('key, value')
     if (error) {
       // Table may not exist yet — fall back to defaults silently for the loader,
       // but surface the issue subtly via console.
@@ -72,9 +70,7 @@ export default function AdminSettingsPage() {
       two_fa_admins:
         map.two_fa_admins !== undefined ? !!map.two_fa_admins : defaultSecurity.two_fa_admins,
       ip_whitelisting:
-        map.ip_whitelisting !== undefined
-          ? !!map.ip_whitelisting
-          : defaultSecurity.ip_whitelisting,
+        map.ip_whitelisting !== undefined ? !!map.ip_whitelisting : defaultSecurity.ip_whitelisting,
       rate_limiting:
         map.rate_limiting !== undefined ? !!map.rate_limiting : defaultSecurity.rate_limiting,
     })
@@ -97,7 +93,11 @@ export default function AdminSettingsPage() {
     const { error } = await supabase.from('platform_settings').upsert(rows, { onConflict: 'key' })
     setSaving(null)
     if (error) {
-      toast({ title: 'Échec de la sauvegarde', description: errorMessage(error), variant: 'destructive' })
+      toast({
+        title: 'Échec de la sauvegarde',
+        description: errorMessage(error),
+        variant: 'destructive',
+      })
       return
     }
     toast({ title: 'Paramètres enregistrés' })
@@ -117,11 +117,10 @@ export default function AdminSettingsPage() {
     <div className="flex items-center justify-between p-4 border border-border rounded-lg gap-4">
       <div>
         <p className="font-medium text-foreground">{label}</p>
-        {description ? (
-          <p className="text-sm text-muted-foreground">{description}</p>
-        ) : null}
+        {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
       </div>
       <button
+        type="button"
         role="switch"
         aria-checked={value}
         onClick={() => onChange(!value)}
@@ -147,13 +146,22 @@ export default function AdminSettingsPage() {
 
       <Tabs defaultValue="general" className="w-full">
         <TabsList className="grid w-full max-w-md grid-cols-3 border-b border-border bg-transparent">
-          <TabsTrigger value="general" className="border-b-2 border-transparent data-[state=active]:border-primary">
+          <TabsTrigger
+            value="general"
+            className="border-b-2 border-transparent data-[state=active]:border-primary"
+          >
             Général
           </TabsTrigger>
-          <TabsTrigger value="security" className="border-b-2 border-transparent data-[state=active]:border-primary">
+          <TabsTrigger
+            value="security"
+            className="border-b-2 border-transparent data-[state=active]:border-primary"
+          >
             Sécurité
           </TabsTrigger>
-          <TabsTrigger value="info" className="border-b-2 border-transparent data-[state=active]:border-primary">
+          <TabsTrigger
+            value="info"
+            className="border-b-2 border-transparent data-[state=active]:border-primary"
+          >
             Info
           </TabsTrigger>
         </TabsList>
@@ -169,9 +177,7 @@ export default function AdminSettingsPage() {
                 <Label>Nom de la plateforme</Label>
                 <Input
                   value={platform.platform_name}
-                  onChange={(e) =>
-                    setPlatform((s) => ({ ...s, platform_name: e.target.value }))
-                  }
+                  onChange={(e) => setPlatform((s) => ({ ...s, platform_name: e.target.value }))}
                 />
               </div>
               <div className="space-y-2">
@@ -179,9 +185,7 @@ export default function AdminSettingsPage() {
                 <Input
                   type="email"
                   value={platform.support_email}
-                  onChange={(e) =>
-                    setPlatform((s) => ({ ...s, support_email: e.target.value }))
-                  }
+                  onChange={(e) => setPlatform((s) => ({ ...s, support_email: e.target.value }))}
                 />
               </div>
               <Toggle
@@ -195,7 +199,11 @@ export default function AdminSettingsPage() {
                 onClick={() => saveSettings('platform', { ...platform })}
                 disabled={loading || saving !== null}
               >
-                {saving === 'platform' ? <Spinner className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                {saving === 'platform' ? (
+                  <Spinner className="h-4 w-4" />
+                ) : (
+                  <CheckCircle className="h-4 w-4" />
+                )}
                 Enregistrer les paramètres
               </Button>
             </CardContent>
@@ -206,15 +214,29 @@ export default function AdminSettingsPage() {
           <Card className="border-border">
             <CardHeader>
               <CardTitle className="text-foreground">Paramètres de sécurité</CardTitle>
-              <CardDescription>Gérer les fonctionnalités de sécurité de la plateforme</CardDescription>
+              <CardDescription>
+                Gérer les fonctionnalités de sécurité de la plateforme
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {(
                 [
                   ['force_https', 'Forcer HTTPS', 'Bloquer le trafic HTTP non sécurisé'],
-                  ['two_fa_admins', '2FA pour les admins', 'Exiger l\'authentification à deux facteurs pour les administrateurs'],
-                  ['ip_whitelisting', 'Liste blanche IP', 'Autoriser uniquement les IP spécifiées pour la zone admin'],
-                  ['rate_limiting', 'Limitation de débit API', 'Limiter les requêtes API/widget par IP'],
+                  [
+                    'two_fa_admins',
+                    '2FA pour les admins',
+                    "Exiger l'authentification à deux facteurs pour les administrateurs",
+                  ],
+                  [
+                    'ip_whitelisting',
+                    'Liste blanche IP',
+                    'Autoriser uniquement les IP spécifiées pour la zone admin',
+                  ],
+                  [
+                    'rate_limiting',
+                    'Limitation de débit API',
+                    'Limiter les requêtes API/widget par IP',
+                  ],
                 ] as const
               ).map(([key, label, description]) => (
                 <Toggle
@@ -230,7 +252,11 @@ export default function AdminSettingsPage() {
                 onClick={() => saveSettings('security', { ...security })}
                 disabled={loading || saving !== null}
               >
-                {saving === 'security' ? <Spinner className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                {saving === 'security' ? (
+                  <Spinner className="h-4 w-4" />
+                ) : (
+                  <CheckCircle className="h-4 w-4" />
+                )}
                 Enregistrer les paramètres
               </Button>
             </CardContent>
@@ -248,13 +274,13 @@ export default function AdminSettingsPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                Les sauvegardes de la base de données sont gérées par votre projet Supabase. Configurez la rétention et
-                la récupération ponctuelle dans le tableau de bord Supabase sous{' '}
-                <strong>Settings → Database → Backups</strong>.
+                Les sauvegardes de la base de données sont gérées par votre projet Supabase.
+                Configurez la rétention et la récupération ponctuelle dans le tableau de bord
+                Supabase sous <strong>Settings → Database → Backups</strong>.
               </p>
               <p className="text-sm text-muted-foreground">
-                Les emails transactionnels (confirmation d'inscription, réinitialisation de mot de passe) sont envoyés via
-                Supabase Auth. Personnalisez les modèles sous{' '}
+                Les emails transactionnels (confirmation d'inscription, réinitialisation de mot de
+                passe) sont envoyés via Supabase Auth. Personnalisez les modèles sous{' '}
                 <strong>Authentication → Email Templates</strong>.
               </p>
               <a
@@ -284,8 +310,8 @@ export default function AdminSettingsPage() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            La maintenance destructive (purge, restauration, migrations de schéma) est effectuée via la
-            console du projet Supabase plutôt que depuis cette interface.
+            La maintenance destructive (purge, restauration, migrations de schéma) est effectuée via
+            la console du projet Supabase plutôt que depuis cette interface.
           </p>
         </CardContent>
       </Card>

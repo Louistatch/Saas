@@ -78,16 +78,19 @@ export default async function CooperativeReportPage({
         </thead>
         <tbody>
           {(members ?? []).map((m, i) => {
-            const cards = m.member_cards as unknown as
-              { card_number: string | null }[] | null
+            const cards = m.member_cards as unknown as { card_number: string | null }[] | null
             const cardNumber = cards?.[0]?.card_number ?? '—'
             return (
               <tr key={m.id} style={{ background: i % 2 === 0 ? 'white' : '#f9f9f9' }}>
                 <Td>{i + 1}</Td>
-                <Td><strong>{m.last_name?.toUpperCase()} {m.first_name}</strong></Td>
+                <Td>
+                  <strong>
+                    {m.last_name?.toUpperCase()} {m.first_name}
+                  </strong>
+                </Td>
                 <Td>
                   <span style={{ color: m.status === 'active' ? GREEN : '#999' }}>
-                    {m.status === 'active' ? 'Actif' : m.status ?? '—'}
+                    {m.status === 'active' ? 'Actif' : (m.status ?? '—')}
                   </span>
                 </Td>
                 <Td>{m.canton ?? '—'}</Td>
@@ -130,18 +133,24 @@ export default async function CooperativeReportPage({
         </thead>
         <tbody>
           {(cotisations ?? []).map((c, i) => {
-            const mem = c.member as unknown as
-              { first_name: string | null; last_name: string | null } | null
+            const mem = c.member as unknown as {
+              first_name: string | null
+              last_name: string | null
+            } | null
             const memberName = mem ? `${mem.last_name?.toUpperCase()} ${mem.first_name}` : '—'
             return (
               <tr key={c.id} style={{ background: i % 2 === 0 ? 'white' : '#f9f9f9' }}>
                 <Td>{i + 1}</Td>
-                <Td><strong>{memberName}</strong></Td>
-                <Td style={{ textAlign: 'right' }}>{Number(c.amount ?? 0).toLocaleString('fr-FR')}</Td>
+                <Td>
+                  <strong>{memberName}</strong>
+                </Td>
+                <Td style={{ textAlign: 'right' }}>
+                  {Number(c.amount ?? 0).toLocaleString('fr-FR')}
+                </Td>
                 <Td>{c.type ?? '—'}</Td>
                 <Td>
                   <span style={{ color: c.status === 'paid' ? GREEN : '#e67e22' }}>
-                    {c.status === 'paid' ? 'Payé' : c.status ?? '—'}
+                    {c.status === 'paid' ? 'Payé' : (c.status ?? '—')}
                   </span>
                 </Td>
                 <Td>{c.campaign_year ?? '—'}</Td>
@@ -181,15 +190,21 @@ export default async function CooperativeReportPage({
         </thead>
         <tbody>
           {(productions ?? []).map((p, i) => {
-            const mem = p.member as unknown as
-              { first_name: string | null; last_name: string | null } | null
+            const mem = p.member as unknown as {
+              first_name: string | null
+              last_name: string | null
+            } | null
             const memberName = mem ? `${mem.last_name?.toUpperCase()} ${mem.first_name}` : '—'
             return (
               <tr key={p.id} style={{ background: i % 2 === 0 ? 'white' : '#f9f9f9' }}>
                 <Td>{i + 1}</Td>
-                <Td><strong>{memberName}</strong></Td>
+                <Td>
+                  <strong>{memberName}</strong>
+                </Td>
                 <Td>{p.culture ?? '—'}</Td>
-                <Td style={{ textAlign: 'right' }}>{Number(p.quantity_kg ?? 0).toLocaleString('fr-FR')}</Td>
+                <Td style={{ textAlign: 'right' }}>
+                  {Number(p.quantity_kg ?? 0).toLocaleString('fr-FR')}
+                </Td>
                 <Td>{p.campaign_year ?? '—'}</Td>
               </tr>
             )
@@ -217,6 +232,7 @@ export default async function CooperativeReportPage({
       {/* Print button */}
       <div className="no-print" style={{ position: 'fixed', top: 16, right: 16, zIndex: 999 }}>
         <button
+          type="button"
           onClick={() => window.print()}
           style={{
             background: GREEN,
@@ -233,21 +249,47 @@ export default async function CooperativeReportPage({
         </button>
       </div>
 
-      <div style={{ maxWidth: '100%', padding: '24px 32px', background: 'white', minHeight: '100vh' }}>
+      <div
+        style={{ maxWidth: '100%', padding: '24px 32px', background: 'white', minHeight: '100vh' }}
+      >
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: `3px solid ${GREEN}`, paddingBottom: 12, marginBottom: 24 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-end',
+            borderBottom: `3px solid ${GREEN}`,
+            paddingBottom: 12,
+            marginBottom: 24,
+          }}
+        >
           <div>
             <div style={{ fontSize: 26, fontWeight: 'bold', color: GREEN }}>FaîtiereHub</div>
-            <div style={{ fontSize: 13, color: '#555', marginTop: 2 }}>{coop.faitiere_name} — {coop.name}</div>
+            <div style={{ fontSize: 13, color: '#555', marginTop: 2 }}>
+              {coop.faitiere_name} — {coop.name}
+            </div>
           </div>
           <div style={{ textAlign: 'right', fontSize: 12, color: '#555' }}>
-            <div>Généré le : <strong>{issueDate}</strong></div>
-            <div>Total enregistrements : <strong>{totalCount}</strong></div>
+            <div>
+              Généré le : <strong>{issueDate}</strong>
+            </div>
+            <div>
+              Total enregistrements : <strong>{totalCount}</strong>
+            </div>
           </div>
         </div>
 
         {/* Title */}
-        <h1 style={{ fontSize: 18, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 2, color: '#111', marginBottom: 24 }}>
+        <h1
+          style={{
+            fontSize: 18,
+            textAlign: 'center',
+            textTransform: 'uppercase',
+            letterSpacing: 2,
+            color: '#111',
+            marginBottom: 24,
+          }}
+        >
           {REPORT_LABELS[reportType]}
         </h1>
 
@@ -259,7 +301,16 @@ export default async function CooperativeReportPage({
         </table>
 
         {/* Footer */}
-        <div style={{ marginTop: 40, borderTop: '1px solid #eee', paddingTop: 12, fontSize: 11, color: '#999', textAlign: 'center' }}>
+        <div
+          style={{
+            marginTop: 40,
+            borderTop: '1px solid #eee',
+            paddingTop: 12,
+            fontSize: 11,
+            color: '#999',
+            textAlign: 'center',
+          }}
+        >
           Généré par FaîtiereHub le {issueDate} — faitierehub.com
         </div>
       </div>
@@ -269,7 +320,9 @@ export default async function CooperativeReportPage({
 
 function Th({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 'bold', fontSize: 12, ...style }}>
+    <th
+      style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 'bold', fontSize: 12, ...style }}
+    >
       {children}
     </th>
   )
@@ -277,7 +330,15 @@ function Th({ children, style }: { children: React.ReactNode; style?: React.CSSP
 
 function Td({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <td style={{ padding: '7px 12px', fontSize: 12, borderBottom: '1px solid #eee', verticalAlign: 'middle', ...style }}>
+    <td
+      style={{
+        padding: '7px 12px',
+        fontSize: 12,
+        borderBottom: '1px solid #eee',
+        verticalAlign: 'middle',
+        ...style,
+      }}
+    >
       {children}
     </td>
   )

@@ -94,6 +94,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
             <AuthButtons className="hidden md:flex" />
             {/* Mobile menu toggle */}
             <button
+              type="button"
               className="md:hidden p-2 text-muted-foreground hover:text-foreground"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label={mobileMenuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
@@ -145,7 +146,8 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
             <div className="space-y-4">
               <Logo size="sm" />
               <p className="text-sm text-muted-foreground">
-                La plateforme numérique au service des faîtières et coopératives agricoles africaines.
+                La plateforme numérique au service des faîtières et coopératives agricoles
+                africaines.
               </p>
             </div>
             {footerColumns.map((column) => (

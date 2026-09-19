@@ -47,6 +47,7 @@ export function PwaRegister() {
 
   return (
     <button
+      type="button"
       onClick={handleInstall}
       style={{
         position: 'fixed',
@@ -70,11 +71,25 @@ export function PwaRegister() {
         animation: 'pwa-rise .4s cubic-bezier(.2,.7,.2,1) both',
       }}
     >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2v13M7 10l5 5 5-5"/><rect x="3" y="18" width="18" height="3" rx="1.5"/>
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M12 2v13M7 10l5 5 5-5" />
+        <rect x="3" y="18" width="18" height="3" rx="1.5" />
       </svg>
       Installer l'app
-      <style>{'@keyframes pwa-rise{from{opacity:0;transform:translateX(-50%) translateY(12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}'}</style>
+      <style>
+        {
+          '@keyframes pwa-rise{from{opacity:0;transform:translateX(-50%) translateY(12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}'
+        }
+      </style>
     </button>
   )
 }

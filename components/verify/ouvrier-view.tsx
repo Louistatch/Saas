@@ -2,9 +2,23 @@
 
 import { useState } from 'react'
 import {
-  ArrowLeft, User, Briefcase, MapPin, Star, Clock,
-  TrendingUp, Bot, CheckCircle, XCircle, Calendar,
-  Coins, Award, BookOpen, Phone, MessageCircle, RefreshCw,
+  ArrowLeft,
+  User,
+  Briefcase,
+  MapPin,
+  Star,
+  Clock,
+  TrendingUp,
+  Bot,
+  CheckCircle,
+  XCircle,
+  Calendar,
+  Coins,
+  Award,
+  BookOpen,
+  Phone,
+  MessageCircle,
+  RefreshCw,
 } from 'lucide-react'
 import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboard'
 import { AiChat } from '@/components/verify/ai-chat'
@@ -64,12 +78,18 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
       : 'Occupé'
 
   const phoneDigits = ouvrier.phone ? ouvrier.phone.replace(/\D/g, '') : null
-  const waPhone = phoneDigits ? (phoneDigits.startsWith('228') ? phoneDigits : `228${phoneDigits}`) : null
+  const waPhone = phoneDigits
+    ? phoneDigits.startsWith('228')
+      ? phoneDigits
+      : `228${phoneDigits}`
+    : null
 
   function renderStars(note: number) {
     return Array.from({ length: 5 }, (_, i) => (
       // biome-ignore lint/suspicious/noArrayIndexKey: étoiles de notation : cinq positions fixes
-      <span key={i} className={i < Math.round(note) ? 'text-[var(--vfp-accent)]' : 'text-white/20'}>★</span>
+      <span key={i} className={i < Math.round(note) ? 'text-[var(--vfp-accent)]' : 'text-white/20'}>
+        ★
+      </span>
     ))
   }
 
@@ -77,7 +97,11 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
     return (
       <div className="ouvrier-wrap space-y-4 vfp-enter">
         <style>{ouvrierStyles}</style>
-        <button onClick={() => setActiveView('menu')} className="flex items-center gap-2 text-[var(--vfp-accent)] text-sm font-medium active:opacity-70">
+        <button
+          type="button"
+          onClick={() => setActiveView('menu')}
+          className="flex items-center gap-2 text-[var(--vfp-accent)] text-sm font-medium active:opacity-70"
+        >
           <ArrowLeft className="h-4 w-4" /> Retour
         </button>
         <MarketPricesDashboard />
@@ -89,7 +113,11 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
     return (
       <div className="ouvrier-wrap">
         <style>{ouvrierStyles}</style>
-        <AiChat cardNumber={cardNumber} memberName={firstName} onBack={() => setActiveView('menu')} />
+        <AiChat
+          cardNumber={cardNumber}
+          memberName={firstName}
+          onBack={() => setActiveView('menu')}
+        />
       </div>
     )
   }
@@ -102,22 +130,33 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
       <section className="vfp-enter">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-white/60 text-sm mb-1">{greeting}, {firstName} ! 👷</p>
+            <p className="text-white/60 text-sm mb-1">
+              {greeting}, {firstName} ! 👷
+            </p>
             <h1 className="text-[24px] font-bold text-white leading-tight">
-              Votre espace<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--vfp-accent)] to-[var(--vfp-accent-dim)]">Ouvrier Agricole</span>
+              Votre espace
+              <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--vfp-accent)] to-[var(--vfp-accent-dim)]">
+                Ouvrier Agricole
+              </span>
             </h1>
             <p className="text-white/40 text-sm mt-2">Trouvez du travail dans vos cantons.</p>
           </div>
           <div className="vfp-glass-subtle rounded-2xl px-4 py-3 text-center shrink-0">
             <div className="w-10 h-10 rounded-full bg-[var(--vfp-accent)]/15 flex items-center justify-center mx-auto mb-1.5">
-              {ouvrier.disponible
-                ? <CheckCircle className="h-5 w-5 text-[var(--vfp-accent)] vfp-pop" />
-                : <XCircle className="h-5 w-5 text-orange-400" />}
+              {ouvrier.disponible ? (
+                <CheckCircle className="h-5 w-5 text-[var(--vfp-accent)] vfp-pop" />
+              ) : (
+                <XCircle className="h-5 w-5 text-orange-400" />
+              )}
             </div>
-            <p className="text-white text-xs font-semibold leading-tight max-w-[80px]">{disponibilityLabel}</p>
+            <p className="text-white text-xs font-semibold leading-tight max-w-[80px]">
+              {disponibilityLabel}
+            </p>
             <div className="flex items-center gap-1 justify-center mt-0.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${ouvrier.disponible ? 'bg-[var(--vfp-accent)] animate-pulse' : 'bg-orange-400'}`} />
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${ouvrier.disponible ? 'bg-[var(--vfp-accent)] animate-pulse' : 'bg-orange-400'}`}
+              />
               <span className="text-[var(--vfp-accent-dim)] text-[10px]">Carte vérifiée</span>
             </div>
           </div>
@@ -127,10 +166,12 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
       {/* Card info strip */}
       <div className="vfp-card rounded-xl px-4 py-3 flex items-center gap-3 vfp-enter">
         <div className="w-9 h-9 rounded-full bg-[var(--vfp-accent)]/15 flex items-center justify-center shrink-0">
-          {ouvrier.photo_url
+          {ouvrier.photo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            ? <img src={ouvrier.photo_url} alt="" className="w-9 h-9 rounded-full object-cover" />
-            : <User className="h-4 w-4 text-[var(--vfp-accent)]" />}
+            <img src={ouvrier.photo_url} alt="" className="w-9 h-9 rounded-full object-cover" />
+          ) : (
+            <User className="h-4 w-4 text-[var(--vfp-accent)]" />
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-white text-sm font-semibold truncate">
@@ -140,7 +181,9 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
         </div>
         {ouvrier.tarif_journalier && (
           <div className="text-right">
-            <p className="text-[var(--vfp-accent)] text-sm font-bold">{ouvrier.tarif_journalier.toLocaleString('fr-FR')} FCFA</p>
+            <p className="text-[var(--vfp-accent)] text-sm font-bold">
+              {ouvrier.tarif_journalier.toLocaleString('fr-FR')} FCFA
+            </p>
             <p className="text-white/30 text-[10px]">/ jour</p>
           </div>
         )}
@@ -155,9 +198,12 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2.5">
-
           {/* Mon Profil */}
-          <button onClick={() => setActiveView(activeView === 'profil' ? 'menu' : 'profil')} className="vfp-card rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px]">
+          <button
+            type="button"
+            onClick={() => setActiveView(activeView === 'profil' ? 'menu' : 'profil')}
+            className="vfp-card rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px]"
+          >
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[var(--vfp-accent)]/20 to-[var(--vfp-accent)]/5 flex items-center justify-center mb-2.5">
               <User className="h-5 w-5 text-[var(--vfp-accent-bright)]" />
             </div>
@@ -166,11 +212,17 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
           </button>
 
           {/* Offres d'emploi */}
-          <button onClick={() => setActiveView(activeView === 'offres' ? 'menu' : 'offres')} className="vfp-card rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px]">
+          <button
+            type="button"
+            onClick={() => setActiveView(activeView === 'offres' ? 'menu' : 'offres')}
+            className="vfp-card rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px]"
+          >
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-700/5 flex items-center justify-center mb-2.5 relative">
               <Briefcase className="h-5 w-5 text-amber-300" />
               {offres.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[var(--vfp-accent)] text-[var(--vfp-cta-fg)] text-[10px] font-bold flex items-center justify-center">{offres.length}</span>
+                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[var(--vfp-accent)] text-[var(--vfp-cta-fg)] text-[10px] font-bold flex items-center justify-center">
+                  {offres.length}
+                </span>
               )}
             </div>
             <p className="font-semibold text-sm text-white mb-0.5">Offres d&apos;emploi</p>
@@ -178,16 +230,26 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
           </button>
 
           {/* Ma Disponibilité */}
-          <button className="vfp-card rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px] opacity-60" disabled>
+          <button
+            type="button"
+            className="vfp-card rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px] opacity-60"
+            disabled
+          >
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-500/20 to-teal-700/5 flex items-center justify-center mb-2.5">
               <Calendar className="h-5 w-5 text-teal-300" />
             </div>
             <p className="font-semibold text-sm text-white/40 mb-0.5">Disponibilité</p>
-            <span className="mt-1 px-2 py-0.5 rounded-full bg-white/5 text-white/25 text-[10px] font-bold uppercase">Bientôt</span>
+            <span className="mt-1 px-2 py-0.5 rounded-full bg-white/5 text-white/25 text-[10px] font-bold uppercase">
+              Bientôt
+            </span>
           </button>
 
           {/* Prix du Marché */}
-          <button onClick={() => setActiveView('prices')} className="vfp-card rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px]">
+          <button
+            type="button"
+            onClick={() => setActiveView('prices')}
+            className="vfp-card rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px]"
+          >
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500/20 to-violet-700/5 flex items-center justify-center mb-2.5">
               <TrendingUp className="h-5 w-5 text-violet-300" />
             </div>
@@ -196,16 +258,26 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
           </button>
 
           {/* Formation */}
-          <button className="vfp-card rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px] opacity-60" disabled>
+          <button
+            type="button"
+            className="vfp-card rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px] opacity-60"
+            disabled
+          >
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-700/5 flex items-center justify-center mb-2.5">
               <BookOpen className="h-5 w-5 text-cyan-300" />
             </div>
             <p className="font-semibold text-sm text-white/40 mb-0.5">Formation</p>
-            <span className="mt-1 px-2 py-0.5 rounded-full bg-white/5 text-white/25 text-[10px] font-bold uppercase">Bientôt</span>
+            <span className="mt-1 px-2 py-0.5 rounded-full bg-white/5 text-white/25 text-[10px] font-bold uppercase">
+              Bientôt
+            </span>
           </button>
 
           {/* Assistant IA */}
-          <button onClick={() => setActiveView('ai')} className="vfp-card rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px]">
+          <button
+            type="button"
+            onClick={() => setActiveView('ai')}
+            className="vfp-card rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px]"
+          >
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-400/20 to-amber-600/5 flex items-center justify-center mb-2.5">
               <Bot className="h-5 w-5 text-amber-300" />
             </div>
@@ -214,23 +286,32 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
           </button>
 
           {/* Mes Contrats */}
-          <button className="vfp-card rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px] opacity-60" disabled>
+          <button
+            type="button"
+            className="vfp-card rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px] opacity-60"
+            disabled
+          >
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-slate-500/10 to-slate-700/5 flex items-center justify-center mb-2.5">
               <Coins className="h-5 w-5 text-white/30" />
             </div>
             <p className="font-semibold text-sm text-white/40 mb-0.5">Mes Contrats</p>
-            <span className="mt-1 px-2 py-0.5 rounded-full bg-white/5 text-white/25 text-[10px] font-bold uppercase">Bientôt</span>
+            <span className="mt-1 px-2 py-0.5 rounded-full bg-white/5 text-white/25 text-[10px] font-bold uppercase">
+              Bientôt
+            </span>
           </button>
 
           {/* Mon Évaluation */}
-          <button onClick={() => setActiveView(activeView === 'evaluation' ? 'menu' : 'evaluation')} className="vfp-card rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px]">
+          <button
+            type="button"
+            onClick={() => setActiveView(activeView === 'evaluation' ? 'menu' : 'evaluation')}
+            className="vfp-card rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[110px]"
+          >
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-yellow-400/20 to-yellow-600/5 flex items-center justify-center mb-2.5">
               <Award className="h-5 w-5 text-yellow-300" />
             </div>
             <p className="font-semibold text-sm text-white mb-0.5">Mon Évaluation</p>
             <div className="flex gap-0.5 text-xs">{renderStars(ouvrier.note_moyenne)}</div>
           </button>
-
         </div>
       </section>
 
@@ -239,19 +320,31 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
         <div className="vfp-card rounded-2xl p-5 space-y-4 vfp-enter">
           <div className="flex items-center justify-between">
             <h3 className="text-white font-bold text-base">Mon Profil</h3>
-            <button onClick={() => setActiveView('menu')} className="text-[var(--vfp-accent)] text-sm font-medium">
-              <ArrowLeft className="h-4 w-4 inline mr-1" />Réduire
+            <button
+              type="button"
+              onClick={() => setActiveView('menu')}
+              className="text-[var(--vfp-accent)] text-sm font-medium"
+            >
+              <ArrowLeft className="h-4 w-4 inline mr-1" />
+              Réduire
             </button>
           </div>
           {ouvrier.competences.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Star className="h-3.5 w-3.5 text-[var(--vfp-accent)]" />
-                <span className="text-xs text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">Compétences</span>
+                <span className="text-xs text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">
+                  Compétences
+                </span>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {ouvrier.competences.map((c) => (
-                  <span key={c} className="px-2.5 py-1 rounded-full bg-[var(--vfp-accent)]/10 border border-[var(--vfp-accent)]/20 text-[var(--vfp-accent-bright)] text-xs font-medium">{c}</span>
+                  <span
+                    key={c}
+                    className="px-2.5 py-1 rounded-full bg-[var(--vfp-accent)]/10 border border-[var(--vfp-accent)]/20 text-[var(--vfp-accent-bright)] text-xs font-medium"
+                  >
+                    {c}
+                  </span>
                 ))}
               </div>
             </div>
@@ -260,11 +353,18 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <MapPin className="h-3.5 w-3.5 text-[var(--vfp-accent)]" />
-                <span className="text-xs text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">Zones de travail</span>
+                <span className="text-xs text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">
+                  Zones de travail
+                </span>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {ouvrier.cantons_disponibles.map((c) => (
-                  <span key={c} className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/70 text-xs">{c}</span>
+                  <span
+                    key={c}
+                    className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/70 text-xs"
+                  >
+                    {c}
+                  </span>
                 ))}
               </div>
             </div>
@@ -275,7 +375,9 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
                 <Coins className="h-4 w-4 text-[var(--vfp-accent)]" />
                 <span className="text-white/70 text-sm">Tarif journalier</span>
               </div>
-              <span className="text-[var(--vfp-accent)] font-bold text-base">{ouvrier.tarif_journalier.toLocaleString('fr-FR')} FCFA</span>
+              <span className="text-[var(--vfp-accent)] font-bold text-base">
+                {ouvrier.tarif_journalier.toLocaleString('fr-FR')} FCFA
+              </span>
             </div>
           )}
           {/* Phone contact */}
@@ -283,7 +385,9 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
             <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
               <div className="flex items-center gap-2 mb-2">
                 <Phone className="h-3.5 w-3.5 text-[var(--vfp-accent)]" />
-                <span className="text-xs text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">Contact</span>
+                <span className="text-xs text-[var(--vfp-accent)] font-semibold uppercase tracking-wider">
+                  Contact
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <a
@@ -315,16 +419,24 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
         <div key={offresKey} className="space-y-3 vfp-enter">
           <div className="flex items-center justify-between px-1">
             <h3 className="text-white font-bold text-base">Offres d&apos;emploi</h3>
-            <button onClick={() => setActiveView('menu')} className="text-[var(--vfp-accent)] text-sm font-medium">
-              <ArrowLeft className="h-4 w-4 inline mr-1" />Réduire
+            <button
+              type="button"
+              onClick={() => setActiveView('menu')}
+              className="text-[var(--vfp-accent)] text-sm font-medium"
+            >
+              <ArrowLeft className="h-4 w-4 inline mr-1" />
+              Réduire
             </button>
           </div>
           {offres.length === 0 && (
             <div className="vfp-card rounded-2xl p-6 text-center space-y-3">
               <Briefcase className="h-8 w-8 text-white/20 mx-auto" />
-              <p className="text-white/50 text-sm">Aucune offre dans vos cantons pour l&apos;instant.</p>
+              <p className="text-white/50 text-sm">
+                Aucune offre dans vos cantons pour l&apos;instant.
+              </p>
               <button
-                onClick={() => setOffresKey(k => k + 1)}
+                type="button"
+                onClick={() => setOffresKey((k) => k + 1)}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--vfp-accent)]/10 border border-[var(--vfp-accent)]/20 text-[var(--vfp-accent-bright)] text-sm font-medium active:opacity-70"
               >
                 <RefreshCw className="h-4 w-4" />
@@ -337,23 +449,38 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="text-white font-semibold text-sm leading-tight">{o.titre}</p>
-                  {o.culture && <p className="text-[var(--vfp-accent-dim)] text-xs mt-0.5">{o.culture}</p>}
+                  {o.culture && (
+                    <p className="text-[var(--vfp-accent-dim)] text-xs mt-0.5">{o.culture}</p>
+                  )}
                 </div>
                 {o.tarif_journalier && (
-                  <span className="shrink-0 text-[var(--vfp-accent)] font-bold text-sm">{o.tarif_journalier.toLocaleString('fr-FR')} FCFA/j</span>
+                  <span className="shrink-0 text-[var(--vfp-accent)] font-bold text-sm">
+                    {o.tarif_journalier.toLocaleString('fr-FR')} FCFA/j
+                  </span>
                 )}
               </div>
               <div className="flex items-center gap-3 text-xs text-white/40">
-                <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{o.canton}</span>
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3 w-3" />
+                  {o.canton}
+                </span>
                 {o.date_debut && (
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    {new Date(o.date_debut).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                    {new Date(o.date_debut).toLocaleDateString('fr-FR', {
+                      day: 'numeric',
+                      month: 'short',
+                    })}
                   </span>
                 )}
-                <span>{o.nombre_ouvriers} ouvrier{o.nombre_ouvriers > 1 ? 's' : ''} cherché{o.nombre_ouvriers > 1 ? 's' : ''}</span>
+                <span>
+                  {o.nombre_ouvriers} ouvrier{o.nombre_ouvriers > 1 ? 's' : ''} cherché
+                  {o.nombre_ouvriers > 1 ? 's' : ''}
+                </span>
               </div>
-              {o.description && <p className="text-white/40 text-xs leading-relaxed">{o.description}</p>}
+              {o.description && (
+                <p className="text-white/40 text-xs leading-relaxed">{o.description}</p>
+              )}
             </div>
           ))}
         </div>
@@ -364,18 +491,26 @@ export function OuvrierView({ cardNumber, ouvrier, offres, card }: OuvrierViewPr
         <div className="vfp-card rounded-2xl p-5 space-y-3 vfp-enter">
           <div className="flex items-center justify-between">
             <h3 className="text-white font-bold text-base">Mon Évaluation</h3>
-            <button onClick={() => setActiveView('menu')} className="text-[var(--vfp-accent)] text-sm font-medium">
-              <ArrowLeft className="h-4 w-4 inline mr-1" />Réduire
+            <button
+              type="button"
+              onClick={() => setActiveView('menu')}
+              className="text-[var(--vfp-accent)] text-sm font-medium"
+            >
+              <ArrowLeft className="h-4 w-4 inline mr-1" />
+              Réduire
             </button>
           </div>
           <div className="text-center py-4">
-            <div className="text-4xl font-bold text-[var(--vfp-accent)]">{ouvrier.note_moyenne.toFixed(1)}</div>
-            <div className="flex justify-center gap-1 text-xl my-2">{renderStars(ouvrier.note_moyenne)}</div>
+            <div className="text-4xl font-bold text-[var(--vfp-accent)]">
+              {ouvrier.note_moyenne.toFixed(1)}
+            </div>
+            <div className="flex justify-center gap-1 text-xl my-2">
+              {renderStars(ouvrier.note_moyenne)}
+            </div>
             <p className="text-white/50 text-sm">{ouvrier.nombre_avis} avis</p>
           </div>
         </div>
       )}
-
     </div>
   )
 }

@@ -23,7 +23,11 @@ interface Props {
   onOpenAgriSmart?: () => void
 }
 
-const IRRIG_LABEL: Record<string, string> = { oui: 'Irriguée', non: 'Pluviale', partielle: 'Partielle' }
+const IRRIG_LABEL: Record<string, string> = {
+  oui: 'Irriguée',
+  non: 'Pluviale',
+  partielle: 'Partielle',
+}
 const SOL_COLOR: Record<string, string> = {
   argileux: 'bg-amber-500/15 text-amber-300 border-amber-500/20',
   limoneux: 'bg-green-500/15 text-green-300 border-green-500/20',
@@ -42,10 +46,12 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
     setError(false)
     setLoading(true)
     fetch(`/api/verify/${encodeURIComponent(cardNumber)}/parcelles`)
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(d => {
-        if (d) { setParcelles(d.parcelles ?? []); setTotalHa(d.total_ha ?? 0) }
-        else setParcelles([])
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => {
+        if (d) {
+          setParcelles(d.parcelles ?? [])
+          setTotalHa(d.total_ha ?? 0)
+        } else setParcelles([])
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false))
@@ -56,11 +62,15 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
   }, [loadData])
 
   const list = parcelles ?? []
-  const cultures = new Set(list.map(p => p.culture_principale ?? p.culture_name).filter(Boolean))
+  const cultures = new Set(list.map((p) => p.culture_principale ?? p.culture_name).filter(Boolean))
 
   return (
     <div className="space-y-4 vfp-enter">
-      <button onClick={onBack} className="flex items-center gap-2 text-[var(--vfp-accent)] text-sm font-medium active:opacity-70">
+      <button
+        type="button"
+        onClick={onBack}
+        className="flex items-center gap-2 text-[var(--vfp-accent)] text-sm font-medium active:opacity-70"
+      >
         <ArrowLeft className="h-4 w-4" /> Retour
       </button>
       <h3 className="text-white text-lg font-bold">Mes Parcelles</h3>
@@ -68,9 +78,11 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
       {loading && (
         <div className="space-y-3 animate-pulse">
           <div className="grid grid-cols-3 gap-2">
-            {[1,2,3].map(i => <div key={i} className="vfp-card rounded-2xl p-3 h-16" />)}
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="vfp-card rounded-2xl p-3 h-16" />
+            ))}
           </div>
-          {[1,2,3].map(i => (
+          {[1, 2, 3].map((i) => (
             <div key={i} className="vfp-card rounded-2xl p-4 flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-white/10 shrink-0" />
               <div className="flex-1 space-y-2">
@@ -93,6 +105,7 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
           <MapIcon className="h-8 w-8 text-white/20 mx-auto" />
           <p className="text-white/50 text-sm">Impossible de charger les données des parcelles.</p>
           <button
+            type="button"
             onClick={loadData}
             className="text-[var(--vfp-accent)] text-sm font-semibold underline-offset-2 underline active:opacity-60"
           >
@@ -132,14 +145,18 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
             {list.map((p, i) => {
               const culture = p.culture_principale ?? p.culture_name ?? 'Parcelle'
               const surface = p.superficie_ha ?? p.surface_ha
-              const solClass = SOL_COLOR[p.soil_type?.toLowerCase() ?? ''] ?? 'bg-white/5 text-white/50 border-white/8'
-              const irrigLabel = IRRIG_LABEL[p.irrigation_type?.toLowerCase() ?? ''] ?? p.irrigation_type
+              const solClass =
+                SOL_COLOR[p.soil_type?.toLowerCase() ?? ''] ??
+                'bg-white/5 text-white/50 border-white/8'
+              const irrigLabel =
+                IRRIG_LABEL[p.irrigation_type?.toLowerCase() ?? ''] ?? p.irrigation_type
               const isExpanded = expandedIdx === i
 
               return (
                 // biome-ignore lint/suspicious/noArrayIndexKey: l'API de vérification ne renvoie pas d'identifiant de parcelle ; une clé composite inviterait les collisions
                 <div key={i} className="vfp-card rounded-2xl overflow-hidden">
                   <button
+                    type="button"
                     className="w-full p-4 flex items-start gap-3 text-left active:opacity-70"
                     onClick={() => setExpandedIdx(isExpanded ? null : i)}
                   >
@@ -158,17 +175,21 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        {p.name && (
-                          <span className="text-xs text-white/50">{culture}</span>
-                        )}
+                        {p.name && <span className="text-xs text-white/50">{culture}</span>}
                         {p.soil_type && (
-                          <span className={`text-[11px] px-2 py-0.5 rounded-full border ${solClass}`}>
+                          <span
+                            className={`text-[11px] px-2 py-0.5 rounded-full border ${solClass}`}
+                          >
                             {p.soil_type}
                           </span>
                         )}
                         {irrigLabel && (
-                          <span className={`text-[11px] px-2 py-0.5 rounded-full border ${irrigLabel === 'Irriguée' ? 'bg-blue-500/15 text-blue-300 border-blue-500/20' : 'bg-white/5 text-white/40 border-white/8'}`}>
-                            {irrigLabel === 'Irriguée' && <Droplets className="h-2.5 w-2.5 inline mr-0.5" />}
+                          <span
+                            className={`text-[11px] px-2 py-0.5 rounded-full border ${irrigLabel === 'Irriguée' ? 'bg-blue-500/15 text-blue-300 border-blue-500/20' : 'bg-white/5 text-white/40 border-white/8'}`}
+                          >
+                            {irrigLabel === 'Irriguée' && (
+                              <Droplets className="h-2.5 w-2.5 inline mr-0.5" />
+                            )}
                             {irrigLabel}
                           </span>
                         )}
@@ -180,8 +201,18 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
                         )}
                       </div>
                     </div>
-                    <div className={`w-4 h-4 shrink-0 mt-1 text-white/30 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
-                      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 5l6 6 6-6" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>
+                    <div
+                      className={`w-4 h-4 shrink-0 mt-1 text-white/30 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                    >
+                      <svg viewBox="0 0 16 16" fill="currentColor">
+                        <path
+                          d="M2 5l6 6 6-6"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          fill="none"
+                          strokeLinecap="round"
+                        />
+                      </svg>
                     </div>
                   </button>
 
@@ -191,37 +222,57 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
                       <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                         {surface != null && (
                           <div>
-                            <p className="text-[10px] text-white/30 uppercase tracking-wider">Surface</p>
-                            <p className="text-xs text-white font-mono">{surface.toFixed(4)} ha · {Math.round(surface * 10000).toLocaleString('fr-FR')} m²</p>
+                            <p className="text-[10px] text-white/30 uppercase tracking-wider">
+                              Surface
+                            </p>
+                            <p className="text-xs text-white font-mono">
+                              {surface.toFixed(4)} ha ·{' '}
+                              {Math.round(surface * 10000).toLocaleString('fr-FR')} m²
+                            </p>
                           </div>
                         )}
                         {p.soil_type && (
                           <div>
-                            <p className="text-[10px] text-white/30 uppercase tracking-wider">Type de sol</p>
+                            <p className="text-[10px] text-white/30 uppercase tracking-wider">
+                              Type de sol
+                            </p>
                             <p className="text-xs text-white capitalize">{p.soil_type}</p>
                           </div>
                         )}
                         {irrigLabel && (
                           <div>
-                            <p className="text-[10px] text-white/30 uppercase tracking-wider">Irrigation</p>
+                            <p className="text-[10px] text-white/30 uppercase tracking-wider">
+                              Irrigation
+                            </p>
                             <p className="text-xs text-white">{irrigLabel}</p>
                           </div>
                         )}
                         {p.campaign_year && (
                           <div>
-                            <p className="text-[10px] text-white/30 uppercase tracking-wider">Campagne</p>
+                            <p className="text-[10px] text-white/30 uppercase tracking-wider">
+                              Campagne
+                            </p>
                             <p className="text-xs text-white">{p.campaign_year}</p>
                           </div>
                         )}
                         {p.source && (
                           <div>
-                            <p className="text-[10px] text-white/30 uppercase tracking-wider">Source</p>
+                            <p className="text-[10px] text-white/30 uppercase tracking-wider">
+                              Source
+                            </p>
                             <p className="text-xs text-white capitalize">{p.source}</p>
                           </div>
                         )}
                         <div>
-                          <p className="text-[10px] text-white/30 uppercase tracking-wider">Enregistrée</p>
-                          <p className="text-xs text-white/60">{new Date(p.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</p>
+                          <p className="text-[10px] text-white/30 uppercase tracking-wider">
+                            Enregistrée
+                          </p>
+                          <p className="text-xs text-white/60">
+                            {new Date(p.created_at).toLocaleDateString('fr-FR', {
+                              month: 'long',
+                              year: 'numeric',
+                            })}
+                          </p>
                         </div>
                       </div>
 
@@ -246,6 +297,7 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
 
           {onOpenAgriSmart && (
             <button
+              type="button"
               onClick={onOpenAgriSmart}
               className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-blue-500/25 bg-blue-500/8 text-blue-300 text-sm font-semibold active:scale-[0.98] transition-transform"
             >

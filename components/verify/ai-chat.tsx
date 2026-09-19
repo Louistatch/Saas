@@ -71,7 +71,7 @@ const VOICE_STATE_COLORS: Record<VoiceState, string> = {
 function TypingDots() {
   return (
     <div className="flex items-center gap-1 px-1 py-0.5">
-      {[0, 1, 2].map(i => (
+      {[0, 1, 2].map((i) => (
         <span
           key={i}
           className="w-1.5 h-1.5 rounded-full bg-emerald-400"
@@ -88,18 +88,41 @@ function TypingDots() {
 function EngineBadge({ engine, debate }: { engine: string; debate?: boolean }) {
   const config =
     engine === 'direct-data'
-      ? { icon: '⚡', label: 'Réponse instantanée', cls: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-300/70' }
+      ? {
+          icon: '⚡',
+          label: 'Réponse instantanée',
+          cls: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-300/70',
+        }
       : engine === 'agritogo-multiagent'
-      ? { icon: '🧠', label: 'Multi-Agent', cls: 'bg-purple-500/10 border-purple-500/20 text-purple-300/70' }
-      : engine === 'gemini-vision'
-      ? { icon: '📷', label: 'Analyse photo', cls: 'bg-blue-500/10 border-blue-500/20 text-blue-300/70' }
-      : engine === 'gemini-voice'
-      ? { icon: '🎙️', label: 'Réponse vocale', cls: 'bg-rose-500/10 border-rose-500/20 text-rose-300/70' }
-      : { icon: '💬', label: 'Gemini', cls: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300/70' }
+        ? {
+            icon: '🧠',
+            label: 'Multi-Agent',
+            cls: 'bg-purple-500/10 border-purple-500/20 text-purple-300/70',
+          }
+        : engine === 'gemini-vision'
+          ? {
+              icon: '📷',
+              label: 'Analyse photo',
+              cls: 'bg-blue-500/10 border-blue-500/20 text-blue-300/70',
+            }
+          : engine === 'gemini-voice'
+            ? {
+                icon: '🎙️',
+                label: 'Réponse vocale',
+                cls: 'bg-rose-500/10 border-rose-500/20 text-rose-300/70',
+              }
+            : {
+                icon: '💬',
+                label: 'Gemini',
+                cls: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300/70',
+              }
 
   return (
-    <span className={`mt-1.5 inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border ${config.cls}`}>
-      {config.icon} {config.label}{debate ? ' • Débat' : ''}
+    <span
+      className={`mt-1.5 inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border ${config.cls}`}
+    >
+      {config.icon} {config.label}
+      {debate ? ' • Débat' : ''}
     </span>
   )
 }
@@ -117,7 +140,8 @@ function VoiceModeOverlay({
   onExit: () => void
   lastTranscript: string
 }) {
-  const isActive = voiceState === 'recording' || voiceState === 'processing' || voiceState === 'speaking'
+  const isActive =
+    voiceState === 'recording' || voiceState === 'processing' || voiceState === 'speaking'
   const ringColor = VOICE_STATE_COLORS[voiceState]
 
   return (
@@ -127,6 +151,7 @@ function VoiceModeOverlay({
     >
       {/* Close */}
       <button
+        type="button"
         onClick={onExit}
         className="absolute top-4 right-4 text-white/40 hover:text-white/70 text-[13px] transition-colors"
       >
@@ -143,6 +168,7 @@ function VoiceModeOverlay({
 
       {/* Big mic button with animated ring */}
       <button
+        type="button"
         onClick={onMicPress}
         disabled={voiceState === 'processing' || voiceState === 'speaking'}
         className="relative flex items-center justify-center rounded-full transition-transform active:scale-95 disabled:opacity-70"
@@ -150,16 +176,27 @@ function VoiceModeOverlay({
           width: 120,
           height: 120,
           background: ringColor,
-          border: `2px solid ${ringColor.replace('.', '').replace('rgba', 'rgba').replace(')', ', 0.6)').replace(/,\s*[\d.]+\)$/, ', 0.6)')}`,
-          boxShadow: isActive ? `0 0 0 20px ${ringColor}, 0 0 0 40px ${ringColor.replace(/[\d.]+\)$/, '0.08)')}` : 'none',
-          animation: voiceState === 'recording' ? 'voice-ring-pulse 1.2s ease-in-out infinite' : 'none',
+          border: `2px solid ${ringColor
+            .replace('.', '')
+            .replace('rgba', 'rgba')
+            .replace(')', ', 0.6)')
+            .replace(/,\s*[\d.]+\)$/, ', 0.6)')}`,
+          boxShadow: isActive
+            ? `0 0 0 20px ${ringColor}, 0 0 0 40px ${ringColor.replace(/[\d.]+\)$/, '0.08)')}`
+            : 'none',
+          animation:
+            voiceState === 'recording' ? 'voice-ring-pulse 1.2s ease-in-out infinite' : 'none',
         }}
         aria-label={VOICE_STATE_LABELS[voiceState]}
       >
         {voiceState === 'processing' ? (
           <Loader2 size={48} className="text-yellow-300 animate-spin" />
         ) : voiceState === 'speaking' ? (
-          <Volume2 size={48} className="text-blue-300" style={{ animation: 'voice-ring-pulse 0.8s ease-in-out infinite' }} />
+          <Volume2
+            size={48}
+            className="text-blue-300"
+            style={{ animation: 'voice-ring-pulse 0.8s ease-in-out infinite' }}
+          />
         ) : voiceState === 'recording' ? (
           <MicOff size={48} className="text-red-300" />
         ) : (
@@ -188,6 +225,7 @@ function VoiceModeOverlay({
       )}
       {voiceState === 'speaking' && (
         <button
+          type="button"
           onClick={onMicPress}
           className="text-white/40 text-[11px] hover:text-white/70 transition-colors"
         >
@@ -200,14 +238,21 @@ function VoiceModeOverlay({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_SUGGESTIONS }: AiChatProps) {
+export function AiChat({
+  cardNumber,
+  memberName,
+  onBack,
+  suggestions = DEFAULT_SUGGESTIONS,
+}: AiChatProps) {
   const storageKey = `agritogo_chat_${cardNumber}`
   const [messages, setMessages] = useState<Message[]>(() => {
     if (typeof window === 'undefined') return []
     try {
       const saved = sessionStorage.getItem(storageKey)
       return saved ? JSON.parse(saved) : []
-    } catch { return [] }
+    } catch {
+      return []
+    }
   })
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -243,11 +288,15 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
   // Persist messages
   useEffect(() => {
     if (messages.length === 0) return
-    try { sessionStorage.setItem(storageKey, JSON.stringify(messages.slice(-20))) } catch {}
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify(messages.slice(-20)))
+    } catch {}
   }, [messages, storageKey])
 
   // Focus input
-  useEffect(() => { inputRef.current?.focus() }, [])
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -259,51 +308,75 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
 
   // ── Text chat ────────────────────────────────────────────────────
 
-  const sendMessage = useCallback(async (text: string) => {
-    if (!text || loading) return
-    setInput('')
-    setMessages(m => [...m, { role: 'user', content: text }])
-    setLoading(true)
-    try {
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ card_number: cardNumber, message: text }),
-      })
-      const data = await res.json()
-      if (data.response) {
-        setMessages(m => [...m, {
-          role: 'assistant',
-          content: data.response,
-          engine: data.engine ?? null,
-          debate: data.debate_used ?? false,
-        }])
-      } else {
-        setMessages(m => [...m, { role: 'assistant', content: data.error ?? 'Désolé, je n\'ai pas pu répondre.' }])
+  const sendMessage = useCallback(
+    async (text: string) => {
+      if (!text || loading) return
+      setInput('')
+      setMessages((m) => [...m, { role: 'user', content: text }])
+      setLoading(true)
+      try {
+        const res = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ card_number: cardNumber, message: text }),
+        })
+        const data = await res.json()
+        if (data.response) {
+          setMessages((m) => [
+            ...m,
+            {
+              role: 'assistant',
+              content: data.response,
+              engine: data.engine ?? null,
+              debate: data.debate_used ?? false,
+            },
+          ])
+        } else {
+          setMessages((m) => [
+            ...m,
+            { role: 'assistant', content: data.error ?? "Désolé, je n'ai pas pu répondre." },
+          ])
+        }
+      } catch {
+        setMessages((m) => [
+          ...m,
+          { role: 'assistant', content: 'Erreur de connexion. Vérifiez votre réseau.' },
+        ])
+      } finally {
+        setLoading(false)
+        inputRef.current?.focus()
       }
-    } catch {
-      setMessages(m => [...m, { role: 'assistant', content: 'Erreur de connexion. Vérifiez votre réseau.' }])
-    } finally {
-      setLoading(false)
-      inputRef.current?.focus()
-    }
-  }, [loading, cardNumber])
+    },
+    [loading, cardNumber],
+  )
 
-  const send = useCallback(() => { const t = input.trim(); if (t) sendMessage(t) }, [input, sendMessage])
+  const send = useCallback(() => {
+    const t = input.trim()
+    if (t) sendMessage(t)
+  }, [input, sendMessage])
   const sendText = useCallback((t: string) => sendMessage(t), [sendMessage])
 
   // ── Legacy dictation ─────────────────────────────────────────────
 
   const toggleVoice = useCallback(() => {
-    if (isListening) { recognitionRef.current?.stop(); setIsListening(false); return }
+    if (isListening) {
+      recognitionRef.current?.stop()
+      setIsListening(false)
+      return
+    }
     const w = window as SpeechRecognitionWindow
     const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition
-    if (!SR) { alert('Votre navigateur ne supporte pas la reconnaissance vocale.'); return }
+    if (!SR) {
+      alert('Votre navigateur ne supporte pas la reconnaissance vocale.')
+      return
+    }
     const rec = new SR()
-    rec.lang = 'fr-FR'; rec.continuous = false; rec.interimResults = false
+    rec.lang = 'fr-FR'
+    rec.continuous = false
+    rec.interimResults = false
     rec.onresult = (e) => {
       const t: string = e.results[0][0].transcript
-      setInput(prev => prev ? `${prev} ${t}` : t)
+      setInput((prev) => (prev ? `${prev} ${t}` : t))
       setIsListening(false)
     }
     rec.onerror = () => setIsListening(false)
@@ -321,7 +394,7 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
     const base64 = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader()
       const img = new Image()
-      reader.onload = e => {
+      reader.onload = (e) => {
         img.src = e.target?.result as string
         img.onload = () => {
           const canvas = document.createElement('canvas')
@@ -336,7 +409,7 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
       }
       reader.readAsDataURL(file)
     })
-    setMessages(m => [...m, { role: 'user', content: '📸 Photo envoyée — analyse en cours…' }])
+    setMessages((m) => [...m, { role: 'user', content: '📸 Photo envoyée — analyse en cours…' }])
     try {
       const res = await fetch('/api/ai/vision', {
         method: 'POST',
@@ -344,13 +417,16 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
         body: JSON.stringify({ image_base64: base64, mime_type: 'image/jpeg' }),
       })
       const data = await res.json()
-      setMessages(m => [...m, {
-        role: 'assistant',
-        content: data.response ?? data.error ?? 'Impossible d\'analyser l\'image.',
-        engine: 'gemini-vision',
-      }])
+      setMessages((m) => [
+        ...m,
+        {
+          role: 'assistant',
+          content: data.response ?? data.error ?? "Impossible d'analyser l'image.",
+          engine: 'gemini-vision',
+        },
+      ])
     } catch {
-      setMessages(m => [...m, { role: 'assistant', content: 'Erreur lors de l\'analyse photo.' }])
+      setMessages((m) => [...m, { role: 'assistant', content: "Erreur lors de l'analyse photo." }])
     } finally {
       setPhotoLoading(false)
       if (photoInputRef.current) photoInputRef.current.value = ''
@@ -379,8 +455,9 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
 
     // Pick a French voice if available
     const voices = window.speechSynthesis.getVoices()
-    const frVoice = voices.find(v => v.lang.startsWith('fr') && v.localService)
-      ?? voices.find(v => v.lang.startsWith('fr'))
+    const frVoice =
+      voices.find((v) => v.lang.startsWith('fr') && v.localService) ??
+      voices.find((v) => v.lang.startsWith('fr'))
     if (frVoice) utt.voice = frVoice
 
     utt.onend = () => {
@@ -408,15 +485,20 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : MediaRecorder.isTypeSupported('audio/webm')
-        ? 'audio/webm'
-        : 'audio/ogg'
+          ? 'audio/webm'
+          : 'audio/ogg'
 
       const recorder = new MediaRecorder(stream, { mimeType })
-      recorder.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      }
       recorder.onstop = async () => {
-        stream.getTracks().forEach(t => t.stop())
+        stream.getTracks().forEach((t) => t.stop())
         const blob = new Blob(audioChunksRef.current, { type: mimeType })
-        if (blob.size < 1000) { setVoiceState('idle'); return } // Too short, ignore
+        if (blob.size < 1000) {
+          setVoiceState('idle')
+          return
+        } // Too short, ignore
 
         setVoiceState('processing')
 
@@ -443,9 +525,12 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
             if (data.transcript) setLastTranscript(data.transcript)
 
             // Add to message history (visible in text chat)
-            setMessages(m => [
+            setMessages((m) => [
               ...m,
-              { role: 'user', content: data.transcript ? `🎤 ${data.transcript}` : '🎤 Message vocal' },
+              {
+                role: 'user',
+                content: data.transcript ? `🎤 ${data.transcript}` : '🎤 Message vocal',
+              },
               { role: 'assistant', content: data.response, engine: 'gemini-voice' },
             ])
 
@@ -532,13 +617,20 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
           WebkitBackdropFilter: 'blur(12px)',
         }}
       >
-        <button onClick={onBack} className="text-emerald-400 p-1 hover:text-emerald-300 transition-colors flex-shrink-0" aria-label="Retour">
+        <button
+          type="button"
+          onClick={onBack}
+          className="text-emerald-400 p-1 hover:text-emerald-300 transition-colors flex-shrink-0"
+          aria-label="Retour"
+        >
           <ArrowLeft size={18} />
         </button>
 
         <div className="flex items-center gap-2.5 flex-1 min-w-0">
-          <div className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #34d399, #14b8a6)' }}>
+          <div
+            className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, #34d399, #14b8a6)' }}
+          >
             <Bot size={20} className="text-white" />
           </div>
           <div className="min-w-0">
@@ -553,13 +645,17 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
 
         {/* Voice mode toggle */}
         <button
-          onClick={() => setVoiceMode(v => !v)}
+          type="button"
+          onClick={() => setVoiceMode((v) => !v)}
           className={`w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl transition-all ${
-            voiceMode ? 'text-emerald-300 ring-1 ring-emerald-500/50' : 'text-white/40 hover:text-emerald-300 hover:bg-emerald-500/10'
+            voiceMode
+              ? 'text-emerald-300 ring-1 ring-emerald-500/50'
+              : 'text-white/40 hover:text-emerald-300 hover:bg-emerald-500/10'
           }`}
-          style={voiceMode
-            ? { background: 'rgba(52,211,153,.20)', border: '1px solid rgba(52,211,153,.30)' }
-            : { background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.10)' }
+          style={
+            voiceMode
+              ? { background: 'rgba(52,211,153,.20)', border: '1px solid rgba(52,211,153,.30)' }
+              : { background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.10)' }
           }
           title={voiceMode ? 'Désactiver le mode vocal' : 'Activer le mode vocal'}
           aria-label="Mode vocal"
@@ -569,7 +665,13 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
 
         {messages.length > 0 && (
           <button
-            onClick={() => { setMessages([]); try { sessionStorage.removeItem(storageKey) } catch {} }}
+            type="button"
+            onClick={() => {
+              setMessages([])
+              try {
+                sessionStorage.removeItem(storageKey)
+              } catch {}
+            }}
             className="text-white/25 text-[11px] hover:text-white/50 transition-colors flex-shrink-0"
             title="Effacer la conversation"
           >
@@ -580,41 +682,61 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
 
       {/* ── MESSAGES AREA ──────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3" ref={scrollRef}>
-
         {messages.length === 0 && (
           <div className="flex flex-col items-center text-center px-2 pt-4 pb-2 gap-0">
             <div
               className="w-[72px] h-[72px] rounded-2xl flex items-center justify-center mb-4"
-              style={{ background: 'linear-gradient(135deg, #34d399, #14b8a6)', animation: 'halo-pulse 2.5s ease-in-out infinite' }}
+              style={{
+                background: 'linear-gradient(135deg, #34d399, #14b8a6)',
+                animation: 'halo-pulse 2.5s ease-in-out infinite',
+              }}
             >
               <Bot size={34} className="text-white" />
             </div>
-            <p className="text-2xl font-bold text-white mb-1" style={{ animation: 'chat-fade-up 0.4s ease both', animationDelay: '100ms' }}>
+            <p
+              className="text-2xl font-bold text-white mb-1"
+              style={{ animation: 'chat-fade-up 0.4s ease both', animationDelay: '100ms' }}
+            >
               Bonjour{firstName ? ` ${firstName}` : ''} ! 👋
             </p>
-            <p className="text-emerald-300/70 text-sm mb-5" style={{ animation: 'chat-fade-up 0.4s ease both', animationDelay: '150ms' }}>
+            <p
+              className="text-emerald-300/70 text-sm mb-5"
+              style={{ animation: 'chat-fade-up 0.4s ease both', animationDelay: '150ms' }}
+            >
               Je suis AgriTogo IA
             </p>
-            <div className="grid grid-cols-4 gap-2 w-full max-w-[340px] mb-5"
-              style={{ animation: 'chat-fade-up 0.4s ease both', animationDelay: '200ms' }}>
+            <div
+              className="grid grid-cols-4 gap-2 w-full max-w-[340px] mb-5"
+              style={{ animation: 'chat-fade-up 0.4s ease both', animationDelay: '200ms' }}
+            >
               {[
                 { icon: '📊', label: 'Prix Marchés' },
                 { icon: '📷', label: 'Photo Maladie' },
                 { icon: '🎤', label: 'Dicter' },
                 { icon: '🔊', label: 'Mode Vocal' },
-              ].map(cap => (
-                <div key={cap.label} className="bg-white/5 border border-white/10 rounded-2xl p-3 text-center">
+              ].map((cap) => (
+                <div
+                  key={cap.label}
+                  className="bg-white/5 border border-white/10 rounded-2xl p-3 text-center"
+                >
                   <span className="text-2xl block mb-1">{cap.icon}</span>
                   <span className="text-white/60 text-xs leading-tight block">{cap.label}</span>
                 </div>
               ))}
             </div>
-            <div className="flex flex-col gap-2 w-full max-w-[320px]" style={{ animation: 'chat-fade-up 0.4s ease both', animationDelay: '350ms' }}>
+            <div
+              className="flex flex-col gap-2 w-full max-w-[320px]"
+              style={{ animation: 'chat-fade-up 0.4s ease both', animationDelay: '350ms' }}
+            >
               {suggestions.map((s) => (
                 <button
+                  type="button"
                   key={s}
                   className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 rounded-full px-4 py-2.5 text-sm text-left flex items-center justify-between hover:bg-emerald-500/15 active:scale-[0.98] transition-all"
-                  onClick={() => { setInput(s); inputRef.current?.focus() }}
+                  onClick={() => {
+                    setInput(s)
+                    inputRef.current?.focus()
+                  }}
                 >
                   <span>{s}</span>
                   <span className="text-emerald-400/60 ml-2">→</span>
@@ -633,28 +755,45 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
             <div key={i}>
               <div
                 className={`flex gap-2 ${isUser ? 'flex-row-reverse self-end ml-auto max-w-[80%]' : 'flex-row self-start mr-auto max-w-[85%]'}`}
-                style={{ animation: isUser ? 'chat-slide-left 0.25s ease both' : 'chat-slide-right 0.25s ease both' }}
+                style={{
+                  animation: isUser
+                    ? 'chat-slide-left 0.25s ease both'
+                    : 'chat-slide-right 0.25s ease both',
+                }}
               >
-                <div className={`w-7 h-7 flex-shrink-0 flex items-center justify-center text-[11px] font-semibold ${isUser ? 'rounded-full bg-white/15 text-white/80' : 'rounded-xl bg-emerald-500/20 text-emerald-300'}`}>
-                  {isUser ? (firstName ? firstName[0].toUpperCase() : 'U') : <Bot size={13} />}
+                <div
+                  className={`w-7 h-7 flex-shrink-0 flex items-center justify-center text-[11px] font-semibold ${isUser ? 'rounded-full bg-white/15 text-white/80' : 'rounded-xl bg-emerald-500/20 text-emerald-300'}`}
+                >
+                  {isUser ? firstName ? firstName[0].toUpperCase() : 'U' : <Bot size={13} />}
                 </div>
                 <div>
                   <div
                     className={`px-3.5 py-2.5 text-sm leading-relaxed ${isUser ? 'rounded-2xl rounded-tr-sm text-emerald-50' : 'rounded-2xl rounded-tl-sm text-emerald-50'}`}
-                    style={isUser
-                      ? { background: 'linear-gradient(135deg, rgba(52,211,153,.25), rgba(20,184,166,.15))', border: '1px solid rgba(52,211,153,.20)' }
-                      : { background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.08)' }
+                    style={
+                      isUser
+                        ? {
+                            background:
+                              'linear-gradient(135deg, rgba(52,211,153,.25), rgba(20,184,166,.15))',
+                            border: '1px solid rgba(52,211,153,.20)',
+                          }
+                        : {
+                            background: 'rgba(255,255,255,.06)',
+                            border: '1px solid rgba(255,255,255,.08)',
+                          }
                     }
                   >
                     {renderMd(m.content)}
                   </div>
-                  {m.role === 'assistant' && m.engine && <EngineBadge engine={m.engine} debate={m.debate} />}
+                  {m.role === 'assistant' && m.engine && (
+                    <EngineBadge engine={m.engine} debate={m.debate} />
+                  )}
                 </div>
               </div>
               {followUps.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-2 ml-9">
                   {followUps.map((s) => (
                     <button
+                      type="button"
                       key={s}
                       className="bg-white/5 border border-white/10 text-white/60 rounded-full px-3 py-1 text-[12px] hover:bg-emerald-500/10 hover:border-emerald-500/20 hover:text-emerald-300 active:scale-95 transition-all"
                       onClick={() => sendText(s)}
@@ -669,12 +808,20 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
         })}
 
         {(loading || photoLoading) && (
-          <div className="flex gap-2 self-start max-w-[85%]" style={{ animation: 'chat-slide-right 0.25s ease both' }}>
+          <div
+            className="flex gap-2 self-start max-w-[85%]"
+            style={{ animation: 'chat-slide-right 0.25s ease both' }}
+          >
             <div className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
               <Bot size={13} />
             </div>
-            <div className="rounded-2xl rounded-tl-sm px-3.5 py-2.5 flex flex-col gap-1"
-              style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.08)' }}>
+            <div
+              className="rounded-2xl rounded-tl-sm px-3.5 py-2.5 flex flex-col gap-1"
+              style={{
+                background: 'rgba(255,255,255,.06)',
+                border: '1px solid rgba(255,255,255,.08)',
+              }}
+            >
               <TypingDots />
               <span className="text-emerald-300/50 text-[11px]">
                 {photoLoading ? 'Analyse de la photo…' : 'AgriTogo réfléchit…'}
@@ -685,12 +832,25 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
       </div>
 
       {/* ── INPUT BAR ──────────────────────────────────────────────── */}
-      <div className="flex gap-2 px-3 py-3 items-center border-t border-white/[0.08]" style={{ background: 'rgba(0,0,0,.30)' }}>
-        <input ref={photoInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
-          onChange={e => { const f = e.target.files?.[0]; if (f) handlePhoto(f) }} />
+      <div
+        className="flex gap-2 px-3 py-3 items-center border-t border-white/[0.08]"
+        style={{ background: 'rgba(0,0,0,.30)' }}
+      >
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) handlePhoto(f)
+          }}
+        />
 
         {/* Camera */}
-        <button type="button"
+        <button
+          type="button"
           className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl text-blue-300 transition-all disabled:opacity-40 hover:bg-blue-500/20 active:scale-95"
           style={{ background: 'rgba(59,130,246,.15)', border: '1px solid rgba(59,130,246,.25)' }}
           onClick={() => photoInputRef.current?.click()}
@@ -701,13 +861,17 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
         </button>
 
         {/* Dictation mic */}
-        <button type="button"
+        <button
+          type="button"
           className={`w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl text-[17px] transition-all disabled:opacity-40 ${
-            isListening ? 'text-red-300 ring-2 ring-red-500/30 animate-pulse' : 'text-white/60 hover:bg-white/12 active:scale-95'
+            isListening
+              ? 'text-red-300 ring-2 ring-red-500/30 animate-pulse'
+              : 'text-white/60 hover:bg-white/12 active:scale-95'
           }`}
-          style={isListening
-            ? { background: 'rgba(239,68,68,.20)', border: '1px solid rgba(239,68,68,.40)' }
-            : { background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.12)' }
+          style={
+            isListening
+              ? { background: 'rgba(239,68,68,.20)', border: '1px solid rgba(239,68,68,.40)' }
+              : { background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.12)' }
           }
           onClick={toggleVoice}
           disabled={loading || photoLoading}
@@ -718,27 +882,37 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
         </button>
 
         {/* Text input */}
-        <input ref={inputRef} type="text"
+        <input
+          ref={inputRef}
+          type="text"
           className="flex-1 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none transition-colors"
           style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.10)' }}
-          onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(52,211,153,.40)' }}
-          onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,.10)' }}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = 'rgba(52,211,153,.40)'
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,.10)'
+          }}
           placeholder="Posez votre question…"
           value={input}
           maxLength={1000}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && send()}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && send()}
           disabled={loading || photoLoading}
         />
 
         {/* Send */}
         <button
+          type="button"
           className={`w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl transition-all ${
-            input.trim() && !loading && !photoLoading ? 'text-white active:scale-95' : 'text-white/25 cursor-default'
+            input.trim() && !loading && !photoLoading
+              ? 'text-white active:scale-95'
+              : 'text-white/25 cursor-default'
           }`}
-          style={input.trim() && !loading && !photoLoading
-            ? { background: '#10b981', boxShadow: '0 4px 14px rgba(16,185,129,.25)' }
-            : { background: 'rgba(255,255,255,.08)' }
+          style={
+            input.trim() && !loading && !photoLoading
+              ? { background: '#10b981', boxShadow: '0 4px 14px rgba(16,185,129,.25)' }
+              : { background: 'rgba(255,255,255,.08)' }
           }
           onClick={send}
           disabled={loading || photoLoading || !input.trim()}
@@ -793,7 +967,7 @@ function getFollowUpSuggestions(response: string): string[] {
   if (/récolte|harvest|maturité/.test(lo)) picks.push('Comment améliorer ma récolte ?')
   if (/pest|maladie|traitement/.test(lo)) picks.push('Quels traitements appliquer ?')
   if (/sol|terre|ph/.test(lo)) picks.push('Comment améliorer mon sol ?')
-  if (picks.length === 0) picks.push('Expliquez-moi davantage', 'D\'autres conseils ?')
+  if (picks.length === 0) picks.push('Expliquez-moi davantage', "D'autres conseils ?")
   return picks.slice(0, 3)
 }
 
@@ -812,16 +986,41 @@ function renderMd(text: string) {
     let match = regex.exec(src)
     while (match !== null) {
       if (match.index > last) parts.push(src.slice(last, match.index))
-      if (match[2]) parts.push(<strong key={`b${i}-${key++}`} className="font-semibold text-emerald-200">{match[2]}</strong>)
-      else if (match[3]) parts.push(<em key={`i${i}-${key++}`} className="italic text-emerald-300">{match[3]}</em>)
-      else if (match[4]) parts.push(<code key={`c${i}-${key++}`} className="ai-inline-code">{match[4]}</code>)
+      if (match[2])
+        parts.push(
+          <strong key={`b${i}-${key++}`} className="font-semibold text-emerald-200">
+            {match[2]}
+          </strong>,
+        )
+      else if (match[3])
+        parts.push(
+          <em key={`i${i}-${key++}`} className="italic text-emerald-300">
+            {match[3]}
+          </em>,
+        )
+      else if (match[4])
+        parts.push(
+          <code key={`c${i}-${key++}`} className="ai-inline-code">
+            {match[4]}
+          </code>,
+        )
       last = match.index + match[0].length
       match = regex.exec(src)
     }
     if (last < src.length) parts.push(src.slice(last))
     // biome-ignore lint/suspicious/noArrayIndexKey: fragments de rendu Markdown d'un même message, régénérés ensemble à chaque rendu
-    if (isBullet) return <p key={i} className="ai-md-li">{'• '}{parts}</p>
+    if (isBullet)
+      return (
+        <p key={i} className="ai-md-li">
+          {'• '}
+          {parts}
+        </p>
+      )
     // biome-ignore lint/suspicious/noArrayIndexKey: fragments de rendu Markdown d'un même message, régénérés ensemble à chaque rendu
-    return <p key={i} className="m-0 last:mb-0 mb-1">{parts}</p>
+    return (
+      <p key={i} className="m-0 last:mb-0 mb-1">
+        {parts}
+      </p>
+    )
   })
 }

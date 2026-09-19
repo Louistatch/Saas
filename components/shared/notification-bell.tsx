@@ -77,10 +77,8 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
           filter: `cooperative_id=eq.${cooperativeId}`,
         },
         (payload) => {
-          setNotifications((prev) =>
-            [payload.new as InAppNotification, ...prev].slice(0, 20)
-          )
-        }
+          setNotifications((prev) => [payload.new as InAppNotification, ...prev].slice(0, 20))
+        },
       )
       .subscribe()
 
@@ -110,14 +108,12 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
           .update({ read_at: now })
           .eq('id', id)
           .eq('cooperative_id', cooperativeId)
-        setNotifications((prev) =>
-          prev.map((n) => (n.id === id ? { ...n, read_at: now } : n))
-        )
+        setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: now } : n)))
       } catch (error) {
         console.error('Failed to mark notification as read:', error)
       }
     },
-    [cooperativeId]
+    [cooperativeId],
   )
 
   const markAllRead = useCallback(async () => {
@@ -176,6 +172,7 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
             <h3 className="font-semibold text-sm text-foreground">Notifications</h3>
             {unreadCount > 0 && (
               <button
+                type="button"
                 onClick={markAllRead}
                 className="text-xs text-primary hover:underline"
               >
@@ -187,9 +184,7 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
           {/* List */}
           <div className="max-h-96 overflow-y-auto divide-y divide-border">
             {loading && (
-              <div className="py-8 text-center text-sm text-muted-foreground">
-                Chargement…
-              </div>
+              <div className="py-8 text-center text-sm text-muted-foreground">Chargement…</div>
             )}
             {!loading && notifications.length === 0 && (
               <div className="py-8 text-center text-sm text-muted-foreground">
@@ -202,7 +197,7 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
                   key={notif.id}
                   className={cn(
                     'flex gap-3 px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors',
-                    !notif.read_at && 'bg-muted/30'
+                    !notif.read_at && 'bg-muted/30',
                   )}
                   onClick={() => {
                     if (!notif.read_at) markAsRead(notif.id)
@@ -219,12 +214,7 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <p
-                      className={cn(
-                        'text-sm font-medium truncate',
-                        TYPE_COLORS[notif.type]
-                      )}
-                    >
+                    <p className={cn('text-sm font-medium truncate', TYPE_COLORS[notif.type])}>
                       {notif.title}
                     </p>
                     <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">

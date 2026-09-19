@@ -57,17 +57,40 @@ interface MarketListing {
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const CULTURES = [
-  'Maïs', 'Riz', 'Manioc', 'Igname', 'Sorgho', 'Mil', 'Arachide', 'Soja',
-  'Niébé', 'Coton', 'Café', 'Cacao', 'Palmier à huile', 'Hévéa', 'Ananas',
-  'Banane', 'Plantain', 'Mangue', 'Tomate', 'Oignon', 'Piment', 'Gombo',
-  'Aubergine', 'Pastèque', 'Concombre', 'Haricot vert', 'Autre',
+  'Maïs',
+  'Riz',
+  'Manioc',
+  'Igname',
+  'Sorgho',
+  'Mil',
+  'Arachide',
+  'Soja',
+  'Niébé',
+  'Coton',
+  'Café',
+  'Cacao',
+  'Palmier à huile',
+  'Hévéa',
+  'Ananas',
+  'Banane',
+  'Plantain',
+  'Mangue',
+  'Tomate',
+  'Oignon',
+  'Piment',
+  'Gombo',
+  'Aubergine',
+  'Pastèque',
+  'Concombre',
+  'Haricot vert',
+  'Autre',
 ]
 
 const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string }> = {
-  active:    { bg: 'bg-green-100',  text: 'text-green-800',  label: 'Actif' },
-  sold:      { bg: 'bg-blue-100',   text: 'text-blue-800',   label: 'Vendu' },
-  expired:   { bg: 'bg-gray-100',   text: 'text-gray-600',   label: 'Expiré' },
-  cancelled: { bg: 'bg-red-100',    text: 'text-red-800',    label: 'Annulé' },
+  active: { bg: 'bg-green-100', text: 'text-green-800', label: 'Actif' },
+  sold: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Vendu' },
+  expired: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Expiré' },
+  cancelled: { bg: 'bg-red-100', text: 'text-red-800', label: 'Annulé' },
 }
 
 const QUALITY_LABELS: Record<string, string> = {
@@ -76,9 +99,7 @@ const QUALITY_LABELS: Record<string, string> = {
   C: 'C - Économique',
 }
 
-const PREFECTURES = [
-  'Maritime', 'Plateaux', 'Centrale', 'Kara', 'Savanes',
-]
+const PREFECTURES = ['Maritime', 'Plateaux', 'Centrale', 'Kara', 'Savanes']
 
 const formatNum = (n: number) => new Intl.NumberFormat('fr-FR').format(n)
 
@@ -129,7 +150,10 @@ export default function AgriMarketPage() {
   // ── Fetch my listings ──────────────────────────────────────────────────
 
   const fetchMyListings = useCallback(async () => {
-    if (!currentCooperative) { setMyLoading(false); return }
+    if (!currentCooperative) {
+      setMyLoading(false)
+      return
+    }
     setMyLoading(true)
     const { data, error } = await supabase
       .from('market_listings')
@@ -143,11 +167,14 @@ export default function AgriMarketPage() {
       const rows = (data ?? []) as MarketListing[]
       setMyListings(rows)
       // Compute stats from own listings
-      const active = rows.filter(r => r.status === 'active')
+      const active = rows.filter((r) => r.status === 'active')
       setStats({
         activeCount: active.length,
         totalKg: active.reduce((s, r) => s + Number(r.quantity_kg), 0),
-        totalValue: active.reduce((s, r) => s + Number(r.quantity_kg) * Number(r.price_per_kg_fcfa), 0),
+        totalValue: active.reduce(
+          (s, r) => s + Number(r.quantity_kg) * Number(r.price_per_kg_fcfa),
+          0,
+        ),
         totalContacts: rows.reduce((s, r) => s + (r.contact_count ?? 0), 0),
       })
     }
@@ -171,8 +198,12 @@ export default function AgriMarketPage() {
     setRegionalLoading(false)
   }, [supabase, filterCulture, filterPrefecture])
 
-  useEffect(() => { fetchMyListings() }, [fetchMyListings])
-  useEffect(() => { fetchRegional() }, [fetchRegional])
+  useEffect(() => {
+    fetchMyListings()
+  }, [fetchMyListings])
+  useEffect(() => {
+    fetchRegional()
+  }, [fetchRegional])
 
   // ── Create listing ─────────────────────────────────────────────────────
 
@@ -200,7 +231,15 @@ export default function AgriMarketPage() {
       if (!res.ok) throw new Error(json.error ?? 'Erreur')
       toast({ title: 'Annonce créée avec succès' })
       setShowAdd(false)
-      setForm({ culture: '', quantity_kg: '', price_per_kg_fcfa: '', quality_grade: 'B', harvest_date_estimated: '', location_canton: '', description: '' })
+      setForm({
+        culture: '',
+        quantity_kg: '',
+        price_per_kg_fcfa: '',
+        quality_grade: 'B',
+        harvest_date_estimated: '',
+        location_canton: '',
+        description: '',
+      })
       fetchMyListings()
     } catch (err) {
       toast({ title: 'Erreur', description: errorMessage(err), variant: 'destructive' })
@@ -268,7 +307,9 @@ export default function AgriMarketPage() {
         <Card className="border-border">
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-green-50"><ShoppingBag className="h-4 w-4 text-green-600" /></div>
+              <div className="p-1.5 rounded-md bg-green-50">
+                <ShoppingBag className="h-4 w-4 text-green-600" />
+              </div>
               <div>
                 <p className="text-xs text-muted-foreground">Annonces actives</p>
                 <p className="text-lg font-bold text-foreground">{stats.activeCount}</p>
@@ -279,7 +320,9 @@ export default function AgriMarketPage() {
         <Card className="border-border">
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-blue-50"><Sprout className="h-4 w-4 text-blue-600" /></div>
+              <div className="p-1.5 rounded-md bg-blue-50">
+                <Sprout className="h-4 w-4 text-blue-600" />
+              </div>
               <div>
                 <p className="text-xs text-muted-foreground">Volume total</p>
                 <p className="text-lg font-bold text-foreground">{formatNum(stats.totalKg)} kg</p>
@@ -290,10 +333,14 @@ export default function AgriMarketPage() {
         <Card className="border-border">
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-yellow-50"><TrendingUp className="h-4 w-4 text-yellow-600" /></div>
+              <div className="p-1.5 rounded-md bg-yellow-50">
+                <TrendingUp className="h-4 w-4 text-yellow-600" />
+              </div>
               <div>
                 <p className="text-xs text-muted-foreground">Valeur estimée</p>
-                <p className="text-lg font-bold text-foreground">{formatNum(stats.totalValue)} FCFA</p>
+                <p className="text-lg font-bold text-foreground">
+                  {formatNum(stats.totalValue)} FCFA
+                </p>
               </div>
             </div>
           </CardContent>
@@ -301,7 +348,9 @@ export default function AgriMarketPage() {
         <Card className="border-border">
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-purple-50"><Phone className="h-4 w-4 text-purple-600" /></div>
+              <div className="p-1.5 rounded-md bg-purple-50">
+                <Phone className="h-4 w-4 text-purple-600" />
+              </div>
               <div>
                 <p className="text-xs text-muted-foreground">Contacts reçus</p>
                 <p className="text-lg font-bold text-foreground">{stats.totalContacts}</p>
@@ -314,6 +363,7 @@ export default function AgriMarketPage() {
       {/* ── Tab toggle ── */}
       <div className="flex gap-2 border-b border-border">
         <button
+          type="button"
           onClick={() => setTab('mes')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             tab === 'mes'
@@ -324,6 +374,7 @@ export default function AgriMarketPage() {
           Mes annonces
         </button>
         <button
+          type="button"
           onClick={() => setTab('regional')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             tab === 'regional'
@@ -350,7 +401,10 @@ export default function AgriMarketPage() {
                 title="Aucune annonce"
                 description="Publiez vos récoltes pour les vendre aux acheteurs régionaux"
                 action={
-                  <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setShowAdd(true)}>
+                  <Button
+                    className="gap-2 bg-primary hover:bg-primary/90"
+                    onClick={() => setShowAdd(true)}
+                  >
                     <Plus className="h-4 w-4" /> Première annonce
                   </Button>
                 }
@@ -373,18 +427,27 @@ export default function AgriMarketPage() {
                     {myListings.map((l) => {
                       const st = STATUS_CONFIG[l.status] ?? STATUS_CONFIG.active
                       return (
-                        <tr key={l.id} className="border-b border-border last:border-0 hover:bg-accent/5">
+                        <tr
+                          key={l.id}
+                          className="border-b border-border last:border-0 hover:bg-accent/5"
+                        >
                           <td className="py-3 pr-4">
                             <div className="flex items-center gap-1.5">
                               <Sprout className="h-3.5 w-3.5 text-green-600" />
                               <span className="font-medium text-foreground">{l.culture}</span>
                             </div>
                           </td>
-                          <td className="py-3 pr-4 text-foreground">{formatNum(l.quantity_kg)} kg</td>
-                          <td className="py-3 pr-4 text-foreground">{formatNum(l.price_per_kg_fcfa)} FCFA</td>
+                          <td className="py-3 pr-4 text-foreground">
+                            {formatNum(l.quantity_kg)} kg
+                          </td>
+                          <td className="py-3 pr-4 text-foreground">
+                            {formatNum(l.price_per_kg_fcfa)} FCFA
+                          </td>
                           <td className="py-3 pr-4 text-foreground">{l.quality_grade}</td>
                           <td className="py-3 pr-4">
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${st.bg} ${st.text}`}>
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded-full ${st.bg} ${st.text}`}
+                            >
                               {st.label}
                             </span>
                           </td>
@@ -435,8 +498,10 @@ export default function AgriMarketPage() {
               onChange={(e) => setFilterCulture(e.target.value)}
             >
               <option value="">Toutes les cultures</option>
-              {CULTURES.map(c => (
-                <option key={c} value={c}>{c}</option>
+              {CULTURES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
               ))}
             </select>
             <select
@@ -445,8 +510,10 @@ export default function AgriMarketPage() {
               onChange={(e) => setFilterPrefecture(e.target.value)}
             >
               <option value="">Toutes les régions</option>
-              {PREFECTURES.map(p => (
-                <option key={p} value={p}>{p}</option>
+              {PREFECTURES.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
               ))}
             </select>
           </div>
@@ -472,7 +539,9 @@ export default function AgriMarketPage() {
                           </div>
                           <div>
                             <p className="font-semibold text-foreground">{l.culture}</p>
-                            <p className="text-xs text-muted-foreground">Qualité {l.quality_grade}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Qualité {l.quality_grade}
+                            </p>
                           </div>
                         </div>
                         <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800">
@@ -483,24 +552,31 @@ export default function AgriMarketPage() {
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div>
                           <p className="text-muted-foreground text-xs">Quantité</p>
-                          <p className="font-medium text-foreground">{formatNum(l.quantity_kg)} kg</p>
+                          <p className="font-medium text-foreground">
+                            {formatNum(l.quantity_kg)} kg
+                          </p>
                         </div>
                         <div>
                           <p className="text-muted-foreground text-xs">Prix/kg</p>
-                          <p className="font-medium text-foreground">{formatNum(l.price_per_kg_fcfa)} FCFA</p>
+                          <p className="font-medium text-foreground">
+                            {formatNum(l.price_per_kg_fcfa)} FCFA
+                          </p>
                         </div>
                       </div>
 
                       {(l.location_canton || l.location_prefecture) && (
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           <MapPin className="h-3 w-3" />
-                          <span>{[l.location_canton, l.location_prefecture].filter(Boolean).join(', ')}</span>
+                          <span>
+                            {[l.location_canton, l.location_prefecture].filter(Boolean).join(', ')}
+                          </span>
                         </div>
                       )}
 
                       {l.cooperatives?.name && (
                         <p className="text-xs text-muted-foreground">
-                          Coopérative : <span className="font-medium text-foreground">{l.cooperatives.name}</span>
+                          Coopérative :{' '}
+                          <span className="font-medium text-foreground">{l.cooperatives.name}</span>
                         </p>
                       )}
 
@@ -541,41 +617,51 @@ export default function AgriMarketPage() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Nouvelle annonce</DialogTitle>
-            <DialogDescription>Publiez votre récolte sur le marché agricole régional</DialogDescription>
+            <DialogDescription>
+              Publiez votre récolte sur le marché agricole régional
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Culture <span className="text-destructive">*</span></Label>
+              <Label>
+                Culture <span className="text-destructive">*</span>
+              </Label>
               <select
                 className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
                 value={form.culture}
-                onChange={(e) => setForm(f => ({ ...f, culture: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, culture: e.target.value }))}
               >
                 <option value="">— Choisir une culture —</option>
-                {CULTURES.map(c => (
-                  <option key={c} value={c}>{c}</option>
+                {CULTURES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
                 ))}
               </select>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Quantité (kg) <span className="text-destructive">*</span></Label>
+                <Label>
+                  Quantité (kg) <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   type="number"
                   min="1"
                   value={form.quantity_kg}
-                  onChange={(e) => setForm(f => ({ ...f, quantity_kg: e.target.value }))}
+                  onChange={(e) => setForm((f) => ({ ...f, quantity_kg: e.target.value }))}
                   placeholder="ex: 500"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Prix par kg (FCFA) <span className="text-destructive">*</span></Label>
+                <Label>
+                  Prix par kg (FCFA) <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   type="number"
                   min="1"
                   value={form.price_per_kg_fcfa}
-                  onChange={(e) => setForm(f => ({ ...f, price_per_kg_fcfa: e.target.value }))}
+                  onChange={(e) => setForm((f) => ({ ...f, price_per_kg_fcfa: e.target.value }))}
                   placeholder="ex: 250"
                 />
               </div>
@@ -587,10 +673,12 @@ export default function AgriMarketPage() {
                 <select
                   className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
                   value={form.quality_grade}
-                  onChange={(e) => setForm(f => ({ ...f, quality_grade: e.target.value }))}
+                  onChange={(e) => setForm((f) => ({ ...f, quality_grade: e.target.value }))}
                 >
                   {Object.entries(QUALITY_LABELS).map(([v, l]) => (
-                    <option key={v} value={v}>{l}</option>
+                    <option key={v} value={v}>
+                      {l}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -599,7 +687,9 @@ export default function AgriMarketPage() {
                 <Input
                   type="date"
                   value={form.harvest_date_estimated}
-                  onChange={(e) => setForm(f => ({ ...f, harvest_date_estimated: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, harvest_date_estimated: e.target.value }))
+                  }
                 />
               </div>
             </div>
@@ -608,7 +698,7 @@ export default function AgriMarketPage() {
               <Label>Canton / Localité</Label>
               <Input
                 value={form.location_canton}
-                onChange={(e) => setForm(f => ({ ...f, location_canton: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, location_canton: e.target.value }))}
                 placeholder="ex: Tsévié"
               />
             </div>
@@ -619,7 +709,7 @@ export default function AgriMarketPage() {
                 className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm resize-none"
                 rows={3}
                 value={form.description}
-                onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 placeholder="Informations supplémentaires sur la récolte…"
               />
             </div>
@@ -641,7 +731,12 @@ export default function AgriMarketPage() {
       </Dialog>
 
       {/* ── Dialog: Contacter ── */}
-      <Dialog open={!!contactListing} onOpenChange={(o) => { if (!o) setContactListing(null) }}>
+      <Dialog
+        open={!!contactListing}
+        onOpenChange={(o) => {
+          if (!o) setContactListing(null)
+        }}
+      >
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Contacter le producteur</DialogTitle>
@@ -649,8 +744,8 @@ export default function AgriMarketPage() {
               {contactListing && (
                 <>
                   Contactez la coopérative{' '}
-                  <strong>{contactListing.cooperatives?.name ?? 'inconnue'}</strong>{' '}
-                  pour obtenir les coordonnées du producteur.
+                  <strong>{contactListing.cooperatives?.name ?? 'inconnue'}</strong> pour obtenir
+                  les coordonnées du producteur.
                 </>
               )}
             </DialogDescription>
@@ -678,7 +773,9 @@ export default function AgriMarketPage() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setContactListing(null)}>Fermer</Button>
+            <Button variant="outline" onClick={() => setContactListing(null)}>
+              Fermer
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

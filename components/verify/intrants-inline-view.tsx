@@ -20,11 +20,11 @@ interface Props {
 }
 
 const TYPE_META: Record<string, { icon: string; label: string; color: string }> = {
-  semence:   { icon: '🌱', label: 'Semences',   color: 'border-emerald-500/25 bg-emerald-500/8' },
-  engrais:   { icon: '🪣', label: 'Engrais',    color: 'border-blue-500/25 bg-blue-500/8' },
+  semence: { icon: '🌱', label: 'Semences', color: 'border-emerald-500/25 bg-emerald-500/8' },
+  engrais: { icon: '🪣', label: 'Engrais', color: 'border-blue-500/25 bg-blue-500/8' },
   pesticide: { icon: '🧪', label: 'Pesticides', color: 'border-amber-500/25 bg-amber-500/8' },
-  outil:     { icon: '🔧', label: 'Outils',     color: 'border-slate-500/25 bg-slate-500/8' },
-  autre:     { icon: '📦', label: 'Autres',     color: 'border-white/10 bg-white/5' },
+  outil: { icon: '🔧', label: 'Outils', color: 'border-slate-500/25 bg-slate-500/8' },
+  autre: { icon: '📦', label: 'Autres', color: 'border-white/10 bg-white/5' },
 }
 const TYPE_ORDER = ['semence', 'engrais', 'pesticide', 'outil', 'autre']
 
@@ -35,8 +35,8 @@ export function IntrantsInlineView({ cardNumber, onBack }: Props) {
 
   useEffect(() => {
     fetch(`/api/verify/${encodeURIComponent(cardNumber)}/intrants`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => setIntrants(d?.intrants ?? []))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setIntrants(d?.intrants ?? []))
       .catch(() => setIntrants([]))
       .finally(() => setLoading(false))
   }, [cardNumber])
@@ -44,17 +44,21 @@ export function IntrantsInlineView({ cardNumber, onBack }: Props) {
   const totalCost = (intrants ?? []).reduce((s, i) => s + (i.cost_fcfa ?? 0), 0)
 
   // Group by type
-  const groups = TYPE_ORDER.map(type => {
-    const items = (intrants ?? []).filter(i => (i.type ?? 'autre') === type)
+  const groups = TYPE_ORDER.map((type) => {
+    const items = (intrants ?? []).filter((i) => (i.type ?? 'autre') === type)
     const cost = items.reduce((s, i) => s + (i.cost_fcfa ?? 0), 0)
     return { type, items, cost }
-  }).filter(g => g.items.length > 0)
+  }).filter((g) => g.items.length > 0)
 
-  const toggle = (type: string) => setExpanded(prev => ({ ...prev, [type]: !prev[type] }))
+  const toggle = (type: string) => setExpanded((prev) => ({ ...prev, [type]: !prev[type] }))
 
   return (
     <div className="space-y-4 vfp-enter">
-      <button onClick={onBack} className="flex items-center gap-2 text-[var(--vfp-accent)] text-sm font-medium active:opacity-70">
+      <button
+        type="button"
+        onClick={onBack}
+        className="flex items-center gap-2 text-[var(--vfp-accent)] text-sm font-medium active:opacity-70"
+      >
         <ArrowLeft className="h-4 w-4" /> Retour
       </button>
       <h3 className="text-white text-lg font-bold">Mes Intrants</h3>
@@ -67,10 +71,12 @@ export function IntrantsInlineView({ cardNumber, onBack }: Props) {
               <div className="h-3 rounded-full bg-white/15 w-20" />
             </div>
             <div className="flex gap-2">
-              {[1,2,3].map(i => <div key={i} className="h-6 w-20 rounded-full bg-white/8" />)}
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-6 w-20 rounded-full bg-white/8" />
+              ))}
             </div>
           </div>
-          {[1,2,3].map(i => (
+          {[1, 2, 3].map((i) => (
             <div key={i} className="vfp-card rounded-2xl p-4 flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-white/8 shrink-0" />
               <div className="flex-1 space-y-2">
@@ -86,7 +92,9 @@ export function IntrantsInlineView({ cardNumber, onBack }: Props) {
         <div className="vfp-card rounded-2xl p-8 text-center">
           <ShoppingCart className="h-10 w-10 text-white/15 mx-auto mb-3" />
           <p className="text-white/40 text-sm">Aucun intrant enregistré.</p>
-          <p className="text-white/25 text-xs mt-1">Semences, engrais et outils apparaîtront ici.</p>
+          <p className="text-white/25 text-xs mt-1">
+            Semences, engrais et outils apparaîtront ici.
+          </p>
         </div>
       )}
 
@@ -102,17 +110,22 @@ export function IntrantsInlineView({ cardNumber, onBack }: Props) {
                 </span>
               </div>
               <div className="flex gap-1.5 flex-wrap">
-                {groups.filter(g => g.cost > 0).map(g => {
-                  const meta = TYPE_META[g.type] ?? TYPE_META.autre
-                  const pct = Math.round((g.cost / totalCost) * 100)
-                  return (
-                    <div key={g.type} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs ${meta.color}`}>
-                      <span>{meta.icon}</span>
-                      <span className="text-white/70">{meta.label}</span>
-                      <span className="font-bold text-white/90">{pct}%</span>
-                    </div>
-                  )
-                })}
+                {groups
+                  .filter((g) => g.cost > 0)
+                  .map((g) => {
+                    const meta = TYPE_META[g.type] ?? TYPE_META.autre
+                    const pct = Math.round((g.cost / totalCost) * 100)
+                    return (
+                      <div
+                        key={g.type}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs ${meta.color}`}
+                      >
+                        <span>{meta.icon}</span>
+                        <span className="text-white/70">{meta.label}</span>
+                        <span className="font-bold text-white/90">{pct}%</span>
+                      </div>
+                    )
+                  })}
               </div>
             </div>
           )}
@@ -124,23 +137,32 @@ export function IntrantsInlineView({ cardNumber, onBack }: Props) {
             return (
               <div key={type} className="vfp-card rounded-2xl overflow-hidden">
                 <button
+                  type="button"
                   onClick={() => toggle(type)}
                   className="w-full flex items-center gap-3 p-4"
                 >
                   <span className="text-xl w-8 text-center shrink-0">{meta.icon}</span>
                   <div className="flex-1 text-left">
                     <p className="text-white font-semibold text-sm">{meta.label}</p>
-                    <p className="text-white/40 text-xs">{items.length} article{items.length > 1 ? 's' : ''}{cost > 0 ? ` · ${cost.toLocaleString('fr-FR')} XOF` : ''}</p>
+                    <p className="text-white/40 text-xs">
+                      {items.length} article{items.length > 1 ? 's' : ''}
+                      {cost > 0 ? ` · ${cost.toLocaleString('fr-FR')} XOF` : ''}
+                    </p>
                   </div>
-                  {isOpen
-                    ? <ChevronUp className="h-4 w-4 text-white/30 shrink-0" />
-                    : <ChevronDown className="h-4 w-4 text-white/30 shrink-0" />}
+                  {isOpen ? (
+                    <ChevronUp className="h-4 w-4 text-white/30 shrink-0" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-white/30 shrink-0" />
+                  )}
                 </button>
 
                 {isOpen && (
                   <div className="border-t border-white/[0.06] px-4 pb-3 space-y-2 pt-2">
                     {items.map((item, i) => (
-                      <div key={item.id ?? i} className="flex items-start gap-3 py-2 border-b border-white/[0.04] last:border-0">
+                      <div
+                        key={item.id ?? i}
+                        className="flex items-start gap-3 py-2 border-b border-white/[0.04] last:border-0"
+                      >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-sm text-white truncate">{item.name}</span>
@@ -158,11 +180,17 @@ export function IntrantsInlineView({ cardNumber, onBack }: Props) {
                             )}
                             {item.purchase_date && (
                               <span className="text-[11px] text-white/25">
-                                {new Date(item.purchase_date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: '2-digit' })}
+                                {new Date(item.purchase_date).toLocaleDateString('fr-FR', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: '2-digit',
+                                })}
                               </span>
                             )}
                             {item.supplier && (
-                              <span className="text-[11px] text-white/30 truncate">{item.supplier}</span>
+                              <span className="text-[11px] text-white/30 truncate">
+                                {item.supplier}
+                              </span>
                             )}
                           </div>
                         </div>
