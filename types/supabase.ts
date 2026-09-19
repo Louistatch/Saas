@@ -1261,6 +1261,7 @@ export type Database = {
           description: string | null
           faitiere_name: string | null
           id: string
+          is_demo: boolean
           level: string | null
           logo_url: string | null
           name: string
@@ -1278,6 +1279,7 @@ export type Database = {
           description?: string | null
           faitiere_name?: string | null
           id?: string
+          is_demo?: boolean
           level?: string | null
           logo_url?: string | null
           name: string
@@ -1295,6 +1297,7 @@ export type Database = {
           description?: string | null
           faitiere_name?: string | null
           id?: string
+          is_demo?: boolean
           level?: string | null
           logo_url?: string | null
           name?: string
@@ -4136,6 +4139,7 @@ export type Database = {
           haroo_activated_at: string | null
           haroo_type: Database["public"]["Enums"]["haroo_profile_type"] | null
           id: string
+          is_demo: boolean
           last_name: string | null
           org_activated_at: string | null
           role: Database["public"]["Enums"]["user_role"]
@@ -4150,6 +4154,7 @@ export type Database = {
           haroo_activated_at?: string | null
           haroo_type?: Database["public"]["Enums"]["haroo_profile_type"] | null
           id: string
+          is_demo?: boolean
           last_name?: string | null
           org_activated_at?: string | null
           role?: Database["public"]["Enums"]["user_role"]
@@ -4164,6 +4169,7 @@ export type Database = {
           haroo_activated_at?: string | null
           haroo_type?: Database["public"]["Enums"]["haroo_profile_type"] | null
           id?: string
+          is_demo?: boolean
           last_name?: string | null
           org_activated_at?: string | null
           role?: Database["public"]["Enums"]["user_role"]
