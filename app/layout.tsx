@@ -1,11 +1,12 @@
-import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/app/context/auth-context'
 import { CooperativeProvider } from '@/app/context/cooperative-context'
-import { ThemeProvider } from '@/components/theme-provider'
 import { PostHogProvider } from '@/app/providers/posthog-provider'
+import { SiteVisitTracker } from '@/components/shared/site-visit-tracker'
+import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
+import { Analytics } from '@vercel/analytics/next'
+import type { Metadata } from 'next'
+import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
@@ -14,7 +15,7 @@ const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono'
 export const metadata: Metadata = {
   title: 'FaîtiereHub — Plateforme numérique pour coopératives agricoles',
   description:
-    'Donnez du pouvoir à vos coopératives agricoles avec des outils numériques pour la gestion des membres, les comptes d\'exploitation et les décisions basées sur les données.',
+    "Donnez du pouvoir à vos coopératives agricoles avec des outils numériques pour la gestion des membres, les comptes d'exploitation et les décisions basées sur les données.",
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
@@ -43,13 +44,23 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="font-sans antialiased min-h-screen">
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem
+          disableTransitionOnChange
+        >
           <PostHogProvider>
             <AuthProvider>
               <CooperativeProvider>
                 {children}
                 <Toaster />
-                {process.env.NODE_ENV === 'production' && <Analytics />}
+                {process.env.NODE_ENV === 'production' && (
+                  <>
+                    <Analytics />
+                    <SiteVisitTracker />
+                  </>
+                )}
               </CooperativeProvider>
             </AuthProvider>
           </PostHogProvider>

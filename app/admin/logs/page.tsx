@@ -19,7 +19,7 @@ import { useDebounced } from '@/hooks/use-debounced'
 import { useResetPageOnChange } from '@/hooks/use-reset-page'
 import { createClient } from '@/lib/supabase/client'
 import { timeAgo } from '@/lib/utils/time'
-import { Activity, AlertTriangle, ExternalLink, LogIn, Search } from 'lucide-react'
+import { Activity, AlertTriangle, BarChart3, ExternalLink, LogIn, Search } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 interface AuditLog {
@@ -229,6 +229,75 @@ function LoginsTab() {
   )
 }
 
+interface TrafficSummary {
+  total_visits_7d: number
+  unique_visitors_7d: number
+  top_pages: { path: string; views: number }[]
+}
+
+function TrafficTab() {
+  const [summary, setSummary] = useState<TrafficSummary | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/admin/activity/traffic')
+      .then((res) => res.json())
+      .then(setSummary)
+      .finally(() => setIsLoading(false))
+  }, [])
+
+  if (isLoading) return <LoadingBlock />
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Visites (7 jours)</p>
+            <p className="text-2xl font-bold text-foreground">{summary?.total_visits_7d ?? 0}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Visiteurs uniques (7 jours)</p>
+            <p className="text-2xl font-bold text-foreground">{summary?.unique_visitors_7d ?? 0}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="border-border">
+        <CardHeader>
+          <CardTitle className="text-foreground">Pages les plus visitées</CardTitle>
+          <CardDescription>7 derniers jours</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!summary || summary.top_pages.length === 0 ? (
+            <EmptyState
+              icon={BarChart3}
+              title="Aucune visite enregistrée"
+              description="Le trafic apparaîtra ici automatiquement, dès la prochaine visite du site"
+            />
+          ) : (
+            <div className="space-y-2">
+              {summary.top_pages.map((p) => (
+                <div
+                  key={p.path}
+                  className="flex items-center justify-between gap-4 p-3 border border-border rounded-lg"
+                >
+                  <span className="text-sm text-foreground truncate">{p.path}</span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {p.views} vue{p.views !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 function ErrorsTab() {
   const [status, setStatus] = useState<{ configured: boolean; dashboardUrl: string | null } | null>(
     null,
@@ -294,16 +363,20 @@ export default function ActivityAdminPage() {
     <div className="space-y-8">
       <PageHeader
         title="Suivi du site"
-        description="Actions, connexions et suivi des erreurs — tout ce qui bouge sur la plateforme"
+        description="Trafic, actions, connexions et suivi des erreurs — tout ce qui bouge sur la plateforme"
       />
 
-      <Tabs defaultValue="actions" className="w-full">
-        <TabsList className="grid w-full max-w-lg grid-cols-3 border-b border-border bg-transparent">
+      <Tabs defaultValue="traffic" className="w-full">
+        <TabsList className="grid w-full max-w-xl grid-cols-4 border-b border-border bg-transparent">
+          <TabsTrigger value="traffic">Trafic</TabsTrigger>
           <TabsTrigger value="actions">Actions</TabsTrigger>
           <TabsTrigger value="logins">Connexions</TabsTrigger>
           <TabsTrigger value="errors">Erreurs</TabsTrigger>
         </TabsList>
 
+        <TabsContent value="traffic" className="mt-6">
+          <TrafficTab />
+        </TabsContent>
         <TabsContent value="actions" className="mt-6">
           <ActionsTab />
         </TabsContent>
