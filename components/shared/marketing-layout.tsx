@@ -1,16 +1,17 @@
 'use client'
 
+import { AuthButtons } from '@/components/shared/auth-buttons'
+import { Logo } from '@/components/shared/logo'
+import { Menu, ScanLine, X } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
-import { Menu, X, ScanLine } from 'lucide-react'
-import { Logo } from '@/components/shared/logo'
-import { AuthButtons } from '@/components/shared/auth-buttons'
 
 const headerLinks = [
   { href: '/produit', label: 'Produit' },
   { href: '/features', label: 'Fonctionnalités' },
   { href: '/pricing', label: 'Tarifs' },
   { href: '/#haroo', label: 'Haroo', highlight: true },
+  { href: '/#operateur', label: 'Opérateur' },
   { href: '/a-propos', label: 'À propos' },
   { href: '/contact', label: 'Contact' },
 ]
@@ -34,6 +35,14 @@ const footerColumns = [
       { href: '/auth/signup/haroo', label: 'Ouvrier agricole' },
       { href: '/auth/signup/haroo', label: 'Acheteur' },
       { href: '/auth/signup/haroo', label: 'Agronome' },
+    ],
+  },
+  {
+    title: 'Opérateur',
+    links: [
+      { href: '/#operateur', label: 'Devenir Opérateur certifié' },
+      { href: '/operator/training', label: 'Formation (gratuite)' },
+      { href: '/operator', label: 'Espace Opérateur' },
     ],
   },
   {
@@ -142,7 +151,8 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
       {/* Footer */}
       <footer className="border-t border-border bg-background">
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <div className="grid gap-8 md:grid-cols-5">
+          {/* 1 colonne d'identité + 5 colonnes de liens */}
+          <div className="grid gap-8 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
             <div className="space-y-4">
               <Logo size="sm" />
               <p className="text-sm text-muted-foreground">

@@ -1,27 +1,27 @@
-import Link from 'next/link'
+import { HeroSection } from '@/components/marketing/hero-section'
+import { MarketingLayout } from '@/components/shared/marketing-layout'
+import { Button } from '@/components/ui/button'
 import {
   ArrowRight,
-  Users,
-  TrendingUp,
   BarChart3,
-  Zap,
-  ScanLine,
-  UserPlus,
-  MapPin,
-  GraduationCap,
-  CreditCard,
-  ShoppingBag,
   BookOpen,
-  Handshake,
-  CheckCircle,
   Briefcase,
-  Sprout,
-  Network,
+  CheckCircle,
+  CreditCard,
+  GraduationCap,
+  Handshake,
   Link2,
+  MapPin,
+  Network,
+  ScanLine,
+  ShoppingBag,
+  Sprout,
+  TrendingUp,
+  UserPlus,
+  Users,
+  Zap,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { MarketingLayout } from '@/components/shared/marketing-layout'
-import { HeroSection } from '@/components/marketing/hero-section'
+import Link from 'next/link'
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -94,7 +94,11 @@ const HAROO_PROFILES = [
     tagline: 'Emploi saisonnier',
     description:
       "Déclarez vos compétences agricoles et vos cantons de disponibilité. Accédez aux offres d'emploi de la région, triées par proximité.",
-    perks: ["Offres d'emploi géolocalisées", 'Carte professionnelle OUV-XXXXXX', 'Météo & prix marché'],
+    perks: [
+      "Offres d'emploi géolocalisées",
+      'Carte professionnelle OUV-XXXXXX',
+      'Météo & prix marché',
+    ],
   },
   {
     role: 'Acheteur',
@@ -105,7 +109,11 @@ const HAROO_PROFILES = [
     tagline: 'Préventes de production',
     description:
       "Définissez vos produits et zones d'intervention. Accédez aux préventes disponibles filtrées sur vos intérêts.",
-    perks: ['Préventes filtrées par produit', 'Carte professionnelle ACH-XXXXXX', 'Contacts producteurs'],
+    perks: [
+      'Préventes filtrées par produit',
+      'Carte professionnelle ACH-XXXXXX',
+      'Contacts producteurs',
+    ],
   },
   {
     role: 'Agronome',
@@ -116,7 +124,11 @@ const HAROO_PROFILES = [
     tagline: 'Missions de conseil',
     description:
       "Créez votre profil d'expert. Recevez des demandes de mission d'agriculteurs et d'organisations.",
-    perks: ['Demandes de mission directes', 'Badge de validation professionnelle', 'Carte AGR-XXXXXX vérifiable'],
+    perks: [
+      'Demandes de mission directes',
+      'Badge de validation professionnelle',
+      'Carte AGR-XXXXXX vérifiable',
+    ],
   },
 ]
 
@@ -137,7 +149,7 @@ const HOW_IT_WORKS = [
     step: '3',
     title: "Activez l'écosystème complet",
     description:
-      "Les membres accèdent au marché, aux crédits et aux formations. Les ouvriers, acheteurs et agronomes rejoignent via Haroo. Un seul scanner vérifie toutes les cartes.",
+      'Les membres accèdent au marché, aux crédits et aux formations. Les ouvriers, acheteurs et agronomes rejoignent via Haroo. Un seul scanner vérifie toutes les cartes.',
   },
 ]
 
@@ -146,7 +158,6 @@ const HOW_IT_WORKS = [
 export default function Home() {
   return (
     <MarketingLayout>
-
       {/* ── HERO ─────────────────────────────────────────────────────── */}
       <HeroSection />
 
@@ -159,9 +170,15 @@ export default function Home() {
                 <Users className="h-5 w-5" />
               </div>
               <div>
-                <div className="text-xs font-semibold uppercase tracking-wider text-primary mb-0.5">FaîtiereHub</div>
-                <div className="font-semibold text-foreground text-sm">Couche organisationnelle</div>
-                <div className="mt-1 text-xs text-muted-foreground">Faîtières · Unions · Coopératives · Membres</div>
+                <div className="text-xs font-semibold uppercase tracking-wider text-primary mb-0.5">
+                  FaîtiereHub
+                </div>
+                <div className="font-semibold text-foreground text-sm">
+                  Couche organisationnelle
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Faîtières · Unions · Coopératives · Membres
+                </div>
               </div>
             </div>
             <div className="flex items-center justify-center">
@@ -169,7 +186,11 @@ export default function Home() {
                 <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full border-2 border-border bg-background">
                   <Link2 className="h-5 w-5 text-muted-foreground" />
                 </div>
-                <div className="text-xs font-semibold text-muted-foreground">Même scanner QR<br />Même base de données</div>
+                <div className="text-xs font-semibold text-muted-foreground">
+                  Même scanner QR
+                  <br />
+                  Même base de données
+                </div>
               </div>
             </div>
             <div className="flex items-start gap-4 rounded-xl border border-amber-200 bg-amber-50/50 p-5">
@@ -177,9 +198,15 @@ export default function Home() {
                 <Network className="h-5 w-5" />
               </div>
               <div>
-                <div className="text-xs font-semibold uppercase tracking-wider text-amber-700 mb-0.5">Haroo</div>
-                <div className="font-semibold text-foreground text-sm">Couche humaine &amp; réseau</div>
-                <div className="mt-1 text-xs text-muted-foreground">Ouvriers · Acheteurs · Agronomes</div>
+                <div className="text-xs font-semibold uppercase tracking-wider text-amber-700 mb-0.5">
+                  Haroo
+                </div>
+                <div className="font-semibold text-foreground text-sm">
+                  Couche humaine &amp; réseau
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Ouvriers · Acheteurs · Agronomes
+                </div>
               </div>
             </div>
           </div>
@@ -229,8 +256,8 @@ export default function Home() {
               Conçu pour les coopératives agricoles
             </h2>
             <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
-              Tout ce dont vous avez besoin pour gérer vos membres, exploitations et croissance
-              en un seul endroit
+              Tout ce dont vous avez besoin pour gérer vos membres, exploitations et croissance en
+              un seul endroit
             </p>
           </div>
 
@@ -240,7 +267,9 @@ export default function Home() {
                 key={title}
                 className="rounded-xl border border-border bg-background p-6 space-y-3 transition-shadow hover:shadow-md"
               >
-                <div className={`inline-flex h-10 w-10 items-center justify-center rounded-lg ${color}`}>
+                <div
+                  className={`inline-flex h-10 w-10 items-center justify-center rounded-lg ${color}`}
+                >
                   <Icon className="h-5 w-5" />
                 </div>
                 <h3 className="font-semibold text-foreground">{title}</h3>
@@ -252,9 +281,11 @@ export default function Home() {
       </section>
 
       {/* ── HAROO SECTION ────────────────────────────────────────────── */}
-      <section id="haroo" className="py-20 sm:py-28 bg-gradient-to-br from-amber-50 via-orange-50/50 to-background dark:from-amber-950/20 dark:via-background dark:to-background">
+      <section
+        id="haroo"
+        className="py-20 sm:py-28 bg-gradient-to-br from-amber-50 via-orange-50/50 to-background dark:from-amber-950/20 dark:via-background dark:to-background"
+      >
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-
           {/* Header */}
           <div className="text-center space-y-4 mb-16">
             <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-100 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
@@ -272,42 +303,48 @@ export default function Home() {
 
           {/* 3 profile cards */}
           <div className="grid gap-6 sm:grid-cols-3">
-            {HAROO_PROFILES.map(({ role, icon: Icon, cardPrefix, color, tagline, description, perks }) => (
-              <div
-                key={role}
-                className="rounded-2xl border border-amber-200/60 bg-white dark:bg-card shadow-sm overflow-hidden flex flex-col"
-              >
-                {/* Card visual header */}
-                <div className={`bg-gradient-to-br ${color} p-5 text-white`}>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="text-xs font-bold tracking-widest opacity-70 mb-1">HAROO</div>
-                      <div className="font-bold text-lg leading-tight">{role}</div>
-                      <div className="text-xs opacity-75 mt-0.5 font-mono">{cardPrefix}XXXXXX</div>
+            {HAROO_PROFILES.map(
+              ({ role, icon: Icon, cardPrefix, color, tagline, description, perks }) => (
+                <div
+                  key={role}
+                  className="rounded-2xl border border-amber-200/60 bg-white dark:bg-card shadow-sm overflow-hidden flex flex-col"
+                >
+                  {/* Card visual header */}
+                  <div className={`bg-gradient-to-br ${color} p-5 text-white`}>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="text-xs font-bold tracking-widest opacity-70 mb-1">
+                          HAROO
+                        </div>
+                        <div className="font-bold text-lg leading-tight">{role}</div>
+                        <div className="text-xs opacity-75 mt-0.5 font-mono">
+                          {cardPrefix}XXXXXX
+                        </div>
+                      </div>
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20">
+                        <Icon className="h-5 w-5" />
+                      </div>
                     </div>
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20">
-                      <Icon className="h-5 w-5" />
+                    <div className="mt-3 inline-block rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-semibold">
+                      {tagline}
                     </div>
                   </div>
-                  <div className="mt-3 inline-block rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-semibold">
-                    {tagline}
-                  </div>
-                </div>
 
-                {/* Content */}
-                <div className="p-5 flex flex-col flex-1 gap-4">
-                  <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
-                  <ul className="space-y-2 flex-1">
-                    {perks.map((perk) => (
-                      <li key={perk} className="flex items-start gap-2 text-sm">
-                        <CheckCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                        <span className="text-foreground">{perk}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  {/* Content */}
+                  <div className="p-5 flex flex-col flex-1 gap-4">
+                    <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
+                    <ul className="space-y-2 flex-1">
+                      {perks.map((perk) => (
+                        <li key={perk} className="flex items-start gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                          <span className="text-foreground">{perk}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ),
+            )}
           </div>
 
           {/* Haroo CTA */}
@@ -321,7 +358,11 @@ export default function Home() {
               </Button>
             </Link>
             <Link href="/auth/login">
-              <Button size="lg" variant="outline" className="gap-2 border-amber-200 text-amber-700 hover:bg-amber-50">
+              <Button
+                size="lg"
+                variant="outline"
+                className="gap-2 border-amber-200 text-amber-700 hover:bg-amber-50"
+              >
                 Déjà inscrit — Se connecter
               </Button>
             </Link>
@@ -337,10 +378,87 @@ export default function Home() {
               Le même QR code scanner vérifie indifféremment les cartes FAITIERE des membres de
               coopérative et les cartes professionnelles Haroo des ouvriers, acheteurs et agronomes.
             </p>
-            <Link href="/scan" className="mt-3 inline-block text-sm font-semibold text-amber-700 hover:text-amber-900 underline underline-offset-2">
+            <Link
+              href="/scan"
+              className="mt-3 inline-block text-sm font-semibold text-amber-700 hover:text-amber-900 underline underline-offset-2"
+            >
               Essayer le scanner →
             </Link>
           </div>
+        </div>
+      </section>
+
+      {/* ── OPÉRATEUR CERTIFIÉ ───────────────────────────────────────── */}
+      <section id="operateur" className="border-t border-border bg-card/50 py-20 sm:py-28">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center space-y-4 mb-16">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-primary">
+              <Handshake className="h-3.5 w-3.5" /> Opérateur certifié FaîtiereHub
+            </div>
+            <h2 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+              Déployez FaîtiereHub sur le terrain — et vivez-en
+            </h2>
+            <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
+              Un Opérateur certifié accompagne les coopératives de sa région : mise en place de la
+              plateforme, formation des équipes, impression des cartes membres. Une formation
+              gratuite mène à la certification.
+            </p>
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-3">
+            <div className="rounded-2xl border border-border bg-background p-6">
+              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <GraduationCap className="h-5 w-5" />
+              </div>
+              <h3 className="font-bold text-foreground mb-2">Formation gratuite</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                12 leçons pratiques : gouvernance des coopératives, gestion des membres, cartes et
+                QR, collecte terrain, suivi de projets, modèle économique. Diapositives, cas
+                concrets, quiz et devoirs.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-background p-6">
+              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <CheckCircle className="h-5 w-5" />
+              </div>
+              <h3 className="font-bold text-foreground mb-2">Certification reconnue</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Après la formation, une évaluation pratique. Les frais de certification (15 000 XOF)
+                ne sont dus qu&apos;une fois l&apos;examen validé — jamais avant, jamais pour
+                recruter d&apos;autres opérateurs.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-background p-6">
+              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <CreditCard className="h-5 w-5" />
+              </div>
+              <h3 className="font-bold text-foreground mb-2">Des revenus clairs</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Sur chaque carte membre physique à 2 000 FCFA, 1 500 FCFA reviennent à
+                l&apos;Opérateur qui imprime et livre, 500 FCFA à la coopérative. Chaque montant est
+                traçable dans la plateforme.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+            <Link href="/operator">
+              <Button size="lg" className="gap-2">
+                <Handshake className="h-4 w-4" /> Devenir Opérateur certifié
+              </Button>
+            </Link>
+            <Link href="/operator/training">
+              <Button size="lg" variant="outline" className="gap-2">
+                <GraduationCap className="h-4 w-4" /> Découvrir la formation
+              </Button>
+            </Link>
+          </div>
+
+          <p className="mt-4 text-center text-xs text-muted-foreground">
+            Un compte suffit pour suivre la formation — aucune coopérative ni profil Haroo requis.
+          </p>
         </div>
       </section>
 
@@ -399,7 +517,6 @@ export default function Home() {
       <section className="border-t border-border py-20 sm:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-6 md:grid-cols-2">
-
             {/* FaîtiereHub CTA */}
             <div className="rounded-2xl bg-primary p-8 text-primary-foreground">
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-white/20">
@@ -418,7 +535,9 @@ export default function Home() {
                   Démarrer l&apos;essai gratuit <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-              <p className="mt-3 text-xs text-primary-foreground/60">30 jours gratuits · Sans carte bancaire</p>
+              <p className="mt-3 text-xs text-primary-foreground/60">
+                30 jours gratuits · Sans carte bancaire
+              </p>
             </div>
 
             {/* Haroo CTA */}
@@ -428,9 +547,9 @@ export default function Home() {
               </div>
               <h3 className="text-2xl font-extrabold mb-3">Rejoignez Haroo</h3>
               <p className="text-white/80 mb-6 leading-relaxed">
-                Vous êtes ouvrier agricole, acheteur ou agronome ? Créez votre profil
-                professionnel Haroo — obtenez votre carte vérifiable et accédez à des
-                opportunités dans votre région.
+                Vous êtes ouvrier agricole, acheteur ou agronome ? Créez votre profil professionnel
+                Haroo — obtenez votre carte vérifiable et accédez à des opportunités dans votre
+                région.
               </p>
               <Link href="/auth/signup/haroo">
                 <Button
@@ -453,7 +572,6 @@ export default function Home() {
           </p>
         </div>
       </section>
-
     </MarketingLayout>
   )
 }
