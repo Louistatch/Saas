@@ -19,7 +19,15 @@ import { useDebounced } from '@/hooks/use-debounced'
 import { useResetPageOnChange } from '@/hooks/use-reset-page'
 import { createClient } from '@/lib/supabase/client'
 import { timeAgo } from '@/lib/utils/time'
-import { Activity, AlertTriangle, BarChart3, ExternalLink, LogIn, Search } from 'lucide-react'
+import {
+  Activity,
+  AlertTriangle,
+  BarChart3,
+  ExternalLink,
+  Globe,
+  LogIn,
+  Search,
+} from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 interface AuditLog {
@@ -232,7 +240,10 @@ function LoginsTab() {
 interface TrafficSummary {
   total_visits_7d: number
   unique_visitors_7d: number
+  new_visitors_7d: number
+  returning_visitors_7d: number
   top_pages: { path: string; views: number }[]
+  top_countries: { country: string; views: number }[]
 }
 
 function TrafficTab() {
@@ -250,7 +261,7 @@ function TrafficTab() {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Visites (7 jours)</p>
@@ -259,41 +270,89 @@ function TrafficTab() {
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Visiteurs uniques (7 jours)</p>
+            <p className="text-sm text-muted-foreground">Visiteurs uniques</p>
             <p className="text-2xl font-bold text-foreground">{summary?.unique_visitors_7d ?? 0}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Nouveaux visiteurs</p>
+            <p className="text-2xl font-bold text-foreground">{summary?.new_visitors_7d ?? 0}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Visiteurs qui reviennent</p>
+            <p className="text-2xl font-bold text-foreground">
+              {summary?.returning_visitors_7d ?? 0}
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="border-border">
-        <CardHeader>
-          <CardTitle className="text-foreground">Pages les plus visitées</CardTitle>
-          <CardDescription>7 derniers jours</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {!summary || summary.top_pages.length === 0 ? (
-            <EmptyState
-              icon={BarChart3}
-              title="Aucune visite enregistrée"
-              description="Le trafic apparaîtra ici automatiquement, dès la prochaine visite du site"
-            />
-          ) : (
-            <div className="space-y-2">
-              {summary.top_pages.map((p) => (
-                <div
-                  key={p.path}
-                  className="flex items-center justify-between gap-4 p-3 border border-border rounded-lg"
-                >
-                  <span className="text-sm text-foreground truncate">{p.path}</span>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {p.views} vue{p.views !== 1 ? 's' : ''}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="border-border">
+          <CardHeader>
+            <CardTitle className="text-foreground">Pages les plus visitées</CardTitle>
+            <CardDescription>7 derniers jours</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!summary || summary.top_pages.length === 0 ? (
+              <EmptyState
+                icon={BarChart3}
+                title="Aucune visite enregistrée"
+                description="Le trafic apparaîtra ici automatiquement, dès la prochaine visite du site"
+              />
+            ) : (
+              <div className="space-y-2">
+                {summary.top_pages.map((p) => (
+                  <div
+                    key={p.path}
+                    className="flex items-center justify-between gap-4 p-3 border border-border rounded-lg"
+                  >
+                    <span className="text-sm text-foreground truncate">{p.path}</span>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {p.views} vue{p.views !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-border">
+          <CardHeader>
+            <CardTitle className="text-foreground">Pays</CardTitle>
+            <CardDescription>
+              Géolocalisation par IP (Vercel Edge), 7 derniers jours
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!summary || summary.top_countries.length === 0 ? (
+              <EmptyState
+                icon={Globe}
+                title="Aucune donnée de géolocalisation"
+                description="Disponible uniquement en production (Vercel) — jamais en développement local"
+              />
+            ) : (
+              <div className="space-y-2">
+                {summary.top_countries.map((c) => (
+                  <div
+                    key={c.country}
+                    className="flex items-center justify-between gap-4 p-3 border border-border rounded-lg"
+                  >
+                    <span className="text-sm text-foreground">{c.country}</span>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {c.views} visite{c.views !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

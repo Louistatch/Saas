@@ -4259,25 +4259,46 @@ export type Database = {
       }
       site_visits: {
         Row: {
+          city: string | null
+          country: string | null
           created_at: string
           id: string
+          is_new_visitor: boolean
+          latitude: number | null
+          longitude: number | null
           path: string
           referrer: string | null
+          region: string | null
           visitor_hash: string
+          visitor_id: string | null
         }
         Insert: {
+          city?: string | null
+          country?: string | null
           created_at?: string
           id?: string
+          is_new_visitor?: boolean
+          latitude?: number | null
+          longitude?: number | null
           path: string
           referrer?: string | null
+          region?: string | null
           visitor_hash: string
+          visitor_id?: string | null
         }
         Update: {
+          city?: string | null
+          country?: string | null
           created_at?: string
           id?: string
+          is_new_visitor?: boolean
+          latitude?: number | null
+          longitude?: number | null
           path?: string
           referrer?: string | null
+          region?: string | null
           visitor_hash?: string
+          visitor_id?: string | null
         }
         Relationships: []
       }
