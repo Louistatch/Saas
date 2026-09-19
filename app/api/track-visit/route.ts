@@ -77,7 +77,11 @@ export async function POST(request: NextRequest) {
   const response = new NextResponse(null, { status: 204 })
   response.cookies.set(VISITOR_COOKIE, visitorId, {
     httpOnly: true,
-    secure: true,
+    // `secure: true` sur une origine http (ex. localhost pendant un test)
+    // fait que le navigateur rejette silencieusement le cookie — jamais
+    // stocké, donc « nouveau visiteur » à chaque requête. On suit le
+    // protocole réel de la requête plutôt qu'une valeur figée.
+    secure: request.nextUrl.protocol === 'https:',
     sameSite: 'lax',
     maxAge: VISITOR_COOKIE_MAX_AGE,
     path: '/',
