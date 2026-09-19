@@ -171,6 +171,18 @@ export default function VerifyCardPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
 
+  // Fermer le panneau de notifications à l'échappement. L'arrière-plan qui le
+  // ferme au clic n'est jamais lui-même une cible clavier légitime — mais
+  // Escape reste l'attente standard pour un panneau qui se superpose au reste.
+  useEffect(() => {
+    if (!notifOpen) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setNotifOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [notifOpen])
+
   // Scan d'une autre carte : tout remettre à zéro. `cardNumber` est le
   // déclencheur ; sans lui, la carte précédente resterait affichée le temps
   // du chargement — sur une page de vérification, c'est inacceptable.
@@ -375,6 +387,7 @@ export default function VerifyCardPage() {
                 </button>
                 {notifOpen && (
                   <>
+                    {/* biome-ignore lint/a11y/useKeyWithClickEvents: arrière-plan de panneau — jamais une cible clavier, la fermeture au clavier passe par Escape (cf. le useEffect plus haut) */}
                     <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
                     <div className="absolute top-12 right-0 z-50 w-60 rounded-2xl border border-white/10 bg-[#040f0a]/95 backdrop-blur-xl p-4 shadow-xl">
                       <p className="text-white text-sm font-semibold mb-2">Notifications</p>
@@ -489,6 +502,7 @@ export default function VerifyCardPage() {
                 </button>
                 {notifOpen && (
                   <>
+                    {/* biome-ignore lint/a11y/useKeyWithClickEvents: arrière-plan de panneau — jamais une cible clavier, la fermeture au clavier passe par Escape (cf. le useEffect plus haut) */}
                     <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
                     <div className="absolute top-12 right-0 z-50 w-60 rounded-2xl border border-white/10 bg-[#040f0a]/95 backdrop-blur-xl p-4 shadow-xl">
                       <p className="text-white text-sm font-semibold mb-2">Notifications</p>
@@ -603,6 +617,7 @@ export default function VerifyCardPage() {
                 </button>
                 {notifOpen && (
                   <>
+                    {/* biome-ignore lint/a11y/useKeyWithClickEvents: arrière-plan de panneau — jamais une cible clavier, la fermeture au clavier passe par Escape (cf. le useEffect plus haut) */}
                     <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
                     <div className="absolute top-12 right-0 z-50 w-60 rounded-2xl border border-white/10 bg-[#040f0a]/95 backdrop-blur-xl p-4 shadow-xl">
                       <p className="text-white text-sm font-semibold mb-2">Notifications</p>
@@ -743,6 +758,7 @@ export default function VerifyCardPage() {
               </button>
               {notifOpen && (
                 <>
+                  {/* biome-ignore lint/a11y/useKeyWithClickEvents: arrière-plan de panneau — jamais une cible clavier, la fermeture au clavier passe par Escape (cf. le useEffect plus haut) */}
                   <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
                   <div className="absolute top-12 right-0 z-50 w-64 rounded-2xl border border-white/10 bg-[#040f0a]/95 backdrop-blur-xl p-4 shadow-xl">
                     <p className="text-white text-sm font-semibold mb-3">Notifications</p>
@@ -1004,8 +1020,8 @@ export default function VerifyCardPage() {
                   {/* Listening waveform */}
                   <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex items-end gap-[2px] h-2.5">
                     {[4, 9, 6, 10, 5].map((h, i) => (
-                      // biome-ignore lint/suspicious/noArrayIndexKey: barres décoratives d'un indicateur, valeurs littérales figées
                       <span
+                        // biome-ignore lint/suspicious/noArrayIndexKey: barres décoratives d'un indicateur, valeurs littérales figées
                         key={i}
                         className="w-[2px] rounded-full bg-orange-100 vfp-ai-wavebar"
                         style={{ height: h, animationDelay: `${i * 0.15}s` }}
@@ -1710,9 +1726,19 @@ export default function VerifyCardPage() {
 }
 
 function VerifyMobileMenu({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: arrière-plan — jamais une cible clavier, la fermeture au clavier passe par Escape (cf. le useEffect ci-dessus)
     <div className="fixed inset-0 z-50" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: pure plomberie anti-bubbling (stopPropagation), aucune action à apparier à un événement clavier */}
       <div
         className="absolute bottom-0 left-0 right-0 max-w-md mx-auto"
         onClick={(e) => e.stopPropagation()}

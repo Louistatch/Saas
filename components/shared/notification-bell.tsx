@@ -193,10 +193,11 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
             )}
             {!loading &&
               notifications.map((notif) => (
-                <div
+                <button
+                  type="button"
                   key={notif.id}
                   className={cn(
-                    'flex gap-3 px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors',
+                    'flex gap-3 px-4 py-3 w-full text-left cursor-pointer hover:bg-muted/50 transition-colors',
                     !notif.read_at && 'bg-muted/30',
                   )}
                   onClick={() => {
@@ -224,7 +225,7 @@ export function NotificationBell({ cooperativeId, className }: NotificationBellP
                       {formatTime(notif.created_at)}
                     </p>
                   </div>
-                </div>
+                </button>
               ))}
           </div>
 

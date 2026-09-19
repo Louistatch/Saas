@@ -933,6 +933,7 @@ export default function CardsPage() {
                   ] as const
                 ).map(([key, label]) => (
                   <label
+                    key={key}
                     htmlFor={`qr-include-${key}`}
                     className="flex items-center gap-2 cursor-pointer"
                   >

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   BarChart3,
   Briefcase,
@@ -43,6 +43,19 @@ const ADMIN_LINKS = [
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // Fermer le tiroir mobile à l'échappement — l'arrière-plan lui-même n'est
+  // jamais une cible clavier légitime (un utilisateur au clavier ne peut de
+  // toute façon pas s'y focaliser), mais Escape reste l'attente standard
+  // pour un panneau modal.
+  useEffect(() => {
+    if (!sidebarOpen) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSidebarOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [sidebarOpen])
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-background">
@@ -122,6 +135,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile overlay */}
       {sidebarOpen && (
+        // biome-ignore lint/a11y/useKeyWithClickEvents: arrière-plan de tiroir modal — jamais une cible clavier, la fermeture au clavier passe par Escape (cf. le useEffect ci-dessus)
         <div
           className="fixed inset-0 bg-black/50 z-30 md:hidden"
           onClick={() => setSidebarOpen(false)}

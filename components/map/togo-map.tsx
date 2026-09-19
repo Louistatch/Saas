@@ -104,7 +104,22 @@ export function TogoMap({ data, max, metric, onRegionClick, selectedRegion }: To
           const fill = intensityToColor(val, max)
           const isSelected = selectedRegion === r.name
           return (
-            <g key={r.name} onClick={() => onRegionClick(r.name)} className="cursor-pointer">
+            <g
+              key={r.name}
+              onClick={() => onRegionClick(r.name)}
+              className="cursor-pointer"
+              // biome-ignore lint/a11y/useSemanticElements: SVG n'a pas d'élément <button> — role="button" + tabIndex + onKeyDown restent le seul chemin praticable pour une région cliquable
+              role="button"
+              tabIndex={0}
+              aria-label={`${r.name} — ${val}`}
+              aria-pressed={isSelected}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onRegionClick(r.name)
+                }
+              }}
+            >
               <rect
                 x={r.x}
                 y={r.y}

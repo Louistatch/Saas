@@ -513,6 +513,16 @@ export default function ParcellesPage() {
                         <tr
                           className="hover:bg-muted/30 transition-colors cursor-pointer"
                           onClick={() => setExpandedId(isExpanded ? null : p.id)}
+                          // biome-ignore lint/a11y/useSemanticElements: <tr> ne peut pas devenir un <button> — élément de table ; role="button" + tabIndex + onKeyDown restent le seul chemin praticable
+                          role="button"
+                          tabIndex={0}
+                          aria-expanded={isExpanded}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              setExpandedId(isExpanded ? null : p.id)
+                            }
+                          }}
                         >
                           {scopeIds.length > 1 && (
                             <td className="px-4 py-3 text-xs text-muted-foreground hidden sm:table-cell whitespace-nowrap">

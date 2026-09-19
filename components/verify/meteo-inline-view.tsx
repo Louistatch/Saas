@@ -819,8 +819,8 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
                 <div className="px-4 pb-3">
                   <div className="flex gap-1.5">
                     {nowcastBanner.slots60.map((slot, i) => (
-                      // biome-ignore lint/suspicious/noArrayIndexKey: créneaux de prévision à 15 minutes : suite ordonnée de longueur fixe
                       <div
+                        // biome-ignore lint/suspicious/noArrayIndexKey: créneaux de prévision à 15 minutes : suite ordonnée de longueur fixe
                         key={i}
                         className={`flex-1 h-2 rounded-full transition-all ${slot.hasRain ? 'bg-blue-400' : 'bg-white/15'}`}
                       />

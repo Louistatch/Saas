@@ -271,6 +271,18 @@ export default function NotificationsPage() {
                   if (!notif.read_at) markAsRead(notif.id)
                   if (notif.link) router.push(notif.link)
                 }}
+                // Seules les notifications avec un lien sont réellement activables :
+                // pas de faux arrêt clavier sur les autres.
+                role={notif.link ? 'button' : undefined}
+                tabIndex={notif.link ? 0 : undefined}
+                onKeyDown={(e) => {
+                  if (!notif.link) return
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    if (!notif.read_at) markAsRead(notif.id)
+                    router.push(notif.link)
+                  }
+                }}
               >
                 <div className="mt-0.5 flex-shrink-0">
                   <Icon className={cn('h-5 w-5', config.className)} />

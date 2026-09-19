@@ -1008,17 +1008,23 @@ function renderMd(text: string) {
       match = regex.exec(src)
     }
     if (last < src.length) parts.push(src.slice(last))
-    // biome-ignore lint/suspicious/noArrayIndexKey: fragments de rendu Markdown d'un même message, régénérés ensemble à chaque rendu
     if (isBullet)
       return (
-        <p key={i} className="ai-md-li">
+        <p
+          // biome-ignore lint/suspicious/noArrayIndexKey: fragments de rendu Markdown d'un même message, régénérés ensemble à chaque rendu
+          key={i}
+          className="ai-md-li"
+        >
           {'• '}
           {parts}
         </p>
       )
-    // biome-ignore lint/suspicious/noArrayIndexKey: fragments de rendu Markdown d'un même message, régénérés ensemble à chaque rendu
     return (
-      <p key={i} className="m-0 last:mb-0 mb-1">
+      <p
+        // biome-ignore lint/suspicious/noArrayIndexKey: fragments de rendu Markdown d'un même message, régénérés ensemble à chaque rendu
+        key={i}
+        className="m-0 last:mb-0 mb-1"
+      >
         {parts}
       </p>
     )
