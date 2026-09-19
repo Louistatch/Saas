@@ -289,9 +289,9 @@ export default function AnalyticsPage() {
     fetchStatsRef.current = fetchStats
   }, [fetchStats])
 
+  const coopId = currentCooperative?.id
   useEffect(() => {
-    if (!currentCooperative) return
-    const coopId = currentCooperative.id
+    if (!coopId) return
     const channel = supabase
       .channel(`analytics-realtime-${coopId}`)
       .on(
@@ -333,7 +333,7 @@ export default function AnalyticsPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [currentCooperative?.id, supabase])
+  }, [coopId, supabase])
 
   const statCards = [
     {

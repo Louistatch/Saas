@@ -63,10 +63,18 @@ export function usePaginatedQuery<T = Record<string, unknown>>(
   const [page, setPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Reset page when filters/search change
+  // Les appelants passent un littéral d'objet : `filters` change d'identité à
+  // chaque rendu. Sa sérialisation est l'identité qui compte réellement ; on
+  // la calcule une fois et on s'y réfère partout, au lieu de rappeler
+  // `JSON.stringify` dans chaque tableau de dépendances.
+  const filtersKey = JSON.stringify(filters)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: filtersKey EST l'identité de filters — le lister rendrait le mémo inutile
+  const stableFilters = useMemo(() => filters, [filtersKey])
+
+  // Revenir à la première page dès que le filtrage ou la recherche change
   useEffect(() => {
     setPage(1)
-  }, [searchTerm, JSON.stringify(filters)])
+  }, [searchTerm, filtersKey])
 
   const fetchPage = useCallback(async () => {
     if (!enabled) {
@@ -85,7 +93,7 @@ export function usePaginatedQuery<T = Record<string, unknown>>(
         .select(select, { count: 'exact' })
 
       // Apply filters
-      for (const [col, val] of Object.entries(filters)) {
+      for (const [col, val] of Object.entries(stableFilters)) {
         query = query.eq(col, val)
       }
 
@@ -119,7 +127,7 @@ export function usePaginatedQuery<T = Record<string, unknown>>(
     } finally {
       setIsLoading(false)
     }
-  }, [table, select, JSON.stringify(filters), orderBy, ascending, page, pageSize, enabled, searchColumn, searchTerm, supabase, toast])
+  }, [table, select, stableFilters, orderBy, ascending, page, pageSize, enabled, searchColumn, searchTerm, supabase, toast])
 
   useEffect(() => {
     fetchPage()

@@ -150,9 +150,9 @@ export default function DashboardPage() {
   useEffect(() => { fetchStatsRef.current = fetchStats }, [fetchStats])
 
   // Realtime : membres, cartes, fiches, scans
+  const coopId = currentCooperative?.id
   useEffect(() => {
-    if (!currentCooperative) return
-    const coopId = currentCooperative.id
+    if (!coopId) return
     const channel = supabase
       .channel(`dashboard-realtime-${coopId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `cooperative_id=eq.${coopId}` }, () => fetchStatsRef.current())
@@ -161,7 +161,7 @@ export default function DashboardPage() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'member_access_logs', filter: `cooperative_id=eq.${coopId}` }, () => fetchStatsRef.current())
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [currentCooperative?.id, supabase])
+  }, [coopId, supabase])
 
   const dotColor: Record<RecentType, string> = {
     member: 'bg-primary',

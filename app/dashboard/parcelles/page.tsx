@@ -14,6 +14,7 @@ import { PaginationBar } from '@/components/shared/pagination'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { useDebounced } from '@/hooks/use-debounced'
+import { useResetPageOnChange } from '@/hooks/use-reset-page'
 
 interface Parcelle {
   id: string
@@ -211,7 +212,7 @@ export default function ParcellesPage() {
   }, [scopeIds, supabase, page, filterCulture, debouncedSearch])
 
   useEffect(() => { fetchStats() }, [fetchStats])
-  useEffect(() => { setPage(1) }, [debouncedSearch, filterCulture, filterIrrigation, tab])
+  useResetPageOnChange(setPage, [debouncedSearch, filterCulture, filterIrrigation, tab])
   useEffect(() => {
     if (tab === 'parcelles') fetchParcelles()
     else fetchProductions()

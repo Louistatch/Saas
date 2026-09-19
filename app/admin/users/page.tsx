@@ -18,6 +18,7 @@ import { RoleBadge } from '@/components/shared/status-badge'
 import { errorMessage } from '@/lib/utils/errors'
 import { profileUpdateSchema } from '@/lib/validators/schemas'
 import { USER_ROLES, type Profile, type UserRole } from '@/types/domain'
+import { useResetPageOnChange } from '@/hooks/use-reset-page'
 
 const PAGE_SIZE = 20
 
@@ -61,9 +62,7 @@ export default function UsersAdminPage() {
     fetchCooperatives()
   }, [fetchUsers, fetchCooperatives])
 
-  useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch])
+  useResetPageOnChange(setPage, [debouncedSearch])
 
   const filtered = useMemo(() => {
     const q = debouncedSearch.toLowerCase().trim()

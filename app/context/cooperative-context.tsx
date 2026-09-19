@@ -1,7 +1,7 @@
 'use client'
 
 import type React from 'react'
-import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { createLogger } from '@/lib/utils/logger'
 import { useAuth } from './auth-context'
@@ -43,8 +43,10 @@ export function CooperativeProvider({ children }: { children: React.ReactNode })
   const [isLoading, setIsLoading] = useState(true)
   const supabase = useMemo(() => createClient(), [])
 
-  // Track user ID to detect user switches and reset state
-  const [lastUserId, setLastUserId] = useState<string | null>(null)
+  // Identifiant du compte observé au rendu précédent. Une `ref` plutôt qu'un
+  // état : la valeur sert uniquement à comparer, jamais à rendre, et l'effet
+  // n'a donc pas à se redéclencher quand elle change.
+  const lastUserIdRef = useRef<string | null>(null)
 
   const fetchCooperatives = useCallback(async () => {
     if (!user) {
@@ -99,20 +101,25 @@ export function CooperativeProvider({ children }: { children: React.ReactNode })
     }
   }, [user, supabase])
 
-  // Detect user switch: reset state when user changes
+  // Changement de compte : purger les données du précédent locataire.
+  // Sans cela, une coopérative reste affichée après une bascule de compte —
+  // et `current_coop_id` du localStorage rouvrirait celle de l'ancien.
   useEffect(() => {
-    if (user?.id !== lastUserId) {
-      if (lastUserId !== null && user?.id) {
-        // User actually switched (not initial load or logout) — clear old data
-        setCooperatives([])
-        setCurrentCooperative(null)
-        if (typeof window !== 'undefined') {
-          window.localStorage.removeItem('current_coop_id')
-        }
+    const previous = lastUserIdRef.current
+    const currentId = user?.id ?? null
+    if (currentId === previous) return
+
+    // `previous === null` couvre le premier rendu et la déconnexion : il n'y a
+    // alors rien à purger.
+    if (previous !== null && currentId !== null) {
+      setCooperatives([])
+      setCurrentCooperative(null)
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('current_coop_id')
       }
-      setLastUserId(user?.id ?? null)
     }
-  }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+    lastUserIdRef.current = currentId
+  }, [user?.id])
 
   // Fetch cooperatives when user changes (separate from switch detection)
   useEffect(() => {

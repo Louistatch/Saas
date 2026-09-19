@@ -26,6 +26,7 @@ import { downloadCsv, parseCsvWithHeaders, toCsv, validateCsvFile } from '@/lib/
 import { errorMessage } from '@/lib/utils/errors'
 import { memberSchema, flattenZodErrors } from '@/lib/validators/schemas'
 import type { Member } from '@/types/domain'
+import { useResetPageOnChange } from '@/hooks/use-reset-page'
 
 const PAGE_SIZE = 20
 const CSV_HEADERS = ['first_name', 'last_name', 'email', 'phone', 'address'] as const
@@ -148,9 +149,7 @@ export default function MembersPage() {
     )
   }, [members, debouncedSearch])
 
-  useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch])
+  useResetPageOnChange(setPage, [debouncedSearch])
 
   const paged = useMemo(
     () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),

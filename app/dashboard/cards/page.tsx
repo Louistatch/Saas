@@ -33,6 +33,7 @@ import {
   type Member,
   type MemberCard,
 } from '@/types/domain'
+import { useResetPageOnChange } from '@/hooks/use-reset-page'
 
 const PAGE_SIZE = 20
 
@@ -174,9 +175,7 @@ export default function CardsPage() {
     loadCooperativeSettings()
   }, [fetchCards, fetchMembers, loadCooperativeSettings])
 
-  useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch])
+  useResetPageOnChange(setPage, [debouncedSearch])
 
   const filteredCards = useMemo(() => {
     const q = debouncedSearch.toLowerCase().trim()

@@ -18,6 +18,7 @@ import { PageHeader } from '@/components/shared/page-header'
 import { PaginationBar } from '@/components/shared/pagination'
 import { errorMessage } from '@/lib/utils/errors'
 import { buildCotisationSchema, flattenZodErrors } from '@/lib/validators/schemas'
+import { useResetPageOnChange } from '@/hooks/use-reset-page'
 
 interface Cotisation {
   id: string
@@ -160,7 +161,7 @@ export default function CotisationsPage() {
   }, [currentCooperative, supabase, filterStatus, debouncedSearch, page, toast])
 
   useEffect(() => { fetchCotisations() }, [fetchCotisations])
-  useEffect(() => { setPage(1) }, [filterStatus, debouncedSearch])
+  useResetPageOnChange(setPage, [filterStatus, debouncedSearch])
 
   // Add cotisation
   const handleAdd = async () => {

@@ -93,15 +93,15 @@ export default function AgriCreditPage() {
 
   useEffect(() => { void load() }, [load])
 
+  const coopId = currentCooperative?.id
   useEffect(() => {
-    if (!currentCooperative) return
+    if (!coopId) return
     supabase.from('members').select('id, first_name, last_name')
-      .eq('cooperative_id', currentCooperative.id)
+      .eq('cooperative_id', coopId)
       .eq('status', 'active')
       .order('last_name')
       .then(({ data }) => setMembers(data ?? []))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentCooperative?.id])
+  }, [coopId, supabase])
 
   const handleSubmit = async () => {
     if (!currentCooperative) return

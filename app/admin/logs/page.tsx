@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { PaginationBar } from '@/components/shared/pagination'
 import { timeAgo } from '@/lib/utils/time'
+import { useResetPageOnChange } from '@/hooks/use-reset-page'
 
 interface AuditLog {
   id: string
@@ -54,7 +55,7 @@ export default function AuditLogsPage() {
   }, [supabase, debouncedSearch, page])
 
   useEffect(() => { fetchLogs() }, [fetchLogs])
-  useEffect(() => { setPage(1) }, [debouncedSearch])
+  useResetPageOnChange(setPage, [debouncedSearch])
 
   const actionLabel = (action: string) => {
     const map: Record<string, string> = {

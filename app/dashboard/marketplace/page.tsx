@@ -22,6 +22,7 @@ import { PaginationBar } from '@/components/shared/pagination'
 import { useConfirm } from '@/components/shared/confirm-dialog'
 import { errorMessage } from '@/lib/utils/errors'
 import { useCascadingLocations } from '@/hooks/use-cascading-locations'
+import { useResetPageOnChange } from '@/hooks/use-reset-page'
 
 interface FicheTechnique {
   id: string
@@ -242,7 +243,7 @@ export default function MarketplacePage() {
   }, [currentCooperative, supabase, buildScopeIds])
 
   useEffect(() => { fetchFiches() }, [fetchFiches])
-  useEffect(() => { setPage(1) }, [debouncedSearch])
+  useResetPageOnChange(setPage, [debouncedSearch])
   useEffect(() => {
     if (viewMode === 'locality') fetchLocalityFiches()
   }, [viewMode, fetchLocalityFiches])

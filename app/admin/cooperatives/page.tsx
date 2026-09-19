@@ -18,6 +18,7 @@ import { PaginationBar } from '@/components/shared/pagination'
 import { useConfirm } from '@/components/shared/confirm-dialog'
 import { errorMessage } from '@/lib/utils/errors'
 import { cooperativeSchema, flattenZodErrors } from '@/lib/validators/schemas'
+import { useResetPageOnChange } from '@/hooks/use-reset-page'
 
 const PAGE_SIZE = 20
 
@@ -129,9 +130,7 @@ export default function CooperativesAdminPage() {
     fetchCooperatives()
   }, [fetchCooperatives])
 
-  useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch])
+  useResetPageOnChange(setPage, [debouncedSearch])
 
   const filtered = useMemo(() => {
     const q = debouncedSearch.toLowerCase().trim()
