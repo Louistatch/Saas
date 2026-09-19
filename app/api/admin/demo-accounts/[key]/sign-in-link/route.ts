@@ -7,10 +7,7 @@ import { type NextRequest, NextResponse } from 'next/server'
  * Lien de connexion à usage unique pour un compte de démo — jamais un vrai
  * compte utilisateur (generateDemoSignInLink revérifie is_demo en base).
  */
-export async function POST(
-  _request: NextRequest,
-  { params }: { params: Promise<{ key: string }> },
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ key: string }> }) {
   const guard = await assertRole('super_admin')
   if (!guard.ok) return guard.response
 
@@ -21,7 +18,7 @@ export async function POST(
   }
 
   const admin = createAdminClient()
-  const result = await generateDemoSignInLink(admin, key as DemoRoleKey)
+  const result = await generateDemoSignInLink(admin, key as DemoRoleKey, request.nextUrl.origin)
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 })
   }

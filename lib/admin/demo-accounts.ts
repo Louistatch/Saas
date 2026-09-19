@@ -218,6 +218,7 @@ export async function listDemoAccountStatus(admin: AdminClient): Promise<DemoAcc
 export async function generateDemoSignInLink(
   admin: AdminClient,
   key: DemoRoleKey,
+  origin: string,
 ): Promise<{ ok: boolean; error?: string; url?: string }> {
   const config = DEMO_ROLES.find((r) => r.key === key)
   if (!config) return { ok: false, error: 'Rôle de démo inconnu' }
@@ -231,9 +232,16 @@ export async function generateDemoSignInLink(
     return { ok: false, error: "Ce compte n'est pas un compte de démo — initialisez-le d'abord" }
   }
 
+  // Sans `redirectTo` explicite, GoTrue retombe sur le Site URL par défaut du
+  // projet (encore réglé sur localhost en dev) et livre les jetons en
+  // fragment d'URL au lieu de passer par /auth/callback, qui les échange
+  // proprement (exchangeCodeForSession) et route selon le rôle. `origin`
+  // vient de request.nextUrl.origin côté route appelante — jamais d'un en-tête
+  // spoofable (même règle que app/auth/callback/route.ts).
   const { data, error } = await admin.auth.admin.generateLink({
     type: 'magiclink',
     email: config.email,
+    options: { redirectTo: `${origin}/auth/callback` },
   })
   if (error || !data.properties?.action_link) {
     return { ok: false, error: 'Génération du lien impossible' }
