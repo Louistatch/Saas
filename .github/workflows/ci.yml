@@ -47,6 +47,39 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Lint (informatif, ne bloque pas)
-        run: npm run lint
-        continue-on-error: true
+      # Deux choses distinctes, traitées différemment :
+      #
+      #  • des diagnostics de lint → informatif. On les compte et on les écrit
+      #    dans le résumé du job, visible sur la page de l'exécution. Un simple
+      #    continue-on-error afficherait du vert et la dette resterait invisible.
+      #
+      #  • une configuration Biome invalide → bloquant. C'est précisément la
+      #    panne qui a neutralisé le linter du dépôt sans que personne ne s'en
+      #    aperçoive : Biome refuse alors de s'exécuter et ne rapporte aucun
+      #    diagnostic. Un décompte à zéro ne doit jamais pouvoir signifier
+      #    « le linter est cassé ».
+      - name: Lint (informatif, config bloquante)
+        run: |
+          npx biome lint . --max-diagnostics=2000 > lint.log 2>&1 || true
+
+          if grep -q 'configuration resulted in errors' lint.log; then
+            echo "::error::Configuration Biome invalide — le lint ne s'exécute pas."
+            cat lint.log
+            exit 1
+          fi
+
+          count=$(grep -cE ':[0-9]+:[0-9]+ lint/' lint.log || true)
+          count=${count:-0}
+
+          {
+            printf '## Lint — %s diagnostic(s)\n\n' "$count"
+            if [ "$count" -gt 0 ]; then
+              printf 'Non bloquant. Dette accumulée pendant que la configuration Biome était invalide.\n\n'
+              printf '| Règle | Occurrences |\n|---|---:|\n'
+              grep -oE 'lint/[a-z]+/[a-zA-Z]+' lint.log \
+                | sort | uniq -c | sort -rn | head -10 \
+                | awk '{ printf "| `%s` | %s |\n", $2, $1 }'
+            else
+              printf 'Aucun diagnostic — le lint peut devenir bloquant.\n'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
