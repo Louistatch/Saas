@@ -20,11 +20,11 @@ let initialized = false
 
 function initPostHog() {
   if (initialized) return
-  const key = process.env.NEXT_PUBLIC_POSTHOG_KEY
+  const key = process.env.NEXT_POSTHOG_KEY
   if (!key || typeof window === 'undefined') return
 
   posthog.init(key, {
-    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://eu.i.posthog.com',
+    api_host: process.env.NEXT_POSTHOG_HOST ?? 'https://eu.i.posthog.com',
     capture_pageview: false, // we send $pageview manually on route change
     capture_pageleave: true,
     persistence: 'localStorage+cookie',
@@ -42,7 +42,7 @@ function PageviewTracker() {
   const searchParams = useSearchParams()
 
   useEffect(() => {
-    if (!process.env.NEXT_PUBLIC_POSTHOG_KEY || typeof window === 'undefined') return
+    if (!process.env.NEXT_POSTHOG_KEY || typeof window === 'undefined') return
     const qs = searchParams?.toString()
     const url = qs ? `${pathname}?${qs}` : pathname
     posthog.capture('$pageview', { $current_url: window.location.origin + url })
@@ -56,7 +56,7 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
     initPostHog()
   }, [])
 
-  if (!process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+  if (!process.env.NEXT_POSTHOG_KEY) {
     // No key configured — render children without the provider (no-op).
     return <>{children}</>
   }
@@ -76,12 +76,12 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
  * Never send PII beyond what's necessary (id + coarse role).
  */
 export function identifyUser(userId: string, role: string, cooperativeId?: string) {
-  if (!process.env.NEXT_PUBLIC_POSTHOG_KEY || typeof window === 'undefined') return
+  if (!process.env.NEXT_POSTHOG_KEY || typeof window === 'undefined') return
   posthog.identify(userId, { role, cooperative_id: cooperativeId ?? null })
 }
 
 /** Reset on logout so the next session is anonymous. */
 export function resetAnalytics() {
-  if (!process.env.NEXT_PUBLIC_POSTHOG_KEY || typeof window === 'undefined') return
+  if (!process.env.NEXT_POSTHOG_KEY || typeof window === 'undefined') return
   posthog.reset()
 }
