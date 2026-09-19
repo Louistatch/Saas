@@ -42,9 +42,16 @@ const rootDir = path.resolve(__dirname, '..')
 
 // 1. proxy.ts existe (protection serveur des routes — Next.js 16 convention)
 check(
-  'proxy.ts présent (auth gate serveur)',
-  fs.existsSync(path.join(rootDir, 'proxy.ts')),
-  'Le fichier proxy.ts est requis pour la protection des routes (FIX ALPHA-1)'
+  // La propriété à garantir est qu'un garde serveur existe, pas le nom que
+  // Next.js donne au fichier cette année. Le dépôt utilise middleware.ts ;
+  // Next.js 16 pousse vers proxy.ts et affiche un avertissement de
+  // dépréciation, mais les deux remplissent le même rôle. On accepte l'un ou
+  // l'autre plutôt que de laisser un échec permanent qui apprend à ignorer
+  // le rapport.
+  'Garde serveur des routes présent (middleware.ts ou proxy.ts)',
+  fs.existsSync(path.join(rootDir, 'proxy.ts')) ||
+    fs.existsSync(path.join(rootDir, 'middleware.ts')),
+  'Aucun garde serveur : middleware.ts ou proxy.ts est requis (FIX ALPHA-1)'
 )
 
 // 2. security.txt existe
@@ -98,14 +105,19 @@ if (fs.existsSync(marketplacePath)) {
 const webhookPath = path.join(rootDir, 'app', 'api', 'webhooks', 'kobo', 'route.ts')
 if (fs.existsSync(webhookPath)) {
   const webhookContent = fs.readFileSync(webhookPath, 'utf-8')
+  // Ces deux contrôles testaient la présence d'un commentaire
+  // (`SECURITY FIX - GHOST-004/005`), pas la protection. Ils échouaient donc
+  // alors que le webhook porte bien les deux — et, plus grave, ils auraient
+  // laissé passer un fichier dont on aurait gardé le commentaire en retirant le
+  // code. On teste désormais le code, comme le fait déjà le contrôle KOBO-14.
   check(
     'Webhook Kobo: validation taille payload',
-    webhookContent.includes('SECURITY FIX - GHOST-004'),
+    webhookContent.includes('content-length'),
     'Ajouter la vérification content-length (FIX BETA-2)'
   )
   check(
     'Webhook Kobo: validation Zod payload',
-    webhookContent.includes('SECURITY FIX - GHOST-005'),
+    webhookContent.includes('safeParse'),
     'Ajouter le schéma Zod (FIX BETA-5)'
   )
 } else {
@@ -207,7 +219,11 @@ check(
 )
 
 // CHECK 16: kobo_submissions migration a RLS activé
-const migrationPath = path.join(rootDir, 'supabase_migrations', '20260524_kobo_integration_v2.sql')
+// Les migrations vivent dans supabase/migrations/. Le chemin pointait vers
+// supabase_migrations/, dossier inexistant : les contrôles 16 et 17 échouaient
+// donc systématiquement sur un fichier manquant, sans jamais vérifier le RLS
+// qu'ils sont censés garantir.
+const migrationPath = path.join(rootDir, 'supabase', 'migrations', '20260524_kobo_integration_v2.sql')
 if (fs.existsSync(migrationPath)) {
   const migrationContent = fs.readFileSync(migrationPath, 'utf-8')
   check(
