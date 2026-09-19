@@ -6,6 +6,8 @@
  * is heavily used in CRUD forms).
  */
 
+import type { Database } from '@/types/supabase'
+
 /**
  * Un compte porte deux couches indépendantes :
  *   - `role`       : la couche organisationnelle (coopératives)
@@ -504,4 +506,91 @@ export interface OrganizationEarning {
   settled_at: string | null
   created_at: string
   updated_at: string
+}
+
+// ─── AgriAcademy V2 — parcours Opérateur certifié ────────────────────────
+//
+// cf. supabase/migrations/20260919140639_academy_operator_training_v2.sql.
+// Types dérivés de Database['public']['Tables'][...]['Row'] plutôt que
+// dupliqués à la main, pour rester alignés avec le schéma réel.
+
+export type AcademyMediaAsset = Database['public']['Tables']['academy_media_assets']['Row']
+export type AcademyLessonSlide = Database['public']['Tables']['academy_lesson_slides']['Row']
+export type AcademyQuiz = Database['public']['Tables']['academy_quizzes']['Row']
+export type AcademyQuizQuestion = Database['public']['Tables']['academy_quiz_questions']['Row']
+export type AcademyQuizOption = Database['public']['Tables']['academy_quiz_options']['Row']
+export type AcademyQuizAttempt = Database['public']['Tables']['academy_quiz_attempts']['Row']
+export type AcademyAssignment = Database['public']['Tables']['academy_assignments']['Row']
+export type AcademyAssignmentSubmission =
+  Database['public']['Tables']['academy_assignment_submissions']['Row']
+export type AcademyProfileProgress = Database['public']['Tables']['academy_profile_progress']['Row']
+
+export type AcademySlideType =
+  | 'objective'
+  | 'concept'
+  | 'screenshot'
+  | 'procedure'
+  | 'warning'
+  | 'case'
+  | 'summary'
+
+export type AcademyQuestionType = 'single_choice' | 'multiple_choice' | 'true_false' | 'case'
+
+export type AcademyAssetType = 'screenshot' | 'image' | 'diagram' | 'video'
+export type AcademyAssetStatus = 'pending_capture' | 'ready' | 'archived'
+
+export type AcademySubmissionStatus = 'draft' | 'submitted' | 'reviewed' | 'revision_required'
+
+export type AcademyProgressStatus = 'not_started' | 'in_progress' | 'completed'
+
+/** Question du quiz exposée côté client — jamais `is_correct` (§ pas de fuite de la clé de correction). */
+export interface AcademyQuizOptionPublic {
+  id: string
+  label: string
+  order_index: number
+}
+
+export interface AcademyQuizQuestionPublic {
+  id: string
+  question_type: AcademyQuestionType
+  prompt: string
+  points: number
+  order_index: number
+  options: AcademyQuizOptionPublic[]
+}
+
+export interface AcademyQuizPublic {
+  id: string
+  module_id: string
+  lesson_id: string | null
+  title: string
+  description: string | null
+  passing_score: number
+  max_attempts: number | null
+  is_required: boolean
+  questions: AcademyQuizQuestionPublic[]
+}
+
+export interface AcademyLessonWithContent {
+  id: string
+  module_id: string
+  title: string
+  content_type: string
+  content_body: string | null
+  duration_min: number | null
+  order_index: number | null
+  slides: (AcademyLessonSlide & { media_asset: AcademyMediaAsset | null })[]
+  quiz: AcademyQuizPublic | null
+  assignment: AcademyAssignment | null
+}
+
+export interface AcademyModuleWithLessons {
+  id: string
+  title: string
+  description: string | null
+  category: string
+  level: string
+  duration_min: number | null
+  is_published: boolean | null
+  lessons: AcademyLessonWithContent[]
 }

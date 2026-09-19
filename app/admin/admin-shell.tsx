@@ -1,28 +1,29 @@
 'use client'
 
+import { Logo } from '@/components/shared/logo'
+import { Button } from '@/components/ui/button'
+import { performLogout } from '@/lib/auth/logout'
+import {
+  Activity,
+  Award,
+  BarChart3,
+  Briefcase,
+  Building2,
+  Coins,
+  Cpu,
+  GraduationCap,
+  LayoutDashboard,
+  Leaf,
+  LogOut,
+  Menu,
+  Settings,
+  TrendingUp,
+  Users,
+  X,
+} from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import {
-  Award,
-  BarChart3,
-  Coins,
-  Briefcase,
-  Users,
-  Settings,
-  LogOut,
-  Menu,
-  X,
-  Building2,
-  TrendingUp,
-  LayoutDashboard,
-  Activity,
-  Cpu,
-  Leaf,
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Logo } from '@/components/shared/logo'
-import { performLogout } from '@/lib/auth/logout'
 
 const ADMIN_LINKS = [
   { href: '/admin', label: "Vue d'ensemble", icon: TrendingUp },
@@ -30,6 +31,7 @@ const ADMIN_LINKS = [
   { href: '/admin/users', label: 'Utilisateurs', icon: Users },
   { href: '/admin/haroo', label: 'Professionnels Haroo', icon: Briefcase },
   { href: '/admin/partners', label: 'Opérateurs', icon: Award },
+  { href: '/admin/partners/training', label: 'Formation Opérateurs', icon: GraduationCap },
   { href: '/admin/organization-earnings', label: 'Gains organisations', icon: Coins },
   { href: '/admin/analytics', label: 'Statistiques', icon: BarChart3 },
   { href: '/admin/agritogo', label: 'AgriTogo', icon: Cpu },
