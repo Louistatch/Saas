@@ -163,10 +163,12 @@ export default function SignupPage() {
 
   if (!profileChoice) {
     return (
-      <div className="min-h-screen flex">
+      <div className="flex min-h-screen flex-col bg-[#f7f8f5] md:flex-row">
         <AuthSidePanel
-          title="Rejoignez FaîtiereHub"
-          description="Un seul compte pour la gestion coopérative et l'identité professionnelle"
+          imageSrc="/images/auth/operator-field-agent.webp"
+          eyebrow="Votre identité agricole"
+          title="Un profil. Tout un écosystème agricole."
+          description="Choisissez votre parcours et accédez aux services conçus pour votre activité, avec un compte unique FaîtiereHub."
           benefits={[
             'Gestion centralisée de vos membres',
             'Cartes numériques avec QR code',
@@ -174,8 +176,8 @@ export default function SignupPage() {
             'Fiches techniques par culture',
           ]}
         />
-        <div className="flex-1 flex items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
-          <div className="w-full max-w-md space-y-6">
+        <main className="flex flex-1 items-center justify-center px-4 py-8 sm:px-8 lg:px-12">
+          <div className="w-full max-w-md space-y-5">
             <div className="flex items-center justify-between">
               <Link
                 href="/"
@@ -186,8 +188,8 @@ export default function SignupPage() {
               <Logo size="sm" />
             </div>
 
-            <Card className="border-border">
-              <CardHeader className="space-y-1">
+            <Card className="border-black/[0.07] bg-white shadow-xl shadow-black/[0.06]">
+              <CardHeader className="space-y-2">
                 <CardTitle className="text-2xl font-bold text-foreground">
                   Quel est votre profil ?
                 </CardTitle>
@@ -231,17 +233,19 @@ export default function SignupPage() {
               </Link>
             </p>
           </div>
-        </div>
+        </main>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="flex min-h-screen flex-col bg-[#f7f8f5] md:flex-row">
       {/* Side panel */}
       <AuthSidePanel
-        title="Rejoignez FaîtiereHub"
-        description="La plateforme de gestion des faîtières agricoles du Togo"
+        imageSrc="/images/auth/operator-field-agent.webp"
+        eyebrow="Organisations agricoles"
+        title="Structurez votre organisation. Valorisez vos membres."
+        description="Centralisez vos adhérents, vos parcelles et vos cartes professionnelles dans un espace sécurisé."
         benefits={[
           'Gestion centralisée de vos membres',
           'Cartes numériques avec QR code',
@@ -251,8 +255,8 @@ export default function SignupPage() {
       />
 
       {/* Form */}
-      <div className="flex-1 flex items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
-        <div className="w-full max-w-md space-y-6">
+      <main className="flex flex-1 items-center justify-center px-4 py-8 sm:px-8 lg:px-12">
+        <div className="w-full max-w-md space-y-5">
           <div className="flex items-center justify-between">
             <button
               type="button"
@@ -264,7 +268,7 @@ export default function SignupPage() {
             <Logo size="sm" />
           </div>
 
-          <Card className="border-border">
+          <Card className="border-black/[0.07] bg-white shadow-xl shadow-black/[0.06]">
             <CardHeader className="space-y-1">
               <CardTitle className="text-2xl font-bold text-foreground">
                 Demander un accès
@@ -393,7 +397,7 @@ export default function SignupPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
+      </main>
     </div>
   )
 }
