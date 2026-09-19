@@ -451,3 +451,57 @@ export type WalletCreditOutcome =
   | { outcome: 'applied'; ledger_id: string; balance_fcfa: number }
   | { outcome: 'already_applied'; ledger_id: string; balance_fcfa: number }
   | { outcome: 'no_wallet' }
+
+// ─── Carte physique — commande, impression, gains organisation ──────────────
+//
+// cf. supabase/migrations/20260919140105_physical_card_business.sql.
+// `member_cards` (identité numérique) reste inchangée ; ce domaine ne fait
+// que la référencer.
+
+export type CardPrintOrderStatus = 'requested' | 'paid' | 'printed' | 'delivered' | 'cancelled'
+
+export type OrganizationEarningStatus = 'pending' | 'available' | 'paid' | 'cancelled'
+
+export interface CardPrintOrder {
+  id: string
+  cooperative_id: string
+  partner_id: string
+  status: CardPrintOrderStatus
+  requested_by: string | null
+  provider: string
+  provider_reference: string | null
+  amount_fcfa: number
+  paid_at: string | null
+  printed_at: string | null
+  delivered_at: string | null
+  cancelled_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CardPrintOrderItem {
+  id: string
+  order_id: string
+  member_id: string
+  member_card_id: string
+  unit_price_fcfa: number
+  printed_at: string | null
+  reprint_count: number
+  created_at: string
+}
+
+export interface OrganizationEarning {
+  id: string
+  cooperative_id: string
+  partner_id: string
+  order_id: string
+  order_item_id: string
+  amount_fcfa: number
+  currency: string
+  status: OrganizationEarningStatus
+  settlement_method: string | null
+  settlement_reference: string | null
+  settled_at: string | null
+  created_at: string
+  updated_at: string
+}

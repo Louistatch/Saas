@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import {
   Award,
   BarChart3,
+  Coins,
   Briefcase,
   Users,
   Settings,
@@ -29,6 +30,7 @@ const ADMIN_LINKS = [
   { href: '/admin/users', label: 'Utilisateurs', icon: Users },
   { href: '/admin/haroo', label: 'Professionnels Haroo', icon: Briefcase },
   { href: '/admin/partners', label: 'Opérateurs', icon: Award },
+  { href: '/admin/organization-earnings', label: 'Gains organisations', icon: Coins },
   { href: '/admin/analytics', label: 'Statistiques', icon: BarChart3 },
   { href: '/admin/agritogo', label: 'AgriTogo', icon: Cpu },
   { href: '/admin/agrismat', label: 'Agrismat', icon: Leaf },

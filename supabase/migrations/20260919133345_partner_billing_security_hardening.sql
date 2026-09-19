@@ -1,3 +1,9 @@
+-- Renommé depuis 20260921_140000_… (réconciliation d'historique, comme
+-- partner_capability_foundation et partner_billing_wallet avant lui) :
+-- apply_migration horodate à l'instant réel d'exécution (20260919133345),
+-- pas d'après le nom de fichier local. Ce fichier n'avait pas été corrigé
+-- au moment du commit PR 2.1 — repéré et réparé ici, en même temps que
+-- physical_card_business. Contenu inchangé.
 -- ─────────────────────────────────────────────────────────────────────────────
 -- PR 2.1 — durcissement de la facturation Opérateur
 --

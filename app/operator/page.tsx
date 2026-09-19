@@ -36,7 +36,10 @@ import {
   Clock,
   GraduationCap,
   LogOut,
+  PackageCheck,
+  Printer,
   ShieldAlert,
+  Truck,
   Wallet,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -335,6 +338,135 @@ function WalletCard() {
   )
 }
 
+interface PrintQueueMember {
+  first_name: string | null
+  last_name: string | null
+}
+
+interface PrintQueueItem {
+  id: string
+  member_id: string
+  printed_at: string | null
+  reprint_count: number
+  members: PrintQueueMember | null
+}
+
+interface PrintQueueOrder {
+  id: string
+  cooperative_id: string
+  status: 'paid' | 'printed'
+  amount_fcfa: number
+  cooperatives: { name: string } | null
+  card_print_order_items: PrintQueueItem[]
+}
+
+/**
+ * File d'impression du Partenaire (§48 du plan). Marquer une carte imprimée
+ * appelle directement lib/cards/print-orders.ts côté serveur ; ceci ne fait
+ * qu'afficher l'état et déclencher l'action, jamais de logique métier ici.
+ */
+function PrintQueueCard() {
+  const [orders, setOrders] = useState<PrintQueueOrder[]>([])
+  const [loading, setLoading] = useState(true)
+  const [actingId, setActingId] = useState<string | null>(null)
+
+  const load = () => {
+    setLoading(true)
+    fetch('/api/partner/print-queue')
+      .then((r) => (r.ok ? r.json() : { orders: [] }))
+      .then((d: { orders: PrintQueueOrder[] }) => setOrders(d.orders ?? []))
+      .catch(() => setOrders([]))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(load, [])
+
+  const markPrinted = async (orderId: string, itemId: string) => {
+    setActingId(itemId)
+    await fetch(`/api/partner/print-queue/${orderId}/items/${itemId}/print`, { method: 'POST' })
+    await load()
+    setActingId(null)
+  }
+
+  const deliver = async (orderId: string) => {
+    setActingId(orderId)
+    await fetch(`/api/partner/print-queue/${orderId}/deliver`, { method: 'POST' })
+    await load()
+    setActingId(null)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-8">
+        <Spinner className="h-5 w-5" />
+      </div>
+    )
+  }
+
+  if (orders.length === 0) {
+    return null
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-foreground">
+          <Printer className="h-5 w-5 text-primary" /> File d'impression
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {orders.map((order) => {
+          const allPrinted = order.card_print_order_items.every((i) => i.printed_at)
+          return (
+            <div key={order.id} className="rounded-xl border border-border p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="font-medium text-foreground">{order.cooperatives?.name ?? '—'}</p>
+                <span className="text-xs text-muted-foreground">
+                  {order.card_print_order_items.length} carte(s) —{' '}
+                  {order.amount_fcfa.toLocaleString('fr-FR')} FCFA
+                </span>
+              </div>
+              <ul className="divide-y divide-border">
+                {order.card_print_order_items.map((item) => (
+                  <li key={item.id} className="flex items-center justify-between py-1.5 text-sm">
+                    <span className="text-foreground">
+                      {item.members?.first_name} {item.members?.last_name}
+                    </span>
+                    {item.printed_at ? (
+                      <span className="flex items-center gap-1 text-primary">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Imprimée
+                      </span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={actingId === item.id}
+                        onClick={() => markPrinted(order.id, item.id)}
+                      >
+                        <PackageCheck className="mr-1.5 h-3.5 w-3.5" /> Marquer imprimée
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {allPrinted && order.status === 'printed' && (
+                <Button
+                  size="sm"
+                  disabled={actingId === order.id}
+                  onClick={() => deliver(order.id)}
+                  className="w-full"
+                >
+                  <Truck className="mr-1.5 h-4 w-4" /> Marquer livrée
+                </Button>
+              )}
+            </div>
+          )
+        })}
+      </CardContent>
+    </Card>
+  )
+}
+
 function ApplicationForm({ onApplied }: { onApplied: () => void }) {
   const [displayName, setDisplayName] = useState('')
   const [phone, setPhone] = useState('')
@@ -490,6 +622,12 @@ function OperatorPageContent() {
               <WalletCard />
             </div>
           )}
+
+        {status?.status === 'active' && (
+          <div className="mt-6">
+            <PrintQueueCard />
+          </div>
+        )}
       </main>
     </div>
   )

@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   Search,
   Printer,
+  IdCard,
 } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
@@ -659,6 +660,12 @@ export default function CardsPage() {
                 <Button variant="outline" className="gap-2 border-border">
                   <Printer className="h-4 w-4" />
                   Imprimer A4
+                </Button>
+              </Link>
+              <Link href="/dashboard/cards/print-orders">
+                <Button variant="outline" className="gap-2 border-border">
+                  <IdCard className="h-4 w-4" />
+                  Commander des cartes physiques
                 </Button>
               </Link>
               <Button

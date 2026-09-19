@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Award, CheckCircle2, XCircle } from 'lucide-react'
+import { Award, Building2, CheckCircle2, XCircle } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
 import { EmptyState } from '@/components/shared/empty-state'
 import { LoadingBlock } from '@/components/shared/loading'
@@ -26,10 +26,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
 import { errorMessage } from '@/lib/utils/errors'
-import type { PartnerStatus } from '@/types/domain'
+import { PARTNER_ACCESS_SCOPES, type PartnerAccessScope, type PartnerStatus } from '@/types/domain'
 
 interface PartnerRow {
   id: string
@@ -121,6 +128,123 @@ function ExamDialog({
   )
 }
 
+type AssignDialogState = { partnerId: string; displayName: string } | null
+
+const ASSIGNABLE_SCOPE_LABEL: Record<PartnerAccessScope, string> = {
+  'members.read': 'Lecture membres',
+  'members.manage': 'Gestion membres',
+  'cards.read': 'Lecture cartes',
+  'cards.manage': 'Gestion cartes',
+  'cards.print': 'Impression cartes physiques',
+  'kobo.manage': 'Gestion KoboCollect',
+  'imports.manage': 'Gestion imports',
+  'analytics.read': 'Lecture statistiques',
+  'reports.generate': 'Génération de rapports',
+  'projects.manage': 'Gestion de projets',
+  'support.manage': 'Support',
+}
+
+/**
+ * Mandat Partenaire ↔ Organisation (§13 du plan) — mécanisme pilote, comme
+ * la validation de certification : en attendant un parcours en
+ * libre-service pour les organisations, un super_admin pose le mandat.
+ * Sans lui, aucune commande de carte physique (PR 3) n'est possible — voir
+ * lib/partners/assignments.ts.
+ */
+function AssignDialog({
+  state,
+  onClose,
+  onSubmit,
+}: {
+  state: AssignDialogState
+  onClose: () => void
+  onSubmit: (cooperativeId: string, scopes: PartnerAccessScope[]) => Promise<void>
+}) {
+  const supabase = useMemo(() => createClient(), [])
+  const [cooperatives, setCooperatives] = useState<{ id: string; name: string }[]>([])
+  const [cooperativeId, setCooperativeId] = useState('')
+  const [scopes, setScopes] = useState<PartnerAccessScope[]>(['cards.print', 'cards.read'])
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!state) return
+    setCooperativeId('')
+    setScopes(['cards.print', 'cards.read'])
+    supabase
+      .from('cooperatives')
+      .select('id, name')
+      .order('name')
+      .then(({ data }) => setCooperatives(data ?? []))
+  }, [state, supabase])
+
+  const toggleScope = (scope: PartnerAccessScope) => {
+    setScopes((prev) => (prev.includes(scope) ? prev.filter((s) => s !== scope) : [...prev, scope]))
+  }
+
+  const submit = async () => {
+    if (!cooperativeId || scopes.length === 0) return
+    setSubmitting(true)
+    await onSubmit(cooperativeId, scopes)
+    setSubmitting(false)
+  }
+
+  return (
+    <Dialog open={!!state} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Assigner une organisation — {state?.displayName}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="assign-coop">Coopérative</Label>
+            <Select value={cooperativeId} onValueChange={setCooperativeId}>
+              <SelectTrigger id="assign-coop">
+                <SelectValue placeholder="Sélectionner une coopérative" />
+              </SelectTrigger>
+              <SelectContent>
+                {cooperatives.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <fieldset className="space-y-2 border-0 p-0 m-0">
+            <legend className="text-sm font-medium text-foreground">Périmètres délégués</legend>
+            <div className="grid grid-cols-2 gap-2">
+              {PARTNER_ACCESS_SCOPES.map((scope) => (
+                <label
+                  key={scope}
+                  htmlFor={`scope-${scope}`}
+                  className="flex items-center gap-2 text-sm"
+                >
+                  <input
+                    id={`scope-${scope}`}
+                    type="checkbox"
+                    checked={scopes.includes(scope)}
+                    onChange={() => toggleScope(scope)}
+                    className="h-4 w-4 rounded border-input"
+                  />
+                  {ASSIGNABLE_SCOPE_LABEL[scope]}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>
+            Annuler
+          </Button>
+          <Button onClick={submit} disabled={submitting || !cooperativeId || scopes.length === 0}>
+            Assigner
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export default function AdminPartnersPage() {
   const supabase = useMemo(() => createClient(), [])
   const { toast } = useToast()
@@ -128,6 +252,7 @@ export default function AdminPartnersPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [actingId, setActingId] = useState<string | null>(null)
   const [examDialog, setExamDialog] = useState<ExamDialogState>(null)
+  const [assignDialog, setAssignDialog] = useState<AssignDialogState>(null)
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -301,6 +426,18 @@ export default function AdminPartnersPage() {
                                 Activer opérateur
                               </Button>
                             )}
+                            {p.status === 'active' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={acting}
+                                onClick={() =>
+                                  setAssignDialog({ partnerId: p.id, displayName: p.display_name })
+                                }
+                              >
+                                <Building2 className="mr-1.5 h-3.5 w-3.5" /> Assigner
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -324,6 +461,39 @@ export default function AdminPartnersPage() {
             note: note || undefined,
           })
           setExamDialog(null)
+        }}
+      />
+
+      <AssignDialog
+        state={assignDialog}
+        onClose={() => setAssignDialog(null)}
+        onSubmit={async (cooperativeId, scopes) => {
+          if (!assignDialog) return
+          try {
+            const res = await fetch('/api/admin/partner-assignments', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                partner_id: assignDialog.partnerId,
+                cooperative_id: cooperativeId,
+                scopes,
+              }),
+            })
+            const payload = await res.json().catch(() => ({}))
+            if (!res.ok) {
+              toast({
+                title: 'Assignation impossible',
+                description: payload.error ?? '—',
+                variant: 'destructive',
+              })
+              return
+            }
+            toast({ title: 'Mandat créé' })
+          } catch {
+            toast({ title: 'Erreur de connexion', variant: 'destructive' })
+          } finally {
+            setAssignDialog(null)
+          }
         }}
       />
     </div>

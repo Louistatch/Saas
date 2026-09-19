@@ -504,6 +504,141 @@ export type Database = {
           },
         ]
       }
+      card_print_order_items: {
+        Row: {
+          created_at: string
+          id: string
+          member_card_id: string
+          member_id: string
+          order_id: string
+          printed_at: string | null
+          reprint_count: number
+          unit_price_fcfa: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          member_card_id: string
+          member_id: string
+          order_id: string
+          printed_at?: string | null
+          reprint_count?: number
+          unit_price_fcfa: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          member_card_id?: string
+          member_id?: string
+          order_id?: string
+          printed_at?: string | null
+          reprint_count?: number
+          unit_price_fcfa?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_print_order_items_member_card_id_fkey"
+            columns: ["member_card_id"]
+            isOneToOne: false
+            referencedRelation: "member_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_print_order_items_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_print_order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "card_print_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_print_orders: {
+        Row: {
+          amount_fcfa: number
+          cancelled_at: string | null
+          cooperative_id: string
+          created_at: string
+          delivered_at: string | null
+          id: string
+          paid_at: string | null
+          partner_id: string
+          printed_at: string | null
+          provider: string
+          provider_reference: string | null
+          requested_by: string | null
+          status: Database["public"]["Enums"]["card_print_order_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount_fcfa: number
+          cancelled_at?: string | null
+          cooperative_id: string
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          paid_at?: string | null
+          partner_id: string
+          printed_at?: string | null
+          provider?: string
+          provider_reference?: string | null
+          requested_by?: string | null
+          status?: Database["public"]["Enums"]["card_print_order_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount_fcfa?: number
+          cancelled_at?: string | null
+          cooperative_id?: string
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          paid_at?: string | null
+          partner_id?: string
+          printed_at?: string | null
+          provider?: string
+          provider_reference?: string | null
+          requested_by?: string | null
+          status?: Database["public"]["Enums"]["card_print_order_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_print_orders_cooperative_id_fkey"
+            columns: ["cooperative_id"]
+            isOneToOne: false
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_print_orders_cooperative_id_fkey"
+            columns: ["cooperative_id"]
+            isOneToOne: false
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_print_orders_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_print_orders_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       communes: {
         Row: {
           created_at: string
@@ -2640,6 +2775,90 @@ export type Database = {
           },
         ]
       }
+      organization_earnings: {
+        Row: {
+          amount_fcfa: number
+          cooperative_id: string
+          created_at: string
+          currency: string
+          id: string
+          order_id: string
+          order_item_id: string
+          partner_id: string
+          settled_at: string | null
+          settlement_method: string | null
+          settlement_reference: string | null
+          status: Database["public"]["Enums"]["organization_earning_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount_fcfa: number
+          cooperative_id: string
+          created_at?: string
+          currency?: string
+          id?: string
+          order_id: string
+          order_item_id: string
+          partner_id: string
+          settled_at?: string | null
+          settlement_method?: string | null
+          settlement_reference?: string | null
+          status?: Database["public"]["Enums"]["organization_earning_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount_fcfa?: number
+          cooperative_id?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          order_id?: string
+          order_item_id?: string
+          partner_id?: string
+          settled_at?: string | null
+          settlement_method?: string | null
+          settlement_reference?: string | null
+          status?: Database["public"]["Enums"]["organization_earning_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_earnings_cooperative_id_fkey"
+            columns: ["cooperative_id"]
+            isOneToOne: false
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_earnings_cooperative_id_fkey"
+            columns: ["cooperative_id"]
+            isOneToOne: false
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_earnings_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "card_print_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_earnings_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: true
+            referencedRelation: "card_print_order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_earnings_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       parcelles: {
         Row: {
           campaign_year: string | null
@@ -4002,7 +4221,18 @@ export type Database = {
       }
     }
     Enums: {
+      card_print_order_status:
+        | "requested"
+        | "paid"
+        | "printed"
+        | "delivered"
+        | "cancelled"
       haroo_profile_type: "ouvrier" | "acheteur" | "agronome"
+      organization_earning_status:
+        | "pending"
+        | "available"
+        | "paid"
+        | "cancelled"
       partner_access_scope:
         | "members.read"
         | "members.manage"
@@ -4181,7 +4411,20 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      card_print_order_status: [
+        "requested",
+        "paid",
+        "printed",
+        "delivered",
+        "cancelled",
+      ],
       haroo_profile_type: ["ouvrier", "acheteur", "agronome"],
+      organization_earning_status: [
+        "pending",
+        "available",
+        "paid",
+        "cancelled",
+      ],
       partner_access_scope: [
         "members.read",
         "members.manage",
