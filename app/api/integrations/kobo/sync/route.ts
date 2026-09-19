@@ -15,8 +15,8 @@
  * @test Auth failure: member role → 403
  * @test Validation failure: missing cooperativeId → 400
  */
-import { NextRequest, NextResponse } from 'next/server'
-import { assertAuthenticated, assertTenantAccess, assertRole } from '@/lib/security/assert-access'
+import { type NextRequest, NextResponse } from 'next/server'
+import { assertTenantAccess, assertRole } from '@/lib/security/assert-access'
 import { createLogger } from '@/lib/utils/logger'
 import { decryptSecret } from '@/lib/utils/crypto'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'

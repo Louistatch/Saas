@@ -18,7 +18,7 @@
  * @test Auth failure: unauthenticated → 401
  * @test Validation failure: invalid syncLogId → 400
  */
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { assertAuthenticated, assertTenantAccess } from '@/lib/security/assert-access'
 import { koboSyncProgressQuerySchema } from '@/lib/validators/kobo'
 import { createLogger } from '@/lib/utils/logger'

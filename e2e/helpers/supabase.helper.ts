@@ -4,7 +4,7 @@
  * Uses the service role key for admin-level operations.
  */
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { TEST_PREFIX, CARD_PREFIX } from './constants'
 
 let adminClient: SupabaseClient | null = null

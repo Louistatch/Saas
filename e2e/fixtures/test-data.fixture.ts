@@ -6,7 +6,6 @@ import {
   cleanupTestData,
   getCooperativeForUser,
 } from '../helpers/supabase.helper'
-import { ACCOUNTS } from '../helpers/constants'
 
 export interface TestDataHelper {
   createMember: (cooperativeId: string, overrides?: {

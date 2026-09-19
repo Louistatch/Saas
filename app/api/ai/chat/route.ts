@@ -17,7 +17,7 @@
  *   NIVEAU 3b — DeepSeek Direct (fallback, ~2s, rotation clés)
  *     Si AgriTogo est down → fallback contextuel avec DeepSeek-V3 (ou R1).
  */
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'

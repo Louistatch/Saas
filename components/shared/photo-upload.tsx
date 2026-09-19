@@ -2,7 +2,6 @@
 
 import { useState, useRef, useCallback, useMemo } from 'react'
 import { Camera, X, Loader2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 

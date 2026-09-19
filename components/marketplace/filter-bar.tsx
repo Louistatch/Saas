@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import { Slider } from '@/components/ui/slider'
 import { Search, SlidersHorizontal, X, RotateCcw } from 'lucide-react'
 import type { MarketplaceFilters } from '@/hooks/use-marketplace-filters'
 

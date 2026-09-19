@@ -1,6 +1,7 @@
 'use client'
 
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
+import type React from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { createLogger } from '@/lib/utils/logger'
 import { useAuth } from './auth-context'

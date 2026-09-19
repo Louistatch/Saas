@@ -11,7 +11,7 @@
  *
  * Public route (verify is anon) — rate limited.
  */
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 

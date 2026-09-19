@@ -23,7 +23,7 @@
  * @test Auth failure: missing/invalid signature → 403
  * @test Validation failure: malformed payload → 200 + {valid: false}
  */
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { waitUntil } from '@vercel/functions'
 import { timingSafeEqual, createHmac } from 'node:crypto'
 import { createClient } from '@/lib/supabase/admin'

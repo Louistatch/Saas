@@ -9,7 +9,7 @@
  * @security assertRole('cooperative_admin') + assertTenantAccess
  * @security Rate limited: 10 req/min/user
  */
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { assertTenantAccess, assertRole } from '@/lib/security/assert-access'
 import { createLogger } from '@/lib/utils/logger'
 import { decryptSecret } from '@/lib/utils/crypto'

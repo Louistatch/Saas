@@ -5,7 +5,7 @@
  * NEVER exposes: phone, email, address, card_number full, cotisation amounts.
  */
 
-import { createBrowserClient } from '@supabase/ssr'
+import type { createBrowserClient } from '@supabase/ssr'
 
 export interface PublicAgricultureProfile {
   cultures: string[]

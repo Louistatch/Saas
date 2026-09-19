@@ -8,7 +8,7 @@
  *
  * @security assertFaitiereAccess + assertTenantAccess
  */
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { assertFaitiereAccess, assertTenantAccess } from '@/lib/security/assert-access'
 import { decryptSecret } from '@/lib/utils/crypto'
 import { createLogger } from '@/lib/utils/logger'

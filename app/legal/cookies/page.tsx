@@ -1,4 +1,4 @@
-import { Metadata } from 'next'
+import type { Metadata } from 'next'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
 
 export const metadata: Metadata = {

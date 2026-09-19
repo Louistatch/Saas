@@ -22,7 +22,7 @@ import { MeteoInlineView } from '@/components/verify/meteo-inline-view'
 import { OuvrierView } from '@/components/verify/ouvrier-view'
 import { AcheteurView } from '@/components/verify/acheteur-view'
 import { AgronomeView } from '@/components/verify/agronome-view'
-import { memberFullName, memberLocality as getMemberLocality, waNumber } from '@/components/verify/types'
+import { memberFullName, waNumber } from '@/components/verify/types'
 import { AtsBadge, type AtsBreakdown } from '@/components/shared/ats-badge'
 
 interface VerifyResult {

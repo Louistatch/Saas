@@ -10,7 +10,7 @@
  * @security assertAuthenticated + assertTenantAccess(cooperativeId)
  * @security rate limited via the 'auth' bucket (cheap anti-spam)
  */
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { assertTenantAccess } from '@/lib/security/assert-access'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 import { cardPrefix, generateUniqueCardNumber } from '@/lib/utils/card-number'

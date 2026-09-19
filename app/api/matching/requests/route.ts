@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { rankListings } from '@/lib/matching/engine'
 import type { ListingSummary } from '@/lib/matching/engine'

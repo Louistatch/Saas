@@ -1,5 +1,5 @@
 import { timingSafeEqual } from 'crypto'
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { fetchOpenMeteoForRegion } from '@/lib/weather/open-meteo'
 

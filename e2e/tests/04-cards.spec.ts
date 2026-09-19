@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/base.fixture'
 import { CardsPage } from '../pages/cards.page'
-import { TEST_PREFIX, CARD_PREFIX } from '../helpers/constants'
+import { TEST_PREFIX, } from '../helpers/constants'
 
 test.describe('Scenario 4: Card Generation', () => {
   test('cards page loads with generate button', async ({ coopAdminPage }) => {

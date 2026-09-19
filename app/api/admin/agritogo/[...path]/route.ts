@@ -9,7 +9,7 @@
 // Le jeton de l'appelant est transmis en amont pour qu'AgriTogo vérifie
 // l'identité de son côté plutôt que de faire confiance à ce proxy sur parole.
 
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { assertRole, type AccessContext } from '@/lib/security/assert-access'
 
 const AGRITOGO = process.env.AGRITOGO_API_URL ?? ''

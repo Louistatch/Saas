@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { createHmac, timingSafeEqual } from 'crypto'
 import { createClient } from '@/lib/supabase/admin'
 import { queueInAppNotification } from '@/lib/notifications/queue'

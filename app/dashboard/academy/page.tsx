@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useAuth } from '@/app/context/auth-context'
 import { useCooperative } from '@/app/context/cooperative-context'
-import { BookOpen, Play, HelpCircle, CheckSquare, GraduationCap, Plus, Clock } from 'lucide-react'
+import { BookOpen, Play, HelpCircle, CheckSquare, Plus, Clock } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
 
 interface AcademyModule {

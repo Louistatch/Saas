@@ -16,7 +16,7 @@
  * @test Auth failure: non-faitiere user → 403
  * @test Validation failure: invalid formId → 400
  */
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { assertAuthenticated, assertTenantAccess, assertFaitiereAccess } from '@/lib/security/assert-access'
 import { encryptSecret, decryptSecret, isEncrypted } from '@/lib/utils/crypto'
 import { createLogger } from '@/lib/utils/logger'
@@ -25,7 +25,6 @@ import {
   koboConfigSchema,
   koboConfigQuerySchema,
   koboDeleteQuerySchema,
-  koboStatsQuerySchema,
 } from '@/lib/validators/kobo'
 import type { KoboConfigResponse, KoboStatsResponse } from '@/lib/kobo/types'
 

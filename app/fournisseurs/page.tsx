@@ -1,4 +1,4 @@
-import { Metadata } from 'next'
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { SupplierCard, type SupplierData } from '@/components/fournisseurs/supplier-card'
 import { MarketingLayout } from '@/components/shared/marketing-layout'

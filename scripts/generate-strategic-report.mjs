@@ -1,9 +1,8 @@
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
-  TableOfContents, PageBreak, HorizontalPositionRelativeFrom,
-  VerticalPositionRelativeFrom, Table, TableRow, TableCell, WidthType,
-  BorderStyle, ShadingType, UnderlineType, PageNumber, NumberFormat,
-  Footer, Header, ImageRun, convertInchesToTwip,
+  PageBreak, Table, TableRow, TableCell, WidthType,
+  BorderStyle, ShadingType, PageNumber,
+  Footer, Header, convertInchesToTwip,
 } from 'docx'
 import { writeFileSync } from 'fs'
 

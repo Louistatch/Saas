@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Search, CheckCircle2, XCircle, CreditCard, FileText, Users, ShoppingCart } from 'lucide-react'
+import { CheckCircle2, XCircle, CreditCard, FileText, Users, ShoppingCart } from 'lucide-react'
 
 interface EmbedTheme {
   primaryColor?: string

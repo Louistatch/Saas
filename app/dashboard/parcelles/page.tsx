@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
-import { MapPin, Sprout, Droplets, BarChart3, Search, Download, ChevronDown, Navigation, CalendarDays, User } from 'lucide-react'
+import { MapPin, Sprout, Droplets, BarChart3, Search, Download, ChevronDown, Navigation, User } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'

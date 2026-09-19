@@ -3,7 +3,7 @@
  * Saves browser storage state to .auth/ directory for reuse.
  */
 
-import { chromium, FullConfig } from '@playwright/test'
+import { chromium, type FullConfig } from '@playwright/test'
 import path from 'path'
 import fs from 'fs'
 import { ACCOUNTS, ROUTES } from './helpers/constants'

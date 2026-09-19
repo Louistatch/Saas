@@ -19,7 +19,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type {
   KoboSubmissionRow,
-  KoboSubmissionStatus,
   UseKoboSubmissionsOptions,
   UseKoboSubmissionsReturn,
 } from '@/lib/kobo/types'

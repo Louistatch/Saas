@@ -6,7 +6,7 @@
  *   GET  /api/agrismart?resource=soil-types
  *   POST /api/agrismart  (body: { resource: 'calculate', ...payload })
  */
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 
 const AGRITOGO_URL = process.env.AGRITOGO_API_URL?.replace(/\/$/, '') ?? ''
 
