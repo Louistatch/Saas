@@ -756,13 +756,10 @@ function BreakdownBars({
                 {item.value} ({Math.round(pct)}%)
               </span>
             </div>
-            <div
-              className="h-2 bg-secondary rounded-full overflow-hidden"
-              role="progressbar"
-              aria-valuenow={pct}
-              aria-valuemin={0}
-              aria-valuemax={100}
-            >
+            {/* Barre décorative : la valeur et le pourcentage sont déjà du texte
+                visible juste au-dessus — un rôle "progressbar" ici dupliquerait
+                l'information derrière un arrêt clavier supplémentaire pour rien. */}
+            <div className="h-2 bg-secondary rounded-full overflow-hidden" aria-hidden="true">
               <div
                 className={`h-full ${item.color} rounded-full transition-all`}
                 style={{ width: `${pct}%` }}

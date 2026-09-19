@@ -10,11 +10,11 @@ interface AtsData {
 }
 
 const LEVEL_META: Record<string, { label: string; icon: string; color: string }> = {
-  starter:  { label: 'Starter',  icon: '🌱', color: '#6B7280' },
-  bronze:   { label: 'Bronze',   icon: '🥉', color: '#CD7F32' },
-  silver:   { label: 'Argent',   icon: '🥈', color: '#A8A9AD' },
-  gold:     { label: 'Or',       icon: '🥇', color: '#FFD700' },
-  platinum: { label: 'Platine',  icon: '💎', color: '#06B6D4' },
+  starter: { label: 'Starter', icon: '🌱', color: '#6B7280' },
+  bronze: { label: 'Bronze', icon: '🥉', color: '#CD7F32' },
+  silver: { label: 'Argent', icon: '🥈', color: '#A8A9AD' },
+  gold: { label: 'Or', icon: '🥇', color: '#FFD700' },
+  platinum: { label: 'Platine', icon: '💎', color: '#06B6D4' },
 }
 
 interface AgriScoreWidgetProps {
@@ -26,14 +26,23 @@ export function AgriScoreWidget({ memberId }: AgriScoreWidgetProps) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!memberId) { setLoading(false); return }
+    if (!memberId) {
+      setLoading(false)
+      return
+    }
     let cancelled = false
     fetch(`/api/members/${encodeURIComponent(memberId)}/ats`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (!cancelled && d?.score != null) setData({ score: d.score, level: d.level }) })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d?.score != null) setData({ score: d.score, level: d.level })
+      })
       .catch(() => null)
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [memberId])
 
   const meta = data ? (LEVEL_META[data.level] ?? LEVEL_META.starter) : null
@@ -50,14 +59,21 @@ export function AgriScoreWidget({ memberId }: AgriScoreWidgetProps) {
         {!loading && data && meta && (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold" style={{ color: meta.color }}>{data.score}</span>
+              <span className="text-2xl font-bold" style={{ color: meta.color }}>
+                {data.score}
+              </span>
               <span className="text-sm text-muted-foreground">/ 1000</span>
-              <span className="ml-auto text-lg" aria-hidden>{meta.icon}</span>
+              <span className="ml-auto text-lg" aria-hidden>
+                {meta.icon}
+              </span>
             </div>
-            <p className="text-xs font-medium" style={{ color: meta.color }}>{meta.label}</p>
+            <p className="text-xs font-medium" style={{ color: meta.color }}>
+              {meta.label}
+            </p>
             <div
               className="h-2 rounded-full bg-secondary overflow-hidden"
               role="progressbar"
+              tabIndex={0}
               aria-valuenow={data.score}
               aria-valuemin={0}
               aria-valuemax={1000}

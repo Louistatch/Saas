@@ -128,7 +128,7 @@ export function PhotoUpload({
       {value ? (
         <div className={frameClassName}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={value} alt="Photo du membre" className="w-full h-full object-cover" />
+          <img src={value} alt="Membre" className="w-full h-full object-cover" />
           {!disabled && (
             <>
               <button
