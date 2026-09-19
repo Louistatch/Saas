@@ -42,6 +42,7 @@ import {
   Truck,
   Wallet,
 } from 'lucide-react'
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
 interface PartnerStatusResponse {
@@ -562,14 +563,23 @@ function OperatorPageContent() {
     <div className="min-h-screen bg-background">
       <OperatorHeader />
       <main className="mx-auto max-w-xl px-4 py-10 sm:px-6">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-            <Briefcase className="h-5 w-5 text-primary" />
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <Briefcase className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-foreground">Espace Opérateur</h1>
+              <p className="text-sm text-muted-foreground">Bonjour {user?.firstName ?? ''}</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-foreground">Espace Opérateur</h1>
-            <p className="text-sm text-muted-foreground">Bonjour {user?.firstName ?? ''}</p>
-          </div>
+          {/* Accessible sans candidature déposée — la formation n'exige aucune
+              couche organisationnelle ni Haroo (cf. academy_profile_progress). */}
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/operator/training">
+              <GraduationCap className="mr-1.5 h-4 w-4" /> Formation
+            </Link>
+          </Button>
         </div>
 
         {loading ? (
@@ -600,6 +610,14 @@ function OperatorPageContent() {
               ) : (
                 <>
                   <CertificationProgress status={status.status} />
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link href="/operator/training">
+                      <GraduationCap className="mr-1.5 h-4 w-4" />
+                      {status.training_completed_at
+                        ? 'Revoir la formation'
+                        : 'Aller à la formation'}
+                    </Link>
+                  </Button>
                   <CertificationPayment
                     eligible={
                       !!status.training_completed_at &&
