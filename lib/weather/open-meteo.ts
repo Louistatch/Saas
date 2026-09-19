@@ -342,8 +342,12 @@ export function mergeWeatherModels(
   const byDate = new Map<string, { models: { day: WeatherDayLive; w: number }[] }>()
   for (const { data, w } of sources) {
     for (const day of data) {
-      if (!byDate.has(day.date)) byDate.set(day.date, { models: [] })
-      byDate.get(day.date)!.models.push({ day, w })
+      let entry = byDate.get(day.date)
+      if (!entry) {
+        entry = { models: [] }
+        byDate.set(day.date, entry)
+      }
+      entry.models.push({ day, w })
     }
   }
 
@@ -360,8 +364,8 @@ export function mergeWeatherModels(
     const precipMax = Math.max(...models.map(m => m.day.precipitation_mm ?? 0))
 
     // ET0 from ECMWF when available (FAO-56 reference)
-    const ecmwfDay = models.find(m => m.w === W_ECMWF)?.day
-    const et0 = (ecmwfDay?.et0_mm ?? 0) > 0 ? ecmwfDay!.et0_mm : wAvg('et0_mm')
+    const ecmwfEt0 = models.find(m => m.w === W_ECMWF)?.day.et0_mm
+    const et0 = ecmwfEt0 != null && ecmwfEt0 > 0 ? ecmwfEt0 : wAvg('et0_mm')
 
     result.push({
       date,
@@ -406,8 +410,12 @@ export function mergeHourlyModels(
   const byTime = new Map<string, { slots: { slot: WeatherHour; w: number }[] }>()
   for (const { data, w } of sources) {
     for (const slot of data) {
-      if (!byTime.has(slot.time)) byTime.set(slot.time, { slots: [] })
-      byTime.get(slot.time)!.slots.push({ slot, w })
+      let entry = byTime.get(slot.time)
+      if (!entry) {
+        entry = { slots: [] }
+        byTime.set(slot.time, entry)
+      }
+      entry.slots.push({ slot, w })
     }
   }
 

@@ -81,6 +81,9 @@ export default function VerifyCardPage() {
   const [expired, setExpired] = useState(false)
   const [activeView, setActiveView] = useState<'menu' | 'identity' | 'prices' | 'technicien' | 'ai' | 'agrismart' | 'parcelles' | 'intrants' | 'cotisation' | 'exploitation' | 'meteo'>('menu')
   const [contacts, setContacts] = useState<{ role: 'technicien' | 'coordo'; name: string; phone: string; canton?: string | null }[] | null>(null)
+  // Le coordinateur sert au lien WhatsApp et à la carte de contact : on le
+  // cherche une fois, plutôt que de rebalayer la liste à chaque usage.
+  const coordo = contacts?.find((c) => c.role === 'coordo') ?? null
   const [contactsLoading, setContactsLoading] = useState(false)
   const [atsData, setAtsData] = useState<{ score: number; level: string; breakdown: AtsBreakdown } | null>(null)
   const [quickStats, setQuickStats] = useState<{ totalHa: number; cotisationStatus: string | null; intrantCount: number } | null>(null)
@@ -933,9 +936,9 @@ export default function VerifyCardPage() {
                 <Share2 className="h-4 w-4" />
                 Partager ma carte
               </button>
-              {contacts?.find(c => c.role === 'coordo')?.phone && (
+              {coordo?.phone && (
                 <a
-                  href={`https://wa.me/${waNumber(contacts.find(c => c.role === 'coordo')!.phone)}?text=${encodeURIComponent(`Bonjour ${contacts.find(c => c.role === 'coordo')!.name}, je suis ${firstName}. J'ai une question concernant ma carte membre.`)}`}
+                  href={`https://wa.me/${waNumber(coordo.phone)}?text=${encodeURIComponent(`Bonjour ${coordo.name}, je suis ${firstName}. J'ai une question concernant ma carte membre.`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-[#25D366]/20 bg-[#25D366]/10 text-[#25D366] text-sm font-semibold active:scale-[0.98] transition-transform"
@@ -1024,8 +1027,8 @@ export default function VerifyCardPage() {
           <CotisationView
             cardNumber={cardNumber}
             onBack={() => setActiveView('menu')}
-            coordoPhone={contacts?.find(c => c.role === 'coordo')?.phone ?? null}
-            coordoName={contacts?.find(c => c.role === 'coordo')?.name ?? null}
+            coordoPhone={coordo?.phone ?? null}
+            coordoName={coordo?.name ?? null}
             memberName={firstName}
             memberCanton={result.member?.canton ?? null}
           />

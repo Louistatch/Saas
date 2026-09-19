@@ -36,7 +36,10 @@ export async function POST(_req: NextRequest) {
   let failed = 0
 
   for (const member of members) {
-    const faceUrl = await processPhotoFaceCrop(member.photo_url!, member.id)
+    // `.not('photo_url', 'is', null)` le garantit côté requête ; le redire ici
+    // met la garantie sous le contrôle du compilateur.
+    if (!member.photo_url) continue
+    const faceUrl = await processPhotoFaceCrop(member.photo_url, member.id)
     if (faceUrl) {
       await supabase
         .from('members')

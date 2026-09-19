@@ -348,7 +348,8 @@ async function svgToCanvas(svgString: string): Promise<HTMLCanvasElement> {
   const canvas = document.createElement('canvas')
   canvas.width = 1180 * 2
   canvas.height = 740 * 2
-  const ctx = canvas.getContext('2d')!
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Contexte 2D indisponible — impossible de rendre la carte')
 
   const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' })
   const url = URL.createObjectURL(blob)

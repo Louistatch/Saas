@@ -38,9 +38,24 @@ export async function middleware(request: NextRequest) {
   // ─── ALWAYS refresh session (keeps cookies alive on every navigation) ───
   let supabaseResponse = NextResponse.next({ request })
 
+  // Ce code s'exécute sur chaque requête. Sans ces variables, `createServerClient`
+  // lève, et le site entier répond 500 sur une erreur illisible. On laisse
+  // plutôt passer la requête sans rafraîchir la session : l'utilisateur devra
+  // se reconnecter, mais rien ne s'ouvre pour autant — le middleware ne décide
+  // d'aucun accès, les gardes serveur (`assertRole`, lisant `profiles`) et le
+  // RLS restent seuls juges, et ils échouent fermés.
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error(
+      '[middleware] NEXT_PUBLIC_SUPABASE_URL ou NEXT_PUBLIC_SUPABASE_ANON_KEY manquante — session non rafraîchie',
+    )
+    return supabaseResponse
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {

@@ -64,6 +64,10 @@ export default function AgrismatAdminPage() {
   }, [crop, area, soil, system, region, toast])
 
   const cropResult = result?.results?.[0]
+  // Le maximum servait d'échelle au graphe, mais était recalculé pour chaque
+  // barre — un balayage complet par colonne. Calculé une fois ici.
+  const monthly = cropResult?.monthly ?? null
+  const monthlyMax = monthly ? Math.max(...monthly) : 0
   const MOIS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
 
   return (
@@ -168,13 +172,12 @@ export default function AgrismatAdminPage() {
               </div>
             )}
 
-            {cropResult.monthly && (
+            {monthly && (
               <div>
                 <p className="text-sm font-medium text-foreground mb-3">Besoins mensuels (m³)</p>
                 <div className="grid grid-cols-6 sm:grid-cols-12 gap-2">
-                  {cropResult.monthly.map((val, i) => {
-                    const max = Math.max(...cropResult.monthly!)
-                    const pct = max > 0 ? (val / max) * 100 : 0
+                  {monthly.map((val, i) => {
+                    const pct = monthlyMax > 0 ? (val / monthlyMax) * 100 : 0
                     return (
                       <div key={i} className="flex flex-col items-center gap-1">
                         <div className="w-full bg-muted rounded-sm overflow-hidden" style={{ height: 60 }}>

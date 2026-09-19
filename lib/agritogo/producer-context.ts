@@ -167,8 +167,11 @@ export async function buildProducerContext(
         ? (p.culture[0] as { name?: string })?.name
         : (p.culture as { name?: string } | null)?.name
       if (!cn) continue
-      if (!byMarket.has(p.market_name)) byMarket.set(p.market_name, new Map())
-      const marketMap = byMarket.get(p.market_name)!
+      let marketMap = byMarket.get(p.market_name)
+      if (!marketMap) {
+        marketMap = new Map()
+        byMarket.set(p.market_name, marketMap)
+      }
       if (!marketMap.has(cn)) marketMap.set(cn, Number(p.price))
     }
     const lines: string[] = []

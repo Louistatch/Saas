@@ -222,8 +222,10 @@ function buildAlerts(insights: AgroInsights|undefined, today: WeatherDay|null, u
     if (insights.planting_window) alerts.push({ level: 'low', emoji: '🌱', text: 'Semis favorable les prochains jours' })
     if ((insights.heat_stress_days ?? 0) > 2) alerts.push({ level: 'high', emoji: '🌡️', text: `Stress thermique ${insights.heat_stress_days} jours · Protégez vos plants` })
   } else {
-    if ((today.et0_mm ?? 0) >= 5) alerts.push({ level: 'high', emoji: '🟠', text: `ETP élevée (${today.et0_mm!.toFixed(1)} mm/j) — irriguez dès aujourd'hui` })
-    if ((today.temperature_max ?? 0) >= 38) alerts.push({ level: 'critical', emoji: '🔴', text: `Chaleur extrême (${Math.round(today.temperature_max!)}°C) — protégez vos plants` })
+    const et0 = today.et0_mm
+    if (et0 != null && et0 >= 5) alerts.push({ level: 'high', emoji: '🟠', text: `ETP élevée (${et0.toFixed(1)} mm/j) — irriguez dès aujourd'hui` })
+    const tMax = today.temperature_max
+    if (tMax != null && tMax >= 38) alerts.push({ level: 'critical', emoji: '🔴', text: `Chaleur extrême (${Math.round(tMax)}°C) — protégez vos plants` })
     const totalP = upcoming.reduce((s, d) => s + (d.precipitation_mm ?? 0), 0)
     if (totalP >= 50) alerts.push({ level: 'moderate', emoji: '🟡', text: `Pluies importantes prévues (${totalP.toFixed(0)} mm) — vérifiez le drainage` })
     const dryDays = upcoming.filter(d => (d.precipitation_mm ?? 0) < 1).length
@@ -476,9 +478,9 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
                   <Droplets className="h-3.5 w-3.5 text-sky-300 shrink-0" />
                   {todayRow.humidity_pct != null ? `${Math.round(todayRow.humidity_pct)}%` : '—'}
                 </span>
-                {uvIndex != null && (
-                  <span className="text-xs font-bold" style={{ color: uvInfo!.color }}>
-                    UV {Math.round(uvIndex)} · {uvInfo!.text}
+                {uvIndex != null && uvInfo && (
+                  <span className="text-xs font-bold" style={{ color: uvInfo.color }}>
+                    UV {Math.round(uvIndex)} · {uvInfo.text}
                   </span>
                 )}
               </div>
@@ -612,7 +614,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
                     <span className={`text-[13px] font-semibold shrink-0 w-14 ${isToday ? 'text-sky-300' : 'text-white/65'}`}>{dayShort(day.date, todayStr)}</span>
                     <span className="text-xl shrink-0" aria-hidden>{emoji}</span>
                     <span className="text-[10px] text-blue-300/65 font-mono shrink-0 w-9 text-right">
-                      {precipPct != null ? `${precipPct}%` : (day.precipitation_mm ?? 0) > 0 ? `${day.precipitation_mm!.toFixed(0)}mm` : ''}
+                      {precipPct != null ? `${precipPct}%` : day.precipitation_mm ? `${day.precipitation_mm.toFixed(0)}mm` : ''}
                     </span>
                     <span className="text-[11px] text-blue-400/55 shrink-0 w-6 text-right">{day.temperature_min != null ? Math.round(day.temperature_min) : '—'}°</span>
                     <div className="flex-1 h-1.5 rounded-full bg-white/10 relative overflow-hidden">
@@ -736,7 +738,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
                         <p className="text-white/40 text-xs w-28 shrink-0 capitalize">{dayFull(day.date, todayStr)}</p>
                         <span className="text-xs text-orange-400/55">↑{day.temperature_max != null ? Math.round(day.temperature_max) : '—'}°</span>
                         <span className="text-xs text-blue-400/55 ml-1">↓{day.temperature_min != null ? Math.round(day.temperature_min) : '—'}°</span>
-                        <span className="ml-auto text-xs text-blue-300/45 font-mono">{(day.precipitation_mm ?? 0) > 0 ? `${day.precipitation_mm!.toFixed(1)}mm` : '—'}</span>
+                        <span className="ml-auto text-xs text-blue-300/45 font-mono">{day.precipitation_mm ? `${day.precipitation_mm.toFixed(1)}mm` : '—'}</span>
                       </div>
                     )
                   })}

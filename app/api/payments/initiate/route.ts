@@ -38,6 +38,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const tenantCheck = await assertTenantAccess(cooperative_id)
   if (!tenantCheck.ok) return tenantCheck.response
 
+  // Le paiement en espèces est saisi par l'administrateur, sans téléphone ;
+  // tout opérateur mobile en exige un.
   if (provider !== 'cash' && !phone) {
     return NextResponse.json({ error: 'Phone required for non-cash payment' }, { status: 400 })
   }
@@ -86,8 +88,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   if (provider === 'orange_money') {
+    // Redit ici pour que le rétrécissement soit local et vérifié par le
+    // compilateur, plutôt que déduit d'un garde cinquante lignes plus haut.
+    if (!phone) {
+      return NextResponse.json({ error: 'Phone required for non-cash payment' }, { status: 400 })
+    }
     const result = await initiateOrangeMoneyPayment({
-      phone: phone!,
+      phone,
       amount: amount_fcfa,
       reference,
       description: `Paiement cotisation — réf. ${reference}`,

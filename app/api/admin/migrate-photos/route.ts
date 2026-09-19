@@ -46,9 +46,14 @@ export async function POST(request: Request) {
 
   for (const member of toMigrate) {
     const name = `${member.first_name} ${member.last_name}`
+    // Le filtre ci-dessus garantit déjà une URL, mais c'est une garantie que le
+    // compilateur ne voit pas et qu'un remaniement du filtre romprait en
+    // silence. On la rend locale et vérifiable.
+    const photoUrl = member.photo_url
+    if (!photoUrl) continue
     try {
       // Download from old project (public URL)
-      const res = await fetch(member.photo_url!, { signal: AbortSignal.timeout(15000) })
+      const res = await fetch(photoUrl, { signal: AbortSignal.timeout(15000) })
       if (!res.ok) {
         results.push({ id: member.id, name, status: `download failed: ${res.status}` })
         continue
@@ -58,7 +63,7 @@ export async function POST(request: Request) {
       const buffer = Buffer.from(await blob.arrayBuffer())
 
       // Generate new storage path
-      const ext = member.photo_url!.split('.').pop() ?? 'jpeg'
+      const ext = photoUrl.split('.').pop() ?? 'jpeg'
       const storagePath = `${member.id}/photo.${ext}`
 
       // Upload to new project storage

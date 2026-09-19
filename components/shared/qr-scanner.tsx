@@ -154,8 +154,9 @@ export function QrScanner({ onResult, onError, className = '' }: QrScannerProps)
       // If BarcodeDetector silently fails on first real detect(), fall back to jsQR.
       let detectorFailed = false
 
-      const canvas = canvasRef.current!
-      const ctx = canvas.getContext('2d', { willReadFrequently: true })!
+      const canvas = canvasRef.current
+      const ctx = canvas?.getContext('2d', { willReadFrequently: true })
+      if (!canvas || !ctx) return
 
       const tick = async () => {
         if (detectedRef.current) return
