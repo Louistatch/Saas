@@ -70,6 +70,7 @@ export default async function ParcellesPage({ params }: Props) {
   if (!card) {
     return (
       <div className="min-h-screen vfp-bg flex items-center justify-center px-6 relative">
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: feuille de style statique locale (const vfpStyles), aucune donnee utilisateur */}
         <style dangerouslySetInnerHTML={{ __html: vfpStyles }} />
         <div className="text-center max-w-xs">
           <p className="text-white/50 text-sm">Carte non trouvée ou inactive.</p>
@@ -109,6 +110,7 @@ export default async function ParcellesPage({ params }: Props) {
 
   return (
     <div className="min-h-screen vfp-bg relative overflow-hidden" style={{ isolation: 'isolate' }}>
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: feuille de style statique locale (const vfpStyles), aucune donnee utilisateur */}
       <style dangerouslySetInnerHTML={{ __html: vfpStyles }} />
 
       {/* Ambient glow */}

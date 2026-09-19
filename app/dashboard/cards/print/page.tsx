@@ -167,6 +167,7 @@ function MiniCardSvg({
   return (
     <div
       className="w-full h-full rounded-xl overflow-hidden"
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: SVG produit par renderToSvgString, qui echappe chaque interpolation (lib/card-engine/renderer.ts escapeXml)
       dangerouslySetInnerHTML={{ __html: svgString }}
     />
   )

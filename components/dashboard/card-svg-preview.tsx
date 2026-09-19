@@ -112,6 +112,7 @@ export function CardSvgPreview({
   return (
     <div
       className={`w-full max-w-2xl mx-auto ${className}`}
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: SVG produit par renderToSvgString, qui echappe chaque interpolation (lib/card-engine/renderer.ts escapeXml)
       dangerouslySetInnerHTML={{ __html: svgString }}
     />
   )

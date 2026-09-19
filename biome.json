@@ -55,9 +55,6 @@
         "useTemplate": "warn",
         "noNonNullAssertion": "warn",
         "useImportType": "error"
-      },
-      "nursery": {
-        "noFloatingPromises": "off"
       }
     }
   },
