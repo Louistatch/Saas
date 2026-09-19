@@ -186,6 +186,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         void fetch('/api/auth/log-login', { method: 'POST' }).catch(() => {})
       }
 
+      // Filet de sécurité, indépendant de la config Supabase (Site URL /
+      // Redirect URLs) : si un lien magique atterrit en flux implicite
+      // (access_token dans le fragment d'URL au lieu de passer par
+      // /auth/callback), supabase-js l'a déjà consommé pour établir la
+      // session à ce stade (detectSessionInUrl) — on efface juste le
+      // fragment de la barre d'adresse pour ne jamais laisser le jeton
+      // visible ni dans l'historique du navigateur.
+      if (typeof window !== 'undefined' && window.location.hash.includes('access_token=')) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search)
+      }
+
       // Couvre SIGNED_IN, INITIAL_SESSION, TOKEN_REFRESHED et USER_UPDATED :
       // dans tous les cas on resynchronise le profil.
       //
