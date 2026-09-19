@@ -268,7 +268,7 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
         if (hookData.section === 'body' && hookData.column.index === 2) {
           const raw = hookData.row.raw
           const mm = Number.parseFloat(String(Array.isArray(raw) ? raw[2] : 0))
-          if (!isNaN(mm) && mm > 0.05) {
+          if (!Number.isNaN(mm) && mm > 0.05) {
             const [r, g, b] = precipColor(mm)
             doc.setFillColor(r, g, b)
           }

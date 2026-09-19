@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   CheckCircle, XCircle, Shield, MapPin, Building2,
-  FileText, TrendingUp, PhoneCall, Map, CloudRain,
+  FileText, TrendingUp, PhoneCall, Map as MapIcon, CloudRain,
   ShoppingCart, Coins, Timer, User, ArrowLeft, Bot,
   Bell, Droplets, Share2, ChevronRight, ScanLine,
 } from 'lucide-react'
@@ -662,7 +662,7 @@ export default function VerifyCardPage() {
               <p className="text-white/40 text-[11px] font-semibold uppercase tracking-wider px-1 mb-2">Mon Exploitation</p>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { icon: Map, label: 'Parcelles GPS', sub: 'Mes parcelles agricoles', view: 'parcelles', color: 'text-emerald-300', bg: 'from-emerald-500/20 to-emerald-700/5', border: 'border-emerald-400/15' },
+                  { icon: MapIcon, label: 'Parcelles GPS', sub: 'Mes parcelles agricoles', view: 'parcelles', color: 'text-emerald-300', bg: 'from-emerald-500/20 to-emerald-700/5', border: 'border-emerald-400/15' },
                   { icon: ShoppingCart, label: 'Intrants', sub: 'Semences & engrais', view: 'intrants', color: 'text-orange-300', bg: 'from-orange-500/20 to-orange-700/5', border: 'border-orange-400/15' },
                   { icon: FileText, label: 'Mon Exploitation', sub: 'Fiches techniques', view: 'exploitation', color: 'text-cyan-300', bg: 'from-cyan-500/20 to-cyan-700/5', border: 'border-cyan-400/15' },
                   { icon: Coins, label: 'Cotisation', sub: 'Statut & campagne', view: 'cotisation', color: 'text-yellow-300', bg: 'from-yellow-500/20 to-yellow-700/5', border: 'border-yellow-400/15' },

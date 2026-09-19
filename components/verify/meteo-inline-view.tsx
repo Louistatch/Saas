@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import {
   ArrowLeft, Bell, BellOff, ChevronDown, CloudRain,
-  Droplets, FileDown, Leaf, Map, Share2, Waves, Wind,
+  Droplets, FileDown, Leaf, Map as MapIcon, Share2, Waves, Wind,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
@@ -130,7 +130,9 @@ function lagosHourStr() {
   return new Date(Date.now() + 3600000).toISOString().slice(0, 13)
 }
 function dailyEmoji(p: number|null, t: number|null, w: number|null): string {
-  const pr = p ?? 0, temp = t ?? 28, wind = w ?? 0
+  const pr = p ?? 0
+  const temp = t ?? 28
+  const wind = w ?? 0
   if (pr > 20 || (pr > 10 && wind > 6)) return '⛈️'
   if (pr > 8) return '🌧️'
   if (pr > 2) return '🌦️'
@@ -582,7 +584,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
               className="w-full flex items-center justify-between px-4 py-3 active:bg-white/5 transition-colors"
             >
               <span className="text-white/50 text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5">
-                <Map className="h-3.5 w-3.5" />
+                <MapIcon className="h-3.5 w-3.5" />
                 Radar précipitations · Temps réel
               </span>
               <ChevronDown className="h-4 w-4 text-white/30 transition-transform duration-300" style={{ transform: showRadar ? 'rotate(180deg)' : 'rotate(0deg)' }} />

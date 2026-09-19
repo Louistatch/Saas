@@ -190,10 +190,11 @@ export default function DashboardPage() {
       <ActivateHarooCard />
 
       <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
-        {statCards.map((stat, i) => {
+        {statCards.map((stat) => {
           const Icon = stat.icon
           const isClickable = stat.href !== '#'
           const inner = (
+            // biome-ignore lint/correctness/useJsxKeyInIterable: la clé est portée par le Link/div retourné plus bas ; Biome ne la voit pas à travers la variable
             <Card className={`border-border transition-all ${isClickable ? 'hover:border-primary/40 hover:shadow-sm cursor-pointer' : ''}`}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
@@ -209,8 +210,8 @@ export default function DashboardPage() {
             </Card>
           )
           return isClickable
-            ? <Link key={i} href={stat.href}>{inner}</Link>
-            : <div key={i}>{inner}</div>
+            ? <Link key={stat.title} href={stat.href}>{inner}</Link>
+            : <div key={stat.title}>{inner}</div>
         })}
       </div>
 

@@ -13,7 +13,7 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   Home, Users, IdCard, Banknote, Leaf, ShoppingBag, BookOpen, Handshake,
-  BarChart3, Map, GraduationCap, ShoppingCart, FolderOpen, PhoneCall, Zap,
+  BarChart3, Map as MapIcon, GraduationCap, ShoppingCart, FolderOpen, PhoneCall, Zap,
   Smartphone, Code, Network,
 } from 'lucide-react'
 
@@ -51,7 +51,7 @@ export const SERVICE_REGISTRY: ServiceDefinition[] = [
 
   // ── Analyse ──────────────────────────────────────────────────────────────
   { id: 'analytics', name: 'Statistiques', description: 'Indicateurs et croissance de la coopérative', icon: BarChart3, category: 'Analyse', route: '/dashboard/analytics', type: 'native', roles: ['super_admin', 'cooperative_admin'], status: 'healthy' },
-  { id: 'carte', name: 'Carte Agricole', description: 'Répartition géographique par préfecture', icon: Map, category: 'Analyse', route: '/dashboard/carte', type: 'native', roles: ['super_admin', 'cooperative_admin'], status: 'healthy' },
+  { id: 'carte', name: 'Carte Agricole', description: 'Répartition géographique par préfecture', icon: MapIcon, category: 'Analyse', route: '/dashboard/carte', type: 'native', roles: ['super_admin', 'cooperative_admin'], status: 'healthy' },
   { id: 'academy', name: 'AgriAcademy', description: 'Modules de formation certifiante', icon: GraduationCap, category: 'Analyse', route: '/dashboard/academy', type: 'native', status: 'healthy' },
 
   // ── Gestion ──────────────────────────────────────────────────────────────

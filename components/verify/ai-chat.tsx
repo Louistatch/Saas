@@ -694,8 +694,8 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
         <input ref={inputRef} type="text"
           className="flex-1 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none transition-colors"
           style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.10)' }}
-          onFocus={e => (e.currentTarget.style.borderColor = 'rgba(52,211,153,.40)')}
-          onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,.10)')}
+          onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(52,211,153,.40)' }}
+          onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,.10)' }}
           placeholder="Posez votre question…"
           value={input}
           maxLength={1000}
@@ -778,14 +778,17 @@ function renderMd(text: string) {
     const content = isBullet ? trimmed.replace(/^[-*•]\s+/, '') : trimmed
     const parts: React.ReactNode[] = []
     const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g
-    let last = 0, match: RegExpExecArray | null, key = 0
+    let last = 0
+    let key = 0
     const src = content
-    while ((match = regex.exec(src)) !== null) {
+    let match = regex.exec(src)
+    while (match !== null) {
       if (match.index > last) parts.push(src.slice(last, match.index))
       if (match[2]) parts.push(<strong key={`b${i}-${key++}`} className="font-semibold text-emerald-200">{match[2]}</strong>)
       else if (match[3]) parts.push(<em key={`i${i}-${key++}`} className="italic text-emerald-300">{match[3]}</em>)
       else if (match[4]) parts.push(<code key={`c${i}-${key++}`} className="ai-inline-code">{match[4]}</code>)
       last = match.index + match[0].length
+      match = regex.exec(src)
     }
     if (last < src.length) parts.push(src.slice(last))
     if (isBullet) return <p key={i} className="ai-md-li">{'• '}{parts}</p>

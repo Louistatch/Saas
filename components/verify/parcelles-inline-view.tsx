@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Sprout, Map, Droplets, Navigation, CalendarDays } from 'lucide-react'
+import { ArrowLeft, Sprout, Map as MapIcon, Droplets, Navigation, CalendarDays } from 'lucide-react'
 
 interface Parcelle {
   name: string | null
@@ -91,7 +91,7 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
 
       {error && (
         <div className="vfp-card rounded-2xl p-6 text-center space-y-3">
-          <Map className="h-8 w-8 text-white/20 mx-auto" />
+          <MapIcon className="h-8 w-8 text-white/20 mx-auto" />
           <p className="text-white/50 text-sm">Impossible de charger les données des parcelles.</p>
           <button
             onClick={loadData}
@@ -104,7 +104,7 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
 
       {!loading && !error && list.length === 0 && (
         <div className="vfp-card rounded-2xl p-8 text-center">
-          <Map className="h-10 w-10 text-white/15 mx-auto mb-3" />
+          <MapIcon className="h-10 w-10 text-white/15 mx-auto mb-3" />
           <p className="text-white/40 text-sm">Aucune parcelle enregistrée.</p>
           <p className="text-white/25 text-xs mt-1">Données collectées via KoboCollect</p>
         </div>

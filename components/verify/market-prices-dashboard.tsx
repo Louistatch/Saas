@@ -16,7 +16,8 @@ function SVGSparkline({ values, trend }: { values: number[]; trend: string }) {
   const min = Math.min(...values)
   const max = Math.max(...values)
   const range = max - min || 1
-  const W = 48, H = 20
+  const W = 48
+  const H = 20
   const pts = values.map((v, i) => [
     (i / (values.length - 1)) * W,
     H - ((v - min) / range) * (H - 4) - 2,

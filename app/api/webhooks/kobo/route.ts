@@ -86,7 +86,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<KoboWebho
     request.headers.get('content-length') ?? '0',
     10,
   )
-  if (isNaN(contentLength) || contentLength > 2_097_152) {
+  if (Number.isNaN(contentLength) || contentLength > 2_097_152) {
     return NextResponse.json(
       { error: 'Payload trop volumineux (max 2MB)' },
       { status: 413 },

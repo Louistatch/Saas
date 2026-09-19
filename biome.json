@@ -37,6 +37,7 @@
       "recommended": true,
       "suspicious": {
         "noExplicitAny": "error",
+        "noMisleadingCharacterClass": "off",
         "noConsoleLog": "warn",
         "noArrayIndexKey": "warn"
       },

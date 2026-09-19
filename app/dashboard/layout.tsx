@@ -10,7 +10,7 @@ import {
   ShoppingBag,
   BookOpen,
   Handshake,
-  Map,
+  Map as MapIcon,
   GraduationCap,
   Users,
   Settings,
@@ -74,7 +74,7 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'Analyse',
     items: [
       { href: '/dashboard/analytics', label: 'Statistiques', icon: BarChart3, roles: ['super_admin', 'cooperative_admin'] },
-      { href: '/dashboard/carte', label: 'Carte Agricole', icon: Map, roles: ['super_admin', 'cooperative_admin'] },
+      { href: '/dashboard/carte', label: 'Carte Agricole', icon: MapIcon, roles: ['super_admin', 'cooperative_admin'] },
       { href: '/dashboard/academy', label: 'AgriAcademy', icon: GraduationCap, roles: ['super_admin', 'cooperative_admin', 'member'] },
     ],
   },

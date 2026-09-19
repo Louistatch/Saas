@@ -123,14 +123,14 @@ export function toCsv<T extends Record<string, unknown>>(
   rows: T[],
   columns: (keyof T)[],
 ): string {
-  const escape = (v: unknown) => {
+  const escapeCell = (v: unknown) => {
     const s = v == null ? '' : String(v)
     if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`
     return s
   }
   const lines = [columns.map((c) => String(c)).join(',')]
   for (const row of rows) {
-    lines.push(columns.map((c) => escape(row[c])).join(','))
+    lines.push(columns.map((c) => escapeCell(row[c])).join(','))
   }
   return lines.join('\n')
 }

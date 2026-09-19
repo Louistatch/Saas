@@ -28,6 +28,7 @@ export type TestDataFixtures = {
 }
 
 export const testDataTest = base.extend<TestDataFixtures>({
+  // biome-ignore lint/correctness/noEmptyPattern: signature imposée par Playwright — une fixture sans dépendance se déclare ainsi
   testData: async ({}, use) => {
     const helper: TestDataHelper = {
       createMember: createTestMember,
