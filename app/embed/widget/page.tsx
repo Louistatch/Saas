@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ProductCard } from '@/components/marketplace/product-card'
+import type { MarketplaceProduct } from '@/hooks/use-marketplace-data'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -251,9 +252,8 @@ function EmbedWidgetContent() {
       {widget === 'marketplace' && Array.isArray(data?.products) && (
         <div className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {(data.products as Record<string, unknown>[]).map((product) => (
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              <ProductCard key={String(product.id)} product={product as any} />
+            {(data.products as unknown as MarketplaceProduct[]).map((product) => (
+              <ProductCard key={String(product.id)} product={product} />
             ))}
           </div>
           {data.products.length === 0 && (

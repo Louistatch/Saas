@@ -78,8 +78,9 @@ export default async function CooperativeReportPage({
         </thead>
         <tbody>
           {(members ?? []).map((m, i) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const cardNumber = (m.member_cards as any)?.[0]?.card_number ?? '—'
+            const cards = m.member_cards as unknown as
+              { card_number: string | null }[] | null
+            const cardNumber = cards?.[0]?.card_number ?? '—'
             return (
               <tr key={m.id} style={{ background: i % 2 === 0 ? 'white' : '#f9f9f9' }}>
                 <Td>{i + 1}</Td>
@@ -129,8 +130,8 @@ export default async function CooperativeReportPage({
         </thead>
         <tbody>
           {(cotisations ?? []).map((c, i) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const mem = c.member as any
+            const mem = c.member as unknown as
+              { first_name: string | null; last_name: string | null } | null
             const memberName = mem ? `${mem.last_name?.toUpperCase()} ${mem.first_name}` : '—'
             return (
               <tr key={c.id} style={{ background: i % 2 === 0 ? 'white' : '#f9f9f9' }}>
@@ -180,8 +181,8 @@ export default async function CooperativeReportPage({
         </thead>
         <tbody>
           {(productions ?? []).map((p, i) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const mem = p.member as any
+            const mem = p.member as unknown as
+              { first_name: string | null; last_name: string | null } | null
             const memberName = mem ? `${mem.last_name?.toUpperCase()} ${mem.first_name}` : '—'
             return (
               <tr key={p.id} style={{ background: i % 2 === 0 ? 'white' : '#f9f9f9' }}>

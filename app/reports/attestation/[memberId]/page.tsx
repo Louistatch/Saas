@@ -61,8 +61,9 @@ export default async function AttestationPage({
   const atsScore = typeof atsData === 'number' ? atsData : (Array.isArray(atsData) ? atsData[0] : null)
   const scoreNum = typeof atsScore === 'number' ? Math.round(atsScore) : null
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const coop = member.cooperative as any
+  // Relation embarquée PostgREST : le type généré ne fixe pas la forme.
+  const coop = member.cooperative as unknown as
+    { name: string | null; faitiere_name: string | null } | null
   const cooperativeName = coop?.name ?? '—'
   const faitiereName = coop?.faitiere_name ?? '—'
   const fullName = `${member.last_name?.toUpperCase()} ${member.first_name}`

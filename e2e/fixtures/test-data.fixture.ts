@@ -7,18 +7,12 @@ import {
   getCooperativeForUser,
 } from '../helpers/supabase.helper'
 
+// Les signatures suivent les aides elles-mêmes : le type de ligne Supabase ne
+// peut pas diverger de ce que les aides renvoient réellement.
 export interface TestDataHelper {
-  createMember: (cooperativeId: string, overrides?: {
-    firstName?: string
-    lastName?: string
-    email?: string
-    phone?: string
-  }) => Promise<any>
-  createCard: (memberId: string, cooperativeId: string, overrides?: {
-    status?: string
-    expiryDate?: string
-  }) => Promise<any>
-  createExpiredCard: (memberId: string, cooperativeId: string) => Promise<any>
+  createMember: typeof createTestMember
+  createCard: typeof createTestCard
+  createExpiredCard: typeof createExpiredTestCard
   getCoopId: (email: string) => Promise<string | null>
   cleanup: () => Promise<void>
 }

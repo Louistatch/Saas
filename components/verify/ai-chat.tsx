@@ -3,6 +3,32 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Send, Bot, Loader2, Mic, MicOff, Volume2, VolumeX } from 'lucide-react'
 
+/**
+ * Web Speech API : absente de lib.dom.d.ts, et préfixée `webkit` sur les
+ * navigateurs qui l'implémentent. On décrit ici la seule surface utilisée,
+ * plutôt que de passer par `any` — le compilateur vérifie alors les rappels.
+ */
+interface SpeechRecognitionResultLike {
+  readonly transcript: string
+}
+interface SpeechRecognitionEventLike {
+  readonly results: ArrayLike<ArrayLike<SpeechRecognitionResultLike>>
+}
+interface SpeechRecognitionLike {
+  lang: string
+  continuous: boolean
+  interimResults: boolean
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null
+  onerror: (() => void) | null
+  onend: (() => void) | null
+  start(): void
+  stop(): void
+}
+type SpeechRecognitionWindow = Window & {
+  SpeechRecognition?: new () => SpeechRecognitionLike
+  webkitSpeechRecognition?: new () => SpeechRecognitionLike
+}
+
 interface Message {
   role: 'user' | 'assistant'
   content: string
@@ -190,8 +216,7 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
 
   // Legacy dictation (Web Speech API → text box)
   const [isListening, setIsListening] = useState(false)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recognitionRef = useRef<any>(null)
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
 
   // Photo analysis
   const photoInputRef = useRef<HTMLInputElement>(null)
@@ -268,14 +293,12 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
 
   const toggleVoice = useCallback(() => {
     if (isListening) { recognitionRef.current?.stop(); setIsListening(false); return }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    const w = window as SpeechRecognitionWindow
+    const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition
     if (!SR) { alert('Votre navigateur ne supporte pas la reconnaissance vocale.'); return }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rec = new SR() as any
+    const rec = new SR()
     rec.lang = 'fr-FR'; rec.continuous = false; rec.interimResults = false
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    rec.onresult = (e: any) => {
+    rec.onresult = (e) => {
       const t: string = e.results[0][0].transcript
       setInput(prev => prev ? `${prev} ${t}` : t)
       setIsListening(false)
