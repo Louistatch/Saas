@@ -41,7 +41,11 @@ export const USER_ROLES = [
 /** Couche Haroo. `null` = non activée. Un seul profil à la fois. */
 export type HarooType = 'ouvrier' | 'acheteur' | 'agronome'
 
-export const HAROO_TYPES = ['ouvrier', 'acheteur', 'agronome'] as const satisfies readonly HarooType[]
+export const HAROO_TYPES = [
+  'ouvrier',
+  'acheteur',
+  'agronome',
+] as const satisfies readonly HarooType[]
 
 export const HAROO_TYPE_LABELS: Record<HarooType, string> = {
   ouvrier: 'Ouvrier agricole',
@@ -142,7 +146,20 @@ export interface MemberCard {
   expiry_date: string | null
   qr_data: string | null
   created_at: string
-  member?: Pick<Member, 'first_name' | 'last_name' | 'email' | 'phone' | 'photo_url' | 'signature_url' | 'prefecture' | 'region' | 'village' | 'canton' | 'faitiere'> | null
+  member?: Pick<
+    Member,
+    | 'first_name'
+    | 'last_name'
+    | 'email'
+    | 'phone'
+    | 'photo_url'
+    | 'signature_url'
+    | 'prefecture'
+    | 'region'
+    | 'village'
+    | 'canton'
+    | 'faitiere'
+  > | null
 }
 
 export interface CardTemplate {
@@ -207,3 +224,129 @@ export const PRODUCT_CATEGORIES = [
   'Services',
 ] as const
 export type ProductCategory = (typeof PRODUCT_CATEGORIES)[number]
+
+// ─── Partenaire / Opérateur certifié ─────────────────────────────────────────
+//
+// Troisième couche de compte, indépendante de `role` et `haroo_type`
+// (cf. supabase/migrations/20260920_100000_partner_capability_foundation.sql).
+// Un compte peut être admin de coopérative, ouvrier Haroo, ET partenaire
+// certifié — simultanément.
+
+export type PartnerStatus =
+  | 'candidate'
+  | 'training'
+  | 'exam_pending'
+  | 'certified'
+  | 'active'
+  | 'suspended'
+  | 'expired'
+  | 'revoked'
+
+export const PARTNER_STATUSES = [
+  'candidate',
+  'training',
+  'exam_pending',
+  'certified',
+  'active',
+  'suspended',
+  'expired',
+  'revoked',
+] as const satisfies readonly PartnerStatus[]
+
+export type PartnerMembershipRole = 'owner' | 'manager' | 'agent'
+
+export const PARTNER_MEMBERSHIP_ROLES = [
+  'owner',
+  'manager',
+  'agent',
+] as const satisfies readonly PartnerMembershipRole[]
+
+export type PartnerMembershipStatus = 'active' | 'revoked'
+
+export type PartnerAssignmentStatus = 'active' | 'revoked' | 'ended'
+
+/**
+ * Périmètres d'accès délégué qu'un mandat Partenaire↔Organisation peut
+ * porter. Un accès délégué n'est jamais total : il est composé de ces
+ * périmètres explicites, jamais d'un rôle générique.
+ */
+export type PartnerAccessScope =
+  | 'members.read'
+  | 'members.manage'
+  | 'cards.read'
+  | 'cards.manage'
+  | 'cards.print'
+  | 'kobo.manage'
+  | 'imports.manage'
+  | 'analytics.read'
+  | 'reports.generate'
+  | 'projects.manage'
+  | 'support.manage'
+
+export const PARTNER_ACCESS_SCOPES = [
+  'members.read',
+  'members.manage',
+  'cards.read',
+  'cards.manage',
+  'cards.print',
+  'kobo.manage',
+  'imports.manage',
+  'analytics.read',
+  'reports.generate',
+  'projects.manage',
+  'support.manage',
+] as const satisfies readonly PartnerAccessScope[]
+
+export interface Partner {
+  id: string
+  partner_code: string
+  business_name: string | null
+  display_name: string
+  phone: string | null
+  email: string | null
+  region_id: string | null
+  prefecture_id: string | null
+  status: PartnerStatus
+  created_at: string
+  updated_at: string
+  suspended_at: string | null
+}
+
+export interface PartnerMembership {
+  id: string
+  partner_id: string
+  user_id: string
+  membership_role: PartnerMembershipRole
+  status: PartnerMembershipStatus
+  created_at: string
+  updated_at: string
+}
+
+export interface PartnerCertification {
+  id: string
+  user_id: string
+  academy_module_id: string | null
+  training_completed_at: string | null
+  exam_score: number | null
+  exam_passed_at: string | null
+  certified_at: string | null
+  partner_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface PartnerOrganizationAssignment {
+  id: string
+  partner_id: string
+  cooperative_id: string
+  status: PartnerAssignmentStatus
+  is_primary_operator: boolean
+  started_at: string
+  ended_at: string | null
+  approved_by: string | null
+  revoked_by: string | null
+  created_at: string
+  updated_at: string
+  /** Chargé séparément (table de jointure `partner_assignment_scopes`) ; absent tant que non demandé. */
+  scopes?: PartnerAccessScope[]
+}
