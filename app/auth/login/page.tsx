@@ -1,20 +1,20 @@
 'use client'
 
-import Link from 'next/link'
-import { useSearchParams, useRouter } from 'next/navigation'
-import { useState, useCallback, Suspense } from 'react'
-import { Logo } from '@/components/shared/logo'
+import { useAuth } from '@/app/context/auth-context'
 import { AuthSidePanel } from '@/components/shared/auth-side-panel'
+import { Spinner } from '@/components/shared/loading'
+import { Logo } from '@/components/shared/logo'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Eye, EyeOff, ArrowLeft } from 'lucide-react'
-import { useAuth } from '@/app/context/auth-context'
-import { Spinner } from '@/components/shared/loading'
 import { errorMessage } from '@/lib/utils/errors'
-import { isHarooRole, hasOrgLayer } from '@/lib/utils/permissions'
+import { hasOrgLayer, isHarooRole } from '@/lib/utils/permissions'
 import { flattenZodErrors, loginSchema } from '@/lib/validators/schemas'
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense, useCallback, useState } from 'react'
 
 /**
  * Login page — FAST + RESILIENT.
@@ -84,15 +84,29 @@ function LoginInner() {
         // Haroo SEUL : un compte qui porte aussi la couche organisationnelle
         // atterrit sur son dashboard, d'où il bascule vers Haroo.
         const harooUser = !hasOrgLayer(user?.role) && isHarooRole(user?.role, user?.harooType)
+        const layerlessUser = user?.role === 'none' && !user.harooType
+        let operatorUser = false
+        if (layerlessUser) {
+          const operatorStatus = await fetch('/api/account/partner-status')
+            .then((response) => (response.ok ? response.json() : null))
+            .catch(() => null)
+          operatorUser = operatorStatus?.has_applied === true
+        }
         const applicableRedirect =
-          harooUser &&
+          (harooUser || operatorUser) &&
           safeRedirect &&
           (safeRedirect.startsWith('/dashboard') || safeRedirect.startsWith('/admin'))
             ? null
             : safeRedirect
         const target =
           applicableRedirect ??
-          (user?.role === 'super_admin' ? '/admin' : harooUser ? '/haroo' : '/dashboard')
+          (user?.role === 'super_admin'
+            ? '/admin'
+            : operatorUser
+              ? '/operator'
+              : harooUser
+                ? '/haroo'
+                : '/dashboard')
 
         router.replace(target)
       } catch (err: unknown) {

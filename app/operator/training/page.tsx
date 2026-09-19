@@ -5,15 +5,14 @@ import {
   getModuleWithLessons,
   getProfileProgressSummary,
 } from '@/lib/academy/operator-training'
-import { getAccessContext } from '@/lib/security/assert-access'
+import { assertOperatorCandidate } from '@/lib/security/assert-partner-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import type { AcademyProgressStatus } from '@/types/domain'
 import { CheckCircle2, Circle, CircleDot, GraduationCap } from 'lucide-react'
 /**
  * Liste de la formation Opérateur — server component : pas d'interaction
  * temps réel ici, seul le quiz/devoir (dans [lessonId]/) a besoin de 'use client'.
- * Aucune dépendance coopérative/membre — la formation Opérateur est ouverte
- * à tout compte authentifié (cf. app/api/academy/operator/*).
+ * Aucune dépendance coopérative/membre — mais un dossier Opérateur est requis.
  */
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -47,8 +46,9 @@ function StatusBadge({ status }: { status: AcademyProgressStatus }) {
 }
 
 export default async function OperatorTrainingPage() {
-  const ctx = await getAccessContext()
-  if (!ctx) redirect('/auth/login')
+  const guard = await assertOperatorCandidate()
+  if (!guard.ok) redirect('/operator')
+  const { ctx } = guard
 
   const admin = createAdminClient()
   const module_ = await getModuleWithLessons(admin, OPERATOR_MODULE_ID)

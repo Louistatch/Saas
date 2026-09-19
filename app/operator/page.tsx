@@ -573,13 +573,13 @@ function OperatorPageContent() {
               <p className="text-sm text-muted-foreground">Bonjour {user?.firstName ?? ''}</p>
             </div>
           </div>
-          {/* Accessible sans candidature déposée — la formation n'exige aucune
-              couche organisationnelle ni Haroo (cf. academy_profile_progress). */}
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/operator/training">
-              <GraduationCap className="mr-1.5 h-4 w-4" /> Formation
-            </Link>
-          </Button>
+          {status?.has_applied ? (
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/operator/training">
+                <GraduationCap className="mr-1.5 h-4 w-4" /> Formation
+              </Link>
+            </Button>
+          ) : null}
         </div>
 
         {loading ? (
