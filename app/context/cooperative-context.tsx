@@ -1,11 +1,11 @@
 'use client'
 
-import type React from 'react'
-import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { createLogger } from '@/lib/utils/logger'
-import { useAuth } from './auth-context'
 import type { Cooperative, CooperativeRow } from '@/types/domain'
+import type React from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useAuth } from './auth-context'
 
 const log = createLogger('coop-context')
 
@@ -17,7 +17,9 @@ export interface CooperativeContextType {
   isLoading: boolean
   switchCooperative: (cooperativeId: string) => void
   updateCooperative: (cooperative: Cooperative) => Promise<void>
-  addCooperative: (cooperative: Pick<Cooperative, 'name' | 'description' | 'primaryColor'>) => Promise<Cooperative | null>
+  addCooperative: (
+    cooperative: Pick<Cooperative, 'name' | 'description' | 'primaryColor'>,
+  ) => Promise<Cooperative | null>
   refreshCooperatives: () => Promise<void>
 }
 
@@ -56,22 +58,42 @@ export function CooperativeProvider({ children }: { children: React.ReactNode })
       return
     }
 
+    // Compte sans couche organisationnelle (role='none', ou Haroo pur) : rien
+    // à charger, jamais de repli sur `mapped[0]` ni sur `current_coop_id` du
+    // localStorage. Sans ce garde-fou, la condition ci-dessous ne filtrait
+    // QUE si `cooperativeId` était renseigné — un compte sans coopérative
+    // tombait sur la requête non filtrée (toutes les coopératives), et le
+    // `current_coop_id` mis en cache par un AUTRE compte dans un AUTRE onglet
+    // du même navigateur (localStorage est partagé entre onglets, pas par
+    // session) pouvait alors s'y trouver et être sélectionné — fuite de
+    // données d'une coopérative réelle vers un compte qui n'y appartient pas.
+    if (user.role !== 'super_admin' && !user.cooperativeId) {
+      setCooperatives([])
+      setCurrentCooperative(null)
+      setIsLoading(false)
+      return
+    }
+
     try {
       setIsLoading(true)
       let query = supabase
         .from('cooperatives')
-        .select('id, name, description, logo_url, primary_color, faitiere_name, level, parent_id, created_at')
+        .select(
+          'id, name, description, logo_url, primary_color, faitiere_name, level, parent_id, created_at',
+        )
 
       if (user.role !== 'super_admin' && user.cooperativeId) {
         // For faitiere/union admins: load the full hierarchy (self + children + grandchildren)
         // For cooperative admins: load only their cooperative
-        
+
         // Use the SQL function that already computes the full accessible hierarchy
         const { data: accessibleIds } = await supabase.rpc('get_accessible_cooperative_ids')
         if (accessibleIds && accessibleIds.length > 0) {
           query = supabase
             .from('cooperatives')
-            .select('id, name, description, logo_url, primary_color, faitiere_name, level, parent_id, created_at')
+            .select(
+              'id, name, description, logo_url, primary_color, faitiere_name, level, parent_id, created_at',
+            )
             .in('id', accessibleIds as string[])
         } else {
           query = query.eq('id', user.cooperativeId)
@@ -86,9 +108,7 @@ export function CooperativeProvider({ children }: { children: React.ReactNode })
 
       // Persist last-selected cooperative for super_admin so they don't reset on refresh
       const stored =
-        typeof window !== 'undefined'
-          ? window.localStorage.getItem('current_coop_id')
-          : null
+        typeof window !== 'undefined' ? window.localStorage.getItem('current_coop_id') : null
       const fallback = user.cooperativeId
         ? mapped.find((c) => c.id === user.cooperativeId)
         : undefined
