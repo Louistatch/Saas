@@ -18,7 +18,7 @@ import { flattenZodErrors, loginSchema } from '@/lib/validators/schemas'
 
 /**
  * Login page — FAST + RESILIENT.
- * 
+ *
  * Design principles:
  * - NO session check on mount (eliminates 4-8s delay on slow networks)
  * - Single network call: signInWithPassword (profile fetch is optional)
@@ -43,68 +43,68 @@ function LoginInner() {
 
   const redirectTo = searchParams?.get('redirect')
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (submitting) return
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault()
+      if (submitting) return
 
-    setError('')
-    setFieldErrors({})
+      setError('')
+      setFieldErrors({})
 
-    const parsed = loginSchema.safeParse({ email, password })
-    if (!parsed.success) {
-      setFieldErrors(flattenZodErrors(parsed.error))
-      return
-    }
+      const parsed = loginSchema.safeParse({ email, password })
+      if (!parsed.success) {
+        setFieldErrors(flattenZodErrors(parsed.error))
+        return
+      }
 
-    setSubmitting(true)
-    setProgress('Authentification…')
+      setSubmitting(true)
+      setProgress('Authentification…')
 
-    // Progressive feedback for Supabase free-tier cold starts (no hard timeout).
-    const progressTimer = setTimeout(() => {
-      setProgress('Connexion en cours, veuillez patienter…')
-    }, 5000)
-    const slowTimer = setTimeout(() => {
-      setProgress('Le serveur démarre, encore quelques secondes…')
-    }, 12000)
+      // Progressive feedback for Supabase free-tier cold starts (no hard timeout).
+      const progressTimer = setTimeout(() => {
+        setProgress('Connexion en cours, veuillez patienter…')
+      }, 5000)
+      const slowTimer = setTimeout(() => {
+        setProgress('Le serveur démarre, encore quelques secondes…')
+      }, 12000)
 
-    try {
-      // SINGLE source of truth: the AuthContext.login() method.
-      const user = await login(parsed.data.email, parsed.data.password)
+      try {
+        // SINGLE source of truth: the AuthContext.login() method.
+        const user = await login(parsed.data.email, parsed.data.password)
 
-      clearTimeout(progressTimer)
-      clearTimeout(slowTimer)
+        clearTimeout(progressTimer)
+        clearTimeout(slowTimer)
 
-      setProgress('Redirection…')
+        setProgress('Redirection…')
 
-      const safeRedirect =
-        redirectTo && /^\/[^/]/.test(redirectTo) ? redirectTo : null
-      // Un professionnel Haroo ne doit jamais être renvoyé vers le dashboard
-      // coopérative, même si ?redirect=/dashboard a été posé par le middleware
-      // lors d'une visite déconnectée — son espace est /haroo.
-      // Haroo SEUL : un compte qui porte aussi la couche organisationnelle
-      // atterrit sur son dashboard, d'où il bascule vers Haroo.
-      const harooUser = !hasOrgLayer(user?.role) && isHarooRole(user?.role, user?.harooType)
-      const applicableRedirect =
-        harooUser && safeRedirect && (safeRedirect.startsWith('/dashboard') || safeRedirect.startsWith('/admin'))
-          ? null
-          : safeRedirect
-      const target =
-        applicableRedirect ??
-        (user?.role === 'super_admin'
-          ? '/admin'
-          : harooUser
-            ? '/haroo'
-            : '/dashboard')
+        const safeRedirect = redirectTo && /^\/[^/]/.test(redirectTo) ? redirectTo : null
+        // Un professionnel Haroo ne doit jamais être renvoyé vers le dashboard
+        // coopérative, même si ?redirect=/dashboard a été posé par le middleware
+        // lors d'une visite déconnectée — son espace est /haroo.
+        // Haroo SEUL : un compte qui porte aussi la couche organisationnelle
+        // atterrit sur son dashboard, d'où il bascule vers Haroo.
+        const harooUser = !hasOrgLayer(user?.role) && isHarooRole(user?.role, user?.harooType)
+        const applicableRedirect =
+          harooUser &&
+          safeRedirect &&
+          (safeRedirect.startsWith('/dashboard') || safeRedirect.startsWith('/admin'))
+            ? null
+            : safeRedirect
+        const target =
+          applicableRedirect ??
+          (user?.role === 'super_admin' ? '/admin' : harooUser ? '/haroo' : '/dashboard')
 
-      router.replace(target)
-    } catch (err: unknown) {
-      clearTimeout(progressTimer)
-      clearTimeout(slowTimer)
-      setError(errorMessage(err))
-      setSubmitting(false)
-      setProgress('')
-    }
-  }, [email, password, login, redirectTo, submitting, router])
+        router.replace(target)
+      } catch (err: unknown) {
+        clearTimeout(progressTimer)
+        clearTimeout(slowTimer)
+        setError(errorMessage(err))
+        setSubmitting(false)
+        setProgress('')
+      }
+    },
+    [email, password, login, redirectTo, submitting, router],
+  )
 
   return (
     <div className="min-h-screen grid md:grid-cols-2 bg-background">
@@ -113,8 +113,8 @@ function LoginInner() {
         description="Gérez vos membres, les comptes d'exploitation et la croissance en un seul endroit."
         benefits={[
           'Gérer les données des membres et les cartes numériques',
-          'Publier les comptes d\'exploitation par région',
-          'Suivre les cotisations et l\'engagement des membres',
+          "Publier les comptes d'exploitation par région",
+          "Suivre les cotisations et l'engagement des membres",
         ]}
         footer="Au service des coopératives agricoles."
       />
@@ -123,7 +123,10 @@ function LoginInner() {
         {/* Mobile header: logo + back link + mini card */}
         <div className="md:hidden w-full max-w-sm mb-6 space-y-4">
           <div className="flex items-center justify-between">
-            <Link href="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
               <ArrowLeft className="h-4 w-4" />
               Accueil
             </Link>
@@ -138,7 +141,14 @@ function LoginInner() {
                   <p className="text-white font-bold text-xs">FaîtiereHub</p>
                 </div>
                 <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                  <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <svg
+                    aria-hidden="true"
+                    className="w-4 h-4 text-white"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  >
                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                   </svg>
                 </div>
@@ -192,7 +202,10 @@ function LoginInner() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">Mot de passe</Label>
-                  <Link href="/auth/forgot-password" className="text-xs text-primary hover:underline">
+                  <Link
+                    href="/auth/forgot-password"
+                    className="text-xs text-primary hover:underline"
+                  >
                     Mot de passe oublié ?
                   </Link>
                 </div>
@@ -213,7 +226,9 @@ function LoginInner() {
                     type="button"
                     onClick={() => setShowPassword((s) => !s)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
-                    aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                    aria-label={
+                      showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'
+                    }
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>

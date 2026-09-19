@@ -228,6 +228,7 @@ export function QrScanner({ onResult, onError, className = '' }: QrScannerProps)
           <div className="qr-cta">
             <div className="qr-cta-icon" aria-hidden>
               <svg
+                aria-hidden="true"
                 viewBox="0 0 24 24"
                 width="34"
                 height="34"

@@ -350,7 +350,7 @@ export default function VerifyCardPage() {
                 className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"
                 aria-label="Menu"
               >
-                <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+                <svg aria-hidden="true" width="18" height="14" viewBox="0 0 18 14" fill="none">
                   <path
                     d="M1 1h16M1 7h10M1 13h14"
                     stroke="oklch(0.75 0.20 50)"
@@ -464,7 +464,7 @@ export default function VerifyCardPage() {
                 className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"
                 aria-label="Menu"
               >
-                <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+                <svg aria-hidden="true" width="18" height="14" viewBox="0 0 18 14" fill="none">
                   <path
                     d="M1 1h16M1 7h10M1 13h14"
                     stroke="oklch(0.72 0.18 280)"
@@ -578,7 +578,7 @@ export default function VerifyCardPage() {
                 className="w-10 h-10 rounded-xl vfp-glass-subtle flex items-center justify-center"
                 aria-label="Menu"
               >
-                <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+                <svg aria-hidden="true" width="18" height="14" viewBox="0 0 18 14" fill="none">
                   <path
                     d="M1 1h16M1 7h10M1 13h14"
                     stroke="oklch(0.72 0.18 230)"
@@ -717,7 +717,7 @@ export default function VerifyCardPage() {
               {activeView !== 'menu' ? (
                 <ArrowLeft className="h-4 w-4" style={{ color: 'var(--vfp-accent)' }} />
               ) : (
-                <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+                <svg aria-hidden="true" width="18" height="14" viewBox="0 0 18 14" fill="none">
                   <path
                     d="M1 1h16M1 7h10M1 13h14"
                     stroke="var(--vfp-accent)"
@@ -871,7 +871,7 @@ export default function VerifyCardPage() {
                 style={{ transitionDelay: '200ms' }}
               >
                 <div className="relative w-[68px] h-[68px] shrink-0">
-                  <svg viewBox="0 0 64 64" className="w-full h-full -rotate-90">
+                  <svg aria-hidden="true" viewBox="0 0 64 64" className="w-full h-full -rotate-90">
                     <circle
                       cx="32"
                       cy="32"

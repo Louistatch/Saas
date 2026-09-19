@@ -37,7 +37,7 @@ export function InstallPrompt() {
     <div className="install-banner" role="banner" aria-live="polite">
       <div className="install-inner">
         <div className="install-icon" aria-hidden>
-          <svg width="36" height="36" viewBox="0 0 32 32" fill="none">
+          <svg aria-hidden="true" width="36" height="36" viewBox="0 0 32 32" fill="none">
             <rect width="32" height="32" rx="8" fill="#16a34a" />
             <path
               d="M16 6c-1.5 0-2.8.6-3.8 1.6C11.2 8.6 10.5 10 10.5 11.5c0 2 1 3.7 2.5 4.7v1.3c0 .3.1.5.3.7l2.5 2.5c.2.2.5.3.7.3s.5-.1.7-.3l2.5-2.5c.2-.2.3-.4.3-.7v-1.3c1.5-1 2.5-2.7 2.5-4.7 0-1.5-.7-2.9-1.7-3.9C19.3 6.6 17.5 6 16 6z"

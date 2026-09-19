@@ -47,7 +47,13 @@ function SVGSparkline({ values, trend }: { values: number[]; trend: string }) {
     .join(' ')
   const color = trend === 'up' ? '#f87171' : trend === 'down' ? '#4ade80' : 'rgba(255,255,255,0.3)'
   return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="shrink-0 opacity-80">
+    <svg
+      aria-hidden="true"
+      width={W}
+      height={H}
+      viewBox={`0 0 ${W} ${H}`}
+      className="shrink-0 opacity-80"
+    >
       <path
         d={d}
         fill="none"
@@ -245,6 +251,7 @@ export function MarketPricesDashboard({ onBack, cardNumber, memberLocality }: Pr
         className="flex items-center gap-2 text-[var(--vfp-accent)] text-sm font-medium active:opacity-70"
       >
         <svg
+          aria-hidden="true"
           className="h-4 w-4"
           viewBox="0 0 24 24"
           fill="none"

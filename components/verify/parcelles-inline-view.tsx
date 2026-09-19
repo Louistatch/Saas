@@ -204,7 +204,7 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
                     <div
                       className={`w-4 h-4 shrink-0 mt-1 text-white/30 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
                     >
-                      <svg viewBox="0 0 16 16" fill="currentColor">
+                      <svg aria-hidden="true" viewBox="0 0 16 16" fill="currentColor">
                         <path
                           d="M2 5l6 6 6-6"
                           stroke="currentColor"

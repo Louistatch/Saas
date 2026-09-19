@@ -31,7 +31,9 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     let settled = false
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
         settled = true
         setSessionState('valid')
@@ -60,8 +62,14 @@ export default function ResetPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (password.length < 8) { setError('Le mot de passe doit contenir au moins 8 caractères'); return }
-    if (password !== confirm) { setError('Les mots de passe ne correspondent pas'); return }
+    if (password.length < 8) {
+      setError('Le mot de passe doit contenir au moins 8 caractères')
+      return
+    }
+    if (password !== confirm) {
+      setError('Les mots de passe ne correspondent pas')
+      return
+    }
     setLoading(true)
     const { error: updateError } = await supabase.auth.updateUser({ password })
     if (updateError) {
@@ -92,7 +100,10 @@ export default function ResetPasswordPage() {
         {/* Mobile header: logo + back link + mini card */}
         <div className="md:hidden w-full max-w-sm mb-6 space-y-4">
           <div className="flex items-center justify-between">
-            <Link href="/auth/login" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <Link
+              href="/auth/login"
+              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
               <ArrowLeft className="h-4 w-4" />
               Connexion
             </Link>
@@ -107,7 +118,14 @@ export default function ResetPasswordPage() {
                   <p className="text-white font-bold text-xs">FaîtiereHub</p>
                 </div>
                 <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                  <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <svg
+                    aria-hidden="true"
+                    className="w-4 h-4 text-white"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  >
                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                   </svg>
                 </div>
@@ -153,7 +171,9 @@ export default function ResetPasswordPage() {
               <div className="space-y-4 text-center py-4">
                 <CheckCircle className="h-12 w-12 text-green-600 mx-auto" />
                 <p className="font-medium text-foreground">Mot de passe mis à jour !</p>
-                <p className="text-sm text-muted-foreground">Redirection vers la page de connexion…</p>
+                <p className="text-sm text-muted-foreground">
+                  Redirection vers la page de connexion…
+                </p>
               </div>
             ) : (
               <form className="space-y-4" onSubmit={handleSubmit}>
@@ -189,7 +209,11 @@ export default function ResetPasswordPage() {
                     required
                   />
                 </div>
-                <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={loading}>
+                <Button
+                  type="submit"
+                  className="w-full bg-primary hover:bg-primary/90"
+                  disabled={loading}
+                >
                   {loading ? 'Mise à jour…' : 'Mettre à jour le mot de passe'}
                 </Button>
               </form>

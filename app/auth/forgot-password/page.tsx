@@ -21,7 +21,10 @@ export default function ForgotPasswordPage() {
     e.preventDefault()
     setError('')
     const trimmedEmail = email.trim().toLowerCase()
-    if (!trimmedEmail) { setError('L\'email est requis'); return }
+    if (!trimmedEmail) {
+      setError("L'email est requis")
+      return
+    }
     setLoading(true)
     const supabase = createClient()
     // [SECURITY FIX - PHANTOM-002] Ne jamais révéler si l'email existe ou non
@@ -51,7 +54,10 @@ export default function ForgotPasswordPage() {
         {/* Mobile header: logo + back link + mini card */}
         <div className="md:hidden w-full max-w-sm mb-6 space-y-4">
           <div className="flex items-center justify-between">
-            <Link href="/auth/login" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <Link
+              href="/auth/login"
+              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
               <ArrowLeft className="h-4 w-4" />
               Connexion
             </Link>
@@ -66,7 +72,14 @@ export default function ForgotPasswordPage() {
                   <p className="text-white font-bold text-xs">FaîtiereHub</p>
                 </div>
                 <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                  <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <svg
+                    aria-hidden="true"
+                    className="w-4 h-4 text-white"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  >
                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                   </svg>
                 </div>
@@ -95,7 +108,8 @@ export default function ForgotPasswordPage() {
                 <CheckCircle className="h-12 w-12 text-green-600 mx-auto" />
                 <p className="font-medium text-foreground">Vérifiez votre email</p>
                 <p className="text-sm text-muted-foreground">
-                  Si cet email est enregistré, un lien de réinitialisation a été envoyé à <strong>{email}</strong>
+                  Si cet email est enregistré, un lien de réinitialisation a été envoyé à{' '}
+                  <strong>{email}</strong>
                 </p>
                 <Link href="/auth/login">
                   <Button variant="outline" className="w-full border-border gap-2">
@@ -123,7 +137,11 @@ export default function ForgotPasswordPage() {
                     required
                   />
                 </div>
-                <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={loading}>
+                <Button
+                  type="submit"
+                  className="w-full bg-primary hover:bg-primary/90"
+                  disabled={loading}
+                >
                   {loading ? 'Envoi en cours...' : 'Envoyer le lien de réinitialisation'}
                 </Button>
               </form>
