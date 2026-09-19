@@ -466,10 +466,10 @@ export function MarketPricesDashboard({ onBack, cardNumber, memberLocality }: Pr
               Fermer
             </button>
           </div>
-          <div>
-            <label className="text-xs text-white/50 uppercase tracking-wider font-semibold block mb-1.5">
+          <fieldset className="border-0 p-0 m-0">
+            <legend className="text-xs text-white/50 uppercase tracking-wider font-semibold block mb-1.5">
               Culture
-            </label>
+            </legend>
             <div className="grid grid-cols-4 gap-2">
               {ALL_CULTURES.map((c) => (
                 <button
@@ -483,12 +483,16 @@ export function MarketPricesDashboard({ onBack, cardNumber, memberLocality }: Pr
                 </button>
               ))}
             </div>
-          </div>
+          </fieldset>
           <div>
-            <label className="text-xs text-white/50 uppercase tracking-wider font-semibold block mb-1.5">
+            <label
+              htmlFor="price-submit"
+              className="text-xs text-white/50 uppercase tracking-wider font-semibold block mb-1.5"
+            >
               Prix (FCFA/kg)
             </label>
             <input
+              id="price-submit"
               type="number"
               inputMode="numeric"
               placeholder="Ex: 450"

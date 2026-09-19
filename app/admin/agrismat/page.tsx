@@ -4,9 +4,7 @@ import { useState, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  CheckCircle2, Leaf, Droplets, RefreshCw, Play,
-} from 'lucide-react'
+import { CheckCircle2, Leaf, Droplets, RefreshCw, Play } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { LoadingBlock } from '@/components/shared/loading'
 import { PageHeader } from '@/components/shared/page-header'
@@ -25,7 +23,18 @@ interface CalculateResult {
   error?: string
 }
 
-const CROPS = ['Maïs', 'Riz', 'Manioc', 'Tomate', 'Igname', 'Café', 'Cacao', 'Sorgho', 'Mil', 'Arachide']
+const CROPS = [
+  'Maïs',
+  'Riz',
+  'Manioc',
+  'Tomate',
+  'Igname',
+  'Café',
+  'Cacao',
+  'Sorgho',
+  'Mil',
+  'Arachide',
+]
 const SOILS = ['Argileux', 'Limoneux', 'Sableux', 'Limon sableux', 'Argilo-limoneux']
 const SYSTEMS = ['Goutte à goutte', 'Aspersion', 'Gravitaire', 'Micro-aspersion', 'Submersion']
 
@@ -54,7 +63,7 @@ export default function AgrismatAdminPage() {
           region,
         }),
       })
-      const data = await res.json() as CalculateResult
+      const data = (await res.json()) as CalculateResult
       if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`)
       setResult(data)
     } catch (e) {
@@ -80,15 +89,32 @@ export default function AgrismatAdminPage() {
       {/* Capabilities */}
       <div className="grid gap-4 md:grid-cols-3">
         {[
-          { icon: Leaf, label: '20+ cultures', desc: 'Maïs, riz, manioc, café, cacao…', color: 'bg-green-100 text-green-700' },
-          { icon: Droplets, label: '6 types de sol', desc: 'Argileux, limoneux, sableux…', color: 'bg-blue-100 text-blue-700' },
-          { icon: CheckCircle2, label: 'FAO-56 certifié', desc: 'Méthode Penman-Monteith internationale', color: 'bg-primary/10 text-primary' },
+          {
+            icon: Leaf,
+            label: '20+ cultures',
+            desc: 'Maïs, riz, manioc, café, cacao…',
+            color: 'bg-green-100 text-green-700',
+          },
+          {
+            icon: Droplets,
+            label: '6 types de sol',
+            desc: 'Argileux, limoneux, sableux…',
+            color: 'bg-blue-100 text-blue-700',
+          },
+          {
+            icon: CheckCircle2,
+            label: 'FAO-56 certifié',
+            desc: 'Méthode Penman-Monteith internationale',
+            color: 'bg-primary/10 text-primary',
+          },
         ].map((item) => {
           const Icon = item.icon
           return (
             <Card key={item.label} className="border-border">
               <CardContent className="pt-5 flex items-center gap-4">
-                <div className={`p-3 rounded-full ${item.color}`}><Icon className="h-6 w-6" /></div>
+                <div className={`p-3 rounded-full ${item.color}`}>
+                  <Icon className="h-6 w-6" />
+                </div>
                 <div>
                   <p className="font-semibold text-foreground">{item.label}</p>
                   <p className="text-xs text-muted-foreground">{item.desc}</p>
@@ -105,42 +131,87 @@ export default function AgrismatAdminPage() {
           <CardTitle className="text-foreground flex items-center gap-2">
             <Droplets className="h-5 w-5 text-primary" /> Calculateur de besoins en eau
           </CardTitle>
-          <CardDescription>Utilisé par AgriTogo pour les recommandations aux agriculteurs</CardDescription>
+          <CardDescription>
+            Utilisé par AgriTogo pour les recommandations aux agriculteurs
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Culture</label>
-              <select value={crop} onChange={(e) => setCrop(e.target.value)}
-                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-                {CROPS.map((c) => <option key={c}>{c}</option>)}
+              <label htmlFor="ag-crop" className="text-xs font-medium text-muted-foreground">
+                Culture
+              </label>
+              <select
+                id="ag-crop"
+                value={crop}
+                onChange={(e) => setCrop(e.target.value)}
+                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+              >
+                {CROPS.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Surface (m²)</label>
-              <Input type="number" min="1" value={area} onChange={(e) => setArea(e.target.value)} />
+              <label htmlFor="ag-area" className="text-xs font-medium text-muted-foreground">
+                Surface (m²)
+              </label>
+              <Input
+                id="ag-area"
+                type="number"
+                min="1"
+                value={area}
+                onChange={(e) => setArea(e.target.value)}
+              />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Type de sol</label>
-              <select value={soil} onChange={(e) => setSoil(e.target.value)}
-                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-                {SOILS.map((s) => <option key={s}>{s}</option>)}
+              <label htmlFor="ag-soil" className="text-xs font-medium text-muted-foreground">
+                Type de sol
+              </label>
+              <select
+                id="ag-soil"
+                value={soil}
+                onChange={(e) => setSoil(e.target.value)}
+                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+              >
+                {SOILS.map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Système d&apos;irrigation</label>
-              <select value={system} onChange={(e) => setSystem(e.target.value)}
-                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-                {SYSTEMS.map((s) => <option key={s}>{s}</option>)}
+              <label htmlFor="ag-system" className="text-xs font-medium text-muted-foreground">
+                Système d&apos;irrigation
+              </label>
+              <select
+                id="ag-system"
+                value={system}
+                onChange={(e) => setSystem(e.target.value)}
+                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+              >
+                {SYSTEMS.map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Région (Togo)</label>
-              <Input value={region} onChange={(e) => setRegion(e.target.value)} placeholder="Centrale" />
+              <label htmlFor="ag-region" className="text-xs font-medium text-muted-foreground">
+                Région (Togo)
+              </label>
+              <Input
+                id="ag-region"
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+                placeholder="Centrale"
+              />
             </div>
           </div>
           <Button onClick={calculate} disabled={calculating} className="gap-2">
-            {calculating ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+            {calculating ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <Play className="h-4 w-4" />
+            )}
             Calculer les besoins
           </Button>
         </CardContent>
@@ -160,11 +231,26 @@ export default function AgrismatAdminPage() {
             {cropResult.kpis && (
               <div className="grid gap-4 md:grid-cols-3">
                 {[
-                  { label: 'Volume total annuel', value: cropResult.kpis.total_m3 !== undefined ? `${cropResult.kpis.total_m3.toFixed(0)} m³` : '—' },
+                  {
+                    label: 'Volume total annuel',
+                    value:
+                      cropResult.kpis.total_m3 !== undefined
+                        ? `${cropResult.kpis.total_m3.toFixed(0)} m³`
+                        : '—',
+                  },
                   { label: 'Mois de pointe', value: cropResult.kpis.peak_month ?? '—' },
-                  { label: 'Moyenne mensuelle', value: cropResult.kpis.avg_monthly_mm !== undefined ? `${cropResult.kpis.avg_monthly_mm.toFixed(1)} mm` : '—' },
+                  {
+                    label: 'Moyenne mensuelle',
+                    value:
+                      cropResult.kpis.avg_monthly_mm !== undefined
+                        ? `${cropResult.kpis.avg_monthly_mm.toFixed(1)} mm`
+                        : '—',
+                  },
                 ].map((kpi) => (
-                  <div key={kpi.label} className="p-4 rounded-lg border border-border bg-primary/5 text-center">
+                  <div
+                    key={kpi.label}
+                    className="p-4 rounded-lg border border-border bg-primary/5 text-center"
+                  >
                     <p className="text-2xl font-bold text-primary">{kpi.value}</p>
                     <p className="text-xs text-muted-foreground mt-1">{kpi.label}</p>
                   </div>
@@ -180,11 +266,19 @@ export default function AgrismatAdminPage() {
                     const pct = monthlyMax > 0 ? (val / monthlyMax) * 100 : 0
                     return (
                       <div key={MOIS[i]} className="flex flex-col items-center gap-1">
-                        <div className="w-full bg-muted rounded-sm overflow-hidden" style={{ height: 60 }}>
-                          <div className="w-full bg-primary rounded-sm transition-all" style={{ height: `${pct}%`, marginTop: `${100 - pct}%` }} />
+                        <div
+                          className="w-full bg-muted rounded-sm overflow-hidden"
+                          style={{ height: 60 }}
+                        >
+                          <div
+                            className="w-full bg-primary rounded-sm transition-all"
+                            style={{ height: `${pct}%`, marginTop: `${100 - pct}%` }}
+                          />
                         </div>
                         <span className="text-xs text-muted-foreground">{MOIS[i]}</span>
-                        <span className="text-xs font-medium text-foreground">{val.toFixed(0)}</span>
+                        <span className="text-xs font-medium text-foreground">
+                          {val.toFixed(0)}
+                        </span>
                       </div>
                     )
                   })}

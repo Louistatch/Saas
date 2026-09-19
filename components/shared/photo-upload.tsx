@@ -65,7 +65,7 @@ export function PhotoUpload({
       // Validate the REAL file type via magic bytes (Content-Type is spoofable).
       const okMagic = await hasImageMagicBytes(file)
       if (!okMagic) {
-        setError("Fichier image invalide ou corrompu")
+        setError('Fichier image invalide ou corrompu')
         return
       }
 
@@ -91,9 +91,7 @@ export function PhotoUpload({
 
         if (uploadError) throw uploadError
 
-        const { data: urlData } = supabase.storage
-          .from('member-photos')
-          .getPublicUrl(filename)
+        const { data: urlData } = supabase.storage.from('member-photos').getPublicUrl(filename)
 
         onChange(urlData.publicUrl)
       } catch (err) {
@@ -116,57 +114,60 @@ export function PhotoUpload({
     onChange(null)
   }, [value, onChange, supabase])
 
+  // Une photo déjà présente affiche deux actions distinctes (changer /
+  // supprimer) plutôt qu'une zone entière cliquable : un <button> ne peut pas
+  // en contenir un autre, et « Supprimer » en est déjà un.
+  const frameClassName = cn(
+    'relative rounded-lg border-2 border-dashed border-border overflow-hidden flex items-center justify-center bg-muted/30 transition-colors',
+    value && 'border-solid border-border',
+    sizes[size],
+  )
+
   return (
     <div className={cn('space-y-2', className)}>
-      <div
-        className={cn(
-          'relative rounded-lg border-2 border-dashed border-border overflow-hidden flex items-center justify-center bg-muted/30 transition-colors',
-          !disabled && 'hover:border-primary/50 cursor-pointer',
-          value && 'border-solid border-border',
-          sizes[size],
-        )}
-        onClick={() => !disabled && !uploading && inputRef.current?.click()}
-        role="button"
-        tabIndex={disabled ? -1 : 0}
-        aria-label="Upload photo"
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            inputRef.current?.click()
-          }
-        }}
-      >
-        {value ? (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={value}
-              alt="Photo du membre"
-              className="w-full h-full object-cover"
-            />
-            {!disabled && (
+      {value ? (
+        <div className={frameClassName}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={value} alt="Photo du membre" className="w-full h-full object-cover" />
+          {!disabled && (
+            <>
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleRemove()
-                }}
+                onClick={() => inputRef.current?.click()}
+                className="absolute bottom-1 left-1 bg-background/90 text-foreground rounded-full p-1 hover:bg-background transition-colors"
+                aria-label="Changer la photo"
+              >
+                <Camera className="h-3 w-3" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRemove()}
                 className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 hover:bg-destructive/80 transition-colors"
                 aria-label="Supprimer la photo"
               >
                 <X className="h-3 w-3" />
               </button>
-            )}
-          </>
-        ) : uploading ? (
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        ) : (
-          <div className="text-center p-2">
-            <Camera className="h-6 w-6 text-muted-foreground mx-auto" />
-            <p className="text-[10px] text-muted-foreground mt-1">Photo ID</p>
-          </div>
-        )}
-      </div>
+            </>
+          )}
+        </div>
+      ) : (
+        <button
+          type="button"
+          className={cn(frameClassName, !disabled && 'hover:border-primary/50 cursor-pointer')}
+          onClick={() => !disabled && !uploading && inputRef.current?.click()}
+          disabled={disabled}
+          aria-label="Ajouter une photo"
+        >
+          {uploading ? (
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          ) : (
+            <div className="text-center p-2">
+              <Camera className="h-6 w-6 text-muted-foreground mx-auto" />
+              <p className="text-[10px] text-muted-foreground mt-1">Photo ID</p>
+            </div>
+          )}
+        </button>
+      )}
 
       <input
         ref={inputRef}

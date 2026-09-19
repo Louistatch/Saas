@@ -65,12 +65,21 @@ function FilterSelect({
   options: { value: string; label: string; icon?: string | null }[]
   onChange: (v: string) => void
 }) {
+  const fieldId = `filter-${label
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')}`
   return (
     <div className="space-y-1.5">
-      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+      <label
+        htmlFor={fieldId}
+        className="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+      >
         {label}
       </label>
       <select
+        id={fieldId}
         className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -101,10 +110,10 @@ export function MarketplaceFilterBar({
   const FilterPanel = () => (
     <div className="space-y-5">
       {/* Category chips */}
-      <div className="space-y-1.5">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+      <fieldset className="space-y-1.5 border-0 p-0 m-0">
+        <legend className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           Catégorie
-        </label>
+        </legend>
         <div className="flex flex-wrap gap-2">
           {CATEGORIES.map((cat) => (
             <button
@@ -122,7 +131,7 @@ export function MarketplaceFilterBar({
             </button>
           ))}
         </div>
-      </div>
+      </fieldset>
 
       {/* Geographic cascade */}
       <FilterSelect
@@ -168,12 +177,13 @@ export function MarketplaceFilterBar({
 
       {/* Price range */}
       <div className="space-y-1.5">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           Prix (FCFA)
-        </label>
+        </span>
         <div className="flex gap-2 items-center">
           <Input
             type="number"
+            aria-label="Prix minimum (FCFA)"
             placeholder="Min"
             value={filters.min_price}
             onChange={(e) => setFilter('min_price', e.target.value)}
@@ -182,6 +192,7 @@ export function MarketplaceFilterBar({
           <span className="text-muted-foreground">—</span>
           <Input
             type="number"
+            aria-label="Prix maximum (FCFA)"
             placeholder="Max"
             value={filters.max_price}
             onChange={(e) => setFilter('max_price', e.target.value)}

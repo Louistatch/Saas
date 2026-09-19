@@ -80,20 +80,25 @@ export default function EmbedConfigPage() {
     setLoading(false)
   }, [currentCooperative, supabase])
 
-  useEffect(() => { loadConfig() }, [loadConfig])
+  useEffect(() => {
+    loadConfig()
+  }, [loadConfig])
 
   const saveConfig = async () => {
     if (!currentCooperative) return
     setSaving(true)
-    const { error } = await supabase.from('embed_configs').upsert({
-      cooperative_id: currentCooperative.id,
-      enabled: config.enabled,
-      allowed_origins: config.allowed_origins,
-      widgets: config.widgets,
-      custom_domain: config.custom_domain || null,
-      theme: config.theme,
-      logo_url: config.logo_url,
-    }, { onConflict: 'cooperative_id' })
+    const { error } = await supabase.from('embed_configs').upsert(
+      {
+        cooperative_id: currentCooperative.id,
+        enabled: config.enabled,
+        allowed_origins: config.allowed_origins,
+        widgets: config.widgets,
+        custom_domain: config.custom_domain || null,
+        theme: config.theme,
+        logo_url: config.logo_url,
+      },
+      { onConflict: 'cooperative_id' },
+    )
     setSaving(false)
 
     if (error) {
@@ -109,7 +114,8 @@ export default function EmbedConfigPage() {
     setTimeout(() => setCopied(null), 2000)
   }
 
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://app.faitierehub.com'
+  const baseUrl =
+    typeof window !== 'undefined' ? window.location.origin : 'https://app.faitierehub.com'
   const cooperativeId = currentCooperative?.id ?? 'YOUR_COOPERATIVE_ID'
 
   const embedSnippets = {
@@ -156,11 +162,13 @@ export default function EmbedConfigPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-semibold text-foreground">Activer l'embed</h3>
-                  <p className="text-sm text-muted-foreground">Permettre l'intégration sur des sites externes</p>
+                  <p className="text-sm text-muted-foreground">
+                    Permettre l'intégration sur des sites externes
+                  </p>
                 </div>
                 <Switch
                   checked={config.enabled}
-                  onCheckedChange={(v) => setConfig(c => ({ ...c, enabled: v }))}
+                  onCheckedChange={(v) => setConfig((c) => ({ ...c, enabled: v }))}
                 />
               </div>
             </CardContent>
@@ -170,23 +178,30 @@ export default function EmbedConfigPage() {
           <Card className="border-border">
             <CardHeader>
               <CardTitle className="text-foreground">Widgets activés</CardTitle>
-              <CardDescription>Choisissez quels widgets sont disponibles pour l'embed</CardDescription>
+              <CardDescription>
+                Choisissez quels widgets sont disponibles pour l'embed
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {WIDGET_OPTIONS.map((w) => (
-                <label key={w.key} className="flex items-center justify-between p-3 border border-border rounded-lg cursor-pointer hover:bg-accent/5">
+                <label
+                  htmlFor={`widget-${w.key}`}
+                  key={w.key}
+                  className="flex items-center justify-between p-3 border border-border rounded-lg cursor-pointer hover:bg-accent/5"
+                >
                   <div>
                     <p className="font-medium text-sm text-foreground">{w.label}</p>
                     <p className="text-xs text-muted-foreground">{w.description}</p>
                   </div>
                   <Switch
+                    id={`widget-${w.key}`}
                     checked={config.widgets.includes(w.key)}
                     onCheckedChange={(checked) => {
-                      setConfig(c => ({
+                      setConfig((c) => ({
                         ...c,
                         widgets: checked
                           ? [...c.widgets, w.key]
-                          : c.widgets.filter(x => x !== w.key),
+                          : c.widgets.filter((x) => x !== w.key),
                       }))
                     }}
                   />
@@ -202,7 +217,9 @@ export default function EmbedConfigPage() {
                 <Shield className="h-5 w-5" />
                 Origines autorisées
               </CardTitle>
-              <CardDescription>Domaines autorisés à intégrer vos widgets (laissez vide pour tout autoriser)</CardDescription>
+              <CardDescription>
+                Domaines autorisés à intégrer vos widgets (laissez vide pour tout autoriser)
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex gap-2">
@@ -212,7 +229,10 @@ export default function EmbedConfigPage() {
                   onChange={(e) => setNewOrigin(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && newOrigin.trim()) {
-                      setConfig(c => ({ ...c, allowed_origins: [...c.allowed_origins, newOrigin.trim()] }))
+                      setConfig((c) => ({
+                        ...c,
+                        allowed_origins: [...c.allowed_origins, newOrigin.trim()],
+                      }))
                       setNewOrigin('')
                     }
                   }}
@@ -221,7 +241,10 @@ export default function EmbedConfigPage() {
                   variant="outline"
                   onClick={() => {
                     if (newOrigin.trim()) {
-                      setConfig(c => ({ ...c, allowed_origins: [...c.allowed_origins, newOrigin.trim()] }))
+                      setConfig((c) => ({
+                        ...c,
+                        allowed_origins: [...c.allowed_origins, newOrigin.trim()],
+                      }))
                       setNewOrigin('')
                     }
                   }}
@@ -231,9 +254,17 @@ export default function EmbedConfigPage() {
               </div>
               <div className="flex flex-wrap gap-2">
                 {config.allowed_origins.map((origin, i) => (
-                  <Badge key={origin} variant="secondary" className="gap-1 cursor-pointer" onClick={() => {
-                    setConfig(c => ({ ...c, allowed_origins: c.allowed_origins.filter((_, j) => j !== i) }))
-                  }}>
+                  <Badge
+                    key={origin}
+                    variant="secondary"
+                    className="gap-1 cursor-pointer"
+                    onClick={() => {
+                      setConfig((c) => ({
+                        ...c,
+                        allowed_origins: c.allowed_origins.filter((_, j) => j !== i),
+                      }))
+                    }}
+                  >
                     {origin} ×
                   </Badge>
                 ))}
@@ -260,12 +291,22 @@ export default function EmbedConfigPage() {
                     <input
                       type="color"
                       value={config.theme.primaryColor}
-                      onChange={(e) => setConfig(c => ({ ...c, theme: { ...c.theme, primaryColor: e.target.value } }))}
+                      onChange={(e) =>
+                        setConfig((c) => ({
+                          ...c,
+                          theme: { ...c.theme, primaryColor: e.target.value },
+                        }))
+                      }
                       className="h-9 w-12 rounded border border-border cursor-pointer"
                     />
                     <Input
                       value={config.theme.primaryColor}
-                      onChange={(e) => setConfig(c => ({ ...c, theme: { ...c.theme, primaryColor: e.target.value } }))}
+                      onChange={(e) =>
+                        setConfig((c) => ({
+                          ...c,
+                          theme: { ...c.theme, primaryColor: e.target.value },
+                        }))
+                      }
                       className="flex-1"
                     />
                   </div>
@@ -274,7 +315,12 @@ export default function EmbedConfigPage() {
                   <Label>Border radius</Label>
                   <Input
                     value={config.theme.borderRadius}
-                    onChange={(e) => setConfig(c => ({ ...c, theme: { ...c.theme, borderRadius: e.target.value } }))}
+                    onChange={(e) =>
+                      setConfig((c) => ({
+                        ...c,
+                        theme: { ...c.theme, borderRadius: e.target.value },
+                      }))
+                    }
                     placeholder="8px"
                   />
                 </div>
@@ -283,15 +329,23 @@ export default function EmbedConfigPage() {
                 <Label>Domaine personnalisé</Label>
                 <Input
                   value={config.custom_domain ?? ''}
-                  onChange={(e) => setConfig(c => ({ ...c, custom_domain: e.target.value || null }))}
+                  onChange={(e) =>
+                    setConfig((c) => ({ ...c, custom_domain: e.target.value || null }))
+                  }
                   placeholder="marketplace.votre-faitiere.org"
                 />
-                <p className="text-xs text-muted-foreground">Configurez un CNAME vers app.faitierehub.com</p>
+                <p className="text-xs text-muted-foreground">
+                  Configurez un CNAME vers app.faitierehub.com
+                </p>
               </div>
             </CardContent>
           </Card>
 
-          <Button className="w-full gap-2 bg-primary hover:bg-primary/90" onClick={saveConfig} disabled={saving}>
+          <Button
+            className="w-full gap-2 bg-primary hover:bg-primary/90"
+            onClick={saveConfig}
+            disabled={saving}
+          >
             {saving ? <Spinner className="h-4 w-4" /> : null}
             Sauvegarder la configuration
           </Button>
@@ -326,7 +380,11 @@ export default function EmbedConfigPage() {
                         className="absolute top-2 right-2 h-7 w-7 p-0"
                         onClick={() => copyToClipboard(code, key)}
                       >
-                        {copied === key ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+                        {copied === key ? (
+                          <Check className="h-3.5 w-3.5 text-green-600" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
                       </Button>
                     </div>
                   </TabsContent>

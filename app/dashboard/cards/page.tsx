@@ -6,9 +6,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Download, QrCode, Trash2, RefreshCw, Users, CheckCircle2, Search, Printer } from 'lucide-react'
+import {
+  Plus,
+  Download,
+  QrCode,
+  Trash2,
+  RefreshCw,
+  Users,
+  CheckCircle2,
+  Search,
+  Printer,
+} from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
@@ -78,21 +95,24 @@ export default function CardsPage() {
   const [templateErrors, setTemplateErrors] = useState<Record<string, string>>({})
 
   // Faîtière logic: detect if current user manages a faîtière (parent org)
-  const isFaitiereAdmin = currentCooperative?.level === 'faitiere' || currentCooperative?.level === 'union'
-  
+  const isFaitiereAdmin =
+    currentCooperative?.level === 'faitiere' || currentCooperative?.level === 'union'
+
   // Child cooperatives (only leaf-level cooperatives for card generation)
   const childCooperatives = useMemo(() => {
     if (!isFaitiereAdmin || !currentCooperative) return []
-    return cooperatives.filter(c => c.level === 'cooperative' && c.id !== currentCooperative.id)
+    return cooperatives.filter((c) => c.level === 'cooperative' && c.id !== currentCooperative.id)
   }, [isFaitiereAdmin, currentCooperative, cooperatives])
 
   // Members filtered by selected cooperative (for faîtière admins)
-  const [allMembers, setAllMembers] = useState<(Pick<Member, 'id' | 'first_name' | 'last_name'> & { cooperative_id: string })[]>([])
-  
+  const [allMembers, setAllMembers] = useState<
+    (Pick<Member, 'id' | 'first_name' | 'last_name'> & { cooperative_id: string })[]
+  >([])
+
   const filteredMembersForGenerate = useMemo(() => {
     if (!isFaitiereAdmin) return members
     if (!selectedCoopId) return []
-    return allMembers.filter(m => m.cooperative_id === selectedCoopId)
+    return allMembers.filter((m) => m.cooperative_id === selectedCoopId)
   }, [isFaitiereAdmin, selectedCoopId, members, allMembers])
 
   const fetchCards = useCallback(async () => {
@@ -103,30 +123,32 @@ export default function CardsPage() {
     setIsLoading(true)
     let query = supabase
       .from('member_cards')
-      .select('*, member:members(first_name, last_name, email, phone, photo_url, prefecture, region, village, canton, faitiere)')
-    
+      .select(
+        '*, member:members(first_name, last_name, email, phone, photo_url, prefecture, region, village, canton, faitiere)',
+      )
+
     if (currentCooperative.level === 'faitiere' || currentCooperative.level === 'union') {
       // Fetch all cooperative IDs in hierarchy directly
       const { data: allCoops } = await supabase
         .from('cooperatives')
         .select('id')
         .or(`id.eq.${currentCooperative.id},parent_id.eq.${currentCooperative.id}`)
-      const directIds = (allCoops ?? []).map(c => c.id)
-      
+      const directIds = (allCoops ?? []).map((c) => c.id)
+
       // Also get grandchildren
       if (directIds.length > 0) {
         const { data: grandChildren } = await supabase
           .from('cooperatives')
           .select('id')
           .in('parent_id', directIds)
-        const allIds = [...new Set([...directIds, ...(grandChildren ?? []).map(c => c.id)])]
+        const allIds = [...new Set([...directIds, ...(grandChildren ?? []).map((c) => c.id)])]
         query = query.in('cooperative_id', allIds)
       }
     } else {
       query = query.eq('cooperative_id', currentCooperative.id)
     }
     // If currentCooperative is null, load all (RLS will filter)
-    
+
     query = query.order('created_at', { ascending: false })
     const { data, error } = await query
     if (error) {
@@ -138,16 +160,16 @@ export default function CardsPage() {
   }, [currentCooperative, supabase, toast])
 
   const fetchMembers = useCallback(async () => {
-    let query = supabase
-      .from('members')
-      .select('id, first_name, last_name, cooperative_id')
+    let query = supabase.from('members').select('id, first_name, last_name, cooperative_id')
     if (currentCooperative && !isFaitiereAdmin) {
       query = query.eq('cooperative_id', currentCooperative.id)
     }
     query = query.eq('status', 'active').order('last_name')
     const { data, error } = await query
     if (!error) {
-      const rows = (data ?? []) as (Pick<Member, 'id' | 'first_name' | 'last_name'> & { cooperative_id: string })[]
+      const rows = (data ?? []) as (Pick<Member, 'id' | 'first_name' | 'last_name'> & {
+        cooperative_id: string
+      })[]
       setMembers(rows)
       setAllMembers(rows)
     }
@@ -197,31 +219,42 @@ export default function CardsPage() {
 
   // -- helpers --
 
-  const generateCardNumber = useCallback(
-    async (cooperativeId: string): Promise<string> => {
-      // SEC-02: numbers are generated SERVER-SIDE with crypto.randomInt() and a
-      // DB uniqueness check, never with client-side Math.random().
-      const res = await fetch('/api/cards/generate-number', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ cooperativeId }),
-      })
-      if (!res.ok) {
-        const { error: msg } = (await res.json().catch(() => ({}))) as { error?: string }
-        throw new Error(msg ?? 'Échec de génération du numéro de carte')
-      }
-      const { cardNumber } = (await res.json()) as { cardNumber: string }
-      return cardNumber
-    },
-    [],
-  )
+  const generateCardNumber = useCallback(async (cooperativeId: string): Promise<string> => {
+    // SEC-02: numbers are generated SERVER-SIDE with crypto.randomInt() and a
+    // DB uniqueness check, never with client-side Math.random().
+    const res = await fetch('/api/cards/generate-number', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ cooperativeId }),
+    })
+    if (!res.ok) {
+      const { error: msg } = (await res.json().catch(() => ({}))) as { error?: string }
+      throw new Error(msg ?? 'Échec de génération du numéro de carte')
+    }
+    const { cardNumber } = (await res.json()) as { cardNumber: string }
+    return cardNumber
+  }, [])
 
   const buildQrPayload = useCallback(
-    (_memberId: string, cardNumber: string, _member?: { first_name?: string | null; last_name?: string | null; phone?: string | null; photo_url?: string | null; village?: string | null; canton?: string | null; prefecture?: string | null; region?: string | null } | null) => {
+    (
+      _memberId: string,
+      cardNumber: string,
+      _member?: {
+        first_name?: string | null
+        last_name?: string | null
+        phone?: string | null
+        photo_url?: string | null
+        village?: string | null
+        canton?: string | null
+        prefecture?: string | null
+        region?: string | null
+      } | null,
+    ) => {
       // QR code = direct verification URL (scannable by any phone)
       // All member info is displayed on the verify page from the database
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://faitierehub.com'
+      const baseUrl =
+        typeof window !== 'undefined' ? window.location.origin : 'https://faitierehub.com'
       return `${baseUrl}/verify/${encodeURIComponent(cardNumber)}`
     },
     [],
@@ -236,10 +269,10 @@ export default function CardsPage() {
     }
     // For faîtière admins, use the selected child cooperative
     const targetCoopId = isFaitiereAdmin ? selectedCoopId : currentCooperative.id
-    const targetCoopName = isFaitiereAdmin 
-      ? childCooperatives.find(c => c.id === selectedCoopId)?.name 
+    const targetCoopName = isFaitiereAdmin
+      ? childCooperatives.find((c) => c.id === selectedCoopId)?.name
       : currentCooperative.name
-    
+
     if (!targetCoopId) {
       toast({ title: 'Sélectionnez une coopérative', variant: 'destructive' })
       return
@@ -266,10 +299,17 @@ export default function CardsPage() {
 
       setSaving(false)
       if (error) {
-        toast({ title: 'Impossible de renouveler la carte', description: errorMessage(error), variant: 'destructive' })
+        toast({
+          title: 'Impossible de renouveler la carte',
+          description: errorMessage(error),
+          variant: 'destructive',
+        })
         return
       }
-      toast({ title: 'Carte renouvelée', description: `${existingCard.card_number} — validité prolongée` })
+      toast({
+        title: 'Carte renouvelée',
+        description: `${existingCard.card_number} — validité prolongée`,
+      })
     } else {
       // NEW CARD: generate new number (member has no active card)
       // Also check for any previously revoked/expired card to reuse the number
@@ -308,12 +348,16 @@ export default function CardsPage() {
       if (error || !inserted) {
         toast({
           title: 'Impossible de générer la carte',
-          description: errorMessage(error) || 'La carte n\'a pas été enregistrée (vérifiez vos droits)',
+          description:
+            errorMessage(error) || "La carte n'a pas été enregistrée (vérifiez vos droits)",
           variant: 'destructive',
         })
         return
       }
-      toast({ title: 'Carte générée', description: `${inserted.card_number} — ${currentCooperative.name}/${targetCoopName}` })
+      toast({
+        title: 'Carte générée',
+        description: `${inserted.card_number} — ${currentCooperative.name}/${targetCoopName}`,
+      })
     }
 
     setShowGenerate(false)
@@ -392,7 +436,8 @@ export default function CardsPage() {
   const handleRevoke = async (card: MemberCard) => {
     const ok = await confirm({
       title: 'Révoquer la carte ?',
-      description: 'Le membre perdra l\'accès aux comptes d\'exploitation jusqu\'à l\'émission d\'une nouvelle carte.',
+      description:
+        "Le membre perdra l'accès aux comptes d'exploitation jusqu'à l'émission d'une nouvelle carte.",
       destructive: true,
       confirmLabel: 'Révoquer',
     })
@@ -402,7 +447,11 @@ export default function CardsPage() {
       .update({ status: 'revoked' })
       .eq('id', card.id)
     if (error) {
-      toast({ title: 'Échec de la révocation', description: errorMessage(error), variant: 'destructive' })
+      toast({
+        title: 'Échec de la révocation',
+        description: errorMessage(error),
+        variant: 'destructive',
+      })
       return
     }
     toast({ title: 'Carte révoquée' })
@@ -413,11 +462,11 @@ export default function CardsPage() {
     setDownloadingId(card.id)
     try {
       // Resolve cooperative and faîtière names from the card's cooperative_id
-      const cardCoop = cooperatives.find(c => c.id === card.cooperative_id)
+      const cardCoop = cooperatives.find((c) => c.id === card.cooperative_id)
       const coopName = cardCoop?.name ?? currentCooperative?.name
       // If current org is a faîtière, use its name as faitiereName
-      const faitName = isFaitiereAdmin 
-        ? currentCooperative?.name 
+      const faitName = isFaitiereAdmin
+        ? currentCooperative?.name
         : (cardCoop?.faitiereName ?? currentCooperative?.faitiereName)
 
       await downloadCardImage({
@@ -429,7 +478,11 @@ export default function CardsPage() {
       })
       toast({ title: 'Carte téléchargée' })
     } catch (e) {
-      toast({ title: 'Échec du téléchargement', description: errorMessage(e), variant: 'destructive' })
+      toast({
+        title: 'Échec du téléchargement',
+        description: errorMessage(e),
+        variant: 'destructive',
+      })
     } finally {
       setDownloadingId(null)
     }
@@ -441,7 +494,8 @@ export default function CardsPage() {
     if (active.length > 25) {
       const ok = await confirm({
         title: `Télécharger ${active.length} cartes ?`,
-        description: 'Cela déclenchera un téléchargement par carte. Votre navigateur pourrait demander l\'autorisation pour les téléchargements multiples.',
+        description:
+          "Cela déclenchera un téléchargement par carte. Votre navigateur pourrait demander l'autorisation pour les téléchargements multiples.",
         confirmLabel: 'Télécharger',
       })
       if (!ok) return
@@ -449,10 +503,10 @@ export default function CardsPage() {
     setDownloadingAll(true)
     try {
       for (const card of active) {
-        const cardCoop = cooperatives.find(c => c.id === card.cooperative_id)
+        const cardCoop = cooperatives.find((c) => c.id === card.cooperative_id)
         const coopName = cardCoop?.name ?? currentCooperative?.name
-        const faitName = isFaitiereAdmin 
-          ? currentCooperative?.name 
+        const faitName = isFaitiereAdmin
+          ? currentCooperative?.name
           : (cardCoop?.faitiereName ?? currentCooperative?.faitiereName)
 
         await downloadCardImage({
@@ -465,9 +519,15 @@ export default function CardsPage() {
         // Small delay so browsers don't merge downloads
         await new Promise((r) => setTimeout(r, 150))
       }
-      toast({ title: `${active.length} carte${active.length === 1 ? '' : 's'} téléchargée${active.length === 1 ? '' : 's'}` })
+      toast({
+        title: `${active.length} carte${active.length === 1 ? '' : 's'} téléchargée${active.length === 1 ? '' : 's'}`,
+      })
     } catch (e) {
-      toast({ title: 'Échec du téléchargement', description: errorMessage(e), variant: 'destructive' })
+      toast({
+        title: 'Échec du téléchargement',
+        description: errorMessage(e),
+        variant: 'destructive',
+      })
     } finally {
       setDownloadingAll(false)
     }
@@ -484,13 +544,19 @@ export default function CardsPage() {
     }
     setTemplateErrors({})
     setSavingTemplate(true)
-    const { error } = await supabase.from('cooperative_settings').upsert(
-      { cooperative_id: currentCooperative.id, card_template: parsed.data },
-      { onConflict: 'cooperative_id' },
-    )
+    const { error } = await supabase
+      .from('cooperative_settings')
+      .upsert(
+        { cooperative_id: currentCooperative.id, card_template: parsed.data },
+        { onConflict: 'cooperative_id' },
+      )
     setSavingTemplate(false)
     if (error) {
-      toast({ title: 'Impossible d\'enregistrer le modèle', description: errorMessage(error), variant: 'destructive' })
+      toast({
+        title: "Impossible d'enregistrer le modèle",
+        description: errorMessage(error),
+        variant: 'destructive',
+      })
       return
     }
     toast({ title: 'Modèle enregistré' })
@@ -500,17 +566,27 @@ export default function CardsPage() {
     if (!currentCooperative) return
     const parsed = cardSettingsSchema.safeParse(settings)
     if (!parsed.success) {
-      toast({ title: 'Paramètres invalides', description: parsed.error.issues[0]?.message, variant: 'destructive' })
+      toast({
+        title: 'Paramètres invalides',
+        description: parsed.error.issues[0]?.message,
+        variant: 'destructive',
+      })
       return
     }
     setSavingSettings(true)
-    const { error } = await supabase.from('cooperative_settings').upsert(
-      { cooperative_id: currentCooperative.id, card_settings: parsed.data },
-      { onConflict: 'cooperative_id' },
-    )
+    const { error } = await supabase
+      .from('cooperative_settings')
+      .upsert(
+        { cooperative_id: currentCooperative.id, card_settings: parsed.data },
+        { onConflict: 'cooperative_id' },
+      )
     setSavingSettings(false)
     if (error) {
-      toast({ title: 'Impossible d\'enregistrer les paramètres', description: errorMessage(error), variant: 'destructive' })
+      toast({
+        title: "Impossible d'enregistrer les paramètres",
+        description: errorMessage(error),
+        variant: 'destructive',
+      })
       return
     }
     toast({ title: 'Paramètres enregistrés' })
@@ -527,13 +603,22 @@ export default function CardsPage() {
 
       <Tabs defaultValue="generated" className="w-full">
         <TabsList className="grid w-full max-w-lg grid-cols-3 border-b border-border bg-transparent">
-          <TabsTrigger value="generated" className="border-b-2 border-transparent data-[state=active]:border-primary">
+          <TabsTrigger
+            value="generated"
+            className="border-b-2 border-transparent data-[state=active]:border-primary"
+          >
             Cartes ({cards.length})
           </TabsTrigger>
-          <TabsTrigger value="template" className="border-b-2 border-transparent data-[state=active]:border-primary">
+          <TabsTrigger
+            value="template"
+            className="border-b-2 border-transparent data-[state=active]:border-primary"
+          >
             Modèle
           </TabsTrigger>
-          <TabsTrigger value="settings" className="border-b-2 border-transparent data-[state=active]:border-primary">
+          <TabsTrigger
+            value="settings"
+            className="border-b-2 border-transparent data-[state=active]:border-primary"
+          >
             Paramètres
           </TabsTrigger>
         </TabsList>
@@ -542,10 +627,18 @@ export default function CardsPage() {
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="space-y-0.5">
               <h2 className="text-lg font-semibold text-foreground">Cartes générées</h2>
-              <p className="text-sm text-muted-foreground">{activeCount} carte{activeCount === 1 ? '' : 's'} active{activeCount === 1 ? '' : 's'}</p>
+              <p className="text-sm text-muted-foreground">
+                {activeCount} carte{activeCount === 1 ? '' : 's'} active
+                {activeCount === 1 ? '' : 's'}
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" className="gap-2 border-border" onClick={fetchCards} aria-label="Actualiser">
+              <Button
+                variant="outline"
+                className="gap-2 border-border"
+                onClick={fetchCards}
+                aria-label="Actualiser"
+              >
                 <RefreshCw className="h-4 w-4" />
                 Actualiser
               </Button>
@@ -555,7 +648,11 @@ export default function CardsPage() {
                 onClick={handleDownloadAll}
                 disabled={downloadingAll || activeCount === 0}
               >
-                {downloadingAll ? <Spinner className="h-4 w-4" /> : <Download className="h-4 w-4" />}
+                {downloadingAll ? (
+                  <Spinner className="h-4 w-4" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
                 Tout télécharger
               </Button>
               <Link href="/dashboard/cards/print">
@@ -564,11 +661,18 @@ export default function CardsPage() {
                   Imprimer A4
                 </Button>
               </Link>
-              <Button variant="outline" className="gap-2 border-border" onClick={() => setShowBulk(true)}>
+              <Button
+                variant="outline"
+                className="gap-2 border-border"
+                onClick={() => setShowBulk(true)}
+              >
                 <Users className="h-4 w-4" />
                 Génération en masse
               </Button>
-              <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setShowGenerate(true)}>
+              <Button
+                className="gap-2 bg-primary hover:bg-primary/90"
+                onClick={() => setShowGenerate(true)}
+              >
                 <Plus className="h-4 w-4" />
                 Générer une carte
               </Button>
@@ -589,7 +693,9 @@ export default function CardsPage() {
           <Card className="border-border">
             <CardHeader>
               <CardTitle className="text-foreground">Cartes membres</CardTitle>
-              <CardDescription>Toutes les cartes générées pour l&apos;accès aux comptes d&apos;exploitation</CardDescription>
+              <CardDescription>
+                Toutes les cartes générées pour l&apos;accès aux comptes d&apos;exploitation
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -597,15 +703,22 @@ export default function CardsPage() {
               ) : filteredCards.length === 0 ? (
                 <EmptyState
                   icon={QrCode}
-                  title={search ? 'Aucune carte ne correspond à votre recherche' : 'Aucune carte générée pour le moment'}
+                  title={
+                    search
+                      ? 'Aucune carte ne correspond à votre recherche'
+                      : 'Aucune carte générée pour le moment'
+                  }
                   description={
                     search
                       ? 'Essayez un autre nom ou numéro de carte'
-                      : 'Générez des cartes pour vos membres afin d\'activer l\'accès aux comptes d\'exploitation'
+                      : "Générez des cartes pour vos membres afin d'activer l'accès aux comptes d'exploitation"
                   }
                   action={
                     !search ? (
-                      <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setShowGenerate(true)}>
+                      <Button
+                        className="gap-2 bg-primary hover:bg-primary/90"
+                        onClick={() => setShowGenerate(true)}
+                      >
                         <Plus className="h-4 w-4" />
                         Générer la première carte
                       </Button>
@@ -618,21 +731,40 @@ export default function CardsPage() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-border">
-                          <th className="text-left py-3 px-4 font-semibold text-foreground">Membre</th>
-                          <th className="text-left py-3 px-4 font-semibold text-foreground">Numéro de carte</th>
-                          <th className="text-left py-3 px-4 font-semibold text-foreground">Expiration</th>
-                          <th className="text-center py-3 px-4 font-semibold text-foreground">Statut</th>
-                          <th className="text-right py-3 px-4 font-semibold text-foreground">Actions</th>
+                          <th className="text-left py-3 px-4 font-semibold text-foreground">
+                            Membre
+                          </th>
+                          <th className="text-left py-3 px-4 font-semibold text-foreground">
+                            Numéro de carte
+                          </th>
+                          <th className="text-left py-3 px-4 font-semibold text-foreground">
+                            Expiration
+                          </th>
+                          <th className="text-center py-3 px-4 font-semibold text-foreground">
+                            Statut
+                          </th>
+                          <th className="text-right py-3 px-4 font-semibold text-foreground">
+                            Actions
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
                         {pagedCards.map((card) => (
-                          <tr key={card.id} className="border-b border-border hover:bg-accent/5 transition-colors">
+                          <tr
+                            key={card.id}
+                            className="border-b border-border hover:bg-accent/5 transition-colors"
+                          >
                             <td className="py-3 px-4 text-foreground font-medium">
-                              {card.member ? `${card.member.first_name} ${card.member.last_name}` : '—'}
+                              {card.member
+                                ? `${card.member.first_name} ${card.member.last_name}`
+                                : '—'}
                             </td>
-                            <td className="py-3 px-4 text-muted-foreground font-mono text-sm">{card.card_number}</td>
-                            <td className="py-3 px-4 text-muted-foreground">{card.expiry_date || '—'}</td>
+                            <td className="py-3 px-4 text-muted-foreground font-mono text-sm">
+                              {card.card_number}
+                            </td>
+                            <td className="py-3 px-4 text-muted-foreground">
+                              {card.expiry_date || '—'}
+                            </td>
                             <td className="py-3 px-4 text-center">
                               <CardStatusBadge status={card.status} />
                             </td>
@@ -646,7 +778,11 @@ export default function CardsPage() {
                                   disabled={downloadingId === card.id}
                                   aria-label={`Download ${card.card_number}`}
                                 >
-                                  {downloadingId === card.id ? <Spinner className="h-4 w-4" /> : <Download className="h-4 w-4" />}
+                                  {downloadingId === card.id ? (
+                                    <Spinner className="h-4 w-4" />
+                                  ) : (
+                                    <Download className="h-4 w-4" />
+                                  )}
                                 </Button>
                                 {card.status === 'active' ? (
                                   <Button
@@ -688,8 +824,14 @@ export default function CardsPage() {
               {/* Premium card preview — SVG-based (matches actual export) */}
               <div className="flex justify-center">
                 <CardSvgPreview
-                  cooperativeName={isFaitiereAdmin && selectedCoopId ? childCooperatives.find(c => c.id === selectedCoopId)?.name : currentCooperative?.name}
-                  faitiereName={isFaitiereAdmin ? currentCooperative?.name : currentCooperative?.faitiereName}
+                  cooperativeName={
+                    isFaitiereAdmin && selectedCoopId
+                      ? childCooperatives.find((c) => c.id === selectedCoopId)?.name
+                      : currentCooperative?.name
+                  }
+                  faitiereName={
+                    isFaitiereAdmin ? currentCooperative?.name : currentCooperative?.faitiereName
+                  }
                   level="or"
                   template={template}
                 />
@@ -741,7 +883,11 @@ export default function CardsPage() {
                   onClick={handleSaveTemplate}
                   disabled={savingTemplate}
                 >
-                  {savingTemplate ? <Spinner className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                  {savingTemplate ? (
+                    <Spinner className="h-4 w-4" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
                   Enregistrer le modèle
                 </Button>
               </div>
@@ -766,7 +912,10 @@ export default function CardsPage() {
                   onChange={(e) =>
                     setSettings((s) => ({
                       ...s,
-                      defaultValidityDays: Math.max(1, Math.min(3650, Number.parseInt(e.target.value) || 1)),
+                      defaultValidityDays: Math.max(
+                        1,
+                        Math.min(3650, Number.parseInt(e.target.value) || 1),
+                      ),
                     }))
                   }
                 />
@@ -783,8 +932,12 @@ export default function CardsPage() {
                     ['cooperativeId', 'ID de la coopérative'],
                   ] as const
                 ).map(([key, label]) => (
-                  <label key={key} className="flex items-center gap-2 cursor-pointer">
+                  <label
+                    htmlFor={`qr-include-${key}`}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
                     <Checkbox
+                      id={`qr-include-${key}`}
                       checked={settings.qrCodeIncludes[key]}
                       onCheckedChange={(v) =>
                         setSettings((s) => ({
@@ -802,7 +955,11 @@ export default function CardsPage() {
                 onClick={handleSaveSettings}
                 disabled={savingSettings}
               >
-                {savingSettings ? <Spinner className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                {savingSettings ? (
+                  <Spinner className="h-4 w-4" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
                 Enregistrer les paramètres
               </Button>
             </CardContent>
@@ -821,7 +978,9 @@ export default function CardsPage() {
             {/* Cooperative selector for faîtière admins */}
             {isFaitiereAdmin && (
               <div className="space-y-2">
-                <Label>Coopérative <span className="text-destructive">*</span></Label>
+                <Label>
+                  Coopérative <span className="text-destructive">*</span>
+                </Label>
                 <select
                   className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
                   value={selectedCoopId}
@@ -832,16 +991,21 @@ export default function CardsPage() {
                 >
                   <option value="">— Choisir la coopérative —</option>
                   {childCooperatives.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
                   ))}
                 </select>
                 <p className="text-xs text-muted-foreground">
-                  La carte affichera : {currentCooperative?.name} / {childCooperatives.find(c => c.id === selectedCoopId)?.name || '…'}
+                  La carte affichera : {currentCooperative?.name} /{' '}
+                  {childCooperatives.find((c) => c.id === selectedCoopId)?.name || '…'}
                 </p>
               </div>
             )}
             <div className="space-y-2">
-              <Label>Membre <span className="text-destructive">*</span></Label>
+              <Label>
+                Membre <span className="text-destructive">*</span>
+              </Label>
               <select
                 className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
                 value={selectedMemberId}
@@ -899,7 +1063,8 @@ export default function CardsPage() {
           <DialogHeader>
             <DialogTitle>Générer des cartes en masse</DialogTitle>
             <DialogDescription>
-              L'émission d'une nouvelle carte révoque toute carte active existante pour les membres sélectionnés.
+              L'émission d'une nouvelle carte révoque toute carte active existante pour les membres
+              sélectionnés.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -938,7 +1103,9 @@ export default function CardsPage() {
             <div className="border border-border rounded-md p-2 max-h-72 overflow-y-auto">
               {filteredBulkMembers.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-6">
-                  {members.length === 0 ? 'Aucun membre actif' : 'Aucun membre ne correspond au filtre'}
+                  {members.length === 0
+                    ? 'Aucun membre actif'
+                    : 'Aucun membre ne correspond au filtre'}
                 </p>
               ) : (
                 <ul className="space-y-1">
@@ -946,8 +1113,12 @@ export default function CardsPage() {
                     const checked = bulkSelectedIds.includes(m.id)
                     return (
                       <li key={m.id}>
-                        <label className="flex items-center gap-2 cursor-pointer hover:bg-accent/5 rounded p-2">
+                        <label
+                          htmlFor={`bulk-member-${m.id}`}
+                          className="flex items-center gap-2 cursor-pointer hover:bg-accent/5 rounded p-2"
+                        >
                           <Checkbox
+                            id={`bulk-member-${m.id}`}
                             checked={checked}
                             onCheckedChange={(v) =>
                               setBulkSelectedIds((prev) =>
@@ -1039,7 +1210,12 @@ function FieldColor({
           className="h-10 w-16 border border-border rounded-md cursor-pointer"
           aria-label={`${label} picker`}
         />
-        <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="#16a34a" className="font-mono" />
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="#16a34a"
+          className="font-mono"
+        />
       </div>
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
     </div>
