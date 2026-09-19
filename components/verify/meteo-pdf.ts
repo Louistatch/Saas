@@ -81,7 +81,7 @@ function frDate(iso: string): string {
 
 function frMonth(iso: string): string {
   try {
-    return new Date(iso + '-01').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+    return new Date(`${iso}-01`).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
   } catch { return iso }
 }
 
@@ -89,9 +89,9 @@ function dayShort(iso: string): string {
   try {
     const today = new Date().toISOString().slice(0, 10)
     if (iso === today) return "Aujourd'hui"
-    const diff = Math.round((new Date(iso + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000)
+    const diff = Math.round((new Date(`${iso}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86400000)
     if (diff === 1) return 'Demain'
-    return new Date(iso + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
+    return new Date(`${iso}T00:00:00`).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
   } catch { return iso }
 }
 
@@ -239,7 +239,7 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
   // ══════════════════════════ NOWCAST 6H ════════════════════════════════════
 
   const futureNowcast = data.nowcast.filter(s => {
-    const slotMs = new Date(s.time + ':00+01:00').getTime()
+    const slotMs = new Date(`${s.time}:00+01:00`).getTime()
     return slotMs >= Date.now()
   }).slice(0, 24)
 
@@ -255,7 +255,7 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
     y += 10
 
     const rows = futureNowcast.map(s => {
-      const slotMs = new Date(s.time + ':00+01:00').getTime()
+      const slotMs = new Date(`${s.time}:00+01:00`).getTime()
       const minFromNow = Math.round((slotMs - Date.now()) / 60000)
       const timeLabel = minFromNow <= 0 ? 'Maintenant' : `+${minFromNow} min`
       const hhmm = s.time.slice(11, 16)
@@ -281,7 +281,7 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
       willDrawCell: (hookData: { section: string; row: { raw: unknown }; column: { index: number } }) => {
         if (hookData.section === 'body' && hookData.column.index === 2) {
           const raw = hookData.row.raw
-          const mm = parseFloat(String(Array.isArray(raw) ? raw[2] : 0))
+          const mm = Number.parseFloat(String(Array.isArray(raw) ? raw[2] : 0))
           if (!isNaN(mm) && mm > 0.05) {
             const [r, g, b] = precipColor(mm)
             doc.setFillColor(r, g, b)
@@ -423,21 +423,21 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
       lines: [
         ins?.spray_window
           ? `→ Fenêtre recommandée : ${ins.spray_window} matin (vent < 4 m/s, pas de pluie dans les 6h)`
-          : `→ Vérifier les prévisions horaires avant tout traitement`,
-        `→ Éviter les traitements si pluie prévue dans les 4h (lessivage des produits)`,
-        `→ Idéal : vent < 3 m/s, T° entre 15-25°C, humidité 40-80%`,
+          : '→ Vérifier les prévisions horaires avant tout traitement',
+        '→ Éviter les traitements si pluie prévue dans les 4h (lessivage des produits)',
+        '→ Idéal : vent < 3 m/s, T° entre 15-25°C, humidité 40-80%',
       ],
     },
     {
       section: 'SEMIS ET RÉCOLTE',
       lines: [
         ins?.planting_window
-          ? `→ Fenêtre de semis favorable les prochains jours`
-          : `→ Vérifier les températures sol (optimal : 20-32°C pour la plupart des cultures)`,
-        `→ Récolte : éviter les jours pluvieux — qualité du grain compromise`,
+          ? '→ Fenêtre de semis favorable les prochains jours'
+          : '→ Vérifier les températures sol (optimal : 20-32°C pour la plupart des cultures)',
+        '→ Récolte : éviter les jours pluvieux — qualité du grain compromise',
         futureDays.some(d => (d.precipitation_mm ?? 0) > 15)
-          ? `→ Fortes pluies prévues : sécuriser les stocks et vérifier le drainage`
-          : `→ Pas de risque de fortes pluies dans les 7 prochains jours`,
+          ? '→ Fortes pluies prévues : sécuriser les stocks et vérifier le drainage'
+          : '→ Pas de risque de fortes pluies dans les 7 prochains jours',
       ],
     },
   ]

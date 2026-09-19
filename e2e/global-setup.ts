@@ -4,8 +4,8 @@
  */
 
 import { chromium, type FullConfig } from '@playwright/test'
-import path from 'path'
-import fs from 'fs'
+import path from 'node:path'
+import fs from 'node:fs'
 import { ACCOUNTS, ROUTES } from './helpers/constants'
 
 const AUTH_DIR = path.resolve(__dirname, '.auth')

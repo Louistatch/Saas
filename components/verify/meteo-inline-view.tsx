@@ -139,25 +139,25 @@ function dailyEmoji(p: number|null, t: number|null, w: number|null): string {
   return '☀️'
 }
 function hourLabel(time: string, nowHour: string) {
-  return time.slice(0,13) === nowHour ? 'Maint.' : `${parseInt(time.slice(11,13))}h`
+  return time.slice(0,13) === nowHour ? 'Maint.' : `${Number.parseInt(time.slice(11,13))}h`
 }
 function dayShort(dateStr: string, todayStr: string) {
-  const diff = Math.round((new Date(dateStr + 'T00:00:00').getTime() - new Date(todayStr + 'T00:00:00').getTime()) / 86400000)
+  const diff = Math.round((new Date(`${dateStr}T00:00:00`).getTime() - new Date(`${todayStr}T00:00:00`).getTime()) / 86400000)
   if (diff === 0) return "Auj."
   if (diff === 1) return 'Demain'
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'short' })
+  return new Date(`${dateStr}T00:00:00`).toLocaleDateString('fr-FR', { weekday: 'short' })
 }
 function dayFull(dateStr: string, todayStr: string) {
-  const diff = Math.round((new Date(dateStr + 'T00:00:00').getTime() - new Date(todayStr + 'T00:00:00').getTime()) / 86400000)
+  const diff = Math.round((new Date(`${dateStr}T00:00:00`).getTime() - new Date(`${todayStr}T00:00:00`).getTime()) / 86400000)
   if (diff === 0) return "Aujourd'hui"
   if (diff === 1) return 'Demain'
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' })
+  return new Date(`${dateStr}T00:00:00`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' })
 }
 function fmtTime(iso: string) {
   try { return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) } catch { return '' }
 }
 function frMonth(iso: string) {
-  try { return new Date(iso + '-01').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) } catch { return iso }
+  try { return new Date(`${iso}-01`).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) } catch { return iso }
 }
 
 /* ─── Nowcast banner ─────────────────────────────────────────────── */
@@ -170,7 +170,7 @@ function buildNowcastBanner(nowcast: WeatherMinutely15[]): NowcastBanner | null 
   if (!nowcast.length) return null
   const now = Date.now()
   const enriched = nowcast.map(s => {
-    const slotMs = new Date(s.time + ':00+01:00').getTime()
+    const slotMs = new Date(`${s.time}:00+01:00`).getTime()
     const minutesFromNow = Math.round((slotMs - now) / 60000)
     const hasRain = s.precipitation > 0.05 || RAIN_CODES.has(s.weather_code)
     return { ...s, minutesFromNow, hasRain }
@@ -375,7 +375,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
 
   // Nowcast chart data (next 6h, 15-min slots)
   const nowcastChartData = nowcast
-    .filter(s => new Date(s.time + ':00+01:00').getTime() >= Date.now())
+    .filter(s => new Date(`${s.time}:00+01:00`).getTime() >= Date.now())
     .slice(0, 24)
     .map(s => ({
       time: s.time.slice(11, 16),
@@ -633,7 +633,7 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
             <div className="rounded-2xl bg-white/5 border border-white/10 p-3 flex flex-col gap-0.5">
               <p className="text-white/40 text-[9px] uppercase tracking-wide font-semibold">Indice UV</p>
               <p className="font-bold text-xl leading-none mt-0.5" style={{ color: uvInfo?.color ?? 'white' }}>{uvIndex != null ? Math.round(uvIndex) : '—'}</p>
-              <p className="text-[9px] font-semibold" style={{ color: uvInfo ? uvInfo.color + '99' : 'rgba(255,255,255,.25)' }}>{uvInfo?.text ?? '—'}</p>
+              <p className="text-[9px] font-semibold" style={{ color: uvInfo ? `${uvInfo.color}99` : 'rgba(255,255,255,.25)' }}>{uvInfo?.text ?? '—'}</p>
             </div>
             <div className="rounded-2xl bg-white/5 border border-white/10 p-3 flex flex-col gap-0.5">
               <p className="text-white/40 text-[9px] uppercase tracking-wide font-semibold">Humidité</p>

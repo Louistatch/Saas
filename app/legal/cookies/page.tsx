@@ -47,7 +47,7 @@ export default function CookiesPage() {
             {/* Cookies essentiels */}
             <div className="rounded-lg border border-border bg-background p-6 space-y-3">
               <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                <div className="h-3 w-3 rounded-full bg-green-500" />
                 <h3 className="text-lg font-semibold text-foreground">Cookies essentiels</h3>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
@@ -71,7 +71,7 @@ export default function CookiesPage() {
             {/* Cookies analytics */}
             <div className="rounded-lg border border-border bg-background p-6 space-y-3">
               <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+                <div className="h-3 w-3 rounded-full bg-blue-500" />
                 <h3 className="text-lg font-semibold text-foreground">Cookies analytiques</h3>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
@@ -96,7 +96,7 @@ export default function CookiesPage() {
             {/* Cookies fonctionnels */}
             <div className="rounded-lg border border-border bg-background p-6 space-y-3">
               <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-amber-500"></div>
+                <div className="h-3 w-3 rounded-full bg-amber-500" />
                 <h3 className="text-lg font-semibold text-foreground">Cookies fonctionnels</h3>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">

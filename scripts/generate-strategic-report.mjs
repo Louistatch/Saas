@@ -4,7 +4,7 @@ import {
   BorderStyle, ShadingType, PageNumber,
   Footer, Header, convertInchesToTwip,
 } from 'docx'
-import { writeFileSync } from 'fs'
+import { writeFileSync } from 'node:fs'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 

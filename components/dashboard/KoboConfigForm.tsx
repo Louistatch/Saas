@@ -475,7 +475,7 @@ export function KoboConfigForm({ cooperativeId, onSaved }: KoboConfigFormProps) 
                 <div className="col-span-3">Colonne</div>
                 <div className="col-span-2">Transform</div>
                 <div className="col-span-1">Clé</div>
-                <div className="col-span-1"></div>
+                <div className="col-span-1" />
               </div>
 
               {/* Rows */}

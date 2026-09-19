@@ -32,7 +32,7 @@ export default async function FournisseursPage({ searchParams }: PageProps) {
   const culture = params.culture ?? ''
   const regionId = params.region_id ?? ''
   const prefectureId = params.prefecture_id ?? ''
-  const page = Math.max(1, parseInt(params.page ?? '1'))
+  const page = Math.max(1, Number.parseInt(params.page ?? '1'))
   const pageSize = 20
 
   const supabase = await createClient()

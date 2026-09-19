@@ -113,7 +113,7 @@ function buildMonthlyAmountSeries(
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     const label = FR_MONTHS[d.getMonth()]
     const total = rows
-      .filter((r) => r.paid_date && r.paid_date.startsWith(key))
+      .filter((r) => r.paid_date?.startsWith(key))
       .reduce((acc, r) => acc + (r.amount ?? 0), 0)
     series.push({ month: label, value: total })
   }
@@ -141,7 +141,7 @@ function exportStatsCsv(stats: Stats, cooperativeName: string) {
     ['Scans cette semaine', stats.scansThisWeek],
   ]
   const csv = rows.map((r) => r.map((cell) => `"${cell}"`).join(',')).join('\n')
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+  const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url

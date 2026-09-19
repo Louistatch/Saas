@@ -125,12 +125,12 @@ export const koboSubmissionsQuerySchema = z.object({
   cooperativeId: uuidParam,
   page: z
     .string()
-    .transform((v) => parseInt(v, 10))
+    .transform((v) => Number.parseInt(v, 10))
     .pipe(z.number().int().min(1).max(1000))
     .default('1'),
   pageSize: z
     .string()
-    .transform((v) => parseInt(v, 10))
+    .transform((v) => Number.parseInt(v, 10))
     .pipe(z.number().int().min(1).max(100))
     .default('25'),
   status: z
@@ -184,7 +184,7 @@ export const koboWebhookHeadersSchema = z.object({
   ),
   'content-length': z
     .string()
-    .transform((v) => parseInt(v, 10))
+    .transform((v) => Number.parseInt(v, 10))
     .pipe(z.number().max(2_097_152, 'Payload exceeds 2MB limit'))
     .optional(),
 })

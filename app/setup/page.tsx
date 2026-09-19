@@ -79,19 +79,19 @@ export default function SetupPage() {
                     <h4 className="font-semibold text-foreground">User Roles</h4>
                     <div className="mt-2 space-y-2 text-sm">
                       <div className="flex items-center gap-2">
-                        <span className="inline-block w-3 h-3 rounded-full bg-red-500"></span>
+                        <span className="inline-block w-3 h-3 rounded-full bg-red-500" />
                         <span><strong>super_admin</strong>: Full platform access, manage all cooperatives and users</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="inline-block w-3 h-3 rounded-full bg-blue-500"></span>
+                        <span className="inline-block w-3 h-3 rounded-full bg-blue-500" />
                         <span><strong>cooperative_admin</strong>: Accès complet à la coopérative assignée, gestion des membres et comptes d&apos;exploitation</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="inline-block w-3 h-3 rounded-full bg-green-500"></span>
+                        <span className="inline-block w-3 h-3 rounded-full bg-green-500" />
                         <span><strong>member</strong>: Membre de coopérative, accès aux comptes d&apos;exploitation et fonctionnalités membre</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="inline-block w-3 h-3 rounded-full bg-gray-500"></span>
+                        <span className="inline-block w-3 h-3 rounded-full bg-gray-500" />
                         <span><strong>guest</strong>: Accès limité, consultation des comptes d&apos;exploitation publics uniquement</span>
                       </div>
                     </div>

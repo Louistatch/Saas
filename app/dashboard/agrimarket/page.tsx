@@ -190,8 +190,8 @@ export default function AgriMarketPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           culture: form.culture,
-          quantity_kg: parseFloat(form.quantity_kg),
-          price_per_kg_fcfa: parseFloat(form.price_per_kg_fcfa),
+          quantity_kg: Number.parseFloat(form.quantity_kg),
+          price_per_kg_fcfa: Number.parseFloat(form.price_per_kg_fcfa),
           quality_grade: form.quality_grade,
           harvest_date_estimated: form.harvest_date_estimated || null,
           location_canton: form.location_canton || null,

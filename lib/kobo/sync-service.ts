@@ -764,7 +764,7 @@ export class KoboSyncService {
   private async fetchWithRetry(
     url: string,
     apiToken: string,
-    attempt: number = 0,
+    attempt = 0,
   ): Promise<Response> {
     try {
       const response = await fetch(url, {
@@ -780,7 +780,7 @@ export class KoboSyncService {
         (response.status >= 500 || response.status === 429) &&
         attempt < MAX_RETRIES
       ) {
-        const delay = Math.min(30_000, 1000 * Math.pow(2, attempt))
+        const delay = Math.min(30_000, 1000 * 2 ** attempt)
         await this.sleep(delay)
         return this.fetchWithRetry(url, apiToken, attempt + 1)
       }
@@ -788,7 +788,7 @@ export class KoboSyncService {
       return response
     } catch (err: unknown) {
       if (attempt < MAX_RETRIES) {
-        const delay = Math.min(30_000, 1000 * Math.pow(2, attempt))
+        const delay = Math.min(30_000, 1000 * 2 ** attempt)
         log.warn('KoboToolbox request failed, retrying', {
           attempt: attempt + 1,
           delay,

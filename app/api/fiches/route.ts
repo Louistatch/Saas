@@ -22,8 +22,8 @@ export async function GET(request: NextRequest) {
   const cantonId = searchParams.get('canton_id')
   const prefectureId = searchParams.get('prefecture_id')
   const regionId = searchParams.get('region_id')
-  const page = parseInt(searchParams.get('page') ?? '1')
-  const pageSize = Math.min(parseInt(searchParams.get('limit') ?? '20'), 50)
+  const page = Number.parseInt(searchParams.get('page') ?? '1')
+  const pageSize = Math.min(Number.parseInt(searchParams.get('limit') ?? '20'), 50)
 
   try {
     const supabase = await createClient()

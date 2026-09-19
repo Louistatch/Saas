@@ -27,7 +27,7 @@ function escapeXml(str: string): string {
 /** Truncate text to fit within a max character count */
 function truncate(str: string, max: number): string {
   if (str.length <= max) return str
-  return str.slice(0, max - 1) + '…'
+  return `${str.slice(0, max - 1)}…`
 }
 
 function getLevelTheme(level?: string): {
@@ -41,7 +41,6 @@ function getLevelTheme(level?: string): {
       return { label: 'NIVEAU OR', textColor: '#3d2c00', fill: 'url(#orGrad)', ring: '#e0a106' }
     case 'argent':
       return { label: 'NIVEAU ARGENT', textColor: '#2a3540', fill: 'url(#silverGrad)', ring: '#9aa6b0' }
-    case 'bronze':
     default:
       return { label: 'NIVEAU BRONZE', textColor: '#3a1e08', fill: 'url(#bronzeGrad)', ring: '#9c6b3f' }
   }

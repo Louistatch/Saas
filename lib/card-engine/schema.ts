@@ -160,14 +160,14 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const h = hex.replace('#', '')
   const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h
   return {
-    r: parseInt(full.slice(0, 2), 16),
-    g: parseInt(full.slice(2, 4), 16),
-    b: parseInt(full.slice(4, 6), 16),
+    r: Number.parseInt(full.slice(0, 2), 16),
+    g: Number.parseInt(full.slice(2, 4), 16),
+    b: Number.parseInt(full.slice(4, 6), 16),
   }
 }
 
 function rgbToHex(r: number, g: number, b: number): string {
-  return '#' + [r, g, b].map((v) => clamp(v).toString(16).padStart(2, '0')).join('')
+  return `#${[r, g, b].map((v) => clamp(v).toString(16).padStart(2, '0')).join('')}`
 }
 
 /** Lighten a hex color toward white by amount 0..1 */

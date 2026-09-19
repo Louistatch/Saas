@@ -321,7 +321,7 @@ export default function MatchingPage() {
               </p>
             ) : (
               requests.map((req) => {
-                const sc = REQUEST_STATUS_CONFIG[req.status] ?? REQUEST_STATUS_CONFIG['open']
+                const sc = REQUEST_STATUS_CONFIG[req.status] ?? REQUEST_STATUS_CONFIG.open
                 const isSelected = selectedRequest?.id === req.id
                 return (
                   <button
@@ -397,7 +397,7 @@ export default function MatchingPage() {
             ) : (
               matches.map((m) => {
                 const listing = m.market_listings
-                const sc = MATCH_STATUS_CONFIG[m.status] ?? MATCH_STATUS_CONFIG['proposed']
+                const sc = MATCH_STATUS_CONFIG[m.status] ?? MATCH_STATUS_CONFIG.proposed
                 const reasons = m.match_reason ? m.match_reason.split(', ') : []
                 return (
                   <div key={m.id} className="rounded-lg border border-border p-3 space-y-2">

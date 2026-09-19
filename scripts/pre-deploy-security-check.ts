@@ -2,9 +2,9 @@
 // Script de vérification pré-déploiement.
 // Exécuter avant chaque déploiement Vercel : npm run security:check
 
-import { execSync } from 'child_process'
-import * as fs from 'fs'
-import * as path from 'path'
+import { execSync } from 'node:child_process'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 
 /**
  * Simple recursive glob for .ts/.tsx files.

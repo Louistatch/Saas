@@ -277,7 +277,7 @@ export function AiChat({ cardNumber, memberName, onBack, suggestions = DEFAULT_S
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     rec.onresult = (e: any) => {
       const t: string = e.results[0][0].transcript
-      setInput(prev => prev ? prev + ' ' + t : t)
+      setInput(prev => prev ? `${prev} ${t}` : t)
       setIsListening(false)
     }
     rec.onerror = () => setIsListening(false)

@@ -377,19 +377,19 @@ export async function enrollNewMemberFromSubmission(
   const parcelles = (payload.S5 ?? []) as Array<Record<string, unknown>>
   for (const p of parcelles) {
     const culture = String(
-      p['S5/culture_principale'] ?? p['culture_principale'] ?? '',
+      p['S5/culture_principale'] ?? p.culture_principale ?? '',
     )
-    const surface = parseFloat(
-      String(p['S5/superficie_ha'] ?? p['superficie_ha'] ?? '0'),
+    const surface = Number.parseFloat(
+      String(p['S5/superficie_ha'] ?? p.superficie_ha ?? '0'),
     )
-    const typeSol = String(p['S5/type_sol'] ?? p['type_sol'] ?? '')
-    const irrigation = String(p['S5/irrigation'] ?? p['irrigation'] ?? '')
+    const typeSol = String(p['S5/type_sol'] ?? p.type_sol ?? '')
+    const irrigation = String(p['S5/irrigation'] ?? p.irrigation ?? '')
     if (culture && surface > 0) {
       try {
         await supabase.from('parcelles').insert({
           member_id: newMember.id,
           cooperative_id: targetCooperativeId,
-          name: 'Parcelle ' + culture,
+          name: `Parcelle ${culture}`,
           culture_principale: culture,
           superficie_ha: surface,
           soil_type: typeSol || null,
@@ -406,13 +406,13 @@ export async function enrollNewMemberFromSubmission(
   const productions = (payload.S6 ?? []) as Array<Record<string, unknown>>
   for (const p of productions) {
     const culture = String(
-      p['S6/culture_produite'] ?? p['culture_produite'] ?? '',
+      p['S6/culture_produite'] ?? p.culture_produite ?? '',
     )
-    const quantity = parseFloat(
-      String(p['S6/rendement_kg'] ?? p['rendement_kg'] ?? '0'),
+    const quantity = Number.parseFloat(
+      String(p['S6/rendement_kg'] ?? p.rendement_kg ?? '0'),
     )
     const campagne = String(
-      p['S6/campagne_annee'] ?? p['campagne_annee'] ?? '',
+      p['S6/campagne_annee'] ?? p.campagne_annee ?? '',
     )
     if (culture && quantity > 0) {
       try {

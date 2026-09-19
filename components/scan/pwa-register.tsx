@@ -74,7 +74,7 @@ export function PwaRegister() {
         <path d="M12 2v13M7 10l5 5 5-5"/><rect x="3" y="18" width="18" height="3" rx="1.5"/>
       </svg>
       Installer l'app
-      <style>{`@keyframes pwa-rise{from{opacity:0;transform:translateX(-50%) translateY(12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}`}</style>
+      <style>{'@keyframes pwa-rise{from{opacity:0;transform:translateX(-50%) translateY(12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}'}</style>
     </button>
   )
 }

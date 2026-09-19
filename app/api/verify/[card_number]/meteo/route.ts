@@ -132,7 +132,7 @@ export async function GET(
 
   const sprayDays = futureDays.filter(d => (d.wind_speed_ms ?? 99) < 4 && (d.precipitation_mm ?? 99) < 2)
   const sprayWindow = sprayDays.length >= 2
-    ? sprayDays.slice(0, 2).map(d => new Date(d.date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'short' })).join('-')
+    ? sprayDays.slice(0, 2).map(d => new Date(`${d.date}T00:00:00`).toLocaleDateString('fr-FR', { weekday: 'short' })).join('-')
     : null
 
   const plantingOk = futureDays.some(d =>

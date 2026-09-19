@@ -82,7 +82,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<KoboWebho
   // -------------------------------------------------------
   // 2. Size check — payload ≤ 2MB
   // -------------------------------------------------------
-  const contentLength = parseInt(
+  const contentLength = Number.parseInt(
     request.headers.get('content-length') ?? '0',
     10,
   )
@@ -491,7 +491,7 @@ async function processMarketPriceSubmission(
   const marche = getPayloadField(payload, 'S1/marche') ?? 'Lomé'
 
   // Extract repeat group (products)
-  const produits = (payload['S2/produits'] ?? payload['produits'] ?? []) as Array<Record<string, unknown>>
+  const produits = (payload['S2/produits'] ?? payload.produits ?? []) as Array<Record<string, unknown>>
 
   if (!Array.isArray(produits) || produits.length === 0) {
     log.warn('No products in market price submission', { submissionId })
@@ -507,8 +507,8 @@ async function processMarketPriceSubmission(
 
   let inserted = 0
   for (const p of produits) {
-    const nomProduit = String(p['S2/produits/nom_produit'] ?? p['nom_produit'] ?? '').trim()
-    const prixKg = Number(p['S2/produits/prix_kg'] ?? p['prix_kg'] ?? 0)
+    const nomProduit = String(p['S2/produits/nom_produit'] ?? p.nom_produit ?? '').trim()
+    const prixKg = Number(p['S2/produits/prix_kg'] ?? p.prix_kg ?? 0)
 
     if (!nomProduit || prixKg <= 0) continue
 
@@ -580,11 +580,11 @@ async function processHarvestSubmission(
     return
   }
 
-  const recoltes = (payload['S2/recoltes'] ?? payload['recoltes'] ?? []) as Array<Record<string, unknown>>
+  const recoltes = (payload['S2/recoltes'] ?? payload.recoltes ?? []) as Array<Record<string, unknown>>
 
   for (const r of recoltes) {
-    const culture = String(r['S2/recoltes/culture'] ?? r['culture'] ?? '')
-    const quantite = Number(r['S2/recoltes/quantite_kg'] ?? r['quantite_kg'] ?? 0)
+    const culture = String(r['S2/recoltes/culture'] ?? r.culture ?? '')
+    const quantite = Number(r['S2/recoltes/quantite_kg'] ?? r.quantite_kg ?? 0)
 
     if (!culture || quantite <= 0) continue
 
@@ -639,12 +639,12 @@ async function processPlotSurveySubmission(
     return
   }
 
-  const parcelles = (payload['S2/parcelles'] ?? payload['parcelles'] ?? []) as Array<Record<string, unknown>>
+  const parcelles = (payload['S2/parcelles'] ?? payload.parcelles ?? []) as Array<Record<string, unknown>>
 
   for (const p of parcelles) {
-    const culture = String(p['S2/parcelles/culture'] ?? p['culture'] ?? '')
-    const surface = Number(p['S2/parcelles/surface_ha'] ?? p['surface_ha'] ?? 0)
-    const gps = String(p['S2/parcelles/gps'] ?? p['gps'] ?? '')
+    const culture = String(p['S2/parcelles/culture'] ?? p.culture ?? '')
+    const surface = Number(p['S2/parcelles/surface_ha'] ?? p.surface_ha ?? 0)
+    const gps = String(p['S2/parcelles/gps'] ?? p.gps ?? '')
 
     if (!culture || surface <= 0) continue
 

@@ -82,9 +82,7 @@ async function handlePrix(parsed: ParsedQuery): Promise<ActionResult | null> {
 
   if (!culture) {
     return {
-      response: `Je n'ai pas trouvé de données pour "${parsed.produit}". `
-        + 'Les produits disponibles sont : Maïs, Riz, Sorgho, Mil, Haricot, Soja, '
-        + 'Arachide, Igname, Manioc, Tomate, Piment, Oignon.',
+      response: `Je n'ai pas trouvé de données pour "${parsed.produit}". Les produits disponibles sont : Maïs, Riz, Sorgho, Mil, Haricot, Soja, Arachide, Igname, Manioc, Tomate, Piment, Oignon.`,
       engine: 'direct-data',
     }
   }
@@ -106,8 +104,7 @@ async function handlePrix(parsed: ParsedQuery): Promise<ActionResult | null> {
   if (!prices || prices.length === 0) {
     const suffix = parsed.marche ? ` au marché de ${parsed.marche}` : ''
     return {
-      response: `Aucun prix trouvé pour ${culture.name}${suffix}. `
-        + 'Essayez un autre marché : Lomé-Adawlato, Kara, Sokodé, Atakpamé ou Dapaong.',
+      response: `Aucun prix trouvé pour ${culture.name}${suffix}. Essayez un autre marché : Lomé-Adawlato, Kara, Sokodé, Atakpamé ou Dapaong.`,
       engine: 'direct-data',
     }
   }
@@ -135,7 +132,7 @@ async function handlePrix(parsed: ParsedQuery): Promise<ActionResult | null> {
     const marketName = [...byMarket.keys()][0]
     response += ` à ${marketName} : **${entry.price} FCFA/kg** (${entry.date}).`
   } else {
-    response += ` — Prix récents :\n`
+    response += ' — Prix récents :\n'
     for (const [market, info] of byMarket) {
       response += `• ${market} : ${info.price} FCFA/kg (${info.date})\n`
     }
@@ -299,27 +296,18 @@ function formatMLResult(module: string, data: Record<string, unknown>, produit: 
       const total = d.total_dossiers ?? '?'
       const riskiest = d.riskiest_region ?? '?'
       const safest = d.safest_region ?? '?'
-      return `⚠️ **Évaluation du risque financier** :\n`
-        + `• ${total} dossiers analysés\n`
-        + `• Région la plus risquée : ${riskiest}\n`
-        + `• Région la plus sûre : ${safest}\n`
-        + `• ${(d.summary as string) ?? ''}`
+      return `⚠️ **Évaluation du risque financier** :\n• ${total} dossiers analysés\n• Région la plus risquée : ${riskiest}\n• Région la plus sûre : ${safest}\n• ${(d.summary as string) ?? ''}`
     }
     case 'segmentation': {
       const d = data as Record<string, unknown>
       const total = d.total_farmers ?? '?'
       const clusters = d.n_clusters ?? '?'
-      return `👥 **Segmentation des agriculteurs** :\n`
-        + `• ${total} agriculteurs en ${clusters} groupes\n`
-        + `• ${(d.summary as string) ?? 'Analyse complète disponible.'}`
+      return `👥 **Segmentation des agriculteurs** :\n• ${total} agriculteurs en ${clusters} groupes\n• ${(d.summary as string) ?? 'Analyse complète disponible.'}`
     }
     case 'kpi': {
       const d = data as Record<string, unknown>
       const ns = (d.national_summary as Record<string, unknown>) ?? {}
-      return `📊 **KPIs Agriculture Togo** :\n`
-        + `• Rendement national moyen : ${ns.avg_national_yield ?? '?'} kg/ha\n`
-        + `• Surface cultivée totale : ${ns.total_cultivated_ha ?? '?'} ha\n`
-        + `• Coût intrants : ${ns.total_input_cost_ha ?? '?'} FCFA/ha`
+      return `📊 **KPIs Agriculture Togo** :\n• Rendement national moyen : ${ns.avg_national_yield ?? '?'} kg/ha\n• Surface cultivée totale : ${ns.total_cultivated_ha ?? '?'} ha\n• Coût intrants : ${ns.total_input_cost_ha ?? '?'} FCFA/ha`
     }
     default:
       return JSON.stringify(data).slice(0, 500)

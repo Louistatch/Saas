@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   }
 
   const toMigrate = (members ?? []).filter(m => 
-    m.photo_url && m.photo_url.includes(OLD_HOST)
+    m.photo_url?.includes(OLD_HOST)
   )
 
   if (toMigrate.length === 0) {
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
-    message: `Migration complete`,
+    message: 'Migration complete',
     total: toMigrate.length,
     migrated: results.filter(r => r.status === 'migrated').length,
     results,

@@ -120,7 +120,7 @@ function AccountCard({ account }: { account: typeof demoAccounts[0] }) {
               </span>
             </div>
           </div>
-          <Link href={`/auth/login`}>
+          <Link href={'/auth/login'}>
             <Button size="sm" className="gap-1 bg-primary hover:bg-primary/90 text-xs">
               Connexion <ArrowRight className="h-3 w-3" />
             </Button>

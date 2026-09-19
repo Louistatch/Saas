@@ -507,7 +507,7 @@ export default function AgriTogoAdminPage() {
               {health ? (
                 <div className="grid gap-3 md:grid-cols-2">
                   {[
-                    { label: 'Statut', value: health.status === 'ok' ? '🟢 En ligne' : '🔴 ' + health.status },
+                    { label: 'Statut', value: health.status === 'ok' ? '🟢 En ligne' : `🔴 ${health.status}` },
                     { label: 'Version', value: `v${health.version}` },
                     { label: 'Agents IA', value: String(health.agents) },
                     { label: 'Modèles LLM', value: health.models.join(', ') },

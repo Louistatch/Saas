@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   const culture = searchParams.get('culture')
   const regionId = searchParams.get('region_id')
   const prefectureId = searchParams.get('prefecture_id')
-  const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'))
+  const page = Math.max(1, Number.parseInt(searchParams.get('page') ?? '1'))
   const pageSize = 20
 
   try {

@@ -159,7 +159,7 @@ export function parseQuery(message: string): ParsedQuery {
   let montant: number | null = null
   const montantMatch = raw.match(/(\d[\d\s.,]*)\s*(?:fcfa|francs?|f\b)/i)
   if (montantMatch) {
-    montant = parseInt(montantMatch[1].replace(/[\s.,]/g, ''), 10)
+    montant = Number.parseInt(montantMatch[1].replace(/[\s.,]/g, ''), 10)
   }
 
   // Extract quantity

@@ -141,7 +141,7 @@ function formatDate(date: string | null): string {
 
 function formatFCFA(amount: number | null): string {
   if (amount == null) return '—'
-  return amount.toLocaleString('fr-FR') + ' FCFA'
+  return `${amount.toLocaleString('fr-FR')} FCFA`
 }
 
 function isJournalType(value: string): value is JournalType {
@@ -249,9 +249,9 @@ function JournalTab({
           type: form.type,
           title: form.title,
           body: form.body || undefined,
-          quantity: form.quantity ? parseFloat(form.quantity) : undefined,
+          quantity: form.quantity ? Number.parseFloat(form.quantity) : undefined,
           unit: form.unit || undefined,
-          cost_fcfa: form.cost_fcfa ? parseFloat(form.cost_fcfa) : undefined,
+          cost_fcfa: form.cost_fcfa ? Number.parseFloat(form.cost_fcfa) : undefined,
         }),
       })
       if (res.ok) {
@@ -498,7 +498,7 @@ function CampagnesTab({ cooperativeId, campagnes, onRefresh }: CampagnesTabProps
           culture: form.culture,
           start_date: form.start_date || undefined,
           end_date: form.end_date || undefined,
-          target_yield_kg: form.target_yield_kg ? parseFloat(form.target_yield_kg) : undefined,
+          target_yield_kg: form.target_yield_kg ? Number.parseFloat(form.target_yield_kg) : undefined,
           status: form.status,
         }),
       })
@@ -691,9 +691,9 @@ function IntrantsTab({ cooperativeId, memberId, members, campagnes, isAdmin }: I
           campagne_id: form.campagne_id || undefined,
           name: form.name,
           type: form.type,
-          quantity: parseFloat(form.quantity),
+          quantity: Number.parseFloat(form.quantity),
           unit: form.unit,
-          cost_fcfa: form.cost_fcfa ? parseFloat(form.cost_fcfa) : undefined,
+          cost_fcfa: form.cost_fcfa ? Number.parseFloat(form.cost_fcfa) : undefined,
           purchase_date: form.purchase_date || undefined,
           supplier: form.supplier || undefined,
         }),

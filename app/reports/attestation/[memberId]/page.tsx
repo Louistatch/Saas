@@ -166,7 +166,7 @@ export default async function AttestationPage({
               />
             ) : (
               <div style={{
-                width: 110, height: 130, border: `2px dashed #aaa`, borderRadius: 4,
+                width: 110, height: 130, border: '2px dashed #aaa', borderRadius: 4,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: '#aaa', fontSize: 12, textAlign: 'center',
               }}>
@@ -207,7 +207,7 @@ export default async function AttestationPage({
           gap: 16,
           marginBottom: 32,
           background: '#f7f9f7',
-          border: `1px solid #d0e8d8`,
+          border: '1px solid #d0e8d8',
           borderRadius: 8,
           padding: 16,
         }}>
@@ -271,7 +271,7 @@ export default async function AttestationPage({
           bottom: 15,
           left: 20,
           right: 20,
-          borderTop: `1px solid #eee`,
+          borderTop: '1px solid #eee',
           paddingTop: 8,
           fontSize: 10,
           color: '#999',

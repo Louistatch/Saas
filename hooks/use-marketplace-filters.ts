@@ -66,7 +66,7 @@ export function useMarketplaceFilters() {
     producer_type: searchParams.get('type') ?? '',
     sort_by: searchParams.get('sort') ?? 'created_at',
     sort_order: searchParams.get('order') ?? 'desc',
-    page: parseInt(searchParams.get('page') ?? '1') || 1,
+    page: Number.parseInt(searchParams.get('page') ?? '1') || 1,
   }), [searchParams])
 
   // Local search state for instant feedback

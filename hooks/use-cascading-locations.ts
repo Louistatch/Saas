@@ -239,7 +239,7 @@ export function useCascadingLocations(
       const table = TABLE_BY_LEVEL[level]
       supabase
         .from(table)
-        .select('id, name, ' + (PARENT_COLUMN_BY_LEVEL[level] ?? 'id'))
+        .select(`id, name, ${PARENT_COLUMN_BY_LEVEL[level] ?? 'id'}`)
         .order('name')
         .then(({ data }) => {
           if (cancelled) return

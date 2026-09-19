@@ -1,5 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
-import path from 'path'
+import path from 'node:path'
 import dotenv from 'dotenv'
 
 // Load E2E-specific env vars

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { createHmac, timingSafeEqual } from 'crypto'
+import { createHmac, timingSafeEqual } from 'node:crypto'
 import { createClient } from '@/lib/supabase/admin'
 import { queueInAppNotification } from '@/lib/notifications/queue'
 import { claimPaymentForSettlement } from '@/lib/payments/settle'

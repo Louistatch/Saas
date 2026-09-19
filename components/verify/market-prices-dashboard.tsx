@@ -151,7 +151,7 @@ export function MarketPricesDashboard({ onBack, cardNumber, memberLocality }: Pr
       cultureId: submitForm.culture_id,
       regionId,
       marketName,
-      price: parseInt(submitForm.price, 10),
+      price: Number.parseInt(submitForm.price, 10),
     })
     setSubmitResult({ ok: result.ok, msg: result.message })
     if (result.ok) setSubmitForm({ culture_id: '', price: '' })

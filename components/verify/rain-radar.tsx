@@ -57,7 +57,7 @@ export default function RainRadar({ region, city, className }: Props) {
       if (cancelled || !mapRef.current) return
 
       const center: LatLng =
-        REGION_CENTERS[region] ?? REGION_CENTERS['Maritime']
+        REGION_CENTERS[region] ?? REGION_CENTERS.Maritime
 
       map = L.map(mapRef.current, {
         center,

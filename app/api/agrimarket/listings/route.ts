@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   const memberId = searchParams.get('member_id')
   const culture = searchParams.get('culture')
   const status = searchParams.get('status') ?? 'active'
-  const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'))
+  const page = Math.max(1, Number.parseInt(searchParams.get('page') ?? '1'))
   const pageSize = 50
 
   try {

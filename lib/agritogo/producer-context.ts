@@ -132,8 +132,7 @@ export async function buildProducerContext(
   const parcelles = parcellesRes.data
   const parcellesCtx = parcelles && parcelles.length > 0
     ? parcelles.map(p =>
-        `• ${p.name ?? 'Parcelle'}: ${p.culture_principale ?? '?'}, ${p.superficie_ha ?? '?'} ha` +
-        (p.canton ? ` — ${p.canton}` : '')
+        `• ${p.name ?? 'Parcelle'}: ${p.culture_principale ?? '?'}, ${p.superficie_ha ?? '?'} ha${p.canton ? ` — ${p.canton}` : ''}`
       ).join('\n')
     : 'Aucune parcelle enregistrée.'
 

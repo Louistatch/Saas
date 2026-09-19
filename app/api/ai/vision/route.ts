@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
           const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
           const result = await model.generateContent([
-            systemText + '\n\nQuestion : ' + userText,
+            `${systemText}\n\nQuestion : ${userText}`,
             { inlineData: { data: image_base64, mimeType: mime_type } },
           ])
 

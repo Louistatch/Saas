@@ -23,8 +23,8 @@ export async function GET(request: NextRequest) {
   const prefectureId = searchParams.get('prefecture_id')
   const cooperativeId = searchParams.get('cooperative_id')
   const search = searchParams.get('q')
-  const page = parseInt(searchParams.get('page') ?? '1')
-  const pageSize = Math.min(parseInt(searchParams.get('limit') ?? '20'), 50)
+  const page = Number.parseInt(searchParams.get('page') ?? '1')
+  const pageSize = Math.min(Number.parseInt(searchParams.get('limit') ?? '20'), 50)
 
   try {
     const supabase = await createClient()

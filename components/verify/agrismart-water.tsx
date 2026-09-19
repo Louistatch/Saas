@@ -182,7 +182,7 @@ export function AgriSmartWater({ onBack, initialRegion, cardNumber }: Props) {
     try {
       const payload: Record<string, unknown> = {
         resource:   'calculate',
-        crops:      entries.map(e => ({ name: e.crop.name, area_m2: parseFloat(e.area_m2) || 1000 })),
+        crops:      entries.map(e => ({ name: e.crop.name, area_m2: Number.parseFloat(e.area_m2) || 1000 })),
         soil_type:  soil.name,
         system:     system.id,
       }
@@ -202,7 +202,7 @@ export function AgriSmartWater({ onBack, initialRegion, cardNumber }: Props) {
 
       // Sauvegarder dans l'historique
       const firstCropName = entries[0]?.crop.name ?? ''
-      const totalSuperficie = entries.reduce((sum, e) => sum + (parseFloat(e.area_m2) || 0), 0) / 10000
+      const totalSuperficie = entries.reduce((sum, e) => sum + (Number.parseFloat(e.area_m2) || 0), 0) / 10000
       const firstCropResult: CropResult | undefined = (data as CalcResult).results?.[0]
       const newCalc: SavedCalc = {
         id: new Date().toISOString(),
@@ -344,9 +344,9 @@ export function AgriSmartWater({ onBack, initialRegion, cardNumber }: Props) {
                         className="w-24 rounded-lg bg-white/[0.06] border border-white/[0.1] px-2 py-1 text-white text-sm font-bold placeholder:text-white/20 focus:outline-none focus:border-[var(--vfp-accent)]/40"
                       />
                       <span className="text-white/40 text-xs">m²</span>
-                      {parseFloat(entry.area_m2) > 0 && (
+                      {Number.parseFloat(entry.area_m2) > 0 && (
                         <span className="text-white/25 text-[10px]">
-                          = {(parseFloat(entry.area_m2) / 10000).toFixed(4)} ha
+                          = {(Number.parseFloat(entry.area_m2) / 10000).toFixed(4)} ha
                         </span>
                       )}
                     </div>
@@ -420,7 +420,7 @@ export function AgriSmartWater({ onBack, initialRegion, cardNumber }: Props) {
           {entries.length > 0 && (
             <button
               onClick={() => setStep(2)}
-              disabled={entries.some(e => !e.area_m2 || parseFloat(e.area_m2) <= 0)}
+              disabled={entries.some(e => !e.area_m2 || Number.parseFloat(e.area_m2) <= 0)}
               className="w-full py-3.5 rounded-xl bg-[var(--vfp-cta)] text-[var(--vfp-cta-fg)] font-bold text-sm disabled:opacity-30 active:scale-[0.97] transition-transform flex items-center justify-center gap-2"
             >
               Continuer avec {entries.length} culture{entries.length > 1 ? 's' : ''} →
@@ -577,7 +577,7 @@ export function AgriSmartWater({ onBack, initialRegion, cardNumber }: Props) {
                 label="Rendement optimal +"
                 value={(result.combined_kpis.total_boost_m3 / 1000).toFixed(2)}
                 unit="k m³/an"
-                sub={`+15% ETM · sécheresses intra-mois`}
+                sub={'+15% ETM · sécheresses intra-mois'}
                 accent
                 icon={<TrendingUp className="h-3 w-3" />}
               />
@@ -652,7 +652,7 @@ export function AgriSmartWater({ onBack, initialRegion, cardNumber }: Props) {
                   key={r.crop}
                   onClick={() => setActiveCropIdx(i)}
                   className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${activeCropIdx === i ? 'text-white' : 'text-white/30 bg-white/[0.04]'}`}
-                  style={activeCropIdx === i ? { background: CROP_COLORS[i % CROP_COLORS.length] + '33', border: `1px solid ${CROP_COLORS[i % CROP_COLORS.length]}66`, color: CROP_COLORS[i % CROP_COLORS.length] } : {}}
+                  style={activeCropIdx === i ? { background: `${CROP_COLORS[i % CROP_COLORS.length]}33`, border: `1px solid ${CROP_COLORS[i % CROP_COLORS.length]}66`, color: CROP_COLORS[i % CROP_COLORS.length] } : {}}
                 >
                   {entries.find(e => e.crop.name === r.crop)?.crop.emoji} {r.crop}
                 </button>

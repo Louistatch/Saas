@@ -86,7 +86,7 @@ export default function AgriCreditPage() {
   const load = useCallback(async () => {
     if (!currentCooperative) return
     setIsLoading(true)
-    const res = await fetch(`/api/credit/applications`)
+    const res = await fetch('/api/credit/applications')
     if (res.ok) { const d = await res.json(); setApplications(d.applications) }
     setIsLoading(false)
   }, [currentCooperative])

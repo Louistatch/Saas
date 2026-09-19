@@ -831,7 +831,7 @@ export default function MarketplacePage() {
                 <Input
                   type="number"
                   value={form.price_non_member}
-                  onChange={(e) => setForm((f) => ({ ...f, price_non_member: parseInt(e.target.value) || 500 }))}
+                  onChange={(e) => setForm((f) => ({ ...f, price_non_member: Number.parseInt(e.target.value) || 500 }))}
                 />
               </div>
             </div>

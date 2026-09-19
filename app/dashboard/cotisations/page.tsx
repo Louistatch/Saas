@@ -82,7 +82,7 @@ export default function CotisationsPage() {
     member_id: '',
     amount: '1000',
     type: 'cotisation',
-    campaign: new Date().getFullYear() + '-' + (new Date().getFullYear() + 1),
+    campaign: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
     due_date: '',
     notes: '',
   })
@@ -215,7 +215,7 @@ export default function CotisationsPage() {
     fetchCotisations()
   }
 
-  const formatAmount = (amount: number) => new Intl.NumberFormat('fr-FR').format(amount) + ' FCFA'
+  const formatAmount = (amount: number) => `${new Intl.NumberFormat('fr-FR').format(amount)} FCFA`
 
   return (
     <div className="space-y-8">

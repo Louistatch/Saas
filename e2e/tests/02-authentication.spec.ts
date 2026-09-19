@@ -48,7 +48,7 @@ test.describe('Scenario 2: Authentication Flows', () => {
   test('logout clears session and redirects to login', async ({ browser }) => {
     // Create a fresh context with coop admin auth
     const context = await browser.newContext({
-      storageState: `e2e/.auth/coop-admin.json`,
+      storageState: 'e2e/.auth/coop-admin.json',
     })
     const page = await context.newPage()
 

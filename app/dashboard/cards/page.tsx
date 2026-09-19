@@ -779,7 +779,7 @@ export default function CardsPage() {
                   onChange={(e) =>
                     setSettings((s) => ({
                       ...s,
-                      defaultValidityDays: Math.max(1, Math.min(3650, parseInt(e.target.value) || 1)),
+                      defaultValidityDays: Math.max(1, Math.min(3650, Number.parseInt(e.target.value) || 1)),
                     }))
                   }
                 />
@@ -886,7 +886,7 @@ export default function CardsPage() {
                 min={1}
                 max={3650}
                 value={validityDays}
-                onChange={(e) => setValidityDays(Math.max(1, parseInt(e.target.value) || 1))}
+                onChange={(e) => setValidityDays(Math.max(1, Number.parseInt(e.target.value) || 1))}
               />
             </div>
           </div>
@@ -985,7 +985,7 @@ export default function CardsPage() {
                 min={1}
                 max={3650}
                 value={validityDays}
-                onChange={(e) => setValidityDays(Math.max(1, parseInt(e.target.value) || 1))}
+                onChange={(e) => setValidityDays(Math.max(1, Number.parseInt(e.target.value) || 1))}
               />
             </div>
           </div>

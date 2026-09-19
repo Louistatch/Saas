@@ -61,7 +61,7 @@ export function getDeepSeekKey(): string | null {
 
   // Toutes en cooldown : retourner celle qui récupère le plus vite
   let soonestIdx = 0
-  let soonestTime = Infinity
+  let soonestTime = Number.POSITIVE_INFINITY
   for (let i = 0; i < keys.length; i++) {
     const until = exhaustedUntil.get(i) ?? 0
     if (until < soonestTime) { soonestTime = until; soonestIdx = i }
@@ -100,7 +100,7 @@ export function getDeepSeekRecoveryWaitMs(): number {
   for (let i = 0; i < keys.length; i++) {
     if (!isInCooldown(i)) return 0
   }
-  let soonest = Infinity
+  let soonest = Number.POSITIVE_INFINITY
   for (let i = 0; i < keys.length; i++) {
     const until = exhaustedUntil.get(i) ?? 0
     if (until < soonest) soonest = until

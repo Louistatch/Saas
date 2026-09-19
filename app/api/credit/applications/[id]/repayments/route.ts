@@ -50,7 +50,7 @@ export async function POST(
   // Check if all repayments paid — update application status
   void Promise.resolve(
     supabase.from('credit_repayments').select('status').eq('application_id', id).then(({ data: reps }) => {
-      if (reps && reps.every(r => r.status === 'paid')) {
+      if (reps?.every(r => r.status === 'paid')) {
         return supabase.from('credit_applications').update({ status: 'closed', updated_at: new Date().toISOString() }).eq('id', id)
       }
     })

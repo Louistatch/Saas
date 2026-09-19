@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'crypto'
+import { timingSafeEqual } from 'node:crypto'
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 

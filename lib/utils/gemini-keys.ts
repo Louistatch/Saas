@@ -57,7 +57,7 @@ export function getGeminiKey(): string | null {
 
   // All keys in cooldown — return the one that recovers soonest
   let soonestIdx = 0
-  let soonestTime = Infinity
+  let soonestTime = Number.POSITIVE_INFINITY
   for (let i = 0; i < keys.length; i++) {
     const until = exhaustedUntil.get(i) ?? 0
     if (until < soonestTime) {
@@ -108,7 +108,7 @@ export function getRecoveryWaitMs(): number {
     if (!isInCooldown(i)) return 0
   }
   // All in cooldown — find the soonest recovery
-  let soonest = Infinity
+  let soonest = Number.POSITIVE_INFINITY
   for (let i = 0; i < keys.length; i++) {
     const until = exhaustedUntil.get(i) ?? 0
     if (until < soonest) soonest = until

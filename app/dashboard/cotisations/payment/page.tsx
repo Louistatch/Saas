@@ -42,7 +42,7 @@ export default function PaymentPage() {
   const [error, setError] = useState<string | null>(null)
 
   const formatAmount = (n: number) =>
-    new Intl.NumberFormat('fr-FR').format(n) + ' FCFA'
+    `${new Intl.NumberFormat('fr-FR').format(n)} FCFA`
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
