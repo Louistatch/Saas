@@ -1,5 +1,5 @@
-import { type NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { type NextRequest, NextResponse } from 'next/server'
 
 /**
  * Next.js middleware — PRIMARY auth gate (SEC-01 / AUTH-07).
@@ -18,7 +18,8 @@ export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') ?? ''
 
   // Domain redirect: force all Vercel preview/production URLs to www.faitierehub.com
-  const isVercelDomain = hostname.endsWith('.vercel.app') || hostname === 'saas-one-teal-62.vercel.app'
+  const isVercelDomain =
+    hostname.endsWith('.vercel.app') || hostname === 'saas-one-teal-62.vercel.app'
   const isProductionDomain = hostname === 'www.faitierehub.com' || hostname === 'faitierehub.com'
 
   if (isVercelDomain && !isProductionDomain) {
@@ -53,31 +54,32 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse
   }
 
-  const supabase = createServerClient(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options),
-          )
-        },
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll()
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+        supabaseResponse = NextResponse.next({ request })
+        cookiesToSet.forEach(({ name, value, options }) =>
+          supabaseResponse.cookies.set(name, value, options),
+        )
       },
     },
-  )
+  })
 
   // Refresh session on EVERY request — this is the Supabase-recommended pattern.
   // It ensures the JWT stays fresh and cookies are properly rotated.
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   // ─── Route protection logic ───
-  const isProtected = pathname.startsWith('/dashboard') || pathname.startsWith('/admin')
+  const isProtected =
+    pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/operator')
   const isAuthPage = pathname.startsWith('/auth/')
 
   // Protected routes: redirect unauthenticated users
@@ -95,7 +97,7 @@ export async function middleware(request: NextRequest) {
   // hook) ou périmés (entre une activation et le refresh). Ils servent donc
   // au routage, jamais à l'autorisation.
   const claims = user?.app_metadata as
-    | { role?: string; haroo_type?: string }
+    | { role?: string; haroo_type?: string; account_type?: string }
     | undefined
 
   // /admin : pré-filtre peu coûteux seulement. On ne détourne que sur un claim
@@ -114,10 +116,16 @@ export async function middleware(request: NextRequest) {
     // Un compte porte deux couches indépendantes. La couche organisationnelle
     // prime : son dashboard porte la bascule vers Haroo.
     const orgRole = claims?.role
-    const hasOrg =
-      !!orgRole && !['none', 'ouvrier', 'acheteur', 'agronome'].includes(orgRole)
+    const hasOrg = !!orgRole && !['none', 'ouvrier', 'acheteur', 'agronome'].includes(orgRole)
     const hasHaroo = !!claims?.haroo_type
-    const destination = hasOrg ? '/dashboard' : hasHaroo ? '/haroo' : '/dashboard'
+    const isOperator = claims?.account_type === 'operator'
+    const destination = hasOrg
+      ? '/dashboard'
+      : isOperator
+        ? '/operator'
+        : hasHaroo
+          ? '/haroo'
+          : '/dashboard'
     return NextResponse.redirect(new URL(destination, request.url))
   }
 

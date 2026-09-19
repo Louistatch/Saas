@@ -1,5 +1,5 @@
 import { getProfileProgressSummary, upsertProgress } from '@/lib/academy/operator-training'
-import { assertAuthenticated } from '@/lib/security/assert-access'
+import { assertOperatorCandidate } from '@/lib/security/assert-partner-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 // Progression du candidat Opérateur — écriture via upsertProgress avec
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Trop de requêtes' }, { status: 429 })
   }
 
-  const guard = await assertAuthenticated()
+  const guard = await assertOperatorCandidate()
   if (!guard.ok) return guard.response
 
   const parsed = bodySchema.safeParse(await request.json().catch(() => null))
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const guard = await assertAuthenticated()
+  const guard = await assertOperatorCandidate()
   if (!guard.ok) return guard.response
 
   const moduleId = new URL(request.url).searchParams.get('moduleId')

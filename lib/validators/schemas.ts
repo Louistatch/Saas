@@ -1,9 +1,8 @@
+import { PRODUCT_CATEGORIES, USER_ROLES } from '@/types/domain'
 import { z } from 'zod'
-import { USER_ROLES, PRODUCT_CATEGORIES } from '@/types/domain'
 
 const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
-const UUID_RE =
-  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
 
 export const uuidSchema = z.string().regex(UUID_RE, 'Invalid identifier')
 
@@ -34,10 +33,7 @@ export const exploitationSchema = z.object({
   producer: z.string().max(120).optional().or(z.literal('')),
   unit: z.string().max(20).optional().or(z.literal('')),
   price: z
-    .union([
-      z.string().regex(/^\d+(\.\d{1,2})?$/, 'Use numbers like 3.50'),
-      z.literal(''),
-    ])
+    .union([z.string().regex(/^\d+(\.\d{1,2})?$/, 'Use numbers like 3.50'), z.literal('')])
     .optional(),
   active: z.boolean(),
 })
@@ -106,7 +102,11 @@ export function buildCotisationSchema(allowPastDueDate = false) {
     amount: z
       .union([z.string(), z.number()])
       .transform((v: string | number) => (typeof v === 'string' ? Number(v) : v))
-      .pipe(z.number({ invalid_type_error: 'Le montant doit être un nombre' }).positive('Le montant doit être supérieur à 0')),
+      .pipe(
+        z
+          .number({ invalid_type_error: 'Le montant doit être un nombre' })
+          .positive('Le montant doit être supérieur à 0'),
+      ),
     type: z.string().min(1),
     campaign: z.string().max(60).optional().or(z.literal('')),
     due_date: z
@@ -134,7 +134,13 @@ export const accessRequestSchema = z.object({
     .min(1, 'Le téléphone est requis')
     .max(40)
     .regex(/^[+0-9 ()\-.]*$/, 'Le téléphone ne peut contenir que des chiffres, espaces et + - ( )'),
-  email: z.string().trim().toLowerCase().email('Adresse email invalide').optional().or(z.literal('')),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email('Adresse email invalide')
+    .optional()
+    .or(z.literal('')),
   message: z.string().max(2000).optional().or(z.literal('')),
 })
 export type AccessRequestInput = z.infer<typeof accessRequestSchema>
@@ -155,12 +161,30 @@ export const harooSignupSchema = z.object({
     .max(40)
     .regex(/^[+0-9 ()\-.]*$/, 'Le téléphone ne peut contenir que des chiffres, espaces et + - ( )'),
   email: emailSchema,
+  password: z.string().min(8, 'Le mot de passe doit contenir au moins 8 caractères').max(128),
+})
+export type HarooSignupInput = z.infer<typeof harooSignupSchema>
+
+/** Inscription autonome d'un compte exclusivement Opérateur. */
+export const operatorSignupSchema = z.object({
+  firstName: z.string().trim().min(2, 'Le prénom est requis').max(100),
+  lastName: z.string().trim().min(2, 'Le nom est requis').max(100),
+  displayName: z.string().trim().min(2, "Le nom d'opérateur est requis").max(120),
+  phone: z
+    .string()
+    .trim()
+    .min(8, 'Le téléphone est requis')
+    .max(40)
+    .regex(/^[+0-9 ()\-.]*$/, 'Le téléphone ne peut contenir que des chiffres, espaces et + - ( )'),
+  email: emailSchema,
   password: z
     .string()
     .min(8, 'Le mot de passe doit contenir au moins 8 caractères')
-    .max(128),
+    .max(128)
+    .regex(/[a-zA-Z]/, 'Le mot de passe doit contenir au moins une lettre')
+    .regex(/[0-9]/, 'Le mot de passe doit contenir au moins un chiffre'),
 })
-export type HarooSignupInput = z.infer<typeof harooSignupSchema>
+export type OperatorSignupInput = z.infer<typeof operatorSignupSchema>
 
 /**
  * Returns a flat object of `{ field: firstError }` for use with the

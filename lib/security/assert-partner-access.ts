@@ -58,6 +58,43 @@ export async function assertPartnerAuthenticated() {
 }
 
 /**
+ * Garde du parcours de formation Opérateur. Une simple session ne suffit pas :
+ * le compte doit avoir créé son dossier Opérateur et posséder une adhésion
+ * Partenaire active. Cette capacité reste indépendante de profiles.role.
+ */
+export async function assertOperatorCandidate() {
+  const result = await assertPartnerAuthenticated()
+  if (!result.ok) {
+    return {
+      ok: false as const,
+      response: NextResponse.json(
+        { error: 'Un compte Opérateur est requis pour accéder à cette formation' },
+        { status: 403 },
+      ),
+    }
+  }
+
+  const { data: certification } = await result.ctx.supabase
+    .from('partner_certifications')
+    .select('id')
+    .eq('user_id', result.ctx.userId)
+    .not('partner_id', 'is', null)
+    .maybeSingle<{ id: string }>()
+
+  if (!certification) {
+    return {
+      ok: false as const,
+      response: NextResponse.json(
+        { error: 'Dossier de formation Opérateur introuvable' },
+        { status: 403 },
+      ),
+    }
+  }
+
+  return result
+}
+
+/**
  * Le compte est-il membre du Partenaire `partnerId`, avec un rôle au moins
  * égal à `minRole` (owner > manager > agent) ? Utile pour les actions qui ne
  * doivent pas être ouvertes à un simple agent de terrain (ex. gérer l'équipe).

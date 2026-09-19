@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { OPERATOR_MODULE_ID, getModuleWithLessons } from '@/lib/academy/operator-training'
-import { getAccessContext } from '@/lib/security/assert-access'
+import { assertOperatorCandidate } from '@/lib/security/assert-partner-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { ArrowLeft, ImageIcon } from 'lucide-react'
 /**
@@ -30,8 +30,8 @@ export default async function OperatorLessonPage({
 }: {
   params: Promise<{ lessonId: string }>
 }) {
-  const ctx = await getAccessContext()
-  if (!ctx) redirect('/auth/login')
+  const guard = await assertOperatorCandidate()
+  if (!guard.ok) redirect('/operator')
 
   const { lessonId } = await params
   const admin = createAdminClient()

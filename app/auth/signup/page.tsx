@@ -1,17 +1,27 @@
 'use client'
 
-import { Logo } from '@/components/shared/logo'
 import { AuthSidePanel } from '@/components/shared/auth-side-panel'
+import { Spinner } from '@/components/shared/loading'
+import { Logo } from '@/components/shared/logo'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { accessRequestSchema, flattenZodErrors } from '@/lib/validators/schemas'
+import {
+  ArrowLeft,
+  ArrowRight,
+  BookOpen,
+  Building2,
+  CheckCircle2,
+  Send,
+  ShieldCheck,
+  Sprout,
+  TrendingUp,
+} from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ArrowLeft, ArrowRight, Send, CheckCircle2, Building2, Sprout, TrendingUp, BookOpen } from 'lucide-react'
-import { Spinner } from '@/components/shared/loading'
-import { accessRequestSchema, flattenZodErrors } from '@/lib/validators/schemas'
 
 /**
  * Inscription — le profil se choisit d'abord, puis chaque choix enchaîne sur
@@ -26,7 +36,7 @@ import { accessRequestSchema, flattenZodErrors } from '@/lib/validators/schemas'
  * Le choix n'enferme personne : la seconde couche s'active plus tard depuis
  * son espace, sur le même compte (cf. components/account/layer-activation).
  */
-type ProfileChoice = 'organisation' | 'ouvrier' | 'acheteur' | 'agronome'
+type ProfileChoice = 'organisation' | 'ouvrier' | 'acheteur' | 'agronome' | 'operator'
 
 const PROFILE_CHOICES: {
   value: ProfileChoice
@@ -34,6 +44,12 @@ const PROFILE_CHOICES: {
   blurb: string
   icon: React.ElementType
 }[] = [
+  {
+    value: 'operator',
+    label: 'Opérateur FaîtiereHub',
+    blurb: 'Suivez la formation et obtenez votre certification professionnelle',
+    icon: ShieldCheck,
+  },
   {
     value: 'organisation',
     label: 'Une organisation',
@@ -104,7 +120,7 @@ export default function SignupPage() {
       if (res.ok) {
         setSubmitted(true)
       } else {
-        setError('Erreur lors de l\'envoi. Réessayez ou contactez-nous par WhatsApp.')
+        setError("Erreur lors de l'envoi. Réessayez ou contactez-nous par WhatsApp.")
       }
     } catch {
       setError('Erreur de connexion. Vérifiez votre internet.')
@@ -122,8 +138,8 @@ export default function SignupPage() {
             </div>
             <h2 className="text-xl font-bold text-foreground">Demande envoyée !</h2>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              Votre demande d&apos;accès a été transmise à l&apos;équipe FaîtiereHub.
-              Nous vous contacterons sous 24-48h pour créer votre compte.
+              Votre demande d&apos;accès a été transmise à l&apos;équipe FaîtiereHub. Nous vous
+              contacterons sous 24-48h pour créer votre compte.
             </p>
             <div className="pt-4 space-y-2">
               <Link href="/auth/login">
@@ -134,7 +150,9 @@ export default function SignupPage() {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <Button variant="outline" className="w-full mt-2">💬 Nous contacter sur WhatsApp</Button>
+                <Button variant="outline" className="w-full mt-2">
+                  💬 Nous contacter sur WhatsApp
+                </Button>
               </a>
             </div>
           </CardContent>
@@ -159,7 +177,10 @@ export default function SignupPage() {
         <div className="flex-1 flex items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
           <div className="w-full max-w-md space-y-6">
             <div className="flex items-center justify-between">
-              <Link href="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <Link
+                href="/"
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
                 <ArrowLeft className="h-4 w-4" /> Accueil
               </Link>
               <Logo size="sm" />
@@ -167,7 +188,9 @@ export default function SignupPage() {
 
             <Card className="border-border">
               <CardHeader className="space-y-1">
-                <CardTitle className="text-2xl font-bold text-foreground">Quel est votre profil ?</CardTitle>
+                <CardTitle className="text-2xl font-bold text-foreground">
+                  Quel est votre profil ?
+                </CardTitle>
                 <CardDescription>
                   Vous pourrez activer la seconde couche plus tard depuis votre espace, sans créer
                   de second compte.
@@ -181,6 +204,8 @@ export default function SignupPage() {
                     onClick={() => {
                       if (value === 'organisation') {
                         setProfileChoice(value)
+                      } else if (value === 'operator') {
+                        router.push('/auth/signup/operator')
                       } else {
                         // Itinéraire Haroo déjà établi, avec le type pré-sélectionné.
                         router.push(`/auth/signup/haroo?type=${value.toUpperCase()}`)
@@ -241,9 +266,12 @@ export default function SignupPage() {
 
           <Card className="border-border">
             <CardHeader className="space-y-1">
-              <CardTitle className="text-2xl font-bold text-foreground">Demander un accès</CardTitle>
+              <CardTitle className="text-2xl font-bold text-foreground">
+                Demander un accès
+              </CardTitle>
               <CardDescription>
-                Les comptes sont créés par l&apos;administrateur. Remplissez ce formulaire et nous vous contacterons.
+                Les comptes sont créés par l&apos;administrateur. Remplissez ce formulaire et nous
+                vous contacterons.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -253,7 +281,7 @@ export default function SignupPage() {
                   <select
                     id="type"
                     value={formData.type}
-                    onChange={(e) => setFormData(f => ({ ...f, type: e.target.value }))}
+                    onChange={(e) => setFormData((f) => ({ ...f, type: e.target.value }))}
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   >
                     <option value="faitiere">Faîtière / Fédération</option>
@@ -271,7 +299,9 @@ export default function SignupPage() {
                     id="org"
                     placeholder="Ex: FENOMAT, FNGPC..."
                     value={formData.organizationName}
-                    onChange={(e) => setFormData(f => ({ ...f, organizationName: e.target.value }))}
+                    onChange={(e) =>
+                      setFormData((f) => ({ ...f, organizationName: e.target.value }))
+                    }
                     aria-invalid={!!fieldErrors.organizationName}
                     required
                   />
@@ -286,7 +316,7 @@ export default function SignupPage() {
                     id="contact"
                     placeholder="Prénom et nom"
                     value={formData.contactName}
-                    onChange={(e) => setFormData(f => ({ ...f, contactName: e.target.value }))}
+                    onChange={(e) => setFormData((f) => ({ ...f, contactName: e.target.value }))}
                     aria-invalid={!!fieldErrors.contactName}
                     required
                   />
@@ -302,7 +332,7 @@ export default function SignupPage() {
                     type="tel"
                     placeholder="+228 90 XX XX XX"
                     value={formData.phone}
-                    onChange={(e) => setFormData(f => ({ ...f, phone: e.target.value }))}
+                    onChange={(e) => setFormData((f) => ({ ...f, phone: e.target.value }))}
                     aria-invalid={!!fieldErrors.phone}
                     required
                   />
@@ -318,7 +348,7 @@ export default function SignupPage() {
                     type="email"
                     placeholder="contact@organisation.tg"
                     value={formData.email}
-                    onChange={(e) => setFormData(f => ({ ...f, email: e.target.value }))}
+                    onChange={(e) => setFormData((f) => ({ ...f, email: e.target.value }))}
                     aria-invalid={!!fieldErrors.email}
                   />
                   {fieldErrors.email && (
@@ -332,7 +362,7 @@ export default function SignupPage() {
                     id="message"
                     placeholder="Précisions sur votre organisation, nombre de membres..."
                     value={formData.message}
-                    onChange={(e) => setFormData(f => ({ ...f, message: e.target.value }))}
+                    onChange={(e) => setFormData((f) => ({ ...f, message: e.target.value }))}
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px] resize-none"
                   />
                   {fieldErrors.message && (
@@ -341,7 +371,9 @@ export default function SignupPage() {
                 </div>
 
                 {error && (
-                  <p className="text-sm text-destructive bg-destructive/10 rounded-md p-2">{error}</p>
+                  <p className="text-sm text-destructive bg-destructive/10 rounded-md p-2">
+                    {error}
+                  </p>
                 )}
 
                 <Button type="submit" className="w-full gap-2" disabled={submitting}>

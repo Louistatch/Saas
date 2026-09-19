@@ -1,14 +1,13 @@
 import { getModuleWithLessons } from '@/lib/academy/operator-training'
-import { assertAuthenticated } from '@/lib/security/assert-access'
+import { assertOperatorCandidate } from '@/lib/security/assert-partner-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { isUuid } from '@/lib/utils/rate-limit'
 // Module Opérateur complet (leçons, slides, quiz sans clé de correction,
-// devoir) pour le compte authentifié — aucune contrainte de rôle ou de
-// coopérative : la formation Opérateur est ouverte à tout compte.
+// devoir) exclusivement pour un compte ayant un dossier Opérateur.
 import { type NextRequest, NextResponse } from 'next/server'
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const guard = await assertAuthenticated()
+  const guard = await assertOperatorCandidate()
   if (!guard.ok) return guard.response
 
   const { id } = await params

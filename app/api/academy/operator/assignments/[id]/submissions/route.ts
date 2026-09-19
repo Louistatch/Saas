@@ -1,5 +1,5 @@
 import { submitAssignment } from '@/lib/academy/operator-training'
-import { assertAuthenticated } from '@/lib/security/assert-access'
+import { assertOperatorCandidate } from '@/lib/security/assert-partner-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { clientKeyFromHeaders, isUuid, rateLimit } from '@/lib/utils/rate-limit'
 // Dépôt d'un devoir Opérateur — écrit via submitAssignment avec l'identifiant authentifié.
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'Trop de requêtes' }, { status: 429 })
   }
 
-  const guard = await assertAuthenticated()
+  const guard = await assertOperatorCandidate()
   if (!guard.ok) return guard.response
 
   const { id } = await params
