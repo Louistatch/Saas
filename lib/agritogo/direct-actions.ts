@@ -49,7 +49,7 @@ export async function tryDirectAction(parsed: ParsedQuery): Promise<ActionResult
 
 // ─── Salutation ──────────────────────────────────────────────────
 
-async function handleSalutation(parsed: ParsedQuery): Promise<ActionResult> {
+async function handleSalutation(_parsed: ParsedQuery): Promise<ActionResult> {
   return {
     response: 'Bonjour ! Je suis AgriTogo, votre assistant agricole. '
       + 'Je peux vous renseigner sur les prix du marché, les tendances, '

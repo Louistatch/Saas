@@ -519,16 +519,6 @@ export default function CardsPage() {
     toast({ title: 'Paramètres enregistrés' })
   }
 
-  // Preview QR payload (so the preview reflects current settings choices)
-  const previewQr = useMemo(() => {
-    const sample: Record<string, string> = {}
-    if (settings.qrCodeIncludes.cardNumber) sample.card_number = 'COOP-12345'
-    if (settings.qrCodeIncludes.memberId) sample.member_id = 'preview'
-    if (settings.qrCodeIncludes.cooperativeId && currentCooperative)
-      sample.cooperative_id = currentCooperative.id
-    return JSON.stringify(sample)
-  }, [settings, currentCooperative])
-
   const activeCount = cards.filter((c) => c.status === 'active').length
 
   return (

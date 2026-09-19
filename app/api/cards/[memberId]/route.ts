@@ -41,7 +41,7 @@ async function ensureWasm() {
 }
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ memberId: string }> }
 ) {
   const { memberId } = await params

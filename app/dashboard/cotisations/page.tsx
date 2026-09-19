@@ -10,7 +10,6 @@ import Link from 'next/link'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
-import { useAuth } from '@/app/context/auth-context'
 import { useToast } from '@/hooks/use-toast'
 import { useDebounced } from '@/hooks/use-debounced'
 import { LoadingBlock, Spinner } from '@/components/shared/loading'
@@ -58,7 +57,6 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }>
 
 export default function CotisationsPage() {
   const { currentCooperative } = useCooperative()
-  const { user } = useAuth()
   const { toast } = useToast()
   const supabase = useMemo(() => createClient(), [])
 

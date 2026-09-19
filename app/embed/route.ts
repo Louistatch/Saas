@@ -31,16 +31,6 @@ interface CoopRow {
   primary_color: string | null
 }
 
-interface ExploitationRow {
-  id: string
-  name: string
-  description: string | null
-  category: string | null
-  price: number | null
-  unit: string | null
-  producer: string | null
-}
-
 export async function GET(request: NextRequest) {
   const limit = rateLimit(`embed:${clientKeyFromHeaders(request.headers)}`, 60, 60_000)
   if (!limit.ok) {

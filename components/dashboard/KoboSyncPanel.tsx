@@ -37,7 +37,6 @@ import { Spinner } from '@/components/shared/loading'
 import type { KoboStatsResponse, SyncResult } from '@/lib/kobo/types'
 
 interface KoboSyncPanelProps {
-  cooperativeId: string
   stats: KoboStatsResponse | null
   statsLoading: boolean
   isSyncing: boolean
@@ -50,7 +49,6 @@ interface KoboSyncPanelProps {
 }
 
 export function KoboSyncPanel({
-  cooperativeId,
   stats,
   statsLoading,
   isSyncing,

@@ -272,7 +272,7 @@ export default function Home() {
 
           {/* 3 profile cards */}
           <div className="grid gap-6 sm:grid-cols-3">
-            {HAROO_PROFILES.map(({ role, icon: Icon, cardPrefix, color, badgeBg, tagline, description, perks }) => (
+            {HAROO_PROFILES.map(({ role, icon: Icon, cardPrefix, color, tagline, description, perks }) => (
               <div
                 key={role}
                 className="rounded-2xl border border-amber-200/60 bg-white dark:bg-card shadow-sm overflow-hidden flex flex-col"

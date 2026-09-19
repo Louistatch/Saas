@@ -72,13 +72,6 @@ function wmoLabel(code: number): string {
   return WMO_LABELS[nearest] ?? `Code ${code}`
 }
 
-function frDate(iso: string): string {
-  try {
-    const d = new Date(iso + (iso.length === 10 ? 'T00:00:00' : ''))
-    return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
-  } catch { return iso }
-}
-
 function frMonth(iso: string): string {
   try {
     return new Date(`${iso}-01`).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
@@ -107,13 +100,6 @@ function precipColor(mm: number): [number, number, number] {
   if (mm > 1)  return [96, 165, 250]  // light blue
   if (mm > 0)  return [186, 230, 253] // very light blue
   return [226, 232, 240]              // gray
-}
-
-function riskColor(risk?: string): [number, number, number] {
-  if (risk === 'critical') return [220, 38, 38]
-  if (risk === 'high')     return [234, 88, 12]
-  if (risk === 'moderate') return [202, 138, 4]
-  return [22, 163, 74]
 }
 
 // ── Main generator ────────────────────────────────────────────────────────────

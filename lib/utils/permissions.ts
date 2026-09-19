@@ -156,27 +156,6 @@ export function canCreateCooperatives(
   return cooperativeLevel === 'faitiere' || cooperativeLevel === 'union'
 }
 
-/**
- * Can this user generate cards for a specific cooperative?
- * - super_admin: any cooperative
- * - faitiere_admin: any child cooperative
- * - union_admin: any child cooperative
- * - cooperative_admin: own cooperative only
- */
-export function canGenerateCardsFor(
-  userRole: UserRole | undefined,
-  userCoopId: string | undefined,
-  userCoopLevel: string | undefined,
-  targetCoopId: string,
-  accessibleCoopIds: string[],
-): boolean {
-  if (userRole === 'super_admin') return true
-  if (userRole !== 'cooperative_admin') return false
-  
-  // Check if target cooperative is in the user's accessible hierarchy
-  return accessibleCoopIds.includes(targetCoopId)
-}
-
 // ─── Role Labels ────────────────────────────────────────────────────────────
 
 export function roleLabel(role: UserRole): string {

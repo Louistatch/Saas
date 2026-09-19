@@ -20,7 +20,7 @@ test.describe('Scenario 5: Comptes d\'Exploitation (Marketplace)', () => {
     // Regular coop admin (not faitiere level) should not see the button
     // Note: This depends on the cooperative's level field
     // If coop-admin manages a faitiere-level coop, this test may need adjustment
-    const isVisible = await adminMarketplace.newFicheButton.isVisible().catch(() => false)
+    const _isVisible = await adminMarketplace.newFicheButton.isVisible().catch(() => false)
 
     // The button visibility depends on cooperative level
     // We verify the page loaded correctly regardless

@@ -89,7 +89,6 @@ export function KoboConfigForm({ cooperativeId, onSaved }: KoboConfigFormProps) 
   const [webhookEnabled, setWebhookEnabled] = useState(true)
   const [hasExistingToken, setHasExistingToken] = useState(false)
   const [status, setStatus] = useState<'disconnected' | 'connected' | 'error'>('disconnected')
-  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null)
 
   // Field mappings
   const [mappings, setMappings] = useState<FieldMappingEntry[]>([])
@@ -124,7 +123,6 @@ export function KoboConfigForm({ cooperativeId, onSaved }: KoboConfigFormProps) 
       setFormId(data.formId ?? '')
       setWebhookEnabled(data.webhookEnabled ?? true)
       setStatus(data.status ?? 'disconnected')
-      setLastSyncAt(data.lastSyncAt ?? null)
       setHasExistingToken(!!data.apiTokenMasked)
       setApiToken(data.apiTokenMasked ? '••••••••••••••••' : '')
 

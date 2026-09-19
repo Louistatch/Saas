@@ -54,13 +54,6 @@ function p(text, opts = {}) {
   })
 }
 
-function pBold(text, color = COLORS.dark) {
-  return new Paragraph({
-    children: [new TextRun({ text, bold: true, size: 22, color })],
-    spacing: { before: 80, after: 80 },
-  })
-}
-
 function bullet(text, level = 0) {
   return new Paragraph({
     children: [new TextRun({ text, size: 21, color: COLORS.dark })],

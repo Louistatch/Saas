@@ -138,8 +138,6 @@ export function useCascadingLocations(
   const [prefetched, setPrefetched] = useState<Record<string, LocationOption[]>>({})
   const [loadingLevel, setLoadingLevel] = useState<CascadingLocationLevel | null>(null)
 
-  const isEnabled = useCallback((level: CascadingLocationLevel) => levels.includes(level), [levels])
-
   // Reset every level after `level` (exclusive) in the cascade order.
   const resetChildrenOf = useCallback(
     (level: CascadingLocationLevel, base: CascadingLocationSelection): CascadingLocationSelection => {

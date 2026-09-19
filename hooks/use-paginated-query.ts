@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
 import { errorMessage } from '@/lib/utils/errors'
 
-interface UsePaginatedQueryOptions<T> {
+interface UsePaginatedQueryOptions {
   /** Supabase table name */
   table: string
   /** Columns to select (PostgREST syntax) */
@@ -42,7 +42,7 @@ interface PaginatedResult<T> {
  * Fetches only the rows needed for the current page.
  */
 export function usePaginatedQuery<T = Record<string, unknown>>(
-  opts: UsePaginatedQueryOptions<T>,
+  opts: UsePaginatedQueryOptions,
 ): PaginatedResult<T> {
   const {
     table,

@@ -178,11 +178,6 @@ export function parseQuery(message: string): ParsedQuery {
   const wordCount = raw.split(/\s+/).length
   const isLong = wordCount > 10
 
-  // ─── GUARD 3: Questions with ? → likely needs explanation → LLM
-  // UNLESS it's a pure "combien coûte X?" pattern
-  const hasQuestionMark = raw.includes('?')
-  const isPureFactualQuestion = hasQuestionMark && wordCount <= 6 && !hasConversationalMarker
-
   // ─── Detect intent ─────────────────────────────────────────────
   let intent: Intent = 'conseil_general'
   let needsLLM = true

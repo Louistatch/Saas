@@ -26,7 +26,6 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
-import { useAuth } from '@/app/context/auth-context'
 import { useToast } from '@/hooks/use-toast'
 import { LoadingBlock, Spinner } from '@/components/shared/loading'
 import { EmptyState } from '@/components/shared/empty-state'
@@ -87,7 +86,6 @@ const formatNum = (n: number) => new Intl.NumberFormat('fr-FR').format(n)
 
 export default function AgriMarketPage() {
   const { currentCooperative } = useCooperative()
-  const { user } = useAuth()
   const { toast } = useToast()
   const supabase = useMemo(() => createClient(), [])
 

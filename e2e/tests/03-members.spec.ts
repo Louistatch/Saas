@@ -39,7 +39,7 @@ test.describe('Scenario 3: Member Management', () => {
       return
     }
 
-    const member = await testData.createMember(coopId, {
+    const _member = await testData.createMember(coopId, {
       firstName: `${TEST_PREFIX}EditMe`,
       lastName: `${TEST_PREFIX}Original`,
     })
@@ -64,7 +64,7 @@ test.describe('Scenario 3: Member Management', () => {
       return
     }
 
-    const member = await testData.createMember(coopId, {
+    const _member = await testData.createMember(coopId, {
       firstName: `${TEST_PREFIX}DeleteMe`,
       lastName: `${TEST_PREFIX}Please`,
     })

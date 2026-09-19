@@ -104,7 +104,7 @@ function useEmbedData(cooperativeId: string, widget: string) {
   return { data, loading, cooperative }
 }
 
-function MemberVerifyWidget({ cooperativeId }: { cooperativeId: string }) {
+function MemberVerifyWidget() {
   const [cardNumber, setCardNumber] = useState('')
   const [result, setResult] = useState<WidgetVerifyResult | null>(null)
   const [loading, setLoading] = useState(false)
@@ -263,7 +263,7 @@ function EmbedWidgetContent() {
       )}
 
       {widget === 'member_verify' && (
-        <MemberVerifyWidget cooperativeId={cooperativeId} />
+        <MemberVerifyWidget />
       )}
 
       {widget === 'fiches' && data?.fiches && (

@@ -23,7 +23,7 @@ export function AuthButtons({
   className?: string
   stacked?: boolean
 }) {
-  const { isAuthenticated, isLoading, user } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   const wrapClassName = cn(stacked ? 'flex flex-col gap-2' : 'flex items-center gap-3', className)
   const linkClassName = stacked ? 'w-full' : undefined
   const buttonClassName = stacked ? 'w-full' : undefined

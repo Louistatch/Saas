@@ -22,24 +22,6 @@ export interface MarketplaceFilters {
   page: number
 }
 
-const DEFAULT_FILTERS: MarketplaceFilters = {
-  search: '',
-  category: '',
-  culture: '',
-  region_id: '',
-  prefecture_id: '',
-  canton_id: '',
-  cooperative_id: '',
-  min_price: '',
-  max_price: '',
-  certification: '',
-  season: '',
-  producer_type: '',
-  sort_by: 'created_at',
-  sort_order: 'desc',
-  page: 1,
-}
-
 /**
  * URL-synced marketplace filters with optimistic updates.
  * Filters are stored in URL search params for shareability and back/forward navigation.

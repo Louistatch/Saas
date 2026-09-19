@@ -37,13 +37,6 @@ const LEVELS: CascadingLocationLevel[] = [
   'village_id',
 ]
 
-const LOADING_LABEL: Partial<Record<CascadingLocationLevel, string>> = {
-  prefecture_id: 'prefecture',
-  commune_id: 'commune',
-  canton_id: 'canton',
-  village_id: 'village',
-}
-
 /**
  * Cascading location picker for Togo administrative subdivisions.
  * Région → Préfecture → Commune → Canton → Village

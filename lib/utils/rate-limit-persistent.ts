@@ -104,7 +104,7 @@ export async function applyRateLimit(
     ?? request.headers.get('x-real-ip')
     ?? 'unknown'
 
-  const { success, limit, remaining, reset } = await rateLimiters[limiter].limit(ip)
+  const { success, limit, reset } = await rateLimiters[limiter].limit(ip)
 
   if (!success) {
     return NextResponse.json(

@@ -19,7 +19,7 @@ test.describe('Scenario 4: Card Generation', () => {
     }
 
     // Create a test member without a card
-    const member = await testData.createMember(coopId, {
+    const _member = await testData.createMember(coopId, {
       firstName: `${TEST_PREFIX}CardTest`,
       lastName: `${TEST_PREFIX}Member`,
     })
@@ -69,7 +69,7 @@ test.describe('Scenario 4: Card Generation', () => {
     expect(filename).toMatch(/\.(png|jpg|jpeg)$/i)
   })
 
-  test('QR payload contains valid /verify/ URL', async ({ coopAdminPage, testData }) => {
+  test('QR payload contains valid /verify/ URL', async ({ testData }) => {
     const coopId = await testData.getCoopId('coop-admin@demo.local')
     if (!coopId) {
       test.skip(true, 'Could not determine cooperative ID')
@@ -83,7 +83,6 @@ test.describe('Scenario 4: Card Generation', () => {
     const card = await testData.createCard(member.id, coopId)
 
     // The QR payload should be a verification URL
-    const expectedPayload = `/verify/${encodeURIComponent(card.card_number)}`
     expect(card.qr_data).toContain('/verify/')
     expect(card.qr_data).toContain(card.card_number)
   })
@@ -100,7 +99,7 @@ test.describe('Scenario 4: Card Generation', () => {
       firstName: `${TEST_PREFIX}Renew`,
       lastName: `${TEST_PREFIX}Test`,
     })
-    const originalCard = await testData.createCard(member.id, coopId)
+    const _originalCard = await testData.createCard(member.id, coopId)
 
     const cardsPage = new CardsPage(coopAdminPage)
     await cardsPage.goto()

@@ -171,7 +171,6 @@ export default function KoboIntegrationPage() {
         {/* Tab 2: Synchronisation */}
         <TabsContent value="sync" className="mt-6">
           <KoboSyncPanel
-            cooperativeId={currentCooperative.id}
             stats={stats}
             statsLoading={statsLoading}
             isSyncing={isSyncing}
@@ -191,7 +190,7 @@ export default function KoboIntegrationPage() {
 
         {/* Tab 4: Guide */}
         <TabsContent value="guide" className="mt-6">
-          <GuideTab cooperativeId={currentCooperative.id} />
+          <GuideTab />
         </TabsContent>
       </Tabs>
     </div>
@@ -232,7 +231,7 @@ function StatCard({
 // =========================================================
 // Guide tab
 // =========================================================
-function GuideTab({ cooperativeId }: { cooperativeId: string }) {
+function GuideTab() {
   const webhookUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/api/webhooks/kobo`
     : 'https://www.faitierehub.com/api/webhooks/kobo'
