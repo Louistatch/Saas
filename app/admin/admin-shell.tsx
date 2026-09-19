@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
+  Award,
   BarChart3,
   Briefcase,
   Users,
@@ -27,6 +28,7 @@ const ADMIN_LINKS = [
   { href: '/admin/cooperatives', label: 'Coopératives', icon: Building2 },
   { href: '/admin/users', label: 'Utilisateurs', icon: Users },
   { href: '/admin/haroo', label: 'Professionnels Haroo', icon: Briefcase },
+  { href: '/admin/partners', label: 'Opérateurs', icon: Award },
   { href: '/admin/analytics', label: 'Statistiques', icon: BarChart3 },
   { href: '/admin/agritogo', label: 'AgriTogo', icon: Cpu },
   { href: '/admin/agrismat', label: 'Agrismat', icon: Leaf },

@@ -1,3 +1,7 @@
+-- Renommé depuis 20260921_100000_… (PR 2.1, réconciliation d'historique) :
+-- même cause que partner_capability_foundation — apply_migration horodate à
+-- l'instant réel d'exécution (20260919131948), pas d'après le nom de
+-- fichier local choisi à la main. Contenu inchangé, seul le nom a bougé.
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Facturation Opérateur — portefeuille PAYG (PR 2 du plan à 4 PR)
 --

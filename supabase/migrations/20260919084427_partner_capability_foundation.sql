@@ -1,3 +1,10 @@
+-- Renommé depuis 20260920_100000_… (PR 2.1, réconciliation d'historique) :
+-- le nom local portait une date choisie à la main, alors que la migration a
+-- réellement été appliquée via apply_migration, qui horodate à l'instant
+-- réel d'exécution — 20260919084427 — indépendamment du nom de fichier
+-- local. `supabase db push` compare les deux par préfixe numérique ; un
+-- écart aurait fait retenter la création d'objets déjà en base. Contenu
+-- inchangé, seul le nom de fichier a bougé.
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Capacité Opérateur/Partenaire certifié — fondations (PR 1 du plan à 4 PR)
 --
