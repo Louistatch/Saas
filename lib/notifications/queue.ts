@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
+import 'server-only'
+import { createClient } from '@/lib/supabase/admin'
 
 export type NotificationChannel = 'sms' | 'whatsapp' | 'email' | 'in_app'
 
@@ -19,7 +20,7 @@ interface QueueNotificationParams {
  */
 export async function queueNotification(params: QueueNotificationParams): Promise<void> {
   try {
-    const supabase = await createClient()
+    const supabase = createClient()
 
     // Fetch template
     const { data: template } = await supabase
@@ -35,7 +36,7 @@ export async function queueNotification(params: QueueNotificationParams): Promis
       body = body.replace(new RegExp(`\\{${key}\\}`, 'g'), value)
     }
 
-    await supabase.from('notification_queue').insert({
+    const { error } = await supabase.from('notification_queue').insert({
       member_id: params.memberId ?? null,
       cooperative_id: params.cooperativeId,
       channel: params.channel,
@@ -46,8 +47,9 @@ export async function queueNotification(params: QueueNotificationParams): Promis
       body_rendered: body,
       scheduled_at: params.scheduledAt?.toISOString() ?? new Date().toISOString(),
     })
+    if (error) throw new Error('Queue insert failed')
   } catch {
-    // Silent — notifications must never break the main flow
+    console.error('[notifications] Queue insert failed')
   }
 }
 
@@ -63,8 +65,8 @@ export async function queueInAppNotification(params: {
   link?: string
 }): Promise<void> {
   try {
-    const supabase = await createClient()
-    await supabase.from('notifications_inapp').insert({
+    const supabase = createClient()
+    const { error } = await supabase.from('notifications_inapp').insert({
       cooperative_id: params.cooperativeId,
       title: params.title,
       body: params.body,
@@ -72,7 +74,8 @@ export async function queueInAppNotification(params: {
       icon: params.icon ?? null,
       link: params.link ?? null,
     })
+    if (error) throw new Error('Notification insert failed')
   } catch {
-    // Silent
+    console.error('[notifications] In-app insert failed')
   }
 }

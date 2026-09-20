@@ -15,7 +15,7 @@ export default function ConditionsPage() {
           Conditions générales d&apos;utilisation
         </h1>
         <p className="text-muted-foreground mb-12">
-          Dernière mise à jour : 1er janvier 2025
+          Dernière mise à jour : 20 septembre 2026
         </p>
 
         <div className="prose prose-neutral dark:prose-invert max-w-none space-y-10">
@@ -39,9 +39,10 @@ export default function ConditionsPage() {
           <div className="space-y-4">
             <h2 className="text-2xl font-bold text-foreground">2. Inscription et accès</h2>
             <p className="text-muted-foreground leading-relaxed">
-              L&apos;accès à la Plateforme nécessite la création d&apos;un compte utilisateur. L&apos;inscription est
-              réservée aux personnes morales (coopératives, faîtières, fédérations) représentées par
-              une personne physique dûment habilitée, âgée d&apos;au moins 18 ans.
+              L&apos;accès à la Plateforme nécessite la création d&apos;un compte utilisateur. L&apos;inscription est ouverte aux personnes majeures selon le parcours choisi :
+              organisation agricole, Opérateur ou professionnel Haroo. Le représentant d&apos;une
+              organisation doit être habilité à agir pour celle-ci. Un compte Opérateur ne confère
+              aucun droit sur une organisation sans certification et mandat explicite.
             </p>
             <p className="text-muted-foreground leading-relaxed">
               L&apos;utilisateur s&apos;engage à fournir des informations exactes, complètes et à jour lors de

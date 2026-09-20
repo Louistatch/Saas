@@ -5,46 +5,16 @@ import { Shield, Lock, KeyRound, Gauge, Cloud, DatabaseBackup } from 'lucide-rea
 export const metadata: Metadata = {
   title: 'Sécurité — FaîtiereHub | Protection de vos données',
   description:
-    'FaîtiereHub protège vos données avec le chiffrement AES-256-GCM, Row Level Security, authentification sécurisée et hébergement conforme SOC2/GDPR.',
+    'Découvrez les protections des comptes, les accès aux organisations et les principes de sécurité de FaîtiereHub.',
 }
 
 const securityFeatures = [
-  {
-    icon: Lock,
-    title: 'Chiffrement AES-256-GCM',
-    description:
-      'Tous les secrets et données sensibles sont chiffrés avec l\'algorithme AES-256-GCM, le standard utilisé par les institutions financières. Les clés de chiffrement sont gérées de manière sécurisée et ne sont jamais exposées.',
-  },
-  {
-    icon: Shield,
-    title: 'Row Level Security (RLS)',
-    description:
-      "Chaque table de la base de données est protégée par des politiques RLS. Un utilisateur ne peut accéder qu'aux données de sa propre coopérative. L'isolation des données est garantie au niveau de la base de données — y compris pour les profils professionnels Haroo (ouvriers, acheteurs, agronomes), qui partagent la même infrastructure sécurisée.",
-  },
-  {
-    icon: KeyRound,
-    title: 'Authentification sécurisée',
-    description:
-      'Authentification gérée par Supabase Auth avec support du MFA, tokens JWT signés, sessions sécurisées et protection contre les attaques par force brute. Mots de passe hashés avec bcrypt.',
-  },
-  {
-    icon: Gauge,
-    title: 'Rate limiting sur les APIs',
-    description:
-      'Toutes les routes API sont protégées par un système de rate limiting qui prévient les abus, les attaques DDoS et les tentatives d\'extraction massive de données.',
-  },
-  {
-    icon: Cloud,
-    title: 'Hébergement Vercel + Supabase',
-    description:
-      'Infrastructure hébergée sur Vercel (Edge Network mondial) et Supabase (PostgreSQL managé). Les deux plateformes sont certifiées SOC2 Type II et conformes au RGPD/GDPR.',
-  },
-  {
-    icon: DatabaseBackup,
-    title: 'Sauvegardes automatiques',
-    description:
-      'Sauvegardes automatiques quotidiennes de la base de données avec rétention de 30 jours. Point-in-time recovery disponible pour restaurer les données à n\'importe quel moment.',
-  },
+  { icon: Lock, title: 'Protection des secrets', description: "Les secrets d’intégration sont traités côté serveur. Les clés d’administration ne sont pas transmises au navigateur." },
+  { icon: Shield, title: 'Accès selon votre rôle', description: "Les accès aux données dépendent de votre rôle, de votre organisation et des mandats accordés. Un compte Opérateur candidat ne donne pas accès aux données des coopératives." },
+  { icon: KeyRound, title: 'Connexion à votre compte', description: "La connexion et la récupération de mot de passe sont assurées par Supabase Auth. Une carte publique permet de vérifier une identité ; elle ne remplace pas la connexion pour accéder aux informations privées." },
+  { icon: Gauge, title: 'Prévention des abus', description: "Les points d’entrée sensibles disposent de contrôles d’accès et de limites de requêtes. Ces protections sont vérifiées et améliorées au fil des mises à jour." },
+  { icon: Cloud, title: 'Hébergement', description: "L’application utilise Vercel et Supabase. Les garanties des hébergeurs dépendent de leurs offres et ne constituent pas une certification de FaîtiereHub." },
+  { icon: DatabaseBackup, title: 'Continuité du service', description: "Les modalités de sauvegarde et de restauration dépendent de la configuration du service. Contactez-nous pour convenir des besoins de votre organisation et des engagements applicables." },
 ]
 
 export default function SecuritePage() {
@@ -61,8 +31,7 @@ export default function SecuritePage() {
           La sécurité au cœur de FaîtiereHub
         </h1>
         <p className="mt-6 text-lg text-muted-foreground max-w-3xl mx-auto">
-          Vos données sont précieuses. Nous mettons en œuvre les meilleures pratiques de l&apos;industrie
-          pour garantir leur confidentialité, intégrité et disponibilité.
+          La protection de vos données repose sur des accès contrôlés et des vérifications régulières.
         </p>
       </section>
 
@@ -88,29 +57,10 @@ export default function SecuritePage() {
         </div>
       </section>
 
-      {/* Compliance */}
-      <section className="py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-foreground">Conformité et certifications</h2>
-            <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
-              Notre infrastructure respecte les normes internationales de sécurité et de protection des données.
-            </p>
-          </div>
-          <div className="grid gap-6 md:grid-cols-4">
-            {['SOC2 Type II', 'RGPD / GDPR', 'ISO 27001', 'CEDEAO'].map((cert) => (
-              <div
-                key={cert}
-                className="rounded-lg border border-border bg-background p-6 text-center"
-              >
-                <div className="h-12 w-12 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center">
-                  <Shield className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <p className="font-semibold text-foreground">{cert}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+      <section className="mx-auto max-w-3xl px-4 py-16 text-center">
+        <h2 className="text-2xl font-bold">Signaler un problème</h2>
+        <p className="mt-4 text-muted-foreground">Pour une question de sécurité ou un accès inhabituel, contactez notre équipe sans transmettre de mot de passe.</p>
+        <a href="mailto:support@faitierehub.com" className="mt-4 inline-block text-primary underline">support@faitierehub.com</a>
       </section>
     </MarketingLayout>
   )

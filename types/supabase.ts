@@ -817,6 +817,7 @@ export type Database = {
       }
       buyer_requests: {
         Row: {
+          created_by: string | null
           buyer_email: string | null
           buyer_name: string
           buyer_phone: string | null
@@ -833,6 +834,7 @@ export type Database = {
           status: string
         }
         Insert: {
+          created_by?: string | null
           buyer_email?: string | null
           buyer_name: string
           buyer_phone?: string | null
@@ -849,6 +851,7 @@ export type Database = {
           status?: string
         }
         Update: {
+          created_by?: string | null
           buyer_email?: string | null
           buyer_name?: string
           buyer_phone?: string | null

@@ -85,7 +85,7 @@ const FR_MONTHS = [
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Groups ISO date strings by month (YYYY-MM) and returns cumulative or per-month counts */
-export function buildMonthlySeries(dates: string[], months: number): TimeSeriesPoint[] {
+function buildMonthlySeries(dates: string[], months: number): TimeSeriesPoint[] {
   const now = new Date()
   const series: TimeSeriesPoint[] = []
 
@@ -106,7 +106,7 @@ export function buildMonthlySeries(dates: string[], months: number): TimeSeriesP
 }
 
 /** Groups ISO date strings by day (YYYY-MM-DD) for the last `days` days */
-export function buildDailySeries(dates: string[], days: number): { day: string; value: number }[] {
+function buildDailySeries(dates: string[], days: number): { day: string; value: number }[] {
   const now = new Date()
   const series: { day: string; value: number }[] = []
 

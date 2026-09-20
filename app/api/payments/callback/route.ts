@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { createClient } from '@/lib/supabase/admin'
-import { queueInAppNotification } from '@/lib/notifications/queue'
 import { claimPaymentForSettlement } from '@/lib/payments/settle'
 
 interface OrangeCallbackBody {
@@ -36,7 +35,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const { reference, tx_id, status, failure_reason } = body
-  if (!reference || !status) {
+  if (typeof reference !== 'string' || !reference || typeof tx_id !== 'string' || !tx_id || !['SUCCESS', 'FAILED'].includes(status)) {
     return NextResponse.json({ error: 'Missing reference or status' }, { status: 400 })
   }
 
@@ -44,12 +43,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const { data: payment, error: fetchError } = await supabase
     .from('payments')
-    .select('id, cooperative_id, cotisation_id, amount_fcfa, member_id')
+    .select('id, cooperative_id, cotisation_id, amount_fcfa, member_id, currency, provider')
     .eq('reference', reference)
     .single()
 
   if (fetchError || !payment) {
     return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
+  }
+
+  if (payment.provider !== 'orange_money') {
+    return NextResponse.json({ error: 'Provider mismatch' }, { status: 409 })
   }
 
   const now = new Date().toISOString()
@@ -74,64 +77,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: settlement.message }, { status: 500 })
     }
     return NextResponse.json({ received: true, duplicate: true })
-  }
-
-  if (isSuccess && payment.cotisation_id) {
-    void supabase
-      .from('cotisations')
-      .update({ status: 'paid', paid_date: now })
-      .eq('id', payment.cotisation_id)
-      .then(() => undefined)
-  }
-
-  void queueInAppNotification({
-    cooperativeId: payment.cooperative_id as string,
-    title: isSuccess ? 'Paiement reçu' : 'Paiement échoué',
-    body: isSuccess
-      ? `Paiement de ${payment.amount_fcfa} FCFA confirmé (réf. ${reference})`
-      : `Paiement de ${payment.amount_fcfa} FCFA échoué (réf. ${reference})`,
-    type: isSuccess ? 'success' : 'alert',
-    icon: isSuccess ? '✅' : '❌',
-    link: '/dashboard/cotisations',
-  })
-
-  // SMS de confirmation au membre (fire-and-forget)
-  if (isSuccess && payment.member_id) {
-    void (async () => {
-      try {
-        const { data: member } = await supabase
-          .from('members')
-          .select('first_name, phone')
-          .eq('id', payment.member_id as string)
-          .single()
-
-        if (member?.phone) {
-          const { data: tpl } = await supabase
-            .from('notification_templates')
-            .select('body_fr')
-            .eq('key', 'cotisation_paid')
-            .eq('channel', 'sms')
-            .maybeSingle()
-
-          const body = (tpl?.body_fr ?? '')
-            .replace('{prenom}', member.first_name ?? '')
-            .replace('{montant}', String(payment.amount_fcfa))
-
-          if (body) {
-            await supabase.from('notification_queue').insert({
-              member_id: payment.member_id as string,
-              cooperative_id: payment.cooperative_id as string,
-              channel: 'sms',
-              template_key: 'cotisation_paid',
-              recipient_phone: member.phone,
-              variables: { prenom: member.first_name ?? '', montant: String(payment.amount_fcfa) },
-              body_rendered: body,
-              scheduled_at: now,
-            })
-          }
-        }
-      } catch { /* non-bloquant */ }
-    })()
   }
 
   return NextResponse.json({ received: true })

@@ -1,116 +1,92 @@
 import { timingSafeEqual } from 'node:crypto'
-import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { type DeliveryResult, deliverSms } from '@/lib/notifications/delivery'
+import { createClient } from '@/lib/supabase/admin'
+import { type NextRequest, NextResponse } from 'next/server'
 
-// Vercel Cron: runs every hour
-// vercel.json: { "crons": [{ "path": "/api/cron/notifications", "schedule": "0 * * * *" }] }
+export const maxDuration = 60
 
 function verifyCronSecret(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET
-  if (!secret) return false
   const authHeader = request.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) return false
-  const provided = authHeader.slice(7)
-  try {
-    const a = Buffer.from(provided)
-    const b = Buffer.from(secret)
-    return a.length === b.length && timingSafeEqual(a, b)
-  } catch {
-    return false
-  }
+  if (!secret || !authHeader?.startsWith('Bearer ')) return false
+  const actual = Buffer.from(authHeader.slice(7))
+  const expected = Buffer.from(secret)
+  return actual.length === expected.length && timingSafeEqual(actual, expected)
 }
 
+interface NotificationJob {
+  id: string
+  channel: string
+  recipient_phone: string | null
+  body_rendered: string | null
+  attempts: number
+  claim_token: string
+}
+
+// Schedule is defined once in vercel.json. Leases prevent concurrent workers claiming the same row.
 export async function GET(request: NextRequest) {
-  if (!verifyCronSecret(request)) {
+  if (!verifyCronSecret(request))
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const supabase = await createClient()
-  const processed = { sent: 0, failed: 0, skipped: 0 }
-
-  // Expire overdue market_listings
-  await supabase
-    .from('market_listings')
-    .update({ status: 'expired' })
-    .eq('status', 'active')
-    .lt('expires_at', new Date().toISOString())
-    .not('expires_at', 'is', null)
-
-  // Fetch pending notifications scheduled for now or past
-  const { data: pending } = await supabase
-    .from('notification_queue')
-    .select('*')
-    .eq('status', 'pending')
-    .lte('scheduled_at', new Date().toISOString())
-    .lt('attempts', 3)
-    .limit(50)
-    .order('scheduled_at', { ascending: true })
-
-  if (!pending?.length) {
-    return NextResponse.json({ ...processed, message: 'Nothing to process' })
-  }
-
-  for (const notif of pending) {
-    try {
-      let success = false
-
-      if (notif.channel === 'sms') {
-        success = await sendSMS(notif.recipient_phone, notif.body_rendered)
-      } else if (notif.channel === 'in_app') {
-        // in_app already written to notifications_inapp at creation
-        success = true
-      } else {
-        processed.skipped++
-        continue
-      }
-
-      await supabase
+  const processed = { sent: 0, failed: 0, remaining: 0 }
+  const deadline = Date.now() + 45_000
+  try {
+    const supabase = createClient()
+    const { error: expiryError } = await supabase
+      .from('market_listings')
+      .update({ status: 'expired' })
+      .eq('status', 'active')
+      .lt('expires_at', new Date().toISOString())
+      .not('expires_at', 'is', null)
+    if (expiryError) throw new Error('Listing expiry failed')
+    // One job per claim keeps the deadline bounded even when the provider is slow.
+    for (let count = 0; count < 500 && Date.now() < deadline; count++) {
+      const { data, error } = await supabase.rpc('claim_notification_batch', { p_limit: 1 })
+      if (error) throw new Error('Notification claim failed')
+      const job = (data as NotificationJob[] | null)?.[0]
+      if (!job) break
+      const result: DeliveryResult =
+        job.channel === 'sms'
+          ? await deliverSms(job.recipient_phone, job.body_rendered)
+          : job.channel === 'in_app'
+            ? { ok: true }
+            : { ok: false, retryable: false, error: 'Unsupported notification channel' }
+      const terminal = !result.ok && (!result.retryable || job.attempts >= 3)
+      const { data: finished, error: finishError } = await supabase
         .from('notification_queue')
         .update({
-          status: success ? 'sent' : 'failed',
-          sent_at: success ? new Date().toISOString() : null,
-          attempts: notif.attempts + 1,
+          status: result.ok ? 'sent' : terminal ? 'failed' : 'pending',
+          attempts: terminal ? 3 : job.attempts,
+          sent_at: result.ok ? new Date().toISOString() : null,
+          last_error: result.ok ? null : result.error,
+          scheduled_at: new Date(Date.now() + 60_000 * 2 ** job.attempts).toISOString(),
+          locked_until: null,
+          claim_token: null,
         })
-        .eq('id', notif.id)
-
-      if (success) processed.sent++
+        .eq('id', job.id)
+        .eq('claim_token', job.claim_token)
+        .select('id')
+      if (finishError || !finished?.length) throw new Error('Notification acknowledgement failed')
+      if (result.ok) processed.sent++
       else processed.failed++
-    } catch (e) {
-      await supabase
-        .from('notification_queue')
-        .update({ attempts: notif.attempts + 1, last_error: String(e) })
-        .eq('id', notif.id)
-      processed.failed++
     }
-  }
-
-  return NextResponse.json(processed)
-}
-
-async function sendSMS(phone: string | null, body: string | null): Promise<boolean> {
-  if (!phone || !body) return false
-
-  const apiKey = process.env.AFRICAS_TALKING_API_KEY
-  const username = process.env.AFRICAS_TALKING_USERNAME
-  if (!apiKey || !username) return false // graceful degradation
-
-  try {
-    const res = await fetch('https://api.africastalking.com/version1/messaging', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        apiKey: apiKey,
-      },
-      body: new URLSearchParams({
-        username,
-        to: phone,
-        message: body,
-        from: 'FaîtiereHub',
-      }),
-    })
-    return res.ok
-  } catch {
-    return false
+    const { count, error } = await supabase
+      .from('notification_queue')
+      .select('id', { count: 'exact', head: true })
+      .in('status', ['pending', 'failed'])
+      .lt('attempts', 3)
+    if (error) throw new Error('Notification backlog check failed')
+    processed.remaining = count ?? 0
+    if (processed.failed || processed.remaining)
+      console.error('[notifications] Delivery attention required', processed)
+    return NextResponse.json(processed, { status: processed.failed ? 503 : 200 })
+  } catch (error) {
+    console.error(
+      '[notifications] Worker failed',
+      error instanceof Error ? error.message : 'Unknown error',
+    )
+    return NextResponse.json(
+      { error: 'Notification processing failed', ...processed },
+      { status: 500 },
+    )
   }
 }

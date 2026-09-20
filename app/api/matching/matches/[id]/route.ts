@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { assertTenantAccess } from '@/lib/security/assert-access'
 
 const VALID_STATUSES = ['accepted', 'rejected', 'completed'] as const
 type MatchStatus = (typeof VALID_STATUSES)[number]
@@ -48,7 +49,7 @@ export async function PATCH(
     // Vérification propriété : récupérer le match + sa requête + la coopérative
     const { data: match, error: matchFetchError } = await supabase
       .from('buyer_matches')
-      .select('id, request_id, buyer_requests(cooperative_id)')
+      .select('id, request_id, buyer_requests(cooperative_id, created_by)')
       .eq('id', id)
       .single()
 
@@ -56,12 +57,12 @@ export async function PATCH(
       return NextResponse.json({ error: 'Match introuvable' }, { status: 404 })
     }
 
-    const requestCoopId = (match.buyer_requests as unknown as { cooperative_id: string } | null)?.cooperative_id
-    const isSuperAdmin = profile.role === 'super_admin'
-    const isOwner = requestCoopId === profile.cooperative_id
-
-    if (!isSuperAdmin && !isOwner) {
-      return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
+    const owner = match.buyer_requests as unknown as { cooperative_id: string | null; created_by: string | null } | null
+    if (owner?.created_by !== user.id) {
+      const access = owner?.cooperative_id ? await assertTenantAccess(owner.cooperative_id) : null
+      if (profile.role !== 'super_admin' && !access?.ok) {
+        return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
+      }
     }
 
     const { data, error } = await supabase

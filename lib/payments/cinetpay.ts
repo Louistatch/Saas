@@ -54,7 +54,10 @@ export async function initiateCinetPayPayment(
   }
 
   // CinetPay rejects amounts that aren't multiples of 5 FCFA.
-  const amount = Math.round(params.amount / 5) * 5
+  if (!Number.isSafeInteger(params.amount) || params.amount <= 0 || params.amount % 5 !== 0) {
+    return { success: false, error: 'Le montant doit être un entier positif multiple de 5 FCFA' }
+  }
+  const amount = params.amount
 
   try {
     const response = await fetch(CINETPAY_BASE_URL, {

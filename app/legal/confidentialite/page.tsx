@@ -15,7 +15,7 @@ export default function ConfidentialitePage() {
           Politique de confidentialité
         </h1>
         <p className="text-muted-foreground mb-12">
-          Dernière mise à jour : 1er janvier 2025
+          Dernière mise à jour : 20 septembre 2026
         </p>
 
         <div className="prose prose-neutral dark:prose-invert max-w-none space-y-10">
@@ -66,8 +66,9 @@ export default function ConfidentialitePage() {
             <h2 className="text-2xl font-bold text-foreground">3. Stockage et sécurité</h2>
             <p className="text-muted-foreground leading-relaxed">
               Les données sont hébergées sur des serveurs sécurisés fournis par Supabase (infrastructure
-              AWS) avec chiffrement au repos (AES-256) et en transit (TLS 1.3). Les sauvegardes sont
-              effectuées quotidiennement avec une rétention de 30 jours.
+              AWS). Les connexions au service utilisent HTTPS. Les modalités de sauvegarde et de
+              restauration dépendent de la configuration d&apos;hébergement ; les engagements
+              applicables à une organisation sont précisés dans son accord de service.
             </p>
             <p className="text-muted-foreground leading-relaxed">
               La durée de conservation des données personnelles est limitée à la durée nécessaire aux

@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@/lib/supabase/admin'
+import { claimPaymentForSettlement } from '@/lib/payments/settle'
 import { initiateOrangeMoneyPayment, generatePaymentReference } from '@/lib/payments/orange-money'
 import { initiateCinetPayPayment } from '@/lib/payments/cinetpay'
 import { assertTenantAccess } from '@/lib/security/assert-access'
@@ -15,8 +17,8 @@ const paymentInitiateSchema = z.object({
 })
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const session = await createClient()
+  const { data: { user } } = await session.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -37,6 +39,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const tenantCheck = await assertTenantAccess(cooperative_id)
   if (!tenantCheck.ok) return tenantCheck.response
+
+  // Check both related rows before using the service-role client.
+  const { data: memberRow } = await session.from('members').select('id')
+    .eq('id', member_id).eq('cooperative_id', cooperative_id).maybeSingle()
+  if (!memberRow) return NextResponse.json({ error: 'Membre non autorisé' }, { status: 403 })
+  if (cotisation_id) {
+    const { data: cotisation } = await session.from('cotisations').select('amount, currency, status')
+      .eq('id', cotisation_id).eq('member_id', member_id).eq('cooperative_id', cooperative_id).maybeSingle()
+    if (!cotisation || cotisation.status === 'paid' || cotisation.status === 'waived'
+      || Number(cotisation.amount) !== amount_fcfa || cotisation.currency !== 'XOF') {
+      return NextResponse.json({ error: 'Cotisation ou montant invalide' }, { status: 400 })
+    }
+  }
+  if (['moov', 'tmoney'].includes(provider) && amount_fcfa % 5 !== 0) {
+    return NextResponse.json({ error: 'Le montant Mobile Money doit être un multiple de 5 FCFA' }, { status: 400 })
+  }
+  const supabase = createAdminClient()
 
   // Le paiement en espèces est saisi par l'administrateur, sans téléphone ;
   // tout opérateur mobile en exige un.
@@ -67,21 +86,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   if (provider === 'cash') {
-    const { error: updateError } = await supabase
-      .from('payments')
-      .update({ status: 'success', paid_at: now })
-      .eq('id', payment.id)
-
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
-    }
-
-    if (cotisation_id) {
-      void supabase
-        .from('cotisations')
-        .update({ status: 'paid', paid_date: now.split('T')[0] })
-        .eq('id', cotisation_id)
-        .then(() => undefined)
+    const settlement = await claimPaymentForSettlement(supabase, payment.id, { status: 'success', paid_at: now })
+    if (!settlement.claimed && settlement.reason === 'error') {
+      return NextResponse.json({ error: 'Enregistrement du paiement impossible' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, reference, provider: 'cash' })
@@ -102,19 +109,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     })
 
     if (!result.success) {
-      void supabase
+      await supabase
         .from('payments')
         .update({ status: 'failed', failure_reason: result.error ?? 'Initiation failed' })
         .eq('id', payment.id)
+        .eq('status', 'pending')
         .then(() => undefined)
 
       return NextResponse.json({ error: result.error ?? 'Payment initiation failed' }, { status: 502 })
     }
 
-    void supabase
+    await supabase
       .from('payments')
       .update({ status: 'processing', provider_tx_id: result.txId ?? null })
       .eq('id', payment.id)
+        .eq('status', 'pending')
       .then(() => undefined)
 
     return NextResponse.json({ success: true, paymentUrl: result.paymentUrl, reference })
@@ -139,19 +148,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     })
 
     if (!result.success) {
-      void supabase
+      await supabase
         .from('payments')
         .update({ status: 'failed', failure_reason: result.error ?? 'Initiation failed' })
         .eq('id', payment.id)
+        .eq('status', 'pending')
         .then(() => undefined)
 
       return NextResponse.json({ error: result.error ?? 'Payment initiation failed' }, { status: 502 })
     }
 
-    void supabase
+    await supabase
       .from('payments')
       .update({ status: 'processing', provider_tx_id: result.paymentToken ?? null })
       .eq('id', payment.id)
+        .eq('status', 'pending')
       .then(() => undefined)
 
     return NextResponse.json({ success: true, paymentUrl: result.paymentUrl, reference })

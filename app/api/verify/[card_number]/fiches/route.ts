@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { createClient as createAdminClient } from '@/lib/supabase/admin'
+import { requirePrivateCard } from '@/lib/security/card-access'
 
 export async function GET(
   _request: NextRequest,
@@ -9,21 +8,15 @@ export async function GET(
   const { card_number } = await params
   const cardNumber = decodeURIComponent(card_number).toUpperCase().trim()
 
-  const supabase = await createClient()
-
-  // Find card → cooperative_id + member_id
-  const { data: card } = await supabase
-    .from('member_cards')
-    .select('member_id, cooperative_id')
-    .eq('card_number', cardNumber)
-    .eq('status', 'active')
-    .maybeSingle()
+  const access = await requirePrivateCard(cardNumber)
+  if (!access.ok) return access.response
+  const { card, supabase } = access
 
   if (!card?.cooperative_id) {
     return NextResponse.json({ fiches: [], cooperative_name: null }, { status: 200 })
   }
 
-  const admin = createAdminClient()
+  const admin = supabase
 
   // Get the member's coop + its faitière parent
   const { data: coop } = await admin
@@ -62,6 +55,6 @@ export async function GET(
       cooperative_name: coop?.name ?? null,
       cooperative_level: coop?.level ?? null,
     },
-    { headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=300' } },
+    { headers: { 'Cache-Control': 'private, no-store' } },
   )
 }

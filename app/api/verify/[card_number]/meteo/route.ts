@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { resolvePublicCard, cardRateLimit } from '@/lib/security/card-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 import {
@@ -24,17 +24,13 @@ export async function GET(
   const blocked = await applyRateLimit(request, 'verify')
   if (blocked) return blocked
 
+  const limited = cardRateLimit(request)
+  if (limited) return limited
+
   const { card_number } = await params
   const cardNumber = decodeURIComponent(card_number).toUpperCase().trim()
 
-  const supabase = await createClient()
-
-  const { data: card } = await supabase
-    .from('member_cards')
-    .select('member_id')
-    .eq('card_number', cardNumber)
-    .eq('status', 'active')
-    .maybeSingle()
+  const card = await resolvePublicCard(cardNumber)
 
   if (!card?.member_id) {
     return NextResponse.json({ error: 'Carte non trouvée.' }, { status: 404 })
