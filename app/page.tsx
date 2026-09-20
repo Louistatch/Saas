@@ -87,6 +87,8 @@ const FAITIERE_FEATURES = [
 const HAROO_PROFILES = [
   {
     role: 'Ouvrier agricole',
+    type: 'OUVRIER',
+    action: 'Trouver un emploi agricole',
     icon: Sprout,
     cardPrefix: 'OUV-',
     color: 'from-amber-600 to-amber-800',
@@ -102,6 +104,8 @@ const HAROO_PROFILES = [
   },
   {
     role: 'Acheteur',
+    type: 'ACHETEUR',
+    action: 'Explorer les préventes',
     icon: TrendingUp,
     cardPrefix: 'ACH-',
     color: 'from-orange-600 to-orange-800',
@@ -117,6 +121,8 @@ const HAROO_PROFILES = [
   },
   {
     role: 'Agronome',
+    type: 'AGRONOME',
+    action: 'Accéder aux missions de conseil',
     icon: BookOpen,
     cardPrefix: 'AGR-',
     color: 'from-yellow-600 to-yellow-800',
@@ -161,6 +167,135 @@ export default function Home() {
       {/* ── HERO ─────────────────────────────────────────────────────── */}
       <HeroSection />
 
+      {/* ── HAROO SECTION ────────────────────────────────────────────── */}
+      <section
+        id="haroo"
+        className="scroll-mt-20 py-12 sm:py-16 bg-gradient-to-br from-amber-50 via-orange-50/50 to-background dark:from-amber-950/20 dark:via-background dark:to-background"
+      >
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          {/* Header */}
+          <div className="text-center space-y-4 mb-16">
+            <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-100 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+              <Network className="h-3.5 w-3.5" /> Haroo — Emplois, préventes et conseil
+            </div>
+            <h2 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+              Votre métier agricole, les bons contacts
+            </h2>
+            <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
+              Trouvez des offres d&apos;emploi, consultez les préventes de récoltes ou suivez vos
+              missions de conseil. Choisissez votre profil pour découvrir votre espace Haroo et les
+              opportunités disponibles.
+            </p>
+          </div>
+
+          {/* 3 profile cards */}
+          <div className="grid gap-6 sm:grid-cols-3">
+            {HAROO_PROFILES.map(
+              ({
+                role,
+                type,
+                action,
+                icon: Icon,
+                cardPrefix,
+                color,
+                tagline,
+                description,
+                perks,
+              }) => (
+                <div
+                  key={role}
+                  id={`haroo-${type.toLowerCase()}`}
+                  className="scroll-mt-24 rounded-2xl border border-amber-200/60 bg-white dark:bg-card shadow-sm overflow-hidden flex flex-col"
+                >
+                  {/* Card visual header */}
+                  <div className={`bg-gradient-to-br ${color} p-5 text-white`}>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="text-xs font-bold tracking-widest opacity-70 mb-1">
+                          HAROO
+                        </div>
+                        <div className="font-bold text-lg leading-tight">{role}</div>
+                        <div className="text-xs opacity-75 mt-0.5 font-mono">
+                          {cardPrefix}XXXXXX
+                        </div>
+                      </div>
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                    </div>
+                    <div className="mt-3 inline-block rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-semibold">
+                      {tagline}
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="p-5 flex flex-col flex-1 gap-4">
+                    <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
+                    <ul className="space-y-2 flex-1">
+                      {perks.map((perk) => (
+                        <li key={perk} className="flex items-start gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                          <span className="text-foreground">{perk}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <Link
+                      href={`/auth/signup/haroo?type=${type}`}
+                      className="inline-flex min-h-12 items-center justify-between gap-3 rounded-xl bg-amber-700 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-700"
+                    >
+                      {action}
+                      <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0" />
+                    </Link>
+                    <p className="text-xs text-muted-foreground">
+                      Inscription avec le profil {role.toLowerCase()}.
+                    </p>
+                  </div>
+                </div>
+              ),
+            )}
+          </div>
+
+          {/* Haroo CTA */}
+          <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+            <Link href="/auth/signup/haroo">
+              <Button
+                size="lg"
+                className="gap-2 bg-amber-600 text-white hover:bg-amber-700 border-amber-600"
+              >
+                <UserPlus className="h-4 w-4" /> Créer mon profil Haroo
+              </Button>
+            </Link>
+            <Link href="/haroo">
+              <Button
+                size="lg"
+                variant="outline"
+                className="gap-2 border-amber-200 text-amber-700 hover:bg-amber-50"
+              >
+                Accéder à mon espace Haroo
+              </Button>
+            </Link>
+          </div>
+
+          {/* Haroo integration note */}
+          <div className="mt-10 rounded-xl border border-amber-200 bg-amber-50/80 dark:bg-amber-900/10 dark:border-amber-800 p-5 max-w-2xl mx-auto text-center">
+            <div className="flex items-center justify-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">
+              <ScanLine className="h-4 w-4" />
+              Un seul scanner pour toutes les cartes
+            </div>
+            <p className="text-sm text-amber-700 dark:text-amber-400">
+              Le même QR code scanner vérifie indifféremment les cartes FAITIERE des membres de
+              coopérative et les cartes professionnelles Haroo des ouvriers, acheteurs et agronomes.
+            </p>
+            <Link
+              href="/scan"
+              className="mt-3 inline-block text-sm font-semibold text-amber-700 hover:text-amber-900 underline underline-offset-2"
+            >
+              Essayer le scanner →
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* ── ECOSYSTEM OVERVIEW ───────────────────────────────────────── */}
       <section className="border-y border-border bg-muted/30 py-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -174,7 +309,7 @@ export default function Home() {
                   FaîtiereHub
                 </div>
                 <div className="font-semibold text-foreground text-sm">
-                  Couche organisationnelle
+                  Gestion des organisations
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
                   Faîtières · Unions · Coopératives · Membres
@@ -187,9 +322,9 @@ export default function Home() {
                   <Link2 className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div className="text-xs font-semibold text-muted-foreground">
-                  Même scanner QR
+                  Une organisation, des métiers
                   <br />
-                  Même base de données
+                  Des services complémentaires
                 </div>
               </div>
             </div>
@@ -202,7 +337,7 @@ export default function Home() {
                   Haroo
                 </div>
                 <div className="font-semibold text-foreground text-sm">
-                  Couche humaine &amp; réseau
+                  Emplois, préventes et conseil
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
                   Ouvriers · Acheteurs · Agronomes
@@ -276,114 +411,6 @@ export default function Home() {
                 <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── HAROO SECTION ────────────────────────────────────────────── */}
-      <section
-        id="haroo"
-        className="py-20 sm:py-28 bg-gradient-to-br from-amber-50 via-orange-50/50 to-background dark:from-amber-950/20 dark:via-background dark:to-background"
-      >
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="text-center space-y-4 mb-16">
-            <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-100 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-              <Network className="h-3.5 w-3.5" /> Haroo — L'identité professionnelle agricole
-            </div>
-            <h2 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
-              Les acteurs du terrain ont leur propre identité
-            </h2>
-            <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
-              Haroo est la couche humaine de l&apos;écosystème FaîtiereHub. Ouvriers agricoles,
-              acheteurs et agronomes bénéficient chacun d&apos;un profil dédié, d&apos;une carte
-              professionnelle vérifiable et d&apos;un flux d&apos;opportunités personnalisé.
-            </p>
-          </div>
-
-          {/* 3 profile cards */}
-          <div className="grid gap-6 sm:grid-cols-3">
-            {HAROO_PROFILES.map(
-              ({ role, icon: Icon, cardPrefix, color, tagline, description, perks }) => (
-                <div
-                  key={role}
-                  className="rounded-2xl border border-amber-200/60 bg-white dark:bg-card shadow-sm overflow-hidden flex flex-col"
-                >
-                  {/* Card visual header */}
-                  <div className={`bg-gradient-to-br ${color} p-5 text-white`}>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="text-xs font-bold tracking-widest opacity-70 mb-1">
-                          HAROO
-                        </div>
-                        <div className="font-bold text-lg leading-tight">{role}</div>
-                        <div className="text-xs opacity-75 mt-0.5 font-mono">
-                          {cardPrefix}XXXXXX
-                        </div>
-                      </div>
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20">
-                        <Icon className="h-5 w-5" />
-                      </div>
-                    </div>
-                    <div className="mt-3 inline-block rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-semibold">
-                      {tagline}
-                    </div>
-                  </div>
-
-                  {/* Content */}
-                  <div className="p-5 flex flex-col flex-1 gap-4">
-                    <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
-                    <ul className="space-y-2 flex-1">
-                      {perks.map((perk) => (
-                        <li key={perk} className="flex items-start gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                          <span className="text-foreground">{perk}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              ),
-            )}
-          </div>
-
-          {/* Haroo CTA */}
-          <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <Link href="/auth/signup/haroo">
-              <Button
-                size="lg"
-                className="gap-2 bg-amber-600 text-white hover:bg-amber-700 border-amber-600"
-              >
-                <UserPlus className="h-4 w-4" /> Créer mon profil Haroo
-              </Button>
-            </Link>
-            <Link href="/auth/login">
-              <Button
-                size="lg"
-                variant="outline"
-                className="gap-2 border-amber-200 text-amber-700 hover:bg-amber-50"
-              >
-                Déjà inscrit — Se connecter
-              </Button>
-            </Link>
-          </div>
-
-          {/* Haroo integration note */}
-          <div className="mt-10 rounded-xl border border-amber-200 bg-amber-50/80 dark:bg-amber-900/10 dark:border-amber-800 p-5 max-w-2xl mx-auto text-center">
-            <div className="flex items-center justify-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">
-              <ScanLine className="h-4 w-4" />
-              Un seul scanner pour toutes les cartes
-            </div>
-            <p className="text-sm text-amber-700 dark:text-amber-400">
-              Le même QR code scanner vérifie indifféremment les cartes FAITIERE des membres de
-              coopérative et les cartes professionnelles Haroo des ouvriers, acheteurs et agronomes.
-            </p>
-            <Link
-              href="/scan"
-              className="mt-3 inline-block text-sm font-semibold text-amber-700 hover:text-amber-900 underline underline-offset-2"
-            >
-              Essayer le scanner →
-            </Link>
           </div>
         </div>
       </section>
