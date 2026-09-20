@@ -41,7 +41,7 @@ const footerColumns = [
     title: 'Opérateur',
     links: [
       { href: '/#operateur', label: 'Devenir Opérateur certifié' },
-      { href: '/operator/training', label: 'Formation (gratuite)' },
+      { href: '/auth/signup/operator', label: 'Créer un compte Opérateur' },
       { href: '/operator', label: 'Espace Opérateur' },
     ],
   },

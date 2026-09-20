@@ -11,6 +11,7 @@
  * confiance dans la config statique seule) — cf. app/api/admin/demo-accounts.
  */
 import 'server-only'
+import { generateUniquePartnerCode } from '@/lib/utils/partner-code'
 import type { Database } from '@/types/supabase'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -184,7 +185,70 @@ export async function ensureDemoAccount(
     }
   }
 
+  // Le candidat Opérateur a besoin d'un vrai dossier (partners +
+  // partner_memberships + partner_certifications) : depuis que la formation
+  // est réservée aux Opérateurs (assertOperatorCandidate), un profil nu ne
+  // voit plus le parcours et l'aperçu admin ne montrerait rien. Statut
+  // 'candidate', certification vide — exactement ce qu'obtient un vrai
+  // candidat après /api/account/apply-partner, aucun privilège en plus.
+  if (config.key === 'operator_candidate') {
+    const { error } = await ensureDemoPartnerDossier(admin, profileId, config)
+    if (error) return { ok: false, error }
+  }
+
   return { ok: true }
+}
+
+async function ensureDemoPartnerDossier(
+  admin: AdminClient,
+  profileId: string,
+  config: DemoRoleConfig,
+): Promise<{ error?: string }> {
+  const { data: existing } = await admin
+    .from('partner_certifications')
+    .select('id')
+    .eq('user_id', profileId)
+    .not('partner_id', 'is', null)
+    .maybeSingle<{ id: string }>()
+  if (existing) return {}
+
+  let partnerCode: string
+  try {
+    partnerCode = await generateUniquePartnerCode(admin, 'XX')
+  } catch {
+    return { error: 'Génération du code Opérateur de démo impossible' }
+  }
+
+  const { data: partner, error: partnerError } = await admin
+    .from('partners')
+    .insert({
+      partner_code: partnerCode,
+      display_name: `${config.firstName} ${config.lastName}`.trim(),
+      email: config.email,
+      status: 'candidate',
+    })
+    .select('id')
+    .single<{ id: string }>()
+  if (partnerError || !partner) return { error: 'Création du Partenaire de démo impossible' }
+
+  const { error: membershipError } = await admin.from('partner_memberships').insert({
+    partner_id: partner.id,
+    user_id: profileId,
+    membership_role: 'owner',
+    status: 'active',
+  })
+  const { error: certificationError } = membershipError
+    ? { error: membershipError }
+    : await admin
+        .from('partner_certifications')
+        .insert({ user_id: profileId, partner_id: partner.id })
+
+  if (membershipError || certificationError) {
+    await admin.from('partners').delete().eq('id', partner.id)
+    return { error: 'Création du dossier Opérateur de démo impossible' }
+  }
+
+  return {}
 }
 
 export async function ensureAllDemoAccounts(

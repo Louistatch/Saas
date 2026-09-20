@@ -61,8 +61,23 @@ export async function assertPartnerAuthenticated() {
  * Garde du parcours de formation Opérateur. Une simple session ne suffit pas :
  * le compte doit avoir créé son dossier Opérateur et posséder une adhésion
  * Partenaire active. Cette capacité reste indépendante de profiles.role.
+ *
+ * Exception de supervision : un super_admin consulte la formation sans dossier
+ * Opérateur, pour relire le contenu et vérifier le parcours que suivent les
+ * candidats. Il n'en devient pas Opérateur pour autant — `partnerIds` reste
+ * vide, donc aucune action liée à un Partenaire (portefeuille, impression de
+ * cartes, créances) ne s'ouvre par ce biais : celles-ci passent par
+ * `assertPartnerScope`/`assertPartnerMember`, qui exigent une adhésion réelle.
  */
 export async function assertOperatorCandidate() {
+  const access = await getAccessContext()
+  if (access?.role === 'super_admin') {
+    return {
+      ok: true as const,
+      ctx: { userId: access.userId, partnerIds: [], supabase: access.supabase },
+    }
+  }
+
   const result = await assertPartnerAuthenticated()
   if (!result.ok) {
     return {

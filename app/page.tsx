@@ -444,20 +444,22 @@ export default function Home() {
           </div>
 
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <Link href="/operator">
+            <Link href="/auth/signup/operator">
               <Button size="lg" className="gap-2">
-                <Handshake className="h-4 w-4" /> Devenir Opérateur certifié
+                <Handshake className="h-4 w-4" /> Créer mon compte Opérateur
               </Button>
             </Link>
-            <Link href="/operator/training">
+            <Link href="/operator">
               <Button size="lg" variant="outline" className="gap-2">
-                <GraduationCap className="h-4 w-4" /> Découvrir la formation
+                <GraduationCap className="h-4 w-4" /> J&apos;ai déjà un compte Opérateur
               </Button>
             </Link>
           </div>
 
           <p className="mt-4 text-center text-xs text-muted-foreground">
-            Un compte suffit pour suivre la formation — aucune coopérative ni profil Haroo requis.
+            La formation Opérateur s&apos;ouvre dès la création du compte, et le tableau de bord
+            Opérateur une fois les frais de certification réglés. Membres de coopérative et profils
+            Haroo ont leurs propres formations dans AgriAcademy.
           </p>
         </div>
       </section>
