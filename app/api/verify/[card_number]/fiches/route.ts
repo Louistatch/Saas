@@ -1,9 +1,9 @@
-import { NextResponse, type NextRequest } from 'next/server'
 import { requirePrivateCard } from '@/lib/security/card-access'
+import { type NextRequest, NextResponse } from 'next/server'
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ card_number: string }> }
+  { params }: { params: Promise<{ card_number: string }> },
 ) {
   const { card_number } = await params
   const cardNumber = decodeURIComponent(card_number).toUpperCase().trim()
@@ -42,7 +42,9 @@ export async function GET(
 
   const { data: fiches } = await admin
     .from('fiches_techniques')
-    .select('id, title, description, culture, type_agriculture, campaign, price_non_member, is_free_for_members, download_count, files, created_at, cooperative_id, cooperatives(name)')
+    .select(
+      'id, title, description, culture, type_agriculture, campaign, price_non_member, is_free_for_members, download_count, files, created_at, cooperative_id, cooperatives(name)',
+    )
     .in('cooperative_id', coopIds)
     .eq('status', 'published')
     .order('created_at', { ascending: false })

@@ -18,12 +18,12 @@
 const CINETPAY_BASE_URL = 'https://api-checkout.cinetpay.com/v2/payment'
 
 export interface CinetPayPaymentParams {
-  transactionId: string   // must match the `reference` used elsewhere (payments.reference)
-  amount: number          // FCFA — CinetPay requires amounts to be multiples of 5
+  transactionId: string // must match the `reference` used elsewhere (payments.reference)
+  amount: number // FCFA — CinetPay requires amounts to be multiples of 5
   description: string
   customerName?: string
   customerSurname?: string
-  customerPhone?: string  // format: 9-digit local number, e.g. 90123456
+  customerPhone?: string // format: 9-digit local number, e.g. 90123456
   notifyUrl: string
   returnUrl: string
 }
@@ -87,10 +87,17 @@ export async function initiateCinetPayPayment(
     // against a live account; the presence of a usable checkout link is the
     // unambiguous signal either way.
     if (!response.ok || !data.data?.payment_url) {
-      return { success: false, error: data.description || data.message || `CinetPay error ${response.status}` }
+      return {
+        success: false,
+        error: data.description || data.message || `CinetPay error ${response.status}`,
+      }
     }
 
-    return { success: true, paymentUrl: data.data.payment_url, paymentToken: data.data.payment_token }
+    return {
+      success: true,
+      paymentUrl: data.data.payment_url,
+      paymentToken: data.data.payment_token,
+    }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     return { success: false, error: message }
@@ -126,7 +133,9 @@ interface CinetPayCheckApiResponse {
  * or before crediting a payment. Never trust a client-side redirect or
  * the notify_url body alone (CinetPay deliberately omits the status there).
  */
-export async function checkCinetPayTransaction(transactionId: string): Promise<CinetPayCheckResult> {
+export async function checkCinetPayTransaction(
+  transactionId: string,
+): Promise<CinetPayCheckResult> {
   const apiKey = process.env.CINETPAY_API_KEY
   const siteId = process.env.CINETPAY_SITE_ID
 

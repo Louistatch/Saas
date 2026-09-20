@@ -1,36 +1,36 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  BarChart3,
-  Users,
-  ShoppingCart,
-  CreditCard,
-  TrendingUp,
-  MapPin,
-  ScanLine,
-  Activity,
-  Download,
-} from 'lucide-react'
-import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts'
-import { createClient } from '@/lib/supabase/client'
 import { useCooperative } from '@/app/context/cooperative-context'
+import { ChartCard } from '@/components/shared/chart-card'
 import { LoadingBlock, Skeleton } from '@/components/shared/loading'
 import { PageHeader } from '@/components/shared/page-header'
-import { ChartCard } from '@/components/shared/chart-card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { createClient } from '@/lib/supabase/client'
+import {
+  Activity,
+  BarChart3,
+  CreditCard,
+  Download,
+  MapPin,
+  ScanLine,
+  ShoppingCart,
+  TrendingUp,
+  Users,
+} from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

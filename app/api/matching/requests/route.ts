@@ -1,9 +1,9 @@
-import { type NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { assertTenantAccess } from '@/lib/security/assert-access'
-import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { rankListings } from '@/lib/matching/engine'
 import type { ListingSummary } from '@/lib/matching/engine'
+import { assertTenantAccess } from '@/lib/security/assert-access'
+import { createClient as createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
+import { type NextRequest, NextResponse } from 'next/server'
 
 /**
  * GET /api/matching/requests
@@ -13,7 +13,10 @@ export async function GET(_request: NextRequest) {
   try {
     const supabase = await createClient()
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
     }
@@ -25,13 +28,20 @@ export async function GET(_request: NextRequest) {
       )
       .order('created_at', { ascending: false })
 
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
     if (profile?.role !== 'super_admin') {
-      const { data: ids } = profile?.role === 'cooperative_admin'
-        ? await supabase.rpc('get_accessible_cooperative_ids') : { data: [] }
-      query = Array.isArray(ids) && ids.length
-        ? query.or(`created_by.eq.${user.id},cooperative_id.in.(${ids.join(',')})`)
-        : query.eq('created_by', user.id)
+      const { data: ids } =
+        profile?.role === 'cooperative_admin'
+          ? await supabase.rpc('get_accessible_cooperative_ids')
+          : { data: [] }
+      query =
+        Array.isArray(ids) && ids.length
+          ? query.or(`created_by.eq.${user.id},cooperative_id.in.(${ids.join(',')})`)
+          : query.eq('created_by', user.id)
     }
 
     const { data, error } = await query
@@ -60,7 +70,10 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
     }
@@ -92,7 +105,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (cooperative_id) {
-      if (typeof cooperative_id !== 'string') return NextResponse.json({ error: 'Organisation invalide' }, { status: 400 })
+      if (typeof cooperative_id !== 'string')
+        return NextResponse.json({ error: 'Organisation invalide' }, { status: 400 })
       const access = await assertTenantAccess(cooperative_id)
       if (!access.ok) return access.response
     }
@@ -121,13 +135,18 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (insertError || !newRequest) {
-      return NextResponse.json({ error: insertError?.message ?? 'Erreur création' }, { status: 400 })
+      return NextResponse.json(
+        { error: insertError?.message ?? 'Erreur création' },
+        { status: 400 },
+      )
     }
 
     // Auto-run matching: fetch active listings for same culture
     const { data: listings } = await supabase
       .from('market_listings')
-      .select('id, culture, quantity_kg, price_per_kg_fcfa, quality_grade, location_prefecture, cooperative_id, cooperatives(name)')
+      .select(
+        'id, culture, quantity_kg, price_per_kg_fcfa, quality_grade, location_prefecture, cooperative_id, cooperatives(name)',
+      )
       .eq('culture', String(culture))
       .eq('status', 'active')
 
@@ -171,13 +190,24 @@ export async function POST(request: NextRequest) {
 
       if (matchingError) {
         console.error('[matching] Match persistence failed')
-        return NextResponse.json({ request: newRequest, matches_found: 0, warning: 'Demande enregistrée, rapprochement à réessayer' }, { status: 201 })
+        return NextResponse.json(
+          {
+            request: newRequest,
+            matches_found: 0,
+            warning: 'Demande enregistrée, rapprochement à réessayer',
+          },
+          { status: 201 },
+        )
       }
 
       // Notify the seller cooperatives behind each matched listing
       // (in-app bell notification — fire-and-forget, never blocks the response)
       const matchedCooperativeIds = [
-        ...new Set(top5.map((m) => listingCooperativeIds.get(m.listing_id)).filter((id): id is string => !!id)),
+        ...new Set(
+          top5
+            .map((m) => listingCooperativeIds.get(m.listing_id))
+            .filter((id): id is string => !!id),
+        ),
       ]
       const inAppRows = matchedCooperativeIds.map((coopId) => ({
         cooperative_id: coopId,
@@ -192,10 +222,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(
-      { request: newRequest, matches_found: top5.length },
-      { status: 201 },
-    )
+    return NextResponse.json({ request: newRequest, matches_found: top5.length }, { status: 201 })
   } catch {
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }

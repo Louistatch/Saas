@@ -1,6 +1,6 @@
-import { type NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { assertTenantAccess } from '@/lib/security/assert-access'
+import { createClient } from '@/lib/supabase/server'
+import { type NextRequest, NextResponse } from 'next/server'
 
 const VALID_STATUSES = ['accepted', 'rejected', 'completed'] as const
 type MatchStatus = (typeof VALID_STATUSES)[number]
@@ -9,15 +9,15 @@ type MatchStatus = (typeof VALID_STATUSES)[number]
  * PATCH /api/matching/matches/[id]
  * Update match status. Auth required + ownership verified via buyer_request.
  */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const supabase = await createClient()
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
     }
@@ -57,7 +57,10 @@ export async function PATCH(
       return NextResponse.json({ error: 'Match introuvable' }, { status: 404 })
     }
 
-    const owner = match.buyer_requests as unknown as { cooperative_id: string | null; created_by: string | null } | null
+    const owner = match.buyer_requests as unknown as {
+      cooperative_id: string | null
+      created_by: string | null
+    } | null
     if (owner?.created_by !== user.id) {
       const access = owner?.cooperative_id ? await assertTenantAccess(owner.cooperative_id) : null
       if (profile.role !== 'super_admin' && !access?.ok) {

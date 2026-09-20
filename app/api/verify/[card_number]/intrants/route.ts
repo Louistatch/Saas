@@ -1,11 +1,11 @@
-import { NextResponse, type NextRequest } from 'next/server'
 import { requirePrivateCard } from '@/lib/security/card-access'
-import { rateLimit, clientKeyFromHeaders } from '@/lib/utils/rate-limit'
+import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
+import { type NextRequest, NextResponse } from 'next/server'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ card_number: string }> }
+  { params }: { params: Promise<{ card_number: string }> },
 ) {
   const blocked = await applyRateLimit(request, 'verify')
   if (blocked) return blocked
@@ -15,7 +15,7 @@ export async function GET(
   if (!limit.ok) {
     return NextResponse.json(
       { error: 'Trop de requêtes. Réessayez dans quelques instants.' },
-      { status: 429 }
+      { status: 429 },
     )
   }
 

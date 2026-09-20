@@ -1,11 +1,11 @@
-import { NextResponse, type NextRequest } from 'next/server'
 import { requirePrivateCard } from '@/lib/security/card-access'
-import { rateLimit, clientKeyFromHeaders } from '@/lib/utils/rate-limit'
+import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
+import { type NextRequest, NextResponse } from 'next/server'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ card_number: string }> }
+  { params }: { params: Promise<{ card_number: string }> },
 ) {
   const blocked = await applyRateLimit(request, 'verify')
   if (blocked) return blocked
@@ -15,7 +15,7 @@ export async function GET(
   if (!limit.ok) {
     return NextResponse.json(
       { error: 'Trop de requêtes. Réessayez dans quelques instants.' },
-      { status: 429 }
+      { status: 429 },
     )
   }
 
@@ -34,13 +34,17 @@ export async function GET(
   const supabaseAdmin = supabase
   const { data: parcelles } = await supabaseAdmin
     .from('parcelles')
-    .select('name, culture_principale, culture_name, superficie_ha, surface_ha, soil_type, irrigation_type, gps_coordinates, campaign_year, source, created_at')
+    .select(
+      'name, culture_principale, culture_name, superficie_ha, surface_ha, soil_type, irrigation_type, gps_coordinates, campaign_year, source, created_at',
+    )
     .eq('member_id', card.member_id)
     .order('created_at', { ascending: false })
 
   const list = parcelles ?? []
   const total_ha = list.reduce((s, p) => s + (p.superficie_ha ?? p.surface_ha ?? 0), 0)
-  const cultures = [...new Set(list.map((p) => p.culture_principale ?? p.culture_name).filter(Boolean))]
+  const cultures = [
+    ...new Set(list.map((p) => p.culture_principale ?? p.culture_name).filter(Boolean)),
+  ]
 
   return NextResponse.json({ parcelles: list, total_ha, cultures })
 }

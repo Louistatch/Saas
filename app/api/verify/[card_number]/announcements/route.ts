@@ -6,17 +6,17 @@
  * POST /api/verify/[card_number]/announcements — create a new announcement
  */
 
-import { NextResponse, type NextRequest } from 'next/server'
+import { ANNOUNCEMENT_TYPES, type AnnouncementType } from '@/lib/announcements/models'
 import { requirePrivateCard } from '@/lib/security/card-access'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
-import { ANNOUNCEMENT_TYPES, type AnnouncementType } from '@/lib/announcements/models'
+import { type NextRequest, NextResponse } from 'next/server'
 
 const ANNOUNCEMENT_COLUMNS =
   'id, type, title, description, culture, quantity_kg, price_per_kg_fcfa, location_canton, contact_phone, status, created_at'
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ card_number: string }> }
+  { params }: { params: Promise<{ card_number: string }> },
 ) {
   const { card_number } = await params
   const access = await requirePrivateCard(decodeURIComponent(card_number))
@@ -36,13 +36,13 @@ export async function GET(
 
   return NextResponse.json(
     { announcements: announcements ?? [] },
-    { headers: { 'Cache-Control': 'private, no-store' } }
+    { headers: { 'Cache-Control': 'private, no-store' } },
   )
 }
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ card_number: string }> }
+  { params }: { params: Promise<{ card_number: string }> },
 ) {
   const rateLimited = await applyRateLimit(request, 'verify')
   if (rateLimited) return rateLimited
@@ -71,7 +71,7 @@ export async function POST(
 
     const validTypes = ANNOUNCEMENT_TYPES.map((t) => t.id) as AnnouncementType[]
     if (!validTypes.includes(type)) {
-      return NextResponse.json({ error: 'Type d\'annonce invalide' }, { status: 400 })
+      return NextResponse.json({ error: "Type d'annonce invalide" }, { status: 400 })
     }
 
     const trimmedTitle = typeof title === 'string' ? title.trim() : ''
@@ -97,19 +97,22 @@ export async function POST(
         cooperative_id: card.cooperative_id,
         type,
         title: trimmedTitle,
-        description: typeof description === 'string' ? description.trim().slice(0, 1000) || null : null,
+        description:
+          typeof description === 'string' ? description.trim().slice(0, 1000) || null : null,
         culture: typeof culture === 'string' ? culture.trim().slice(0, 80) || null : null,
         quantity_kg: quantity,
         price_per_kg_fcfa: price,
-        location_canton: typeof location_canton === 'string' ? location_canton.trim().slice(0, 80) || null : null,
-        contact_phone: typeof contact_phone === 'string' ? contact_phone.trim().slice(0, 30) || null : null,
+        location_canton:
+          typeof location_canton === 'string' ? location_canton.trim().slice(0, 80) || null : null,
+        contact_phone:
+          typeof contact_phone === 'string' ? contact_phone.trim().slice(0, 30) || null : null,
         status: 'active',
       })
       .select(ANNOUNCEMENT_COLUMNS)
       .single()
 
     if (error) {
-      return NextResponse.json({ error: 'Erreur lors de l\'enregistrement' }, { status: 500 })
+      return NextResponse.json({ error: "Erreur lors de l'enregistrement" }, { status: 500 })
     }
 
     return NextResponse.json({ announcement: data, message: 'Annonce publiée !' }, { status: 201 })

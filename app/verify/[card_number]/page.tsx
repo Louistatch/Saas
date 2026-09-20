@@ -1,47 +1,47 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { useParams } from 'next/navigation'
-import Link from 'next/link'
-import {
-  CheckCircle,
-  XCircle,
-  Shield,
-  MapPin,
-  Building2,
-  FileText,
-  TrendingUp,
-  PhoneCall,
-  Map as MapIcon,
-  CloudRain,
-  ShoppingCart,
-  Coins,
-  Timer,
-  User,
-  ArrowLeft,
-  Bot,
-  Bell,
-  Droplets,
-  Share2,
-  ChevronRight,
-  ScanLine,
-} from 'lucide-react'
+import { AtsBadge, type AtsBreakdown } from '@/components/shared/ats-badge'
 import { Logo } from '@/components/shared/logo'
-import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboard'
-import { Card3D } from '@/components/verify/card-3d'
-import { AiChat } from '@/components/verify/ai-chat'
+import { AcheteurView } from '@/components/verify/acheteur-view'
 import { AgriSmartWater } from '@/components/verify/agrismart-water'
-import { ParcellesInlineView } from '@/components/verify/parcelles-inline-view'
-import { IntrantsInlineView } from '@/components/verify/intrants-inline-view'
-import { PrivateCardSection } from '@/components/verify/private-card-section'
+import { AgronomeView } from '@/components/verify/agronome-view'
+import { AiChat } from '@/components/verify/ai-chat'
+import { Card3D } from '@/components/verify/card-3d'
 import { CotisationView } from '@/components/verify/cotisation-view'
 import { ExploitationInlineView } from '@/components/verify/exploitation-inline-view'
+import { IntrantsInlineView } from '@/components/verify/intrants-inline-view'
+import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboard'
 import { MeteoInlineView } from '@/components/verify/meteo-inline-view'
 import { OuvrierView } from '@/components/verify/ouvrier-view'
-import { AcheteurView } from '@/components/verify/acheteur-view'
-import { AgronomeView } from '@/components/verify/agronome-view'
+import { ParcellesInlineView } from '@/components/verify/parcelles-inline-view'
+import { PrivateCardSection } from '@/components/verify/private-card-section'
 import { memberFullName, waNumber } from '@/components/verify/types'
-import { AtsBadge, type AtsBreakdown } from '@/components/shared/ats-badge'
+import {
+  ArrowLeft,
+  Bell,
+  Bot,
+  Building2,
+  CheckCircle,
+  ChevronRight,
+  CloudRain,
+  Coins,
+  Droplets,
+  FileText,
+  Map as MapIcon,
+  MapPin,
+  PhoneCall,
+  ScanLine,
+  Share2,
+  Shield,
+  ShoppingCart,
+  Timer,
+  TrendingUp,
+  User,
+  XCircle,
+} from 'lucide-react'
+import Link from 'next/link'
+import { useParams } from 'next/navigation'
+import { useCallback, useEffect, useState } from 'react'
 
 interface VerifyResult {
   valid: boolean
@@ -1653,43 +1653,43 @@ export default function VerifyCardPage() {
         {/* ─── Parcelles View ─── */}
         {isValid && activeView === 'parcelles' && (
           <PrivateCardSection cardNumber={cardNumber}>
-          <ParcellesInlineView
-            cardNumber={cardNumber}
-            onBack={() => setActiveView('menu')}
-            onOpenAgriSmart={() => setActiveView('agrismart')}
-          />
+            <ParcellesInlineView
+              cardNumber={cardNumber}
+              onBack={() => setActiveView('menu')}
+              onOpenAgriSmart={() => setActiveView('agrismart')}
+            />
           </PrivateCardSection>
         )}
 
         {/* ─── Intrants View ─── */}
         {isValid && activeView === 'intrants' && (
           <PrivateCardSection cardNumber={cardNumber}>
-          <IntrantsInlineView cardNumber={cardNumber} onBack={() => setActiveView('menu')} />
+            <IntrantsInlineView cardNumber={cardNumber} onBack={() => setActiveView('menu')} />
           </PrivateCardSection>
         )}
 
         {/* ─── Cotisation View ─── */}
         {isValid && activeView === 'cotisation' && (
           <PrivateCardSection cardNumber={cardNumber}>
-          <CotisationView
-            cardNumber={cardNumber}
-            onBack={() => setActiveView('menu')}
-            coordoPhone={coordo?.phone ?? null}
-            coordoName={coordo?.name ?? null}
-            memberName={firstName}
-            memberCanton={result.member?.canton ?? null}
-          />
+            <CotisationView
+              cardNumber={cardNumber}
+              onBack={() => setActiveView('menu')}
+              coordoPhone={coordo?.phone ?? null}
+              coordoName={coordo?.name ?? null}
+              memberName={firstName}
+              memberCanton={result.member?.canton ?? null}
+            />
           </PrivateCardSection>
         )}
 
         {/* ─── Exploitation View ─── */}
         {isValid && activeView === 'exploitation' && (
           <PrivateCardSection cardNumber={cardNumber}>
-          <ExploitationInlineView
-            cardNumber={cardNumber}
-            memberId={result.member_id ?? null}
-            onBack={() => setActiveView('menu')}
-          />
+            <ExploitationInlineView
+              cardNumber={cardNumber}
+              memberId={result.member_id ?? null}
+              onBack={() => setActiveView('menu')}
+            />
           </PrivateCardSection>
         )}
 

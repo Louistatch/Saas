@@ -51,28 +51,28 @@ check(
   'Garde serveur des routes présent (middleware.ts ou proxy.ts)',
   fs.existsSync(path.join(rootDir, 'proxy.ts')) ||
     fs.existsSync(path.join(rootDir, 'middleware.ts')),
-  'Aucun garde serveur : middleware.ts ou proxy.ts est requis (FIX ALPHA-1)'
+  'Aucun garde serveur : middleware.ts ou proxy.ts est requis (FIX ALPHA-1)',
 )
 
 // 2. security.txt existe
 check(
   'security.txt route présente',
   fs.existsSync(path.join(rootDir, 'app', '.well-known', 'security.txt', 'route.ts')),
-  'Créer app/.well-known/security.txt/route.ts (FIX GAMMA-6)'
+  'Créer app/.well-known/security.txt/route.ts (FIX GAMMA-6)',
 )
 
 // 3. Rate limit persistent module existe
 check(
   'Module rate-limit-persistent présent',
   fs.existsSync(path.join(rootDir, 'lib', 'utils', 'rate-limit-persistent.ts')),
-  'Créer lib/utils/rate-limit-persistent.ts (FIX BETA-1)'
+  'Créer lib/utils/rate-limit-persistent.ts (FIX BETA-1)',
 )
 
 // 4. API verify route existe
 check(
   'Route API /api/verify/[card_number] présente',
   fs.existsSync(path.join(rootDir, 'app', 'api', 'verify', '[card_number]', 'route.ts')),
-  'Créer app/api/verify/[card_number]/route.ts (FIX ALPHA-3)'
+  'Créer app/api/verify/[card_number]/route.ts (FIX ALPHA-3)',
 )
 
 // 5. Pas de createBrowserClient dans la page verify (données sensibles)
@@ -81,8 +81,8 @@ if (fs.existsSync(verifyPagePath)) {
   const verifyContent = fs.readFileSync(verifyPagePath, 'utf-8')
   check(
     '/verify ne fait plus de requêtes Supabase directes',
-    !verifyContent.includes('createBrowserClient') && !verifyContent.includes('.from(\'members\')'),
-    'La page /verify doit utiliser /api/verify au lieu de Supabase direct (FIX ALPHA-3)'
+    !verifyContent.includes('createBrowserClient') && !verifyContent.includes(".from('members')"),
+    'La page /verify doit utiliser /api/verify au lieu de Supabase direct (FIX ALPHA-3)',
   )
 } else {
   check('/verify page existe', false, 'Fichier manquant: app/verify/[card_number]/page.tsx')
@@ -94,8 +94,9 @@ if (fs.existsSync(marketplacePath)) {
   const marketplaceContent = fs.readFileSync(marketplacePath, 'utf-8')
   check(
     'Marketplace: injection SQL corrigée (Zod + échappement)',
-    marketplaceContent.includes('SECURITY FIX - GHOST-002') && marketplaceContent.includes('safeParse'),
-    'Le paramètre q doit être validé avec Zod (FIX ALPHA-2)'
+    marketplaceContent.includes('SECURITY FIX - GHOST-002') &&
+      marketplaceContent.includes('safeParse'),
+    'Le paramètre q doit être validé avec Zod (FIX ALPHA-2)',
   )
 } else {
   check('Marketplace route existe', false, 'Fichier manquant')
@@ -113,12 +114,12 @@ if (fs.existsSync(webhookPath)) {
   check(
     'Webhook Kobo: validation taille payload',
     webhookContent.includes('content-length'),
-    'Ajouter la vérification content-length (FIX BETA-2)'
+    'Ajouter la vérification content-length (FIX BETA-2)',
   )
   check(
     'Webhook Kobo: validation Zod payload',
     webhookContent.includes('safeParse'),
-    'Ajouter le schéma Zod (FIX BETA-5)'
+    'Ajouter le schéma Zod (FIX BETA-5)',
   )
 } else {
   check('Webhook Kobo route existe', false, 'Fichier manquant')
@@ -130,8 +131,9 @@ if (fs.existsSync(embedPath)) {
   const embedContent = fs.readFileSync(embedPath, 'utf-8')
   check(
     'Embed: validation origine sécurisée (pas .includes())',
-    embedContent.includes('SECURITY FIX - PHANTOM-003') && !embedContent.includes('origin.includes(o)'),
-    'Remplacer .includes() par comparaison exacte (FIX GAMMA-2)'
+    embedContent.includes('SECURITY FIX - PHANTOM-003') &&
+      !embedContent.includes('origin.includes(o)'),
+    'Remplacer .includes() par comparaison exacte (FIX GAMMA-2)',
   )
 } else {
   check('Embed route existe', false, 'Fichier manquant')
@@ -142,9 +144,9 @@ const forgotPath = path.join(rootDir, 'app', 'auth', 'forgot-password', 'page.ts
 if (fs.existsSync(forgotPath)) {
   const forgotContent = fs.readFileSync(forgotPath, 'utf-8')
   check(
-    'Forgot-password: pas d\'énumération email',
+    "Forgot-password: pas d'énumération email",
     forgotContent.includes('SECURITY FIX - PHANTOM-002'),
-    'Le message doit être identique que l\'email existe ou non (FIX GAMMA-1)'
+    "Le message doit être identique que l'email existe ou non (FIX GAMMA-1)",
   )
 } else {
   check('Forgot-password page existe', false, 'Fichier manquant')
@@ -165,15 +167,14 @@ try {
 // CHECK 12: KOBO_WEBHOOK_SECRET présent ET longueur >= 32 chars
 const koboSecret = process.env.KOBO_WEBHOOK_SECRET ?? ''
 if (!process.argv.includes('--static')) {
-check(
-  '[KOBO-12] KOBO_WEBHOOK_SECRET configuré (≥32 chars)',
-  koboSecret.length >= 32,
-  'Ajouter KOBO_WEBHOOK_SECRET (≥32 chars) dans .env.local et Vercel Dashboard'
-)
+  check(
+    '[KOBO-12] KOBO_WEBHOOK_SECRET configuré (≥32 chars)',
+    koboSecret.length >= 32,
+    'Ajouter KOBO_WEBHOOK_SECRET (≥32 chars) dans .env.local et Vercel Dashboard',
+  )
 } else {
   console.log('Configuration des secrets : contrôle réservé à l’environnement de déploiement.')
 }
-
 
 // CHECK 13: Webhook handler contient 'timingSafeEqual'
 if (fs.existsSync(webhookPath)) {
@@ -181,7 +182,7 @@ if (fs.existsSync(webhookPath)) {
   check(
     '[KOBO-13] Webhook utilise timingSafeEqual',
     webhookContent.includes('timingSafeEqual'),
-    'Le webhook doit utiliser crypto.timingSafeEqual pour la vérification du secret'
+    'Le webhook doit utiliser crypto.timingSafeEqual pour la vérification du secret',
   )
 } else {
   check('[KOBO-13] Webhook route existe', false, 'Fichier manquant: app/api/webhooks/kobo/route.ts')
@@ -193,7 +194,7 @@ if (fs.existsSync(webhookPath)) {
   check(
     '[KOBO-14] Webhook a un schéma Zod de validation',
     webhookContent.includes('safeParse') || webhookContent.includes('koboWebhookPayloadSchema'),
-    'Le webhook doit valider le payload avec un schéma Zod'
+    'Le webhook doit valider le payload avec un schéma Zod',
   )
 } else {
   check('[KOBO-14] Webhook route existe', false, 'Fichier manquant')
@@ -220,7 +221,7 @@ check(
   hardcodedTokenFiles.length === 0,
   hardcodedTokenFiles.length > 0
     ? `Clés trouvées dans: ${hardcodedTokenFiles.join(', ')}`
-    : undefined
+    : undefined,
 )
 
 // CHECK 16: kobo_submissions migration a RLS activé
@@ -228,16 +229,25 @@ check(
 // supabase_migrations/, dossier inexistant : les contrôles 16 et 17 échouaient
 // donc systématiquement sur un fichier manquant, sans jamais vérifier le RLS
 // qu'ils sont censés garantir.
-const migrationPath = path.join(rootDir, 'supabase', 'migrations', '20260524_kobo_integration_v2.sql')
+const migrationPath = path.join(
+  rootDir,
+  'supabase',
+  'migrations',
+  '20260524_kobo_integration_v2.sql',
+)
 if (fs.existsSync(migrationPath)) {
   const migrationContent = fs.readFileSync(migrationPath, 'utf-8')
   check(
     '[KOBO-16] kobo_submissions a RLS activé',
     migrationContent.includes('ALTER TABLE kobo_submissions ENABLE ROW LEVEL SECURITY'),
-    'La table kobo_submissions doit avoir RLS activé dans la migration'
+    'La table kobo_submissions doit avoir RLS activé dans la migration',
   )
 } else {
-  check('[KOBO-16] Migration Kobo v2 existe', false, 'Fichier manquant: supabase_migrations/20260524_kobo_integration_v2.sql')
+  check(
+    '[KOBO-16] Migration Kobo v2 existe',
+    false,
+    'Fichier manquant: supabase_migrations/20260524_kobo_integration_v2.sql',
+  )
 }
 
 // CHECK 17: kobo_field_mappings a RLS activé
@@ -246,7 +256,7 @@ if (fs.existsSync(migrationPath)) {
   check(
     '[KOBO-17] kobo_field_mappings a RLS activé',
     migrationContent.includes('ALTER TABLE kobo_field_mappings ENABLE ROW LEVEL SECURITY'),
-    'La table kobo_field_mappings doit avoir RLS activé dans la migration'
+    'La table kobo_field_mappings doit avoir RLS activé dans la migration',
   )
 } else {
   check('[KOBO-17] Migration Kobo v2 existe', false, 'Fichier manquant')
@@ -259,16 +269,20 @@ if (fs.existsSync(syncRoutePath)) {
   check(
     '[KOBO-18] Sync route a maxDuration exporté',
     syncContent.includes('export const maxDuration'),
-    'La route sync doit exporter maxDuration pour le timeout Vercel'
+    'La route sync doit exporter maxDuration pour le timeout Vercel',
   )
 } else {
-  check('[KOBO-18] Sync route existe', false, 'Fichier manquant: app/api/integrations/kobo/sync/route.ts')
+  check(
+    '[KOBO-18] Sync route existe',
+    false,
+    'Fichier manquant: app/api/integrations/kobo/sync/route.ts',
+  )
 }
 
 // --- Rapport ---
 console.log('\n🔐 FaîtiereHub — Security Pre-Deploy Check\n')
-const failed = checks.filter(c => !c.pass)
-checks.forEach(c => {
+const failed = checks.filter((c) => !c.pass)
+checks.forEach((c) => {
   console.log(`${c.pass ? '✅' : '❌'} ${c.name}${c.detail && !c.pass ? ` — ${c.detail}` : ''}`)
 })
 

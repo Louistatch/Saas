@@ -7,12 +7,12 @@
 //   2. If not found → proxy to AgriTogo API (OUVRIER / ACHETEUR / AGRONOME)
 //   3. If AgriTogo also returns nothing → 404
 
-import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/admin'
-import { z } from 'zod'
-import { rateLimit, clientKeyFromHeaders } from '@/lib/utils/rate-limit'
-import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 import { queueInAppNotification } from '@/lib/notifications/queue'
+import { createClient } from '@/lib/supabase/admin'
+import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
+import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
+import { type NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 
 /**
  * Génère toutes les variantes O↔0 et I↔1 du préfixe.
@@ -42,7 +42,7 @@ function expandAmbiguousVariants(prefix: string): string[] {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ card_number: string }> }
+  { params }: { params: Promise<{ card_number: string }> },
 ) {
   const { card_number } = await params
 
@@ -56,18 +56,24 @@ export async function GET(
   if (!limit.ok) {
     return NextResponse.json(
       { error: 'Trop de requêtes. Réessayez dans quelques instants.' },
-      { status: 429 }
+      { status: 429 },
     )
   }
 
   // Décoder le numéro de carte (support legacy QR format)
   let decodedCardNumber: string
-  try { decodedCardNumber = decodeURIComponent(card_number) } catch {
+  try {
+    decodedCardNumber = decodeURIComponent(card_number)
+  } catch {
     return NextResponse.json({ valid: false, error: 'Carte non trouvée' }, { status: 404 })
   }
 
   // Legacy QR format: extraire le numéro de carte si format JSON fragmenté
-  if (decodedCardNumber.includes('"') || decodedCardNumber.includes('{') || decodedCardNumber.includes(',')) {
+  if (
+    decodedCardNumber.includes('"') ||
+    decodedCardNumber.includes('{') ||
+    decodedCardNumber.includes(',')
+  ) {
     const cardMatch = decodedCardNumber.match(/^([A-Z]{2,5}-\d{4,6})/)
     if (cardMatch) {
       decodedCardNumber = cardMatch[1]
@@ -85,7 +91,7 @@ export async function GET(
   const parsed = lenientSchema.safeParse(decodedCardNumber)
   if (!parsed.success) {
     // Même délai que la réponse normale pour éviter le timing attack
-    await new Promise(r => setTimeout(r, 100))
+    await new Promise((r) => setTimeout(r, 100))
     return NextResponse.json({ valid: false, error: 'Carte non trouvée' }, { status: 404 })
   }
 
@@ -101,7 +107,9 @@ export async function GET(
   // ── Step 1: Check Supabase (FAITIERE cards) ────────────────────────────────
   const { data: card, error: cardError } = await supabase
     .from('member_cards')
-    .select('id, card_number, status, expiry_date, created_at, member_id, cooperative_id, card_type')
+    .select(
+      'id, card_number, status, expiry_date, created_at, member_id, cooperative_id, card_type',
+    )
     .in('card_number', variants)
     .in('status', ['active', 'expired'])
     .is('deleted_at', null)
@@ -113,14 +121,17 @@ export async function GET(
   // silently swallowed and treated as "card not found", proxying to AgriTogo instead
   // of surfacing the real infrastructure error.
   if (cardError) {
-    return NextResponse.json({ valid: false, error: 'Service temporairement indisponible' }, { status: 503 })
+    return NextResponse.json(
+      { valid: false, error: 'Service temporairement indisponible' },
+      { status: 503 },
+    )
   }
 
   if (!card) {
     // ── Step 2: Not in Supabase → proxy to AgriTogo ─────────────────────────
     const agritogoUrl = process.env.AGRITOGO_API_URL
     if (!agritogoUrl) {
-      await new Promise(r => setTimeout(r, 100))
+      await new Promise((r) => setTimeout(r, 100))
       return NextResponse.json({ valid: false, error: 'Carte non trouvée' }, { status: 404 })
     }
 
@@ -129,18 +140,18 @@ export async function GET(
     try {
       const agriRes = await fetch(
         `${agritogoUrl}/api/v1/haroo/verify/${encodeURIComponent(normalizedCardNumber)}`,
-        { signal: controller.signal, headers: { 'Accept': 'application/json' } }
+        { signal: controller.signal, headers: { Accept: 'application/json' } },
       )
       clearTimeout(timeoutId)
       if (agriRes.ok) {
         const data: unknown = await agriRes.json()
         return NextResponse.json(data)
       }
-      await new Promise(r => setTimeout(r, 100))
+      await new Promise((r) => setTimeout(r, 100))
       return NextResponse.json({ valid: false, error: 'Carte non trouvée' }, { status: 404 })
     } catch {
       clearTimeout(timeoutId)
-      await new Promise(r => setTimeout(r, 100))
+      await new Promise((r) => setTimeout(r, 100))
       return NextResponse.json({ valid: false, error: 'Carte non trouvée' }, { status: 404 })
     }
   }
@@ -156,7 +167,7 @@ export async function GET(
       try {
         const agriRes = await fetch(
           `${agritogoUrl}/api/v1/haroo/verify/${encodeURIComponent(card.card_number)}`,
-          { signal: controller.signal, headers: { 'Accept': 'application/json' } }
+          { signal: controller.signal, headers: { Accept: 'application/json' } },
         )
         clearTimeout(timeoutId)
         if (agriRes.ok) {
@@ -189,7 +200,7 @@ export async function GET(
 
   const cardOut = {
     card_number: card.card_number,
-    status: isActive ? 'active' : (isExpired ? 'expired' : card.status),
+    status: isActive ? 'active' : isExpired ? 'expired' : card.status,
     expiry_date: card.expiry_date,
     created_at: card.created_at,
   }
@@ -216,7 +227,9 @@ export async function GET(
   if (card.member_id) {
     const { data: memberData } = await supabase
       .from('members')
-      .select('first_name, last_name, photo_url, village, canton, prefecture, region, status, created_at')
+      .select(
+        'first_name, last_name, photo_url, village, canton, prefecture, region, status, created_at',
+      )
       .eq('id', card.member_id)
       .is('deleted_at', null)
       .maybeSingle<MemberRow>()
@@ -233,12 +246,14 @@ export async function GET(
   }
 
   // Log the scan (fire-and-forget — never block the response)
-  await Promise.resolve(supabase.from('member_access_logs').insert({
-    card_number: card.card_number,
-    member_id: card.member_id ?? null,
-    cooperative_id: card.cooperative_id ?? null,
-    action: 'scan',
-  }))
+  await Promise.resolve(
+    supabase.from('member_access_logs').insert({
+      card_number: card.card_number,
+      member_id: card.member_id ?? null,
+      cooperative_id: card.cooperative_id ?? null,
+      action: 'scan',
+    }),
+  )
 
   // In-app notification for cooperative admin (fire-and-forget)
   if (card.cooperative_id) {

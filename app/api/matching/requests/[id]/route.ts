@@ -1,21 +1,21 @@
-import { type NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { assertTenantAccess } from '@/lib/security/assert-access'
+import { createClient } from '@/lib/supabase/server'
+import { type NextRequest, NextResponse } from 'next/server'
 
 /**
  * GET /api/matching/requests/[id]
  * Fetch a buyer request and all its matches with listing details.
  * Auth required — only the owning cooperative or super_admin can view.
  */
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const supabase = await createClient()
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
     }
@@ -41,7 +41,9 @@ export async function GET(
     }
 
     if (buyerRequest.created_by !== user.id) {
-      const access = buyerRequest.cooperative_id ? await assertTenantAccess(buyerRequest.cooperative_id) : null
+      const access = buyerRequest.cooperative_id
+        ? await assertTenantAccess(buyerRequest.cooperative_id)
+        : null
       if (profile.role !== 'super_admin' && !access?.ok) {
         return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
       }

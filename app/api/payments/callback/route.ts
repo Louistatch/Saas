@@ -1,7 +1,7 @@
-import { type NextRequest, NextResponse } from 'next/server'
 import { createHmac, timingSafeEqual } from 'node:crypto'
-import { createClient } from '@/lib/supabase/admin'
 import { claimPaymentForSettlement } from '@/lib/payments/settle'
+import { createClient } from '@/lib/supabase/admin'
+import { type NextRequest, NextResponse } from 'next/server'
 
 interface OrangeCallbackBody {
   reference: string
@@ -35,7 +35,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const { reference, tx_id, status, failure_reason } = body
-  if (typeof reference !== 'string' || !reference || typeof tx_id !== 'string' || !tx_id || !['SUCCESS', 'FAILED'].includes(status)) {
+  if (
+    typeof reference !== 'string' ||
+    !reference ||
+    typeof tx_id !== 'string' ||
+    !tx_id ||
+    !['SUCCESS', 'FAILED'].includes(status)
+  ) {
     return NextResponse.json({ error: 'Missing reference or status' }, { status: 400 })
   }
 

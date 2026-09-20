@@ -1,7 +1,7 @@
-import { type NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/admin'
 import { createLogger } from '@/lib/utils/logger'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
+import { type NextRequest, NextResponse } from 'next/server'
 
 const log = createLogger('api:member-access')
 
@@ -22,9 +22,7 @@ interface MemberRelation {
  * depending on the inferred cardinality, as a single-element array. Normalize
  * both into a single MemberRelation | null — without resorting to `as any`.
  */
-function normalizeMember(
-  member: MemberRelation | MemberRelation[] | null,
-): MemberRelation | null {
+function normalizeMember(member: MemberRelation | MemberRelation[] | null): MemberRelation | null {
   if (!member) return null
   return Array.isArray(member) ? (member[0] ?? null) : member
 }
@@ -50,7 +48,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
 
-  const cardNumber = typeof body.card_number === 'string' ? body.card_number.trim().toUpperCase() : ''
+  const cardNumber =
+    typeof body.card_number === 'string' ? body.card_number.trim().toUpperCase() : ''
   if (!/^[A-Z0-9]{2,5}-\d{4,6}$/.test(cardNumber)) {
     return NextResponse.json({ error: 'Numéro de carte invalide' }, { status: 400 })
   }
@@ -93,9 +92,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     // Normalize the embedded relation (object | single-element array) safely.
-    const member = normalizeMember(
-      card.member as MemberRelation | MemberRelation[] | null,
-    )
+    const member = normalizeMember(card.member as MemberRelation | MemberRelation[] | null)
 
     // Log access
     await supabase.from('member_access_logs').insert({

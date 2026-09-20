@@ -1,7 +1,7 @@
-import { type NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/admin'
 import { checkCinetPayTransaction } from '@/lib/payments/cinetpay'
 import { claimPaymentForSettlement } from '@/lib/payments/settle'
+import { createClient } from '@/lib/supabase/admin'
+import { type NextRequest, NextResponse } from 'next/server'
 
 /**
  * CinetPay notify_url — called after every transaction status change.
@@ -52,13 +52,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!['moov', 'tmoney'].includes(payment.provider)) {
     return NextResponse.json({ error: 'Provider mismatch' }, { status: 409 })
   }
-  if (check.status === 'ACCEPTED' && (check.amount !== Number(payment.amount_fcfa) || check.currency !== payment.currency)) {
+  if (
+    check.status === 'ACCEPTED' &&
+    (check.amount !== Number(payment.amount_fcfa) || check.currency !== payment.currency)
+  ) {
     return NextResponse.json({ error: 'Amount or currency mismatch' }, { status: 409 })
   }
 
   const now = new Date().toISOString()
   const isSuccess = check.status === 'ACCEPTED'
-  const isTerminal = check.status === 'ACCEPTED' || check.status === 'REFUSED' || check.status === 'CANCELLED'
+  const isTerminal =
+    check.status === 'ACCEPTED' || check.status === 'REFUSED' || check.status === 'CANCELLED'
 
   if (!isTerminal) {
     // Still PENDING — nothing to settle yet, CinetPay will notify again.

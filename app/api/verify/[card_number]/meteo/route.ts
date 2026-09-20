@@ -1,24 +1,24 @@
-import { NextResponse, type NextRequest } from 'next/server'
-import { resolvePublicCard, cardRateLimit } from '@/lib/security/card-access'
+import { cardRateLimit, resolvePublicCard } from '@/lib/security/card-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 import {
-  fetchOpenMeteoForRegion,
   fetchGFSForRegion,
-  fetchICONForRegion,
   fetchHourlyForRegion,
   fetchHourlyGFSForRegion,
   fetchHourlyICONForRegion,
+  fetchICONForRegion,
   fetchMinutely15ForRegion,
+  fetchOpenMeteoForRegion,
   fetchSeasonalForRegion,
-  mergeWeatherModels,
-  mergeHourlyModels,
   getRegionCoords,
+  mergeHourlyModels,
+  mergeWeatherModels,
 } from '@/lib/weather/open-meteo'
+import { type NextRequest, NextResponse } from 'next/server'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ card_number: string }> }
+  { params }: { params: Promise<{ card_number: string }> },
 ) {
   // H2 FIX: rate-limit before the 7 parallel Open-Meteo + 2 Supabase calls
   const blocked = await applyRateLimit(request, 'verify')
@@ -54,31 +54,27 @@ export async function GET(
   tenDaysLater.setDate(today.getDate() + 10)
 
   const dateFrom = threeDaysAgo.toISOString().split('T')[0]
-  const dateTo   = tenDaysLater.toISOString().split('T')[0]
+  const dateTo = tenDaysLater.toISOString().split('T')[0]
 
   // All 7 fetches run in parallel — cache hit = instant, first miss = HTTP to Open-Meteo
-  const [
-    { data: cached },
-    hourlyECMWF,
-    hourlyGFS,
-    hourlyICON,
-    nowcastRaw,
-    seasonalRaw,
-  ] = await Promise.all([
-    supabaseAdmin
-      .from('weather_data')
-      .select('date, temperature_max, temperature_min, temperature_mean, precipitation_mm, humidity_pct, wind_speed_ms, et0_mm, region')
-      .gte('date', dateFrom)
-      .lte('date', dateTo)
-      .eq('region', region)
-      .order('date', { ascending: true })
-      .limit(14),
-    fetchHourlyForRegion(region),
-    fetchHourlyGFSForRegion(region),
-    fetchHourlyICONForRegion(region),
-    fetchMinutely15ForRegion(region),
-    fetchSeasonalForRegion(region),
-  ])
+  const [{ data: cached }, hourlyECMWF, hourlyGFS, hourlyICON, nowcastRaw, seasonalRaw] =
+    await Promise.all([
+      supabaseAdmin
+        .from('weather_data')
+        .select(
+          'date, temperature_max, temperature_min, temperature_mean, precipitation_mm, humidity_pct, wind_speed_ms, et0_mm, region',
+        )
+        .gte('date', dateFrom)
+        .lte('date', dateTo)
+        .eq('region', region)
+        .order('date', { ascending: true })
+        .limit(14),
+      fetchHourlyForRegion(region),
+      fetchHourlyGFSForRegion(region),
+      fetchHourlyICONForRegion(region),
+      fetchMinutely15ForRegion(region),
+      fetchSeasonalForRegion(region),
+    ])
 
   // Merge hourly from 3 models
   const mergedHourly = mergeHourlyModels(hourlyECMWF, hourlyGFS, hourlyICON)
@@ -105,34 +101,45 @@ export async function GET(
     ])
     const merged = mergeWeatherModels(liveECMWF, liveGFS, liveICON)
     if (merged.length > 0) {
-      const existingDates = new Set(weather.map(w => w.date))
-      const newDays = merged.filter(l => !existingDates.has(l.date))
+      const existingDates = new Set(weather.map((w) => w.date))
+      const newDays = merged.filter((l) => !existingDates.has(l.date))
       weather = [...weather, ...newDays].sort((a, b) => a.date.localeCompare(b.date))
       dataSource = weather.length === merged.length ? 'live' : 'partial'
     }
   }
 
   // Agronomic insights
-  const futureDays = weather.filter(d => d.date >= todayStr)
-  const daysWithoutRain  = futureDays.filter(d => (d.precipitation_mm ?? 0) < 1).length
-  const avgEto = futureDays.length > 0
-    ? futureDays.reduce((s, d) => s + (d.et0_mm ?? 0), 0) / futureDays.length
-    : 0
-  const waterStressDays = futureDays.filter(d => (d.et0_mm ?? 0) > (d.precipitation_mm ?? 0) + 2).length
-  const heatStressDays  = futureDays.filter(d => (d.temperature_max ?? 0) > 36).length
+  const futureDays = weather.filter((d) => d.date >= todayStr)
+  const daysWithoutRain = futureDays.filter((d) => (d.precipitation_mm ?? 0) < 1).length
+  const avgEto =
+    futureDays.length > 0
+      ? futureDays.reduce((s, d) => s + (d.et0_mm ?? 0), 0) / futureDays.length
+      : 0
+  const waterStressDays = futureDays.filter(
+    (d) => (d.et0_mm ?? 0) > (d.precipitation_mm ?? 0) + 2,
+  ).length
+  const heatStressDays = futureDays.filter((d) => (d.temperature_max ?? 0) > 36).length
 
   let droughtRisk: 'low' | 'moderate' | 'high' | 'critical' = 'low'
   if (daysWithoutRain >= 7 || (daysWithoutRain >= 4 && avgEto > 5)) droughtRisk = 'critical'
   else if (daysWithoutRain >= 5 || (daysWithoutRain >= 3 && avgEto > 4)) droughtRisk = 'high'
   else if (daysWithoutRain >= 3 || avgEto > 3.5) droughtRisk = 'moderate'
 
-  const sprayDays = futureDays.filter(d => (d.wind_speed_ms ?? 99) < 4 && (d.precipitation_mm ?? 99) < 2)
-  const sprayWindow = sprayDays.length >= 2
-    ? sprayDays.slice(0, 2).map(d => new Date(`${d.date}T00:00:00`).toLocaleDateString('fr-FR', { weekday: 'short' })).join('-')
-    : null
+  const sprayDays = futureDays.filter(
+    (d) => (d.wind_speed_ms ?? 99) < 4 && (d.precipitation_mm ?? 99) < 2,
+  )
+  const sprayWindow =
+    sprayDays.length >= 2
+      ? sprayDays
+          .slice(0, 2)
+          .map((d) =>
+            new Date(`${d.date}T00:00:00`).toLocaleDateString('fr-FR', { weekday: 'short' }),
+          )
+          .join('-')
+      : null
 
-  const plantingOk = futureDays.some(d =>
-    (d.temperature_mean ?? 0) >= 20 && (d.temperature_mean ?? 0) <= 32
+  const plantingOk = futureDays.some(
+    (d) => (d.temperature_mean ?? 0) >= 20 && (d.temperature_mean ?? 0) <= 32,
   )
 
   const city = getRegionCoords(region)?.city ?? region
