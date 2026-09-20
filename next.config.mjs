@@ -53,11 +53,20 @@ const nextConfig = {
   },
   // Ensure @resvg/resvg-wasm is not bundled by Turbopack (uses WASM binary)
   serverExternalPackages: ['@resvg/resvg-wasm'],
+  // Tests and their embedded PostgreSQL engine never belong in serverless functions.
+  outputFileTracingExcludes: {
+    '/*': ['./tests/**/*', './e2e/**/*', './node_modules/@electric-sql/pglite/**/*'],
+  },
   outputFileTracingIncludes: {
     '/api/cards/[memberId]': ['./node_modules/@resvg/resvg-wasm/index_bg.wasm'],
   },
   async headers() {
     return [
+      { source: '/api/verify/:path*', headers: [
+        { key: 'Cache-Control', value: 'private, no-store' },
+        { key: 'CDN-Cache-Control', value: 'no-store' },
+        { key: 'Vercel-CDN-Cache-Control', value: 'no-store' },
+      ] },
       {
         source: '/((?!embed|api/widget|verify).*)',
         headers: securityHeaders,
@@ -101,12 +110,15 @@ const nextConfig = {
 
 // Sentry wraps the config for source maps upload + error tracking
 // If SENTRY_DSN is not set, it gracefully does nothing.
-export default withSentryConfig(nextConfig, {
+// Local/CI verification must not upload project artifacts to an external service.
+export default process.env.FAITIERE_LOCAL_VERIFY === '1' ? nextConfig : withSentryConfig(nextConfig, {
   // Suppresses source maps uploading logs during build
   silent: true,
   
-  // Upload source maps for better stack traces
-  widenClientFileUpload: true,
+  // Runtime monitoring remains enabled; builds do not send source artifacts externally.
+  sourcemaps: { disable: true },
+  telemetry: false,
+  release: { create: false, finalize: false },
   
   // Routes browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers
   tunnelRoute: '/monitoring',

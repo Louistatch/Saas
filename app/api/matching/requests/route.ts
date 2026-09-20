@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { assertTenantAccess } from '@/lib/security/assert-access'
+import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { rankListings } from '@/lib/matching/engine'
 import type { ListingSummary } from '@/lib/matching/engine'
 
@@ -16,12 +18,6 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, cooperative_id')
-      .eq('id', user.id)
-      .single()
-
     let query = supabase
       .from('buyer_requests')
       .select(
@@ -29,8 +25,13 @@ export async function GET(_request: NextRequest) {
       )
       .order('created_at', { ascending: false })
 
-    if (profile?.role !== 'super_admin' && profile?.cooperative_id) {
-      query = query.eq('cooperative_id', profile.cooperative_id)
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+    if (profile?.role !== 'super_admin') {
+      const { data: ids } = profile?.role === 'cooperative_admin'
+        ? await supabase.rpc('get_accessible_cooperative_ids') : { data: [] }
+      query = Array.isArray(ids) && ids.length
+        ? query.or(`created_by.eq.${user.id},cooperative_id.in.(${ids.join(',')})`)
+        : query.eq('created_by', user.id)
     }
 
     const { data, error } = await query
@@ -90,9 +91,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (cooperative_id) {
+      if (typeof cooperative_id !== 'string') return NextResponse.json({ error: 'Organisation invalide' }, { status: 400 })
+      const access = await assertTenantAccess(cooperative_id)
+      if (!access.ok) return access.response
+    }
+    if (!Number.isFinite(Number(quantity_kg_needed)) || Number(quantity_kg_needed) <= 0) {
+      return NextResponse.json({ error: 'Quantité invalide' }, { status: 400 })
+    }
+
     const { data: newRequest, error: insertError } = await supabase
       .from('buyer_requests')
       .insert({
+        created_by: user.id,
         buyer_name: String(buyer_name),
         buyer_phone: buyer_phone ? String(buyer_phone) : null,
         buyer_email: buyer_email ? String(buyer_email) : null,
@@ -147,7 +158,8 @@ export async function POST(request: NextRequest) {
     const top5 = ranked.slice(0, 5)
 
     if (top5.length > 0) {
-      await supabase.from('buyer_matches').insert(
+      const admin = createAdminClient()
+      const { error: matchingError } = await admin.from('buyer_matches').insert(
         top5.map((m) => ({
           request_id: newRequest.id as string,
           listing_id: m.listing_id,
@@ -156,6 +168,11 @@ export async function POST(request: NextRequest) {
           status: 'proposed',
         })),
       )
+
+      if (matchingError) {
+        console.error('[matching] Match persistence failed')
+        return NextResponse.json({ request: newRequest, matches_found: 0, warning: 'Demande enregistrée, rapprochement à réessayer' }, { status: 201 })
+      }
 
       // Notify the seller cooperatives behind each matched listing
       // (in-app bell notification — fire-and-forget, never blocks the response)
@@ -171,7 +188,7 @@ export async function POST(request: NextRequest) {
       }))
 
       if (inAppRows.length > 0) {
-        void Promise.resolve(supabase.from('notifications_inapp').insert(inAppRows)).catch(() => null)
+        await admin.from('notifications_inapp').insert(inAppRows)
       }
     }
 

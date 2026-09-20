@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/admin'
 import { checkCinetPayTransaction } from '@/lib/payments/cinetpay'
-import { queueInAppNotification } from '@/lib/notifications/queue'
 import { claimPaymentForSettlement } from '@/lib/payments/settle'
 
 /**
@@ -42,12 +41,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const { data: payment, error: fetchError } = await supabase
     .from('payments')
-    .select('id, cooperative_id, cotisation_id, amount_fcfa, member_id')
+    .select('id, cooperative_id, cotisation_id, amount_fcfa, member_id, currency, provider')
     .eq('reference', transactionId)
     .single()
 
   if (fetchError || !payment) {
     return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
+  }
+
+  if (!['moov', 'tmoney'].includes(payment.provider)) {
+    return NextResponse.json({ error: 'Provider mismatch' }, { status: 409 })
+  }
+  if (check.status === 'ACCEPTED' && (check.amount !== Number(payment.amount_fcfa) || check.currency !== payment.currency)) {
+    return NextResponse.json({ error: 'Amount or currency mismatch' }, { status: 409 })
   }
 
   const now = new Date().toISOString()
@@ -78,63 +84,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // Déjà réglé par une livraison précédente ou concurrente : on acquitte sans
     // rejouer quoi que ce soit.
     return NextResponse.json({ received: true, duplicate: true })
-  }
-
-  if (isSuccess && payment.cotisation_id) {
-    void supabase
-      .from('cotisations')
-      .update({ status: 'paid', paid_date: now })
-      .eq('id', payment.cotisation_id)
-      .then(() => undefined)
-  }
-
-  void queueInAppNotification({
-    cooperativeId: payment.cooperative_id as string,
-    title: isSuccess ? 'Paiement reçu' : 'Paiement échoué',
-    body: isSuccess
-      ? `Paiement de ${payment.amount_fcfa} FCFA confirmé via ${check.paymentMethod ?? 'mobile money'} (réf. ${transactionId})`
-      : `Paiement de ${payment.amount_fcfa} FCFA échoué (réf. ${transactionId})`,
-    type: isSuccess ? 'success' : 'alert',
-    icon: isSuccess ? '✅' : '❌',
-    link: '/dashboard/cotisations',
-  })
-
-  if (isSuccess && payment.member_id) {
-    void (async () => {
-      try {
-        const { data: member } = await supabase
-          .from('members')
-          .select('first_name, phone')
-          .eq('id', payment.member_id as string)
-          .single()
-
-        if (member?.phone) {
-          const { data: tpl } = await supabase
-            .from('notification_templates')
-            .select('body_fr')
-            .eq('key', 'cotisation_paid')
-            .eq('channel', 'sms')
-            .maybeSingle()
-
-          const body = (tpl?.body_fr ?? '')
-            .replace('{prenom}', member.first_name ?? '')
-            .replace('{montant}', String(payment.amount_fcfa))
-
-          if (body) {
-            await supabase.from('notification_queue').insert({
-              member_id: payment.member_id as string,
-              cooperative_id: payment.cooperative_id as string,
-              channel: 'sms',
-              template_key: 'cotisation_paid',
-              recipient_phone: member.phone,
-              variables: { prenom: member.first_name ?? '', montant: String(payment.amount_fcfa) },
-              body_rendered: body,
-              scheduled_at: now,
-            })
-          }
-        }
-      } catch { /* non-bloquant */ }
-    })()
   }
 
   return NextResponse.json({ received: true })

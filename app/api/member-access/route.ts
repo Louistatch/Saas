@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/admin'
 import { createLogger } from '@/lib/utils/logger'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 
@@ -10,7 +10,6 @@ interface MemberRelation {
   id: string
   first_name: string | null
   last_name: string | null
-  phone: string | null
   photo_url: string | null
   village: string | null
   canton: string | null
@@ -32,8 +31,7 @@ function normalizeMember(
 
 /**
  * POST /api/member-access
- * Login by card number — returns member info + cooperative if valid.
- * No password needed. Card number = access token for members.
+ * Public card lookup. A printed card number is not an authentication credential.
  */
 export async function POST(request: NextRequest) {
   // Rate limiting: prevent card number brute-force (10 attempts per minute per IP)
@@ -52,23 +50,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
 
-  const cardNumber = body.card_number?.trim()
-  if (!cardNumber || cardNumber.length < 5) {
+  const cardNumber = typeof body.card_number === 'string' ? body.card_number.trim().toUpperCase() : ''
+  if (!/^[A-Z0-9]{2,5}-\d{4,6}$/.test(cardNumber)) {
     return NextResponse.json({ error: 'Numéro de carte invalide' }, { status: 400 })
   }
 
   try {
-    const supabase = await createClient()
+    const supabase = createClient()
 
     // Find active card
     const { data: card, error: cardError } = await supabase
       .from('member_cards')
       .select(`
         id, card_number, status, expiry_date, cooperative_id,
-        member:members(id, first_name, last_name, phone, photo_url, village, canton, prefecture, region)
+        member:members(id, first_name, last_name, photo_url, village, canton, prefecture, region)
       `)
       .eq('card_number', cardNumber)
       .eq('status', 'active')
+      .is('deleted_at', null)
       .single()
 
     if (cardError || !card) {
@@ -114,7 +113,7 @@ export async function POST(request: NextRequest) {
         expiry: card.expiry_date,
       },
       cooperative: coop,
-      access: 'full', // Members get full free access
+      access: 'public', // Private services require an authenticated account.
     })
   } catch (error) {
     log.error('Member access error', error)

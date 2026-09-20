@@ -164,11 +164,16 @@ try {
 
 // CHECK 12: KOBO_WEBHOOK_SECRET présent ET longueur >= 32 chars
 const koboSecret = process.env.KOBO_WEBHOOK_SECRET ?? ''
+if (!process.argv.includes('--static')) {
 check(
   '[KOBO-12] KOBO_WEBHOOK_SECRET configuré (≥32 chars)',
   koboSecret.length >= 32,
   'Ajouter KOBO_WEBHOOK_SECRET (≥32 chars) dans .env.local et Vercel Dashboard'
 )
+} else {
+  console.log('Configuration des secrets : contrôle réservé à l’environnement de déploiement.')
+}
+
 
 // CHECK 13: Webhook handler contient 'timingSafeEqual'
 if (fs.existsSync(webhookPath)) {

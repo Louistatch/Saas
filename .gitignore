@@ -63,3 +63,6 @@ test-results/
 # Tooling caches
 .turbo/
 .claude/
+
+# Supabase CLI cache
+supabase/.temp/

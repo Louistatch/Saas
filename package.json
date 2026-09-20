@@ -11,13 +11,14 @@
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
     "check": "turbo run typecheck lint",
-    "security:check": "npx tsx scripts/pre-deploy-security-check.ts",
+    "security:check": "node --import tsx scripts/pre-deploy-security-check.ts",
     "predeploy": "npm run security:check",
     "test:e2e": "playwright test --config=e2e/playwright.config.ts",
     "test:e2e:ui": "playwright test --config=e2e/playwright.config.ts --ui",
     "test:e2e:headed": "playwright test --config=e2e/playwright.config.ts --headed",
     "test:e2e:chromium": "playwright test --config=e2e/playwright.config.ts --project=chromium",
-    "test:e2e:mobile": "playwright test --config=e2e/playwright.config.ts --project=mobile-chrome"
+    "test:e2e:mobile": "playwright test --config=e2e/playwright.config.ts --project=mobile-chrome",
+    "test:hardening": "node --test tests/launch-hardening.test.mjs && node --import tsx --test tests/notification-delivery.test.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -88,6 +89,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@electric-sql/pglite": "0.3.14",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4.2.0",
     "@types/leaflet": "^1.9.21",

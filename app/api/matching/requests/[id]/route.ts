@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { assertTenantAccess } from '@/lib/security/assert-access'
 
 /**
  * GET /api/matching/requests/[id]
@@ -39,12 +40,11 @@ export async function GET(
       return NextResponse.json({ error: 'Demande introuvable' }, { status: 404 })
     }
 
-    // Vérification propriété : seule la coopérative propriétaire ou super_admin peut voir
-    const isSuperAdmin = profile.role === 'super_admin'
-    const isOwner = buyerRequest.cooperative_id === profile.cooperative_id
-
-    if (!isSuperAdmin && !isOwner) {
-      return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
+    if (buyerRequest.created_by !== user.id) {
+      const access = buyerRequest.cooperative_id ? await assertTenantAccess(buyerRequest.cooperative_id) : null
+      if (profile.role !== 'super_admin' && !access?.ok) {
+        return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
+      }
     }
 
     const { data: matches, error: matchError } = await supabase

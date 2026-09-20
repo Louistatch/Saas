@@ -47,6 +47,18 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Isolation et reprise des traitements (PostgreSQL local)
+        run: npm run test:hardening
+
+      - name: Contrôles de sécurité
+        run: npm run security:check -- --static
+
+      - name: Build de production sans envoi externe
+        run: npm run build
+        env:
+          FAITIERE_LOCAL_VERIFY: "1"
+          NEXT_TELEMETRY_DISABLED: "1"
+
       # Deux choses distinctes, traitées différemment :
       #
       #  • des diagnostics de lint → informatif. On les compte et on les écrit

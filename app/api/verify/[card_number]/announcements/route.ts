@@ -7,37 +7,27 @@
  */
 
 import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { createClient as createAdminClient } from '@/lib/supabase/admin'
+import { requirePrivateCard } from '@/lib/security/card-access'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 import { ANNOUNCEMENT_TYPES, type AnnouncementType } from '@/lib/announcements/models'
 
 const ANNOUNCEMENT_COLUMNS =
   'id, type, title, description, culture, quantity_kg, price_per_kg_fcfa, location_canton, contact_phone, status, created_at'
 
-async function resolveCard(cardNumber: string) {
-  const supabase = await createClient()
-  const { data: card } = await supabase
-    .from('member_cards')
-    .select('member_id, cooperative_id')
-    .eq('card_number', cardNumber.toUpperCase().trim())
-    .eq('status', 'active')
-    .maybeSingle()
-  return card
-}
-
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ card_number: string }> }
 ) {
   const { card_number } = await params
-  const card = await resolveCard(decodeURIComponent(card_number))
+  const access = await requirePrivateCard(decodeURIComponent(card_number))
+  if (!access.ok) return access.response
+  const { card } = access
 
   if (!card?.member_id) {
     return NextResponse.json({ error: 'Carte non trouvée.' }, { status: 404 })
   }
 
-  const supabaseAdmin = createAdminClient()
+  const supabaseAdmin = access.supabase
   const { data: announcements } = await supabaseAdmin
     .from('producer_announcements')
     .select(ANNOUNCEMENT_COLUMNS)
@@ -46,7 +36,7 @@ export async function GET(
 
   return NextResponse.json(
     { announcements: announcements ?? [] },
-    { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' } }
+    { headers: { 'Cache-Control': 'private, no-store' } }
   )
 }
 
@@ -58,7 +48,9 @@ export async function POST(
   if (rateLimited) return rateLimited
 
   const { card_number } = await params
-  const card = await resolveCard(decodeURIComponent(card_number))
+  const access = await requirePrivateCard(decodeURIComponent(card_number))
+  if (!access.ok) return access.response
+  const { card } = access
 
   if (!card?.member_id) {
     return NextResponse.json({ error: 'Carte non trouvée.' }, { status: 404 })
@@ -97,7 +89,7 @@ export async function POST(
       return NextResponse.json({ error: 'Prix invalide' }, { status: 400 })
     }
 
-    const supabaseAdmin = createAdminClient()
+    const supabaseAdmin = access.supabase
     const { data, error } = await supabaseAdmin
       .from('producer_announcements')
       .insert({

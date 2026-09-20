@@ -8,7 +8,7 @@
 //   3. If AgriTogo also returns nothing → 404
 
 import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/admin'
 import { z } from 'zod'
 import { rateLimit, clientKeyFromHeaders } from '@/lib/utils/rate-limit'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
@@ -61,7 +61,10 @@ export async function GET(
   }
 
   // Décoder le numéro de carte (support legacy QR format)
-  let decodedCardNumber = decodeURIComponent(card_number)
+  let decodedCardNumber: string
+  try { decodedCardNumber = decodeURIComponent(card_number) } catch {
+    return NextResponse.json({ valid: false, error: 'Carte non trouvée' }, { status: 404 })
+  }
 
   // Legacy QR format: extraire le numéro de carte si format JSON fragmenté
   if (decodedCardNumber.includes('"') || decodedCardNumber.includes('{') || decodedCardNumber.includes(',')) {
@@ -88,9 +91,8 @@ export async function GET(
 
   const normalizedCardNumber = parsed.data
 
-  // Use server client — the anon RLS policy allows SELECT on active member_cards
-  // with embedded joins to members and cooperatives.
-  const supabase = await createClient()
+  // Server-only lookup; raw member/card tables are not public.
+  const supabase = createClient()
 
   // Construire la liste des variantes possibles (O↔0, I↔1) du préfixe.
   const [prefix, suffix] = normalizedCardNumber.split('-')
@@ -102,6 +104,7 @@ export async function GET(
     .select('id, card_number, status, expiry_date, created_at, member_id, cooperative_id, card_type')
     .in('card_number', variants)
     .in('status', ['active', 'expired'])
+    .is('deleted_at', null)
     .limit(1)
     .maybeSingle()
 
@@ -191,7 +194,7 @@ export async function GET(
     created_at: card.created_at,
   }
 
-  // Second: get member info (may fail if anon doesn't have access — graceful fallback)
+  // Public projection deliberately excludes contact, birth date and signature.
   interface MemberRow {
     first_name: string | null
     last_name: string | null
@@ -215,6 +218,7 @@ export async function GET(
       .from('members')
       .select('first_name, last_name, photo_url, village, canton, prefecture, region, status, created_at')
       .eq('id', card.member_id)
+      .is('deleted_at', null)
       .maybeSingle<MemberRow>()
     if (memberData) member = memberData
   }
@@ -229,7 +233,7 @@ export async function GET(
   }
 
   // Log the scan (fire-and-forget — never block the response)
-  void Promise.resolve(supabase.from('member_access_logs').insert({
+  await Promise.resolve(supabase.from('member_access_logs').insert({
     card_number: card.card_number,
     member_id: card.member_id ?? null,
     cooperative_id: card.cooperative_id ?? null,
@@ -238,7 +242,7 @@ export async function GET(
 
   // In-app notification for cooperative admin (fire-and-forget)
   if (card.cooperative_id) {
-    void queueInAppNotification({
+    await queueInAppNotification({
       cooperativeId: card.cooperative_id,
       title: 'Carte scannée',
       body: `Carte ${card.card_number} scannée à ${new Date().toLocaleTimeString('fr-FR')}`,

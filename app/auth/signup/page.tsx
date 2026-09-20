@@ -194,8 +194,8 @@ export default function SignupPage() {
                   Quel est votre profil ?
                 </CardTitle>
                 <CardDescription>
-                  Vous pourrez activer la seconde couche plus tard depuis votre espace, sans créer
-                  de second compte.
+                  Vous pourrez ajouter une autre activité depuis votre espace, selon les conditions
+                  du parcours choisi, sans créer de second compte.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">

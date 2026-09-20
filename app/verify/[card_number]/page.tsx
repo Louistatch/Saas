@@ -33,6 +33,7 @@ import { AiChat } from '@/components/verify/ai-chat'
 import { AgriSmartWater } from '@/components/verify/agrismart-water'
 import { ParcellesInlineView } from '@/components/verify/parcelles-inline-view'
 import { IntrantsInlineView } from '@/components/verify/intrants-inline-view'
+import { PrivateCardSection } from '@/components/verify/private-card-section'
 import { CotisationView } from '@/components/verify/cotisation-view'
 import { ExploitationInlineView } from '@/components/verify/exploitation-inline-view'
 import { MeteoInlineView } from '@/components/verify/meteo-inline-view'
@@ -1651,20 +1652,25 @@ export default function VerifyCardPage() {
 
         {/* ─── Parcelles View ─── */}
         {isValid && activeView === 'parcelles' && (
+          <PrivateCardSection cardNumber={cardNumber}>
           <ParcellesInlineView
             cardNumber={cardNumber}
             onBack={() => setActiveView('menu')}
             onOpenAgriSmart={() => setActiveView('agrismart')}
           />
+          </PrivateCardSection>
         )}
 
         {/* ─── Intrants View ─── */}
         {isValid && activeView === 'intrants' && (
+          <PrivateCardSection cardNumber={cardNumber}>
           <IntrantsInlineView cardNumber={cardNumber} onBack={() => setActiveView('menu')} />
+          </PrivateCardSection>
         )}
 
         {/* ─── Cotisation View ─── */}
         {isValid && activeView === 'cotisation' && (
+          <PrivateCardSection cardNumber={cardNumber}>
           <CotisationView
             cardNumber={cardNumber}
             onBack={() => setActiveView('menu')}
@@ -1673,15 +1679,18 @@ export default function VerifyCardPage() {
             memberName={firstName}
             memberCanton={result.member?.canton ?? null}
           />
+          </PrivateCardSection>
         )}
 
         {/* ─── Exploitation View ─── */}
         {isValid && activeView === 'exploitation' && (
+          <PrivateCardSection cardNumber={cardNumber}>
           <ExploitationInlineView
             cardNumber={cardNumber}
             memberId={result.member_id ?? null}
             onBack={() => setActiveView('menu')}
           />
+          </PrivateCardSection>
         )}
 
         {/* ─── Météo View ─── */}
