@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { errorMessage } from '@/lib/utils/errors'
 import { hasOrgLayer, isHarooRole } from '@/lib/utils/permissions'
 import { flattenZodErrors, loginSchema } from '@/lib/validators/schemas'
-import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useState } from 'react'
@@ -121,21 +121,23 @@ function LoginInner() {
   )
 
   return (
-    <div className="min-h-screen grid md:grid-cols-2 bg-background">
+    <div className="flex min-h-screen flex-col bg-[#f7f8f5] md:flex-row">
       <AuthSidePanel
-        title="Connectez votre coopérative"
-        description="Gérez vos membres, les comptes d'exploitation et la croissance en un seul endroit."
+        imageSrc="/images/auth/operator-field-agent.webp"
+        eyebrow="Votre espace FaîtiereHub"
+        title="Le terrain nous rassemble."
+        description="Retrouvez votre organisation, vos activités ou votre parcours de formation dans un espace adapté à votre profil."
         benefits={[
-          'Gérer les données des membres et les cartes numériques',
-          "Publier les comptes d'exploitation par région",
-          "Suivre les cotisations et l'engagement des membres",
+          'Formation et accompagnement',
+          'Gestion des organisations agricoles',
+          'Cartes membres vérifiables',
+          'Activités et services agricoles',
         ]}
-        footer="Au service des coopératives agricoles."
+        footer="Organisations, membres, opérateurs et professionnels Haroo."
       />
 
-      <div className="flex flex-col items-center justify-center p-4 sm:p-8 overflow-y-auto">
-        {/* Mobile header: logo + back link + mini card */}
-        <div className="md:hidden w-full max-w-sm mb-6 space-y-4">
+      <main className="flex min-w-0 flex-1 flex-col items-center justify-center px-4 py-7 sm:px-8 md:py-12 lg:px-12">
+        <div className="mb-5 hidden w-full max-w-md md:block">
           <div className="flex items-center justify-between">
             <Link
               href="/"
@@ -146,42 +148,17 @@ function LoginInner() {
             </Link>
             <Logo size="sm" />
           </div>
-          {/* Mini card illustration mobile */}
-          <div className="relative mx-auto w-full max-w-[240px]">
-            <div className="bg-gradient-to-br from-primary via-primary/90 to-green-700 rounded-xl p-4 shadow-lg transform -rotate-1">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-white/70 text-[9px] uppercase tracking-widest">Carte Membre</p>
-                  <p className="text-white font-bold text-xs">FaîtiereHub</p>
-                </div>
-                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                  <svg
-                    aria-hidden="true"
-                    className="w-4 h-4 text-white"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                  >
-                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                  </svg>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 mt-3">
-                <div className="w-8 h-8 rounded-full bg-white/20" />
-                <div className="space-y-1">
-                  <div className="h-2 w-16 bg-white/30 rounded-full" />
-                  <div className="h-1.5 w-10 bg-white/20 rounded-full" />
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
 
-        <Card className="w-full max-w-sm border-border">
-          <CardHeader className="space-y-2">
+        <Card className="w-full max-w-md border-black/[0.07] bg-white shadow-xl shadow-black/[0.06]">
+          <CardHeader className="space-y-3 pb-5">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
+              <ShieldCheck className="h-5 w-5 text-primary" aria-hidden="true" />
+            </div>
             <CardTitle className="text-2xl">Bon retour</CardTitle>
-            <CardDescription>Connectez-vous à votre compte coopératif</CardDescription>
+            <CardDescription>
+              Connectez-vous pour retrouver votre espace personnel FaîtiereHub.
+            </CardDescription>
           </CardHeader>
 
           <CardContent>
@@ -201,20 +178,27 @@ function LoginInner() {
                   id="email"
                   type="email"
                   autoComplete="email"
-                  placeholder="you@example.com"
+                  inputMode="email"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  className="h-12 text-base"
+                  placeholder="vous@exemple.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   aria-invalid={!!fieldErrors.email}
+                  aria-describedby={fieldErrors.email ? 'email-error' : undefined}
                   disabled={submitting}
                   required
                 />
                 {fieldErrors.email && (
-                  <p className="text-xs text-destructive">{fieldErrors.email}</p>
+                  <p id="email-error" className="text-xs text-destructive">
+                    {fieldErrors.email}
+                  </p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <Label htmlFor="password">Mot de passe</Label>
                   <Link
                     href="/auth/forgot-password"
@@ -232,14 +216,17 @@ function LoginInner() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     aria-invalid={!!fieldErrors.password}
+                    aria-describedby={fieldErrors.password ? 'password-error' : undefined}
                     disabled={submitting}
                     required
-                    className="pr-10"
+                    className="h-12 pr-12 text-base"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((s) => !s)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+                    className="absolute right-0 top-0 flex h-12 w-12 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                    aria-pressed={showPassword}
+                    disabled={submitting}
                     aria-label={
                       showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'
                     }
@@ -248,13 +235,15 @@ function LoginInner() {
                   </button>
                 </div>
                 {fieldErrors.password && (
-                  <p className="text-xs text-destructive">{fieldErrors.password}</p>
+                  <p id="password-error" className="text-xs text-destructive">
+                    {fieldErrors.password}
+                  </p>
                 )}
               </div>
 
               <Button
                 type="submit"
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
+                className="h-12 w-full bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
                 disabled={submitting}
               >
                 {submitting ? <Spinner className="h-4 w-4" /> : null}
@@ -270,7 +259,10 @@ function LoginInner() {
             </p>
           </CardContent>
         </Card>
-      </div>
+        <p className="mt-5 max-w-md text-center text-xs leading-relaxed text-muted-foreground">
+          Un seul accès pour votre organisation, votre parcours Opérateur ou vos activités Haroo.
+        </p>
+      </main>
     </div>
   )
 }
