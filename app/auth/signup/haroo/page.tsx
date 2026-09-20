@@ -1,22 +1,30 @@
 'use client'
 
-import { Logo } from '@/components/shared/logo'
 import { AuthSidePanel } from '@/components/shared/auth-side-panel'
+import { Spinner } from '@/components/shared/loading'
+import { Logo } from '@/components/shared/logo'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { flattenZodErrors, harooSignupSchema } from '@/lib/validators/schemas'
+import { ArrowLeft, CheckCircle2, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ArrowLeft, UserPlus, CheckCircle2 } from 'lucide-react'
-import { Spinner } from '@/components/shared/loading'
-import { harooSignupSchema, flattenZodErrors } from '@/lib/validators/schemas'
 
 const PROFILE_TYPES = [
-  { value: 'OUVRIER', label: 'Ouvrier agricole', description: 'Emploi saisonnier dans vos cantons' },
+  {
+    value: 'OUVRIER',
+    label: 'Ouvrier agricole',
+    description: 'Emploi saisonnier dans vos cantons',
+  },
   { value: 'ACHETEUR', label: 'Acheteur', description: 'Préventes et achats de production' },
-  { value: 'AGRONOME', label: 'Agronome', description: 'Missions de conseil auprès des exploitants' },
+  {
+    value: 'AGRONOME',
+    label: 'Agronome',
+    description: 'Missions de conseil auprès des exploitants',
+  },
 ] as const
 
 /**
@@ -90,8 +98,8 @@ function HarooSignupForm() {
             </div>
             <h2 className="text-xl font-bold text-foreground">Compte Haroo créé !</h2>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              Votre profil professionnel est enregistré. Connectez-vous avec votre
-              email et votre mot de passe pour accéder aux services Haroo.
+              Votre profil professionnel est enregistré. Connectez-vous avec votre email et votre
+              mot de passe pour accéder aux services Haroo.
             </p>
             <div className="pt-4">
               <Link href="/auth/login">
@@ -105,11 +113,13 @@ function HarooSignupForm() {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="flex min-h-screen flex-col bg-[#f7f8f5] md:flex-row">
       {/* Side panel */}
       <AuthSidePanel
-        title="Rejoignez Haroo"
-        description="Les services professionnels agricoles, intégrés à FaîtiereHub"
+        imageSrc="/images/auth/operator-field-agent.webp"
+        eyebrow="Réseau professionnel Haroo"
+        title="Votre métier agricole mérite plus d’opportunités."
+        description="Créez votre identité professionnelle, développez votre réseau et accédez aux missions adaptées à votre profil."
         benefits={[
           'Emploi saisonnier pour les ouvriers agricoles',
           'Préventes de production pour les acheteurs',
@@ -119,20 +129,26 @@ function HarooSignupForm() {
       />
 
       {/* Form */}
-      <div className="flex-1 flex items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
-        <div className="w-full max-w-md space-y-6">
+      <main className="flex flex-1 items-center justify-center px-4 py-8 sm:px-8 lg:px-12">
+        <div className="w-full max-w-md space-y-5">
           <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <Link
+              href="/"
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
               <ArrowLeft className="h-4 w-4" /> Accueil
             </Link>
             <Logo size="sm" />
           </div>
 
-          <Card className="border-border">
+          <Card className="border-black/[0.07] bg-white shadow-xl shadow-black/[0.06]">
             <CardHeader className="space-y-1">
-              <CardTitle className="text-2xl font-bold text-foreground">Créer un compte Haroo</CardTitle>
+              <CardTitle className="text-2xl font-bold text-foreground">
+                Créer un compte Haroo
+              </CardTitle>
               <CardDescription>
-                Ouvriers agricoles, acheteurs et agronomes — créez votre profil professionnel en quelques minutes.
+                Ouvriers agricoles, acheteurs et agronomes — créez votre profil professionnel en
+                quelques minutes.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -142,15 +158,17 @@ function HarooSignupForm() {
                   <select
                     id="profileType"
                     value={formData.profileType}
-                    onChange={(e) => setFormData(f => ({ ...f, profileType: e.target.value }))}
+                    onChange={(e) => setFormData((f) => ({ ...f, profileType: e.target.value }))}
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   >
                     {PROFILE_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>{t.label}</option>
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
                     ))}
                   </select>
                   <p className="text-xs text-muted-foreground">
-                    {PROFILE_TYPES.find(t => t.value === formData.profileType)?.description}
+                    {PROFILE_TYPES.find((t) => t.value === formData.profileType)?.description}
                   </p>
                   {fieldErrors.profileType && (
                     <p className="text-xs text-destructive">{fieldErrors.profileType}</p>
@@ -164,7 +182,7 @@ function HarooSignupForm() {
                       id="firstName"
                       placeholder="Prénom"
                       value={formData.firstName}
-                      onChange={(e) => setFormData(f => ({ ...f, firstName: e.target.value }))}
+                      onChange={(e) => setFormData((f) => ({ ...f, firstName: e.target.value }))}
                       aria-invalid={!!fieldErrors.firstName}
                       required
                     />
@@ -178,7 +196,7 @@ function HarooSignupForm() {
                       id="lastName"
                       placeholder="Nom"
                       value={formData.lastName}
-                      onChange={(e) => setFormData(f => ({ ...f, lastName: e.target.value }))}
+                      onChange={(e) => setFormData((f) => ({ ...f, lastName: e.target.value }))}
                       aria-invalid={!!fieldErrors.lastName}
                       required
                     />
@@ -195,7 +213,7 @@ function HarooSignupForm() {
                     type="tel"
                     placeholder="+228 90 XX XX XX"
                     value={formData.phone}
-                    onChange={(e) => setFormData(f => ({ ...f, phone: e.target.value }))}
+                    onChange={(e) => setFormData((f) => ({ ...f, phone: e.target.value }))}
                     aria-invalid={!!fieldErrors.phone}
                     required
                   />
@@ -211,7 +229,7 @@ function HarooSignupForm() {
                     type="email"
                     placeholder="vous@exemple.tg"
                     value={formData.email}
-                    onChange={(e) => setFormData(f => ({ ...f, email: e.target.value }))}
+                    onChange={(e) => setFormData((f) => ({ ...f, email: e.target.value }))}
                     aria-invalid={!!fieldErrors.email}
                     required
                   />
@@ -227,7 +245,7 @@ function HarooSignupForm() {
                     type="password"
                     placeholder="8 caractères minimum"
                     value={formData.password}
-                    onChange={(e) => setFormData(f => ({ ...f, password: e.target.value }))}
+                    onChange={(e) => setFormData((f) => ({ ...f, password: e.target.value }))}
                     aria-invalid={!!fieldErrors.password}
                     required
                   />
@@ -237,7 +255,9 @@ function HarooSignupForm() {
                 </div>
 
                 {error && (
-                  <p className="text-sm text-destructive bg-destructive/10 rounded-md p-2">{error}</p>
+                  <p className="text-sm text-destructive bg-destructive/10 rounded-md p-2">
+                    {error}
+                  </p>
                 )}
 
                 <Button type="submit" className="w-full gap-2" disabled={submitting}>
@@ -263,7 +283,7 @@ function HarooSignupForm() {
             </CardContent>
           </Card>
         </div>
-      </div>
+      </main>
     </div>
   )
 }
