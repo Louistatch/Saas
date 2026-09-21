@@ -1,7 +1,7 @@
-import Link from 'next/link'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
 import { Button } from '@/components/ui/button'
-import { Check, ArrowRight, Network, Users } from 'lucide-react'
+import { ArrowRight, Check, Network, Users } from 'lucide-react'
+import Link from 'next/link'
 
 const FAITIERE_PLANS = [
   {
@@ -14,9 +14,9 @@ const FAITIERE_PLANS = [
     cta: 'Démarrer gratuitement',
     ctaHref: '/auth/signup',
     features: [
-      "Jusqu'à 500 membres",
+      '10 cartes numériques gratuites par coopérative',
       'Gestion des membres et cotisations',
-      'Cartes numériques avec QR code',
+      'QR code vérifiable sur chaque carte',
       'Place de marché basique',
       'Analytiques de base',
       'Support email',
@@ -71,26 +71,25 @@ const FAITIERE_PLANS = [
 const FAQ = [
   {
     q: 'Puis-je changer de plan à tout moment ?',
-    a: "Oui, vous pouvez passer à un plan supérieur ou inférieur à tout moment. Les modifications prennent effet au début du cycle de facturation suivant.",
+    a: 'Oui, vous pouvez passer à un plan supérieur ou inférieur à tout moment. Les modifications prennent effet au début du cycle de facturation suivant.',
   },
   {
     q: 'Y a-t-il des frais de configuration ?',
-    a: "Non. Aucun frais de configuration ni de frais cachés. Vous ne payez que le plan choisi.",
+    a: 'Non. Aucun frais de configuration ni de frais cachés. Vous ne payez que le plan choisi.',
   },
   {
     q: 'Puis-je résilier à tout moment ?',
-    a: "Oui, vous pouvez résilier votre abonnement à tout moment sans pénalité.",
+    a: 'Oui, vous pouvez résilier votre abonnement à tout moment sans pénalité.',
   },
   {
-    q: "Haroo est-il inclus dans les plans FaîtiereHub ?",
-    a: "Haroo est entièrement gratuit et indépendant des plans FaîtiereHub. Ouvriers agricoles, acheteurs et agronomes créent leur profil sans abonnement.",
+    q: 'Haroo est-il inclus dans les plans FaîtiereHub ?',
+    a: 'Haroo est entièrement gratuit et indépendant des plans FaîtiereHub. Ouvriers agricoles, acheteurs et agronomes créent leur profil sans abonnement.',
   },
 ]
 
 export default function PricingPage() {
   return (
     <MarketingLayout>
-
       {/* Hero */}
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
         <div className="text-center space-y-4 mb-16">
@@ -101,8 +100,8 @@ export default function PricingPage() {
             Des tarifs simples et transparents
           </h1>
           <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
-            Choisissez le plan qui correspond à votre coopérative. Tous les plans
-            incluent une période d&apos;essai gratuite.
+            Choisissez le plan qui correspond à votre coopérative. Tous les plans incluent une
+            période d&apos;essai gratuite.
           </p>
         </div>
 
@@ -127,12 +126,11 @@ export default function PricingPage() {
                   <h2 className="text-xl font-bold text-foreground">{plan.name}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
                   <div className="mt-4 flex items-baseline gap-1">
-                    <span className="text-3xl font-extrabold text-foreground">
-                      {plan.price}
-                    </span>
+                    <span className="text-3xl font-extrabold text-foreground">{plan.price}</span>
                     {plan.period && (
                       <span className="text-muted-foreground text-sm">
-                        {' '}{plan.currency} /{plan.period}
+                        {' '}
+                        {plan.currency} /{plan.period}
                       </span>
                     )}
                   </div>
@@ -177,9 +175,9 @@ export default function PricingPage() {
               Vous êtes ouvrier, acheteur ou agronome ?
             </h2>
             <p className="text-muted-foreground mb-6 max-w-xl mx-auto">
-              Haroo est entièrement gratuit. Créez votre profil professionnel, obtenez
-              votre carte vérifiable par QR code et accédez aux opportunités de votre région —
-              emploi saisonnier, préventes de production, missions de conseil.
+              Haroo est entièrement gratuit. Créez votre profil professionnel, obtenez votre carte
+              vérifiable par QR code et accédez aux opportunités de votre région — emploi
+              saisonnier, préventes de production, missions de conseil.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
               <Link href="/auth/signup/haroo">
@@ -188,7 +186,10 @@ export default function PricingPage() {
                 </Button>
               </Link>
               <Link href="/#haroo">
-                <Button variant="outline" className="border-amber-200 text-amber-700 hover:bg-amber-50 w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  className="border-amber-200 text-amber-700 hover:bg-amber-50 w-full sm:w-auto"
+                >
                   En savoir plus
                 </Button>
               </Link>
@@ -221,8 +222,8 @@ export default function PricingPage() {
             Prêt à commencer ?
           </h2>
           <p className="text-lg text-muted-foreground mb-8">
-            Rejoignez les coopératives agricoles qui utilisent FaîtiereHub pour structurer
-            leur organisation et développer leurs activités.
+            Rejoignez les coopératives agricoles qui utilisent FaîtiereHub pour structurer leur
+            organisation et développer leurs activités.
           </p>
           <Link href="/auth/signup">
             <Button size="lg" className="gap-2">

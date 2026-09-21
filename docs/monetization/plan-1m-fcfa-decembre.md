@@ -6,7 +6,7 @@ chaque itération plutôt que de le refaire de zéro — c'est le rôle du skill
 
 ## 1. Où en est le produit (audité en profondeur cette session)
 
-- Plans réels : Starter (gratuit, 500 membres) / Professional (99 000 XOF/mois)
+- Plans réels : Starter (10 cartes numériques gratuites) / Professional (99 000 XOF/mois)
   / Enterprise (sur devis) — `app/pricing/page.tsx`
 - Partenaire réel déjà en place : **FENOMAT** (Fédération Nationale des
   Organisations de Maraîchers du Togo) — mentionné en dur sur `/a-propos`,

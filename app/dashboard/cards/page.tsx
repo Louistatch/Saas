@@ -1,24 +1,16 @@
-﻿'use client'
+'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import Link from 'next/link'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useCooperative } from '@/app/context/cooperative-context'
+import { CardSvgPreview } from '@/components/dashboard/card-svg-preview'
+import { useConfirm } from '@/components/shared/confirm-dialog'
+import { EmptyState } from '@/components/shared/empty-state'
+import { LoadingBlock, Spinner } from '@/components/shared/loading'
+import { PageHeader } from '@/components/shared/page-header'
+import { PaginationBar } from '@/components/shared/pagination'
+import { CardStatusBadge } from '@/components/shared/status-badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Plus,
-  Download,
-  QrCode,
-  Trash2,
-  RefreshCw,
-  Users,
-  CheckCircle2,
-  Search,
-  Printer,
-  IdCard,
-} from 'lucide-react'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -27,30 +19,38 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Checkbox } from '@/components/ui/checkbox'
-import { createClient } from '@/lib/supabase/client'
-import { useCooperative } from '@/app/context/cooperative-context'
-import { useToast } from '@/hooks/use-toast'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useDebounced } from '@/hooks/use-debounced'
-import { LoadingBlock, Spinner } from '@/components/shared/loading'
-import { EmptyState } from '@/components/shared/empty-state'
-import { CardStatusBadge } from '@/components/shared/status-badge'
-import { PageHeader } from '@/components/shared/page-header'
-import { PaginationBar } from '@/components/shared/pagination'
-import { useConfirm } from '@/components/shared/confirm-dialog'
-import { CardSvgPreview } from '@/components/dashboard/card-svg-preview'
+import { useResetPageOnChange } from '@/hooks/use-reset-page'
+import { useToast } from '@/hooks/use-toast'
+import { createClient } from '@/lib/supabase/client'
+import { downloadCardImage, renderCardImage } from '@/lib/utils/card-image'
 import { errorMessage } from '@/lib/utils/errors'
 import { cardSettingsSchema, cardTemplateSchema, flattenZodErrors } from '@/lib/validators/schemas'
-import { downloadCardImage, renderCardImage } from '@/lib/utils/card-image'
 import {
-  DEFAULT_CARD_SETTINGS,
-  DEFAULT_CARD_TEMPLATE,
   type CardSettings,
   type CardTemplate,
+  DEFAULT_CARD_SETTINGS,
+  DEFAULT_CARD_TEMPLATE,
   type Member,
   type MemberCard,
 } from '@/types/domain'
-import { useResetPageOnChange } from '@/hooks/use-reset-page'
+import {
+  CheckCircle2,
+  Download,
+  IdCard,
+  Plus,
+  Printer,
+  QrCode,
+  RefreshCw,
+  Search,
+  Trash2,
+  Users,
+} from 'lucide-react'
+import Link from 'next/link'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 const PAGE_SIZE = 20
 
@@ -377,60 +377,70 @@ export default function CardsPage() {
     expiry.setDate(expiry.getDate() + validityDays)
     const expiryStr = expiry.toISOString().split('T')[0]
 
-    // For each member: renew if active card exists, create new if not
     let renewedCount = 0
     let createdCount = 0
+    const failedIds: string[] = []
+    let firstError = ''
 
     for (const memberId of bulkSelectedIds) {
-      // Check for existing active card
-      const { data: existingCard } = await supabase
-        .from('member_cards')
-        .select('id, card_number')
-        .eq('member_id', memberId)
-        .eq('status', 'active')
-        .maybeSingle()
-
-      if (existingCard) {
-        // RENEW: just extend expiry
-        await supabase
+      try {
+        const { data: existingCard, error: lookupError } = await supabase
           .from('member_cards')
-          .update({ expiry_date: expiryStr })
-          .eq('id', existingCard.id)
-        renewedCount++
-      } else {
-        // Check for previous card number to reuse
-        const { data: previousCard } = await supabase
-          .from('member_cards')
-          .select('card_number')
+          .select('id, card_number')
           .eq('member_id', memberId)
-          .order('created_at', { ascending: false })
-          .limit(1)
+          .eq('status', 'active')
           .maybeSingle()
+        if (lookupError) throw lookupError
 
-        const cardNumber =
-          previousCard?.card_number ?? (await generateCardNumber(currentCooperative.id))
-        const qrPayload = buildQrPayload(memberId, cardNumber, null)
-
-        await supabase.from('member_cards').insert({
-          cooperative_id: currentCooperative.id,
-          member_id: memberId,
-          card_number: cardNumber,
-          status: 'active',
-          expiry_date: expiryStr,
-          qr_data: qrPayload,
-        })
-        createdCount++
+        if (existingCard) {
+          const { data, error } = await supabase
+            .from('member_cards')
+            .update({ expiry_date: expiryStr })
+            .eq('id', existingCard.id)
+            .select('id')
+            .single()
+          if (error) throw error
+          if (!data) throw new Error('La carte n’a pas pu être renouvelée.')
+          renewedCount++
+        } else {
+          const { data: previousCard, error: previousError } = await supabase
+            .from('member_cards')
+            .select('card_number')
+            .eq('member_id', memberId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+          if (previousError) throw previousError
+          const cardNumber =
+            previousCard?.card_number ?? (await generateCardNumber(currentCooperative.id))
+          const { error } = await supabase.from('member_cards').insert({
+            cooperative_id: currentCooperative.id,
+            member_id: memberId,
+            card_number: cardNumber,
+            status: 'active',
+            expiry_date: expiryStr,
+            qr_data: buildQrPayload(memberId, cardNumber, null),
+          })
+          if (error) throw error
+          createdCount++
+        }
+      } catch (error) {
+        failedIds.push(memberId)
+        if (!firstError) firstError = errorMessage(error)
       }
     }
 
     setSaving(false)
-    const parts = []
-    if (createdCount > 0) parts.push(`${createdCount} créée${createdCount > 1 ? 's' : ''}`)
-    if (renewedCount > 0) parts.push(`${renewedCount} renouvelée${renewedCount > 1 ? 's' : ''}`)
-    toast({ title: `Cartes : ${parts.join(', ')}` })
-    setShowBulk(false)
-    setBulkSelectedIds([])
-    setBulkSearch('')
+    const parts = [`${createdCount} créée(s)`, `${renewedCount} renouvelée(s)`]
+    if (failedIds.length) parts.push(`${failedIds.length} non traitée(s)`)
+    toast({
+      title: `Cartes : ${parts.join(', ')}`,
+      description: firstError || undefined,
+      variant: failedIds.length ? 'destructive' : 'default',
+    })
+    setShowBulk(failedIds.length > 0)
+    setBulkSelectedIds(failedIds)
+    if (!failedIds.length) setBulkSearch('')
     fetchCards()
   }
 
@@ -599,7 +609,7 @@ export default function CardsPage() {
     <div className="space-y-8">
       <PageHeader
         title="Cartes membres"
-        description="Générer et gérer les cartes numériques avec codes QR"
+        description="Générer et gérer les cartes numériques avec codes QR. Offre gratuite : 10 cartes par coopérative."
       />
 
       <Tabs defaultValue="generated" className="w-full">

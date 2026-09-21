@@ -18,7 +18,7 @@
     "test:e2e:headed": "playwright test --config=e2e/playwright.config.ts --headed",
     "test:e2e:chromium": "playwright test --config=e2e/playwright.config.ts --project=chromium",
     "test:e2e:mobile": "playwright test --config=e2e/playwright.config.ts --project=mobile-chrome",
-    "test:hardening": "node --test tests/launch-hardening.test.mjs && node --import tsx --test tests/notification-delivery.test.ts"
+    "test:hardening": "node --test tests/launch-hardening.test.mjs tests/card-allowance.test.mjs && node --import tsx --test tests/notification-delivery.test.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
