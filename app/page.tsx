@@ -16,6 +16,7 @@ import {
   ScanLine,
   ShoppingBag,
   Sprout,
+  Store,
   TrendingUp,
   UserPlus,
   Users,
@@ -292,6 +293,68 @@ export default function Home() {
             >
               Essayer le scanner →
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ── MARCHÉ DE PROXIMITÉ ──────────────────────────────────────── */}
+      <section id="marche" className="border-t border-border py-16 sm:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid items-center gap-10 lg:grid-cols-2">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-primary">
+                <Store className="h-3.5 w-3.5" /> Marché de proximité
+              </div>
+              <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+                Ce qui se vend et se cherche près de chez vous
+              </h2>
+              <p className="mt-4 text-lg text-muted-foreground">
+                Les annonces sont classées par proximité administrative — votre canton d&apos;abord,
+                puis votre préfecture, puis votre région. Le contact se fait en direct, par appel ou
+                WhatsApp, sans intermédiaire ni commission.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Button asChild>
+                  <Link href="/marche">
+                    Voir le marché <ArrowRight className="ml-1.5 h-4 w-4" />
+                  </Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link href="/haroo">Publier une annonce</Link>
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              {[
+                {
+                  icon: ShoppingBag,
+                  title: 'Préventes de récoltes',
+                  text: 'Vendre une production à venir, au prix et au volume annoncés.',
+                },
+                {
+                  icon: Briefcase,
+                  title: 'Emplois agricoles',
+                  text: 'Trouver de la main-d’œuvre pour un chantier, dans son canton.',
+                },
+                {
+                  icon: GraduationCap,
+                  title: 'Missions de conseil',
+                  text: 'Faire appel à un agronome accrédité près de son exploitation.',
+                },
+                {
+                  icon: MapPin,
+                  title: 'Classé par proximité',
+                  text: 'Canton, puis préfecture, puis région — le plus proche en premier.',
+                },
+              ].map((item) => (
+                <div key={item.title} className="rounded-xl border border-border bg-card p-5">
+                  <item.icon className="h-5 w-5 text-primary" />
+                  <div className="mt-3 font-semibold text-foreground">{item.title}</div>
+                  <p className="mt-1 text-sm text-muted-foreground">{item.text}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>

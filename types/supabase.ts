@@ -1,10 +1,16 @@
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: '14.5'
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -56,25 +62,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'academy_assignment_submissions_assignment_id_fkey'
-            columns: ['assignment_id']
+            foreignKeyName: "academy_assignment_submissions_assignment_id_fkey"
+            columns: ["assignment_id"]
             isOneToOne: false
-            referencedRelation: 'academy_assignments'
-            referencedColumns: ['id']
+            referencedRelation: "academy_assignments"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'academy_assignment_submissions_profile_id_fkey'
-            columns: ['profile_id']
+            foreignKeyName: "academy_assignment_submissions_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'academy_assignment_submissions_reviewed_by_fkey'
-            columns: ['reviewed_by']
+            foreignKeyName: "academy_assignment_submissions_reviewed_by_fkey"
+            columns: ["reviewed_by"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -111,11 +117,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'academy_assignments_lesson_id_fkey'
-            columns: ['lesson_id']
+            foreignKeyName: "academy_assignments_lesson_id_fkey"
+            columns: ["lesson_id"]
             isOneToOne: true
-            referencedRelation: 'academy_lessons'
-            referencedColumns: ['id']
+            referencedRelation: "academy_lessons"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -152,18 +158,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'academy_lesson_slides_lesson_id_fkey'
-            columns: ['lesson_id']
+            foreignKeyName: "academy_lesson_slides_lesson_id_fkey"
+            columns: ["lesson_id"]
             isOneToOne: false
-            referencedRelation: 'academy_lessons'
-            referencedColumns: ['id']
+            referencedRelation: "academy_lessons"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'academy_lesson_slides_media_asset_id_fkey'
-            columns: ['media_asset_id']
+            foreignKeyName: "academy_lesson_slides_media_asset_id_fkey"
+            columns: ["media_asset_id"]
             isOneToOne: false
-            referencedRelation: 'academy_media_assets'
-            referencedColumns: ['id']
+            referencedRelation: "academy_media_assets"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -200,11 +206,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'academy_lessons_module_id_fkey'
-            columns: ['module_id']
+            foreignKeyName: "academy_lessons_module_id_fkey"
+            columns: ["module_id"]
             isOneToOne: false
-            referencedRelation: 'academy_modules'
-            referencedColumns: ['id']
+            referencedRelation: "academy_modules"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -250,18 +256,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'academy_media_assets_lesson_id_fkey'
-            columns: ['lesson_id']
+            foreignKeyName: "academy_media_assets_lesson_id_fkey"
+            columns: ["lesson_id"]
             isOneToOne: false
-            referencedRelation: 'academy_lessons'
-            referencedColumns: ['id']
+            referencedRelation: "academy_lessons"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'academy_media_assets_module_id_fkey'
-            columns: ['module_id']
+            foreignKeyName: "academy_media_assets_module_id_fkey"
+            columns: ["module_id"]
             isOneToOne: false
-            referencedRelation: 'academy_modules'
-            referencedColumns: ['id']
+            referencedRelation: "academy_modules"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -313,25 +319,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'academy_modules_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "academy_modules_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'academy_modules_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "academy_modules_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'academy_modules_created_by_fkey'
-            columns: ['created_by']
+            foreignKeyName: "academy_modules_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -377,25 +383,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'academy_profile_progress_lesson_id_fkey'
-            columns: ['lesson_id']
+            foreignKeyName: "academy_profile_progress_lesson_id_fkey"
+            columns: ["lesson_id"]
             isOneToOne: false
-            referencedRelation: 'academy_lessons'
-            referencedColumns: ['id']
+            referencedRelation: "academy_lessons"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'academy_profile_progress_module_id_fkey'
-            columns: ['module_id']
+            foreignKeyName: "academy_profile_progress_module_id_fkey"
+            columns: ["module_id"]
             isOneToOne: false
-            referencedRelation: 'academy_modules'
-            referencedColumns: ['id']
+            referencedRelation: "academy_modules"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'academy_profile_progress_profile_id_fkey'
-            columns: ['profile_id']
+            foreignKeyName: "academy_profile_progress_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -432,25 +438,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'academy_progress_lesson_id_fkey'
-            columns: ['lesson_id']
+            foreignKeyName: "academy_progress_lesson_id_fkey"
+            columns: ["lesson_id"]
             isOneToOne: false
-            referencedRelation: 'academy_lessons'
-            referencedColumns: ['id']
+            referencedRelation: "academy_lessons"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'academy_progress_member_id_fkey'
-            columns: ['member_id']
+            foreignKeyName: "academy_progress_member_id_fkey"
+            columns: ["member_id"]
             isOneToOne: false
-            referencedRelation: 'members'
-            referencedColumns: ['id']
+            referencedRelation: "members"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'academy_progress_module_id_fkey'
-            columns: ['module_id']
+            foreignKeyName: "academy_progress_module_id_fkey"
+            columns: ["module_id"]
             isOneToOne: false
-            referencedRelation: 'academy_modules'
-            referencedColumns: ['id']
+            referencedRelation: "academy_modules"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -490,18 +496,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'academy_quiz_attempts_profile_id_fkey'
-            columns: ['profile_id']
+            foreignKeyName: "academy_quiz_attempts_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'academy_quiz_attempts_quiz_id_fkey'
-            columns: ['quiz_id']
+            foreignKeyName: "academy_quiz_attempts_quiz_id_fkey"
+            columns: ["quiz_id"]
             isOneToOne: false
-            referencedRelation: 'academy_quizzes'
-            referencedColumns: ['id']
+            referencedRelation: "academy_quizzes"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -532,11 +538,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'academy_quiz_options_question_id_fkey'
-            columns: ['question_id']
+            foreignKeyName: "academy_quiz_options_question_id_fkey"
+            columns: ["question_id"]
             isOneToOne: false
-            referencedRelation: 'academy_quiz_questions'
-            referencedColumns: ['id']
+            referencedRelation: "academy_quiz_questions"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -576,11 +582,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'academy_quiz_questions_quiz_id_fkey'
-            columns: ['quiz_id']
+            foreignKeyName: "academy_quiz_questions_quiz_id_fkey"
+            columns: ["quiz_id"]
             isOneToOne: false
-            referencedRelation: 'academy_quizzes'
-            referencedColumns: ['id']
+            referencedRelation: "academy_quizzes"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -626,18 +632,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'academy_quizzes_lesson_id_fkey'
-            columns: ['lesson_id']
+            foreignKeyName: "academy_quizzes_lesson_id_fkey"
+            columns: ["lesson_id"]
             isOneToOne: true
-            referencedRelation: 'academy_lessons'
-            referencedColumns: ['id']
+            referencedRelation: "academy_lessons"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'academy_quizzes_module_id_fkey'
-            columns: ['module_id']
+            foreignKeyName: "academy_quizzes_module_id_fkey"
+            columns: ["module_id"]
             isOneToOne: false
-            referencedRelation: 'academy_modules'
-            referencedColumns: ['id']
+            referencedRelation: "academy_modules"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -707,18 +713,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'audit_logs_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "audit_logs_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'audit_logs_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "audit_logs_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -794,29 +800,29 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'buyer_matches_listing_id_fkey'
-            columns: ['listing_id']
+            foreignKeyName: "buyer_matches_listing_id_fkey"
+            columns: ["listing_id"]
             isOneToOne: false
-            referencedRelation: 'market_listings'
-            referencedColumns: ['id']
+            referencedRelation: "market_listings"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'buyer_matches_request_id_fkey'
-            columns: ['request_id']
+            foreignKeyName: "buyer_matches_request_id_fkey"
+            columns: ["request_id"]
             isOneToOne: false
-            referencedRelation: 'buyer_requests'
-            referencedColumns: ['id']
+            referencedRelation: "buyer_requests"
+            referencedColumns: ["id"]
           },
         ]
       }
       buyer_requests: {
         Row: {
-          created_by: string | null
           buyer_email: string | null
           buyer_name: string
           buyer_phone: string | null
           cooperative_id: string | null
           created_at: string | null
+          created_by: string | null
           culture: string
           id: string
           location_prefecture: string | null
@@ -828,12 +834,12 @@ export type Database = {
           status: string
         }
         Insert: {
-          created_by?: string | null
           buyer_email?: string | null
           buyer_name: string
           buyer_phone?: string | null
           cooperative_id?: string | null
           created_at?: string | null
+          created_by?: string | null
           culture: string
           id?: string
           location_prefecture?: string | null
@@ -845,12 +851,12 @@ export type Database = {
           status?: string
         }
         Update: {
-          created_by?: string | null
           buyer_email?: string | null
           buyer_name?: string
           buyer_phone?: string | null
           cooperative_id?: string | null
           created_at?: string | null
+          created_by?: string | null
           culture?: string
           id?: string
           location_prefecture?: string | null
@@ -863,18 +869,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'buyer_requests_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "buyer_requests_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'buyer_requests_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "buyer_requests_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "buyer_requests_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -914,18 +927,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'campagnes_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "campagnes_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'campagnes_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "campagnes_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -953,18 +966,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'cantons_commune_id_fkey'
-            columns: ['commune_id']
+            foreignKeyName: "cantons_commune_id_fkey"
+            columns: ["commune_id"]
             isOneToOne: false
-            referencedRelation: 'communes'
-            referencedColumns: ['id']
+            referencedRelation: "communes"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'cantons_prefecture_id_fkey'
-            columns: ['prefecture_id']
+            foreignKeyName: "cantons_prefecture_id_fkey"
+            columns: ["prefecture_id"]
             isOneToOne: false
-            referencedRelation: 'prefectures'
-            referencedColumns: ['id']
+            referencedRelation: "prefectures"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1001,25 +1014,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'card_print_order_items_member_card_id_fkey'
-            columns: ['member_card_id']
+            foreignKeyName: "card_print_order_items_member_card_id_fkey"
+            columns: ["member_card_id"]
             isOneToOne: false
-            referencedRelation: 'member_cards'
-            referencedColumns: ['id']
+            referencedRelation: "member_cards"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'card_print_order_items_member_id_fkey'
-            columns: ['member_id']
+            foreignKeyName: "card_print_order_items_member_id_fkey"
+            columns: ["member_id"]
             isOneToOne: false
-            referencedRelation: 'members'
-            referencedColumns: ['id']
+            referencedRelation: "members"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'card_print_order_items_order_id_fkey'
-            columns: ['order_id']
+            foreignKeyName: "card_print_order_items_order_id_fkey"
+            columns: ["order_id"]
             isOneToOne: false
-            referencedRelation: 'card_print_orders'
-            referencedColumns: ['id']
+            referencedRelation: "card_print_orders"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1037,7 +1050,7 @@ export type Database = {
           provider: string
           provider_reference: string | null
           requested_by: string | null
-          status: Database['public']['Enums']['card_print_order_status']
+          status: Database["public"]["Enums"]["card_print_order_status"]
           updated_at: string
         }
         Insert: {
@@ -1053,7 +1066,7 @@ export type Database = {
           provider?: string
           provider_reference?: string | null
           requested_by?: string | null
-          status?: Database['public']['Enums']['card_print_order_status']
+          status?: Database["public"]["Enums"]["card_print_order_status"]
           updated_at?: string
         }
         Update: {
@@ -1069,37 +1082,37 @@ export type Database = {
           provider?: string
           provider_reference?: string | null
           requested_by?: string | null
-          status?: Database['public']['Enums']['card_print_order_status']
+          status?: Database["public"]["Enums"]["card_print_order_status"]
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: 'card_print_orders_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "card_print_orders_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'card_print_orders_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "card_print_orders_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'card_print_orders_partner_id_fkey'
-            columns: ['partner_id']
+            foreignKeyName: "card_print_orders_partner_id_fkey"
+            columns: ["partner_id"]
             isOneToOne: false
-            referencedRelation: 'partners'
-            referencedColumns: ['id']
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'card_print_orders_requested_by_fkey'
-            columns: ['requested_by']
+            foreignKeyName: "card_print_orders_requested_by_fkey"
+            columns: ["requested_by"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1124,11 +1137,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'communes_prefecture_id_fkey'
-            columns: ['prefecture_id']
+            foreignKeyName: "communes_prefecture_id_fkey"
+            columns: ["prefecture_id"]
             isOneToOne: false
-            referencedRelation: 'prefectures'
-            referencedColumns: ['id']
+            referencedRelation: "prefectures"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1201,11 +1214,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'contact_requests_member_id_fkey'
-            columns: ['member_id']
+            foreignKeyName: "contact_requests_member_id_fkey"
+            columns: ["member_id"]
             isOneToOne: false
-            referencedRelation: 'members'
-            referencedColumns: ['id']
+            referencedRelation: "members"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1233,18 +1246,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'cooperative_settings_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "cooperative_settings_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: true
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'cooperative_settings_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "cooperative_settings_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: true
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1305,18 +1318,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'cooperatives_parent_id_fkey'
-            columns: ['parent_id']
+            foreignKeyName: "cooperatives_parent_id_fkey"
+            columns: ["parent_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'cooperatives_parent_id_fkey'
-            columns: ['parent_id']
+            foreignKeyName: "cooperatives_parent_id_fkey"
+            columns: ["parent_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1368,25 +1381,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'cotisations_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "cotisations_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'cotisations_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "cotisations_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'cotisations_member_id_fkey'
-            columns: ['member_id']
+            foreignKeyName: "cotisations_member_id_fkey"
+            columns: ["member_id"]
             isOneToOne: false
-            referencedRelation: 'members'
-            referencedColumns: ['id']
+            referencedRelation: "members"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1456,32 +1469,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'credit_applications_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "credit_applications_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'credit_applications_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "credit_applications_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'credit_applications_member_id_fkey'
-            columns: ['member_id']
+            foreignKeyName: "credit_applications_member_id_fkey"
+            columns: ["member_id"]
             isOneToOne: false
-            referencedRelation: 'members'
-            referencedColumns: ['id']
+            referencedRelation: "members"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'credit_applications_reviewed_by_fkey'
-            columns: ['reviewed_by']
+            foreignKeyName: "credit_applications_reviewed_by_fkey"
+            columns: ["reviewed_by"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1518,11 +1531,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'credit_repayments_application_id_fkey'
-            columns: ['application_id']
+            foreignKeyName: "credit_repayments_application_id_fkey"
+            columns: ["application_id"]
             isOneToOne: false
-            referencedRelation: 'credit_applications'
-            referencedColumns: ['id']
+            referencedRelation: "credit_applications"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1589,18 +1602,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'embed_configs_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "embed_configs_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: true
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'embed_configs_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "embed_configs_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: true
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1667,39 +1680,39 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'fiches_techniques_canton_id_fkey'
-            columns: ['canton_id']
+            foreignKeyName: "fiches_techniques_canton_id_fkey"
+            columns: ["canton_id"]
             isOneToOne: false
-            referencedRelation: 'cantons'
-            referencedColumns: ['id']
+            referencedRelation: "cantons"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'fiches_techniques_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "fiches_techniques_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'fiches_techniques_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "fiches_techniques_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'fiches_techniques_prefecture_id_fkey'
-            columns: ['prefecture_id']
+            foreignKeyName: "fiches_techniques_prefecture_id_fkey"
+            columns: ["prefecture_id"]
             isOneToOne: false
-            referencedRelation: 'prefectures'
-            referencedColumns: ['id']
+            referencedRelation: "prefectures"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'fiches_techniques_region_id_fkey'
-            columns: ['region_id']
+            foreignKeyName: "fiches_techniques_region_id_fkey"
+            columns: ["region_id"]
             isOneToOne: false
-            referencedRelation: 'regions'
-            referencedColumns: ['id']
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1718,18 +1731,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'haroo_acheteur_cantons_acheteur_id_fkey'
-            columns: ['acheteur_id']
+            foreignKeyName: "haroo_acheteur_cantons_acheteur_id_fkey"
+            columns: ["acheteur_id"]
             isOneToOne: false
-            referencedRelation: 'haroo_acheteur_profiles'
-            referencedColumns: ['id']
+            referencedRelation: "haroo_acheteur_profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'haroo_acheteur_cantons_canton_id_fkey'
-            columns: ['canton_id']
+            foreignKeyName: "haroo_acheteur_cantons_canton_id_fkey"
+            columns: ["canton_id"]
             isOneToOne: false
-            referencedRelation: 'cantons'
-            referencedColumns: ['id']
+            referencedRelation: "cantons"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1781,18 +1794,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'haroo_acheteur_profiles_member_card_id_fkey'
-            columns: ['member_card_id']
+            foreignKeyName: "haroo_acheteur_profiles_member_card_id_fkey"
+            columns: ["member_card_id"]
             isOneToOne: false
-            referencedRelation: 'member_cards'
-            referencedColumns: ['id']
+            referencedRelation: "member_cards"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'haroo_acheteur_profiles_prefecture_id_fkey'
-            columns: ['prefecture_id']
+            foreignKeyName: "haroo_acheteur_profiles_prefecture_id_fkey"
+            columns: ["prefecture_id"]
             isOneToOne: false
-            referencedRelation: 'prefectures'
-            referencedColumns: ['id']
+            referencedRelation: "prefectures"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1853,18 +1866,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'haroo_agronome_profiles_canton_id_fkey'
-            columns: ['canton_id']
+            foreignKeyName: "haroo_agronome_profiles_canton_id_fkey"
+            columns: ["canton_id"]
             isOneToOne: false
-            referencedRelation: 'cantons'
-            referencedColumns: ['id']
+            referencedRelation: "cantons"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'haroo_agronome_profiles_member_card_id_fkey'
-            columns: ['member_card_id']
+            foreignKeyName: "haroo_agronome_profiles_member_card_id_fkey"
+            columns: ["member_card_id"]
             isOneToOne: false
-            referencedRelation: 'member_cards'
-            referencedColumns: ['id']
+            referencedRelation: "member_cards"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1910,11 +1923,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'haroo_jobs_canton_id_fkey'
-            columns: ['canton_id']
+            foreignKeyName: "haroo_jobs_canton_id_fkey"
+            columns: ["canton_id"]
             isOneToOne: false
-            referencedRelation: 'cantons'
-            referencedColumns: ['id']
+            referencedRelation: "cantons"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1954,11 +1967,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'haroo_missions_agronome_id_fkey'
-            columns: ['agronome_id']
+            foreignKeyName: "haroo_missions_agronome_id_fkey"
+            columns: ["agronome_id"]
             isOneToOne: false
-            referencedRelation: 'haroo_agronome_profiles'
-            referencedColumns: ['id']
+            referencedRelation: "haroo_agronome_profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1977,18 +1990,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'haroo_ouvrier_cantons_canton_id_fkey'
-            columns: ['canton_id']
+            foreignKeyName: "haroo_ouvrier_cantons_canton_id_fkey"
+            columns: ["canton_id"]
             isOneToOne: false
-            referencedRelation: 'cantons'
-            referencedColumns: ['id']
+            referencedRelation: "cantons"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'haroo_ouvrier_cantons_ouvrier_id_fkey'
-            columns: ['ouvrier_id']
+            foreignKeyName: "haroo_ouvrier_cantons_ouvrier_id_fkey"
+            columns: ["ouvrier_id"]
             isOneToOne: false
-            referencedRelation: 'haroo_ouvrier_profiles'
-            referencedColumns: ['id']
+            referencedRelation: "haroo_ouvrier_profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2043,11 +2056,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'haroo_ouvrier_profiles_member_card_id_fkey'
-            columns: ['member_card_id']
+            foreignKeyName: "haroo_ouvrier_profiles_member_card_id_fkey"
+            columns: ["member_card_id"]
             isOneToOne: false
-            referencedRelation: 'member_cards'
-            referencedColumns: ['id']
+            referencedRelation: "member_cards"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2090,11 +2103,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'haroo_presales_canton_id_fkey'
-            columns: ['canton_id']
+            foreignKeyName: "haroo_presales_canton_id_fkey"
+            columns: ["canton_id"]
             isOneToOne: false
-            referencedRelation: 'cantons'
-            referencedColumns: ['id']
+            referencedRelation: "cantons"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2131,18 +2144,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'integrations_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "integrations_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'integrations_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "integrations_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2191,32 +2204,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'intrants_campagne_id_fkey'
-            columns: ['campagne_id']
+            foreignKeyName: "intrants_campagne_id_fkey"
+            columns: ["campagne_id"]
             isOneToOne: false
-            referencedRelation: 'campagnes'
-            referencedColumns: ['id']
+            referencedRelation: "campagnes"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'intrants_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "intrants_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'intrants_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "intrants_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'intrants_member_id_fkey'
-            columns: ['member_id']
+            foreignKeyName: "intrants_member_id_fkey"
+            columns: ["member_id"]
             isOneToOne: false
-            referencedRelation: 'members'
-            referencedColumns: ['id']
+            referencedRelation: "members"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2271,39 +2284,39 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'journal_entries_campagne_id_fkey'
-            columns: ['campagne_id']
+            foreignKeyName: "journal_entries_campagne_id_fkey"
+            columns: ["campagne_id"]
             isOneToOne: false
-            referencedRelation: 'campagnes'
-            referencedColumns: ['id']
+            referencedRelation: "campagnes"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'journal_entries_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "journal_entries_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'journal_entries_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "journal_entries_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'journal_entries_member_id_fkey'
-            columns: ['member_id']
+            foreignKeyName: "journal_entries_member_id_fkey"
+            columns: ["member_id"]
             isOneToOne: false
-            referencedRelation: 'members'
-            referencedColumns: ['id']
+            referencedRelation: "members"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'journal_entries_parcelle_id_fkey'
-            columns: ['parcelle_id']
+            foreignKeyName: "journal_entries_parcelle_id_fkey"
+            columns: ["parcelle_id"]
             isOneToOne: false
-            referencedRelation: 'parcelles'
-            referencedColumns: ['id']
+            referencedRelation: "parcelles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2343,18 +2356,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'kobo_field_mappings_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "kobo_field_mappings_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'kobo_field_mappings_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "kobo_field_mappings_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2412,25 +2425,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'kobo_submissions_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "kobo_submissions_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'kobo_submissions_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "kobo_submissions_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'kobo_submissions_member_id_fkey'
-            columns: ['member_id']
+            foreignKeyName: "kobo_submissions_member_id_fkey"
+            columns: ["member_id"]
             isOneToOne: false
-            referencedRelation: 'members'
-            referencedColumns: ['id']
+            referencedRelation: "members"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2488,25 +2501,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'kobo_sync_logs_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "kobo_sync_logs_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'kobo_sync_logs_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "kobo_sync_logs_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'kobo_sync_logs_integration_id_fkey'
-            columns: ['integration_id']
+            foreignKeyName: "kobo_sync_logs_integration_id_fkey"
+            columns: ["integration_id"]
             isOneToOne: false
-            referencedRelation: 'integrations'
-            referencedColumns: ['id']
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2570,25 +2583,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'market_listings_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "market_listings_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'market_listings_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "market_listings_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'market_listings_member_id_fkey'
-            columns: ['member_id']
+            foreignKeyName: "market_listings_member_id_fkey"
+            columns: ["member_id"]
             isOneToOne: false
-            referencedRelation: 'members'
-            referencedColumns: ['id']
+            referencedRelation: "members"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2646,39 +2659,39 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'market_prices_canton_id_fkey'
-            columns: ['canton_id']
+            foreignKeyName: "market_prices_canton_id_fkey"
+            columns: ["canton_id"]
             isOneToOne: false
-            referencedRelation: 'cantons'
-            referencedColumns: ['id']
+            referencedRelation: "cantons"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'market_prices_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "market_prices_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'market_prices_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "market_prices_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'market_prices_culture_id_fkey'
-            columns: ['culture_id']
+            foreignKeyName: "market_prices_culture_id_fkey"
+            columns: ["culture_id"]
             isOneToOne: false
-            referencedRelation: 'cultures'
-            referencedColumns: ['id']
+            referencedRelation: "cultures"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'market_prices_region_id_fkey'
-            columns: ['region_id']
+            foreignKeyName: "market_prices_region_id_fkey"
+            columns: ["region_id"]
             isOneToOne: false
-            referencedRelation: 'regions'
-            referencedColumns: ['id']
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2751,32 +2764,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'marketplace_products_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "marketplace_products_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'marketplace_products_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "marketplace_products_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'marketplace_products_prefecture_id_fkey'
-            columns: ['prefecture_id']
+            foreignKeyName: "marketplace_products_prefecture_id_fkey"
+            columns: ["prefecture_id"]
             isOneToOne: false
-            referencedRelation: 'prefectures'
-            referencedColumns: ['id']
+            referencedRelation: "prefectures"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'marketplace_products_region_id_fkey'
-            columns: ['region_id']
+            foreignKeyName: "marketplace_products_region_id_fkey"
+            columns: ["region_id"]
             isOneToOne: false
-            referencedRelation: 'regions'
-            referencedColumns: ['id']
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2810,32 +2823,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'member_access_logs_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "member_access_logs_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'member_access_logs_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "member_access_logs_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'member_access_logs_fiche_id_fkey'
-            columns: ['fiche_id']
+            foreignKeyName: "member_access_logs_fiche_id_fkey"
+            columns: ["fiche_id"]
             isOneToOne: false
-            referencedRelation: 'fiches_techniques'
-            referencedColumns: ['id']
+            referencedRelation: "fiches_techniques"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'member_access_logs_member_id_fkey'
-            columns: ['member_id']
+            foreignKeyName: "member_access_logs_member_id_fkey"
+            columns: ["member_id"]
             isOneToOne: false
-            referencedRelation: 'members'
-            referencedColumns: ['id']
+            referencedRelation: "members"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2884,25 +2897,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'member_ats_scores_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "member_ats_scores_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'member_ats_scores_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "member_ats_scores_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'member_ats_scores_member_id_fkey'
-            columns: ['member_id']
+            foreignKeyName: "member_ats_scores_member_id_fkey"
+            columns: ["member_id"]
             isOneToOne: true
-            referencedRelation: 'members'
-            referencedColumns: ['id']
+            referencedRelation: "members"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2948,25 +2961,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'member_cards_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "member_cards_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'member_cards_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "member_cards_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'member_cards_member_id_fkey'
-            columns: ['member_id']
+            foreignKeyName: "member_cards_member_id_fkey"
+            columns: ["member_id"]
             isOneToOne: false
-            referencedRelation: 'members'
-            referencedColumns: ['id']
+            referencedRelation: "members"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3045,39 +3058,39 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'members_canton_id_fkey'
-            columns: ['canton_id']
+            foreignKeyName: "members_canton_id_fkey"
+            columns: ["canton_id"]
             isOneToOne: false
-            referencedRelation: 'cantons'
-            referencedColumns: ['id']
+            referencedRelation: "cantons"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'members_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "members_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'members_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "members_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'members_prefecture_id_fkey'
-            columns: ['prefecture_id']
+            foreignKeyName: "members_prefecture_id_fkey"
+            columns: ["prefecture_id"]
             isOneToOne: false
-            referencedRelation: 'prefectures'
-            referencedColumns: ['id']
+            referencedRelation: "prefectures"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'members_region_id_fkey'
-            columns: ['region_id']
+            foreignKeyName: "members_region_id_fkey"
+            columns: ["region_id"]
             isOneToOne: false
-            referencedRelation: 'regions'
-            referencedColumns: ['id']
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3086,10 +3099,12 @@ export type Database = {
           attempts: number | null
           body_rendered: string | null
           channel: string
+          claim_token: string | null
           cooperative_id: string | null
           created_at: string | null
           id: string
           last_error: string | null
+          locked_until: string | null
           member_id: string | null
           recipient_email: string | null
           recipient_phone: string | null
@@ -3103,10 +3118,12 @@ export type Database = {
           attempts?: number | null
           body_rendered?: string | null
           channel: string
+          claim_token?: string | null
           cooperative_id?: string | null
           created_at?: string | null
           id?: string
           last_error?: string | null
+          locked_until?: string | null
           member_id?: string | null
           recipient_email?: string | null
           recipient_phone?: string | null
@@ -3120,10 +3137,12 @@ export type Database = {
           attempts?: number | null
           body_rendered?: string | null
           channel?: string
+          claim_token?: string | null
           cooperative_id?: string | null
           created_at?: string | null
           id?: string
           last_error?: string | null
+          locked_until?: string | null
           member_id?: string | null
           recipient_email?: string | null
           recipient_phone?: string | null
@@ -3135,32 +3154,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'notification_queue_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "notification_queue_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'notification_queue_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "notification_queue_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'notification_queue_member_id_fkey'
-            columns: ['member_id']
+            foreignKeyName: "notification_queue_member_id_fkey"
+            columns: ["member_id"]
             isOneToOne: false
-            referencedRelation: 'members'
-            referencedColumns: ['id']
+            referencedRelation: "members"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'notification_queue_template_key_fkey'
-            columns: ['template_key']
+            foreignKeyName: "notification_queue_template_key_fkey"
+            columns: ["template_key"]
             isOneToOne: false
-            referencedRelation: 'notification_templates'
-            referencedColumns: ['key']
+            referencedRelation: "notification_templates"
+            referencedColumns: ["key"]
           },
         ]
       }
@@ -3227,18 +3246,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'notifications_inapp_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "notifications_inapp_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'notifications_inapp_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "notifications_inapp_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3255,7 +3274,7 @@ export type Database = {
           settled_at: string | null
           settlement_method: string | null
           settlement_reference: string | null
-          status: Database['public']['Enums']['organization_earning_status']
+          status: Database["public"]["Enums"]["organization_earning_status"]
           updated_at: string
         }
         Insert: {
@@ -3270,7 +3289,7 @@ export type Database = {
           settled_at?: string | null
           settlement_method?: string | null
           settlement_reference?: string | null
-          status?: Database['public']['Enums']['organization_earning_status']
+          status?: Database["public"]["Enums"]["organization_earning_status"]
           updated_at?: string
         }
         Update: {
@@ -3285,44 +3304,44 @@ export type Database = {
           settled_at?: string | null
           settlement_method?: string | null
           settlement_reference?: string | null
-          status?: Database['public']['Enums']['organization_earning_status']
+          status?: Database["public"]["Enums"]["organization_earning_status"]
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: 'organization_earnings_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "organization_earnings_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'organization_earnings_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "organization_earnings_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'organization_earnings_order_id_fkey'
-            columns: ['order_id']
+            foreignKeyName: "organization_earnings_order_id_fkey"
+            columns: ["order_id"]
             isOneToOne: false
-            referencedRelation: 'card_print_orders'
-            referencedColumns: ['id']
+            referencedRelation: "card_print_orders"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'organization_earnings_order_item_id_fkey'
-            columns: ['order_item_id']
+            foreignKeyName: "organization_earnings_order_item_id_fkey"
+            columns: ["order_item_id"]
             isOneToOne: true
-            referencedRelation: 'card_print_order_items'
-            referencedColumns: ['id']
+            referencedRelation: "card_print_order_items"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'organization_earnings_partner_id_fkey'
-            columns: ['partner_id']
+            foreignKeyName: "organization_earnings_partner_id_fkey"
+            columns: ["partner_id"]
             isOneToOne: false
-            referencedRelation: 'partners'
-            referencedColumns: ['id']
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3377,48 +3396,48 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'parcelles_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "parcelles_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'parcelles_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "parcelles_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'parcelles_member_id_fkey'
-            columns: ['member_id']
+            foreignKeyName: "parcelles_member_id_fkey"
+            columns: ["member_id"]
             isOneToOne: false
-            referencedRelation: 'members'
-            referencedColumns: ['id']
+            referencedRelation: "members"
+            referencedColumns: ["id"]
           },
         ]
       }
       partner_assignment_scopes: {
         Row: {
           assignment_id: string
-          scope: Database['public']['Enums']['partner_access_scope']
+          scope: Database["public"]["Enums"]["partner_access_scope"]
         }
         Insert: {
           assignment_id: string
-          scope: Database['public']['Enums']['partner_access_scope']
+          scope: Database["public"]["Enums"]["partner_access_scope"]
         }
         Update: {
           assignment_id?: string
-          scope?: Database['public']['Enums']['partner_access_scope']
+          scope?: Database["public"]["Enums"]["partner_access_scope"]
         }
         Relationships: [
           {
-            foreignKeyName: 'partner_assignment_scopes_assignment_id_fkey'
-            columns: ['assignment_id']
+            foreignKeyName: "partner_assignment_scopes_assignment_id_fkey"
+            columns: ["assignment_id"]
             isOneToOne: false
-            referencedRelation: 'partner_organization_assignments'
-            referencedColumns: ['id']
+            referencedRelation: "partner_organization_assignments"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3461,25 +3480,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'partner_certifications_academy_module_id_fkey'
-            columns: ['academy_module_id']
+            foreignKeyName: "partner_certifications_academy_module_id_fkey"
+            columns: ["academy_module_id"]
             isOneToOne: false
-            referencedRelation: 'academy_modules'
-            referencedColumns: ['id']
+            referencedRelation: "academy_modules"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'partner_certifications_partner_id_fkey'
-            columns: ['partner_id']
+            foreignKeyName: "partner_certifications_partner_id_fkey"
+            columns: ["partner_id"]
             isOneToOne: false
-            referencedRelation: 'partners'
-            referencedColumns: ['id']
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'partner_certifications_user_id_fkey'
-            columns: ['user_id']
+            foreignKeyName: "partner_certifications_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: true
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3487,44 +3506,44 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          membership_role: Database['public']['Enums']['partner_membership_role']
+          membership_role: Database["public"]["Enums"]["partner_membership_role"]
           partner_id: string
-          status: Database['public']['Enums']['partner_membership_status']
+          status: Database["public"]["Enums"]["partner_membership_status"]
           updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
-          membership_role?: Database['public']['Enums']['partner_membership_role']
+          membership_role?: Database["public"]["Enums"]["partner_membership_role"]
           partner_id: string
-          status?: Database['public']['Enums']['partner_membership_status']
+          status?: Database["public"]["Enums"]["partner_membership_status"]
           updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
           id?: string
-          membership_role?: Database['public']['Enums']['partner_membership_role']
+          membership_role?: Database["public"]["Enums"]["partner_membership_role"]
           partner_id?: string
-          status?: Database['public']['Enums']['partner_membership_status']
+          status?: Database["public"]["Enums"]["partner_membership_status"]
           updated_at?: string
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: 'partner_memberships_partner_id_fkey'
-            columns: ['partner_id']
+            foreignKeyName: "partner_memberships_partner_id_fkey"
+            columns: ["partner_id"]
             isOneToOne: false
-            referencedRelation: 'partners'
-            referencedColumns: ['id']
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'partner_memberships_user_id_fkey'
-            columns: ['user_id']
+            foreignKeyName: "partner_memberships_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3539,7 +3558,7 @@ export type Database = {
           partner_id: string
           revoked_by: string | null
           started_at: string
-          status: Database['public']['Enums']['partner_assignment_status']
+          status: Database["public"]["Enums"]["partner_assignment_status"]
           updated_at: string
         }
         Insert: {
@@ -3552,7 +3571,7 @@ export type Database = {
           partner_id: string
           revoked_by?: string | null
           started_at?: string
-          status?: Database['public']['Enums']['partner_assignment_status']
+          status?: Database["public"]["Enums"]["partner_assignment_status"]
           updated_at?: string
         }
         Update: {
@@ -3565,44 +3584,44 @@ export type Database = {
           partner_id?: string
           revoked_by?: string | null
           started_at?: string
-          status?: Database['public']['Enums']['partner_assignment_status']
+          status?: Database["public"]["Enums"]["partner_assignment_status"]
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: 'partner_organization_assignments_approved_by_fkey'
-            columns: ['approved_by']
+            foreignKeyName: "partner_organization_assignments_approved_by_fkey"
+            columns: ["approved_by"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'partner_organization_assignments_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "partner_organization_assignments_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'partner_organization_assignments_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "partner_organization_assignments_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'partner_organization_assignments_partner_id_fkey'
-            columns: ['partner_id']
+            foreignKeyName: "partner_organization_assignments_partner_id_fkey"
+            columns: ["partner_id"]
             isOneToOne: false
-            referencedRelation: 'partners'
-            referencedColumns: ['id']
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'partner_organization_assignments_revoked_by_fkey'
-            columns: ['revoked_by']
+            foreignKeyName: "partner_organization_assignments_revoked_by_fkey"
+            columns: ["revoked_by"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3618,8 +3637,8 @@ export type Database = {
           phone: string | null
           provider: string
           provider_reference: string
-          purpose: Database['public']['Enums']['partner_payment_purpose']
-          status: Database['public']['Enums']['partner_payment_intent_status']
+          purpose: Database["public"]["Enums"]["partner_payment_purpose"]
+          status: Database["public"]["Enums"]["partner_payment_intent_status"]
           updated_at: string
         }
         Insert: {
@@ -3633,8 +3652,8 @@ export type Database = {
           phone?: string | null
           provider?: string
           provider_reference: string
-          purpose: Database['public']['Enums']['partner_payment_purpose']
-          status?: Database['public']['Enums']['partner_payment_intent_status']
+          purpose: Database["public"]["Enums"]["partner_payment_purpose"]
+          status?: Database["public"]["Enums"]["partner_payment_intent_status"]
           updated_at?: string
         }
         Update: {
@@ -3648,24 +3667,24 @@ export type Database = {
           phone?: string | null
           provider?: string
           provider_reference?: string
-          purpose?: Database['public']['Enums']['partner_payment_purpose']
-          status?: Database['public']['Enums']['partner_payment_intent_status']
+          purpose?: Database["public"]["Enums"]["partner_payment_purpose"]
+          status?: Database["public"]["Enums"]["partner_payment_intent_status"]
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: 'partner_payment_intents_created_by_fkey'
-            columns: ['created_by']
+            foreignKeyName: "partner_payment_intents_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'partner_payment_intents_partner_id_fkey'
-            columns: ['partner_id']
+            foreignKeyName: "partner_payment_intents_partner_id_fkey"
+            columns: ["partner_id"]
             isOneToOne: false
-            referencedRelation: 'partners'
-            referencedColumns: ['id']
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3675,7 +3694,7 @@ export type Database = {
           balance_after: number
           created_at: string
           created_by: string | null
-          entry_type: Database['public']['Enums']['partner_ledger_entry_type']
+          entry_type: Database["public"]["Enums"]["partner_ledger_entry_type"]
           id: string
           idempotency_key: string
           note: string | null
@@ -3690,7 +3709,7 @@ export type Database = {
           balance_after: number
           created_at?: string
           created_by?: string | null
-          entry_type: Database['public']['Enums']['partner_ledger_entry_type']
+          entry_type: Database["public"]["Enums"]["partner_ledger_entry_type"]
           id?: string
           idempotency_key: string
           note?: string | null
@@ -3705,7 +3724,7 @@ export type Database = {
           balance_after?: number
           created_at?: string
           created_by?: string | null
-          entry_type?: Database['public']['Enums']['partner_ledger_entry_type']
+          entry_type?: Database["public"]["Enums"]["partner_ledger_entry_type"]
           id?: string
           idempotency_key?: string
           note?: string | null
@@ -3717,46 +3736,46 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'fk_wallet_ledger_payment_intent'
-            columns: ['payment_intent_id']
+            foreignKeyName: "fk_wallet_ledger_payment_intent"
+            columns: ["payment_intent_id"]
             isOneToOne: false
-            referencedRelation: 'partner_payment_intents'
-            referencedColumns: ['id']
+            referencedRelation: "partner_payment_intents"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'fk_wallet_ledger_usage_event'
-            columns: ['usage_event_id']
+            foreignKeyName: "fk_wallet_ledger_usage_event"
+            columns: ["usage_event_id"]
             isOneToOne: false
-            referencedRelation: 'usage_events'
-            referencedColumns: ['id']
+            referencedRelation: "usage_events"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'partner_wallet_ledger_created_by_fkey'
-            columns: ['created_by']
+            foreignKeyName: "partner_wallet_ledger_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'partner_wallet_ledger_partner_id_fkey'
-            columns: ['partner_id']
+            foreignKeyName: "partner_wallet_ledger_partner_id_fkey"
+            columns: ["partner_id"]
             isOneToOne: false
-            referencedRelation: 'partners'
-            referencedColumns: ['id']
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'partner_wallet_ledger_reversed_ledger_id_fkey'
-            columns: ['reversed_ledger_id']
+            foreignKeyName: "partner_wallet_ledger_reversed_ledger_id_fkey"
+            columns: ["reversed_ledger_id"]
             isOneToOne: false
-            referencedRelation: 'partner_wallet_ledger'
-            referencedColumns: ['id']
+            referencedRelation: "partner_wallet_ledger"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'partner_wallet_ledger_wallet_id_fkey'
-            columns: ['wallet_id']
+            foreignKeyName: "partner_wallet_ledger_wallet_id_fkey"
+            columns: ["wallet_id"]
             isOneToOne: false
-            referencedRelation: 'partner_wallets'
-            referencedColumns: ['id']
+            referencedRelation: "partner_wallets"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3784,11 +3803,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'partner_wallets_partner_id_fkey'
-            columns: ['partner_id']
+            foreignKeyName: "partner_wallets_partner_id_fkey"
+            columns: ["partner_id"]
             isOneToOne: true
-            referencedRelation: 'partners'
-            referencedColumns: ['id']
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3803,7 +3822,7 @@ export type Database = {
           phone: string | null
           prefecture_id: string | null
           region_id: string | null
-          status: Database['public']['Enums']['partner_status']
+          status: Database["public"]["Enums"]["partner_status"]
           suspended_at: string | null
           updated_at: string
         }
@@ -3817,7 +3836,7 @@ export type Database = {
           phone?: string | null
           prefecture_id?: string | null
           region_id?: string | null
-          status?: Database['public']['Enums']['partner_status']
+          status?: Database["public"]["Enums"]["partner_status"]
           suspended_at?: string | null
           updated_at?: string
         }
@@ -3831,24 +3850,24 @@ export type Database = {
           phone?: string | null
           prefecture_id?: string | null
           region_id?: string | null
-          status?: Database['public']['Enums']['partner_status']
+          status?: Database["public"]["Enums"]["partner_status"]
           suspended_at?: string | null
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: 'partners_prefecture_id_fkey'
-            columns: ['prefecture_id']
+            foreignKeyName: "partners_prefecture_id_fkey"
+            columns: ["prefecture_id"]
             isOneToOne: false
-            referencedRelation: 'prefectures'
-            referencedColumns: ['id']
+            referencedRelation: "prefectures"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'partners_region_id_fkey'
-            columns: ['region_id']
+            foreignKeyName: "partners_region_id_fkey"
+            columns: ["region_id"]
             isOneToOne: false
-            referencedRelation: 'regions'
-            referencedColumns: ['id']
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3909,32 +3928,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'payments_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "payments_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'payments_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "payments_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'payments_cotisation_id_fkey'
-            columns: ['cotisation_id']
+            foreignKeyName: "payments_cotisation_id_fkey"
+            columns: ["cotisation_id"]
             isOneToOne: false
-            referencedRelation: 'cotisations'
-            referencedColumns: ['id']
+            referencedRelation: "cotisations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'payments_member_id_fkey'
-            columns: ['member_id']
+            foreignKeyName: "payments_member_id_fkey"
+            columns: ["member_id"]
             isOneToOne: false
-            referencedRelation: 'members'
-            referencedColumns: ['id']
+            referencedRelation: "members"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3980,81 +3999,127 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'prefectures_region_id_fkey'
-            columns: ['region_id']
+            foreignKeyName: "prefectures_region_id_fkey"
+            columns: ["region_id"]
             isOneToOne: false
-            referencedRelation: 'regions'
-            referencedColumns: ['id']
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
           },
         ]
       }
       producer_announcements: {
         Row: {
+          author_id: string | null
+          canton_id: string | null
           contact_phone: string | null
           cooperative_id: string | null
           created_at: string
           culture: string | null
           description: string | null
+          expires_at: string | null
           id: string
           location_canton: string | null
-          member_id: string
+          member_id: string | null
+          prefecture_id: string | null
           price_per_kg_fcfa: number | null
           quantity_kg: number | null
+          region_id: string | null
           status: string
           title: string
           type: string
+          updated_at: string
         }
         Insert: {
+          author_id?: string | null
+          canton_id?: string | null
           contact_phone?: string | null
           cooperative_id?: string | null
           created_at?: string
           culture?: string | null
           description?: string | null
+          expires_at?: string | null
           id?: string
           location_canton?: string | null
-          member_id: string
+          member_id?: string | null
+          prefecture_id?: string | null
           price_per_kg_fcfa?: number | null
           quantity_kg?: number | null
+          region_id?: string | null
           status?: string
           title: string
           type: string
+          updated_at?: string
         }
         Update: {
+          author_id?: string | null
+          canton_id?: string | null
           contact_phone?: string | null
           cooperative_id?: string | null
           created_at?: string
           culture?: string | null
           description?: string | null
+          expires_at?: string | null
           id?: string
           location_canton?: string | null
-          member_id?: string
+          member_id?: string | null
+          prefecture_id?: string | null
           price_per_kg_fcfa?: number | null
           quantity_kg?: number | null
+          region_id?: string | null
           status?: string
           title?: string
           type?: string
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: 'producer_announcements_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "producer_announcements_author_id_fkey"
+            columns: ["author_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'producer_announcements_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "producer_announcements_canton_id_fkey"
+            columns: ["canton_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cantons"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'producer_announcements_member_id_fkey'
-            columns: ['member_id']
+            foreignKeyName: "producer_announcements_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'members'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "producer_announcements_cooperative_id_fkey"
+            columns: ["cooperative_id"]
+            isOneToOne: false
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "producer_announcements_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "producer_announcements_prefecture_id_fkey"
+            columns: ["prefecture_id"]
+            isOneToOne: false
+            referencedRelation: "prefectures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "producer_announcements_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4097,32 +4162,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'productions_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "productions_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'productions_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "productions_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'productions_member_id_fkey'
-            columns: ['member_id']
+            foreignKeyName: "productions_member_id_fkey"
+            columns: ["member_id"]
             isOneToOne: false
-            referencedRelation: 'members'
-            referencedColumns: ['id']
+            referencedRelation: "members"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'productions_parcelle_id_fkey'
-            columns: ['parcelle_id']
+            foreignKeyName: "productions_parcelle_id_fkey"
+            columns: ["parcelle_id"]
             isOneToOne: false
-            referencedRelation: 'parcelles'
-            referencedColumns: ['id']
+            referencedRelation: "parcelles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4134,12 +4199,12 @@ export type Database = {
           email: string
           first_name: string | null
           haroo_activated_at: string | null
-          haroo_type: Database['public']['Enums']['haroo_profile_type'] | null
+          haroo_type: Database["public"]["Enums"]["haroo_profile_type"] | null
           id: string
           is_demo: boolean
           last_name: string | null
           org_activated_at: string | null
-          role: Database['public']['Enums']['user_role']
+          role: Database["public"]["Enums"]["user_role"]
           updated_at: string | null
         }
         Insert: {
@@ -4149,12 +4214,12 @@ export type Database = {
           email: string
           first_name?: string | null
           haroo_activated_at?: string | null
-          haroo_type?: Database['public']['Enums']['haroo_profile_type'] | null
+          haroo_type?: Database["public"]["Enums"]["haroo_profile_type"] | null
           id: string
           is_demo?: boolean
           last_name?: string | null
           org_activated_at?: string | null
-          role?: Database['public']['Enums']['user_role']
+          role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string | null
         }
         Update: {
@@ -4164,28 +4229,28 @@ export type Database = {
           email?: string
           first_name?: string | null
           haroo_activated_at?: string | null
-          haroo_type?: Database['public']['Enums']['haroo_profile_type'] | null
+          haroo_type?: Database["public"]["Enums"]["haroo_profile_type"] | null
           id?: string
           is_demo?: boolean
           last_name?: string | null
           org_activated_at?: string | null
-          role?: Database['public']['Enums']['user_role']
+          role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: 'profiles_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "profiles_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'profiles_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "profiles_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4225,11 +4290,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'purchases_fiche_id_fkey'
-            columns: ['fiche_id']
+            foreignKeyName: "purchases_fiche_id_fkey"
+            columns: ["fiche_id"]
             isOneToOne: false
-            referencedRelation: 'fiches_techniques'
-            referencedColumns: ['id']
+            referencedRelation: "fiches_techniques"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4329,25 +4394,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'techniciens_canton_id_fkey'
-            columns: ['canton_id']
+            foreignKeyName: "techniciens_canton_id_fkey"
+            columns: ["canton_id"]
             isOneToOne: false
-            referencedRelation: 'cantons'
-            referencedColumns: ['id']
+            referencedRelation: "cantons"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'techniciens_faitiere_id_fkey'
-            columns: ['faitiere_id']
+            foreignKeyName: "techniciens_faitiere_id_fkey"
+            columns: ["faitiere_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'techniciens_faitiere_id_fkey'
-            columns: ['faitiere_id']
+            foreignKeyName: "techniciens_faitiere_id_fkey"
+            columns: ["faitiere_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4396,18 +4461,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'templates_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "templates_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'templates_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "templates_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4447,32 +4512,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'usage_events_billing_rule_id_fkey'
-            columns: ['billing_rule_id']
+            foreignKeyName: "usage_events_billing_rule_id_fkey"
+            columns: ["billing_rule_id"]
             isOneToOne: false
-            referencedRelation: 'billing_rules'
-            referencedColumns: ['id']
+            referencedRelation: "billing_rules"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'usage_events_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "usage_events_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'usage_events_cooperative_id_fkey'
-            columns: ['cooperative_id']
+            foreignKeyName: "usage_events_cooperative_id_fkey"
+            columns: ["cooperative_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'usage_events_partner_id_fkey'
-            columns: ['partner_id']
+            foreignKeyName: "usage_events_partner_id_fkey"
+            columns: ["partner_id"]
             isOneToOne: false
-            referencedRelation: 'partners'
-            referencedColumns: ['id']
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4500,11 +4565,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'user_login_events_user_id_fkey'
-            columns: ['user_id']
+            foreignKeyName: "user_login_events_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4529,11 +4594,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'villages_canton_id_fkey'
-            columns: ['canton_id']
+            foreignKeyName: "villages_canton_id_fkey"
+            columns: ["canton_id"]
             isOneToOne: false
-            referencedRelation: 'cantons'
-            referencedColumns: ['id']
+            referencedRelation: "cantons"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4610,18 +4675,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'cooperatives_parent_id_fkey'
-            columns: ['parent_id']
+            foreignKeyName: "cooperatives_parent_id_fkey"
+            columns: ["parent_id"]
             isOneToOne: false
-            referencedRelation: 'cooperative_stats'
-            referencedColumns: ['id']
+            referencedRelation: "cooperative_stats"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'cooperatives_parent_id_fkey'
-            columns: ['parent_id']
+            foreignKeyName: "cooperatives_parent_id_fkey"
+            columns: ["parent_id"]
             isOneToOne: false
-            referencedRelation: 'cooperatives'
-            referencedColumns: ['id']
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4640,11 +4705,39 @@ export type Database = {
         Returns: undefined
       }
       calculate_member_ats: { Args: { p_member_id: string }; Returns: Json }
+      claim_notification_batch: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number | null
+          body_rendered: string | null
+          channel: string
+          claim_token: string | null
+          cooperative_id: string | null
+          created_at: string | null
+          id: string
+          last_error: string | null
+          locked_until: string | null
+          member_id: string | null
+          recipient_email: string | null
+          recipient_phone: string | null
+          scheduled_at: string | null
+          sent_at: string | null
+          status: string
+          template_key: string | null
+          variables: Json | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "notification_queue"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       credit_partner_wallet: {
         Args: {
           p_amount_fcfa: number
           p_created_by?: string
-          p_entry_type: Database['public']['Enums']['partner_ledger_entry_type']
+          p_entry_type: Database["public"]["Enums"]["partner_ledger_entry_type"]
           p_idempotency_key: string
           p_note?: string
           p_partner_id: string
@@ -4654,7 +4747,7 @@ export type Database = {
       }
       current_haroo_type: {
         Args: never
-        Returns: Database['public']['Enums']['haroo_profile_type']
+        Returns: Database["public"]["Enums"]["haroo_profile_type"]
       }
       current_partner_ids: { Args: never; Returns: string[] }
       debit_partner_wallet: {
@@ -4697,14 +4790,14 @@ export type Database = {
       }
       has_org_access: {
         Args: {
-          allowed: Database['public']['Enums']['user_role'][]
+          allowed: Database["public"]["Enums"]["user_role"][]
           target_coop: string
         }
         Returns: boolean
       }
       has_partner_org_access: {
         Args: {
-          required_scope?: Database['public']['Enums']['partner_access_scope']
+          required_scope?: Database["public"]["Enums"]["partner_access_scope"]
           target_coop: string
         }
         Returns: boolean
@@ -4745,6 +4838,10 @@ export type Database = {
         }
         Returns: Json
       }
+      settle_payment_atomic: {
+        Args: { p_patch: Json; p_payment_id: string }
+        Returns: Json
+      }
       upsert_member_ats: { Args: { p_member_id: string }; Returns: undefined }
       verify_card: {
         Args: { p_card_numbers: string[] }
@@ -4768,51 +4865,69 @@ export type Database = {
       }
     }
     Enums: {
-      card_print_order_status: 'requested' | 'paid' | 'printed' | 'delivered' | 'cancelled'
-      haroo_profile_type: 'ouvrier' | 'acheteur' | 'agronome'
-      organization_earning_status: 'pending' | 'available' | 'paid' | 'cancelled'
+      card_print_order_status:
+        | "requested"
+        | "paid"
+        | "printed"
+        | "delivered"
+        | "cancelled"
+      haroo_profile_type: "ouvrier" | "acheteur" | "agronome"
+      organization_earning_status:
+        | "pending"
+        | "available"
+        | "paid"
+        | "cancelled"
       partner_access_scope:
-        | 'members.read'
-        | 'members.manage'
-        | 'cards.read'
-        | 'cards.manage'
-        | 'cards.print'
-        | 'kobo.manage'
-        | 'imports.manage'
-        | 'analytics.read'
-        | 'reports.generate'
-        | 'projects.manage'
-        | 'support.manage'
-      partner_assignment_status: 'active' | 'revoked' | 'ended'
-      partner_ledger_entry_type: 'CREDIT' | 'DEBIT' | 'REFUND' | 'REVERSAL' | 'ADJUSTMENT' | 'BONUS'
-      partner_membership_role: 'owner' | 'manager' | 'agent'
-      partner_membership_status: 'active' | 'revoked'
+        | "members.read"
+        | "members.manage"
+        | "cards.read"
+        | "cards.manage"
+        | "cards.print"
+        | "kobo.manage"
+        | "imports.manage"
+        | "analytics.read"
+        | "reports.generate"
+        | "projects.manage"
+        | "support.manage"
+      partner_assignment_status: "active" | "revoked" | "ended"
+      partner_ledger_entry_type:
+        | "CREDIT"
+        | "DEBIT"
+        | "REFUND"
+        | "REVERSAL"
+        | "ADJUSTMENT"
+        | "BONUS"
+      partner_membership_role: "owner" | "manager" | "agent"
+      partner_membership_status: "active" | "revoked"
       partner_payment_intent_status:
-        | 'pending'
-        | 'processing'
-        | 'success'
-        | 'failed'
-        | 'cancelled'
-        | 'expired'
-      partner_payment_purpose: 'wallet_topup' | 'certification' | 'operator_subscription'
+        | "pending"
+        | "processing"
+        | "success"
+        | "failed"
+        | "cancelled"
+        | "expired"
+      partner_payment_purpose:
+        | "wallet_topup"
+        | "certification"
+        | "operator_subscription"
       partner_status:
-        | 'candidate'
-        | 'training'
-        | 'exam_pending'
-        | 'certified'
-        | 'active'
-        | 'suspended'
-        | 'expired'
-        | 'revoked'
+        | "candidate"
+        | "training"
+        | "exam_pending"
+        | "certified"
+        | "active"
+        | "suspended"
+        | "expired"
+        | "revoked"
       user_role:
-        | 'super_admin'
-        | 'cooperative_admin'
-        | 'member'
-        | 'guest'
-        | 'ouvrier'
-        | 'acheteur'
-        | 'agronome'
-        | 'none'
+        | "super_admin"
+        | "cooperative_admin"
+        | "member"
+        | "guest"
+        | "ouvrier"
+        | "acheteur"
+        | "agronome"
+        | "none"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -4820,31 +4935,33 @@ export type Database = {
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, '__InternalSupabase'>
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, 'public'>]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
-    : never = never,
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])[TableName] extends {
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
-    ? (DefaultSchema['Tables'] & DefaultSchema['Views'])[DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -4853,23 +4970,23 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema['Tables']
+    | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
-    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -4878,23 +4995,23 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema['Tables']
+    | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
-    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -4903,89 +5020,111 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema['Enums']
+    | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
-    : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums'][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema['Enums']
-    ? DefaultSchema['Enums'][DefaultSchemaEnumNameOrOptions]
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema['CompositeTypes']
+    | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
-    : never = never,
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes'][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema['CompositeTypes']
-    ? DefaultSchema['CompositeTypes'][PublicCompositeTypeNameOrOptions]
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
 
 export const Constants = {
   public: {
     Enums: {
-      card_print_order_status: ['requested', 'paid', 'printed', 'delivered', 'cancelled'],
-      haroo_profile_type: ['ouvrier', 'acheteur', 'agronome'],
-      organization_earning_status: ['pending', 'available', 'paid', 'cancelled'],
+      card_print_order_status: [
+        "requested",
+        "paid",
+        "printed",
+        "delivered",
+        "cancelled",
+      ],
+      haroo_profile_type: ["ouvrier", "acheteur", "agronome"],
+      organization_earning_status: [
+        "pending",
+        "available",
+        "paid",
+        "cancelled",
+      ],
       partner_access_scope: [
-        'members.read',
-        'members.manage',
-        'cards.read',
-        'cards.manage',
-        'cards.print',
-        'kobo.manage',
-        'imports.manage',
-        'analytics.read',
-        'reports.generate',
-        'projects.manage',
-        'support.manage',
+        "members.read",
+        "members.manage",
+        "cards.read",
+        "cards.manage",
+        "cards.print",
+        "kobo.manage",
+        "imports.manage",
+        "analytics.read",
+        "reports.generate",
+        "projects.manage",
+        "support.manage",
       ],
-      partner_assignment_status: ['active', 'revoked', 'ended'],
-      partner_ledger_entry_type: ['CREDIT', 'DEBIT', 'REFUND', 'REVERSAL', 'ADJUSTMENT', 'BONUS'],
-      partner_membership_role: ['owner', 'manager', 'agent'],
-      partner_membership_status: ['active', 'revoked'],
+      partner_assignment_status: ["active", "revoked", "ended"],
+      partner_ledger_entry_type: [
+        "CREDIT",
+        "DEBIT",
+        "REFUND",
+        "REVERSAL",
+        "ADJUSTMENT",
+        "BONUS",
+      ],
+      partner_membership_role: ["owner", "manager", "agent"],
+      partner_membership_status: ["active", "revoked"],
       partner_payment_intent_status: [
-        'pending',
-        'processing',
-        'success',
-        'failed',
-        'cancelled',
-        'expired',
+        "pending",
+        "processing",
+        "success",
+        "failed",
+        "cancelled",
+        "expired",
       ],
-      partner_payment_purpose: ['wallet_topup', 'certification', 'operator_subscription'],
+      partner_payment_purpose: [
+        "wallet_topup",
+        "certification",
+        "operator_subscription",
+      ],
       partner_status: [
-        'candidate',
-        'training',
-        'exam_pending',
-        'certified',
-        'active',
-        'suspended',
-        'expired',
-        'revoked',
+        "candidate",
+        "training",
+        "exam_pending",
+        "certified",
+        "active",
+        "suspended",
+        "expired",
+        "revoked",
       ],
       user_role: [
-        'super_admin',
-        'cooperative_admin',
-        'member',
-        'guest',
-        'ouvrier',
-        'acheteur',
-        'agronome',
-        'none',
+        "super_admin",
+        "cooperative_admin",
+        "member",
+        "guest",
+        "ouvrier",
+        "acheteur",
+        "agronome",
+        "none",
       ],
     },
   },

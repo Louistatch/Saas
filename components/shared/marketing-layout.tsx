@@ -16,12 +16,14 @@ import {
   Menu,
   ScanLine,
   ShoppingBasket,
+  Store,
   X,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
 
 const headerLinks = [
+  { href: '/marche', label: 'Marché' },
   { href: '/produit', label: 'Produit' },
   { href: '/features', label: 'Fonctionnalités' },
   { href: '/pricing', label: 'Tarifs' },
@@ -31,6 +33,12 @@ const headerLinks = [
 ]
 
 const harooLinks = [
+  {
+    href: '/marche',
+    label: 'Marché de proximité',
+    description: 'Préventes, emplois et missions près de chez vous',
+    icon: Store,
+  },
   {
     href: '/#haroo-ouvrier',
     label: 'Emplois agricoles',
@@ -65,6 +73,7 @@ const footerColumns = [
   {
     title: 'Haroo',
     links: [
+      { href: '/marche', label: 'Marché de proximité' },
       { href: '/#haroo', label: "Qu'est-ce que Haroo ?" },
       { href: '/auth/signup/haroo', label: 'Créer un profil Haroo' },
       { href: '/auth/signup/haroo?type=OUVRIER', label: 'Ouvrier agricole — Emplois' },
