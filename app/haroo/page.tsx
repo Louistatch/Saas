@@ -1,11 +1,17 @@
 'use client'
 
-import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { ProtectedRoute } from '@/app/components/protected-route'
+import { useAuth } from '@/app/context/auth-context'
+import { RequestOrgCard } from '@/components/account/layer-activation'
+import { HarooProfileEditor } from '@/components/haroo/profile-editor'
+import { PublishAnnouncement } from '@/components/haroo/publish-announcement'
+import { Spinner } from '@/components/shared/loading'
 import { Logo } from '@/components/shared/logo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { performLogout } from '@/lib/auth/logout'
+import { createClient } from '@/lib/supabase/client'
+import { effectiveHarooType, isHarooRole } from '@/lib/utils/permissions'
 import {
   Briefcase,
   CalendarDays,
@@ -22,15 +28,13 @@ import {
   Sparkles,
   Sprout,
   Star,
+  Store,
   Sun,
+  Trash2,
 } from 'lucide-react'
-import { ProtectedRoute } from '@/app/components/protected-route'
-import { useAuth } from '@/app/context/auth-context'
-import { performLogout } from '@/lib/auth/logout'
-import { createClient } from '@/lib/supabase/client'
-import { isHarooRole, effectiveHarooType } from '@/lib/utils/permissions'
-import { Spinner } from '@/components/shared/loading'
-import { RequestOrgCard } from '@/components/account/layer-activation'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
 
 /**
  * Espace Haroo — tableau de bord des professionnels agricoles
@@ -61,12 +65,14 @@ interface HarooProfile {
   // acheteur
   type_acheteur?: string | null
   produits_interesses?: string[]
+  prefecture_id?: string | null
   prefectures?: { name: string } | null
   // agronome
   specialisations?: string[]
   badge_valide?: boolean
   statut_validation?: string
   nombre_missions?: number
+  canton_id?: string | null
   cantons?: { name: string } | null
 }
 
@@ -99,6 +105,19 @@ interface MissionRow {
   date_debut: string | null
   date_fin: string | null
   exploitant_name: string | null
+}
+
+/** Annonce publiée par le titulaire du compte sur le marché de proximité. */
+interface MyAnnouncement {
+  id: string
+  type: string
+  title: string
+  culture: string | null
+  price_per_kg_fcfa: number | null
+  contact_phone: string | null
+  status: string
+  created_at: string
+  cantons: { name: string } | null
 }
 
 /** Payload de /api/haroo/insights — météo 3 modèles + prix du marché régionaux. */
@@ -140,7 +159,11 @@ const MISSION_STATUT_STYLE: Record<string, string> = {
 
 function formatDate(value: string | null): string {
   if (!value) return '—'
-  return new Date(value).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+  return new Date(value).toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
 }
 
 function formatFcfa(value: number | null): string {
@@ -195,7 +218,9 @@ function JobCard({ job, highlight }: { job: JobRow; highlight: boolean }) {
             </span>
           )}
         </div>
-        <span className="text-sm font-medium text-primary">{formatFcfa(job.salaire_horaire)} / h</span>
+        <span className="text-sm font-medium text-primary">
+          {formatFcfa(job.salaire_horaire)} / h
+        </span>
       </div>
       {job.description && <p className="text-sm text-muted-foreground">{job.description}</p>}
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -231,9 +256,13 @@ function PresaleCard({ presale, highlight }: { presale: PresaleRow; highlight: b
             </span>
           )}
         </div>
-        <span className="text-sm font-medium text-primary">{formatFcfa(presale.prix_par_tonne)} / tonne</span>
+        <span className="text-sm font-medium text-primary">
+          {formatFcfa(presale.prix_par_tonne)} / tonne
+        </span>
       </div>
-      {presale.description && <p className="text-sm text-muted-foreground">{presale.description}</p>}
+      {presale.description && (
+        <p className="text-sm text-muted-foreground">{presale.description}</p>
+      )}
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
         {presale.cantons?.name && (
           <span className="inline-flex items-center gap-1">
@@ -264,7 +293,9 @@ function MissionCard({ mission }: { mission: MissionRow }) {
           {mission.statut.replace('_', ' ')}
         </span>
       </div>
-      {mission.description && <p className="text-sm text-muted-foreground">{mission.description}</p>}
+      {mission.description && (
+        <p className="text-sm text-muted-foreground">{mission.description}</p>
+      )}
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span>Budget : {formatFcfa(mission.budget_propose)}</span>
         <span className="inline-flex items-center gap-1">
@@ -282,6 +313,11 @@ function HarooSpaceInner() {
 
   const [profile, setProfile] = useState<HarooProfile | null>(null)
   const [myCantons, setMyCantons] = useState<string[]>([])
+  const [myCantonIds, setMyCantonIds] = useState<string[]>([])
+  const [myAnnouncements, setMyAnnouncements] = useState<MyAnnouncement[]>([])
+  // Incrémenté après une édition de profil ou une publication : c'est le seul
+  // moyen de relancer le chargement sans dupliquer la logique de `load`.
+  const [reloadKey, setReloadKey] = useState(0)
   const [jobs, setJobs] = useState<JobRow[]>([])
   const [presales, setPresales] = useState<PresaleRow[]>([])
   const [missions, setMissions] = useState<MissionRow[]>([])
@@ -330,13 +366,17 @@ function HarooSpaceInner() {
           profileData
             ? supabase
                 .from('haroo_ouvrier_cantons')
-                .select('cantons(name)')
+                .select('canton_id, cantons(name)')
                 .eq('ouvrier_id', profileData.id)
-                .returns<{ cantons: { name: string } | null }[]>()
-            : Promise.resolve({ data: [] as { cantons: { name: string } | null }[] }),
+                .returns<{ canton_id: string; cantons: { name: string } | null }[]>()
+            : Promise.resolve({
+                data: [] as { canton_id: string; cantons: { name: string } | null }[],
+              }),
           supabase
             .from('haroo_jobs')
-            .select('id, type_travail, description, date_debut, date_fin, salaire_horaire, nombre_postes, cantons(name)')
+            .select(
+              'id, type_travail, description, date_debut, date_fin, salaire_horaire, nombre_postes, cantons(name)',
+            )
             .eq('statut', 'OUVERTE')
             .order('created_at', { ascending: false })
             .limit(20)
@@ -346,11 +386,14 @@ function HarooSpaceInner() {
         setMyCantons(
           (cantonsRes.data ?? []).map((r) => r.cantons?.name).filter((n): n is string => !!n),
         )
+        setMyCantonIds((cantonsRes.data ?? []).map((r) => r.canton_id))
         setJobs(jobsRes.data ?? [])
       } else if (harooRole === 'acheteur') {
         const { data } = await supabase
           .from('haroo_presales')
-          .select('id, culture, quantite_estimee, prix_par_tonne, date_recolte_prevue, description, cantons(name)')
+          .select(
+            'id, culture, quantite_estimee, prix_par_tonne, date_recolte_prevue, description, cantons(name)',
+          )
           .eq('statut', 'DISPONIBLE')
           .order('created_at', { ascending: false })
           .limit(20)
@@ -367,6 +410,19 @@ function HarooSpaceInner() {
         if (!cancelled) setMissions(data ?? [])
       }
 
+      // Annonces publiées par le compte : la policy propriétaire les rend
+      // lisibles ici, y compris celles qui ne sont plus actives.
+      const { data: mine } = await supabase
+        .from('producer_announcements')
+        .select(
+          'id, type, title, culture, price_per_kg_fcfa, contact_phone, status, created_at, cantons(name)',
+        )
+        .eq('author_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(20)
+        .returns<MyAnnouncement[]>()
+      if (!cancelled) setMyAnnouncements(mine ?? [])
+
       if (!cancelled) setLoading(false)
     }
 
@@ -374,7 +430,7 @@ function HarooSpaceInner() {
     return () => {
       cancelled = true
     }
-  }, [user, harooRole])
+  }, [user, harooRole, reloadKey])
 
   // Insights écosystème (météo de la zone + prix du marché de la région) —
   // un seul appel serveur, indépendant du chargement du profil.
@@ -430,6 +486,13 @@ function HarooSpaceInner() {
     setTogglingDispo(false)
   }
 
+  /** Retirer une annonce : la policy propriétaire limite au seul auteur. */
+  const removeAnnouncement = async (id: string) => {
+    const supabase = createClient()
+    const { error } = await supabase.from('producer_announcements').delete().eq('id', id)
+    if (!error) setMyAnnouncements((prev) => prev.filter((a) => a.id !== id))
+  }
+
   if (!harooRole) return null
 
   const meta = ROLE_META[harooRole]
@@ -437,7 +500,8 @@ function HarooSpaceInner() {
   const fullName = profile
     ? `${profile.first_name} ${profile.last_name}`
     : `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim()
-  const tags = profile?.competences ?? profile?.produits_interesses ?? profile?.specialisations ?? []
+  const tags =
+    profile?.competences ?? profile?.produits_interesses ?? profile?.specialisations ?? []
 
   return (
     <div className="min-h-screen bg-background">
@@ -471,8 +535,10 @@ function HarooSpaceInner() {
             Bonjour{profile?.first_name ? `, ${profile.first_name}` : ''} 👋
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {harooRole === 'ouvrier' && 'Voici les offres d\'emploi du moment, en commençant par vos cantons.'}
-            {harooRole === 'acheteur' && 'Voici les préventes disponibles, en commençant par vos produits.'}
+            {harooRole === 'ouvrier' &&
+              "Voici les offres d'emploi du moment, en commençant par vos cantons."}
+            {harooRole === 'acheteur' &&
+              'Voici les préventes disponibles, en commençant par vos produits.'}
             {harooRole === 'agronome' && 'Voici vos demandes de mission et vos missions en cours.'}
           </p>
         </div>
@@ -497,7 +563,9 @@ function HarooSpaceInner() {
                   <CardContent className="pt-5 pb-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className={`text-xl font-bold leading-tight ${profile?.disponible ? 'text-primary' : 'text-muted-foreground'}`}>
+                        <p
+                          className={`text-xl font-bold leading-tight ${profile?.disponible ? 'text-primary' : 'text-muted-foreground'}`}
+                        >
                           {profile?.disponible ? '● Disponible' : 'Indisponible'}
                         </p>
                         <p className="text-xs text-muted-foreground">Visible par les recruteurs</p>
@@ -508,7 +576,13 @@ function HarooSpaceInner() {
                         onClick={toggleDisponible}
                         disabled={togglingDispo || !profile}
                       >
-                        {togglingDispo ? <Spinner className="h-4 w-4" /> : profile?.disponible ? 'Me retirer' : 'Me rendre dispo'}
+                        {togglingDispo ? (
+                          <Spinner className="h-4 w-4" />
+                        ) : profile?.disponible ? (
+                          'Me retirer'
+                        ) : (
+                          'Me rendre dispo'
+                        )}
                       </Button>
                     </div>
                   </CardContent>
@@ -523,7 +597,11 @@ function HarooSpaceInner() {
                   value={matchingPresales.length}
                   hint={(profile?.produits_interesses ?? []).join(', ') || undefined}
                 />
-                <StatCard icon={ShoppingBasket} label="Préventes disponibles" value={presales.length} />
+                <StatCard
+                  icon={ShoppingBasket}
+                  label="Préventes disponibles"
+                  value={presales.length}
+                />
                 <StatCard
                   icon={MapPin}
                   label="Préfecture d'intervention"
@@ -563,8 +641,8 @@ function HarooSpaceInner() {
                     const hint =
                       harooRole === 'ouvrier'
                         ? favorable
-                          ? '✅ Conditions favorables aux travaux des champs aujourd\'hui'
-                          : '🌧️ Pluie probable aujourd\'hui — planifiez les travaux en conséquence'
+                          ? "✅ Conditions favorables aux travaux des champs aujourd'hui"
+                          : "🌧️ Pluie probable aujourd'hui — planifiez les travaux en conséquence"
                         : harooRole === 'acheteur'
                           ? favorable
                             ? '✅ Bonne fenêtre pour les collectes et livraisons'
@@ -593,7 +671,7 @@ function HarooSpaceInner() {
                         >
                           <p className="text-[11px] font-medium text-muted-foreground capitalize">
                             {i === 0
-                              ? 'Aujourd\'hui'
+                              ? "Aujourd'hui"
                               : new Date(day.date).toLocaleDateString('fr-FR', {
                                   weekday: 'short',
                                   day: 'numeric',
@@ -623,7 +701,8 @@ function HarooSpaceInner() {
               <Card className="border-border">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <LineChart className="h-4 w-4 text-primary" /> Prix du marché — région {insights.region}
+                    <LineChart className="h-4 w-4 text-primary" /> Prix du marché — région{' '}
+                    {insights.region}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -699,11 +778,15 @@ function HarooSpaceInner() {
                   .toUpperCase() || '?'}
               </div>
               <div className="flex-1 space-y-1">
-                <h2 className="text-lg font-bold text-foreground">{fullName || 'Mon profil Haroo'}</h2>
+                <h2 className="text-lg font-bold text-foreground">
+                  {fullName || 'Mon profil Haroo'}
+                </h2>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                   <span className="inline-flex items-center gap-1.5">
                     <RoleIcon className="h-3.5 w-3.5" /> {meta.label}
-                    {harooRole === 'acheteur' && profile?.type_acheteur ? ` · ${profile.type_acheteur}` : ''}
+                    {harooRole === 'acheteur' && profile?.type_acheteur
+                      ? ` · ${profile.type_acheteur}`
+                      : ''}
                   </span>
                   {profile?.phone && (
                     <span className="inline-flex items-center gap-1.5">
@@ -712,7 +795,9 @@ function HarooSpaceInner() {
                   )}
                   <span className="inline-flex items-center gap-1.5">
                     <CreditCard className="h-3.5 w-3.5" />
-                    {profile?.card_number ? `Carte ${profile.card_number}` : 'Carte en attente d\'émission'}
+                    {profile?.card_number
+                      ? `Carte ${profile.card_number}`
+                      : "Carte en attente d'émission"}
                   </span>
                   {harooRole === 'agronome' && profile?.cantons?.name && (
                     <span className="inline-flex items-center gap-1.5">
@@ -728,7 +813,9 @@ function HarooSpaceInner() {
                       <CheckCircle2 className="h-4 w-4" /> Badge validé
                     </p>
                   ) : (
-                    <p className="text-muted-foreground">Validation : {profile.statut_validation ?? 'EN_ATTENTE'}</p>
+                    <p className="text-muted-foreground">
+                      Validation : {profile.statut_validation ?? 'EN_ATTENTE'}
+                    </p>
                   )}
                 </div>
               )}
@@ -737,10 +824,31 @@ function HarooSpaceInner() {
             {tags.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-2">
                 {tags.map((tag) => (
-                  <span key={tag} className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+                  <span
+                    key={tag}
+                    className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground"
+                  >
                     {tag}
                   </span>
                 ))}
+              </div>
+            )}
+
+            {/* Le profil n'était jusqu'ici modifiable que par un administrateur :
+                c'est ce qui laissait les cantons de disponibilité vides. */}
+            {profile && (
+              <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
+                <HarooProfileEditor
+                  harooRole={harooRole}
+                  profile={profile}
+                  myCantonIds={myCantonIds}
+                  onSaved={() => setReloadKey((k) => k + 1)}
+                />
+                {harooRole === 'ouvrier' && myCantonIds.length === 0 && (
+                  <p className="text-xs text-amber-700">
+                    Renseignez vos cantons pour voir les offres près de chez vous.
+                  </p>
+                )}
               </div>
             )}
           </CardContent>
@@ -776,6 +884,83 @@ function HarooSpaceInner() {
           </Card>
         )}
 
+        {/* Marché de proximité — publier et suivre ses propres annonces.
+            `haroo_jobs` et `haroo_presales` n'ont aucune écriture publique :
+            c'est par les annonces que passe la publication des particuliers. */}
+        <Card className="border-border">
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Store className="h-5 w-5 text-primary" /> Mes annonces
+              </CardTitle>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/marche">Voir le marché</Link>
+                </Button>
+                <PublishAnnouncement
+                  defaultType={
+                    harooRole === 'ouvrier'
+                      ? 'job'
+                      : harooRole === 'agronome'
+                        ? 'mission'
+                        : 'prevente'
+                  }
+                  defaultPhone={profile?.phone ?? null}
+                  defaultCantonId={profile?.canton_id ?? myCantonIds[0] ?? null}
+                  onPublished={() => setReloadKey((k) => k + 1)}
+                />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {myAnnouncements.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Vous n&apos;avez encore rien publié. Une annonce vous rend visible auprès des
+                personnes de votre canton, puis de votre préfecture et de votre région.
+              </p>
+            ) : (
+              myAnnouncements.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-border p-4"
+                >
+                  <div className="min-w-0 space-y-1">
+                    <p className="font-semibold text-foreground">{item.title}</p>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      {item.culture && <span>{item.culture}</span>}
+                      {item.price_per_kg_fcfa != null && (
+                        <span>
+                          {Number(item.price_per_kg_fcfa).toLocaleString('fr-FR')} FCFA/kg
+                        </span>
+                      )}
+                      {item.cantons?.name && (
+                        <span className="inline-flex items-center gap-1">
+                          <MapPin className="h-3 w-3" /> {item.cantons.name}
+                        </span>
+                      )}
+                      <span>Publiée le {formatDate(item.created_at)}</span>
+                      {item.status !== 'active' && <span>· {item.status}</span>}
+                    </div>
+                    {!item.contact_phone && (
+                      <p className="text-xs text-amber-700">
+                        Aucun numéro renseigné — personne ne peut vous joindre depuis cette annonce.
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => removeAnnouncement(item.id)}
+                  >
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Retirer
+                  </Button>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
         {/* Activité selon le type de profil */}
         {loading ? (
           <div className="flex items-center justify-center py-16">
@@ -793,8 +978,8 @@ function HarooSpaceInner() {
                 <CardContent className="space-y-4">
                   {jobs.length === 0 && (
                     <p className="text-sm text-muted-foreground">
-                      Aucune offre ouverte pour le moment. Revenez bientôt — les coopératives publient
-                      régulièrement de nouvelles offres.
+                      Aucune offre ouverte pour le moment. Revenez bientôt — les coopératives
+                      publient régulièrement de nouvelles offres.
                     </p>
                   )}
                   {jobsInMyCantons.map((job) => (
