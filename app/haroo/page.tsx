@@ -13,6 +13,7 @@ import {
   Clock,
   CloudRain,
   CreditCard,
+  Download,
   LineChart,
   LogOut,
   MapPin,
@@ -744,6 +745,36 @@ function HarooSpaceInner() {
             )}
           </CardContent>
         </Card>
+
+        {/* Carte professionnelle — servie par /api/haroo/card, toujours celle
+            du porteur de la session. Sans numéro émis, rien à afficher. */}
+        {profile?.card_number && (
+          <Card className="border-border">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-primary" /> Ma carte professionnelle
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/api/haroo/card"
+                alt={`Carte professionnelle ${profile.card_number}`}
+                className="w-full rounded-xl border border-border shadow-sm"
+              />
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-muted-foreground">
+                  Présentez le QR pour faire vérifier votre profil, hors ligne comme en ligne.
+                </p>
+                <Button variant="outline" size="sm" asChild>
+                  <a href="/api/haroo/card" download={`carte-${profile.card_number}.png`}>
+                    <Download className="mr-1.5 h-4 w-4" /> Télécharger
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Activité selon le type de profil */}
         {loading ? (
