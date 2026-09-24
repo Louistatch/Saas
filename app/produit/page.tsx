@@ -1,25 +1,25 @@
-import type { Metadata } from 'next'
-import Link from 'next/link'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
 import { Button } from '@/components/ui/button'
 import {
-  Users,
-  CreditCard,
-  BarChart3,
-  Database,
-  Coins,
-  ShoppingCart,
-  Globe,
-  QrCode,
-  MapPin,
-  GraduationCap,
-  Network,
   ArrowRight,
+  BarChart3,
   CheckCircle,
-  Zap,
-  Shield,
+  Coins,
+  CreditCard,
+  Database,
+  Globe,
+  GraduationCap,
+  MapPin,
+  Network,
+  QrCode,
   ScanLine,
+  Shield,
+  ShoppingCart,
+  Users,
+  Zap,
 } from 'lucide-react'
+import type { Metadata } from 'next'
+import Link from 'next/link'
 
 export const metadata: Metadata = {
   title: 'Produit — FaîtiereHub | Plateforme tout-en-un pour faîtières agricoles',
@@ -62,7 +62,7 @@ const CORE = [
     badge: 'Données terrain',
     badgeColor: 'bg-teal-100 text-teal-800',
     description:
-      "Publiez et partagez les fiches techniques et itinéraires de culture classés par région, préfecture et canton. Accès membre et accès public différenciés.",
+      'Publiez et partagez les fiches techniques et itinéraires de culture classés par région, préfecture et canton. Accès membre et accès public différenciés.',
     points: [
       'Fiches par canton, préfecture et région',
       'Itinéraires culturaux détaillés',
@@ -76,7 +76,7 @@ const CORE = [
     badge: 'Intégration',
     badgeColor: 'bg-purple-100 text-purple-800',
     description:
-      "Connectez vos formulaires KoboToolbox et synchronisez automatiquement les données terrain. Webhook en temps réel, retry queue, mapping intelligent.",
+      'Connectez vos formulaires KoboToolbox et synchronisez automatiquement les données terrain. Webhook en temps réel, retry queue, mapping intelligent.',
     points: [
       'Webhook en temps réel',
       'Retry queue automatique',
@@ -90,11 +90,11 @@ const CORE = [
     badge: 'Finance',
     badgeColor: 'bg-amber-100 text-amber-800',
     description:
-      "Gérez les cotisations annuelles, suivez les paiements, envoyez des rappels. Tableau de bord financier avec taux de recouvrement et projections.",
+      'Gérez les cotisations annuelles, suivez les paiements, envoyez des rappels. Tableau de bord financier avec taux de recouvrement et projections.',
     points: [
       'Suivi des paiements membre',
       'Rappels automatiques',
-      "Taux de recouvrement en temps réel",
+      'Taux de recouvrement en temps réel',
       'Export comptable',
     ],
   },
@@ -104,7 +104,7 @@ const CORE = [
     badge: 'Géographie',
     badgeColor: 'bg-emerald-100 text-emerald-800',
     description:
-      "Visualisez la répartition géographique des membres et parcelles sur la carte interactive du Togo. Filtrez par préfecture, culture ou surface.",
+      'Visualisez la répartition géographique des membres et parcelles sur la carte interactive du Togo. Filtrez par préfecture, culture ou surface.',
     points: [
       'Carte du Togo par préfecture',
       'Filtres par culture et surface',
@@ -119,53 +119,52 @@ const ADVANCED = [
     icon: ShoppingCart,
     title: 'AgriMarket',
     description:
-      "Place de marché agricole intégrée — catalogue de produits, services et intrants avec filtres en cascade, full-text search et pagination.",
+      'Place de marché agricole intégrée — catalogue de produits, services et intrants avec filtres en cascade, full-text search et pagination.',
   },
   {
     icon: CreditCard,
     title: 'AgriCredit',
     description:
-      "Gérez les demandes de crédit agricole avec scoring automatique basé sur le profil membre et suivi des remboursements en temps réel.",
+      'Gérez les demandes de crédit agricole avec scoring automatique basé sur le profil membre et suivi des remboursements en temps réel.',
   },
   {
     icon: GraduationCap,
     title: 'AgriAcademy',
     description:
-      "Modules de formation certifiante pour vos membres — irrigation FAO-56, pratiques culturales, agrobusiness et bonnes pratiques terrain.",
+      'Modules de formation certifiante pour vos membres — irrigation FAO-56, pratiques culturales, agrobusiness et bonnes pratiques terrain.',
   },
   {
     icon: Users,
     title: 'Matching & Carnet',
     description:
-      "Mettez en relation producteurs et acheteurs. Gérez votre carnet de contacts et de techniciens agricoles partenaires.",
+      'Mettez en relation producteurs et acheteurs. Gérez votre carnet de contacts et de techniciens agricoles partenaires.',
   },
   {
     icon: Globe,
     title: 'Widget embeddable',
     description:
-      "Intégrez FaîtiereHub sur votre site web en une ligne de code. Compatible WordPress, Webflow, HTML statique.",
+      'Intégrez FaîtiereHub sur votre site web en une ligne de code. Compatible WordPress, Webflow, HTML statique.',
   },
   {
     icon: Zap,
     title: 'Multi-niveaux',
     description:
-      "Architecture faîtière → unions → coopératives. Chaque niveau a son tableau de bord et ses droits propres.",
+      'Architecture faîtière → unions → coopératives. Chaque niveau a son tableau de bord et ses droits propres.',
   },
 ]
 
 const SECURITY = [
   'Row-Level Security Supabase sur toutes les tables',
-  "Isolation totale des données par coopérative",
+  'Isolation totale des données par coopérative',
   'Webhook HMAC pour les intégrations',
   'Rate limiting par IP (en mémoire + Redis)',
-  "Pas de cache sur les pages de vérification (/verify/* = no-store)",
+  'Pas de cache sur les pages de vérification (/verify/* = no-store)',
   'JWT rafraîchi à chaque requête (middleware Vercel Edge)',
 ]
 
 export default function ProduitPage() {
   return (
     <MarketingLayout>
-
       {/* Hero */}
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
         <div className="max-w-3xl">
@@ -177,9 +176,9 @@ export default function ProduitPage() {
             <span className="text-primary">faîtières agricoles</span>
           </h1>
           <p className="mt-6 text-lg text-muted-foreground max-w-2xl leading-relaxed">
-            FaîtiereHub réunit tous les outils dont votre organisation a besoin pour
-            gérer ses membres, digitaliser ses opérations et accélérer sa croissance.
-            Et Haroo connecte les acteurs humains qui font vivre l&apos;écosystème.
+            FaîtiereHub réunit tous les outils dont votre organisation a besoin pour gérer ses
+            membres, digitaliser ses opérations et accélérer sa croissance. Et Haroo connecte les
+            acteurs humains qui font vivre l&apos;écosystème.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link href="/auth/signup">
@@ -218,7 +217,9 @@ export default function ProduitPage() {
                   <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
                     <Icon className="h-5 w-5 text-primary" />
                   </div>
-                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${badgeColor}`}>
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${badgeColor}`}
+                  >
                     {badge}
                   </span>
                 </div>
@@ -249,8 +250,8 @@ export default function ProduitPage() {
               L&apos;écosystème s&apos;étend
             </h2>
             <p className="mt-3 text-muted-foreground max-w-2xl">
-              Au-delà de la gestion de base, FaîtiereHub embarque des modules métier
-              pour accélérer votre développement.
+              Au-delà de la gestion de base, FaîtiereHub embarque des modules métier pour accélérer
+              votre développement.
             </p>
           </div>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -288,9 +289,9 @@ export default function ProduitPage() {
               </p>
               <div className="mt-6 space-y-3">
                 {[
-                  { label: 'Ouvrier agricole', desc: "Emploi saisonnier géolocalisé par canton" },
-                  { label: 'Acheteur', desc: "Préventes de production filtrées par produit" },
-                  { label: 'Agronome', desc: "Missions de conseil avec badge de validation" },
+                  { label: 'Ouvrier agricole', desc: 'Emploi saisonnier géolocalisé par canton' },
+                  { label: 'Acheteur', desc: 'Préventes de production filtrées par produit' },
+                  { label: 'Agronome', desc: 'Missions de conseil avec badge de validation' },
                 ].map(({ label, desc }) => (
                   <div key={label} className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
@@ -308,7 +309,10 @@ export default function ProduitPage() {
                   </Button>
                 </Link>
                 <Link href="/#haroo">
-                  <Button variant="outline" className="border-amber-200 text-amber-700 hover:bg-amber-50">
+                  <Button
+                    variant="outline"
+                    className="border-amber-200 text-amber-700 hover:bg-amber-50"
+                  >
                     En savoir plus
                   </Button>
                 </Link>
@@ -327,15 +331,46 @@ export default function ProduitPage() {
                 <p className="text-sm text-muted-foreground">
                   Le même QR code scanner vérifie indifféremment les 4 types de cartes :
                 </p>
+                {/* Carte réelle, rendue par le moteur de cartes : la liste de
+                    préfixes seule ne dit pas à quoi ressemble une carte. */}
+                <img
+                  src="/api/haroo/card/preview?type=OUVRIER"
+                  alt="Spécimen de carte professionnelle Haroo"
+                  width={1180}
+                  height={740}
+                  loading="lazy"
+                  className="w-full rounded-lg border border-border shadow-sm"
+                />
                 <div className="space-y-2 text-left">
                   {[
-                    { prefix: 'ALL-XXXXXX', label: 'Carte FAITIERE (membres coopérative)', color: 'bg-green-100 text-green-800' },
-                    { prefix: 'OUV-XXXXXX', label: 'Ouvrier agricole Haroo', color: 'bg-amber-100 text-amber-800' },
-                    { prefix: 'ACH-XXXXXX', label: 'Acheteur Haroo', color: 'bg-orange-100 text-orange-800' },
-                    { prefix: 'AGR-XXXXXX', label: 'Agronome Haroo', color: 'bg-yellow-100 text-yellow-800' },
+                    {
+                      prefix: 'ALL-XXXXXX',
+                      label: 'Carte FAITIERE (membres coopérative)',
+                      color: 'bg-green-100 text-green-800',
+                    },
+                    {
+                      prefix: 'OUV-XXXXXX',
+                      label: 'Ouvrier agricole Haroo',
+                      color: 'bg-amber-100 text-amber-800',
+                    },
+                    {
+                      prefix: 'ACH-XXXXXX',
+                      label: 'Acheteur Haroo',
+                      color: 'bg-orange-100 text-orange-800',
+                    },
+                    {
+                      prefix: 'AGR-XXXXXX',
+                      label: 'Agronome Haroo',
+                      color: 'bg-yellow-100 text-yellow-800',
+                    },
                   ].map(({ prefix, label, color }) => (
-                    <div key={prefix} className="flex items-center gap-3 rounded-lg border border-border p-3">
-                      <span className={`rounded-full px-2.5 py-0.5 font-mono text-xs font-bold ${color}`}>
+                    <div
+                      key={prefix}
+                      className="flex items-center gap-3 rounded-lg border border-border p-3"
+                    >
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 font-mono text-xs font-bold ${color}`}
+                      >
                         {prefix}
                       </span>
                       <span className="text-sm text-foreground">{label}</span>
@@ -365,8 +400,8 @@ export default function ProduitPage() {
                 Sécurité enterprise, adapté aux coopératives
               </h2>
               <p className="mt-4 text-muted-foreground leading-relaxed">
-                Chaque coopérative est isolée des autres. Vos données ne sont jamais
-                visibles par une autre organisation.
+                Chaque coopérative est isolée des autres. Vos données ne sont jamais visibles par
+                une autre organisation.
               </p>
             </div>
             <ul className="space-y-3">

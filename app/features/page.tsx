@@ -1,26 +1,26 @@
-import Link from 'next/link'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
 import { Button } from '@/components/ui/button'
 import {
-  Users,
-  BarChart3,
-  QrCode,
-  Database,
-  Zap,
-  Globe,
   ArrowRight,
-  MapPin,
-  ShoppingBag,
+  BarChart3,
+  BookOpen,
+  Briefcase,
+  CheckCircle,
   CreditCard,
+  Database,
+  Globe,
   GraduationCap,
   Handshake,
+  MapPin,
   Network,
-  Briefcase,
-  Sprout,
-  BookOpen,
-  CheckCircle,
+  QrCode,
   ScanLine,
+  ShoppingBag,
+  Sprout,
+  Users,
+  Zap,
 } from 'lucide-react'
+import Link from 'next/link'
 
 const FAITIERE_FEATURES = [
   {
@@ -69,7 +69,7 @@ const FAITIERE_FEATURES = [
     icon: GraduationCap,
     title: 'AgriAcademy',
     description:
-      "Modules de formation certifiante pour vos membres — irrigation (FAO-56), pratiques culturales, agrobusiness, bonnes pratiques de terrain.",
+      'Modules de formation certifiante pour vos membres — irrigation (FAO-56), pratiques culturales, agrobusiness, bonnes pratiques de terrain.',
   },
   {
     icon: Handshake,
@@ -93,7 +93,7 @@ const FAITIERE_FEATURES = [
     icon: Database,
     title: 'Sécurité & RLS',
     description:
-      "Row-Level Security Supabase sur toutes les tables. Chaque coopérative ne voit que ses propres données. Webhook HMAC et rate limiting intégrés.",
+      'Row-Level Security Supabase sur toutes les tables. Chaque coopérative ne voit que ses propres données. Webhook HMAC et rate limiting intégrés.',
   },
 ]
 
@@ -101,34 +101,37 @@ const HAROO_PROFILES = [
   {
     icon: Sprout,
     role: 'Ouvrier agricole',
+    type: 'OUVRIER',
     color: 'text-amber-700 bg-amber-100',
     features: [
-      "Profil avec compétences et cantons de disponibilité",
+      'Profil avec compétences et cantons de disponibilité',
       "Offres d'emploi géolocalisées par canton",
-      "Carte professionnelle OUV-XXXXXX vérifiable",
-      "Météo agricole 4 jours et prix du marché",
+      'Carte professionnelle vérifiable par QR',
+      'Météo agricole 4 jours et prix du marché',
     ],
   },
   {
     icon: Briefcase,
     role: 'Acheteur',
+    type: 'ACHETEUR',
     color: 'text-orange-700 bg-orange-100',
     features: [
       "Profil avec produits et zones d'intervention",
-      "Préventes filtrées sur vos intérêts",
-      "Carte professionnelle ACH-XXXXXX vérifiable",
-      "Contacts producteurs qualifiés",
+      'Préventes filtrées sur vos intérêts',
+      'Carte professionnelle vérifiable par QR',
+      'Contacts producteurs qualifiés',
     ],
   },
   {
     icon: BookOpen,
     role: 'Agronome',
+    type: 'AGRONOME',
     color: 'text-yellow-700 bg-yellow-100',
     features: [
-      "Profil avec spécialisations et certifications",
+      'Profil avec spécialisations et certifications',
       "Demandes de mission directes depuis l'écosystème",
-      "Badge de validation professionnelle",
-      "Carte AGR-XXXXXX vérifiable par QR",
+      'Badge de validation professionnelle',
+      'Carte professionnelle vérifiable par QR',
     ],
   },
 ]
@@ -147,19 +150,18 @@ const USE_CASES = [
   {
     title: 'Filière cacao / café',
     description:
-      "Les agronomes Haroo effectuent des missions de conseil auprès des exploitants. Les acheteurs accèdent aux préventes de production avant la récolte.",
+      'Les agronomes Haroo effectuent des missions de conseil auprès des exploitants. Les acheteurs accèdent aux préventes de production avant la récolte.',
   },
   {
     title: 'Marché de travail agricole',
     description:
-      "Les ouvriers agricoles déclarent leur disponibilité par canton. Les exploitants publient des offres via AgriTogo. Le matching se fait automatiquement par proximité.",
+      'Les ouvriers agricoles déclarent leur disponibilité par canton. Les exploitants publient des offres via AgriTogo. Le matching se fait automatiquement par proximité.',
   },
 ]
 
 export default function FeaturesPage() {
   return (
     <MarketingLayout>
-
       {/* Hero */}
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
         <div className="text-center space-y-4 mb-16">
@@ -167,8 +169,8 @@ export default function FeaturesPage() {
             Un écosystème complet pour l&apos;agriculture
           </h1>
           <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
-            FaîtiereHub structure vos coopératives. Haroo donne une identité professionnelle
-            aux acteurs du terrain. Tout est connecté, tout est vérifiable.
+            FaîtiereHub structure vos coopératives. Haroo donne une identité professionnelle aux
+            acteurs du terrain. Tout est connecté, tout est vérifiable.
           </p>
         </div>
 
@@ -203,18 +205,30 @@ export default function FeaturesPage() {
               L&apos;identité professionnelle agricole
             </h2>
             <p className="mt-4 mx-auto max-w-2xl text-muted-foreground">
-              Trois profils, trois expériences — une seule plateforme partagée.
-              Haroo est gratuit et complémentaire à FaîtiereHub.
+              Trois profils, trois expériences — une seule plateforme partagée. Haroo est gratuit et
+              complémentaire à FaîtiereHub.
             </p>
           </div>
 
           <div className="grid gap-6 sm:grid-cols-3">
-            {HAROO_PROFILES.map(({ icon: Icon, role, color, features }) => (
+            {HAROO_PROFILES.map(({ icon: Icon, role, type, color, features }) => (
               <div
                 key={role}
                 className="rounded-2xl border border-amber-200/60 bg-white dark:bg-card p-6 shadow-sm"
               >
-                <div className={`inline-flex h-10 w-10 items-center justify-center rounded-lg ${color} mb-4`}>
+                {/* Spécimen rendu par le moteur de cartes : ce que le titulaire
+                    reçoit réellement, pas une vignette décorative. */}
+                <img
+                  src={`/api/haroo/card/preview?type=${type}`}
+                  alt={`Spécimen de carte professionnelle ${role}`}
+                  width={1180}
+                  height={740}
+                  loading="lazy"
+                  className="mb-4 w-full rounded-lg border border-border shadow-sm"
+                />
+                <div
+                  className={`inline-flex h-10 w-10 items-center justify-center rounded-lg ${color} mb-4`}
+                >
                   <Icon className="h-5 w-5" />
                 </div>
                 <h3 className="font-bold text-foreground mb-3">{role}</h3>
@@ -237,8 +251,8 @@ export default function FeaturesPage() {
               Un seul scanner pour toutes les cartes
             </div>
             <p className="text-sm text-amber-700 dark:text-amber-400">
-              Le même QR code scanner vérifie les cartes FAITIERE des membres de
-              coopérative et les cartes professionnelles Haroo (OUV / ACH / AGR).
+              Le même QR code scanner vérifie les cartes FAITIERE des membres de coopérative et les
+              cartes professionnelles Haroo (OUV / ACH / AGR).
             </p>
           </div>
         </div>
@@ -268,8 +282,8 @@ export default function FeaturesPage() {
             Transformez votre coopérative aujourd&apos;hui
           </h2>
           <p className="text-lg text-muted-foreground mb-8">
-            Découvrez comment FaîtiereHub et Haroo peuvent révolutionner la gestion
-            et les connexions au sein de votre coopérative.
+            Découvrez comment FaîtiereHub et Haroo peuvent révolutionner la gestion et les
+            connexions au sein de votre coopérative.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
             <Link href="/auth/signup">
@@ -278,7 +292,11 @@ export default function FeaturesPage() {
               </Button>
             </Link>
             <Link href="/auth/signup/haroo">
-              <Button size="lg" variant="outline" className="gap-2 border-amber-200 text-amber-700 hover:bg-amber-50 w-full sm:w-auto">
+              <Button
+                size="lg"
+                variant="outline"
+                className="gap-2 border-amber-200 text-amber-700 hover:bg-amber-50 w-full sm:w-auto"
+              >
                 <Network className="h-4 w-4" /> Rejoindre Haroo
               </Button>
             </Link>
