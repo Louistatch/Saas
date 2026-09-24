@@ -57,8 +57,24 @@ const nextConfig = {
   outputFileTracingExcludes: {
     '/*': ['./tests/**/*', './e2e/**/*', './node_modules/@electric-sql/pglite/**/*'],
   },
+  // Le moteur de cartes lit deux fichiers à l'exécution : le binaire WASM de
+  // resvg et les polices embarquées. Aucun des deux n'est atteignable par
+  // analyse statique — ils sont chargés par chemin, depuis `process.cwd()`.
+  // Sans ces inclusions explicites, la fonction serverless part sans eux et
+  // la route échoue en production alors qu'elle passe en local.
   outputFileTracingIncludes: {
-    '/api/cards/[memberId]': ['./node_modules/@resvg/resvg-wasm/index_bg.wasm'],
+    '/api/cards/[memberId]': [
+      './node_modules/@resvg/resvg-wasm/index_bg.wasm',
+      './lib/card-engine/fonts/*.ttf',
+    ],
+    '/api/haroo/card': [
+      './node_modules/@resvg/resvg-wasm/index_bg.wasm',
+      './lib/card-engine/fonts/*.ttf',
+    ],
+    '/api/haroo/card/preview': [
+      './node_modules/@resvg/resvg-wasm/index_bg.wasm',
+      './lib/card-engine/fonts/*.ttf',
+    ],
   },
   async headers() {
     return [
