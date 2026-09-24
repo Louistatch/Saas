@@ -13,6 +13,7 @@
  * par @resvg/resvg-wasm.
  */
 
+import { CARD_FONT_FAMILY, loadCardFonts } from '@/lib/card-engine/fonts'
 import { type HarooCardType, renderHarooCardSvg } from '@/lib/card-engine/haroo-card'
 import { createClient } from '@/lib/supabase/server'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
@@ -110,7 +111,16 @@ export async function GET(request: NextRequest) {
   })
 
   await ensureWasm()
-  const png = new Resvg(svg, { fitTo: { mode: 'width', value: 2360 } }).render().asPng()
+  const png = new Resvg(svg, {
+    fitTo: { mode: 'width', value: 2360 },
+    font: {
+      fontBuffers: await loadCardFonts(),
+      defaultFontFamily: CARD_FONT_FAMILY,
+      loadSystemFonts: false,
+    },
+  })
+    .render()
+    .asPng()
 
   return new NextResponse(png, {
     status: 200,

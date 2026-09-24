@@ -91,15 +91,13 @@ const HAROO_PROFILES = [
     type: 'OUVRIER',
     action: 'Trouver un emploi agricole',
     icon: Sprout,
-    cardPrefix: 'OUV-',
-    color: 'from-amber-600 to-amber-800',
     badgeBg: 'bg-amber-100 text-amber-800',
     tagline: 'Emploi saisonnier',
     description:
       "Déclarez vos compétences agricoles et vos cantons de disponibilité. Accédez aux offres d'emploi de la région, triées par proximité.",
     perks: [
       "Offres d'emploi géolocalisées",
-      'Carte professionnelle OUV-XXXXXX',
+      'Carte professionnelle vérifiable par QR',
       'Météo & prix marché',
     ],
   },
@@ -108,15 +106,13 @@ const HAROO_PROFILES = [
     type: 'ACHETEUR',
     action: 'Explorer les préventes',
     icon: TrendingUp,
-    cardPrefix: 'ACH-',
-    color: 'from-orange-600 to-orange-800',
     badgeBg: 'bg-orange-100 text-orange-800',
     tagline: 'Préventes de production',
     description:
       "Définissez vos produits et zones d'intervention. Accédez aux préventes disponibles filtrées sur vos intérêts.",
     perks: [
       'Préventes filtrées par produit',
-      'Carte professionnelle ACH-XXXXXX',
+      'Carte professionnelle vérifiable par QR',
       'Contacts producteurs',
     ],
   },
@@ -125,8 +121,6 @@ const HAROO_PROFILES = [
     type: 'AGRONOME',
     action: 'Accéder aux missions de conseil',
     icon: BookOpen,
-    cardPrefix: 'AGR-',
-    color: 'from-yellow-600 to-yellow-800',
     badgeBg: 'bg-yellow-100 text-yellow-800',
     tagline: 'Missions de conseil',
     description:
@@ -134,7 +128,7 @@ const HAROO_PROFILES = [
     perks: [
       'Demandes de mission directes',
       'Badge de validation professionnelle',
-      'Carte AGR-XXXXXX vérifiable',
+      'Carte professionnelle vérifiable par QR',
     ],
   },
 ]
@@ -192,40 +186,33 @@ export default function Home() {
           {/* 3 profile cards */}
           <div className="grid gap-6 sm:grid-cols-3">
             {HAROO_PROFILES.map(
-              ({
-                role,
-                type,
-                action,
-                icon: Icon,
-                cardPrefix,
-                color,
-                tagline,
-                description,
-                perks,
-              }) => (
+              ({ role, type, action, icon: Icon, badgeBg, tagline, description, perks }) => (
                 <div
                   key={role}
                   id={`haroo-${type.toLowerCase()}`}
                   className="scroll-mt-24 rounded-2xl border border-amber-200/60 bg-white dark:bg-card shadow-sm overflow-hidden flex flex-col"
                 >
-                  {/* Card visual header */}
-                  <div className={`bg-gradient-to-br ${color} p-5 text-white`}>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="text-xs font-bold tracking-widest opacity-70 mb-1">
-                          HAROO
-                        </div>
-                        <div className="font-bold text-lg leading-tight">{role}</div>
-                        <div className="text-xs opacity-75 mt-0.5 font-mono">
-                          {cardPrefix}XXXXXX
-                        </div>
-                      </div>
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20">
-                        <Icon className="h-5 w-5" />
-                      </div>
-                    </div>
-                    <div className="mt-3 inline-block rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-semibold">
-                      {tagline}
+                  {/* La carte réellement émise, rendue par le moteur de cartes
+                      (/api/haroo/card/preview). Un aplat de couleur dessiné en
+                      HTML ne montrait rien de ce que le titulaire recevra. */}
+                  <div className="bg-muted/40 p-4">
+                    <img
+                      src={`/api/haroo/card/preview?type=${type}`}
+                      alt={`Spécimen de carte professionnelle ${role}`}
+                      width={1180}
+                      height={740}
+                      loading="lazy"
+                      className="w-full rounded-lg border border-border shadow-sm"
+                    />
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                        <Icon className="h-4 w-4 text-amber-700" /> {role}
+                      </span>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${badgeBg}`}
+                      >
+                        {tagline}
+                      </span>
                     </div>
                   </div>
 

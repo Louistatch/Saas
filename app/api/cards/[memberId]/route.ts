@@ -1,20 +1,21 @@
 /**
  * Server-side card PNG generation route.
- * 
+ *
  * GET /api/cards/:memberId
- * 
+ *
  * Generates a high-resolution PNG of the member identity card
  * using SVG rendering + @resvg/resvg-wasm (Vercel/Turbopack compatible).
- * 
+ *
  * Auth: requires authenticated user with access to the member's cooperative.
  * Output: image/png (2360px wide, ~80ms generation time)
  */
 
-import { NextResponse, type NextRequest } from 'next/server'
-import { initWasm, Resvg } from '@resvg/resvg-wasm'
-import { createClient } from '@/lib/supabase/server'
-import { assertTenantAccess } from '@/lib/security/assert-access'
 import { buildCardSchema, renderToSvgString } from '@/lib/card-engine'
+import { CARD_FONT_FAMILY, loadCardFonts } from '@/lib/card-engine/fonts'
+import { assertTenantAccess } from '@/lib/security/assert-access'
+import { createClient } from '@/lib/supabase/server'
+import { Resvg, initWasm } from '@resvg/resvg-wasm'
+import { type NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
 
@@ -42,7 +43,7 @@ async function ensureWasm() {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ memberId: string }> }
+  { params }: { params: Promise<{ memberId: string }> },
 ) {
   const { memberId } = await params
 
@@ -53,7 +54,10 @@ export async function GET(
   const supabase = await createClient()
 
   // Verify the user is authenticated
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
   if (authError || !user) {
     return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
   }
@@ -69,10 +73,7 @@ export async function GET(
     .maybeSingle()
 
   if (cardError || !card) {
-    return NextResponse.json(
-      { error: 'Carte active introuvable pour ce membre' },
-      { status: 404 }
-    )
+    return NextResponse.json({ error: 'Carte active introuvable pour ce membre' }, { status: 404 })
   }
 
   // SEC-05: verify the caller actually has access to this card's cooperative.
@@ -116,9 +117,10 @@ export async function GET(
     createdAt: card.created_at,
     cooperativeName: coop?.name ?? '',
     faitiereName: coop?.faitiere_name ?? 'FaîtiereHub',
-    level: (coop?.level === 'or' || coop?.level === 'argent' || coop?.level === 'bronze')
-      ? coop.level
-      : 'bronze',
+    level:
+      coop?.level === 'or' || coop?.level === 'argent' || coop?.level === 'bronze'
+        ? coop.level
+        : 'bronze',
   })
 
   // Render SVG
@@ -128,6 +130,13 @@ export async function GET(
   await ensureWasm()
   const resvg = new Resvg(svg, {
     fitTo: { mode: 'width', value: 2360 },
+    // Sans buffer de police, resvg-wasm rend les <text> vides : la carte
+    // sortait avec le décor et le QR, mais sans un seul caractère.
+    font: {
+      fontBuffers: await loadCardFonts(),
+      defaultFontFamily: CARD_FONT_FAMILY,
+      loadSystemFonts: false,
+    },
   })
   const pngData = resvg.render()
   const pngBuffer = pngData.asPng()
