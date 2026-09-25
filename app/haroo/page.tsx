@@ -487,7 +487,9 @@ function HarooSpaceInner() {
   }
 
   /** Retirer une annonce : la policy propriétaire limite au seul auteur. */
-  const removeAnnouncement = async (id: string) => {
+  const removeAnnouncement = async (id: string, title: string) => {
+    // Suppression définitive, sur un écran tactile : on demande confirmation.
+    if (!window.confirm(`Retirer définitivement l'annonce « ${title} » ?`)) return
     const supabase = createClient()
     const { error } = await supabase.from('producer_announcements').delete().eq('id', id)
     if (!error) setMyAnnouncements((prev) => prev.filter((a) => a.id !== id))
@@ -951,7 +953,7 @@ function HarooSpaceInner() {
                     variant="ghost"
                     size="sm"
                     className="text-destructive hover:text-destructive"
-                    onClick={() => removeAnnouncement(item.id)}
+                    onClick={() => removeAnnouncement(item.id, item.title)}
                   >
                     <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Retirer
                   </Button>

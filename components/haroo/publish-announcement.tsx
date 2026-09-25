@@ -72,6 +72,16 @@ export function PublishAnnouncement({
   const [phone, setPhone] = useState(defaultPhone ?? '')
   const [cantonId, setCantonId] = useState(defaultCantonId ?? '')
 
+  // Le composant est monté avant que le profil ne soit chargé : `useState` a
+  // donc figé un téléphone et un canton vides. Sans ce ré-amorçage à
+  // l'ouverture, le formulaire restait vide alors que le profil les porte.
+  useEffect(() => {
+    if (!open) return
+    setType(defaultType)
+    setPhone(defaultPhone ?? '')
+    setCantonId(defaultCantonId ?? '')
+  }, [open, defaultType, defaultPhone, defaultCantonId])
+
   useEffect(() => {
     if (!open || cantons.length > 0) return
     const supabase = createClient()
