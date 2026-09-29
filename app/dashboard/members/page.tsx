@@ -20,7 +20,7 @@ import { ScoreBadge } from '@/components/members/score-badge'
 import { PageHeader } from '@/components/shared/page-header'
 import { PaginationBar } from '@/components/shared/pagination'
 import { useConfirm } from '@/components/shared/confirm-dialog'
-import { PhotoUpload } from '@/components/shared/photo-upload'
+import { PhotoUpload, PhotoGuidelines } from '@/components/shared/photo-upload'
 import { LocationPicker } from '@/components/shared/location-picker'
 import { downloadCsv, parseCsvWithHeaders, toCsv, validateCsvFile } from '@/lib/utils/csv'
 import { errorMessage } from '@/lib/utils/errors'
@@ -759,6 +759,9 @@ export default function MembersPage() {
                     error={formErrors.last_name}
                   />
                 </div>
+                {/* Only while the photo is still missing — once it is uploaded
+                    the rules have served their purpose and would just be noise. */}
+                {!form.photo_url && <PhotoGuidelines />}
               </div>
             </div>
             <FormField

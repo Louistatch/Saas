@@ -18,10 +18,62 @@ interface PhotoUploadProps {
   disabled?: boolean
 }
 
+// 7:9 — the ISO/ICAO identity-photo ratio, and exactly the ratio of the
+// portrait window in lib/card-engine/renderer.ts. What is framed here is what
+// lands on the printed card, with no second crop in between.
 const sizes = {
-  sm: 'w-20 h-24',
+  sm: 'w-20 h-[103px]',
   md: 'w-28 h-36',
-  lg: 'w-36 h-44',
+  lg: 'w-36 h-[185px]',
+}
+
+/**
+ * Framing guide drawn inside the empty frame: head and shoulders where they
+ * must land, plus the card's own corner registration ticks. An operator
+ * photographing 200 members in a courtyard gets the rule from the shape, not
+ * from a paragraph they will not read.
+ */
+function FramingGuide() {
+  return (
+    <svg viewBox="0 0 70 90" className="absolute inset-0 h-full w-full" aria-hidden="true">
+      <title>Cadrage attendu</title>
+      <g fill="none" stroke="currentColor" strokeWidth="1" className="text-muted-foreground/45">
+        <path d="M6 14V6h8M56 6h8v8M64 76v8h-8M14 84H6v-8" />
+        {/* Head fills ~45% of the frame height and the shoulders start right
+            under the chin — the proportions of a compliant ID portrait. */}
+        <circle cx="35" cy="33" r="19" strokeDasharray="3 3" />
+        <path d="M7 84c0-16 12.5-26 28-26s28 10 28 26" strokeDasharray="3 3" />
+      </g>
+    </svg>
+  )
+}
+
+const PHOTO_TIPS = [
+  'Cadrer la tête et le haut des épaules — la tête occupe ~70 % de la hauteur.',
+  'Tenir le téléphone à la verticale, à hauteur des yeux, à environ 1 mètre.',
+  'Fond uni et clair (un mur, un drap) — ni contre-jour, ni soleil direct.',
+  'Visage de face, regard vers l’objectif, expression neutre, sans chapeau ni lunettes teintées.',
+  'Lumière du jour à l’ombre : pas de flash, pas d’ombre portée sur le visage.',
+]
+
+/** The capture rules, for a form column wide enough to show them. */
+export function PhotoGuidelines({ className }: { className?: string }) {
+  return (
+    <div className={cn('rounded-lg border border-border bg-muted/30 p-3', className)}>
+      <p className="text-xs font-medium">Réussir la photo de la carte</p>
+      <ul className="mt-1.5 space-y-1">
+        {PHOTO_TIPS.map((tip) => (
+          <li key={tip} className="flex gap-1.5 text-[11px] leading-snug text-muted-foreground">
+            <span aria-hidden="true">•</span>
+            <span>{tip}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+        Format portrait 7:9 (photo d’identité). Une image plus large sera recadrée sur son centre.
+      </p>
+    </div>
+  )
 }
 
 /**
@@ -161,10 +213,16 @@ export function PhotoUpload({
           {uploading ? (
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           ) : (
-            <div className="text-center p-2">
-              <Camera className="h-6 w-6 text-muted-foreground mx-auto" />
-              <p className="text-[10px] text-muted-foreground mt-1">Photo ID</p>
-            </div>
+            <>
+              {/* The camera sits inside the head outline: the affordance and
+                  the framing instruction occupy the same spot, so neither
+                  crowds the other in a frame this small. */}
+              <FramingGuide />
+              <Camera
+                className="absolute h-5 w-5 text-muted-foreground"
+                style={{ left: '50%', top: '36.7%', transform: 'translate(-50%,-50%)' }}
+              />
+            </>
           )}
         </button>
       )}

@@ -280,19 +280,22 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
         }
 
         /* ── Photo ─────────────────────────────────────────── */
+        /* 7:9 portrait, matching the window in lib/card-engine/renderer.ts —
+           the reveal must show the same document the member holds, not a
+           rounder, friendlier version of it. */
         .card3d-photo {
           position: relative;
           width: clamp(62px, 17vw, 82px);
-          height: clamp(62px, 17vw, 82px);
+          height: clamp(80px, 22vw, 105px);
           flex-shrink: 0;
         }
         .card3d-photo-ring {
-          position: absolute; inset: -3px; border-radius: 50%;
+          position: absolute; inset: -3px; border-radius: 10px;
           background: conic-gradient(from 0deg, #4dffa0, #1c7a47, #b48cff, #4dffa0);
           filter: blur(.5px);
         }
         .card3d-photo-inner {
-          position: absolute; inset: 0; border-radius: 50%; overflow: hidden;
+          position: absolute; inset: 0; border-radius: 7px; overflow: hidden;
           box-shadow: inset 0 2px 6px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.5);
         }
         .card3d-photo-inner img {
@@ -300,7 +303,7 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
           object-fit: cover; object-position: center top;
         }
         .card3d-photo-empty {
-          width: 100%; height: 100%; border-radius: 50%;
+          width: 100%; height: 100%; border-radius: 7px;
           background: #0c3d24;
           display: grid; place-items: center; color: rgba(255,255,255,.4);
         }

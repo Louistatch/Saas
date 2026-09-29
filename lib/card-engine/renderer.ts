@@ -41,6 +41,24 @@ const H = 740
 const SPLIT = 742
 
 /**
+ * Portrait window — a RECTANGLE, not a disc.
+ *
+ * Ratio is 7:9, the ISO/ICAO identity-photo ratio (35×45 mm) that every photo
+ * booth, passport scanner and `components/shared/photo-upload` preview already
+ * uses. A circle crops the ears and the shoulders out of a correctly-shot ID
+ * portrait — the two things that make a face verifiable at a glance — and it
+ * wastes the corners of the one large empty area the card has. The rectangle
+ * fills that area and makes what the operator frames in the upload widget
+ * EXACTLY what lands on the card, so there is no surprise at printing time.
+ */
+const PX = 48
+const PW = 224
+const PH = Math.round((PW * 9) / 7) // 288
+const PY = 142
+/** Frame bleed around the window: the engraved border sits in this margin. */
+const PB = 7
+
+/**
  * Font stack with NO quoted family names: this string is interpolated into a
  * double-quoted SVG attribute, so an inner `"Liberation Sans"` would close the
  * attribute early and void the whole declaration (the text then falls back to
@@ -49,6 +67,29 @@ const SPLIT = 742
  * in security-art.ts is calibrated against.
  */
 const SANS = 'Arial, Helvetica, sans-serif'
+
+/**
+ * Registration ticks at the four corners of the portrait window — the crop
+ * marks of a printed identity document. They read as alignment marks rather
+ * than decoration, and they tell the eye the photo is a controlled, framed
+ * field of the document and not an avatar dropped onto a background.
+ */
+function cornerTicks(x: number, y: number, w: number, h: number, color: string): string {
+  const L = 16
+  const inset = 11
+  const corners = [
+    [x + inset, y + inset, 1, 1],
+    [x + w - inset, y + inset, -1, 1],
+    [x + inset, y + h - inset, 1, -1],
+    [x + w - inset, y + h - inset, -1, -1],
+  ]
+  return corners
+    .map(
+      ([cx, cy, sx, sy]) =>
+        `<path d="M${cx} ${cy + sy * L}V${cy}H${cx + sx * L}" fill="none" stroke="${esc(color)}" stroke-opacity="0.55" stroke-width="1.6" stroke-linecap="square"/>`,
+    )
+    .join('')
+}
 
 function truncate(str: string, max: number): string {
   if (str.length <= max) return str
@@ -188,13 +229,16 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
     NAME_MAX_W, 40, 26, true,
   ).size
 
-  const photoContent = (photoDataUrl || member.photoUrl)
-    ? `<image href="${esc(photoDataUrl || member.photoUrl || '')}" xlink:href="${esc(photoDataUrl || member.photoUrl || '')}" x="52" y="196" width="196" height="196" preserveAspectRatio="xMidYMid slice" clip-path="url(#photoClip)"/>`
-    : `<g clip-path="url(#photoClip)">
-        <rect x="52" y="196" width="196" height="196" fill="${esc(darken(accent, 0.58))}"/>
-        <g transform="translate(150 300)" fill="${esc(accentSoft)}" opacity="0.5">
-          <circle cx="0" cy="-26" r="30"/>
-          <path d="M-58 60 C -58 14, 58 14, 58 60 Z"/>
+  const photoSrc = photoDataUrl || member.photoUrl || ''
+  const photoContent = photoSrc
+    ? `<image href="${esc(photoSrc)}" xlink:href="${esc(photoSrc)}" x="${PX}" y="${PY}" width="${PW}" height="${PH}" preserveAspectRatio="xMidYMid slice" clip-path="url(#photoClip)"/>`
+    : // Placeholder doubles as a framing guide: the silhouette sits exactly where
+      // a correctly-shot head-and-shoulders portrait should land.
+      `<g clip-path="url(#photoClip)">
+        <rect x="${PX}" y="${PY}" width="${PW}" height="${PH}" fill="${esc(darken(accent, 0.58))}"/>
+        <g transform="translate(${PX + PW / 2} ${PY + PH * 0.44})" fill="${esc(accentSoft)}" opacity="0.4">
+          <circle cx="0" cy="-22" r="36"/>
+          <path d="M-70 106 C -70 38, 70 38, 70 106 Z"/>
         </g>
       </g>`
 
@@ -279,7 +323,16 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
 
     ${rosetteDef('rose')}
     <clipPath id="cardClip"><rect x="0" y="0" width="${W}" height="${H}" rx="30" ry="30"/></clipPath>
-    <clipPath id="photoClip"><circle cx="150" cy="294" r="98"/></clipPath>
+    <clipPath id="photoClip"><rect x="${PX}" y="${PY}" width="${PW}" height="${PH}" rx="14" ry="14"/></clipPath>
+    <!-- Scrim: the photo fades into the card at the bottom instead of sitting
+         on it like a pasted sticker, and picks up a light from the top-left
+         matching the card's own sheen. -->
+    <linearGradient id="photoScrim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.10"/>
+      <stop offset="0.30" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0.72" stop-color="${esc(darken(accent, 0.72))}" stop-opacity="0"/>
+      <stop offset="1" stop-color="${esc(darken(accent, 0.72))}" stop-opacity="0.42"/>
+    </linearGradient>
     <clipPath id="darkClip"><rect x="0" y="0" width="${SPLIT}" height="${H}"/></clipPath>
     <clipPath id="panelClip"><rect x="${SPLIT}" y="0" width="${W - SPLIT}" height="${H}"/></clipPath>
     <clipPath id="foilClip"><rect width="86" height="58" rx="8"/></clipPath>
@@ -293,7 +346,7 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
       <!-- Guilloché engraving behind the identity zone. Kept faint: on a real
            document the engraving is a background texture you notice on close
            inspection, not a pattern competing with the portrait and the name. -->
-      ${useRosette({ href: 'rose', cx: 150, cy: 294, scale: 2.45, color: accentSoft, opacity: 0.1, strokeWidth: 0.45 })}
+      ${useRosette({ href: 'rose', cx: PX + PW / 2, cy: PY + PH / 2, scale: 2.45, color: accentSoft, opacity: 0.1, strokeWidth: 0.45 })}
       ${useRosette({ href: 'rose', cx: 596, cy: 214, scale: 1.75, color: accent, opacity: 0.075, strokeWidth: 0.45 })}
       <rect x="0" y="0" width="${SPLIT}" height="${H}" fill="url(#haloGrad)"/>
       <rect x="0" y="0" width="${SPLIT}" height="${H}" fill="url(#sheen)"/>
@@ -380,13 +433,15 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
       <text x="52" y="34" font-family="${SANS}" font-weight="600" font-size="9.5" fill="${esc(accentSoft)}" letter-spacing="2.2" opacity="0.8">${esc(truncate(branding.faitiereName.toUpperCase(), 30))}</text>
     </g>
 
-    <!-- Portrait: guilloché halo + gradient ring -->
-    ${useRosette({ href: 'rose', cx: 150, cy: 294, scale: 1.3, color: accentSoft, opacity: 0.35, strokeWidth: 0.5 })}
-    <circle cx="150" cy="294" r="106" fill="url(#ringGrad)" filter="url(#softGlow)"/>
-    <circle cx="150" cy="294" r="100" fill="${esc(darken(accent, 0.52))}"/>
+    <!-- Portrait window: guilloché halo, engraved frame, ID-photo rectangle -->
+    ${useRosette({ href: 'rose', cx: PX + PW / 2, cy: PY + PH / 2, scale: 1.55, color: accentSoft, opacity: 0.3, strokeWidth: 0.5 })}
+    <rect x="${PX - PB}" y="${PY - PB}" width="${PW + PB * 2}" height="${PH + PB * 2}" rx="20" ry="20" fill="url(#ringGrad)" filter="url(#shadow)"/>
+    <rect x="${PX}" y="${PY}" width="${PW}" height="${PH}" rx="14" ry="14" fill="${esc(darken(accent, 0.52))}"/>
     ${photoContent}
-    <circle cx="150" cy="294" r="98" fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="2"/>
-    <circle cx="150" cy="294" r="106" fill="none" stroke="#ffffff" stroke-opacity="0.1" stroke-width="1"/>
+    <rect x="${PX}" y="${PY}" width="${PW}" height="${PH}" rx="14" ry="14" fill="url(#photoScrim)"/>
+    <rect x="${PX}" y="${PY}" width="${PW}" height="${PH}" rx="14" ry="14" fill="none" stroke="#ffffff" stroke-opacity="0.2" stroke-width="2"/>
+    <rect x="${PX - PB}" y="${PY - PB}" width="${PW + PB * 2}" height="${PH + PB * 2}" rx="20" ry="20" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1"/>
+    ${cornerTicks(PX, PY, PW, PH, accentSoft)}
 
     <!-- Name + status -->
     <g transform="translate(${NAME_X} ${nameLines.length > 1 ? 218 : 246})">
