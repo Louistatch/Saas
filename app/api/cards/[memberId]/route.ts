@@ -19,6 +19,30 @@ import { type NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
 
+/**
+ * Server-side image inliner. The renderer's own imageToDataUrl() relies on
+ * FileReader, a browser API, so it cannot be reused here — resvg has no network
+ * stack and would silently drop an <image href="https://…">, printing a card
+ * with a blank emblem plate. A logo that cannot be fetched degrades to no logo,
+ * never to a failed card.
+ */
+async function fetchAsDataUrl(url: string | null): Promise<string | null> {
+  if (!url) return null
+  if (url.startsWith('data:')) return url
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(5_000) })
+    if (!response.ok) return null
+    const type = response.headers.get('content-type') ?? 'image/png'
+    if (!type.startsWith('image/')) return null
+    const buffer = Buffer.from(await response.arrayBuffer())
+    // Keep the payload sane: a multi-MB logo would bloat every card render.
+    if (buffer.byteLength > 512 * 1024) return null
+    return `data:${type};base64,${buffer.toString('base64')}`
+  } catch {
+    return null
+  }
+}
+
 // Initialize WASM once (singleton pattern for serverless)
 let wasmInitialized = false
 async function ensureWasm() {
@@ -96,9 +120,34 @@ export async function GET(
   // Fetch cooperative + faîtière info
   const { data: coop } = await supabase
     .from('cooperatives')
-    .select('name, faitiere_name, level')
+    .select('name, faitiere_name, level, logo_url, parent_id')
     .eq('id', card.cooperative_id)
     .maybeSingle()
+
+  // Walk up the hierarchy for the issuing faîtière's own logo. The chain is
+  // cooperative → union → faîtière, so the loop is bounded at a small depth
+  // rather than trusted to terminate: a parent_id cycle would otherwise hang
+  // the request.
+  let faitiereLogo: string | null = null
+  let parentId = coop?.parent_id ?? null
+  for (let depth = 0; depth < 5 && parentId && !faitiereLogo; depth++) {
+    const { data: parent } = await supabase
+      .from('cooperatives')
+      .select('level, logo_url, parent_id')
+      .eq('id', parentId)
+      .maybeSingle()
+    if (!parent) break
+    if (parent.level === 'faitiere') {
+      faitiereLogo = parent.logo_url ?? null
+      break
+    }
+    parentId = parent.parent_id ?? null
+  }
+
+  const [faitiereLogoData, coopLogoData] = await Promise.all([
+    fetchAsDataUrl(faitiereLogo),
+    fetchAsDataUrl(coop?.logo_url ?? null),
+  ])
 
   // Build the card schema
   const schema = buildCardSchema({
@@ -117,6 +166,8 @@ export async function GET(
     createdAt: card.created_at,
     cooperativeName: coop?.name ?? '',
     faitiereName: coop?.faitiere_name ?? 'FaîtiereHub',
+    faitiereLogoUrl: faitiereLogoData,
+    cooperativeLogoUrl: coopLogoData,
     level:
       coop?.level === 'or' || coop?.level === 'argent' || coop?.level === 'bronze'
         ? coop.level

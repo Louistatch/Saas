@@ -28,7 +28,18 @@ export interface CardSchema {
   branding: {
     faitiereName: string
     cooperativeName: string
-    logoUrl?: string
+    /**
+     * Emblem of the ISSUING authority — the faîtière. Takes the header slot,
+     * top-left, where the eye lands first on any identity document.
+     */
+    faitiereLogoUrl?: string | null
+    /**
+     * Emblem of the cooperative the member belongs to. Sits mirrored, top-right
+     * of the identity zone. When only ONE of the two logos exists it is
+     * promoted to the issuer slot instead, so a lone emblem is never orphaned
+     * on the wrong side of the card.
+     */
+    cooperativeLogoUrl?: string | null
     accentColor: string
   }
   /** Member data (filled at generation time) */
@@ -93,6 +104,8 @@ export function buildCardSchema(opts: {
   createdAt: string
   cooperativeName: string
   faitiereName: string
+  faitiereLogoUrl?: string | null
+  cooperativeLogoUrl?: string | null
   accentColor?: string
   textColor?: string
   level?: 'or' | 'argent' | 'bronze'
@@ -127,6 +140,8 @@ export function buildCardSchema(opts: {
     branding: {
       faitiereName: opts.faitiereName,
       cooperativeName: opts.cooperativeName,
+      faitiereLogoUrl: opts.faitiereLogoUrl ?? null,
+      cooperativeLogoUrl: opts.cooperativeLogoUrl ?? null,
       accentColor: accent,
     },
     member: {

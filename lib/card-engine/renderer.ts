@@ -24,6 +24,7 @@ import { lighten, darken } from './schema'
 import { encodeText } from '@/lib/utils/qr'
 import {
   esc,
+  emblem,
   rosetteDef,
   useRosette,
   guillocheBand,
@@ -242,6 +243,58 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
         </g>
       </g>`
 
+  // ── Organisation emblems ──────────────────────────────────────────────────
+  // Identity-document convention: the ISSUING authority's emblem occupies the
+  // header, top-left, where the eye lands first; a second body is mirrored
+  // top-right. The faîtière issues the card (the footer already reads
+  // "DÉLIVRÉE PAR <faîtière>"), so it takes the issuer slot and the cooperative
+  // the member belongs to is mirrored opposite.
+  //
+  // When only ONE logo exists it is promoted to the issuer slot rather than
+  // left stranded on the right-hand side — a single emblem floating opposite an
+  // empty header reads as a mistake, not as a design.
+  const faitiereLogo = branding.faitiereLogoUrl || null
+  const coopLogo = branding.cooperativeLogoUrl || null
+  const issuerLogo = faitiereLogo ?? coopLogo
+  // Only mirror the cooperative when it is not already the issuer emblem.
+  const partnerLogo = faitiereLogo && coopLogo ? coopLogo : null
+  const issuerIsFaitiere = Boolean(faitiereLogo)
+
+  const issuerEmblem = issuerLogo
+    ? emblem({ x: 0, y: 0, size: 44, href: issuerLogo, id: 'emblemIssuer' })
+    : // No org logo: keep the platform's own sprouting-leaf mark rather than
+      // leaving a hole. Nothing regresses for a cooperative that never uploads.
+      `<circle cx="21" cy="21" r="21" fill="url(#iconGrad)" filter="url(#shadow)"/>
+      <circle cx="21" cy="21" r="21" fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="1"/>
+      <path d="M21 31.5 C 21 26, 21 20, 21 13.5" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+      <path d="M21 22 C 14.5 22, 10.5 18, 10.5 12.5 C 17 12.5, 21 16.5, 21 22 Z" fill="#ffffff" fill-opacity="0.95"/>
+      <path d="M21 18 C 27.5 18, 31.5 14, 31.5 8.5 C 25 8.5, 21 12.5, 21 18 Z" fill="#ffffff" fill-opacity="0.7"/>`
+
+  // With an organisation emblem in the header, "Faîtière Hub" beside it would
+  // read as the platform's OWN logo — misattributing the cooperative's mark.
+  // The organisation's name takes the wordmark instead; FaîtiereHub stays
+  // present in the issuance line and the microtext at the foot of the card.
+  const wordmarkName = issuerLogo
+    ? (issuerIsFaitiere ? branding.faitiereName : branding.cooperativeName)
+    : null
+  const issuerWordmark = wordmarkName
+    ? `<text x="56" y="19" font-family="${SANS}" font-weight="800" font-size="${fitFontSize(wordmarkName, 300, 21, 13, true).size}" fill="${esc(onDark)}" letter-spacing="-0.3">${esc(wordmarkName)}</text>
+      <text x="56" y="36" font-family="${SANS}" font-weight="600" font-size="9.5" fill="${esc(accentSoft)}" letter-spacing="2.2" opacity="0.8">${esc(truncate((issuerIsFaitiere ? 'FAÎTIÈRE' : 'COOPÉRATIVE'), 30))}</text>`
+    : `<text x="52" y="17" font-family="${SANS}" font-weight="800" font-size="22" fill="${esc(onDark)}" letter-spacing="-0.3">Faîtière</text>
+      <text x="${52 + estimateTextWidth('Faîtière', 22, true) + 6}" y="17" font-family="${SANS}" font-weight="800" font-size="22" fill="${esc(accentSoft)}" letter-spacing="-0.3">Hub</text>
+      <text x="52" y="34" font-family="${SANS}" font-weight="600" font-size="9.5" fill="${esc(accentSoft)}" letter-spacing="2.2" opacity="0.8">${esc(truncate(branding.faitiereName.toUpperCase(), 30))}</text>`
+
+  // Mirrored slot: right-aligned against the inner edge of the dark zone.
+  const PARTNER_SIZE = 40
+  const PARTNER_X = SPLIT - 36 - PARTNER_SIZE
+  const partnerEmblem = partnerLogo
+    ? `<g transform="translate(0 32)">
+        ${emblem({ x: PARTNER_X, y: 0, size: PARTNER_SIZE, href: partnerLogo, id: 'emblemPartner' })}
+        <text x="${PARTNER_X - 10}" y="17" text-anchor="end" font-family="${SANS}" font-weight="700" font-size="8.5" fill="${esc(accentSoft)}" letter-spacing="1.6" opacity="0.85">COOPÉRATIVE</text>
+        <text x="${PARTNER_X - 10}" y="31" text-anchor="end" font-family="${SANS}" font-weight="700" font-size="11" fill="${esc(onDark)}" opacity="0.92">${esc(truncate(branding.cooperativeName, 26))}</text>
+      </g>`
+    : ''
+
   const bgStops = (schema.background.gradient ?? [
     { offset: 0, color: lighten(accent, 0.1) },
     { offset: 1, color: '#04140b' },
@@ -422,16 +475,10 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
 
     <!-- ═══ IDENTITY ZONE ═══ -->
     <g transform="translate(36 30)">
-      <circle cx="21" cy="21" r="21" fill="url(#iconGrad)" filter="url(#shadow)"/>
-      <circle cx="21" cy="21" r="21" fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="1"/>
-      <!-- Sprouting leaf mark: stem + two blades, readable at 42px -->
-      <path d="M21 31.5 C 21 26, 21 20, 21 13.5" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" fill="none"/>
-      <path d="M21 22 C 14.5 22, 10.5 18, 10.5 12.5 C 17 12.5, 21 16.5, 21 22 Z" fill="#ffffff" fill-opacity="0.95"/>
-      <path d="M21 18 C 27.5 18, 31.5 14, 31.5 8.5 C 25 8.5, 21 12.5, 21 18 Z" fill="#ffffff" fill-opacity="0.7"/>
-      <text x="52" y="17" font-family="${SANS}" font-weight="800" font-size="22" fill="${esc(onDark)}" letter-spacing="-0.3">Faîtière</text>
-      <text x="${52 + estimateTextWidth('Faîtière', 22, true) + 6}" y="17" font-family="${SANS}" font-weight="800" font-size="22" fill="${esc(accentSoft)}" letter-spacing="-0.3">Hub</text>
-      <text x="52" y="34" font-family="${SANS}" font-weight="600" font-size="9.5" fill="${esc(accentSoft)}" letter-spacing="2.2" opacity="0.8">${esc(truncate(branding.faitiereName.toUpperCase(), 30))}</text>
+      ${issuerEmblem}
+      ${issuerWordmark}
     </g>
+    ${partnerEmblem}
 
     <!-- Portrait window: guilloché halo, engraved frame, ID-photo rectangle -->
     ${useRosette({ href: 'rose', cx: PX + PW / 2, cy: PY + PH / 2, scale: 1.55, color: accentSoft, opacity: 0.3, strokeWidth: 0.5 })}

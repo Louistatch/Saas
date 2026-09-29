@@ -17,6 +17,8 @@ interface CardSvgPreviewProps {
   createdAt?: string
   cooperativeName?: string
   faitiereName?: string
+  cooperativeLogoUrl?: string | null
+  faitiereLogoUrl?: string | null
   level?: 'or' | 'argent' | 'bronze'
   template?: {
     title: string
@@ -62,11 +64,17 @@ export function CardSvgPreview({
   createdAt = new Date().toISOString(),
   cooperativeName = 'Coopérative',
   faitiereName = 'FaîtiereHub',
+  cooperativeLogoUrl = null,
+  faitiereLogoUrl = null,
   level = 'bronze',
   template,
   className = '',
 }: CardSvgPreviewProps) {
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null)
+  // Logos must be inlined too: the same SVG string is handed to the PNG export
+  // and to the server renderer, neither of which can follow an external URL.
+  const [coopLogoData, setCoopLogoData] = useState<string | null>(null)
+  const [faitiereLogoData, setFaitiereLogoData] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -74,6 +82,20 @@ export function CardSvgPreview({
     urlToDataUrl(photoUrl).then((v) => { if (!cancelled) setPhotoDataUrl(v) })
     return () => { cancelled = true }
   }, [photoUrl])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!cooperativeLogoUrl) { setCoopLogoData(null); return }
+    urlToDataUrl(cooperativeLogoUrl).then((v) => { if (!cancelled) setCoopLogoData(v) })
+    return () => { cancelled = true }
+  }, [cooperativeLogoUrl])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!faitiereLogoUrl) { setFaitiereLogoData(null); return }
+    urlToDataUrl(faitiereLogoUrl).then((v) => { if (!cancelled) setFaitiereLogoData(v) })
+    return () => { cancelled = true }
+  }, [faitiereLogoUrl])
 
   const svgString = useMemo(() => {
     const schema = buildCardSchema({
@@ -92,12 +114,14 @@ export function CardSvgPreview({
       createdAt,
       cooperativeName,
       faitiereName,
+      cooperativeLogoUrl: coopLogoData,
+      faitiereLogoUrl: faitiereLogoData,
       level,
       accentColor: template?.accentColor,
       template,
     })
     return renderToSvgString(schema, photoDataUrl)
-  }, [firstName, lastName, phone, photoUrl, photoDataUrl, village, canton, prefecture, region, cardNumber, expiryDate, createdAt, cooperativeName, faitiereName, level, template])
+  }, [firstName, lastName, phone, photoUrl, photoDataUrl, village, canton, prefecture, region, cardNumber, expiryDate, createdAt, cooperativeName, faitiereName, coopLogoData, faitiereLogoData, level, template])
 
   return (
     <div

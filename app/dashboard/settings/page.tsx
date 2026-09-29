@@ -13,6 +13,7 @@ import { useAuth } from '@/app/context/auth-context'
 import { useToast } from '@/hooks/use-toast'
 import { Spinner } from '@/components/shared/loading'
 import { PageHeader } from '@/components/shared/page-header'
+import { LogoUpload } from '@/components/shared/logo-upload'
 import { errorMessage } from '@/lib/utils/errors'
 import { cooperativeSchema, flattenZodErrors } from '@/lib/validators/schemas'
 import { roleLabel } from '@/lib/utils/permissions'
@@ -28,6 +29,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [memberCount, setMemberCount] = useState<number | null>(null)
   const [savingPart, setSavingPart] = useState<'general' | 'branding' | null>(null)
+  const [coopLogo, setCoopLogo] = useState<string | null>(null)
 
   useEffect(() => {
     if (currentCooperative) {
@@ -36,6 +38,7 @@ export default function SettingsPage() {
         description: currentCooperative.description || '',
         primary_color: currentCooperative.primaryColor || '#16a34a',
       })
+      setCoopLogo(currentCooperative.logo ?? null)
     }
   }, [currentCooperative])
 
@@ -64,7 +67,9 @@ export default function SettingsPage() {
         name: parsed.data.name,
         description: parsed.data.description || undefined,
         primaryColor: parsed.data.primary_color,
-        logo: currentCooperative.logo,
+        // Was `currentCooperative.logo` — the form could never change it, so
+        // the branding tab had no way to set a logo at all.
+        logo: coopLogo ?? undefined,
       })
       toast({
         title: 'Enregistré',
@@ -182,6 +187,16 @@ export default function SettingsPage() {
               <CardDescription>Personnalisez l&apos;apparence de votre espace coopérative</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label>Logo de l&apos;organisation</Label>
+                {currentCooperative ? (
+                  <LogoUpload
+                    value={coopLogo}
+                    onChange={setCoopLogo}
+                    cooperativeId={currentCooperative.id}
+                  />
+                ) : null}
+              </div>
               <div className="space-y-2">
                 <Label>Couleur principale</Label>
                 <div className="flex gap-3 items-center">

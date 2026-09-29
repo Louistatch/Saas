@@ -231,6 +231,43 @@ export function foilPatch(x: number, y: number, w: number, h: number, id: string
   </g>`
 }
 
+/**
+ * Organisation emblem — a rounded square plate carrying an uploaded logo.
+ *
+ * Deliberately NOT a circle: a circle crops the corners off most cooperative
+ * logos (wordmarks, shields, anything wider than tall), and the rounded square
+ * echoes the portrait window so the two framed elements read as one system.
+ *
+ * The logo sits on a light plate and is fitted with `meet`, never `slice` — an
+ * organisation's emblem may be letterboxed, never cropped. The plate also keeps
+ * dark logos and transparent PNGs legible on a dark green card, which is what a
+ * bare <image> would fail at.
+ *
+ * `id` must be unique per call: it names the clip path.
+ */
+export function emblem(opts: {
+  x: number
+  y: number
+  size: number
+  href: string
+  id: string
+  /** Plate tint behind the logo. */
+  plate?: string
+}): string {
+  const { x, y, size, href, id, plate = '#ffffff' } = opts
+  const r = Math.round(size * 0.26)
+  const pad = Math.round(size * 0.12)
+  const inner = size - pad * 2
+  return `<g transform="translate(${x} ${y})">
+    <clipPath id="${id}"><rect width="${size}" height="${size}" rx="${r}" ry="${r}"/></clipPath>
+    <rect width="${size}" height="${size}" rx="${r}" ry="${r}" fill="${esc(plate)}" fill-opacity="0.94" filter="url(#shadow)"/>
+    <g clip-path="url(#${id})">
+      <image href="${esc(href)}" xlink:href="${esc(href)}" x="${pad}" y="${pad}" width="${inner}" height="${inner}" preserveAspectRatio="xMidYMid meet"/>
+    </g>
+    <rect width="${size}" height="${size}" rx="${r}" ry="${r}" fill="none" stroke="#ffffff" stroke-opacity="0.5" stroke-width="1"/>
+  </g>`
+}
+
 // ─── Text metrics ────────────────────────────────────────────────────────────
 
 /**
