@@ -170,6 +170,7 @@ function infoPill(
   accent: string,
   accentSoft: string,
   icon: 'pin' | 'phone' | 'building' | 'people',
+  width = 300,
 ): string {
   const icons: Record<string, string> = {
     pin: `<path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" fill="none" stroke="#fff" stroke-width="1.7"/><circle cx="12" cy="10" r="2.6" fill="#fff"/>`,
@@ -177,10 +178,11 @@ function infoPill(
     building: `<path d="M4 20V10l8-5 8 5v10" fill="none" stroke="#fff" stroke-width="1.7" stroke-linejoin="round"/><rect x="9.5" y="13" width="5" height="7" rx="1" fill="#fff"/>`,
     people: `<circle cx="9" cy="9" r="3.2" fill="#fff"/><circle cx="16.5" cy="10" r="2.6" fill="#fff"/><path d="M3.5 19c0-3.2 2.5-5 5.5-5s5.5 1.8 5.5 5" fill="none" stroke="#fff" stroke-width="1.7"/><path d="M16 14.5c2.4 0 4.5 1.4 4.5 4.5" fill="none" stroke="#fff" stroke-width="1.6"/>`,
   }
-  const { size } = fitFontSize(value, 218, 14, 10, true)
+  // 82px is the icon plate plus its gutters; the rest is available to the text.
+  const { size } = fitFontSize(value, width - 82, 14, 10, true)
   return `<g transform="translate(${x} ${y})">
-    <rect x="0" y="0" width="300" height="62" rx="14" fill="url(#pillGrad)" stroke="${esc(accent)}" stroke-opacity="0.24"/>
-    <rect x="0" y="0" width="300" height="31" rx="14" fill="#ffffff" fill-opacity="0.035"/>
+    <rect x="0" y="0" width="${width}" height="62" rx="14" fill="url(#pillGrad)" stroke="${esc(accent)}" stroke-opacity="0.24"/>
+    <rect x="0" y="0" width="${width}" height="31" rx="14" fill="#ffffff" fill-opacity="0.035"/>
     <g transform="translate(13 12)">
       <rect x="0" y="0" width="38" height="38" rx="11" fill="url(#iconGrad)"/>
       <g transform="translate(7 7)">${icons[icon]}</g>
@@ -290,8 +292,10 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
   const partnerEmblem = partnerLogo
     ? `<g transform="translate(0 32)">
         ${emblem({ x: PARTNER_X, y: 0, size: PARTNER_SIZE, href: partnerLogo, id: 'emblemPartner' })}
-        <text x="${PARTNER_X - 10}" y="17" text-anchor="end" font-family="${SANS}" font-weight="700" font-size="8.5" fill="${esc(accentSoft)}" letter-spacing="1.6" opacity="0.85">COOPÉRATIVE</text>
-        <text x="${PARTNER_X - 10}" y="31" text-anchor="end" font-family="${SANS}" font-weight="700" font-size="11" fill="${esc(onDark)}" opacity="0.92">${esc(truncate(branding.cooperativeName, 26))}</text>
+        <!-- Label only. The name itself is the affiliation line under the
+             member's name, set large — repeating it here in 11px would be the
+             third occurrence and the least readable of the three. -->
+        <text x="${PARTNER_X - 12}" y="25" text-anchor="end" font-family="${SANS}" font-weight="700" font-size="10" fill="${esc(accentSoft)}" letter-spacing="2.4" opacity="0.85">COOPÉRATIVE</text>
       </g>`
     : ''
 
@@ -510,17 +514,28 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
           <text x="27" y="20" font-family="${SANS}" font-weight="700" font-size="11" fill="${esc(accentSoft)}" letter-spacing="1.2">MEMBRE ACTIF</text>
         </g>
 
-        <text x="0" y="66" font-family="${SANS}" font-weight="600" font-size="13" fill="${esc(accentSoft)}" letter-spacing="1.4">COOPÉRATIVE</text>
-        <text x="0" y="88" font-family="${SANS}" font-weight="700" font-size="${fitFontSize(branding.cooperativeName, NAME_MAX_W, 22, 14, true).size}" fill="${esc(onDark)}">${esc(branding.cooperativeName)}</text>
+        <!-- Affiliation line — the ONE canonical place the cooperative name is
+             written out. Directly under the member's name, in the reading flow
+             "who / which organisation", and in the largest type it gets
+             anywhere on the card. -->
+        <text x="0" y="68" font-family="${SANS}" font-weight="600" font-size="12" fill="${esc(accentSoft)}" letter-spacing="1.8">COOPÉRATIVE</text>
+        <text x="0" y="93" font-family="${SANS}" font-weight="700" font-size="${fitFontSize(branding.cooperativeName, NAME_MAX_W, 26, 15, true).size}" fill="${esc(onDark)}">${esc(branding.cooperativeName)}</text>
       </g>
     </g>
 
-    <!-- Info pills -->
-    <g transform="translate(40 452)">
-      ${infoPill(0, 0, 'LOCALITÉ', truncate(member.locality || '—', 34), accent, accentSoft, 'pin')}
-      ${infoPill(316, 0, 'TÉLÉPHONE', member.phone || '—', accent, accentSoft, 'phone')}
-      ${infoPill(0, 76, 'COOPÉRATIVE', truncate(branding.cooperativeName, 34), accent, accentSoft, 'building')}
-      ${infoPill(316, 76, 'FAÎTIÈRE', truncate(branding.faitiereName, 34), accent, accentSoft, 'people')}
+    <!-- Info pills — PERSONAL data only.
+         The organisations live in the header (faîtière left, cooperative
+         right) and in the affiliation line under the member's name; repeating
+         them here made the cooperative name appear three times, and this was
+         its worst rendering — truncated at 34 characters inside the smallest
+         type on the card. Dropping both org pills also frees a whole row, so
+         the two that remain are wider and the locality is no longer cut. -->
+    <!-- Optically centred between the portrait's lower edge (${PY + PH}) and the
+         issuance rule (604), not merely placed: a single row left at the old
+         two-row origin sat 44px below the photo and 83px above the rule. -->
+    <g transform="translate(40 490)">
+      ${infoPill(0, 0, 'LOCALITÉ', member.locality || '—', accent, accentSoft, 'pin', 320)}
+      ${infoPill(340, 0, 'TÉLÉPHONE', member.phone || '—', accent, accentSoft, 'phone', 320)}
     </g>
 
     <!-- Issuance line + microtext close the identity zone -->
