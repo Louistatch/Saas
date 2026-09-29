@@ -35,6 +35,7 @@ import {
   Shield,
   ShoppingCart,
   Timer,
+  Lock,
   TrendingUp,
   User,
   XCircle,
@@ -164,11 +165,17 @@ export default function VerifyCardPage() {
     level: string
     breakdown: AtsBreakdown
   } | null>(null)
+  // `null` inside means UNKNOWN (the private endpoint refused us), which is not
+  // the same as zero. Conflating the two made a perfectly good member look like
+  // he had no land, no inputs and no dues paid to anyone who scanned his card
+  // without being logged in.
   const [quickStats, setQuickStats] = useState<{
-    totalHa: number
+    totalHa: number | null
     cotisationStatus: string | null
-    intrantCount: number
+    intrantCount: number | null
   } | null>(null)
+  /** True once we know the private endpoints refused us (visitor not signed in). */
+  const [privateLocked, setPrivateLocked] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
 
@@ -273,23 +280,24 @@ export default function VerifyCardPage() {
   useEffect(() => {
     if (!result?.valid || !cardNumber) return
     const cn = encodeURIComponent(cardNumber)
-    Promise.all([
-      fetch(`/api/verify/${cn}/parcelles`)
-        .then((r) => (r.ok ? r.json() : null))
-        .catch(() => null),
-      fetch(`/api/verify/${cn}/cotisation`)
-        .then((r) => (r.ok ? r.json() : null))
-        .catch(() => null),
-      fetch(`/api/verify/${cn}/intrants`)
-        .then((r) => (r.ok ? r.json() : null))
-        .catch(() => null),
-    ]).then(([parcData, cotData, intData]) => {
-      setQuickStats({
-        totalHa: parcData?.total_ha ?? 0,
-        cotisationStatus: cotData?.summary?.last_status ?? null,
-        intrantCount: intData?.intrants?.length ?? 0,
-      })
-    })
+    // A 401 means "not signed in", never "this member has nothing". Track it
+    // separately so the UI can say so instead of printing zeros.
+    const get = (path: string) =>
+      fetch(`/api/verify/${cn}/${path}`)
+        .then(async (r) => ({ ok: r.ok, status: r.status, data: r.ok ? await r.json() : null }))
+        .catch(() => ({ ok: false, status: 0, data: null }))
+
+    Promise.all([get('parcelles'), get('cotisation'), get('intrants')]).then(
+      ([parc, cot, int]) => {
+        const locked = [parc, cot, int].some((r) => r.status === 401)
+        setPrivateLocked(locked)
+        setQuickStats({
+          totalHa: parc.ok ? (parc.data?.total_ha ?? 0) : null,
+          cotisationStatus: cot.ok ? (cot.data?.summary?.last_status ?? null) : null,
+          intrantCount: int.ok ? (int.data?.intrants?.length ?? 0) : null,
+        })
+      },
+    )
   }, [result?.valid, cardNumber])
 
   if (loading) {
@@ -854,8 +862,30 @@ export default function VerifyCardPage() {
             a circular gauge visualizing the real cotisation status (not
             decorative — derived from quickStats.cotisationStatus) beside
             the hectares/intrants metrics. */}
+        {/* Not signed in: the instrument strip would read as an empty gauge and
+            a row of zeros — a factual-looking claim that this member has
+            nothing. Say plainly that the data is private instead. */}
+        {isValid && activeView === 'menu' && privateLocked && (
+          <div
+            className={`vfp-card rounded-2xl p-4 flex items-center gap-3 vfp-enter transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`}
+            style={{ transitionDelay: '200ms' }}
+          >
+            <div className="h-11 w-11 shrink-0 rounded-full bg-white/[0.06] grid place-items-center">
+              <Lock className="h-5 w-5 text-white/40" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-white text-[13.5px] font-semibold">Informations privées</p>
+              <p className="text-white/45 text-[12px] leading-snug">
+                Parcelles, cotisation et intrants ne sont visibles que par le titulaire de la
+                carte.
+              </p>
+            </div>
+          </div>
+        )}
+
         {isValid &&
           activeView === 'menu' &&
+          !privateLocked &&
           quickStats &&
           (() => {
             const cotisationPct =
@@ -934,13 +964,17 @@ export default function VerifyCardPage() {
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-white/50 text-[11.5px]">Hectares</span>
                     <span className="text-white text-[13px] font-bold font-mono">
-                      {quickStats.totalHa > 0 ? quickStats.totalHa.toFixed(1) : '—'}
+                      {quickStats.totalHa === null
+                        ? '—'
+                        : quickStats.totalHa > 0
+                          ? quickStats.totalHa.toFixed(1)
+                          : '0'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-white/50 text-[11.5px]">Intrants</span>
                     <span className="text-white text-[13px] font-bold font-mono">
-                      {quickStats.intrantCount}
+                      {quickStats.intrantCount === null ? '—' : quickStats.intrantCount}
                     </span>
                   </div>
                 </div>
@@ -1087,7 +1121,28 @@ export default function VerifyCardPage() {
               ))}
             </div>
 
-            {/* ③ Mon Exploitation */}
+            {/* ③ Mon Exploitation — owner only.
+                Every entry here hits an endpoint behind requirePrivateCard, so
+                to a visitor who is not signed in these were four buttons that
+                each opened "Impossible de charger les données. Réessayer" — a
+                technical failure, not a permission message. One honest card
+                replaces four dead ends. */}
+            {privateLocked ? (
+              <Link
+                href={`/auth/login?redirect=${encodeURIComponent(`/verify/${cardNumber}`)}`}
+                className="w-full vfp-card rounded-2xl p-4 flex items-center gap-3 text-left border border-white/10 active:scale-95 transition-transform"
+              >
+                <div className="w-11 h-11 rounded-xl bg-white/[0.06] grid place-items-center shrink-0">
+                  <Lock className="h-5 w-5 text-white/40" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-white text-sm font-semibold">Voir mon exploitation</p>
+                  <p className="text-white/40 text-[11.5px] leading-snug">
+                    Parcelles, intrants et cotisation — connectez-vous
+                  </p>
+                </div>
+              </Link>
+            ) : (
             <div>
               <p className="text-white/40 text-[11px] font-semibold uppercase tracking-wider px-1 mb-2">
                 Mon Exploitation
@@ -1152,11 +1207,15 @@ export default function VerifyCardPage() {
                 ))}
               </div>
             </div>
+            )}
 
             {/* ④ Ma Carte Membre */}
             <div>
               <p className="text-white/40 text-[11px] font-semibold uppercase tracking-wider px-1 mb-2">
-                Ma Carte Membre
+                {/* Neutral wording: this section is shown to whoever scans, not
+                    only to the holder, and "Ma carte" read wrong to a buyer
+                    inspecting someone else's card. */}
+                Cette carte
               </p>
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">

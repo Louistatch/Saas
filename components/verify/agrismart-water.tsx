@@ -406,7 +406,17 @@ export function AgriSmartWater({ onBack, initialRegion, cardNumber }: Props) {
               onClick={async () => {
                 try {
                   const res = await fetch(`/api/verify/${encodeURIComponent(cardNumber)}/parcelles`)
-                  if (!res.ok) return
+                  // `return` alone meant the button did nothing at all, with no
+                  // message — the commonest failure (401, not signed in) looked
+                  // like a dead button.
+                  if (res.status === 401) {
+                    alert('Connectez-vous avec votre carte pour importer vos parcelles.')
+                    return
+                  }
+                  if (!res.ok) {
+                    alert('Vos parcelles n’ont pas pu être chargées. Réessayez.')
+                    return
+                  }
                   const data = await res.json()
                   const parcelles: Array<{
                     culture_principale: string | null

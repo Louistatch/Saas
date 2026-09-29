@@ -39,21 +39,26 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
   const [parcelles, setParcelles] = useState<Parcelle[] | null>(null)
   const [totalHa, setTotalHa] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const [error, setError] = useState<false | 'unauthorized' | 'failed'>(false)
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null)
 
   const loadData = useCallback(() => {
     setError(false)
     setLoading(true)
     fetch(`/api/verify/${encodeURIComponent(cardNumber)}/parcelles`)
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      // Keep the status: a 401 is "sign in", not "something broke", and the
+      // generic error offered a Réessayer button that could never succeed.
+      .then((r) => {
+        if (r.status === 401) return Promise.reject(new Error('unauthorized'))
+        return r.ok ? r.json() : Promise.reject(new Error('failed'))
+      })
       .then((d) => {
         if (d) {
           setParcelles(d.parcelles ?? [])
           setTotalHa(d.total_ha ?? 0)
         } else setParcelles([])
       })
-      .catch(() => setError(true))
+      .catch((e: Error) => setError(e.message === 'unauthorized' ? 'unauthorized' : 'failed'))
       .finally(() => setLoading(false))
   }, [cardNumber])
 
@@ -100,7 +105,17 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
         </div>
       )}
 
-      {error && (
+      {error === 'unauthorized' && (
+        <div className="vfp-card rounded-2xl p-6 text-center space-y-2">
+          <MapIcon className="h-8 w-8 text-white/20 mx-auto" />
+          <p className="text-white/60 text-sm font-semibold">Informations privées</p>
+          <p className="text-white/40 text-xs leading-snug">
+            Connectez-vous avec votre carte pour voir vos parcelles.
+          </p>
+        </div>
+      )}
+
+      {error === 'failed' && (
         <div className="vfp-card rounded-2xl p-6 text-center space-y-3">
           <MapIcon className="h-8 w-8 text-white/20 mx-auto" />
           <p className="text-white/50 text-sm">Impossible de charger les données des parcelles.</p>

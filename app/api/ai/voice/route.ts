@@ -166,18 +166,39 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Erreur inconnue'
     if (err instanceof OpenAI.APIError) {
       if (err.status === 429) {
         markDeepSeekKeyExhausted()
         rotateDeepSeekKey()
         return NextResponse.json(
-          { error: 'Quota IA atteint. Réessayez dans quelques secondes.' },
+          { error: "L'assistant est très sollicité. Réessayez dans quelques secondes." },
           { status: 429 },
+        )
+      }
+      // Same reasoning as /api/ai/chat: a bad model id, a rejected key or an
+      // empty balance is not a transient error, and reporting it as one sent
+      // the operator looking for a quota problem that did not exist.
+      if (err.status === 400 || err.status === 401 || err.status === 402 || err.status === 404) {
+        return NextResponse.json(
+          {
+            error: "L'assistant n'est pas disponible pour le moment.",
+            detail:
+              err.status === 401
+                ? 'Clé DEEPSEEK_API_KEY refusée par DeepSeek.'
+                : err.status === 402
+                  ? 'Solde DeepSeek insuffisant.'
+                  : `Requête refusée — vérifier DEEPSEEK_MODEL (actuellement « ${DEEPSEEK_MODEL} »).`,
+            raw: msg,
+            model_used: DEEPSEEK_MODEL,
+            status: err.status,
+          },
+          { status: 502 },
         )
       }
     }
     return NextResponse.json(
-      { error: 'Impossible de générer une réponse.' },
+      { error: "L'assistant n'a pas pu répondre.", detail: msg, model_used: DEEPSEEK_MODEL },
       { status: 500 },
     )
   }

@@ -221,6 +221,35 @@ export async function POST(request: NextRequest) {
         lastError = msg
 
         if (err instanceof OpenAI.APIError) {
+          // Non-retryable: rotating keys or waiting cannot fix a bad model id,
+          // a rejected key or an empty balance. Looping through every key and
+          // then reporting "all keys exhausted" hid the real cause — which is
+          // exactly why a correctly configured key still looked broken.
+          if (err.status === 400 || err.status === 401 || err.status === 402 || err.status === 404) {
+            log.error(`DeepSeek rejected the request (${err.status})`, {
+              model: DEEPSEEK_MODEL,
+              message: msg,
+            })
+            // `error` is read aloud to a farmer in the chat bubble, so it stays
+            // plain French with no environment variable names. The operator's
+            // diagnosis goes to the log and to `detail`.
+            const hint =
+              err.status === 401
+                ? 'Clé DEEPSEEK_API_KEY refusée par DeepSeek.'
+                : err.status === 402
+                  ? 'Solde DeepSeek insuffisant.'
+                  : `Requête refusée — vérifier DEEPSEEK_MODEL (actuellement « ${DEEPSEEK_MODEL} »).`
+            return NextResponse.json(
+              {
+                error: "L'assistant n'est pas disponible pour le moment. Réessayez plus tard.",
+                detail: hint,
+                raw: msg,
+                model_used: DEEPSEEK_MODEL,
+                status: err.status,
+              },
+              { status: 502 },
+            )
+          }
           if (err.status === 429) {
             log.warn(`DeepSeek key ${attempt + 1}/${totalKeys} exhausted (round ${round + 1}), cooldown 60s`)
             markDeepSeekKeyExhausted()
@@ -240,9 +269,16 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  log.error('All DeepSeek keys exhausted', lastError)
+  // Carry the real error through: "keys exhausted" was returned for EVERY
+  // failure mode, so a wrong model id or a rejected key looked like a quota
+  // problem and sent the operator hunting in the wrong place.
+  log.error('DeepSeek exhausted all keys/rounds', { lastError, model: DEEPSEEK_MODEL })
   return NextResponse.json(
-    { error: 'Toutes les clés IA sont épuisées. Réessayez dans quelques minutes.' },
+    {
+      error: "L'assistant est très sollicité. Réessayez dans quelques minutes.",
+      detail: lastError || null,
+      model_used: DEEPSEEK_MODEL,
+    },
     { status: 429 },
   )
 }

@@ -43,10 +43,14 @@ interface AiChatProps {
   suggestions?: string[]
 }
 
+// Short, concrete, everyday French. These are read by people for whom French
+// is a second language and typing is slow — the wording has to be scannable at
+// a glance, and tapping one must ASK it, not merely fill the box.
 const DEFAULT_SUGGESTIONS = [
-  'Quel est le prix du maïs dans ma zone ?',
+  'Prix du maïs près de chez moi',
   'Quand vendre mon soja ?',
-  'Quelles cultures pour ma région ?',
+  'Que planter cette saison ?',
+  'Va-t-il pleuvoir cette semaine ?',
 ]
 
 // ─── Voice conversation states ────────────────────────────────────────────────
@@ -338,9 +342,18 @@ export function AiChat({
           ])
         }
       } catch {
+        // Distinguish "no network" from "the service failed": in rural Togo the
+        // first is by far the commonest, and telling someone to check a network
+        // they already know is down is useless. Say what to do instead.
+        const offline = typeof navigator !== 'undefined' && navigator.onLine === false
         setMessages((m) => [
           ...m,
-          { role: 'assistant', content: 'Erreur de connexion. Vérifiez votre réseau.' },
+          {
+            role: 'assistant',
+            content: offline
+              ? "Vous n'avez pas de réseau. Votre question sera à reposer une fois le réseau revenu."
+              : "La connexion a échoué. Réessayez dans un instant.",
+          },
         ])
       } finally {
         setLoading(false)
@@ -725,18 +738,20 @@ export function AiChat({
               ))}
             </div>
             <div
-              className="flex flex-col gap-2 w-full max-w-[320px]"
+              className="flex flex-col gap-2 w-full max-w-[380px]"
               style={{ animation: 'chat-fade-up 0.4s ease both', animationDelay: '350ms' }}
             >
               {suggestions.map((s) => (
                 <button
                   type="button"
                   key={s}
-                  className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 rounded-full px-4 py-2.5 text-sm text-left flex items-center justify-between hover:bg-emerald-500/15 active:scale-[0.98] transition-all"
-                  onClick={() => {
-                    setInput(s)
-                    inputRef.current?.focus()
-                  }}
+                  // Tapping ASKS the question. It used to only drop the text
+                  // into the input and focus it, so the farmer still had to
+                  // find and press send — a second step that loses people who
+                  // type slowly, which is exactly who these chips are for.
+                  // min-h-[52px] keeps the target comfortable on a small phone.
+                  className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-200 rounded-2xl px-4 py-3.5 min-h-[52px] text-[15px] text-left flex items-center justify-between gap-2 hover:bg-emerald-500/15 active:scale-[0.98] transition-all"
+                  onClick={() => sendText(s)}
                 >
                   <span>{s}</span>
                   <span className="text-emerald-400/60 ml-2">→</span>
@@ -885,7 +900,9 @@ export function AiChat({
         <input
           ref={inputRef}
           type="text"
-          className="flex-1 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none transition-colors"
+          // 16px text is also what stops iOS Safari zooming the page on focus,
+          // which on a small phone throws the whole layout off.
+          className="flex-1 rounded-xl px-4 py-3 min-h-[48px] text-base text-white placeholder:text-white/30 focus:outline-none transition-colors"
           style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.10)' }}
           onFocus={(e) => {
             e.currentTarget.style.borderColor = 'rgba(52,211,153,.40)'
@@ -904,7 +921,7 @@ export function AiChat({
         {/* Send */}
         <button
           type="button"
-          className={`w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl transition-all ${
+          className={`w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-xl transition-all ${
             input.trim() && !loading && !photoLoading
               ? 'text-white active:scale-95'
               : 'text-white/25 cursor-default'
@@ -918,7 +935,7 @@ export function AiChat({
           disabled={loading || photoLoading || !input.trim()}
           aria-label="Envoyer"
         >
-          <Send size={18} />
+          <Send size={20} />
         </button>
       </div>
 
