@@ -385,19 +385,28 @@ export async function enrollNewMemberFromSubmission(
     const typeSol = String(p['S5/type_sol'] ?? p.type_sol ?? '')
     const irrigation = String(p['S5/irrigation'] ?? p.irrigation ?? '')
     if (culture && surface > 0) {
-      try {
-        await supabase.from('parcelles').insert({
-          member_id: newMember.id,
-          cooperative_id: targetCooperativeId,
-          name: `Parcelle ${culture}`,
-          culture_principale: culture,
-          superficie_ha: surface,
-          soil_type: typeSol || null,
-          irrigation_type: irrigation || null,
-          source: 'kobo',
+      // supabase-js RESOLVES with { error } instead of throwing, so a try/catch
+      // alone silently discarded every failure — that is how the whole platform
+      // ended up with zero parcelles while every submission reported success.
+      // The error must be read off the result.
+      const { error } = await supabase.from('parcelles').insert({
+        member_id: newMember.id,
+        cooperative_id: targetCooperativeId,
+        name: `Parcelle ${culture}`,
+        culture_principale: culture,
+        superficie_ha: surface,
+        soil_type: typeSol || null,
+        irrigation_type: irrigation || null,
+        source: 'kobo',
+      })
+      if (error) {
+        log.error('Parcelle insert failed', {
+          submissionId,
+          memberId: newMember.id,
+          culture,
+          code: error.code,
+          message: error.message,
         })
-      } catch (e) {
-        log.warn('Parcelle insert failed', { error: String(e) })
       }
     }
   }
@@ -415,17 +424,22 @@ export async function enrollNewMemberFromSubmission(
       p['S6/campagne_annee'] ?? p.campagne_annee ?? '',
     )
     if (culture && quantity > 0) {
-      try {
-        await supabase.from('productions').insert({
-          member_id: newMember.id,
-          cooperative_id: targetCooperativeId,
-          culture_name: culture,
-          quantity_kg: quantity,
-          campaign_year: campagne || new Date().getFullYear().toString(),
-          source: 'kobo',
+      const { error } = await supabase.from('productions').insert({
+        member_id: newMember.id,
+        cooperative_id: targetCooperativeId,
+        culture_name: culture,
+        quantity_kg: quantity,
+        campaign_year: campagne || new Date().getFullYear().toString(),
+        source: 'kobo',
+      })
+      if (error) {
+        log.error('Production insert failed', {
+          submissionId,
+          memberId: newMember.id,
+          culture,
+          code: error.code,
+          message: error.message,
         })
-      } catch (e) {
-        log.warn('Production insert failed', { error: String(e) })
       }
     }
   }
