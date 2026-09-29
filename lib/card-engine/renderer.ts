@@ -1,30 +1,55 @@
 /**
- * Card Renderer Engine — SVG-based Premium Design
- * 
- * Design: Dark green gradient with organic shapes, light panel on right,
- * circular photo with gradient ring, info pills, QR code block.
- * 
- * SVG: 1180 × 740 (landscape)
- * 
- * Renders to SVG string, then rasterizes to PNG via canvas for download.
+ * Card Renderer Engine — secure-document design.
+ *
+ * Canvas: 1180 × 740 (kept identical to the previous version so the A4 print
+ * sheet in app/dashboard/cards/print and every existing consumer keep their
+ * layout; the ratio 1.595 is within a hair of ID-1's 1.586).
+ *
+ * The visual language borrows from real identity documents rather than from
+ * web UI: guilloché engraving, microtext, an iridescent foil patch, a contact
+ * chip, and a deep multi-layer substrate. All of it is generated as SVG paths
+ * in security-art.ts, so the inline preview, the PNG export and the printed
+ * sheet are byte-for-byte the same drawing.
+ *
+ * Deliberate constraint: NO webfonts. An SVG rasterized through an <img> tag
+ * (which is how renderToPng works) cannot fetch fonts or stylesheets, so a
+ * `font-family: 'Barlow Condensed'` silently fell back to Arial and every
+ * measurement based on the condensed metrics was wrong — that is what pushed
+ * long names off the dark zone. Sizes here are computed against the metrics
+ * that actually render.
  */
 
 import type { CardSchema } from './schema'
 import { lighten, darken } from './schema'
 import { encodeText } from '@/lib/utils/qr'
+import {
+  esc,
+  rosetteDef,
+  useRosette,
+  guillocheBand,
+  microtext,
+  chip,
+  foilPatch,
+  fitFontSize,
+  wrapToTwoLines,
+  estimateTextWidth,
+} from './security-art'
 
-// ─── SVG Generation ─────────────────────────────────────────────────────────
+const W = 1180
+const H = 740
+/** Where the dark identity zone ends and the light data panel begins. */
+const SPLIT = 742
 
-function escapeXml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;')
-}
+/**
+ * Font stack with NO quoted family names: this string is interpolated into a
+ * double-quoted SVG attribute, so an inner `"Liberation Sans"` would close the
+ * attribute early and void the whole declaration (the text then falls back to
+ * the platform serif). Arial resolves through fontconfig to Liberation Sans on
+ * Linux anyway, which is metric-compatible — which is what the width estimator
+ * in security-art.ts is calibrated against.
+ */
+const SANS = 'Arial, Helvetica, sans-serif'
 
-/** Truncate text to fit within a max character count */
 function truncate(str: string, max: number): string {
   if (str.length <= max) return str
   return `${str.slice(0, max - 1)}…`
@@ -46,12 +71,12 @@ function getLevelTheme(level?: string): {
   }
 }
 
-/** Small medallion mark drawn in SVG (replaces emoji which don't rasterize). */
+/** Medallion used inside the level badge. */
 function medallionMark(x: number, y: number, ring: string): string {
   return `<g transform="translate(${x} ${y})">
-    <circle cx="0" cy="0" r="9" fill="#ffffff" fill-opacity="0.9"/>
-    <circle cx="0" cy="0" r="9" fill="none" stroke="${ring}" stroke-width="2"/>
-    <path d="M0 -5 L1.5 -1.5 L5 -1.5 L2.2 1 L3.3 4.5 L0 2.4 L-3.3 4.5 L-2.2 1 L-5 -1.5 L-1.5 -1.5 Z" fill="${ring}"/>
+    <circle cx="0" cy="0" r="8.5" fill="#ffffff" fill-opacity="0.92"/>
+    <circle cx="0" cy="0" r="8.5" fill="none" stroke="${esc(ring)}" stroke-width="1.6"/>
+    <path d="M0 -4.6 L1.4 -1.4 L4.7 -1.4 L2 0.9 L3 4.2 L0 2.2 L-3 4.2 L-2 0.9 L-4.7 -1.4 L-1.4 -1.4 Z" fill="${esc(ring)}"/>
   </g>`
 }
 
@@ -61,23 +86,15 @@ function generateQrSvgPath(text: string): string {
   let path = ''
   for (let y = 0; y < n; y++) {
     for (let x = 0; x < n; x++) {
-      if (matrix[y][x]) {
-        path += `M${x},${y}h1v1h-1z`
-      }
+      if (matrix[y][x]) path += `M${x},${y}h1v1h-1z`
     }
   }
   return path
 }
 
-/**
- * Convert an image URL to a base64 data URL for embedding in SVG.
- * This is needed because SVG rendered via <img> or Blob URL cannot load external images.
- */
 async function imageToDataUrl(url: string): Promise<string | null> {
   if (!url) return null
-  // Already a data URL
   if (url.startsWith('data:')) return url
-  
   try {
     const response = await fetch(url, { mode: 'cors' })
     if (!response.ok) return null
@@ -93,229 +110,16 @@ async function imageToDataUrl(url: string): Promise<string | null> {
   }
 }
 
-export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | null): string {
-  const { branding, member, styles, template } = schema
-  const level = getLevelTheme(member.level)
-
-  // Theme colors — driven by the template so the editor actually changes output.
-  const accent = styles.accentColor || '#1ed760'
-  const accentSoft = lighten(accent, 0.25)
-  const onDark = styles.textColor || '#ffffff'
-
-  // Localized labels (West African francophone cooperatives).
-  const title = (template?.title || 'CARTE DE MEMBRE').toUpperCase()
-  const subtitle = template?.subtitle || branding.faitiereName
-
-  // Format expiry date in French.
-  const expiryText = member.expiryDate
-    ? new Date(member.expiryDate)
-        .toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
-        .toUpperCase()
-    : '—'
-
-  const startYear = member.createdAt ? new Date(member.createdAt).getFullYear() : new Date().getFullYear()
-  const endYear = member.expiryDate ? new Date(member.expiryDate).getFullYear() : startYear + 1
-  const periodText = `${startYear} – ${endYear}`
-
-  // QR code
-  const qrPayload = `https://www.faitierehub.com/verify/${encodeURIComponent(member.cardNumber)}`
-  const qrPath = generateQrSvgPath(qrPayload)
-  const qrMatrix = encodeText(qrPayload, 'H')
-  const qrModuleCount = qrMatrix.length
-
-  // Name: adapt font size based on length
-  const fullName = `${member.firstName} ${member.lastName.toUpperCase()}`
-  const nameFontSize = fullName.length > 20 ? 42 : fullName.length > 15 ? 50 : 56
-
-  // Photo handling — robust: data URL preferred (export), raw URL fallback
-  // (server side), else an elegant placeholder silhouette. The image is clipped
-  // to the circle and centered via xMidYMid slice (handles portrait & landscape).
-  const resolvedPhotoUrl = photoDataUrl || member.photoUrl
-  const photoContent = resolvedPhotoUrl
-    ? `<image href="${escapeXml(resolvedPhotoUrl)}" xlink:href="${escapeXml(resolvedPhotoUrl)}" x="58" y="186" width="216" height="216" preserveAspectRatio="xMidYMid slice" clip-path="url(#photoClip)" />`
-    : `<g clip-path="url(#photoClip)">
-        <rect x="58" y="186" width="216" height="216" fill="${darken(accent, 0.55)}"/>
-        <g transform="translate(166 300)" fill="${accentSoft}" opacity="0.55">
-          <circle cx="0" cy="-30" r="34"/>
-          <path d="M-66 66 C -66 16, 66 16, 66 66 Z"/>
-        </g>
-      </g>`
-
-  // Build the background gradient stops from the schema.
-  const bgStops = (schema.background.gradient ?? [
-    { offset: 0, color: lighten(accent, 0.1) },
-    { offset: 1, color: '#04140b' },
-  ])
-    .map((s) => `<stop offset="${s.offset * 100}%" stop-color="${escapeXml(s.color)}"/>`)
-    .join('')
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1180 740" width="1180" height="740">
-  <defs>
-    <radialGradient id="bgGrad" cx="26%" cy="34%" r="92%">${bgStops}</radialGradient>
-    <radialGradient id="haloGrad" cx="22%" cy="40%" r="42%">
-      <stop offset="0%" stop-color="${escapeXml(accent)}" stop-opacity="0.30"/>
-      <stop offset="70%" stop-color="${escapeXml(accent)}" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="${escapeXml(accentSoft)}"/>
-      <stop offset="0.6" stop-color="${escapeXml(accent)}"/>
-      <stop offset="1" stop-color="${escapeXml(darken(accent, 0.5))}"/>
-    </linearGradient>
-    <linearGradient id="panelGrad" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#f1f7ef" stop-opacity="0"/>
-      <stop offset=".22" stop-color="#f6faf4" stop-opacity=".97"/>
-      <stop offset="1" stop-color="#e6f0e4"/>
-    </linearGradient>
-    <linearGradient id="pillGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="${escapeXml(lighten(accent, 0.05))}" stop-opacity=".18"/>
-      <stop offset="1" stop-color="#04140b" stop-opacity=".30"/>
-    </linearGradient>
-    <linearGradient id="iconGrad" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="${escapeXml(accentSoft)}"/>
-      <stop offset="1" stop-color="${escapeXml(darken(accent, 0.2))}"/>
-    </linearGradient>
-    <linearGradient id="orGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ffd95e"/><stop offset="1" stop-color="#e0a106"/>
-    </linearGradient>
-    <linearGradient id="silverGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#eef2f5"/><stop offset="1" stop-color="#aeb9c2"/>
-    </linearGradient>
-    <linearGradient id="bronzeGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#e6a86a"/><stop offset="1" stop-color="#9c6b3f"/>
-    </linearGradient>
-    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="13" result="b"/>
-      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
-      <feOffset dy="4"/>
-      <feComponentTransfer><feFuncA type="linear" slope="0.32"/></feComponentTransfer>
-      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-    <clipPath id="cardClip"><rect x="0" y="0" width="1180" height="740" rx="30" ry="30"/></clipPath>
-    <clipPath id="photoClip"><circle cx="166" cy="294" r="104"/></clipPath>
-    <!-- West African adinkra-inspired pattern tile (woven motif) -->
-    <pattern id="kente" width="56" height="56" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-      <rect width="56" height="56" fill="none"/>
-      <path d="M0 28 H56 M28 0 V56" stroke="${escapeXml(accent)}" stroke-width="2" stroke-opacity="0.10"/>
-      <circle cx="28" cy="28" r="4" fill="${escapeXml(accent)}" fill-opacity="0.08"/>
-    </pattern>
-  </defs>
-
-  <g clip-path="url(#cardClip)">
-    <!-- Background -->
-    <rect x="0" y="0" width="1180" height="740" fill="url(#bgGrad)"/>
-    <rect x="0" y="0" width="720" height="740" fill="url(#kente)"/>
-    <rect x="0" y="0" width="1180" height="740" fill="url(#haloGrad)"/>
-
-    <!-- Decorative leaf filigrane (cocoa / shea leaf — West African crops) -->
-    <g opacity="0.08" transform="translate(-30 470) rotate(8) scale(3)">
-      <path d="M50 5C30 20 15 45 20 75c2 12 8 18 8 18s-2-30 12-48C58 25 72 18 72 18S60 10 50 5z" fill="${escapeXml(accentSoft)}"/>
-    </g>
-
-    <!-- Top accent ribbon -->
-    <rect x="0" y="0" width="720" height="8" fill="${escapeXml(accent)}"/>
-
-    <!-- ═══ RIGHT PANEL ═══ -->
-    <path d="M750 0 L1180 0 L1180 740 L750 740 C730 740 720 720 720 700 L720 40 C720 20 730 0 750 0 Z" fill="url(#panelGrad)"/>
-
-    <g transform="translate(770 44)" font-family="'Barlow Condensed', Arial, sans-serif">
-      <text x="0" y="24" font-weight="800" font-size="18" fill="${escapeXml(darken(accent, 0.55))}" letter-spacing="3">${escapeXml(truncate(title, 28))}</text>
-      <text x="0" y="44" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="11" fill="${escapeXml(darken(accent, 0.35))}" letter-spacing="1">${escapeXml(truncate(subtitle, 40))}</text>
-
-      <!-- Verified badge (FR) -->
-      <g transform="translate(0 58)" filter="url(#shadow)">
-        <rect x="0" y="0" width="210" height="32" rx="16" fill="url(#iconGrad)"/>
-        <circle cx="18" cy="16" r="8" fill="none" stroke="#fff" stroke-width="1.8"/>
-        <path d="M14 16 l3 3 l5 -5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        <text x="34" y="21" font-weight="700" font-size="12" fill="#fff" letter-spacing="1.5">MEMBRE CERTIFIÉ</text>
-      </g>
-
-      <!-- N° Membre + Valable jusqu'au -->
-      <g transform="translate(0 118)">
-        <text x="0" y="0" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="10" fill="${escapeXml(darken(accent, 0.35))}" letter-spacing="1.5">N° DE MEMBRE</text>
-        <text x="0" y="22" font-weight="800" font-size="20" fill="${escapeXml(darken(accent, 0.6))}">${escapeXml(member.cardNumber)}</text>
-        <text x="210" y="0" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="10" fill="${escapeXml(darken(accent, 0.35))}" letter-spacing="1.5">VALABLE JUSQU'AU</text>
-        <text x="210" y="22" font-weight="800" font-size="20" fill="${escapeXml(darken(accent, 0.6))}">${escapeXml(expiryText)}</text>
-      </g>
-
-      <!-- Statut + Période -->
-      <g transform="translate(0 176)">
-        <text x="0" y="0" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="10" fill="${escapeXml(darken(accent, 0.35))}" letter-spacing="1.5">STATUT</text>
-        <text x="0" y="22" font-weight="800" font-size="20" fill="${escapeXml(darken(accent, 0.15))}">ACTIF</text>
-        <text x="210" y="0" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="10" fill="${escapeXml(darken(accent, 0.35))}" letter-spacing="1.5">PÉRIODE D'ADHÉSION</text>
-        <text x="210" y="22" font-weight="800" font-size="20" fill="${escapeXml(darken(accent, 0.6))}">${escapeXml(periodText)}</text>
-      </g>
-
-      <!-- Signature -->
-      <g transform="translate(0 230)">
-        <text x="0" y="0" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="10" fill="${escapeXml(darken(accent, 0.35))}" letter-spacing="1.5">SIGNATURE</text>
-        <text x="0" y="32" font-family="'Caveat', 'Segoe Script', cursive" font-weight="600" font-size="30" fill="${escapeXml(darken(accent, 0.6))}">${escapeXml(member.firstName)}</text>
-      </g>
-
-      <!-- QR Code (FR) -->
-      <g transform="translate(0 286)">
-        <rect x="0" y="0" width="136" height="136" rx="14" fill="#fff" filter="url(#shadow)"/>
-        <g transform="translate(9 9)">
-          <svg viewBox="0 0 ${qrModuleCount} ${qrModuleCount}" width="118" height="118" shape-rendering="crispEdges">
-            <rect width="100%" height="100%" fill="#ffffff"/>
-            <path d="${qrPath}" fill="${escapeXml(darken(accent, 0.6))}"/>
-          </svg>
-        </g>
-        <text x="154" y="46" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="700" font-size="15" fill="${escapeXml(darken(accent, 0.6))}" letter-spacing="1.2">SCANNER POUR</text>
-        <text x="154" y="66" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="700" font-size="15" fill="${escapeXml(darken(accent, 0.6))}" letter-spacing="1.2">VÉRIFIER</text>
-        <text x="154" y="92" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="9" fill="${escapeXml(darken(accent, 0.2))}" letter-spacing="0.8">SÉCURISÉ • CERTIFIÉ</text>
-      </g>
-    </g>
-
-    <!-- ═══ LEFT SIDE ═══ -->
-    <g transform="translate(36 28)">
-      <circle cx="22" cy="22" r="22" fill="url(#iconGrad)" filter="url(#shadow)"/>
-      <path d="M22 10C18 13 15 17 16 22c.4 2.5 1.6 3.8 1.6 3.8S17 20 20 16c2-3 5-4.2 5-4.2S24 11 22 10z" fill="#fff"/>
-      <text x="54" y="18" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="800" font-size="24" fill="${escapeXml(onDark)}">Faîtière</text>
-      <text x="158" y="18" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="800" font-size="24" fill="${escapeXml(accentSoft)}">Hub</text>
-    </g>
-
-    <!-- Photo ring -->
-    <circle cx="166" cy="294" r="112" fill="url(#ringGrad)" filter="url(#glow)"/>
-    <circle cx="166" cy="294" r="106" fill="${escapeXml(darken(accent, 0.5))}"/>
-    ${photoContent}
-    <circle cx="166" cy="294" r="104" fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-width="2"/>
-
-    <!-- Name + status -->
-    <g transform="translate(290 100)">
-      <text x="0" y="0" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="800" font-size="${nameFontSize}" fill="${escapeXml(onDark)}">${escapeXml(truncate(fullName, 22))}</text>
-
-      <!-- Level badge (SVG medallion, no emoji) -->
-      <g transform="translate(0 18)">
-        <rect x="0" y="0" width="172" height="32" rx="16" fill="${level.fill}" filter="url(#shadow)"/>
-        ${medallionMark(20, 16, level.ring)}
-        <text x="38" y="22" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="700" font-size="13" fill="${level.textColor}" letter-spacing="1.4">${level.label}</text>
-      </g>
-
-      <!-- Active pill -->
-      <g transform="translate(184 18)">
-        <rect x="0" y="0" width="150" height="32" rx="16" fill="${escapeXml(accent)}" fill-opacity="0.18" stroke="${escapeXml(accentSoft)}" stroke-opacity="0.5"/>
-        <circle cx="14" cy="16" r="4" fill="${escapeXml(accentSoft)}"/>
-        <text x="26" y="21" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="700" font-size="12" fill="${escapeXml(accentSoft)}" letter-spacing="1.5">MEMBRE ACTIF</text>
-      </g>
-
-      <text x="0" y="76" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="600" font-size="16" fill="${escapeXml(accentSoft)}" letter-spacing="0.5">COOPÉRATIVE : <tspan fill="${escapeXml(onDark)}" font-weight="700">${escapeXml(truncate(branding.cooperativeName, 25))}</tspan></text>
-    </g>
-
-    <!-- Info pills (2×2) -->
-    <g transform="translate(44 430)">
-      ${infoPill(0, 0, 'LOCALITÉ', truncate(member.locality || '—', 28), accent, accentSoft, 'pin')}
-      ${infoPill(334, 0, 'TÉLÉPHONE', member.phone || '—', accent, accentSoft, 'phone')}
-      ${infoPill(0, 80, 'COOPÉRATIVE', truncate(branding.cooperativeName, 28), accent, accentSoft, 'building')}
-      ${infoPill(334, 80, 'FAÎTIÈRE', truncate(branding.faitiereName, 28), accent, accentSoft, 'people')}
-    </g>
-  </g>
-</svg>`
+/** One labelled field in the right-hand data panel. */
+function dataField(x: number, y: number, label: string, value: string, labelColor: string, valueColor: string, maxWidth: number): string {
+  const { size } = fitFontSize(value, maxWidth, 19, 12, true)
+  return `<g transform="translate(${x} ${y})">
+    <text x="0" y="0" font-family="${SANS}" font-weight="700" font-size="9" fill="${esc(labelColor)}" letter-spacing="1.3">${esc(label)}</text>
+    <text x="0" y="22" font-family="${SANS}" font-weight="700" font-size="${size}" fill="${esc(valueColor)}">${esc(value)}</text>
+  </g>`
 }
 
-/** Render one info pill with an icon. Keeps the renderer DRY and themeable. */
+/** Compact info pill for the dark zone. Icons drawn on a normalized 24px grid. */
 function infoPill(
   x: number,
   y: number,
@@ -326,28 +130,325 @@ function infoPill(
   icon: 'pin' | 'phone' | 'building' | 'people',
 ): string {
   const icons: Record<string, string> = {
-    pin: `<circle cx="22" cy="16" r="4" fill="#fff"/><path d="M22 36s10-9 10-18a10 10 0 10-20 0c0 9 10 18 10 18z" fill="none" stroke="#fff" stroke-width="1.4" transform="translate(5 3) scale(0.7)"/>`,
-    phone: `<path d="M12 12h3l2.5 6-2.5 1c1 2.5 3.5 5 6 6l1-2.5 6 2.5v3c0 1-1 1.5-1.5 1.5-10 0-18-8-18-18 0-.5.5-1.5 1.5-1.5z" fill="#fff" transform="translate(6 6) scale(0.7)"/>`,
-    building: `<path d="M8 32V12l14-9 14 9v20" fill="none" stroke="#fff" stroke-width="1.6" transform="translate(4 6) scale(0.65)"/><rect x="16" y="20" width="8" height="10" rx="1" fill="#fff" transform="scale(0.65) translate(4 6)"/>`,
-    people: `<circle cx="16" cy="16" r="5" fill="#fff" transform="translate(4 4) scale(0.7)"/><circle cx="28" cy="16" r="5" fill="#fff" transform="translate(4 4) scale(0.7)"/><path d="M6 30c0-4 3-6 6-6s6 2 6 6M20 30c0-4 3-6 6-6s4 1.5 4 4" fill="none" stroke="#fff" stroke-width="1.2" transform="translate(4 4) scale(0.7)"/>`,
+    pin: `<path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" fill="none" stroke="#fff" stroke-width="1.7"/><circle cx="12" cy="10" r="2.6" fill="#fff"/>`,
+    phone: `<path d="M6.5 4h3.2l1.7 4.1-2.2 1.3a11 11 0 0 0 5.4 5.4l1.3-2.2 4.1 1.7v3.2c0 .9-.8 1.6-1.7 1.5C10.9 18.3 5.7 13.1 5 5.7A1.6 1.6 0 0 1 6.5 4z" fill="#fff"/>`,
+    building: `<path d="M4 20V10l8-5 8 5v10" fill="none" stroke="#fff" stroke-width="1.7" stroke-linejoin="round"/><rect x="9.5" y="13" width="5" height="7" rx="1" fill="#fff"/>`,
+    people: `<circle cx="9" cy="9" r="3.2" fill="#fff"/><circle cx="16.5" cy="10" r="2.6" fill="#fff"/><path d="M3.5 19c0-3.2 2.5-5 5.5-5s5.5 1.8 5.5 5" fill="none" stroke="#fff" stroke-width="1.7"/><path d="M16 14.5c2.4 0 4.5 1.4 4.5 4.5" fill="none" stroke="#fff" stroke-width="1.6"/>`,
   }
+  const { size } = fitFontSize(value, 218, 14, 10, true)
   return `<g transform="translate(${x} ${y})">
-    <rect x="0" y="0" width="320" height="68" rx="16" fill="url(#pillGrad)" stroke="${escapeXml(accent)}" stroke-opacity="0.22"/>
-    <g transform="translate(14 12)">
-      <rect x="0" y="0" width="44" height="44" rx="12" fill="url(#iconGrad)"/>
-      ${icons[icon]}
+    <rect x="0" y="0" width="300" height="62" rx="14" fill="url(#pillGrad)" stroke="${esc(accent)}" stroke-opacity="0.24"/>
+    <rect x="0" y="0" width="300" height="31" rx="14" fill="#ffffff" fill-opacity="0.035"/>
+    <g transform="translate(13 12)">
+      <rect x="0" y="0" width="38" height="38" rx="11" fill="url(#iconGrad)"/>
+      <g transform="translate(7 7)">${icons[icon]}</g>
     </g>
-    <text x="72" y="28" font-family="'Barlow Condensed', Arial, sans-serif" font-weight="600" font-size="10" fill="${escapeXml(accentSoft)}" letter-spacing="1.6">${escapeXml(label)}</text>
-    <text x="72" y="48" font-family="'Barlow', Arial, sans-serif" font-weight="600" font-size="14" fill="#ffffff">${escapeXml(value)}</text>
+    <text x="63" y="26" font-family="${SANS}" font-weight="700" font-size="9" fill="${esc(accentSoft)}" letter-spacing="1.5">${esc(label)}</text>
+    <text x="63" y="45" font-family="${SANS}" font-weight="700" font-size="${size}" fill="#ffffff">${esc(value)}</text>
   </g>`
+}
+
+export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | null): string {
+  const { branding, member, styles, template } = schema
+  const level = getLevelTheme(member.level)
+
+  const accent = styles.accentColor || '#1ed760'
+  const accentSoft = lighten(accent, 0.25)
+  const onDark = styles.textColor || '#ffffff'
+  const ink = darken(accent, 0.62)
+  const inkSoft = darken(accent, 0.3)
+
+  const title = (template?.title || 'CARTE DE MEMBRE').toUpperCase()
+  const subtitle = template?.subtitle || branding.faitiereName
+
+  const expiryText = member.expiryDate
+    ? new Date(member.expiryDate)
+        .toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
+        .toUpperCase()
+    : '—'
+
+  const startYear = member.createdAt ? new Date(member.createdAt).getFullYear() : new Date().getFullYear()
+  const endYear = member.expiryDate ? new Date(member.expiryDate).getFullYear() : startYear + 1
+  const periodText = `${startYear} – ${endYear}`
+
+  const qrPayload = `https://www.faitierehub.com/verify/${encodeURIComponent(member.cardNumber)}`
+  const qrPath = generateQrSvgPath(qrPayload)
+  const qrModuleCount = encodeText(qrPayload, 'H').length
+
+  // ── Name: measured, not character-counted ────────────────────────────────
+  // Available width in the dark zone right of the photo, with a hard stop
+  // before the panel edge.
+  const NAME_X = 286
+  const NAME_MAX_W = SPLIT - NAME_X - 34
+  const fullName = `${member.firstName} ${member.lastName.toUpperCase()}`.trim()
+  const firstPass = fitFontSize(fullName, NAME_MAX_W, 52, 30, true)
+  const nameLines = firstPass.fits ? [fullName] : wrapToTwoLines(fullName, NAME_MAX_W, 38, true)
+  const nameSize = firstPass.fits ? firstPass.size : fitFontSize(
+    nameLines.reduce((a, b) => (estimateTextWidth(a, 38, true) > estimateTextWidth(b, 38, true) ? a : b)),
+    NAME_MAX_W, 40, 26, true,
+  ).size
+
+  const photoContent = (photoDataUrl || member.photoUrl)
+    ? `<image href="${esc(photoDataUrl || member.photoUrl || '')}" xlink:href="${esc(photoDataUrl || member.photoUrl || '')}" x="52" y="196" width="196" height="196" preserveAspectRatio="xMidYMid slice" clip-path="url(#photoClip)"/>`
+    : `<g clip-path="url(#photoClip)">
+        <rect x="52" y="196" width="196" height="196" fill="${esc(darken(accent, 0.58))}"/>
+        <g transform="translate(150 300)" fill="${esc(accentSoft)}" opacity="0.5">
+          <circle cx="0" cy="-26" r="30"/>
+          <path d="M-58 60 C -58 14, 58 14, 58 60 Z"/>
+        </g>
+      </g>`
+
+  const bgStops = (schema.background.gradient ?? [
+    { offset: 0, color: lighten(accent, 0.1) },
+    { offset: 1, color: '#04140b' },
+  ])
+    .map((s) => `<stop offset="${s.offset * 100}%" stop-color="${esc(s.color)}"/>`)
+    .join('')
+
+  const securityLine = `${branding.faitiereName} · ${member.cardNumber} · FAITIEREHUB`.toUpperCase()
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+  <defs>
+    <radialGradient id="bgGrad" cx="24%" cy="30%" r="95%">${bgStops}</radialGradient>
+    <radialGradient id="haloGrad" cx="20%" cy="38%" r="46%">
+      <stop offset="0%" stop-color="${esc(accent)}" stop-opacity="0.26"/>
+      <stop offset="72%" stop-color="${esc(accent)}" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.10"/>
+      <stop offset="0.42" stop-color="#ffffff" stop-opacity="0.02"/>
+      <stop offset="0.55" stop-color="#ffffff" stop-opacity="0.07"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="${esc(accentSoft)}"/>
+      <stop offset="0.55" stop-color="${esc(accent)}"/>
+      <stop offset="1" stop-color="${esc(darken(accent, 0.55))}"/>
+    </linearGradient>
+    <linearGradient id="panelGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.55" stop-color="#f7faf6"/>
+      <stop offset="1" stop-color="#e9f1e7"/>
+    </linearGradient>
+    <linearGradient id="pillGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="${esc(lighten(accent, 0.05))}" stop-opacity=".16"/>
+      <stop offset="1" stop-color="#04140b" stop-opacity=".34"/>
+    </linearGradient>
+    <linearGradient id="iconGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="${esc(accentSoft)}"/>
+      <stop offset="1" stop-color="${esc(darken(accent, 0.22))}"/>
+    </linearGradient>
+    <linearGradient id="orGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffe98a"/><stop offset="0.5" stop-color="#f0bf3c"/><stop offset="1" stop-color="#cf8f05"/>
+    </linearGradient>
+    <linearGradient id="silverGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f6f9fb"/><stop offset="0.5" stop-color="#cfd8df"/><stop offset="1" stop-color="#a3aeb8"/>
+    </linearGradient>
+    <linearGradient id="bronzeGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eeb782"/><stop offset="0.5" stop-color="#c08553"/><stop offset="1" stop-color="#94623a"/>
+    </linearGradient>
+    <linearGradient id="chipGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7e3a1"/><stop offset="0.45" stop-color="#d9b25c"/><stop offset="1" stop-color="#a97f28"/>
+    </linearGradient>
+    <linearGradient id="foilA" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7af5d0"/><stop offset="0.3" stop-color="#8bb8ff"/>
+      <stop offset="0.6" stop-color="#e29bff"/><stop offset="1" stop-color="#ffd98a"/>
+    </linearGradient>
+    <linearGradient id="foilB" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.75"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#9ef7ff" stop-opacity="0.6"/>
+    </linearGradient>
+
+    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="11" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3.5"/>
+      <feOffset dy="3"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.3"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <!-- Substrate grain: breaks up flat gradient banding the way real card stock does -->
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" stitchTiles="stitch" result="n"/>
+      <feColorMatrix in="n" type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.055"/></feComponentTransfer>
+    </filter>
+
+    ${rosetteDef('rose')}
+    <clipPath id="cardClip"><rect x="0" y="0" width="${W}" height="${H}" rx="30" ry="30"/></clipPath>
+    <clipPath id="photoClip"><circle cx="150" cy="294" r="98"/></clipPath>
+    <clipPath id="darkClip"><rect x="0" y="0" width="${SPLIT}" height="${H}"/></clipPath>
+    <clipPath id="panelClip"><rect x="${SPLIT}" y="0" width="${W - SPLIT}" height="${H}"/></clipPath>
+    <clipPath id="foilClip"><rect width="86" height="58" rx="8"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#cardClip)">
+    <!-- ═══ SUBSTRATE ═══ -->
+    <rect x="0" y="0" width="${W}" height="${H}" fill="url(#bgGrad)"/>
+
+    <g clip-path="url(#darkClip)">
+      <!-- Guilloché engraving behind the identity zone. Kept faint: on a real
+           document the engraving is a background texture you notice on close
+           inspection, not a pattern competing with the portrait and the name. -->
+      ${useRosette({ href: 'rose', cx: 150, cy: 294, scale: 2.45, color: accentSoft, opacity: 0.1, strokeWidth: 0.45 })}
+      ${useRosette({ href: 'rose', cx: 596, cy: 214, scale: 1.75, color: accent, opacity: 0.075, strokeWidth: 0.45 })}
+      <rect x="0" y="0" width="${SPLIT}" height="${H}" fill="url(#haloGrad)"/>
+      <rect x="0" y="0" width="${SPLIT}" height="${H}" fill="url(#sheen)"/>
+    </g>
+
+    <!-- Top accent ribbon with woven guilloché band -->
+    <rect x="0" y="0" width="${SPLIT}" height="10" fill="${esc(accent)}"/>
+    <g clip-path="url(#darkClip)">
+      ${guillocheBand({ x: 0, y: 10, width: SPLIT, height: 26, lines: 7, stroke: accentSoft, strokeWidth: 0.45, opacity: 0.28 })}
+    </g>
+
+    <!-- ═══ LIGHT DATA PANEL ═══ -->
+    <path d="M${SPLIT + 26} 0 L${W} 0 L${W} ${H} L${SPLIT + 26} ${H} C${SPLIT + 4} ${H} ${SPLIT} ${H - 22} ${SPLIT} ${H - 44} L${SPLIT} 44 C${SPLIT} 22 ${SPLIT + 4} 0 ${SPLIT + 26} 0 Z" fill="url(#panelGrad)"/>
+    <path d="M${SPLIT} 44 L${SPLIT} ${H - 44}" stroke="${esc(accent)}" stroke-opacity="0.35" stroke-width="2"/>
+    <!-- Panel watermark: anchored in the bottom-right corner so it bleeds off
+         the card edge. Floating it mid-panel left a pale ring in the middle of
+         the data fields that read as a printing blemish rather than a
+         security feature — and it must stay clear of the QR quiet zone. -->
+    <g clip-path="url(#panelClip)">
+      ${useRosette({ href: 'rose', cx: 1178, cy: 706, scale: 1.55, color: inkSoft, opacity: 0.12, strokeWidth: 0.35 })}
+    </g>
+
+    <g transform="translate(${SPLIT + 34} 46)">
+      <text x="0" y="22" font-family="${SANS}" font-weight="800" font-size="19" fill="${esc(ink)}" letter-spacing="2.4">${esc(truncate(title, 26))}</text>
+      <text x="0" y="42" font-family="${SANS}" font-weight="600" font-size="11" fill="${esc(inkSoft)}" letter-spacing="1.1">${esc(truncate(subtitle, 38))}</text>
+
+      <g transform="translate(0 58)" filter="url(#shadow)">
+        <rect x="0" y="0" width="206" height="31" rx="15.5" fill="url(#iconGrad)"/>
+        <circle cx="17" cy="15.5" r="7.5" fill="none" stroke="#fff" stroke-width="1.7"/>
+        <path d="M13.4 15.5 l2.6 2.6 l4.6 -4.6" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="33" y="20" font-family="${SANS}" font-weight="700" font-size="11.5" fill="#fff" letter-spacing="1.3">MEMBRE CERTIFIÉ</text>
+      </g>
+
+      ${dataField(0, 128, 'N° DE MEMBRE', member.cardNumber, inkSoft, ink, 186)}
+      ${dataField(196, 128, "VALABLE JUSQU'AU", expiryText, inkSoft, ink, 170)}
+      ${dataField(0, 188, 'STATUT', 'ACTIF', inkSoft, darken(accent, 0.18), 186)}
+      ${dataField(196, 188, "PÉRIODE D'ADHÉSION", periodText, inkSoft, ink, 170)}
+
+      <!-- Chip + holographic foil: the two physical security features -->
+      <g transform="translate(0 232)">
+        ${chip(0, 0, 52, 40)}
+        ${foilPatch(72, -1, 86, 58, 'foil')}
+        <text x="168" y="18" font-family="${SANS}" font-weight="700" font-size="8.5" fill="${esc(inkSoft)}" letter-spacing="1.1">ÉLÉMENT</text>
+        <text x="168" y="31" font-family="${SANS}" font-weight="700" font-size="8.5" fill="${esc(inkSoft)}" letter-spacing="1.1">OPTIQUE</text>
+        <text x="168" y="46" font-family="${SANS}" font-weight="700" font-size="8.5" fill="${esc(inkSoft)}" letter-spacing="1.1">VARIABLE</text>
+      </g>
+
+      <!-- QR -->
+      <g transform="translate(0 312)">
+        <rect x="0" y="0" width="128" height="128" rx="13" fill="#fff" filter="url(#shadow)"/>
+        <g transform="translate(9 9)">
+          <svg viewBox="0 0 ${qrModuleCount} ${qrModuleCount}" width="110" height="110" shape-rendering="crispEdges">
+            <rect width="100%" height="100%" fill="#ffffff"/>
+            <path d="${qrPath}" fill="${esc(ink)}"/>
+          </svg>
+        </g>
+        <text x="146" y="44" font-family="${SANS}" font-weight="800" font-size="14" fill="${esc(ink)}" letter-spacing="0.6">SCANNER POUR</text>
+        <text x="146" y="63" font-family="${SANS}" font-weight="800" font-size="14" fill="${esc(ink)}" letter-spacing="0.6">VÉRIFIER</text>
+        <text x="146" y="84" font-family="${SANS}" font-weight="600" font-size="9" fill="${esc(inkSoft)}" letter-spacing="0.7">SÉCURISÉ • CERTIFIÉ</text>
+      </g>
+
+      <!-- Signature -->
+      <g transform="translate(0 470)">
+        <text x="0" y="0" font-family="${SANS}" font-weight="700" font-size="9" fill="${esc(inkSoft)}" letter-spacing="1.3">SIGNATURE DU TITULAIRE</text>
+        <path d="M0 30 C 22 12, 40 44, 62 26 S 104 10, 128 32" fill="none" stroke="${esc(ink)}" stroke-width="2.2" stroke-linecap="round" opacity="0.85"/>
+        <path d="M0 42 H 300" stroke="${esc(inkSoft)}" stroke-opacity="0.35" stroke-width="1"/>
+        <text x="0" y="56" font-family="${SANS}" font-weight="600" font-size="9" fill="${esc(inkSoft)}" letter-spacing="0.5">${esc(truncate(`${member.firstName} ${member.lastName}`.toUpperCase(), 34))}</text>
+      </g>
+
+      <!-- Microtext security line -->
+      ${microtext({ x: 0, y: 612, width: 366, text: securityLine, fill: ink, size: 3.6, opacity: 0.6 })}
+    </g>
+
+    <!-- ═══ IDENTITY ZONE ═══ -->
+    <g transform="translate(36 30)">
+      <circle cx="21" cy="21" r="21" fill="url(#iconGrad)" filter="url(#shadow)"/>
+      <circle cx="21" cy="21" r="21" fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="1"/>
+      <!-- Sprouting leaf mark: stem + two blades, readable at 42px -->
+      <path d="M21 31.5 C 21 26, 21 20, 21 13.5" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+      <path d="M21 22 C 14.5 22, 10.5 18, 10.5 12.5 C 17 12.5, 21 16.5, 21 22 Z" fill="#ffffff" fill-opacity="0.95"/>
+      <path d="M21 18 C 27.5 18, 31.5 14, 31.5 8.5 C 25 8.5, 21 12.5, 21 18 Z" fill="#ffffff" fill-opacity="0.7"/>
+      <text x="52" y="17" font-family="${SANS}" font-weight="800" font-size="22" fill="${esc(onDark)}" letter-spacing="-0.3">Faîtière</text>
+      <text x="${52 + estimateTextWidth('Faîtière', 22, true) + 6}" y="17" font-family="${SANS}" font-weight="800" font-size="22" fill="${esc(accentSoft)}" letter-spacing="-0.3">Hub</text>
+      <text x="52" y="34" font-family="${SANS}" font-weight="600" font-size="9.5" fill="${esc(accentSoft)}" letter-spacing="2.2" opacity="0.8">${esc(truncate(branding.faitiereName.toUpperCase(), 30))}</text>
+    </g>
+
+    <!-- Portrait: guilloché halo + gradient ring -->
+    ${useRosette({ href: 'rose', cx: 150, cy: 294, scale: 1.3, color: accentSoft, opacity: 0.35, strokeWidth: 0.5 })}
+    <circle cx="150" cy="294" r="106" fill="url(#ringGrad)" filter="url(#softGlow)"/>
+    <circle cx="150" cy="294" r="100" fill="${esc(darken(accent, 0.52))}"/>
+    ${photoContent}
+    <circle cx="150" cy="294" r="98" fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="2"/>
+    <circle cx="150" cy="294" r="106" fill="none" stroke="#ffffff" stroke-opacity="0.1" stroke-width="1"/>
+
+    <!-- Name + status -->
+    <g transform="translate(${NAME_X} ${nameLines.length > 1 ? 218 : 246})">
+      ${nameLines
+        .map(
+          (line, i) =>
+            `<text x="0" y="${i * (nameSize + 6)}" font-family="${SANS}" font-weight="800" font-size="${nameSize}" fill="${esc(onDark)}" letter-spacing="-0.5">${esc(line)}</text>`,
+        )
+        .join('')}
+
+      <g transform="translate(0 ${(nameLines.length - 1) * (nameSize + 6) + 22})">
+        <rect x="0" y="0" width="164" height="31" rx="15.5" fill="${level.fill}" filter="url(#shadow)"/>
+        ${medallionMark(19, 15.5, level.ring)}
+        <text x="35" y="20" font-family="${SANS}" font-weight="700" font-size="11.5" fill="${level.textColor}" letter-spacing="1.2">${level.label}</text>
+
+        <g transform="translate(176 0)">
+          <rect x="0" y="0" width="146" height="31" rx="15.5" fill="${esc(accent)}" fill-opacity="0.16" stroke="${esc(accentSoft)}" stroke-opacity="0.5"/>
+          <circle cx="15" cy="15.5" r="4" fill="${esc(accentSoft)}"/>
+          <text x="27" y="20" font-family="${SANS}" font-weight="700" font-size="11" fill="${esc(accentSoft)}" letter-spacing="1.2">MEMBRE ACTIF</text>
+        </g>
+
+        <text x="0" y="66" font-family="${SANS}" font-weight="600" font-size="13" fill="${esc(accentSoft)}" letter-spacing="1.4">COOPÉRATIVE</text>
+        <text x="0" y="88" font-family="${SANS}" font-weight="700" font-size="${fitFontSize(branding.cooperativeName, NAME_MAX_W, 22, 14, true).size}" fill="${esc(onDark)}">${esc(branding.cooperativeName)}</text>
+      </g>
+    </g>
+
+    <!-- Info pills -->
+    <g transform="translate(40 452)">
+      ${infoPill(0, 0, 'LOCALITÉ', truncate(member.locality || '—', 34), accent, accentSoft, 'pin')}
+      ${infoPill(316, 0, 'TÉLÉPHONE', member.phone || '—', accent, accentSoft, 'phone')}
+      ${infoPill(0, 76, 'COOPÉRATIVE', truncate(branding.cooperativeName, 34), accent, accentSoft, 'building')}
+      ${infoPill(316, 76, 'FAÎTIÈRE', truncate(branding.faitiereName, 34), accent, accentSoft, 'people')}
+    </g>
+
+    <!-- Issuance line + microtext close the identity zone -->
+    <g transform="translate(40 604)">
+      <path d="M0 0 H 616" stroke="${esc(accentSoft)}" stroke-opacity="0.22" stroke-width="1"/>
+      <text x="0" y="17" font-family="${SANS}" font-weight="600" font-size="9.5" fill="${esc(accentSoft)}" letter-spacing="1.1" opacity="0.85">DÉLIVRÉE PAR ${esc(truncate(branding.faitiereName.toUpperCase(), 28))} · TOGO</text>
+      <text x="616" y="17" text-anchor="end" font-family="${SANS}" font-weight="600" font-size="9.5" fill="${esc(accentSoft)}" letter-spacing="1.1" opacity="0.85">DOCUMENT PROPRIÉTÉ DE L'ÉMETTEUR</text>
+    </g>
+    ${microtext({ x: 40, y: 636, width: 616, text: securityLine, fill: accentSoft, size: 3.6, opacity: 0.5 })}
+
+    <!-- Bottom guilloché band closes the composition -->
+    <g clip-path="url(#darkClip)">
+      ${guillocheBand({ x: 0, y: 648, width: SPLIT, height: 60, lines: 11, stroke: accentSoft, strokeWidth: 0.45, opacity: 0.22 })}
+    </g>
+
+    <!-- Substrate grain over everything -->
+    <rect x="0" y="0" width="${W}" height="${H}" filter="url(#grain)" opacity="0.5" fill="#808080"/>
+
+    <!-- Card edge -->
+    <rect x="0.75" y="0.75" width="${W - 1.5}" height="${H - 1.5}" rx="29" fill="none" stroke="#ffffff" stroke-opacity="0.14" stroke-width="1.5"/>
+  </g>
+</svg>`
 }
 
 // ─── Rasterization (SVG → Canvas → PNG) ─────────────────────────────────────
 
 async function svgToCanvas(svgString: string): Promise<HTMLCanvasElement> {
   const canvas = document.createElement('canvas')
-  canvas.width = 1180 * 2
-  canvas.height = 740 * 2
+  canvas.width = W * 2
+  canvas.height = H * 2
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Contexte 2D indisponible — impossible de rendre la carte')
 
@@ -357,7 +458,7 @@ async function svgToCanvas(svgString: string): Promise<HTMLCanvasElement> {
   return new Promise<HTMLCanvasElement>((resolve, reject) => {
     const img = new Image()
     img.onload = () => {
-      ctx.drawImage(img, 0, 0, 1180 * 2, 740 * 2)
+      ctx.drawImage(img, 0, 0, W * 2, H * 2)
       URL.revokeObjectURL(url)
       resolve(canvas)
     }
@@ -372,7 +473,6 @@ async function svgToCanvas(svgString: string): Promise<HTMLCanvasElement> {
 // ─── Export Functions ────────────────────────────────────────────────────────
 
 export async function renderToCanvas(schema: CardSchema): Promise<HTMLCanvasElement> {
-  // Convert photo URL to data URL so it renders inside the SVG blob
   let photoDataUrl: string | null = null
   if (schema.member.photoUrl) {
     photoDataUrl = await imageToDataUrl(schema.member.photoUrl)
