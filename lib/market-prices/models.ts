@@ -134,6 +134,35 @@ export class MarketPrice {
     return (this.row.trend as PriceTrend) ?? 'stable'
   }
 
+  /** Âge du relevé, en jours. */
+  get ageDays(): number {
+    const t = Date.parse(this.row.created_at)
+    if (Number.isNaN(t)) return Number.POSITIVE_INFINITY
+    return Math.floor((Date.now() - t) / 86_400_000)
+  }
+
+  /**
+   * Un prix agricole vieux de plus de deux semaines n'est plus un prix, c'est
+   * un souvenir. Le tableau les affichait sans aucune date sous une tuile
+   * intitulée « Cours live » : un producteur pouvait brader sa récolte sur un
+   * relevé vieux de quatre mois sans jamais savoir qu'il était périmé.
+   */
+  get isStale(): boolean {
+    return this.ageDays > 14
+  }
+
+  /** Ancienneté en clair, pour quelqu'un qui ne lit pas une date ISO. */
+  get freshnessLabel(): string {
+    const d = this.ageDays
+    if (!Number.isFinite(d)) return 'date inconnue'
+    if (d <= 0) return "aujourd'hui"
+    if (d === 1) return 'hier'
+    if (d < 7) return `il y a ${d} jours`
+    if (d < 31) return `il y a ${Math.floor(d / 7)} semaine${d >= 14 ? 's' : ''}`
+    const months = Math.floor(d / 30)
+    return `il y a ${months} mois`
+  }
+
   get trendLabel(): string {
     if (this.trend === 'up') return '↑ Hausse'
     if (this.trend === 'down') return '↓ Baisse'

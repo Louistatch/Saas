@@ -110,15 +110,28 @@ async function handlePrix(parsed: ParsedQuery): Promise<ActionResult | null> {
   }
 
   // Group by market, get latest per market
-  const byMarket = new Map<string, { price: number; date: string }>()
+  const byMarket = new Map<string, { price: number; date: string; ageDays: number }>()
   for (const p of prices) {
     if (!byMarket.has(p.market_name)) {
       byMarket.set(p.market_name, {
         price: Number(p.price),
         date: new Date(p.created_at).toLocaleDateString('fr-FR'),
+        ageDays: Math.floor((Date.now() - Date.parse(p.created_at)) / 86_400_000),
       })
     }
   }
+
+  // « (04/06/2026) » ne dit rien à quelqu'un qui demande un prix aujourd'hui :
+  // il faut compter soi-même. L'ancienneté en clair se lit sans effort, et un
+  // relevé périmé doit être annoncé comme tel — un producteur peut brader sa
+  // récolte sur un chiffre de quatre mois.
+  const ageLabel = (d: number) =>
+    d <= 0 ? "aujourd'hui" : d === 1 ? 'hier' : d < 31 ? `il y a ${d} jours` : `il y a ${Math.floor(d / 30)} mois`
+  const freshest = Math.min(...[...byMarket.values()].map((v) => v.ageDays))
+  const staleWarning =
+    freshest > 14
+      ? `\n\n⚠️ Attention : ces prix datent de ${ageLabel(freshest)}. Vérifiez sur votre marché avant de vendre.`
+      : ''
 
   // Calculate average
   const allPrices = prices.map(p => Number(p.price))
@@ -130,16 +143,20 @@ async function handlePrix(parsed: ParsedQuery): Promise<ActionResult | null> {
   if (parsed.marche && byMarket.size === 1) {
     const entry = [...byMarket.values()][0]
     const marketName = [...byMarket.keys()][0]
-    response += ` à ${marketName} : **${entry.price} FCFA/kg** (${entry.date}).`
+    response += ` à ${marketName} : **${entry.price} FCFA/kg** (relevé ${ageLabel(entry.ageDays)}).`
   } else {
     response += ' — Prix récents :\n'
     for (const [market, info] of byMarket) {
-      response += `• ${market} : ${info.price} FCFA/kg (${info.date})\n`
+      response += `• ${market} : ${info.price} FCFA/kg (${ageLabel(info.ageDays)})\n`
     }
     response += `\nMoyenne : ${avg} FCFA/kg | Min : ${min} | Max : ${max}`
   }
 
-  return { response, engine: 'direct-data', data: { prices: [...byMarket.entries()] } }
+  return {
+    response: response + staleWarning,
+    engine: 'direct-data',
+    data: { prices: [...byMarket.entries()] },
+  }
 }
 
 // ─── Tendance ────────────────────────────────────────────────────

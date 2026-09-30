@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
-import { TrendingUp, MapPin, Filter } from 'lucide-react'
+import { TrendingUp, MapPin, Filter, AlertTriangle } from 'lucide-react'
 import {
   Region,
   Culture,
@@ -364,6 +364,23 @@ export function MarketPricesDashboard({ onBack, cardNumber, memberLocality }: Pr
         </div>
       )}
 
+      {/* Avertissement global : quand MÊME le relevé le plus récent est vieux,
+          la liste entière est une archive. Le dire une fois en haut vaut mieux
+          que de laisser l'utilisateur additionner lui-même les mentions
+          « il y a 4 mois » ligne par ligne. */}
+      {!loading &&
+        visiblePrices.length > 0 &&
+        Math.min(...visiblePrices.map((p) => p.ageDays)) > 14 && (
+          <div className="rounded-2xl bg-amber-500/10 ring-1 ring-amber-400/25 px-3.5 py-3 flex items-start gap-2.5">
+            <AlertTriangle className="h-4 w-4 text-amber-300 shrink-0 mt-0.5" />
+            <p className="text-amber-100/90 text-[12.5px] leading-snug">
+              Ces prix datent de{' '}
+              <strong>{visiblePrices.reduce((a, p) => (p.ageDays < a.ageDays ? p : a)).freshnessLabel}</strong>.
+              Vérifiez sur votre marché avant de vendre.
+            </p>
+          </div>
+        )}
+
       {/* Compact price table */}
       {!loading && (
         <div className="rounded-2xl vfp-card overflow-hidden">
@@ -410,7 +427,20 @@ export function MarketPricesDashboard({ onBack, cardNumber, memberLocality }: Pr
                         </div>
                       </td>
                       <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                        <span className="text-sm font-bold text-white">{p.formattedPrice}</span>
+                        <span
+                          className={`text-sm font-bold ${p.isStale ? 'text-white/45' : 'text-white'}`}
+                        >
+                          {p.formattedPrice}
+                        </span>
+                        {/* L'ancienneté accompagne TOUJOURS le prix : un chiffre
+                            sans date se lit comme le cours du jour. Un relevé
+                            périmé est en plus grisé, pour que l'œil le traite
+                            comme une indication et non comme une référence. */}
+                        <span
+                          className={`block text-[10px] leading-tight ${p.isStale ? 'text-amber-300/70' : 'text-white/35'}`}
+                        >
+                          {p.freshnessLabel}
+                        </span>
                       </td>
                     </tr>
                   )
