@@ -692,8 +692,14 @@ export default function VerifyCardPage() {
     ? memberFullName(result.member as Parameters<typeof memberFullName>[0])
     : ''
   const rawFirst = (result.member?.first_name ?? '').trim()
+  // Capitalise EVERY word, not just the first: two-part given names are the
+  // norm here ("ISSODO LOUIS", "Podoma Aklesso"), and lowercasing everything
+  // after the first letter turned them into "Issodo louis". Hyphens count as
+  // word boundaries too ("Kossi-Ama").
   const firstName = rawFirst
-    ? rawFirst.charAt(0).toUpperCase() + rawFirst.slice(1).toLowerCase()
+    ? rawFirst
+        .toLowerCase()
+        .replace(/(^|[\s'’-])([\p{L}])/gu, (_m, sep, ch) => sep + ch.toUpperCase())
     : fullName?.split(' ')[0] || 'Producteur'
   const greetHour = new Date().getHours()
   const greeting = greetHour < 12 ? 'Bonjour' : greetHour < 18 ? 'Bon après-midi' : 'Bonsoir'
@@ -1151,8 +1157,8 @@ export default function VerifyCardPage() {
                 {[
                   {
                     icon: MapIcon,
-                    label: 'Parcelles GPS',
-                    sub: 'Mes parcelles agricoles',
+                    label: 'Parcelles',
+                    sub: 'Mes terrains',
                     view: 'parcelles',
                     color: 'text-emerald-300',
                     bg: 'from-emerald-500/20 to-emerald-700/5',
@@ -1161,7 +1167,7 @@ export default function VerifyCardPage() {
                   {
                     icon: ShoppingCart,
                     label: 'Intrants',
-                    sub: 'Semences & engrais',
+                    sub: 'Semences, engrais',
                     view: 'intrants',
                     color: 'text-orange-300',
                     bg: 'from-orange-500/20 to-orange-700/5',
@@ -1169,7 +1175,7 @@ export default function VerifyCardPage() {
                   },
                   {
                     icon: FileText,
-                    label: 'Mon Exploitation',
+                    label: 'Exploitation',
                     sub: 'Fiches techniques',
                     view: 'exploitation',
                     color: 'text-cyan-300',
@@ -1179,7 +1185,7 @@ export default function VerifyCardPage() {
                   {
                     icon: Coins,
                     label: 'Cotisation',
-                    sub: 'Statut & campagne',
+                    sub: 'Statut, campagne',
                     view: 'cotisation',
                     color: 'text-yellow-300',
                     bg: 'from-yellow-500/20 to-yellow-700/5',
@@ -1198,10 +1204,10 @@ export default function VerifyCardPage() {
                       <Icon className={`h-5 w-5 ${color}`} />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-white text-sm font-semibold leading-tight truncate">
-                        {label}
-                      </p>
-                      <p className="text-white/30 text-[10px] mt-0.5 truncate">{sub}</p>
+                      {/* Jamais de troncature sur le libellé : « Parcelles G… »
+                          ne veut rien dire. Le sous-titre, lui, peut être coupé. */}
+                      <p className="text-white text-sm font-semibold leading-tight">{label}</p>
+                      <p className="text-white/40 text-[11px] mt-0.5 truncate">{sub}</p>
                     </div>
                   </button>
                 ))}
