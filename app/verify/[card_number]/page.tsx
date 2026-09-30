@@ -22,11 +22,11 @@ import {
   Bot,
   Building2,
   CheckCircle,
-  ChevronRight,
   CloudRain,
   Coins,
   Droplets,
   FileText,
+  Lock,
   Map as MapIcon,
   MapPin,
   PhoneCall,
@@ -35,7 +35,6 @@ import {
   Shield,
   ShoppingCart,
   Timer,
-  Lock,
   TrendingUp,
   User,
   XCircle,
@@ -287,17 +286,15 @@ export default function VerifyCardPage() {
         .then(async (r) => ({ ok: r.ok, status: r.status, data: r.ok ? await r.json() : null }))
         .catch(() => ({ ok: false, status: 0, data: null }))
 
-    Promise.all([get('parcelles'), get('cotisation'), get('intrants')]).then(
-      ([parc, cot, int]) => {
-        const locked = [parc, cot, int].some((r) => r.status === 401)
-        setPrivateLocked(locked)
-        setQuickStats({
-          totalHa: parc.ok ? (parc.data?.total_ha ?? 0) : null,
-          cotisationStatus: cot.ok ? (cot.data?.summary?.last_status ?? null) : null,
-          intrantCount: int.ok ? (int.data?.intrants?.length ?? 0) : null,
-        })
-      },
-    )
+    Promise.all([get('parcelles'), get('cotisation'), get('intrants')]).then(([parc, cot, int]) => {
+      const locked = [parc, cot, int].some((r) => r.status === 401)
+      setPrivateLocked(locked)
+      setQuickStats({
+        totalHa: parc.ok ? (parc.data?.total_ha ?? 0) : null,
+        cotisationStatus: cot.ok ? (cot.data?.summary?.last_status ?? null) : null,
+        intrantCount: int.ok ? (int.data?.intrants?.length ?? 0) : null,
+      })
+    })
   }, [result?.valid, cardNumber])
 
   if (loading) {
@@ -701,8 +698,9 @@ export default function VerifyCardPage() {
         .toLowerCase()
         .replace(/(^|[\s'’-])([\p{L}])/gu, (_m, sep, ch) => sep + ch.toUpperCase())
     : fullName?.split(' ')[0] || 'Producteur'
-  const greetHour = new Date().getHours()
-  const greeting = greetHour < 12 ? 'Bonjour' : greetHour < 18 ? 'Bon après-midi' : 'Bonsoir'
+  // Le salut horaire a disparu avec le bloc marketing : la bande d'identité
+  // affiche déjà le nom en gros, et « Bonsoir » ne veut rien dire pour
+  // l'acheteur qui scanne la carte de quelqu'un d'autre.
 
   const handleAttestation = () => {
     if (!result.member_id) return
@@ -732,7 +730,7 @@ export default function VerifyCardPage() {
         <div className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full bg-[var(--vfp-accent)]/[0.12] blur-[80px]" />
       </div>
 
-      <div className="relative z-10 max-w-md mx-auto px-4 pt-4 pb-8 space-y-5">
+      <div className="relative z-10 max-w-md mx-auto px-4 pt-4 pb-5 space-y-3.5">
         {/* ─── Premium Header ─── */}
         <header className="flex items-center justify-between vfp-enter">
           <div className="flex items-center gap-3">
@@ -818,50 +816,56 @@ export default function VerifyCardPage() {
             className={`vfp-enter transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`}
             style={{ transitionDelay: '100ms' }}
           >
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-white/60 text-sm mb-1">
-                  {greeting}, {firstName} ! 👋
-                </p>
-                <h1 className="text-[26px] font-bold text-white leading-tight">
-                  Votre espace,
-                  <br />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--vfp-accent)] to-[var(--vfp-accent-dim)]">
-                    votre succès.
-                  </span>
-                </h1>
-                <p className="text-white/40 text-sm mt-2">
-                  Gérez, développez et prospérez avec FaîtiereHub.
-                </p>
-                {atsData && (
-                  <div className="mt-3 max-w-[200px]">
-                    <AtsBadge score={atsData.score} level={atsData.level} size="sm" />
+            {/* Compact identity band.
+                This replaced a 200px marketing hero ("Votre espace, votre
+                succès — Gérez, développez et prospérez") that told a scanner
+                nothing. What someone wants in the first second after scanning
+                is: is this card valid, and whose is it. That now fits in ~80px,
+                leaving the fold for the things people came to use. */}
+            <div className="flex items-center gap-3">
+              <div className="h-[58px] w-[46px] shrink-0 rounded-xl overflow-hidden bg-white/[0.06] ring-1 ring-white/10">
+                {result.member?.photo_url ? (
+                  // Plain <img>: arbitrary Supabase Storage URL.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={result.member.photo_url}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="h-full w-full grid place-items-center">
+                    <User className="h-6 w-6 text-white/25" />
                   </div>
                 )}
               </div>
-              <div className="vfp-glass-subtle rounded-2xl px-4 py-3 text-center shrink-0">
-                <div className="w-10 h-10 rounded-full bg-[var(--vfp-accent)]/15 flex items-center justify-center mx-auto mb-1.5">
-                  <CheckCircle className="h-5 w-5 text-[var(--vfp-accent)] vfp-pop" />
-                </div>
-                <p className="text-white text-sm font-semibold">Compte vérifié</p>
-                <div className="flex items-center gap-1 justify-center mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--vfp-accent)] animate-pulse" />
-                  <span className="text-[var(--vfp-accent-dim)] text-xs">Membre actif</span>
-                </div>
+
+              <div className="min-w-0 flex-1">
+                {/* Deux lignes plutôt qu'une troncature : « ISSODO LOUIS
+                    TATCHI… » ne permet pas de vérifier une identité, ce qui est
+                    pourtant la seule raison d'être de cette bande. */}
+                <p className="text-white text-[15.5px] font-bold leading-[1.15] line-clamp-2">
+                  {fullName || firstName}
+                </p>
+                <p className="text-white/45 text-[12.5px] leading-snug truncate">
+                  {result.cooperative?.name ?? '—'}
+                </p>
+                <p className="text-white/30 text-[11.5px] font-mono">{cardNumber}</p>
+              </div>
+
+              <div className="shrink-0 flex flex-col items-end gap-1">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--vfp-accent)]/15 px-2.5 py-1.5 ring-1 ring-[var(--vfp-accent)]/30">
+                  <CheckCircle className="h-4 w-4 text-[var(--vfp-accent)] vfp-pop" />
+                  <span className="text-[var(--vfp-accent)] text-[12px] font-bold">VALIDE</span>
+                </span>
+                {atsData && <AtsBadge score={atsData.score} level={atsData.level} size="sm" />}
               </div>
             </div>
           </section>
         )}
 
-        {/* ─── 3D Member Card ─── */}
-        {result.member && result.card && isValid && activeView === 'menu' && (
-          <div
-            className={`transition-all duration-600 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
-            style={{ transitionDelay: '200ms' }}
-          >
-            <Card3D member={result.member} card={result.card} cooperative={result.cooperative} />
-          </div>
-        )}
+        {/* La carte 3D n'est plus dans le menu : elle y prenait ~230 px alors
+            que la bande d'identité ci-dessus porte déjà la preuve. Elle s'ouvre
+            depuis la tuile « Ma carte » (vue `identity`). */}
 
         {/* ─── Status instrument strip ───
             Replaces the 3 flat stat squares with a single glass panel:
@@ -882,108 +886,64 @@ export default function VerifyCardPage() {
             <div className="min-w-0">
               <p className="text-white text-[13.5px] font-semibold">Informations privées</p>
               <p className="text-white/45 text-[12px] leading-snug">
-                Parcelles, cotisation et intrants ne sont visibles que par le titulaire de la
-                carte.
+                Parcelles, cotisation et intrants ne sont visibles que par le titulaire de la carte.
               </p>
             </div>
           </div>
         )}
 
+        {/* Bandeau compact : trois chiffres sur une ligne.
+            L'ancienne version faisait ~110px pour un anneau décoratif de 68px
+            et beaucoup de vide — au prix du seul écran disponible. Le statut de
+            cotisation reste porté par la couleur, qui se lit plus vite qu'un
+            pourcentage dont personne n'a l'usage. */}
         {isValid &&
           activeView === 'menu' &&
           !privateLocked &&
           quickStats &&
           (() => {
-            const cotisationPct =
+            const paid =
               quickStats.cotisationStatus === 'paid' || quickStats.cotisationStatus === 'waived'
-                ? 100
-                : quickStats.cotisationStatus === 'overdue'
-                  ? 15
-                  : quickStats.cotisationStatus === 'pending'
-                    ? 55
-                    : 0
-            const cotisationColor =
-              quickStats.cotisationStatus === 'paid' || quickStats.cotisationStatus === 'waived'
-                ? '#34d399'
-                : quickStats.cotisationStatus === 'overdue'
-                  ? '#f87171'
-                  : 'var(--vfp-accent)'
-            const cotisationLabel =
-              quickStats.cotisationStatus === 'paid' || quickStats.cotisationStatus === 'waived'
-                ? 'À jour'
-                : quickStats.cotisationStatus === 'overdue'
-                  ? 'En retard'
-                  : quickStats.cotisationStatus === 'pending'
-                    ? 'En cours'
-                    : '—'
-            const ringCirc = 2 * Math.PI * 28
-            const ringOffset = ringCirc * (1 - cotisationPct / 100)
+            const overdue = quickStats.cotisationStatus === 'overdue'
+            const cotisationColor = paid ? '#34d399' : overdue ? '#f87171' : 'var(--vfp-accent)'
+            const cotisationLabel = paid
+              ? 'À jour'
+              : overdue
+                ? 'En retard'
+                : quickStats.cotisationStatus === 'pending'
+                  ? 'En cours'
+                  : '—'
+            const cell = (label: string, value: string, color?: string) => (
+              <div key={label} className="flex-1 min-w-0 text-center">
+                <p className="text-white/40 text-[10.5px] uppercase tracking-wide">{label}</p>
+                <p
+                  className="text-[15px] font-bold leading-tight truncate"
+                  style={{ color: color ?? '#fff' }}
+                >
+                  {value}
+                </p>
+              </div>
+            )
             return (
               <div
-                className={`vfp-card rounded-2xl p-4 flex items-stretch gap-3.5 vfp-enter transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`}
+                className={`vfp-card rounded-2xl px-3 py-2.5 flex items-center gap-2 vfp-enter transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`}
                 style={{ transitionDelay: '200ms' }}
               >
-                <div className="relative w-[68px] h-[68px] shrink-0">
-                  <svg aria-hidden="true" viewBox="0 0 64 64" className="w-full h-full -rotate-90">
-                    <circle
-                      cx="32"
-                      cy="32"
-                      r="28"
-                      fill="none"
-                      stroke="rgba(255,255,255,.08)"
-                      strokeWidth="5"
-                    />
-                    <circle
-                      cx="32"
-                      cy="32"
-                      r="28"
-                      fill="none"
-                      stroke={cotisationColor}
-                      strokeWidth="5"
-                      strokeLinecap="round"
-                      strokeDasharray={ringCirc}
-                      strokeDashoffset={ringOffset}
-                      style={{
-                        transition: 'stroke-dashoffset 0.6s ease, stroke 0.3s ease',
-                        filter: `drop-shadow(0 0 5px ${cotisationColor}99)`,
-                      }}
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span
-                      className="text-[15px] font-bold leading-none"
-                      style={{ color: cotisationColor }}
-                    >
-                      {cotisationPct}%
-                    </span>
-                    <span className="text-[8px] text-white/40 mt-0.5 tracking-wide">COTIS.</span>
-                  </div>
-                </div>
-                <div className="w-px bg-white/[0.08] my-0.5" />
-                <div className="flex-1 flex flex-col justify-center gap-2.5 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-white/50 text-[11.5px]">Cotisation</span>
-                    <span className="text-[12.5px] font-bold" style={{ color: cotisationColor }}>
-                      {cotisationLabel}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-white/50 text-[11.5px]">Hectares</span>
-                    <span className="text-white text-[13px] font-bold font-mono">
-                      {quickStats.totalHa === null
-                        ? '—'
-                        : quickStats.totalHa > 0
-                          ? quickStats.totalHa.toFixed(1)
-                          : '0'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-white/50 text-[11.5px]">Intrants</span>
-                    <span className="text-white text-[13px] font-bold font-mono">
-                      {quickStats.intrantCount === null ? '—' : quickStats.intrantCount}
-                    </span>
-                  </div>
-                </div>
+                {cell('Cotisation', cotisationLabel, cotisationColor)}
+                <span className="w-px self-stretch bg-white/10" />
+                {cell(
+                  'Hectares',
+                  quickStats.totalHa === null
+                    ? '—'
+                    : quickStats.totalHa > 0
+                      ? quickStats.totalHa.toFixed(1)
+                      : '0',
+                )}
+                <span className="w-px self-stretch bg-white/10" />
+                {cell(
+                  'Intrants',
+                  quickStats.intrantCount === null ? '—' : String(quickStats.intrantCount),
+                )}
               </div>
             )
           })()}
@@ -1009,271 +969,149 @@ export default function VerifyCardPage() {
           </div>
         )}
 
-        {/* ─── Services Grid (2 cols) ─── */}
+        {/* ─── Grille de lancement ───
+            Une seule grille de tuiles, comme l'écran d'accueil d'un téléphone.
+            Remplace quatre blocs empilés (un encart Assistant IA de 200px, une
+            rangée de 3, deux rangées de 2, un bandeau attestation) séparés par
+            trois en-têtes de section décoratifs. L'ensemble faisait 3,8 écrans
+            de haut pour 390px de large : personne ne fait défiler pour trouver
+            la météo. Les entrées privées ne sont présentes que pour le
+            titulaire — sinon une seule tuile « Se connecter » les remplace. */}
         {isValid && activeView === 'menu' && (
           <section
-            className={`space-y-4 transition-all duration-700 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+            className={`transition-all duration-700 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
             style={{ transitionDelay: '300ms' }}
           >
-            {/* Section header */}
-            <div className="flex items-center justify-between px-1">
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--vfp-accent)]" />
-                <h3 className="text-white font-semibold text-[15px]">Mes services</h3>
-              </div>
-              <span className="text-white/40 text-xs">Tout ce dont vous avez besoin</span>
-            </div>
-
-            {/* ① Featured — Assistant IA AgriTogo */}
-            <button
-              type="button"
-              onClick={() => setActiveView('ai')}
-              className="w-full group relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-500/20 via-amber-600/10 to-orange-700/5 border border-amber-400/20 p-5 text-left active:scale-[0.98] transition-transform"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-amber-400/5 to-transparent opacity-0 group-active:opacity-100 transition-opacity" />
-              {/* Ambient breathing halo — signals the assistant is live/ready */}
-              <div className="absolute -top-8 -right-8 w-36 h-36 rounded-full bg-amber-400/25 blur-3xl vfp-ai-halo" />
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] font-bold tracking-widest text-amber-400/70 uppercase">
-                      Recommandé
-                    </span>
-                    <span className="w-1 h-1 rounded-full bg-amber-400 animate-pulse" />
-                  </div>
-                  <p className="text-white font-bold text-lg leading-tight">Assistant IA</p>
-                  <p className="text-amber-300/60 text-sm mt-0.5">
-                    AgriTogo — Conseils, prix, prévisions
-                  </p>
-                  <div className="flex flex-wrap gap-1.5 mt-3">
-                    {['Maladies', 'Intrants', 'Rendement', 'Météo'].map((tag) => (
-                      <span
-                        key={tag}
-                        className="px-2 py-0.5 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-300/70 text-[10px] font-medium"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400/30 to-orange-500/20 flex items-center justify-center border border-amber-400/20 shrink-0 group-active:scale-90 transition-transform">
-                  <Bot className="h-7 w-7 text-amber-300" />
-                  {/* Listening waveform */}
-                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex items-end gap-[2px] h-2.5">
-                    {[4, 9, 6, 10, 5].map((h, i) => (
-                      <span
-                        // biome-ignore lint/suspicious/noArrayIndexKey: barres décoratives d'un indicateur, valeurs littérales figées
-                        key={i}
-                        className="w-[2px] rounded-full bg-orange-100 vfp-ai-wavebar"
-                        style={{ height: h, animationDelay: `${i * 0.15}s` }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-1 mt-4 text-amber-400/60 text-xs font-medium">
-                <span>Démarrer une conversation</span>
-                <ChevronRight className="h-3 w-3" />
-              </div>
-            </button>
-
-            {/* ② Quick row — Prix, Météo, AgriSmart */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-1.5">
               {[
+                {
+                  icon: Bot,
+                  label: 'Assistant',
+                  view: 'ai',
+                  tint: 'text-amber-300',
+                  ring: 'ring-amber-400/20',
+                  bg: 'bg-amber-500/10',
+                },
                 {
                   icon: TrendingUp,
                   label: 'Marchés',
-                  sub: 'Cours live',
                   view: 'prices',
-                  color: 'text-violet-300',
-                  bg: 'from-violet-500/20 to-violet-700/5',
-                  border: 'border-violet-400/15',
+                  tint: 'text-violet-300',
+                  ring: 'ring-violet-400/20',
+                  bg: 'bg-violet-500/10',
                 },
                 {
                   icon: CloudRain,
                   label: 'Météo',
-                  sub: 'Prévisions',
                   view: 'meteo',
-                  color: 'text-sky-300',
-                  bg: 'from-sky-500/20 to-sky-700/5',
-                  border: 'border-sky-400/15',
+                  tint: 'text-sky-300',
+                  ring: 'ring-sky-400/20',
+                  bg: 'bg-sky-500/10',
                 },
                 {
                   icon: Droplets,
-                  label: 'AgriSmart',
-                  sub: 'Irrigation',
+                  label: 'Irrigation',
                   view: 'agrismart',
-                  color: 'text-cyan-300',
-                  bg: 'from-cyan-400/20 to-cyan-600/5',
-                  border: 'border-cyan-400/15',
+                  tint: 'text-cyan-300',
+                  ring: 'ring-cyan-400/20',
+                  bg: 'bg-cyan-500/10',
                 },
-              ].map(({ icon: Icon, label, sub, view, color, bg, border }) => (
+                ...(privateLocked
+                  ? []
+                  : [
+                      {
+                        icon: MapIcon,
+                        label: 'Parcelles',
+                        view: 'parcelles',
+                        tint: 'text-emerald-300',
+                        ring: 'ring-emerald-400/20',
+                        bg: 'bg-emerald-500/10',
+                      },
+                      {
+                        icon: ShoppingCart,
+                        label: 'Intrants',
+                        view: 'intrants',
+                        tint: 'text-orange-300',
+                        ring: 'ring-orange-400/20',
+                        bg: 'bg-orange-500/10',
+                      },
+                      {
+                        icon: FileText,
+                        label: 'Exploitation',
+                        view: 'exploitation',
+                        tint: 'text-teal-300',
+                        ring: 'ring-teal-400/20',
+                        bg: 'bg-teal-500/10',
+                      },
+                      {
+                        icon: Coins,
+                        label: 'Cotisation',
+                        view: 'cotisation',
+                        tint: 'text-yellow-300',
+                        ring: 'ring-yellow-400/20',
+                        bg: 'bg-yellow-500/10',
+                      },
+                    ]),
+                {
+                  icon: Shield,
+                  label: 'Ma carte',
+                  view: 'identity',
+                  tint: 'text-[var(--vfp-accent)]',
+                  ring: 'ring-[var(--vfp-accent)]/25',
+                  bg: 'bg-[var(--vfp-accent)]/10',
+                },
+                {
+                  icon: PhoneCall,
+                  label: 'Technicien',
+                  view: 'technicien',
+                  tint: 'text-teal-300',
+                  ring: 'ring-teal-400/20',
+                  bg: 'bg-teal-500/10',
+                },
+              ].map(({ icon: Icon, label, view, tint, ring, bg }) => (
                 <button
                   type="button"
                   key={view}
                   onClick={() => setActiveView(view as typeof activeView)}
-                  className={`group vfp-card rounded-2xl p-3 flex flex-col items-center text-center gap-2 border ${border} active:scale-95 transition-transform`}
+                  className="vfp-card rounded-2xl py-3 px-1.5 min-h-[78px] flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform"
                 >
-                  <div
-                    className={`w-10 h-10 rounded-xl bg-gradient-to-br ${bg} flex items-center justify-center group-active:scale-90 transition-transform`}
+                  <span
+                    className={`w-11 h-11 rounded-2xl ${bg} ring-1 ${ring} grid place-items-center`}
                   >
-                    <Icon className={`h-5 w-5 ${color}`} />
-                  </div>
-                  <div>
-                    <p className="text-white text-xs font-semibold leading-tight">{label}</p>
-                    <p className="text-white/30 text-[10px]">{sub}</p>
-                  </div>
+                    <Icon className={`h-[22px] w-[22px] ${tint}`} />
+                  </span>
+                  <span className="text-white text-[12px] font-semibold leading-tight text-center">
+                    {label}
+                  </span>
                 </button>
               ))}
-            </div>
 
-            {/* ③ Mon Exploitation — owner only.
-                Every entry here hits an endpoint behind requirePrivateCard, so
-                to a visitor who is not signed in these were four buttons that
-                each opened "Impossible de charger les données. Réessayer" — a
-                technical failure, not a permission message. One honest card
-                replaces four dead ends. */}
-            {privateLocked ? (
-              <Link
-                href={`/auth/login?redirect=${encodeURIComponent(`/verify/${cardNumber}`)}`}
-                className="w-full vfp-card rounded-2xl p-4 flex items-center gap-3 text-left border border-white/10 active:scale-95 transition-transform"
+              <button
+                type="button"
+                onClick={handleAttestation}
+                className="vfp-card rounded-2xl py-3 px-1.5 min-h-[78px] flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform"
               >
-                <div className="w-11 h-11 rounded-xl bg-white/[0.06] grid place-items-center shrink-0">
-                  <Lock className="h-5 w-5 text-white/40" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-white text-sm font-semibold">Voir mon exploitation</p>
-                  <p className="text-white/40 text-[11.5px] leading-snug">
-                    Parcelles, intrants et cotisation — connectez-vous
-                  </p>
-                </div>
-              </Link>
-            ) : (
-            <div>
-              <p className="text-white/40 text-[11px] font-semibold uppercase tracking-wider px-1 mb-2">
-                Mon Exploitation
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  {
-                    icon: MapIcon,
-                    label: 'Parcelles',
-                    sub: 'Mes terrains',
-                    view: 'parcelles',
-                    color: 'text-emerald-300',
-                    bg: 'from-emerald-500/20 to-emerald-700/5',
-                    border: 'border-emerald-400/15',
-                  },
-                  {
-                    icon: ShoppingCart,
-                    label: 'Intrants',
-                    sub: 'Semences, engrais',
-                    view: 'intrants',
-                    color: 'text-orange-300',
-                    bg: 'from-orange-500/20 to-orange-700/5',
-                    border: 'border-orange-400/15',
-                  },
-                  {
-                    icon: FileText,
-                    label: 'Exploitation',
-                    sub: 'Fiches techniques',
-                    view: 'exploitation',
-                    color: 'text-cyan-300',
-                    bg: 'from-cyan-500/20 to-cyan-700/5',
-                    border: 'border-cyan-400/15',
-                  },
-                  {
-                    icon: Coins,
-                    label: 'Cotisation',
-                    sub: 'Statut, campagne',
-                    view: 'cotisation',
-                    color: 'text-yellow-300',
-                    bg: 'from-yellow-500/20 to-yellow-700/5',
-                    border: 'border-yellow-400/15',
-                  },
-                ].map(({ icon: Icon, label, sub, view, color, bg, border }) => (
-                  <button
-                    type="button"
-                    key={view}
-                    onClick={() => setActiveView(view as typeof activeView)}
-                    className={`group vfp-card rounded-2xl p-4 flex items-center gap-3 text-left border ${border} active:scale-95 transition-transform`}
-                  >
-                    <div
-                      className={`w-10 h-10 rounded-xl bg-gradient-to-br ${bg} flex items-center justify-center shrink-0 group-active:scale-90 transition-transform`}
-                    >
-                      <Icon className={`h-5 w-5 ${color}`} />
-                    </div>
-                    <div className="min-w-0">
-                      {/* Jamais de troncature sur le libellé : « Parcelles G… »
-                          ne veut rien dire. Le sous-titre, lui, peut être coupé. */}
-                      <p className="text-white text-sm font-semibold leading-tight">{label}</p>
-                      <p className="text-white/40 text-[11px] mt-0.5 truncate">{sub}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-            )}
+                <span className="w-11 h-11 rounded-2xl bg-violet-500/10 ring-1 ring-violet-400/20 grid place-items-center">
+                  <Share2 className="h-[22px] w-[22px] text-violet-300" />
+                </span>
+                <span className="text-white text-[12px] font-semibold leading-tight text-center">
+                  Attestation
+                </span>
+              </button>
 
-            {/* ④ Ma Carte Membre */}
-            <div>
-              <p className="text-white/40 text-[11px] font-semibold uppercase tracking-wider px-1 mb-2">
-                {/* Neutral wording: this section is shown to whoever scans, not
-                    only to the holder, and "Ma carte" read wrong to a buyer
-                    inspecting someone else's card. */}
-                Cette carte
-              </p>
-              <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setActiveView('identity')}
-                    className="group vfp-card rounded-2xl p-4 flex items-center gap-3 text-left border border-[var(--vfp-accent)]/15 active:scale-95 transition-transform"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--vfp-accent)]/20 to-[var(--vfp-accent)]/5 flex items-center justify-center shrink-0 group-active:scale-90 transition-transform">
-                      <Shield className="h-5 w-5 text-[var(--vfp-accent-bright)]" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-white text-sm font-semibold leading-tight">Vérification</p>
-                      <p className="text-white/30 text-[10px] mt-0.5">Détails carte</p>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveView('technicien')}
-                    className="group vfp-card rounded-2xl p-4 flex items-center gap-3 text-left border border-teal-400/15 active:scale-95 transition-transform"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500/20 to-teal-700/5 flex items-center justify-center shrink-0 group-active:scale-90 transition-transform">
-                      <PhoneCall className="h-5 w-5 text-teal-300" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-white text-sm font-semibold leading-tight">Technicien</p>
-                      <p className="text-white/30 text-[10px] mt-0.5">Appel & WhatsApp</p>
-                    </div>
-                  </button>
-                </div>
-                {/* Attestation — full width, prominent */}
-                <button
-                  type="button"
-                  onClick={handleAttestation}
-                  className="w-full group vfp-card rounded-2xl p-4 flex items-center justify-between border border-violet-400/15 active:scale-[0.98] transition-transform"
+              {privateLocked && (
+                <Link
+                  href={`/auth/login?redirect=${encodeURIComponent(`/verify/${cardNumber}`)}`}
+                  className="vfp-card rounded-2xl py-3 px-1.5 min-h-[78px] flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/20 to-violet-700/5 flex items-center justify-center shrink-0 group-active:scale-90 transition-transform">
-                      <Share2 className="h-5 w-5 text-violet-300" />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-white text-sm font-semibold leading-tight">
-                        Mon Attestation
-                      </p>
-                      <p className="text-white/30 text-[10px] mt-0.5">
-                        Télécharger le PDF officiel
-                      </p>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-violet-300/50 shrink-0" />
-                </button>
-              </div>
+                  <span className="w-11 h-11 rounded-2xl bg-white/[0.06] ring-1 ring-white/10 grid place-items-center">
+                    <Lock className="h-[22px] w-[22px] text-white/45" />
+                  </span>
+                  <span className="text-white/70 text-[12px] font-semibold leading-tight text-center">
+                    Se connecter
+                  </span>
+                </Link>
+              )}
             </div>
           </section>
         )}
@@ -1318,6 +1156,9 @@ export default function VerifyCardPage() {
               <ArrowLeft className="h-4 w-4" /> Retour
             </button>
             <h3 className="text-white text-lg font-bold">Vérification d&apos;Identité</h3>
+            {result.card && (
+              <Card3D member={result.member} card={result.card} cooperative={result.cooperative} />
+            )}
             <div className="vfp-card rounded-2xl p-5 space-y-4">
               <div className="flex items-center gap-4">
                 <div className="w-20 h-20 rounded-full overflow-hidden border-[3px] border-[var(--vfp-accent)]/40">
