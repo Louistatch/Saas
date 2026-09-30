@@ -6,6 +6,25 @@ import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 const log = createLogger('api:fiches:access')
 
 /**
+ * Les fichiers sont dans un bucket PRIVÉ : seule une URL signée, émise ici
+ * après contrôle d'accès, permet de les télécharger. Validité une heure.
+ */
+async function signFiles(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  files: { name: string; url: string; type: string }[],
+) {
+  return Promise.all(
+    files.map(async (f) => {
+      const path = f.url.includes('/storage/') ? f.url.split('/fiches-techniques/')[1] : f.url
+      if (!path) return { name: f.name, type: f.type, url: '' }
+      const { data } = await supabase.storage.from('fiches-techniques').createSignedUrl(path, 3600)
+      return { name: f.name, type: f.type, url: data?.signedUrl ?? '' }
+    }),
+  )
+}
+
+
+/**
  * POST /api/fiches/[id]/access
  * Check if a user has access to download a fiche.
  * - Members (card_number) → free access (fiches are locality-based, any valid member gets access)
@@ -32,10 +51,9 @@ export async function POST(
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
 
-  // Validate inputs
-  if (!body.card_number && !body.purchase_id) {
-    return NextResponse.json({ error: 'card_number ou purchase_id requis' }, { status: 400 })
-  }
+  // Pas de garde « card_number ou purchase_id requis » ici : une fiche
+  // gratuite s'ouvre sans l'un ni l'autre, et la gratuité ne se connaît
+  // qu'après avoir lu la fiche. La garde est donc déplacée plus bas.
 
   try {
     const supabase = await createClient()
@@ -50,6 +68,33 @@ export async function POST(
 
     if (ficheError || !fiche) {
       return NextResponse.json({ error: 'Fiche non trouvée' }, { status: 404 })
+    }
+
+    // Gratuit au lancement : un prix nul vaut accès libre, sans carte ni achat.
+    // Le choix est porté par la DONNÉE (price_non_member), pas par une variable
+    // d'environnement : la gratuité se lève fiche par fiche le jour où la vente
+    // démarre, sans redéploiement et sans code mort à retirer.
+    if ((fiche.price_non_member ?? 0) <= 0) {
+      const { error: rpcError } = await supabase.rpc('increment_download_count', {
+        target_fiche_id: ficheId,
+      })
+      if (rpcError) {
+        await supabase
+          .from('fiches_techniques')
+          .update({ download_count: (fiche.download_count ?? 0) + 1 })
+          .eq('id', ficheId)
+      }
+      return NextResponse.json({
+        access: 'granted',
+        reason: 'free',
+        fiche: { id: fiche.id, title: fiche.title, culture: fiche.culture },
+        files: await signFiles(supabase, (fiche.files as never) ?? []),
+      })
+    }
+
+    // Au-delà d'ici, une fiche est payante : il faut une carte ou un achat.
+    if (!body.card_number && !body.purchase_id) {
+      return NextResponse.json({ error: 'card_number ou purchase_id requis' }, { status: 400 })
     }
 
     // Check access: MEMBER (free) — fiches are locality-based
@@ -97,20 +142,7 @@ export async function POST(
             .eq('id', ficheId)
         }
 
-        // Generate signed URLs for files
-        const files = (fiche.files as { name: string; url: string; type: string }[]) ?? []
-        const signedFiles = await Promise.all(
-          files.map(async (f) => {
-            const path = f.url.includes('/storage/')
-              ? f.url.split('/fiches-techniques/')[1]
-              : f.url
-            if (!path) return { name: f.name, type: f.type, url: '' }
-            const { data } = await supabase.storage
-              .from('fiches-techniques')
-              .createSignedUrl(path, 3600) // 1 hour
-            return { name: f.name, type: f.type, url: data?.signedUrl ?? '' }
-          }),
-        )
+        const signedFiles = await signFiles(supabase, (fiche.files as never) ?? [])
 
         return NextResponse.json({
           access: 'granted',
@@ -141,20 +173,7 @@ export async function POST(
         return NextResponse.json({ error: 'Achat non trouvé ou paiement en attente' }, { status: 403 })
       }
 
-      // Generate signed URLs
-      const files = (fiche.files as { name: string; url: string; type: string }[]) ?? []
-      const signedFiles = await Promise.all(
-        files.map(async (f) => {
-          const path = f.url.includes('/storage/')
-            ? f.url.split('/fiches-techniques/')[1]
-            : f.url
-          if (!path) return { name: f.name, type: f.type, url: '' }
-          const { data } = await supabase.storage
-            .from('fiches-techniques')
-            .createSignedUrl(path, 3600)
-          return { name: f.name, type: f.type, url: data?.signedUrl ?? '' }
-        }),
-      )
+      const signedFiles = await signFiles(supabase, (fiche.files as never) ?? [])
 
       return NextResponse.json({
         access: 'granted',
