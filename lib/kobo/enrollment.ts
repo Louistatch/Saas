@@ -341,7 +341,14 @@ export async function enrollNewMemberFromSubmission(
       if (faceUrl && faceUrl !== photoUrl) {
         supabase
           .from('members')
-          .update({ photo_url: faceUrl, updated_at: new Date().toISOString() })
+          .update({
+            photo_url: faceUrl,
+            // Keep the source. Without it a later change of crop geometry can
+            // only re-crop the crop — which is exactly how the 1:1 → 7:9 switch
+            // left every existing photo unrepairable.
+            photo_original_url: photoUrl,
+            updated_at: new Date().toISOString(),
+          })
           .eq('id', newMember.id)
           .then(({ error }) => {
             if (error) log.warn('Face-crop photo_url update failed', { error: error.message })

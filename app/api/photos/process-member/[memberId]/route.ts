@@ -30,7 +30,7 @@ export async function POST(
 
   const { data: member, error } = await supabase
     .from('members')
-    .select('photo_url')
+    .select('photo_url, photo_original_url')
     .eq('id', memberId)
     .single()
 
@@ -38,14 +38,23 @@ export async function POST(
     return NextResponse.json({ error: 'Membre introuvable ou sans photo' }, { status: 404 })
   }
 
-  const faceUrl = await processPhotoFaceCrop(member.photo_url, memberId)
+  // Recadrer depuis l'ORIGINAL quand il existe : repartir du recadrage déjà
+  // fait ne peut que perdre de l'information. `force` permet de reprendre une
+  // photo déjà nommée -face.jpg, ce qui est le cas de toutes celles d'avant le
+  // passage en 7:9.
+  const source = member.photo_original_url ?? member.photo_url
+  const faceUrl = await processPhotoFaceCrop(source, memberId, { force: true })
   if (!faceUrl) {
     return NextResponse.json({ error: 'Traitement échoué' }, { status: 500 })
   }
 
   await supabase
     .from('members')
-    .update({ photo_url: faceUrl, updated_at: new Date().toISOString() })
+    .update({
+      photo_url: faceUrl,
+      photo_original_url: member.photo_original_url ?? member.photo_url,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', memberId)
 
   return NextResponse.json({ url: faceUrl })
