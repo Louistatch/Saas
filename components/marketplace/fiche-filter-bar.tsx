@@ -6,16 +6,20 @@ import { Button } from '@/components/ui/button'
 import { Search, X, SlidersHorizontal } from 'lucide-react'
 import { useState } from 'react'
 import type { MarketplaceFilters } from '@/hooks/use-marketplace-filters'
+import {
+  TYPE_AGRICULTURE_KEYS,
+  TYPES_AGRICULTURE as TYPES_AGRICULTURE_LABELS,
+} from '@/lib/fiches/types'
 
-const TYPES_AGRICULTURE = [
-  { value: 'conventionnel', label: 'Conventionnel' },
-  { value: 'biologique', label: 'Biologique' },
-  { value: 'agroforesterie', label: 'Agroforesterie' },
-  { value: 'maraîchage', label: 'Maraîchage' },
-  { value: 'élevage', label: 'Élevage' },
-  { value: 'pisciculture', label: 'Pisciculture' },
-  { value: 'autre', label: 'Autre' },
-]
+// Ce filtre portait sa PROPRE liste, différente de celle du formulaire de
+// dépôt : l'acheteur cherchait dans un vocabulaire que le vendeur n'écrivait
+// pas. Filtrer sur « biologique » ne remontait rien, et aucune erreur ne le
+// signalait — juste zéro résultat, indistinguable d'un catalogue vide.
+// Une seule source, partagée avec le formulaire et la validation de l'API.
+const TYPES_AGRICULTURE = TYPE_AGRICULTURE_KEYS.map((value) => ({
+  value,
+  label: TYPES_AGRICULTURE_LABELS[value],
+}))
 
 interface FicheFilterBarProps {
   filters: MarketplaceFilters

@@ -101,16 +101,20 @@ const createFicheSchema = z.object({
   status: z.enum(['draft', 'published']).default('published'),
 })
 
-/**
- * POST /api/fiches — dépose une fiche technique.
- *
- * Réservé au super_admin : c'est aujourd'hui la seule personne qui produit ces
- * fichiers. Le jour où les coopératives déposeront les leurs, c'est ce garde
- * qu'il faudra ouvrir, et lui seul.
- */
+/** POST /api/fiches — dépose une fiche technique. */
 export async function POST(request: NextRequest) {
-  const guard = await assertRole('super_admin')
+  // Même règle qu'au stockage (fonction SQL can_upload_fiches) et qu'à l'écran
+  // /dashboard/marketplace : super_admin, ou admin d'une faîtière. Trois
+  // endroits, une seule règle — c'est ce qui évite qu'un dépôt passe ici pour
+  // échouer plus loin sans message.
+  const guard = await assertRole('cooperative_admin')
   if (!guard.ok) return guard.response
+  if (guard.ctx.role !== 'super_admin' && guard.ctx.cooperativeLevel !== 'faitiere') {
+    return NextResponse.json(
+      { error: 'Seules les faîtières peuvent déposer des fiches techniques.' },
+      { status: 403 },
+    )
+  }
 
   let raw: unknown
   try {

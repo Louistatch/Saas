@@ -37,6 +37,11 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { PaginationBar } from '@/components/shared/pagination'
 import { useConfirm } from '@/components/shared/confirm-dialog'
+import {
+  TYPE_AGRICULTURE_KEYS,
+  TYPES_AGRICULTURE as TYPES_AGRICULTURE_LABELS,
+  labelTypeAgriculture,
+} from '@/lib/fiches/types'
 import { errorMessage } from '@/lib/utils/errors'
 import { useCascadingLocations } from '@/hooks/use-cascading-locations'
 import { useResetPageOnChange } from '@/hooks/use-reset-page'
@@ -94,15 +99,19 @@ type PrefectureMap = Record<string, CantonMap>
 type RegionTree = Record<string, PrefectureMap>
 
 const PAGE_SIZE = 15
-const TYPES_AGRICULTURE = [
-  { value: 'conventionnel', label: 'Conventionnel' },
-  { value: 'biologique', label: 'Biologique' },
-  { value: 'agroforesterie', label: 'Agroforesterie' },
-  { value: 'maraîchage', label: 'Maraîchage' },
-  { value: 'élevage', label: 'Élevage' },
-  { value: 'pisciculture', label: 'Pisciculture' },
-  { value: 'autre', label: 'Autre' },
-]
+// Trois systèmes de production, et rien d'autre.
+//
+// La liste précédente en mélangeait trois : des systèmes (conventionnel,
+// biologique, agroforesterie), des FILIÈRES (maraîchage, élevage,
+// pisciculture) et un « autre » fourre-tout. Un acheteur qui filtre sur
+// « agroécologique » ne pouvait donc rien trouver, et deux fiches identiques
+// pouvaient être classées l'une en « biologique » l'autre en « maraîchage ».
+// Le vocabulaire vit désormais dans lib/fiches/types, partagé par le
+// formulaire, le filtre acheteur et la validation de l'API.
+const TYPES_AGRICULTURE = TYPE_AGRICULTURE_KEYS.map((value) => ({
+  value,
+  label: TYPES_AGRICULTURE_LABELS[value],
+}))
 
 const FILE_ICON: Record<string, string> = {
   xlsx: '📊',
@@ -163,7 +172,7 @@ export default function MarketplacePage() {
     title: '',
     description: '',
     culture: '',
-    type_agriculture: 'maraîchage',
+    type_agriculture: 'agroecologique',
     campaign: '',
     price_non_member: 500,
   })
@@ -452,7 +461,7 @@ export default function MarketplacePage() {
       title: '',
       description: '',
       culture: '',
-      type_agriculture: 'maraîchage',
+      type_agriculture: 'agroecologique',
       campaign: '',
       price_non_member: 500,
     })
@@ -735,7 +744,7 @@ export default function MarketplacePage() {
                                                       )}
                                                     </div>
                                                     <p className="text-xs text-muted-foreground mt-0.5">
-                                                      {fiche.culture} · {fiche.type_agriculture}
+                                                      {fiche.culture} · {labelTypeAgriculture(fiche.type_agriculture)}
                                                       {fiche.campaign
                                                         ? ` · Campagne ${fiche.campaign}`
                                                         : ''}
@@ -841,7 +850,7 @@ export default function MarketplacePage() {
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground mt-0.5">
-                          {fiche.culture} • {fiche.type_agriculture}
+                          {fiche.culture} • {labelTypeAgriculture(fiche.type_agriculture)}
                           {fiche.campaign ? ` • ${fiche.campaign}` : ''}
                         </p>
                         <div className="flex flex-wrap gap-2 mt-2">
