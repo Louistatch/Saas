@@ -68,7 +68,6 @@ function SVGSparkline({ values, trend }: { values: number[]; trend: string }) {
 }
 
 interface Props {
-  onBack?: () => void
   cooperativeName?: string
   cardNumber?: string
   memberLocality?: {
@@ -84,7 +83,7 @@ interface Props {
 const ALL_REGIONS = Region.all()
 const ALL_CULTURES = Culture.all()
 
-export function MarketPricesDashboard({ onBack, cardNumber, memberLocality }: Props) {
+export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
   // One service instance per mount; aborts in-flight requests on unmount.
   const serviceRef = useRef<MarketPricesService>(new MarketPricesService())
   useEffect(() => () => serviceRef.current.dispose(), [])
@@ -93,6 +92,7 @@ export function MarketPricesDashboard({ onBack, cardNumber, memberLocality }: Pr
   const [selectedPrefectureId, setSelectedPrefectureId] = useState('')
   const [selectedCantonId, setSelectedCantonId] = useState('')
   const [cultureFilter, setCultureFilter] = useState<string | null>(null)
+  const [priceTypeFilter, setPriceTypeFilter] = useState<'all' | 'wholesale' | 'retail'>('all')
 
   const [prefectures, setPrefectures] = useState<LocationOption[]>([])
   const [cantons, setCantons] = useState<LocationOption[]>([])
@@ -117,10 +117,23 @@ export function MarketPricesDashboard({ onBack, cardNumber, memberLocality }: Pr
 
   const pricesByCulture = useMemo(() => MarketPrice.groupValuesByCulture(prices), [prices])
 
-  const visiblePrices = useMemo(
-    () => (cultureFilter ? prices.filter((p) => p.cultureId === cultureFilter) : prices),
-    [prices, cultureFilter],
+  // Le filtre gros/détail n'apparaît QUE si les deux coexistent réellement.
+  // Avant l'ingestion CPC tout est `unknown` : afficher un sélecteur sans objet
+  // encombrerait l'écran d'un choix qui ne change rien.
+  const hasBothPriceTypes = useMemo(
+    () =>
+      prices.some((p) => p.priceType === 'wholesale') &&
+      prices.some((p) => p.priceType === 'retail'),
+    [prices],
   )
+
+  const visiblePrices = useMemo(() => {
+    let list = cultureFilter ? prices.filter((p) => p.cultureId === cultureFilter) : prices
+    if (hasBothPriceTypes && priceTypeFilter !== 'all') {
+      list = list.filter((p) => p.priceType === priceTypeFilter)
+    }
+    return list
+  }, [prices, cultureFilter, hasBothPriceTypes, priceTypeFilter])
 
   // Pre-select the member's own region on mount.
   useEffect(() => {
@@ -244,24 +257,10 @@ export function MarketPricesDashboard({ onBack, cardNumber, memberLocality }: Pr
 
   return (
     <div className="space-y-4">
-      {/* Back */}
-      <button
-        type="button"
-        onClick={onBack}
-        className="flex items-center gap-2 text-[var(--vfp-accent)] text-sm font-medium active:opacity-70"
-      >
-        <svg
-          aria-hidden="true"
-          className="h-4 w-4"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        Retour au menu
-      </button>
+      {/* Un second bouton « Retour au menu » s'empilait sous celui de la page
+          verify — et il était MORT : la page ne passe pas `onBack`, donc le
+          clic ne faisait rien. Bouton et prop supprimés, la page pilote le
+          retour. */}
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -364,6 +363,31 @@ export function MarketPricesDashboard({ onBack, cardNumber, memberLocality }: Pr
         </div>
       )}
 
+      {hasBothPriceTypes && (
+        <div className="flex items-center gap-1.5">
+          {(
+            [
+              ['all', 'Tous'],
+              ['retail', 'Détail'],
+              ['wholesale', 'Gros'],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setPriceTypeFilter(value)}
+              className={`flex-1 rounded-xl px-3 py-2 text-[12.5px] font-semibold transition-colors ${
+                priceTypeFilter === value
+                  ? 'bg-[var(--vfp-accent)]/15 text-[var(--vfp-accent)] ring-1 ring-[var(--vfp-accent)]/30'
+                  : 'bg-white/[0.04] text-white/50'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Avertissement global : quand MÊME le relevé le plus récent est vieux,
           la liste entière est une archive. Le dire une fois en haut vaut mieux
           que de laisser l'utilisateur additionner lui-même les mentions
@@ -410,6 +434,15 @@ export function MarketPricesDashboard({ onBack, cardNumber, memberLocality }: Pr
                           <span className="text-xs font-semibold text-white truncate">
                             {p.cultureName}
                           </span>
+                          {/* Le badge n'apparaît que quand la distinction est
+                              réelle : sans lui, deux lignes « Maïs — Kara »
+                              affichant des prix différents passeraient pour une
+                              incohérence de la base. */}
+                          {p.priceTypeLabel && (
+                            <span className="shrink-0 rounded px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide bg-white/[0.07] text-white/55">
+                              {p.priceTypeLabel}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-3 py-2.5 hidden sm:table-cell">

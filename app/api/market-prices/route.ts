@@ -96,17 +96,30 @@ export async function GET(request: NextRequest) {
     })
   }
 
-  // Default: return market prices
-  let query = supabase
-    .from('market_prices')
-    .select('id, culture_id, region_id, market_name, price, unit, currency, trend, verified, created_at, cultures(name), regions(name)')
-    .order('created_at', { ascending: false })
+  // Default: return market prices.
+  //
+  // `price_type` (gros / détail) n'existe qu'une fois la migration CPC
+  // d'AgriTogo appliquée. PostgREST répond 42703 sur une colonne inconnue, ce
+  // qui casserait toute la page Marchés — on tente donc avec, et on retombe
+  // sans. La seconde branche disparaîtra une fois la migration en place.
+  const BASE_COLUMNS =
+    'id, culture_id, region_id, market_name, price, unit, currency, trend, verified, created_at, cultures(name), regions(name)'
 
-  if (regionId) query = query.eq('region_id', regionId)
-  if (cultureId) query = query.eq('culture_id', cultureId)
-  if (cantonId) query = query.eq('canton_id', cantonId)
+  const runQuery = async (columns: string) => {
+    let q = supabase
+      .from('market_prices')
+      .select(columns)
+      .order('created_at', { ascending: false })
+    if (regionId) q = q.eq('region_id', regionId)
+    if (cultureId) q = q.eq('culture_id', cultureId)
+    if (cantonId) q = q.eq('canton_id', cantonId)
+    return q.limit(200)
+  }
 
-  const { data, error } = await query.limit(200)
+  let { data, error } = await runQuery(`${BASE_COLUMNS}, price_type`)
+  if (error?.code === '42703') {
+    ;({ data, error } = await runQuery(BASE_COLUMNS))
+  }
 
   if (error) {
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })

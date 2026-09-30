@@ -87,19 +87,33 @@ async function handlePrix(parsed: ParsedQuery): Promise<ActionResult | null> {
     }
   }
 
-  // Build query
-  let query = supabase
-    .from('market_prices')
-    .select('market_name, price, created_at')
-    .eq('culture_id', culture.id)
-    .order('created_at', { ascending: false })
-    .limit(20)
-
-  if (parsed.marche) {
-    query = query.ilike('market_name', `%${parsed.marche}%`)
+  // `price_type` n'existe qu'une fois la migration CPC appliquée : PostgREST
+  // répond 42703 sur une colonne inconnue, ce qui ferait échouer toute réponse
+  // sur les prix. On tente avec, on retombe sans.
+  // Le select dynamique fait perdre l'inférence de supabase-js : on redonne la
+  // forme de la ligne explicitement plutôt que de manipuler un `any`.
+  interface PriceRow {
+    market_name: string
+    price: number
+    created_at: string
+    price_type?: string | null
   }
+  const buildQuery = (columns: string) => {
+    let q = supabase
+      .from('market_prices')
+      .select(columns)
+      .eq('culture_id', culture.id)
+      .order('created_at', { ascending: false })
+      .limit(20)
+    if (parsed.marche) q = q.ilike('market_name', `%${parsed.marche}%`)
+    return q.returns<PriceRow[]>()
+  }
+  const BASE = 'market_name, price, created_at'
 
-  const { data: prices } = await query
+  let { data: prices, error: pricesError } = await buildQuery(`${BASE}, price_type`)
+  if (pricesError?.code === '42703') {
+    ;({ data: prices } = await buildQuery(BASE))
+  }
 
   if (!prices || prices.length === 0) {
     const suffix = parsed.marche ? ` au marché de ${parsed.marche}` : ''
@@ -110,10 +124,17 @@ async function handlePrix(parsed: ParsedQuery): Promise<ActionResult | null> {
   }
 
   // Group by market, get latest per market
+  // Regrouper par marché ET par type : le CPC publie un prix de gros et un
+  // prix de détail pour le même produit au même marché. Avec le marché seul
+  // comme clé, l'un écrasait silencieusement l'autre — l'assistant annonçait
+  // un prix au hasard entre les deux.
+  const typeLabel = (t: unknown) =>
+    t === 'wholesale' ? ' (gros)' : t === 'retail' ? ' (détail)' : ''
   const byMarket = new Map<string, { price: number; date: string; ageDays: number }>()
   for (const p of prices) {
-    if (!byMarket.has(p.market_name)) {
-      byMarket.set(p.market_name, {
+    const key = `${p.market_name}${typeLabel(p.price_type)}`
+    if (!byMarket.has(key)) {
+      byMarket.set(key, {
         price: Number(p.price),
         date: new Date(p.created_at).toLocaleDateString('fr-FR'),
         ageDays: Math.floor((Date.now() - Date.parse(p.created_at)) / 86_400_000),

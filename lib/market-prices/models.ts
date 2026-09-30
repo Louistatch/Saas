@@ -84,6 +84,15 @@ export interface LocationOption {
 
 export type PriceTrend = 'up' | 'down' | 'stable'
 
+/**
+ * Valeurs écrites par le pipeline d'ingestion CPC d'AgriTogo
+ * (app/ingestion/cpc.py) : le CPC publie séparément le prix de gros et le prix
+ * de détail. Sans cette dimension, `market_prices` porte DEUX lignes par
+ * culture et par marché, et un tableau qui les mélange affiche deux prix
+ * contradictoires pour le même maïs au même endroit.
+ */
+export type PriceType = 'wholesale' | 'retail' | 'unknown'
+
 export interface MarketPriceRow {
   id: string
   culture_id: string
@@ -92,6 +101,8 @@ export interface MarketPriceRow {
   trend: string
   verified: boolean
   created_at: string
+  /** Absent tant que la migration CPC n'est pas appliquée — d'où l'optionalité. */
+  price_type?: string | null
   cultures: { name: string } | null
 }
 
@@ -132,6 +143,23 @@ export class MarketPrice {
 
   get trend(): PriceTrend {
     return (this.row.trend as PriceTrend) ?? 'stable'
+  }
+
+  get priceType(): PriceType {
+    const t = this.row.price_type
+    return t === 'wholesale' || t === 'retail' ? t : 'unknown'
+  }
+
+  /**
+   * Libellé destiné à un producteur, pas à un économiste. « Gros » est le prix
+   * auquel il VEND sa récolte ; « Détail » celui que paie le consommateur au
+   * marché. Les deux sont utiles, mais les confondre fait croire à une marge
+   * qui n'existe pas.
+   */
+  get priceTypeLabel(): string {
+    if (this.priceType === 'wholesale') return 'Gros'
+    if (this.priceType === 'retail') return 'Détail'
+    return ''
   }
 
   /** Âge du relevé, en jours. */
