@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
   // qui casserait toute la page Marchés — on tente donc avec, et on retombe
   // sans. La seconde branche disparaîtra une fois la migration en place.
   const BASE_COLUMNS =
-    'id, culture_id, region_id, market_name, price, unit, currency, trend, verified, created_at, cultures(name), regions(name)'
+    'id, culture_id, region_id, market_name, price, unit, currency, trend, verified, created_at, source, cultures(name), regions(name)'
 
   const runQuery = async (columns: string) => {
     let q = supabase
@@ -113,7 +113,10 @@ export async function GET(request: NextRequest) {
     if (regionId) q = q.eq('region_id', regionId)
     if (cultureId) q = q.eq('culture_id', cultureId)
     if (cantonId) q = q.eq('canton_id', cantonId)
-    return q.limit(200)
+    // 200 ne suffisait plus : les relevés d'une source externe (CPC) sont plus
+    // anciens que les saisies manuelles et, triés par date, tombaient hors de la
+    // liste. La table fait quelques centaines de lignes ; 1000 les couvre toutes.
+    return q.limit(1000)
   }
 
   let { data, error } = await runQuery(`${BASE_COLUMNS}, price_type`)

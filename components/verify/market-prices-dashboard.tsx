@@ -475,6 +475,12 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
                         >
                           {p.freshnessLabel}
                         </span>
+                        {/* Source externe : publiée, mais pas vérifiée par la plateforme. */}
+                        {p.isExternal && !p.verified && (
+                          <span className="block text-[9.5px] leading-tight text-sky-300/70">
+                            Source {p.sourceLabel} · non vérifié
+                          </span>
+                        )}
                       </td>
                     </tr>
                   )
