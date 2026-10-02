@@ -46,6 +46,7 @@ import {
   QrCode,
   RefreshCw,
   Search,
+  KeyRound,
   Trash2,
   Users,
 } from 'lucide-react'
@@ -76,6 +77,7 @@ export default function CardsPage() {
 
   // Dialogs
   const [showGenerate, setShowGenerate] = useState(false)
+  const [issuedPin, setIssuedPin] = useState<{ card: string; pin: string } | null>(null)
   const [showBulk, setShowBulk] = useState(false)
   const [selectedMemberId, setSelectedMemberId] = useState('')
   const [selectedCoopId, setSelectedCoopId] = useState('')
@@ -444,6 +446,32 @@ export default function CardsPage() {
     fetchCards()
   }
 
+  const handleIssuePin = async (card: MemberCard) => {
+    const ok = await confirm({
+      title: 'Émettre un PIN ?',
+      description:
+        "Le PIN s'affiche une seule fois : remettez-le au titulaire avec la carte. S'il existe déjà un PIN pour cette carte, il sera remplacé.",
+      confirmLabel: 'Émettre',
+    })
+    if (!ok) return
+    try {
+      const res = await fetch('/api/cards/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ card_number: card.card_number }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { pin?: string; error?: string }
+      if (!res.ok || !data.pin) throw new Error(data.error ?? 'Échec')
+      setIssuedPin({ card: card.card_number, pin: data.pin })
+    } catch (error) {
+      toast({
+        title: "Impossible d'émettre le PIN",
+        description: errorMessage(error),
+        variant: 'destructive',
+      })
+    }
+  }
+
   const handleRevoke = async (card: MemberCard) => {
     const ok = await confirm({
       title: 'Révoquer la carte ?',
@@ -805,6 +833,18 @@ export default function CardsPage() {
                                   <Button
                                     size="sm"
                                     variant="outline"
+                                    className="border-border"
+                                    onClick={() => handleIssuePin(card)}
+                                    aria-label={`PIN ${card.card_number}`}
+                                    title="Émettre un PIN"
+                                  >
+                                    <KeyRound className="h-4 w-4" />
+                                  </Button>
+                                ) : null}
+                                {card.status === 'active' ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
                                     className="border-border text-destructive hover:bg-destructive/10"
                                     onClick={() => handleRevoke(card)}
                                     aria-label={`Revoke ${card.card_number}`}
@@ -986,6 +1026,23 @@ export default function CardsPage() {
       </Tabs>
 
       {/* Generate single card */}
+      <Dialog open={!!issuedPin} onOpenChange={(o) => !o && setIssuedPin(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>PIN de la carte {issuedPin?.card}</DialogTitle>
+            <DialogDescription>
+              Notez-le et remettez-le au titulaire. Il ne sera plus affiché.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-center text-4xl font-bold tracking-[0.4em] py-4 tabular-nums">
+            {issuedPin?.pin}
+          </p>
+          <DialogFooter>
+            <Button onClick={() => setIssuedPin(null)}>J'ai remis le PIN</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showGenerate} onOpenChange={setShowGenerate}>
         <DialogContent>
           <DialogHeader>
