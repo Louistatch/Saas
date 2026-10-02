@@ -57,6 +57,15 @@ interface AiChatProps {
   regionName?: string | null
   onBack: () => void
   suggestions?: string[]
+  /**
+   * Intégré dans une page (Conseiller marché) : pas d'en-tête ni d'accueil propres,
+   * le fil suit le défilement de la page et la saisie reste collée en bas.
+   * Par défaut (false), le composant garde son apparence autonome.
+   */
+  embedded?: boolean
+  /** Question posée depuis la page (boutons d'action) ; `id` change à chaque envoi. */
+  pendingQuestion?: { id: number; text: string } | null
+  placeholder?: string
 }
 
 // Short, concrete, everyday French. These are read by people for whom French
@@ -223,6 +232,9 @@ export function AiChat({
   regionName,
   onBack,
   suggestions = DEFAULT_SUGGESTIONS,
+  embedded = false,
+  pendingQuestion = null,
+  placeholder,
 }: AiChatProps) {
   const storageKey = `agritogo_chat_${cardNumber}`
   const [messages, setMessages] = useState<Message[]>(() => {
@@ -260,10 +272,16 @@ export function AiChat({
   // Auto-scroll
   // Défiler en bas à chaque nouveau message. `messages` est le déclencheur,
   // pas une capture — sans lui, le fil resterait figé en haut.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: messages est le déclencheur voulu
+  const endRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
+    if (embedded) {
+      // Intégré : c'est la page qui défile. On amène la dernière réponse à l'écran,
+      // sans rien faire au premier affichage (pas de saut vers le bas à l'ouverture).
+      if (messages.length > 0) endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+      return
+    }
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
-  }, [messages])
+  }, [messages, embedded])
 
   // Persist messages
   useEffect(() => {
@@ -273,10 +291,11 @@ export function AiChat({
     } catch {}
   }, [messages, storageKey])
 
-  // Focus input
+  // Focus input — pas en mode intégré : ouvrir le clavier à l'arrivée sur la page
+  // masquerait la moitié de l'écran sur téléphone.
   useEffect(() => {
-    inputRef.current?.focus()
-  }, [])
+    if (!embedded) inputRef.current?.focus()
+  }, [embedded])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -344,6 +363,14 @@ export function AiChat({
     if (t) sendMessage(t)
   }, [input, sendMessage])
   const sendText = useCallback((t: string) => sendMessage(t), [sendMessage])
+
+  // Question envoyée depuis la page (bouton « Quand vendre ? », etc.).
+  const lastPendingId = useRef<number | null>(null)
+  useEffect(() => {
+    if (!pendingQuestion || pendingQuestion.id === lastPendingId.current) return
+    lastPendingId.current = pendingQuestion.id
+    sendText(pendingQuestion.text)
+  }, [pendingQuestion, sendText])
 
   // ── Legacy dictation ─────────────────────────────────────────────
 
@@ -610,8 +637,12 @@ export function AiChat({
 
   return (
     <div
-      className="relative flex flex-col h-full min-h-[420px] max-h-[calc(100dvh-120px)] rounded-[20px] overflow-hidden"
-      style={{ background: '#06150e', border: '1px solid rgba(255,255,255,.07)' }}
+      className={
+        embedded
+          ? 'relative flex flex-col'
+          : 'relative flex flex-col h-full min-h-[420px] max-h-[calc(100dvh-120px)] rounded-[20px] overflow-hidden'
+      }
+      style={embedded ? undefined : { background: '#06150e', border: '1px solid rgba(255,255,255,.07)' }}
     >
       {/* ── VOICE MODE OVERLAY ─────────────────────────────────────── */}
       {voiceMode && (
@@ -623,6 +654,8 @@ export function AiChat({
         />
       )}
 
+      {!embedded && (
+        <>
       {/* ── HEADER ─────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.06]">
         <button
@@ -665,9 +698,15 @@ export function AiChat({
         )}
       </div>
 
+        </>
+      )}
+
       {/* ── MESSAGES AREA ──────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3" ref={scrollRef}>
-        {messages.length === 0 && (
+      <div
+        className={embedded ? 'flex flex-col gap-4 py-2' : 'flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3'}
+        ref={scrollRef}
+      >
+        {!embedded && messages.length === 0 && (
           <div className="flex flex-col gap-6 pt-2" style={{ animation: 'chat-fade-up 0.3s ease both' }}>
             <div>
               <p className="text-[26px] font-semibold text-white leading-tight">
@@ -777,10 +816,19 @@ export function AiChat({
             <span>{photoLoading ? 'J’examine la photo…' : 'Je cherche dans vos données…'}</span>
           </div>
         )}
+        <div ref={endRef} />
       </div>
 
       {/* ── INPUT BAR ──────────────────────────────────────────────── */}
-      <div className="flex gap-2.5 px-4 pt-3 pb-4 items-center">
+      <div
+        className={
+          embedded
+            ? // Collée en bas de l'écran, au-dessus du clavier (dvh + safe-area) ; le fond
+              // masque le contenu qui défile dessous.
+              'sticky bottom-0 z-20 -mx-4 flex gap-2.5 px-4 pt-3 items-center bg-[#06150e]/95 backdrop-blur-sm border-t border-white/[0.06] pb-[max(16px,env(safe-area-inset-bottom))]'
+            : 'flex gap-2.5 px-4 pt-3 pb-4 items-center'
+        }
+      >
         <input
           ref={photoInputRef}
           type="file"
@@ -792,13 +840,20 @@ export function AiChat({
             if (f) handlePhoto(f)
           }}
         />
-        <div className="flex-1 flex items-center gap-1 rounded-full border border-white/[0.10] bg-white/[0.06] pl-4 pr-2 min-h-[50px] focus-within:border-emerald-400/40">
+        <div className="flex-1 min-w-0 flex items-center gap-1 rounded-full border border-white/[0.10] bg-white/[0.06] pl-4 pr-2 min-h-[50px] focus-within:border-emerald-400/40">
           <input
             ref={inputRef}
             type="text"
             // 16px minimum : en dessous, Safari iOS zoome la page au focus.
             className="flex-1 min-w-0 bg-transparent py-3 text-base text-white placeholder:text-white/40 focus:outline-none"
-            placeholder={isListening ? 'Je vous écoute…' : 'Écrivez votre question…'}
+            placeholder={isListening ? 'Je vous écoute…' : (placeholder ?? 'Écrivez votre question…')}
+            onFocus={(e) => {
+              // Clavier Android : on garde le champ visible une fois le clavier ouvert.
+              if (embedded) {
+                const el = e.currentTarget
+                setTimeout(() => el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 300)
+              }
+            }}
             value={input}
             maxLength={1000}
             onChange={(e) => setInput(e.target.value)}
