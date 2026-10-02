@@ -103,6 +103,8 @@ export interface MarketPriceRow {
   created_at: string
   /** Absent tant que la migration CPC n'est pas appliquée — d'où l'optionalité. */
   price_type?: string | null
+  /** 'manual' (saisie sur la plateforme) ou le code d'une source externe, ex. 'SIM-CPC'. */
+  source?: string | null
   cultures: { name: string } | null
 }
 
@@ -195,6 +197,17 @@ export class MarketPrice {
     if (this.trend === 'up') return '↑ Hausse'
     if (this.trend === 'down') return '↓ Baisse'
     return '→ Stable'
+  }
+
+  /** Relevé issu d'une source externe (pas saisi sur la plateforme). */
+  get isExternal(): boolean {
+    return !!this.row.source && this.row.source !== 'manual'
+  }
+
+  /** « CPC » pour SIM-CPC : le producteur doit savoir d'où vient le chiffre. */
+  get sourceLabel(): string {
+    const code = this.row.source ?? ''
+    return code.startsWith('SIM-') ? code.slice(4) : code
   }
 
   get verified(): boolean {
