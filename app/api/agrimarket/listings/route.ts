@@ -12,7 +12,12 @@ export async function GET(request: NextRequest) {
   const cooperativeId = searchParams.get('cooperative_id')
   const memberId = searchParams.get('member_id')
   const culture = searchParams.get('culture')
-  const status = searchParams.get('status') ?? 'active'
+  // Liste blanche : un `?status=` vide ne doit pas faire sauter le filtre et
+  // renvoyer toutes les annonces, quel que soit leur état.
+  const requestedStatus = searchParams.get('status')
+  const status = ['active', 'sold', 'expired', 'cancelled'].includes(requestedStatus ?? '')
+    ? (requestedStatus as string)
+    : 'active'
   const page = Math.max(1, Number.parseInt(searchParams.get('page') ?? '1'))
   const pageSize = 50
 
@@ -27,7 +32,7 @@ export async function GET(request: NextRequest) {
       )
       .order('created_at', { ascending: false })
 
-    if (status) query = query.eq('status', status)
+    query = query.eq('status', status)
     if (cooperativeId) query = query.eq('cooperative_id', cooperativeId)
     if (memberId) query = query.eq('member_id', memberId)
     if (culture) query = query.eq('culture', culture)
@@ -66,20 +71,13 @@ export async function POST(request: NextRequest) {
     // Get user's cooperative and member record
     const { data: profile } = await supabase
       .from('profiles')
-      .select('cooperative_id')
+      .select('role, cooperative_id')
       .eq('id', user.id)
-      .single()
+      .single<{ role: string; cooperative_id: string | null }>()
 
     if (!profile?.cooperative_id) {
       return NextResponse.json({ error: 'Coopérative introuvable' }, { status: 400 })
     }
-
-    const { data: member } = await supabase
-      .from('members')
-      .select('id')
-      .eq('cooperative_id', profile.cooperative_id)
-      .limit(1)
-      .single()
 
     const body = await request.json()
     const {
@@ -90,16 +88,60 @@ export async function POST(request: NextRequest) {
       harvest_date_estimated,
       location_canton,
       description,
+      member_id: requestedMemberId,
     } = body
 
     if (!culture || !quantity_kg || !price_per_kg_fcfa) {
       return NextResponse.json({ error: 'Culture, quantité et prix sont obligatoires' }, { status: 400 })
     }
 
+    // La vente appartient à LA PERSONNE qui vend, pas au premier membre venu de
+    // la coopérative : fiche rattachée au compte par l'e-mail. Un administrateur
+    // peut vendre pour un membre de sa coopérative en le désignant.
+    const isAdmin = profile.role === 'cooperative_admin' || profile.role === 'super_admin'
+    let memberId: string | null = null
+    if (user.email) {
+      const { data: own } = await supabase
+        .from('members')
+        .select('id')
+        .eq('cooperative_id', profile.cooperative_id)
+        .ilike('email', user.email)
+        .is('deleted_at', null)
+        .limit(1)
+        .maybeSingle<{ id: string }>()
+      memberId = own?.id ?? null
+    }
+    if (isAdmin && typeof requestedMemberId === 'string') {
+      const { data: target } = await supabase
+        .from('members')
+        .select('id')
+        .eq('id', requestedMemberId)
+        .eq('cooperative_id', profile.cooperative_id)
+        .is('deleted_at', null)
+        .maybeSingle<{ id: string }>()
+      if (!target) {
+        return NextResponse.json({ error: 'Membre introuvable dans votre coopérative' }, { status: 400 })
+      }
+      memberId = target.id
+    }
+    if (!memberId) {
+      // Un administrateur peut vendre pour un membre : l'écran propose alors le choix.
+      if (isAdmin) {
+        return NextResponse.json(
+          { error: 'Choisissez le membre pour qui vous vendez.', needs_member: true },
+          { status: 409 },
+        )
+      }
+      return NextResponse.json(
+        { error: "Aucune fiche membre n'est rattachée à votre compte. Contactez votre coopérative." },
+        { status: 403 },
+      )
+    }
+
     const { data, error } = await supabase
       .from('market_listings')
       .insert({
-        member_id: member?.id ?? user.id,
+        member_id: memberId,
         cooperative_id: profile.cooperative_id,
         culture,
         quantity_kg: Number(quantity_kg),

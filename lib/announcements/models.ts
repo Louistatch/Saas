@@ -1,6 +1,6 @@
 /**
  * Object-oriented domain models for producer-side announcements
- * (job offers, pre-sales, other Haroo-related posts) created
+ * (job offers, sales and pre-sales, other needs) created
  * inline from "Mon Exploitation" in the card-verification flow.
  */
 
@@ -8,9 +8,21 @@ export type AnnouncementType = 'job' | 'prevente' | 'autre'
 
 export const ANNOUNCEMENT_TYPES: Array<{ id: AnnouncementType; label: string; emoji: string; description: string }> = [
   { id: 'job', label: "Offre d'emploi", emoji: '👷', description: 'Recruter pour vos travaux agricoles' },
-  { id: 'prevente', label: 'Prévente', emoji: '🌾', description: 'Annoncer une récolte avant maturité' },
-  { id: 'autre', label: 'Autre annonce', emoji: '📣', description: 'Tout autre besoin lié à Haroo' },
+  { id: 'prevente', label: 'Vente / prévente', emoji: '🌾', description: 'Récolte à vendre, ou à venir avant maturité' },
+  { id: 'autre', label: 'Autre annonce', emoji: '📣', description: 'Tout autre besoin' },
 ]
+
+/** Vente AgriMarket (table market_listings), créée depuis le tableau de bord. */
+export interface ListingRow {
+  id: string
+  culture: string
+  quantity_kg: number | null
+  price_per_kg_fcfa: number | null
+  quality_grade: string | null
+  harvest_date_estimated: string | null
+  status: string
+  created_at: string
+}
 
 export interface AnnouncementRow {
   id: string

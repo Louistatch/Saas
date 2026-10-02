@@ -1616,7 +1616,6 @@ export default function VerifyCardPage() {
           <PrivateCardSection cardNumber={cardNumber}>
             <ExploitationInlineView
               cardNumber={cardNumber}
-              memberId={result.member_id ?? null}
               onBack={() => setActiveView('menu')}
             />
           </PrivateCardSection>

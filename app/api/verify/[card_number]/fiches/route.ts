@@ -18,27 +18,34 @@ export async function GET(
 
   const admin = supabase
 
-  // Get the member's coop + its faitière parent
-  const { data: coop } = await admin
-    .from('cooperatives')
-    .select('id, name, parent_id, level')
-    .eq('id', card.cooperative_id)
-    .maybeSingle()
-
-  // Collect IDs: own coop + faitière parent
-  const coopIds = [card.cooperative_id]
-  if (coop?.parent_id) coopIds.push(coop.parent_id)
-
-  // Fetch faitière name for display (fiches are published by the faitière)
-  let faitiereName: string | null = null
-  if (coop?.parent_id) {
-    const { data: parent } = await admin
-      .from('cooperatives')
-      .select('name')
-      .eq('id', coop.parent_id)
-      .maybeSingle()
-    faitiereName = parent?.name ?? null
+  // La coopérative, puis toute sa chaîne d'ancêtres (union, faîtière) : les
+  // fiches sont publiées à n'importe quel niveau. Chaîne bornée à 6 niveaux, et
+  // coupée si elle boucle.
+  interface CoopNode {
+    id: string
+    name: string
+    parent_id: string | null
+    level: string | null
   }
+  const chain: CoopNode[] = []
+  let cursor: string | null = card.cooperative_id as string | null
+  while (cursor && chain.length < 6 && !chain.some((c) => c.id === cursor)) {
+    const { data: row } = await admin
+      .from('cooperatives')
+      .select('id, name, parent_id, level')
+      .eq('id', cursor)
+      .maybeSingle<CoopNode>()
+    if (!row) break
+    chain.push(row)
+    cursor = row.parent_id
+  }
+  const coop = chain[0] ?? null
+  const coopIds = chain.length ? chain.map((c) => c.id) : [card.cooperative_id]
+
+  // Qui publie : la faîtière si la chaîne en contient une, sinon le niveau
+  // juste au-dessus (ex. une union), sinon rien.
+  const publisher = chain.slice(1).find((c) => c.level === 'faitiere') ?? chain[1] ?? null
+  const faitiereName: string | null = publisher?.name ?? null
 
   const { data: fiches } = await admin
     .from('fiches_techniques')
