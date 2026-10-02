@@ -133,7 +133,16 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
     if (hasBothPriceTypes && priceTypeFilter !== 'all') {
       list = list.filter((p) => p.priceType === priceTypeFilter)
     }
-    return list
+    // Une ligne par culture / marché / type de prix : le relevé le plus récent.
+    // `prices` arrive trié du plus récent au plus ancien et garde l'historique
+    // pour les courbes (pricesByCulture) ; le tableau, lui, montre le prix actuel.
+    const latest = new Set<string>()
+    return list.filter((p) => {
+      const key = `${p.cultureId}|${p.marketName.toLowerCase()}|${p.priceType}`
+      if (latest.has(key)) return false
+      latest.add(key)
+      return true
+    })
   }, [prices, cultureFilter, hasBothPriceTypes, priceTypeFilter])
 
   // Pre-select the member's own region on mount.

@@ -105,23 +105,51 @@ export async function GET(request: NextRequest) {
   const BASE_COLUMNS =
     'id, culture_id, region_id, market_name, price, unit, currency, trend, verified, created_at, source, cultures(name), regions(name)'
 
+  // PostgREST plafonne une réponse à 1000 lignes. Les relevés d'une source
+  // externe (CPC : plusieurs milliers) dépassent ce plafond et, triés par date,
+  // ils noieraient les saisies plus anciennes. On lit donc par tranches, puis on
+  // ne garde que les quelques relevés les plus récents de chaque couple
+  // culture / marché / type de prix : de quoi afficher le prix actuel, sa
+  // tendance et sa courbe, sans renvoyer des milliers de lignes.
+  const PAGE = 1000
+  const MAX_PAGES = 6
+  const KEEP_PER_SERIES = 6
+
   const runQuery = async (columns: string) => {
-    let q = supabase
-      .from('market_prices')
-      .select(columns)
-      .order('created_at', { ascending: false })
-    if (regionId) q = q.eq('region_id', regionId)
-    if (cultureId) q = q.eq('culture_id', cultureId)
-    if (cantonId) q = q.eq('canton_id', cantonId)
-    // 200 ne suffisait plus : les relevés d'une source externe (CPC) sont plus
-    // anciens que les saisies manuelles et, triés par date, tombaient hors de la
-    // liste. La table fait quelques centaines de lignes ; 1000 les couvre toutes.
-    return q.limit(1000)
+    const rows: Record<string, unknown>[] = []
+    for (let page = 0; page < MAX_PAGES; page++) {
+      let q = supabase
+        .from('market_prices')
+        .select(columns)
+        .order('created_at', { ascending: false })
+      if (regionId) q = q.eq('region_id', regionId)
+      if (cultureId) q = q.eq('culture_id', cultureId)
+      if (cantonId) q = q.eq('canton_id', cantonId)
+      const { data: chunk, error: chunkError } = await q.range(page * PAGE, page * PAGE + PAGE - 1)
+      if (chunkError) return { data: null, error: chunkError }
+      const got = (chunk ?? []) as unknown as Record<string, unknown>[]
+      rows.push(...got)
+      if (got.length < PAGE) break
+    }
+    const seen = new Map<string, number>()
+    const kept = rows.filter((row) => {
+      const key = `${row.culture_id}|${String(row.market_name ?? '').toLowerCase()}|${row.price_type ?? ''}`
+      const n = seen.get(key) ?? 0
+      seen.set(key, n + 1)
+      return n < KEEP_PER_SERIES
+    })
+    return { data: kept, error: null }
   }
 
-  let { data, error } = await runQuery(`${BASE_COLUMNS}, price_type`)
+  let { data, error } = (await runQuery(`${BASE_COLUMNS}, price_type`)) as {
+    data: unknown[] | null
+    error: { code?: string } | null
+  }
   if (error?.code === '42703') {
-    ;({ data, error } = await runQuery(BASE_COLUMNS))
+    ;({ data, error } = (await runQuery(BASE_COLUMNS)) as {
+      data: unknown[] | null
+      error: { code?: string } | null
+    })
   }
 
   if (error) {
