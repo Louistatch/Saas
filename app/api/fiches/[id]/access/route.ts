@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
+import { requirePrivateCard } from '@/lib/security/card-access'
 import { createClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/utils/logger'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
@@ -105,26 +106,23 @@ export async function POST(
         return NextResponse.json({ error: 'Numéro de carte invalide' }, { status: 400 })
       }
 
-      const { data: card } = await supabase
-        .from('member_cards')
-        .select('id, member_id, cooperative_id, expiry_date')
-        .eq('card_number', cardNumber)
-        .eq('status', 'active')
-        .single()
-
-      if (!card) {
-        return NextResponse.json({ error: 'Carte invalide ou expirée' }, { status: 403 })
+      // Le numéro de carte est PUBLIC (QR, page de scan) : il ne prouve pas que
+      // l'on tient la carte. Une fiche payante exige donc un compte connecté ou
+      // une session de carte (PIN / code SMS) — requirePrivateCard les contrôle
+      // et vérifie aussi que la carte est active et non expirée.
+      const access = await requirePrivateCard(cardNumber)
+      if (!access.ok) {
+        return NextResponse.json(
+          { error: 'Connectez-vous avec votre carte pour télécharger cette fiche.' },
+          { status: 401 },
+        )
       }
-
-      // Check card expiry
-      if (card.expiry_date && new Date(card.expiry_date) < new Date()) {
-        return NextResponse.json({ error: 'Votre carte a expiré' }, { status: 403 })
-      }
+      const card = access.card
 
       // Fiches are locality-based: any valid member gets free access
       if (fiche.is_free_for_members) {
         // Log download
-        await supabase.from('member_access_logs').insert({
+        await access.supabase.from('member_access_logs').insert({
           card_number: cardNumber,
           member_id: card.member_id,
           cooperative_id: card.cooperative_id,

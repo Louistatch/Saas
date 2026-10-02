@@ -87,6 +87,18 @@ export async function GET(
     .eq('member_id', card.member_id)
     .order('created_at', { ascending: false })
 
+  // Ventes AgriMarket de ce membre (créées depuis le tableau de bord). Lues ici,
+  // côté serveur et cantonnées à card.member_id, pour que la connexion par carte
+  // les voie aussi : la base ne les montre qu'aux comptes connectés.
+  const { data: listings } = await supabase
+    .from('market_listings')
+    .select(
+      'id, culture, quantity_kg, price_per_kg_fcfa, quality_grade, harvest_date_estimated, status, created_at',
+    )
+    .eq('member_id', card.member_id)
+    .order('created_at', { ascending: false })
+    .limit(50)
+
   const member = await loadMember(supabase, card.member_id)
   const zone = await resolveZone(supabase, memberZoneInput(member))
 
@@ -109,6 +121,7 @@ export async function GET(
   return NextResponse.json(
     {
       announcements: announcements ?? [],
+      listings: listings ?? [],
       defaults: {
         phone: member?.phone ?? null,
         zone: { prefecture_id: zone.prefectureId, label: describeZone(zone) },

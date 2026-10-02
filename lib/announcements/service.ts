@@ -4,6 +4,7 @@ import {
   type AnnouncementRow,
   type AnnouncementType,
   EMPTY_DEFAULTS,
+  type ListingRow,
 } from './models'
 
 export interface CreateAnnouncementPayload {
@@ -20,6 +21,7 @@ export interface CreateAnnouncementPayload {
 
 export interface ListAnnouncementsResult {
   announcements: Announcement[]
+  listings: ListingRow[]
   defaults: AnnouncementDefaults
 }
 
@@ -41,7 +43,11 @@ export class AnnouncementsService {
   constructor(private readonly cardNumber: string) {}
 
   async list(): Promise<ListAnnouncementsResult> {
-    const empty: ListAnnouncementsResult = { announcements: [], defaults: EMPTY_DEFAULTS }
+    const empty: ListAnnouncementsResult = {
+      announcements: [],
+      listings: [],
+      defaults: EMPTY_DEFAULTS,
+    }
     const controller = new AbortController()
     this.controllers.add(controller)
     try {
@@ -51,10 +57,12 @@ export class AnnouncementsService {
       if (!res.ok) return empty
       const data = (await res.json()) as {
         announcements?: AnnouncementRow[]
+        listings?: ListingRow[]
         defaults?: AnnouncementDefaults
       }
       return {
         announcements: Announcement.fromRows(data.announcements ?? []),
+        listings: data.listings ?? [],
         defaults: data.defaults ?? EMPTY_DEFAULTS,
       }
     } catch {
@@ -108,6 +116,30 @@ export class AnnouncementsService {
       if (res.ok) return { ok: true, message: 'Annonce retirée du marché' }
       const data = (await res.json().catch(() => ({}))) as { error?: string }
       return { ok: false, message: data.error ?? 'Retrait impossible' }
+    } catch {
+      return { ok: false, message: 'Erreur de connexion' }
+    }
+  }
+
+  /** Clôt une vente AgriMarket : « sold » (vendue) ou « cancelled » (retirée). */
+  async closeListing(
+    id: string,
+    status: 'sold' | 'cancelled',
+  ): Promise<{ ok: boolean; message: string }> {
+    try {
+      const res = await fetch(
+        `/api/verify/${encodeURIComponent(this.cardNumber)}/listings/${encodeURIComponent(id)}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status }),
+        },
+      )
+      if (res.ok) {
+        return { ok: true, message: status === 'sold' ? 'Vente marquée comme vendue' : 'Vente retirée' }
+      }
+      const data = (await res.json().catch(() => ({}))) as { error?: string }
+      return { ok: false, message: data.error ?? 'Modification impossible' }
     } catch {
       return { ok: false, message: 'Erreur de connexion' }
     }

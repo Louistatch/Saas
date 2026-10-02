@@ -133,6 +133,10 @@ export default function AgriMarketPage() {
 
   // Dialog: new listing
   const [showAdd, setShowAdd] = useState(false)
+  // Un administrateur sans fiche membre vend POUR un membre : il le désigne.
+  const [needsMember, setNeedsMember] = useState(false)
+  const [memberChoices, setMemberChoices] = useState<{ id: string; name: string }[]>([])
+  const [chosenMemberId, setChosenMemberId] = useState('')
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
     culture: '',
@@ -225,9 +229,25 @@ export default function AgriMarketPage() {
           harvest_date_estimated: form.harvest_date_estimated || null,
           location_canton: form.location_canton || null,
           description: form.description || null,
+          member_id: chosenMemberId || undefined,
         }),
       })
       const json = await res.json()
+      if (res.status === 409 && json.needs_member && currentCooperative) {
+        const { data: rows } = await supabase
+          .from('members')
+          .select('id, first_name, last_name')
+          .eq('cooperative_id', currentCooperative.id)
+          .is('deleted_at', null)
+          .order('last_name')
+        setMemberChoices(
+          (rows ?? []).map((m) => ({
+            id: m.id as string,
+            name: `${m.first_name ?? ''} ${m.last_name ?? ''}`.trim() || 'Membre',
+          })),
+        )
+        setNeedsMember(true)
+      }
       if (!res.ok) throw new Error(json.error ?? 'Erreur')
       toast({ title: 'Annonce créée avec succès' })
       setShowAdd(false)
@@ -622,6 +642,25 @@ export default function AgriMarketPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {needsMember && (
+              <div className="space-y-2">
+                <Label>
+                  Vendre pour <span className="text-destructive">*</span>
+                </Label>
+                <select
+                  className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
+                  value={chosenMemberId}
+                  onChange={(e) => setChosenMemberId(e.target.value)}
+                >
+                  <option value="">— Choisir un membre —</option>
+                  {memberChoices.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>
                 Culture <span className="text-destructive">*</span>
