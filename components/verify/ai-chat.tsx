@@ -142,7 +142,7 @@ function VoiceModeOverlay({
         className="text-emerald-300/80 text-sm font-medium tracking-wide"
         style={{ animation: 'chat-fade-up 0.3s ease both' }}
       >
-        Mode Vocal — AgriTogo IA
+        Conversation vocale
       </p>
 
       {/* Big mic button with animated ring */}
