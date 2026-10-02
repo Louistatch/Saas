@@ -890,62 +890,204 @@ function getFollowUpSuggestions(response: string): string[] {
   return picks.slice(0, 3)
 }
 
-function renderMd(text: string) {
-  return text.split('\n').map((line, i) => {
-    const trimmed = line.trim()
-    // biome-ignore lint/suspicious/noArrayIndexKey: fragments de rendu Markdown d'un même message, régénérés ensemble à chaque rendu
-    if (!trimmed) return <br key={i} />
-    const isBullet = /^[-*•]\s+/.test(trimmed)
-    const content = isBullet ? trimmed.replace(/^[-*•]\s+/, '') : trimmed
-    const parts: React.ReactNode[] = []
-    const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g
-    let last = 0
-    let key = 0
-    const src = content
-    let match = regex.exec(src)
-    while (match !== null) {
-      if (match.index > last) parts.push(src.slice(last, match.index))
-      if (match[2])
-        parts.push(
-          <strong key={`b${i}-${key++}`} className="font-semibold text-emerald-200">
-            {match[2]}
-          </strong>,
-        )
-      else if (match[3])
-        parts.push(
-          <em key={`i${i}-${key++}`} className="italic text-emerald-300">
-            {match[3]}
-          </em>,
-        )
-      else if (match[4])
-        parts.push(
-          <code key={`c${i}-${key++}`} className="ai-inline-code">
-            {match[4]}
-          </code>,
-        )
-      last = match.index + match[0].length
-      match = regex.exec(src)
+/**
+ * Rendu des réponses (Markdown de l'agent) en éléments lisibles sur téléphone.
+ *
+ * Les réponses arrivent en Markdown : titres « ### », listes numérotées,
+ * tableaux « | … | », gras. L'ancien rendu ne traitait que le gras et les puces,
+ * si bien que le producteur voyait les symboles bruts (« ### », « |---| »).
+ * Ici chaque bloc devient son élément : un titre reste un titre court, un
+ * tableau devient une vraie grille défilable, une règle « --- » un séparateur.
+ * Aucun HTML n'est interprété : tout passe par des nœuds React (pas d'injection).
+ */
+type MdBlock =
+  | { kind: 'heading'; text: string }
+  | { kind: 'para'; text: string }
+  | { kind: 'list'; ordered: boolean; items: string[] }
+  | { kind: 'table'; header: string[]; rows: string[][] }
+  | { kind: 'quote'; text: string }
+  | { kind: 'rule' }
+
+const isTableLine = (l: string) => /^\s*\|.*\|\s*$/.test(l)
+const isTableSeparator = (l: string) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(l)
+const splitRow = (l: string) =>
+  l
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((c) => c.trim())
+
+export function parseMd(text: string): MdBlock[] {
+  const lines = text.replace(/\r\n/g, '\n').split('\n')
+  const blocks: MdBlock[] = []
+  let para: string[] = []
+  const flush = () => {
+    if (para.length) blocks.push({ kind: 'para', text: para.join(' ') })
+    para = []
+  }
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const t = line.trim()
+    if (!t) {
+      flush()
+      continue
     }
-    if (last < src.length) parts.push(src.slice(last))
-    if (isBullet)
-      return (
-        <p
-          // biome-ignore lint/suspicious/noArrayIndexKey: fragments de rendu Markdown d'un même message, régénérés ensemble à chaque rendu
-          key={i}
-          className="ai-md-li"
-        >
-          {'• '}
-          {parts}
-        </p>
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(t)) {
+      flush()
+      blocks.push({ kind: 'rule' })
+      continue
+    }
+    const h = t.match(/^#{1,6}\s+(.*)$/)
+    if (h) {
+      flush()
+      blocks.push({ kind: 'heading', text: h[1].replace(/\s*#+\s*$/, '') })
+      continue
+    }
+    if (isTableLine(t) && i + 1 < lines.length && isTableSeparator(lines[i + 1])) {
+      flush()
+      const header = splitRow(t)
+      const rows: string[][] = []
+      i += 2
+      while (i < lines.length && isTableLine(lines[i])) {
+        rows.push(splitRow(lines[i]))
+        i++
+      }
+      i--
+      blocks.push({ kind: 'table', header, rows })
+      continue
+    }
+    const ordered = t.match(/^\d+[.)]\s+(.*)$/)
+    const bullet = t.match(/^[-*•]\s+(.*)$/)
+    if (ordered || bullet) {
+      flush()
+      const isOrdered = !!ordered
+      const item = (ordered ?? bullet)?.[1] ?? ''
+      const prev = blocks[blocks.length - 1]
+      if (prev && prev.kind === 'list' && prev.ordered === isOrdered) prev.items.push(item)
+      else blocks.push({ kind: 'list', ordered: isOrdered, items: [item] })
+      continue
+    }
+    const q = t.match(/^>\s?(.*)$/)
+    if (q) {
+      flush()
+      blocks.push({ kind: 'quote', text: q[1] })
+      continue
+    }
+    // Ligne de continuation d'un élément de liste (indentée sous la puce).
+    const prev = blocks[blocks.length - 1]
+    if (!para.length && prev?.kind === 'list' && /^\s{2,}/.test(line)) {
+      prev.items[prev.items.length - 1] += ` ${t}`
+      continue
+    }
+    para.push(t)
+  }
+  flush()
+  return blocks
+}
+
+function renderInline(src: string, keyPrefix: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = []
+  const regex = /(\*\*(.+?)\*\*|__(.+?)__|\*(?!\s)(.+?)\*|`(.+?)`|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\))/g
+  let last = 0
+  let key = 0
+  let match = regex.exec(src)
+  while (match !== null) {
+    if (match.index > last) parts.push(src.slice(last, match.index))
+    const k = `${keyPrefix}-${key++}`
+    if (match[2] || match[3])
+      parts.push(
+        <strong key={k} className="font-semibold text-white">
+          {match[2] ?? match[3]}
+        </strong>,
       )
-    return (
-      <p
-        // biome-ignore lint/suspicious/noArrayIndexKey: fragments de rendu Markdown d'un même message, régénérés ensemble à chaque rendu
-        key={i}
-        className="m-0 last:mb-0 mb-1"
-      >
-        {parts}
-      </p>
-    )
-  })
+    else if (match[4]) parts.push(<em key={k}>{match[4]}</em>)
+    else if (match[5])
+      parts.push(
+        <code key={k} className="ai-inline-code">
+          {match[5]}
+        </code>,
+      )
+    else if (match[6] && match[7])
+      parts.push(
+        <a key={k} href={match[7]} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 text-emerald-300">
+          {match[6]}
+        </a>,
+      )
+    last = match.index + match[0].length
+    match = regex.exec(src)
+  }
+  if (last < src.length) parts.push(src.slice(last))
+  // Astérisques orphelins (gras non refermé) : on ne laisse pas traîner « ** ».
+  return parts.map((p) => (typeof p === 'string' ? p.replace(/\*\*/g, '') : p))
+}
+
+function renderMd(text: string) {
+  const blocks = parseMd(text)
+  return (
+    <div className="flex flex-col gap-2.5">
+      {blocks.map((b, i) => {
+        const k = `md${i}`
+        switch (b.kind) {
+          case 'heading':
+            return (
+              <p key={k} className="text-white font-semibold text-[15.5px] leading-snug mt-1.5 first:mt-0">
+                {renderInline(b.text, k)}
+              </p>
+            )
+          case 'para':
+            return <p key={k}>{renderInline(b.text, k)}</p>
+          case 'quote':
+            return (
+              <p key={k} className="border-l-2 border-white/15 pl-3 text-white/65">
+                {renderInline(b.text, k)}
+              </p>
+            )
+          case 'rule':
+            return <hr key={k} className="border-white/[0.08] my-1" />
+          case 'list': {
+            const Tag = b.ordered ? 'ol' : 'ul'
+            return (
+              <Tag key={k} className={`${b.ordered ? 'list-decimal' : 'list-disc'} pl-5 flex flex-col gap-1.5 marker:text-white/40`}>
+                {b.items.map((it, j) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: éléments d'une liste figée, régénérés ensemble
+                  <li key={j}>{renderInline(it, `${k}-${j}`)}</li>
+                ))}
+              </Tag>
+            )
+          }
+          case 'table':
+            return (
+              <div key={k} className="overflow-x-auto rounded-2xl border border-white/[0.08] bg-white/[0.045]">
+                <table className="w-full text-[13.5px] leading-snug">
+                  <thead>
+                    <tr className="text-left text-white/50">
+                      {b.header.map((c, j) => (
+                        // biome-ignore lint/suspicious/noArrayIndexKey: colonnes d'un tableau figé
+                        <th key={j} className="px-3 py-2 font-medium whitespace-nowrap">
+                          {renderInline(c, `${k}-h${j}`)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {b.rows.map((r, j) => (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: lignes d'un tableau figé
+                      <tr key={j} className="border-t border-white/[0.06]">
+                        {r.map((c, x) => (
+                          // biome-ignore lint/suspicious/noArrayIndexKey: cellules d'un tableau figé
+                          <td key={x} className={`px-3 py-2 ${x === 0 ? 'text-white' : 'text-white/80'} whitespace-nowrap`}>
+                            {renderInline(c, `${k}-${j}-${x}`)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+        }
+      })}
+    </div>
+  )
 }
