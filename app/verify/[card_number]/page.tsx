@@ -1557,6 +1557,7 @@ export default function VerifyCardPage() {
           <AiChat
             cardNumber={cardNumber}
             memberName={firstName}
+            regionName={result.member.region ?? null}
             onBack={() => setActiveView('menu')}
             suggestions={[
               result.member.region

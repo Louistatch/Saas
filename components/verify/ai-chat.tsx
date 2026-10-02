@@ -1,7 +1,21 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Send, Bot, Loader2, Mic, MicOff, Volume2, VolumeX } from 'lucide-react'
+import {
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  ArrowDownRight,
+  ArrowUpRight,
+  Camera,
+  ChevronRight,
+  Loader2,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
+} from 'lucide-react'
+import { MarketPrice, type MarketPriceRow, Region } from '@/lib/market-prices/models'
 
 /**
  * Web Speech API : absente de lib.dom.d.ts, et préfixée `webkit` sur les
@@ -39,6 +53,8 @@ interface Message {
 interface AiChatProps {
   cardNumber: string
   memberName: string
+  /** Région du membre : la carte d'accueil y montre les prix courants. */
+  regionName?: string | null
   onBack: () => void
   suggestions?: string[]
 }
@@ -59,8 +75,8 @@ type VoiceState = 'idle' | 'recording' | 'processing' | 'speaking'
 const VOICE_STATE_LABELS: Record<VoiceState, string> = {
   idle: 'Appuyez pour parler',
   recording: 'Je vous écoute…',
-  processing: 'AgriTogo réfléchit…',
-  speaking: 'AgriTogo répond…',
+  processing: 'Je cherche…',
+  speaking: 'Je réponds…',
 }
 
 const VOICE_STATE_COLORS: Record<VoiceState, string> = {
@@ -89,47 +105,6 @@ function TypingDots() {
   )
 }
 
-function EngineBadge({ engine, debate }: { engine: string; debate?: boolean }) {
-  const config =
-    engine === 'direct-data'
-      ? {
-          icon: '⚡',
-          label: 'Réponse instantanée',
-          cls: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-300/70',
-        }
-      : engine === 'agritogo-multiagent'
-        ? {
-            icon: '🧠',
-            label: 'Multi-Agent',
-            cls: 'bg-purple-500/10 border-purple-500/20 text-purple-300/70',
-          }
-        : engine === 'gemini-vision'
-          ? {
-              icon: '📷',
-              label: 'Analyse photo',
-              cls: 'bg-blue-500/10 border-blue-500/20 text-blue-300/70',
-            }
-          : engine === 'gemini-voice'
-            ? {
-                icon: '🎙️',
-                label: 'Réponse vocale',
-                cls: 'bg-rose-500/10 border-rose-500/20 text-rose-300/70',
-              }
-            : {
-                icon: '💬',
-                label: 'Gemini',
-                cls: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300/70',
-              }
-
-  return (
-    <span
-      className={`mt-1.5 inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border ${config.cls}`}
-    >
-      {config.icon} {config.label}
-      {debate ? ' • Débat' : ''}
-    </span>
-  )
-}
 
 // ─── Voice mode overlay ───────────────────────────────────────────────────────
 
@@ -245,6 +220,7 @@ function VoiceModeOverlay({
 export function AiChat({
   cardNumber,
   memberName,
+  regionName,
   onBack,
   suggestions = DEFAULT_SUGGESTIONS,
 }: AiChatProps) {
@@ -601,15 +577,41 @@ export function AiChat({
 
   const firstName = memberName ? memberName.split(' ')[0] : ''
 
+  // Carte d'accueil : les prix courants de la région du membre (même calcul que
+  // l'écran Marché). C'est ce qui ancre le conseiller dans les données réelles.
+  const [regionPrices, setRegionPrices] = useState<MarketPrice[]>([])
+  useEffect(() => {
+    const region = Region.findByName(regionName)
+    if (!region) return
+    const controller = new AbortController()
+    fetch(`/api/market-prices?region_id=${region.id}`, { signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { prices?: MarketPriceRow[] } | null) => {
+        const fresh = MarketPrice.fromRows(d?.prices ?? [])
+          .filter((p) => p.ageDays <= 30)
+          .sort((a, b) => b.marketCount - a.marketCount || a.ageDays - b.ageDays)
+          .slice(0, 3)
+        setRegionPrices(fresh)
+      })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [regionName])
+  const latestDate = regionPrices.length
+    ? new Date(Math.max(...regionPrices.map((p) => Date.parse(p.createdAt)))).toLocaleDateString(
+        'fr-FR',
+        { day: 'numeric', month: 'short' },
+      )
+    : null
+  const headerSub = regionName
+    ? latestDate
+      ? `${regionName} · prix du ${latestDate}`
+      : regionName
+    : 'Prix, météo et conseils'
+
   return (
     <div
       className="relative flex flex-col h-full min-h-[420px] max-h-[calc(100dvh-120px)] rounded-[20px] overflow-hidden"
-      style={{
-        background: 'linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.02))',
-        border: '1px solid rgba(255,255,255,.08)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-      }}
+      style={{ background: '#06150e', border: '1px solid rgba(255,255,255,.07)' }}
     >
       {/* ── VOICE MODE OVERLAY ─────────────────────────────────────── */}
       {voiceMode && (
@@ -622,60 +624,31 @@ export function AiChat({
       )}
 
       {/* ── HEADER ─────────────────────────────────────────────────── */}
-      <div
-        className="flex items-center gap-2.5 px-4 py-3 border-b border-white/[0.06]"
-        style={{
-          background: 'linear-gradient(to right, rgba(6,35,25,.80), rgba(4,30,28,.60))',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-        }}
-      >
+      <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.06]">
         <button
           type="button"
           onClick={onBack}
-          className="text-emerald-400 p-1 hover:text-emerald-300 transition-colors flex-shrink-0"
+          className="text-white/60 -ml-1 p-1 hover:text-white transition-colors flex-shrink-0"
           aria-label="Retour"
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft size={20} />
         </button>
-
-        <div className="flex items-center gap-2.5 flex-1 min-w-0">
-          <div
-            className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #34d399, #14b8a6)' }}
-          >
-            <Bot size={20} className="text-white" />
-          </div>
-          <div className="min-w-0">
-            <p className="font-bold text-white text-[15px] leading-none">AgriTogo IA</p>
-            <p className="text-emerald-300/70 text-xs mt-0.5">Assistant agricole intelligent</p>
-            <div className="flex items-center gap-1 mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-emerald-400 text-[10px]">En ligne</span>
-            </div>
-          </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-white text-[17px] leading-tight">Conseiller</p>
+          <p className="text-white/50 text-[12.5px] leading-tight mt-0.5 truncate">{headerSub}</p>
         </div>
-
-        {/* Voice mode toggle */}
         <button
           type="button"
           onClick={() => setVoiceMode((v) => !v)}
-          className={`w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl transition-all ${
-            voiceMode
-              ? 'text-emerald-300 ring-1 ring-emerald-500/50'
-              : 'text-white/40 hover:text-emerald-300 hover:bg-emerald-500/10'
+          className={`w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-full transition-colors ${
+            voiceMode ? 'text-emerald-300 bg-emerald-500/15' : 'text-white/45 hover:text-white'
           }`}
-          style={
-            voiceMode
-              ? { background: 'rgba(52,211,153,.20)', border: '1px solid rgba(52,211,153,.30)' }
-              : { background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.10)' }
-          }
-          title={voiceMode ? 'Désactiver le mode vocal' : 'Activer le mode vocal'}
-          aria-label="Mode vocal"
+          title={voiceMode ? 'Désactiver la conversation vocale' : 'Conversation vocale'}
+          aria-label="Conversation vocale"
+          aria-pressed={voiceMode}
         >
-          {voiceMode ? <Volume2 size={16} /> : <VolumeX size={16} />}
+          {voiceMode ? <Volume2 size={18} /> : <VolumeX size={18} />}
         </button>
-
         {messages.length > 0 && (
           <button
             type="button"
@@ -685,10 +658,9 @@ export function AiChat({
                 sessionStorage.removeItem(storageKey)
               } catch {}
             }}
-            className="text-white/25 text-[11px] hover:text-white/50 transition-colors flex-shrink-0"
-            title="Effacer la conversation"
+            className="text-white/45 text-[12.5px] hover:text-white transition-colors flex-shrink-0"
           >
-            ✕
+            Effacer
           </button>
         )}
       </div>
@@ -696,65 +668,63 @@ export function AiChat({
       {/* ── MESSAGES AREA ──────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3" ref={scrollRef}>
         {messages.length === 0 && (
-          <div className="flex flex-col items-center text-center px-2 pt-4 pb-2 gap-0">
-            <div
-              className="w-[72px] h-[72px] rounded-2xl flex items-center justify-center mb-4"
-              style={{
-                background: 'linear-gradient(135deg, #34d399, #14b8a6)',
-                animation: 'halo-pulse 2.5s ease-in-out infinite',
-              }}
-            >
-              <Bot size={34} className="text-white" />
+          <div className="flex flex-col gap-6 pt-2" style={{ animation: 'chat-fade-up 0.3s ease both' }}>
+            <div>
+              <p className="text-[26px] font-semibold text-white leading-tight">
+                Bonjour{firstName ? ` ${firstName}` : ''}
+              </p>
+              <p className="text-white/55 text-[15px] leading-[21px] mt-1.5">
+                Je vous réponds avec les prix relevés sur vos marchés et la météo de votre zone.
+              </p>
             </div>
-            <p
-              className="text-2xl font-bold text-white mb-1"
-              style={{ animation: 'chat-fade-up 0.4s ease both', animationDelay: '100ms' }}
-            >
-              Bonjour{firstName ? ` ${firstName}` : ''} ! 👋
-            </p>
-            <p
-              className="text-emerald-300/70 text-sm mb-5"
-              style={{ animation: 'chat-fade-up 0.4s ease both', animationDelay: '150ms' }}
-            >
-              Je suis AgriTogo IA
-            </p>
-            <div
-              className="grid grid-cols-4 gap-2 w-full max-w-[340px] mb-5"
-              style={{ animation: 'chat-fade-up 0.4s ease both', animationDelay: '200ms' }}
-            >
-              {[
-                { icon: '📊', label: 'Prix Marchés' },
-                { icon: '📷', label: 'Photo Maladie' },
-                { icon: '🎤', label: 'Dicter' },
-                { icon: '🔊', label: 'Mode Vocal' },
-              ].map((cap) => (
-                <div
-                  key={cap.label}
-                  className="bg-white/5 border border-white/10 rounded-2xl p-3 text-center"
-                >
-                  <span className="text-2xl block mb-1">{cap.icon}</span>
-                  <span className="text-white/60 text-xs leading-tight block">{cap.label}</span>
+
+            {regionPrices.length > 0 && (
+              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.045] px-4 pt-3.5 pb-1.5">
+                <div className="flex items-center justify-between pb-1">
+                  <p className="text-white/55 text-[13px] font-medium">Prix à {regionName} cette semaine</p>
+                  <p className="text-white/45 text-[12px]">21 jours</p>
                 </div>
-              ))}
-            </div>
-            <div
-              className="flex flex-col gap-2 w-full max-w-[380px]"
-              style={{ animation: 'chat-fade-up 0.4s ease both', animationDelay: '350ms' }}
-            >
+                {regionPrices.map((p) => {
+                  const pct = p.changePct
+                  const tone =
+                    p.trend === 'up' ? 'text-emerald-300' : p.trend === 'down' ? 'text-orange-300' : 'text-white/50'
+                  const TrendIcon = p.trend === 'up' ? ArrowUpRight : p.trend === 'down' ? ArrowDownRight : ArrowRight
+                  return (
+                    <div key={p.id} className="flex items-center gap-3 py-2.5">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-[15px] font-medium">{p.cultureName}</p>
+                        <p className="text-white/45 text-[12px] truncate">
+                          {p.marketCount > 1 ? `${p.marketCount} marchés` : p.marketName}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-white text-[15px] font-semibold">{p.formattedPrice}</p>
+                        {pct !== null && (
+                          <p className={`text-[12px] font-medium inline-flex items-center gap-0.5 ${tone}`}>
+                            <TrendIcon size={13} />
+                            {pct === 0 ? 'stable' : `${pct > 0 ? '+' : ''}${pct.toLocaleString('fr-FR')} %`}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            <div>
+              <p className="text-white/55 text-[13px] font-medium">Questions fréquentes</p>
               {suggestions.map((s) => (
                 <button
                   type="button"
                   key={s}
-                  // Tapping ASKS the question. It used to only drop the text
-                  // into the input and focus it, so the farmer still had to
-                  // find and press send — a second step that loses people who
-                  // type slowly, which is exactly who these chips are for.
-                  // min-h-[52px] keeps the target comfortable on a small phone.
-                  className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-200 rounded-2xl px-4 py-3.5 min-h-[52px] text-[15px] text-left flex items-center justify-between gap-2 hover:bg-emerald-500/15 active:scale-[0.98] transition-all"
+                  // Taper la question la POSE : un second geste « envoyer » perd
+                  // les personnes qui tapent lentement, à qui ces raccourcis servent.
+                  className="w-full flex items-center gap-3 py-3.5 min-h-[52px] text-left border-b border-white/[0.07] text-white text-[15.5px] active:opacity-70"
                   onClick={() => sendText(s)}
                 >
-                  <span>{s}</span>
-                  <span className="text-emerald-400/60 ml-2">→</span>
+                  <span className="flex-1">{s}</span>
+                  <ChevronRight size={18} className="text-white/40 flex-shrink-0" />
                 </button>
               ))}
             </div>
@@ -768,49 +738,28 @@ export function AiChat({
           return (
             // biome-ignore lint/suspicious/noArrayIndexKey: fragments de rendu Markdown d'un même message, régénérés ensemble à chaque rendu
             <div key={i}>
-              <div
-                className={`flex gap-2 ${isUser ? 'flex-row-reverse self-end ml-auto max-w-[80%]' : 'flex-row self-start mr-auto max-w-[85%]'}`}
-                style={{
-                  animation: isUser
-                    ? 'chat-slide-left 0.25s ease both'
-                    : 'chat-slide-right 0.25s ease both',
-                }}
-              >
-                <div
-                  className={`w-7 h-7 flex-shrink-0 flex items-center justify-center text-[11px] font-semibold ${isUser ? 'rounded-full bg-white/15 text-white/80' : 'rounded-xl bg-emerald-500/20 text-emerald-300'}`}
-                >
-                  {isUser ? firstName ? firstName[0].toUpperCase() : 'U' : <Bot size={13} />}
-                </div>
-                <div>
-                  <div
-                    className={`px-3.5 py-2.5 text-sm leading-relaxed ${isUser ? 'rounded-2xl rounded-tr-sm text-emerald-50' : 'rounded-2xl rounded-tl-sm text-emerald-50'}`}
-                    style={
-                      isUser
-                        ? {
-                            background:
-                              'linear-gradient(135deg, rgba(52,211,153,.25), rgba(20,184,166,.15))',
-                            border: '1px solid rgba(52,211,153,.20)',
-                          }
-                        : {
-                            background: 'rgba(255,255,255,.06)',
-                            border: '1px solid rgba(255,255,255,.08)',
-                          }
-                    }
-                  >
-                    {renderMd(m.content)}
+              {isUser ? (
+                <div className="flex justify-end" style={{ animation: 'chat-fade-up 0.2s ease both' }}>
+                  <div className="max-w-[80%] rounded-[20px] bg-emerald-500/[0.18] px-4 py-2.5 text-[15px] leading-[21px] text-white">
+                    {m.content}
                   </div>
-                  {m.role === 'assistant' && m.engine && (
-                    <EngineBadge engine={m.engine} debate={m.debate} />
-                  )}
                 </div>
-              </div>
+              ) : (
+                // Réponse sans bulle ni avatar : un texte qu'on lit, pas un robot qui parle.
+                <div
+                  className="text-white/90 text-[15.5px] leading-[23px]"
+                  style={{ animation: 'chat-fade-up 0.25s ease both' }}
+                >
+                  {renderMd(m.content)}
+                </div>
+              )}
               {followUps.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-2 ml-9">
+                <div className="flex flex-wrap gap-2 mt-3">
                   {followUps.map((s) => (
                     <button
                       type="button"
                       key={s}
-                      className="bg-white/5 border border-white/10 text-white/60 rounded-full px-3 py-1 text-[12px] hover:bg-emerald-500/10 hover:border-emerald-500/20 hover:text-emerald-300 active:scale-95 transition-all"
+                      className="border border-white/[0.14] text-white/85 rounded-full px-3.5 py-2 text-[13.5px] hover:bg-white/[0.05] active:scale-95 transition-all"
                       onClick={() => sendText(s)}
                     >
                       {s}
@@ -823,34 +772,15 @@ export function AiChat({
         })}
 
         {(loading || photoLoading) && (
-          <div
-            className="flex gap-2 self-start max-w-[85%]"
-            style={{ animation: 'chat-slide-right 0.25s ease both' }}
-          >
-            <div className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
-              <Bot size={13} />
-            </div>
-            <div
-              className="rounded-2xl rounded-tl-sm px-3.5 py-2.5 flex flex-col gap-1"
-              style={{
-                background: 'rgba(255,255,255,.06)',
-                border: '1px solid rgba(255,255,255,.08)',
-              }}
-            >
-              <TypingDots />
-              <span className="text-emerald-300/50 text-[11px]">
-                {photoLoading ? 'Analyse de la photo…' : 'AgriTogo réfléchit…'}
-              </span>
-            </div>
+          <div className="flex items-center gap-2 text-white/50 text-[14px]">
+            <TypingDots />
+            <span>{photoLoading ? 'J’examine la photo…' : 'Je cherche dans vos données…'}</span>
           </div>
         )}
       </div>
 
       {/* ── INPUT BAR ──────────────────────────────────────────────── */}
-      <div
-        className="flex gap-2 px-3 py-3 items-center border-t border-white/[0.08]"
-        style={{ background: 'rgba(0,0,0,.30)' }}
-      >
+      <div className="flex gap-2.5 px-4 pt-3 pb-4 items-center">
         <input
           ref={photoInputRef}
           type="file"
@@ -862,80 +792,52 @@ export function AiChat({
             if (f) handlePhoto(f)
           }}
         />
-
-        {/* Camera */}
+        <div className="flex-1 flex items-center gap-1 rounded-full border border-white/[0.10] bg-white/[0.06] pl-4 pr-2 min-h-[50px] focus-within:border-emerald-400/40">
+          <input
+            ref={inputRef}
+            type="text"
+            // 16px minimum : en dessous, Safari iOS zoome la page au focus.
+            className="flex-1 min-w-0 bg-transparent py-3 text-base text-white placeholder:text-white/40 focus:outline-none"
+            placeholder={isListening ? 'Je vous écoute…' : 'Écrivez votre question…'}
+            value={input}
+            maxLength={1000}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && send()}
+            disabled={loading || photoLoading}
+          />
+          <button
+            type="button"
+            className="w-9 h-9 flex items-center justify-center rounded-full text-white/55 hover:text-white disabled:opacity-40"
+            onClick={() => photoInputRef.current?.click()}
+            disabled={loading || photoLoading || isListening}
+            aria-label="Analyser une plante (photo)"
+          >
+            {photoLoading ? <Loader2 size={18} className="animate-spin" /> : <Camera size={19} />}
+          </button>
+          <button
+            type="button"
+            className={`w-9 h-9 flex items-center justify-center rounded-full disabled:opacity-40 ${
+              isListening ? 'text-red-300 bg-red-500/15 animate-pulse' : 'text-white/55 hover:text-white'
+            }`}
+            onClick={toggleVoice}
+            disabled={loading || photoLoading}
+            aria-label={isListening ? 'Arrêter la dictée' : 'Dicter un message'}
+          >
+            {isListening ? <MicOff size={19} /> : <Mic size={19} />}
+          </button>
+        </div>
         <button
           type="button"
-          className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl text-blue-300 transition-all disabled:opacity-40 hover:bg-blue-500/20 active:scale-95"
-          style={{ background: 'rgba(59,130,246,.15)', border: '1px solid rgba(59,130,246,.25)' }}
-          onClick={() => photoInputRef.current?.click()}
-          disabled={loading || photoLoading || isListening}
-          aria-label="Analyser une plante (photo)"
-        >
-          {photoLoading ? <Loader2 size={16} className="animate-spin" /> : '📷'}
-        </button>
-
-        {/* Dictation mic */}
-        <button
-          type="button"
-          className={`w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl text-[17px] transition-all disabled:opacity-40 ${
-            isListening
-              ? 'text-red-300 ring-2 ring-red-500/30 animate-pulse'
-              : 'text-white/60 hover:bg-white/12 active:scale-95'
-          }`}
-          style={
-            isListening
-              ? { background: 'rgba(239,68,68,.20)', border: '1px solid rgba(239,68,68,.40)' }
-              : { background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.12)' }
-          }
-          onClick={toggleVoice}
-          disabled={loading || photoLoading}
-          aria-label={isListening ? 'Arrêter la dictée' : 'Dicter un message'}
-          title="Dicter (convertit votre voix en texte)"
-        >
-          {isListening ? '🔴' : '🎤'}
-        </button>
-
-        {/* Text input */}
-        <input
-          ref={inputRef}
-          type="text"
-          // 16px text is also what stops iOS Safari zooming the page on focus,
-          // which on a small phone throws the whole layout off.
-          className="flex-1 rounded-xl px-4 py-3 min-h-[48px] text-base text-white placeholder:text-white/30 focus:outline-none transition-colors"
-          style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.10)' }}
-          onFocus={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(52,211,153,.40)'
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(255,255,255,.10)'
-          }}
-          placeholder="Posez votre question…"
-          value={input}
-          maxLength={1000}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && send()}
-          disabled={loading || photoLoading}
-        />
-
-        {/* Send */}
-        <button
-          type="button"
-          className={`w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-xl transition-all ${
+          className={`w-[50px] h-[50px] flex-shrink-0 flex items-center justify-center rounded-full transition-all ${
             input.trim() && !loading && !photoLoading
-              ? 'text-white active:scale-95'
-              : 'text-white/25 cursor-default'
+              ? 'bg-emerald-400 text-[#082011] active:scale-95'
+              : 'bg-white/[0.08] text-white/30'
           }`}
-          style={
-            input.trim() && !loading && !photoLoading
-              ? { background: '#10b981', boxShadow: '0 4px 14px rgba(16,185,129,.25)' }
-              : { background: 'rgba(255,255,255,.08)' }
-          }
           onClick={send}
           disabled={loading || photoLoading || !input.trim()}
           aria-label="Envoyer"
         >
-          <Send size={20} />
+          <ArrowUp size={21} strokeWidth={2.4} />
         </button>
       </div>
 
