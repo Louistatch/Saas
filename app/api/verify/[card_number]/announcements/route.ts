@@ -26,6 +26,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 interface MemberRow {
   phone: string | null
+  cooperative_id: string | null
   canton_id: string | null
   prefecture_id: string | null
   region_id: string | null
@@ -61,7 +62,7 @@ type CardAccess = Extract<Awaited<ReturnType<typeof requirePrivateCard>>, { ok: 
 async function loadMember(supabase: CardAccess['supabase'], memberId: string) {
   const { data } = await supabase
     .from('members')
-    .select('phone, canton_id, prefecture_id, region_id, canton, prefecture, region')
+    .select('phone, cooperative_id, canton_id, prefecture_id, region_id, canton, prefecture, region')
     .eq('id', memberId)
     .maybeSingle<MemberRow>()
   return data
@@ -196,7 +197,12 @@ export async function POST(
         // répondait « Erreur lors de l'enregistrement » sans autre indice.
         author_id: userId,
         member_id: card.member_id,
-        cooperative_id: card.cooperative_id,
+        // La coopérative de la FICHE, pas celle de la carte. La policy exige
+        // que l'annonce porte la coopérative de son membre, et les deux
+        // peuvent différer : la carte FEN-66261 est émise par la faîtière
+        // FENOMAT pour un membre de HAROFEMA. Avec card.cooperative_id, la
+        // publication pour cette carte serait refusée (42501).
+        cooperative_id: member?.cooperative_id ?? card.cooperative_id,
         type,
         title: trimmedTitle,
         description:
