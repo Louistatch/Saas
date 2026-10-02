@@ -20,7 +20,7 @@ export const CULTURES_DATA = [
 ] as const
 
 const FALLBACK_CULTURE_EMOJIS: Array<[string, string]> = [
-  ['maïs', '🌽'], ['mais', '🌽'], ['riz', '🌾'], ['manioc', '🥔'], ['igname', '🍠'],
+  ['gari', '🥣'], ['haricot', '🫘'], ['sorgho', '🌾'], ['mil', '🌾'], ['maïs', '🌽'], ['mais', '🌽'], ['riz', '🌾'], ['manioc', '🥔'], ['igname', '🍠'],
   ['soja', '🫘'], ['arachide', '🥜'], ['coton', '🌿'], ['cacao', '🍫'],
   ['café', '☕'], ['cafe', '☕'], ['banane', '🍌'], ['ananas', '🍍'],
   ['papaye', '🍈'], ['piment', '🌶️'], ['tomate', '🍅'], ['oignon', '🧅'], ['gombo', '🥒'],
@@ -106,6 +106,19 @@ export interface MarketPriceRow {
   /** 'manual' (saisie sur la plateforme) ou le code d'une source externe, ex. 'SIM-CPC'. */
   source?: string | null
   cultures: { name: string } | null
+  // Ligne de la vue `market_price_current` : un prix par culture ET par région.
+  regions?: { name: string } | null
+  region_name?: string | null
+  markets?: string[] | null
+  sources?: string[] | null
+  n_markets?: number | null
+  n_obs?: number | null
+  price_min?: number | null
+  price_max?: number | null
+  previous_price?: number | null
+  change_pct?: number | null
+  trend_known?: boolean | null
+  history?: number[] | null
 }
 
 /**
@@ -199,15 +212,49 @@ export class MarketPrice {
     return '→ Stable'
   }
 
+  private get externalSource(): string | null {
+    const all = [...(this.row.sources ?? []), ...(this.row.source ? [this.row.source] : [])]
+    return all.find((code) => code && code !== 'manual') ?? null
+  }
+
   /** Relevé issu d'une source externe (pas saisi sur la plateforme). */
   get isExternal(): boolean {
-    return !!this.row.source && this.row.source !== 'manual'
+    return this.externalSource !== null
   }
 
   /** « CPC » pour SIM-CPC : le producteur doit savoir d'où vient le chiffre. */
   get sourceLabel(): string {
-    const code = this.row.source ?? ''
+    const code = this.externalSource ?? ''
     return code.startsWith('SIM-') ? code.slice(4) : code
+  }
+
+  /** Nom de la région du prix (« Kara »), jamais deviné côté écran. */
+  get regionName(): string {
+    return this.row.region_name ?? this.row.regions?.name ?? ''
+  }
+
+  /** Nombre de marchés dont le prix est la médiane. */
+  get marketCount(): number {
+    return this.row.n_markets ?? (this.row.market_name ? 1 : 0)
+  }
+
+  get priceRange(): { min: number; max: number } | null {
+    const { price_min: min, price_max: max } = this.row
+    return min != null && max != null && min !== max ? { min, max } : null
+  }
+
+  /** Variation par rapport à la période précédente, en %. `null` s'il n'y en a pas. */
+  get changePct(): number | null {
+    return this.row.trend_known ? (this.row.change_pct ?? null) : null
+  }
+
+  get trendKnown(): boolean {
+    return this.row.trend_known === true
+  }
+
+  /** Médianes hebdomadaires, de la plus ancienne à la plus récente. */
+  get history(): number[] {
+    return this.row.history ?? []
   }
 
   get verified(): boolean {

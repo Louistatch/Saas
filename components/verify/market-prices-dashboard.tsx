@@ -82,6 +82,7 @@ interface Props {
 }
 
 const ALL_REGIONS = Region.all()
+// Cultures proposées à la SAISIE d'un prix (les puces de filtre, elles, suivent les données).
 const ALL_CULTURES = Culture.all()
 
 export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
@@ -118,6 +119,18 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
 
   const pricesByCulture = useMemo(() => MarketPrice.groupValuesByCulture(prices), [prices])
 
+  // Les puces suivent les cultures qui ONT un prix ici (maïs, riz, haricot… arrivent
+  // avec la source CPC), au lieu de quatre cultures figées dans le code.
+  const cultureChips = useMemo(() => {
+    const seen = new Map<string, { id: string; name: string; emoji: string }>()
+    for (const p of prices) {
+      if (!seen.has(p.cultureId)) {
+        seen.set(p.cultureId, { id: p.cultureId, name: p.cultureName, emoji: p.cultureEmoji })
+      }
+    }
+    return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+  }, [prices])
+
   // Le filtre gros/détail n'apparaît QUE si les deux coexistent réellement.
   // Avant l'ingestion CPC tout est `unknown` : afficher un sélecteur sans objet
   // encombrerait l'écran d'un choix qui ne change rien.
@@ -137,8 +150,11 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
     // `prices` arrive trié du plus récent au plus ancien et garde l'historique
     // pour les courbes (pricesByCulture) ; le tableau, lui, montre le prix actuel.
     const latest = new Set<string>()
-    return list.filter((p) => {
-      const key = `${p.cultureId}|${p.marketName.toLowerCase()}|${p.priceType}`
+    const ordered = [...list].sort(
+      (a, b) => a.ageDays - b.ageDays || a.cultureName.localeCompare(b.cultureName, 'fr'),
+    )
+    return ordered.filter((p) => {
+      const key = `${p.cultureId}|${p.regionName}|${p.marketName.toLowerCase()}|${p.priceType}`
       if (latest.has(key)) return false
       latest.add(key)
       return true
@@ -354,7 +370,7 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
           >
             Toutes les cultures
           </button>
-          {ALL_CULTURES.map((c) => (
+          {cultureChips.map((c) => (
             <button
               type="button"
               key={c.id}
@@ -435,7 +451,7 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
               </thead>
               <tbody>
                 {visiblePrices.map((p) => {
-                  const sparkValues = pricesByCulture[p.cultureId] ?? []
+                  const sparkValues = p.history.length >= 2 ? p.history : (pricesByCulture[p.cultureId] ?? [])
                   return (
                     <tr key={p.id} className="border-b border-white/[0.04] last:border-0">
                       <td className="px-3 py-2.5">
@@ -454,6 +470,13 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
                             </span>
                           )}
                         </div>
+                        {/* Où : la région du prix, et sur combien de marchés il repose. */}
+                        {p.regionName && (
+                          <p className="mt-0.5 pl-7 text-[10.5px] text-white/35 truncate">
+                            {p.regionName}
+                            {p.marketCount > 1 ? ` · ${p.marketCount} marchés` : p.marketName ? ` · ${p.marketName}` : ''}
+                          </p>
+                        )}
                       </td>
                       <td className="px-3 py-2.5 hidden sm:table-cell">
                         <span className="text-xs text-white/50 truncate flex items-center gap-1">
@@ -464,6 +487,14 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-2">
                           <TrendBadge trend={p.trend} />
+                          {p.changePct !== null ? (
+                            <span className="text-[10.5px] font-mono text-white/45">
+                              {p.changePct > 0 ? '+' : ''}
+                              {p.changePct.toLocaleString('fr-FR')} %
+                            </span>
+                          ) : p.regionName ? (
+                            <span className="text-[10px] text-white/30">pas de base de comparaison</span>
+                          ) : null}
                           {sparkValues.length >= 2 && (
                             <SVGSparkline values={sparkValues} trend={p.trend} />
                           )}
@@ -479,6 +510,12 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
                             sans date se lit comme le cours du jour. Un relevé
                             périmé est en plus grisé, pour que l'œil le traite
                             comme une indication et non comme une référence. */}
+                        {p.priceRange && (
+                          <span className="block text-[10px] leading-tight text-white/35">
+                            {p.priceRange.min.toLocaleString('fr-FR')}–
+                            {p.priceRange.max.toLocaleString('fr-FR')}
+                          </span>
+                        )}
                         <span
                           className={`block text-[10px] leading-tight ${p.isStale ? 'text-amber-300/70' : 'text-white/35'}`}
                         >
