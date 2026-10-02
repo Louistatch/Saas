@@ -10,5 +10,10 @@ export async function GET(
   const { card_number } = await params
   const access = await requirePrivateCard(card_number)
   if (!access.ok) return access.response
-  return NextResponse.json({ allowed: true }, { headers: { 'Cache-Control': 'no-store' } })
+  // `via` permet à la page de proposer « Se déconnecter » seulement quand la
+  // session est une session de carte : un compte se quitte ailleurs.
+  return NextResponse.json(
+    { allowed: true, via: access.via },
+    { headers: { 'Cache-Control': 'no-store' } },
+  )
 }

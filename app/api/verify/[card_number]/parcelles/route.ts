@@ -30,7 +30,11 @@ export async function GET(
     return NextResponse.json({ error: 'Carte non trouvée.' }, { status: 404 })
   }
 
-  // Keep the authenticated RLS scope for private data.
+  // ⚠️ Avec une session de CARTE (connexion par code SMS), ce client est celui de
+  // service : il contourne le RLS. La requête ci-dessous est donc cantonnée
+  // EXPLICITEMENT à card.member_id, lu en base par requirePrivateCard — c'est ce
+  // filtre, et lui seul, qui empêche de lire les données d'un autre membre.
+  // Ne jamais le retirer ni le remplacer par une valeur venue de la requête.
   const supabaseAdmin = supabase
   const { data: parcelles } = await supabaseAdmin
     .from('parcelles')

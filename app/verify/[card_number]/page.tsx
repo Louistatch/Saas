@@ -1,5 +1,6 @@
 'use client'
 
+import { CardLoginPanel } from '@/components/verify/card-login-panel'
 import { AtsBadge, type AtsBreakdown } from '@/components/shared/ats-badge'
 import { Logo } from '@/components/shared/logo'
 import { AcheteurView } from '@/components/verify/acheteur-view'
@@ -175,6 +176,8 @@ export default function VerifyCardPage() {
   } | null>(null)
   /** True once we know the private endpoints refused us (visitor not signed in). */
   const [privateLocked, setPrivateLocked] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
+  const [viaCard, setViaCard] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
 
@@ -278,6 +281,7 @@ export default function VerifyCardPage() {
 
   useEffect(() => {
     if (!result?.valid || !cardNumber) return
+    void reloadKey // relance le chargement après connexion / déconnexion
     const cn = encodeURIComponent(cardNumber)
     // A 401 means "not signed in", never "this member has nothing". Track it
     // separately so the UI can say so instead of printing zeros.
@@ -289,13 +293,19 @@ export default function VerifyCardPage() {
     Promise.all([get('parcelles'), get('cotisation'), get('intrants')]).then(([parc, cot, int]) => {
       const locked = [parc, cot, int].some((r) => r.status === 401)
       setPrivateLocked(locked)
+      if (locked) setViaCard(false)
+      else
+        fetch(`/api/verify/${cn}/private-access`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => setViaCard(d?.via === 'card'))
+          .catch(() => setViaCard(false))
       setQuickStats({
         totalHa: parc.ok ? (parc.data?.total_ha ?? 0) : null,
         cotisationStatus: cot.ok ? (cot.data?.summary?.last_status ?? null) : null,
         intrantCount: int.ok ? (int.data?.intrants?.length ?? 0) : null,
       })
     })
-  }, [result?.valid, cardNumber])
+  }, [result?.valid, cardNumber, reloadKey])
 
   if (loading) {
     return (
@@ -876,20 +886,7 @@ export default function VerifyCardPage() {
             a row of zeros — a factual-looking claim that this member has
             nothing. Say plainly that the data is private instead. */}
         {isValid && activeView === 'menu' && privateLocked && (
-          <div
-            className={`vfp-card rounded-2xl p-4 flex items-center gap-3 vfp-enter transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`}
-            style={{ transitionDelay: '200ms' }}
-          >
-            <div className="h-11 w-11 shrink-0 rounded-full bg-white/[0.06] grid place-items-center">
-              <Lock className="h-5 w-5 text-white/40" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-white text-[13.5px] font-semibold">Informations privées</p>
-              <p className="text-white/45 text-[12px] leading-snug">
-                Parcelles, cotisation et intrants ne sont visibles que par le titulaire de la carte.
-              </p>
-            </div>
-          </div>
+          <CardLoginPanel cardNumber={cardNumber} onConnected={() => setReloadKey((k) => k + 1)} />
         )}
 
         {/* Bandeau compact : trois chiffres sur une ligne.
@@ -1100,8 +1097,11 @@ export default function VerifyCardPage() {
               </button>
 
               {privateLocked && (
-                <Link
-                  href={`/auth/login?redirect=${encodeURIComponent(`/verify/${cardNumber}`)}`}
+                <button
+                  type="button"
+                  onClick={() =>
+                    document.getElementById('card-login')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                  }
                   className="vfp-card rounded-2xl py-3 px-1.5 min-h-[78px] flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform"
                 >
                   <span className="w-11 h-11 rounded-2xl bg-white/[0.06] ring-1 ring-white/10 grid place-items-center">
@@ -1110,7 +1110,30 @@ export default function VerifyCardPage() {
                   <span className="text-white/70 text-[12px] font-semibold leading-tight text-center">
                     Se connecter
                   </span>
-                </Link>
+                </button>
+              )}
+
+              {!privateLocked && viaCard && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await fetch('/api/auth/card/logout', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ card_number: cardNumber }),
+                    }).catch(() => undefined)
+                    setViaCard(false)
+                    setReloadKey((k) => k + 1)
+                  }}
+                  className="vfp-card rounded-2xl py-3 px-1.5 min-h-[78px] flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform"
+                >
+                  <span className="w-11 h-11 rounded-2xl bg-white/[0.06] ring-1 ring-white/10 grid place-items-center">
+                    <Lock className="h-[22px] w-[22px] text-white/45" />
+                  </span>
+                  <span className="text-white/70 text-[12px] font-semibold leading-tight text-center">
+                    Se déconnecter
+                  </span>
+                </button>
               )}
             </div>
           </section>
