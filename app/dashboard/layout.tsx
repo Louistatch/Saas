@@ -359,7 +359,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/30 transition-colors"
           >
             <Shield className="h-4 w-4" />
-            Panneau admin
+            Plateforme (super-admin)
           </Link>
         )}
         <button

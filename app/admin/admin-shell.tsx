@@ -34,7 +34,7 @@ const ADMIN_LINKS = [
   { href: '/admin/haroo', label: 'Professionnels Haroo', icon: Briefcase },
   { href: '/admin/partners', label: 'Opérateurs', icon: Award },
   { href: '/admin/partners/training', label: 'Formation Opérateurs', icon: GraduationCap },
-  { href: '/dashboard/cards', label: 'Cartes et PIN', icon: CreditCard },
+  { href: '/admin/cartes', label: 'Cartes et PIN', icon: CreditCard },
   { href: '/admin/organization-earnings', label: 'Gains organisations', icon: Coins },
   { href: '/admin/analytics', label: 'Statistiques', icon: BarChart3 },
   { href: '/admin/agritogo', label: 'AgriTogo', icon: Cpu },
@@ -108,7 +108,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               className="w-full justify-start gap-3 border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent/10"
             >
               <LayoutDashboard className="h-4 w-4" />
-              Tableau de bord
+              Voir comme coopérative
             </Button>
           </Link>
           <Button
@@ -127,7 +127,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         <div className="md:hidden p-4 border-b border-border flex items-center justify-between bg-card">
           <div className="flex items-center gap-3">
             <Logo size="sm" showText={false} />
-            <span className="font-semibold text-foreground">Panneau admin</span>
+            <span className="font-semibold text-foreground">Plateforme (super-admin)</span>
           </div>
           <Button
             size="icon"
