@@ -13,7 +13,7 @@ import { hasOrgLayer, isHarooRole } from '@/lib/utils/permissions'
 import { flattenZodErrors, loginSchema } from '@/lib/validators/schemas'
 import { ArrowLeft, Eye, EyeOff, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useState } from 'react'
 
 /**
@@ -25,12 +25,11 @@ import { Suspense, useCallback, useState } from 'react'
  * - Immediate redirect after signIn success (don't wait for profile)
  * - 15s timeout with smart recovery
  * - Visual progress feedback via the submit button
- * - SPA navigation via router.replace (no full reload)
+ * - Full page navigation after sign-in (fresh cookies, clean provider state)
  */
 
 function LoginInner() {
   const searchParams = useSearchParams()
-  const router = useRouter()
   const { login } = useAuth()
 
   const [email, setEmail] = useState('')
@@ -108,7 +107,12 @@ function LoginInner() {
                 ? '/haroo'
                 : '/dashboard')
 
-        router.replace(target)
+        // Navigation COMPLÈTE, pas router.replace : une navigation douce vers
+        // /admin ou /dashboard fait une requête RSC dont le résultat reste
+        // suspendu sur l'écran « Chargement… » si le jeton vient d'être posé ou
+        // si le cache du routeur garde une redirection périmée. Un vrai
+        // chargement envoie les cookies frais et repart d'un état propre.
+        window.location.assign(target)
       } catch (err: unknown) {
         clearTimeout(progressTimer)
         clearTimeout(slowTimer)
@@ -117,7 +121,7 @@ function LoginInner() {
         setProgress('')
       }
     },
-    [email, password, login, redirectTo, submitting, router],
+    [email, password, login, redirectTo, submitting],
   )
 
   return (
