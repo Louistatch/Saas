@@ -33,6 +33,8 @@ export function CardLoginPanel({ cardNumber, onConnected }: Props) {
   const [code, setCode] = useState('')
   const [notice, setNotice] = useState<Notice | null>(null)
   const [cooldown, setCooldown] = useState(0)
+  // Quel écran porte l'opération en cours : le PIN (écran initial) ou le code SMS.
+  const [mode, setMode] = useState<'pin' | 'sms'>('pin')
   const inputRef = useRef<HTMLInputElement>(null)
   // Empêche deux validations simultanées (double toucher) sans dépendre du
   // rendu : un état React ne se met pas à jour assez vite pour ça.
@@ -50,6 +52,7 @@ export function CardLoginPanel({ cardNumber, onConnected }: Props) {
 
   const requestCode = async (from: 'idle' | 'code') => {
     if (cooldown > 0 && from === 'code') return
+    setMode(from === 'idle' ? 'pin' : 'sms')
     setStep('sending')
     setNotice(null)
     try {
@@ -67,6 +70,7 @@ export function CardLoginPanel({ cardNumber, onConnected }: Props) {
         setCode('')
         setCooldown(data.resend_after ?? 60)
         setNotice({ kind: 'info', text: 'Code envoyé par SMS. Il arrive en quelques secondes.' })
+        setMode('sms')
         setStep('code')
         return
       }
@@ -79,16 +83,22 @@ export function CardLoginPanel({ cardNumber, onConnected }: Props) {
     }
   }
 
-  const submit = async (value: string) => {
+  const submit = async (value: string, kind: 'sms' | 'pin' = 'sms') => {
     if (submitting.current || !new RegExp(`^\\d{${CODE_LENGTH}}$`).test(value)) return
     submitting.current = true
     setStep('verifying')
     setNotice(null)
+    setMode(kind)
+    const back = kind === 'pin' ? 'idle' : 'code'
     try {
-      const res = await fetch('/api/auth/card/verify', {
+      const res = await fetch(kind === 'pin' ? '/api/auth/card/pin' : '/api/auth/card/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ card_number: cardNumber, code: value }),
+        body: JSON.stringify(
+          kind === 'pin'
+            ? { card_number: cardNumber, pin: value }
+            : { card_number: cardNumber, code: value },
+        ),
       })
       const data = (await res.json().catch(() => ({}))) as {
         error?: string
@@ -100,8 +110,16 @@ export function CardLoginPanel({ cardNumber, onConnected }: Props) {
         return
       }
       setCode('')
-      setStep('code')
-      if (data.code === 'wrong_code' && typeof data.attempts_left === 'number') {
+      setStep(back)
+      if (data.code === 'wrong_pin') {
+        setNotice({
+          kind: 'error',
+          text:
+            data.attempts_left && data.attempts_left > 0
+              ? `PIN incorrect. Il vous reste ${data.attempts_left} essai${data.attempts_left > 1 ? 's' : ''}.`
+              : 'PIN incorrect. Trop d’essais : la carte est fermée un moment.',
+        })
+      } else if (data.code === 'wrong_code' && typeof data.attempts_left === 'number') {
         setNotice({
           kind: 'error',
           text:
@@ -114,7 +132,7 @@ export function CardLoginPanel({ cardNumber, onConnected }: Props) {
       }
     } catch {
       setCode('')
-      setStep('code')
+      setStep(back)
       setNotice({ kind: 'error', text: 'Pas de réseau. Réessayez quand il revient.' })
     } finally {
       submitting.current = false
@@ -123,50 +141,70 @@ export function CardLoginPanel({ cardNumber, onConnected }: Props) {
 
   const loginHref = `/auth/login?redirect=${encodeURIComponent(`/verify/${cardNumber}`)}`
 
-  // ── État initial : une ligne, un bouton ──────────────────────────────────
-  if (step === 'idle' || (step === 'sending' && !code && cooldown === 0)) {
+  // ── État initial : le PIN remis avec la carte ────────────────────────────
+  if (step === 'idle' || (mode === 'pin' && (step === 'sending' || step === 'verifying'))) {
+    const busy = step !== 'idle'
     return (
-      <div id="card-login" className="vfp-card rounded-2xl p-3.5 space-y-2.5">
+      <div id="card-login" className="vfp-card rounded-2xl p-4 space-y-3">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 shrink-0 rounded-full bg-white/[0.06] grid place-items-center">
             <Lock className="h-[18px] w-[18px] text-white/45" />
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-white text-[13.5px] font-semibold leading-tight">
-              Informations privées
-            </p>
+          <div className="min-w-0">
+            <p className="text-white text-[13.5px] font-semibold leading-tight">Informations privées</p>
             <p className="text-white/45 text-[12px] leading-snug">
-              Réservées au titulaire de la carte.
+              Entrez le PIN remis avec votre carte.
             </p>
           </div>
+        </div>
+        <label htmlFor="card-login-pin" className="sr-only">
+          PIN de la carte
+        </label>
+        <input
+          id="card-login-pin"
+          value={code}
+          onChange={(e) => {
+            const digits = e.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH)
+            setCode(digits)
+            if (digits.length === CODE_LENGTH) void submit(digits, 'pin')
+          }}
+          type="password"
+          autoComplete="off"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={CODE_LENGTH}
+          placeholder="••••••"
+          disabled={busy}
+          className="w-full rounded-xl bg-white/[0.05] border border-white/[0.12] px-4 py-3.5 text-center text-[26px] font-bold tracking-[0.5em] text-white placeholder:text-white/15 focus:outline-none focus:border-[var(--vfp-accent)]/50 disabled:opacity-60"
+        />
+        <div aria-live="polite" className="min-h-[1.25rem]">
+          {busy ? (
+            <p className="text-[12.5px] text-white/55 inline-flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Vérification…
+            </p>
+          ) : notice ? (
+            <p role="alert" className="text-[12.5px] leading-snug text-red-300 bg-red-500/10 rounded-xl px-3 py-2">
+              {notice.text}
+            </p>
+          ) : null}
+        </div>
+        <div className="flex items-center justify-between gap-3">
           <button
             type="button"
-            onClick={() => requestCode('idle')}
-            disabled={step === 'sending'}
-            className="shrink-0 min-h-[44px] rounded-xl bg-[var(--vfp-accent)]/15 border border-[var(--vfp-accent)]/30 px-3.5 text-[13px] font-bold text-[var(--vfp-accent)] active:scale-95 transition-transform disabled:opacity-50 inline-flex items-center gap-1.5"
+            onClick={() => {
+              setCode('')
+              void requestCode('idle')
+            }}
+            disabled={busy}
+            className="min-h-[44px] -ml-2 px-2 text-[12.5px] font-semibold text-[var(--vfp-accent)] disabled:opacity-50 inline-flex items-center gap-1.5"
           >
-            {step === 'sending' ? (
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <MessageSquare className="h-4 w-4" aria-hidden="true" />
-            )}
-            Me connecter
+            <MessageSquare className="h-4 w-4" aria-hidden="true" />
+            PIN perdu ? Code par SMS
           </button>
-        </div>
-        {notice && (
-          <p
-            role="alert"
-            className="text-[12.5px] leading-snug text-red-300 bg-red-500/10 rounded-xl px-3 py-2"
-          >
-            {notice.text}
-          </p>
-        )}
-        <p className="text-[11.5px] text-white/35 leading-snug">
-          Un code est envoyé par SMS au numéro enregistré pour votre carte.{' '}
-          <Link href={loginHref} className="text-white/55 underline underline-offset-2">
+          <Link href={loginHref} className="min-h-[44px] inline-flex items-center px-2 text-[12.5px] text-white/50 underline underline-offset-2">
             J’ai un compte
           </Link>
-        </p>
+        </div>
       </div>
     )
   }
