@@ -6,7 +6,7 @@ import { Logo } from '@/components/shared/logo'
 import { AcheteurView } from '@/components/verify/acheteur-view'
 import { AgriSmartWater } from '@/components/verify/agrismart-water'
 import { AgronomeView } from '@/components/verify/agronome-view'
-import { AiChat } from '@/components/verify/ai-chat'
+import { MarketAdvisor } from '@/components/verify/market-advisor'
 import { Card3D } from '@/components/verify/card-3d'
 import { CotisationView } from '@/components/verify/cotisation-view'
 import { ExploitationInlineView } from '@/components/verify/exploitation-inline-view'
@@ -983,7 +983,7 @@ export default function VerifyCardPage() {
               {[
                 {
                   icon: Bot,
-                  label: 'Assistant',
+                  label: 'Conseiller',
                   view: 'ai',
                   tint: 'text-amber-300',
                   ring: 'ring-amber-400/20',
@@ -1554,21 +1554,21 @@ export default function VerifyCardPage() {
 
         {/* ─── AI Chat View ─── */}
         {isValid && activeView === 'ai' && result.member && (
-          <AiChat
-            cardNumber={cardNumber}
-            memberName={firstName}
-            regionName={result.member.region ?? null}
-            onBack={() => setActiveView('menu')}
-            suggestions={[
-              result.member.region
-                ? `Quel est le prix du maïs en région ${result.member.region} ?`
-                : 'Quel est le prix du maïs dans ma zone ?',
-              result.member.canton
-                ? `Quand vendre mes cultures dans le canton ${result.member.canton} ?`
-                : 'Quand vendre mes cultures ?',
-              'Quelles cultures sont les plus rentables pour ma région ?',
-            ]}
-          />
+          <div className="space-y-4 vfp-enter">
+            <button
+              type="button"
+              onClick={() => setActiveView('menu')}
+              className="flex items-center gap-2 text-[var(--vfp-accent)] text-sm font-medium active:opacity-70"
+            >
+              <ArrowLeft className="h-4 w-4" /> Retour
+            </button>
+            <MarketAdvisor
+              cardNumber={cardNumber}
+              memberName={firstName}
+              regionName={result.member.region ?? null}
+              onOpenPrices={() => setActiveView('prices')}
+            />
+          </div>
         )}
 
         {/* ─── AgriSmart Water View ─── */}
