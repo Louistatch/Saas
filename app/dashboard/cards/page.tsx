@@ -1,5 +1,6 @@
 'use client'
 
+import { useAuth } from '@/app/context/auth-context'
 import { useCooperative } from '@/app/context/cooperative-context'
 import { CardSvgPreview } from '@/components/dashboard/card-svg-preview'
 import { useConfirm } from '@/components/shared/confirm-dialog'
@@ -63,6 +64,9 @@ interface SettingsRow {
 
 export default function CardsPage() {
   const { currentCooperative, cooperatives } = useCooperative()
+  const { user } = useAuth()
+  // Seul le super-administrateur émet les PIN : les opérateurs n'en voient pas le bouton.
+  const canIssuePin = user?.role === 'super_admin'
   const { toast } = useToast()
   const { confirm, confirmNode } = useConfirm()
   const supabase = useMemo(() => createClient(), [])
@@ -829,7 +833,7 @@ export default function CardsPage() {
                                     <Download className="h-4 w-4" />
                                   )}
                                 </Button>
-                                {card.status === 'active' ? (
+                                {card.status === 'active' && canIssuePin ? (
                                   <Button
                                     size="sm"
                                     variant="outline"
