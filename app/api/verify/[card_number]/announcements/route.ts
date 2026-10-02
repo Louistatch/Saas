@@ -191,10 +191,14 @@ export async function POST(
     const { data, error } = await supabase
       .from('producer_announcements')
       .insert({
-        // La policy RLS `announcements_owner` exige author_id = auth.uid(). Sa
+        // Avec un COMPTE, la policy RLS exige author_id = auth.uid() : son
         // omission faisait échouer CHAQUE publication depuis cet écran avec
-        // 42501 — vérifié en base, y compris pour un super_admin — et l'écran
-        // répondait « Erreur lors de l'enregistrement » sans autre indice.
+        // 42501 — vérifié en base, y compris pour un super_admin.
+        // Avec une SESSION DE CARTE il n'y a pas de profil, donc pas d'auteur :
+        // `userId` vaut null et la ligne reste rattachée à sa fiche par member_id
+        // (la contrainte producer_announcements_has_owner l'accepte). Le client est
+        // alors celui de service ; member_id et cooperative_id viennent de la carte
+        // relue en base, jamais de la requête.
         author_id: userId,
         member_id: card.member_id,
         // La coopérative de la FICHE, pas celle de la carte. La policy exige
