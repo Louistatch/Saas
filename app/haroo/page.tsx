@@ -899,6 +899,9 @@ function HarooSpaceInner() {
                 <Button variant="outline" size="sm" asChild>
                   <Link href="/marche">Voir le marché</Link>
                 </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/marketplace">Comptes d'exploitation</Link>
+                </Button>
                 <PublishAnnouncement
                   defaultType={
                     harooRole === 'ouvrier'

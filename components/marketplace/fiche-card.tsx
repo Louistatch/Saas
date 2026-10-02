@@ -24,9 +24,7 @@ export function FicheCard({ fiche, cultureIcon, onAccess }: FicheCardProps) {
             {cultureIcon ?? '🌿'}
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-foreground text-base line-clamp-2">
-              {fiche.title}
-            </h3>
+            <h3 className="font-semibold text-foreground text-base line-clamp-2">{fiche.title}</h3>
             <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
               <Sprout className="h-3 w-3" />
               <span className="truncate">{fiche.culture}</span>
@@ -38,13 +36,11 @@ export function FicheCard({ fiche, cultureIcon, onAccess }: FicheCardProps) {
 
         {/* Description */}
         {fiche.description ? (
-          <p className="text-sm text-muted-foreground line-clamp-3 mb-3">
-            {fiche.description}
-          </p>
+          <p className="text-sm text-muted-foreground line-clamp-3 mb-3">{fiche.description}</p>
         ) : null}
 
         {/* Locality — découpage administratif */}
-        {(fiche.region || fiche.prefecture || fiche.canton) ? (
+        {fiche.region || fiche.prefecture || fiche.canton ? (
           <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
             <MapPin className="h-3 w-3 shrink-0 text-primary/70" />
             <span className="truncate">
@@ -57,15 +53,19 @@ export function FicheCard({ fiche, cultureIcon, onAccess }: FicheCardProps) {
 
         {/* Cooperative + campaign */}
         <div className="space-y-1 mb-4 text-xs">
+          {!fiche.cooperative_id ? (
+            <p className="text-foreground">
+              <span className="text-muted-foreground">Vendu par : </span>
+              <span className="font-medium">FaîtiereHub</span>
+            </p>
+          ) : null}
           {coopName ? (
             <p className="text-foreground">
               <span className="text-muted-foreground">Coopérative : </span>
               <span className="font-medium">{coopName}</span>
             </p>
           ) : null}
-          {faitiereName ? (
-            <p className="text-muted-foreground">Faîtière : {faitiereName}</p>
-          ) : null}
+          {faitiereName ? <p className="text-muted-foreground">Faîtière : {faitiereName}</p> : null}
           {fiche.campaign ? (
             <p className="text-muted-foreground">Campagne : {fiche.campaign}</p>
           ) : null}
@@ -79,9 +79,7 @@ export function FicheCard({ fiche, cultureIcon, onAccess }: FicheCardProps) {
               {fiche.download_count}{' '}
               {fiche.download_count === 1 ? 'téléchargement' : 'téléchargements'}
             </span>
-            <span className="font-semibold text-foreground">
-              {fiche.price_non_member} FCFA
-            </span>
+            <span className="font-semibold text-foreground">{fiche.price_non_member} FCFA</span>
           </div>
           <Button
             className="w-full gap-2 bg-primary hover:bg-primary/90"
@@ -89,11 +87,13 @@ export function FicheCard({ fiche, cultureIcon, onAccess }: FicheCardProps) {
             onClick={() => onAccess(fiche)}
           >
             <FileText className="h-4 w-4" />
-            Accéder à la fiche
+            {fiche.price_non_member > 0 ? 'Acheter / accéder' : 'Accéder à la fiche'}
           </Button>
-          <p className="text-[10px] text-center text-muted-foreground mt-2">
-            Gratuit pour les membres titulaires d'une carte
-          </p>
+          {fiche.is_free_for_members ? (
+            <p className="text-[10px] text-center text-muted-foreground mt-2">
+              Gratuit pour les membres titulaires d'une carte
+            </p>
+          ) : null}
         </div>
       </CardContent>
     </Card>

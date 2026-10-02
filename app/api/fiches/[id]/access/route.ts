@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { requirePrivateCard } from '@/lib/security/card-access'
+import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/utils/logger'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
@@ -11,9 +12,13 @@ const log = createLogger('api:fiches:access')
  * après contrôle d'accès, permet de les télécharger. Validité une heure.
  */
 async function signFiles(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  _supabase: Awaited<ReturnType<typeof createClient>>,
   files: { name: string; url: string; type: string }[],
 ) {
+  // Signé avec le client de service : l'accès a déjà été décidé ici (gratuité,
+  // carte, ou achat réglé). Un visiteur anonyme n'a aucun droit de lecture sur le
+  // bucket privé, et c'est voulu — seule cette route délivre des liens.
+  const supabase = createAdminClient()
   return Promise.all(
     files.map(async (f) => {
       const path = f.url.includes('/storage/') ? f.url.split('/fiches-techniques/')[1] : f.url
@@ -159,7 +164,9 @@ export async function POST(
         return NextResponse.json({ error: 'ID achat invalide' }, { status: 400 })
       }
 
-      const { data: purchase } = await supabase
+      // Client de service : les achats ne sont plus lisibles par un visiteur
+      // anonyme (politiques RLS), et l'id d'achat aléatoire sert ici de jeton.
+      const { data: purchase } = await createAdminClient()
         .from('purchases')
         .select('id, payment_status, access_granted')
         .eq('id', purchaseId)

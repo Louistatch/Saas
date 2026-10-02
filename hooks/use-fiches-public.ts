@@ -14,7 +14,9 @@ export interface PublicFiche {
   price_non_member: number
   download_count: number
   created_at: string
-  cooperative_id: string
+  /** NULL = compte d'exploitation vendu par la plateforme FaîtiereHub. */
+  cooperative_id: string | null
+  is_free_for_members: boolean
   canton_id: string | null
   prefecture_id: string | null
   region_id: string | null

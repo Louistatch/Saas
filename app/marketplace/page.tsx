@@ -3,6 +3,7 @@
 import { Suspense, useState } from 'react'
 import { FicheFilterBar } from '@/components/marketplace/fiche-filter-bar'
 import { FicheGrid } from '@/components/marketplace/fiche-grid'
+import { MyPurchases } from '@/components/marketplace/my-purchases'
 import { MarketplaceFilterBar } from '@/components/marketplace/filter-bar'
 import { ProductGrid } from '@/components/marketplace/product-grid'
 import { useMarketplaceFilters } from '@/hooks/use-marketplace-filters'
@@ -162,6 +163,7 @@ function MarketplaceContent() {
           </TabsList>
 
           <TabsContent value="fiches">
+            <MyPurchases />
             <FichesTab />
           </TabsContent>
 

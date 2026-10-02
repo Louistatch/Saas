@@ -99,6 +99,8 @@ const createFicheSchema = z.object({
   price_non_member: z.number().int().nonnegative().max(1_000_000).default(0),
   is_free_for_members: z.boolean().default(true),
   status: z.enum(['draft', 'published']).default('published'),
+  // Super-admin : fiche de la plateforme FaîtiereHub (sans coopérative), vendue en ligne.
+  platform: z.boolean().optional(),
 })
 
 /** POST /api/fiches — dépose une fiche technique. */
@@ -134,8 +136,10 @@ export async function POST(request: NextRequest) {
   // `cooperative_id` est NOT NULL : on rattache la fiche à l'organisation de
   // l'auteur plutôt que de la laisser choisir, ce qui évite qu'un super_admin
   // dépose au nom d'une coopérative au hasard.
-  const cooperativeId = guard.ctx.cooperativeId
-  if (!cooperativeId) {
+  const { platform, ...fields } = parsed.data
+  const isPlatform = guard.ctx.role === 'super_admin' && (platform === true || !guard.ctx.cooperativeId)
+  const cooperativeId = isPlatform ? null : guard.ctx.cooperativeId
+  if (!isPlatform && !cooperativeId) {
     return NextResponse.json(
       { error: "Votre compte n'est rattaché à aucune organisation." },
       { status: 400 },
@@ -146,7 +150,7 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient()
     const { data, error } = await supabase
       .from('fiches_techniques')
-      .insert({ ...parsed.data, cooperative_id: cooperativeId })
+      .insert({ ...fields, cooperative_id: cooperativeId })
       .select('id, title, culture, type_agriculture, status')
       .single()
 
