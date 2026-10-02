@@ -57,19 +57,21 @@ export async function GET(request: NextRequest) {
       .eq('region_id', regionId)
       .order('name')
     
-    // Count prices per prefecture (via market_prices where region matches)
-    const { data: priceCounts } = await supabase
-      .from('market_prices')
-      .select('market_name')
+    // Nombre de prix courants par préfecture (une culture = un prix), lu dans la vue.
+    // L'ancien décompte cherchait le NOM de la préfecture dans le nom du marché :
+    // « Kétao » ne contient pas « Binah », donc 0 prix pour la quasi-totalité.
+    const { data: scoped } = await supabase
+      .from('market_price_scoped')
+      .select('scope_id')
+      .eq('scope', 'prefecture')
       .eq('region_id', regionId)
-    
-    const prefWithCounts = (data ?? []).map(p => ({
-      ...p,
-      priceCount: (priceCounts ?? []).filter(pc => 
-        pc.market_name?.toLowerCase().includes(p.name.toLowerCase())
-      ).length,
-    }))
-    
+
+    const counts = new Map<string, number>()
+    for (const row of (scoped ?? []) as { scope_id: string }[]) {
+      counts.set(row.scope_id, (counts.get(row.scope_id) ?? 0) + 1)
+    }
+    const prefWithCounts = (data ?? []).map((p) => ({ ...p, priceCount: counts.get(p.id) ?? 0 }))
+
     return NextResponse.json({ prefectures: prefWithCounts }, {
       headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' }
     })
@@ -83,22 +85,20 @@ export async function GET(request: NextRequest) {
       .eq('prefecture_id', prefectureId)
       .order('name')
     
-    // Count prices per canton using canton_id (reliable, no accent issues)
-    const cantonIds = (data ?? []).map(c => c.id)
-    let cantonCounts: { canton_id: string }[] = []
+    const cantonIds = (data ?? []).map((c) => c.id)
+    const counts = new Map<string, number>()
     if (cantonIds.length > 0) {
-      const { data: prices } = await supabase
-        .from('market_prices')
-        .select('canton_id')
-        .in('canton_id', cantonIds)
-      cantonCounts = prices ?? []
+      const { data: scoped } = await supabase
+        .from('market_price_scoped')
+        .select('scope_id')
+        .eq('scope', 'canton')
+        .in('scope_id', cantonIds)
+      for (const row of (scoped ?? []) as { scope_id: string }[]) {
+        counts.set(row.scope_id, (counts.get(row.scope_id) ?? 0) + 1)
+      }
     }
-    
-    const cantonsWithCounts = (data ?? []).map(c => ({
-      ...c,
-      priceCount: cantonCounts.filter(pc => pc.canton_id === c.id).length,
-    }))
-    
+    const cantonsWithCounts = (data ?? []).map((c) => ({ ...c, priceCount: counts.get(c.id) ?? 0 }))
+
     return NextResponse.json({ cantons: cantonsWithCounts }, {
       headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' }
     })
@@ -106,15 +106,20 @@ export async function GET(request: NextRequest) {
 
   // Prix courants : UNE ligne par culture et par région (vue partagée avec
   // AgriTogo : relevés dédupliqués, médiane par marché puis par région, tendance
-  // sur 21 jours). Un filtre par canton exige les relevés bruts, plus bas.
-  if (!cantonId) {
-    let q = supabase.from('market_price_current').select('*').order('age_days', { ascending: true })
-    if (regionId) q = q.eq('region_id', regionId)
+  // sur 21 jours), à la maille choisie : canton, préfecture ou région.
+  {
+    let q = supabase.from('market_price_scoped').select('*').order('age_days', { ascending: true })
+    if (cantonId) q = q.eq('scope', 'canton').eq('scope_id', cantonId)
+    else if (prefectureId) q = q.eq('scope', 'prefecture').eq('scope_id', prefectureId)
+    else {
+      q = q.eq('scope', 'region')
+      if (regionId) q = q.eq('scope_id', regionId)
+    }
     if (cultureId) q = q.eq('culture_id', cultureId)
     const { data: current, error: currentError } = await q
     if (!currentError) {
       const prices = (current ?? []).map((r: Record<string, unknown>) => ({
-        id: `${r.culture_id}:${r.region_id}`,
+        id: `${r.culture_id}:${r.scope}:${r.scope_id}`,
         culture_id: r.culture_id,
         region_id: r.region_id,
         market_name: ((r.markets as string[] | null) ?? []).join(', '),
@@ -127,6 +132,8 @@ export async function GET(request: NextRequest) {
         cultures: { name: r.culture_name },
         regions: { name: r.region_name },
         region_name: r.region_name,
+        scope: r.scope,
+        scope_name: r.scope_name,
         markets: r.markets,
         sources: r.sources,
         n_markets: r.n_markets,
@@ -146,7 +153,7 @@ export async function GET(request: NextRequest) {
     // Vue absente (42P01) ou erreur : on retombe sur les relevés bruts ci-dessous.
   }
 
-  // Relevés bruts (filtre par canton, ou repli si la vue n'est pas disponible).
+  // Relevés bruts (repli si la vue n'est pas disponible).
   //
   // `price_type` (gros / détail) n'existe qu'une fois la migration CPC
   // d'AgriTogo appliquée. PostgREST répond 42703 sur une colonne inconnue, ce
