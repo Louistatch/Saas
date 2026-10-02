@@ -1,10 +1,11 @@
-import { assertTenantAccess } from '@/lib/security/assert-access'
+import { assertRole } from '@/lib/security/assert-access'
 import { cardCooperative, issueCardPin } from '@/lib/security/card-pin'
 import { NextResponse, type NextRequest } from 'next/server'
 
 /**
- * POST /api/cards/pin { card_number } — un opérateur émet (ou réémet) le PIN
- * d'une carte de sa coopérative. Le PIN n'est renvoyé qu'ici, une seule fois.
+ * POST /api/cards/pin { card_number } — le super-administrateur seul émet (ou
+ * réémet) le PIN d'une carte. Ni les opérateurs ni les administrateurs de
+ * coopérative ne le peuvent. Le PIN n'est renvoyé qu'ici, une seule fois.
  */
 
 const NO_STORE = { 'Cache-Control': 'no-store' }
@@ -15,14 +16,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Requête invalide.' }, { status: 400 })
   }
 
-  const card = await cardCooperative(body.card_number)
-  // Même réponse pour « carte inconnue » et « carte d'une autre coopérative » :
-  // un opérateur ne doit pas pouvoir sonder les cartes des autres.
-  const denied = NextResponse.json({ error: 'Carte introuvable.' }, { status: 404 })
-  if (!card?.cooperativeId) return denied
+  const guard = await assertRole('super_admin')
+  if (!guard.ok) return guard.response
 
-  const guard = await assertTenantAccess(card.cooperativeId)
-  if (!guard.ok) return guard.response.status === 401 ? guard.response : denied
+  const card = await cardCooperative(body.card_number)
+  if (!card) return NextResponse.json({ error: 'Carte introuvable.' }, { status: 404 })
 
   const issued = await issueCardPin(card.cardNumber, guard.ctx.userId)
   if (!issued.ok) {
