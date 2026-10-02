@@ -27,14 +27,22 @@ export async function GET(request: NextRequest) {
 
   // Return regions with price counts
   if (action === 'regions') {
-    const { data: allPrices } = await supabase
-      .from('market_prices')
-      .select('region_id')
-      .limit(1000)
-
+    // Nombre de prix COURANTS (une culture dans une région = un prix), lu dans la
+    // vue : l'ancien décompte lisait 1000 lignes brutes au hasard et pouvait
+    // annoncer « 0 prix » pour une région qui en a des dizaines.
     const regionCounts: Record<string, number> = {}
-    for (const p of allPrices ?? []) {
-      regionCounts[p.region_id] = (regionCounts[p.region_id] ?? 0) + 1
+    const { data: current, error: currentError } = await supabase
+      .from('market_price_current')
+      .select('region_id')
+    if (!currentError) {
+      for (const row of (current ?? []) as { region_id: string }[]) {
+        regionCounts[row.region_id] = (regionCounts[row.region_id] ?? 0) + 1
+      }
+    } else {
+      const { data: allPrices } = await supabase.from('market_prices').select('region_id').limit(1000)
+      for (const p of allPrices ?? []) {
+        regionCounts[p.region_id] = (regionCounts[p.region_id] ?? 0) + 1
+      }
     }
     return NextResponse.json({ regionCounts }, {
       headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' }
@@ -96,7 +104,49 @@ export async function GET(request: NextRequest) {
     })
   }
 
-  // Default: return market prices.
+  // Prix courants : UNE ligne par culture et par région (vue partagée avec
+  // AgriTogo : relevés dédupliqués, médiane par marché puis par région, tendance
+  // sur 21 jours). Un filtre par canton exige les relevés bruts, plus bas.
+  if (!cantonId) {
+    let q = supabase.from('market_price_current').select('*').order('age_days', { ascending: true })
+    if (regionId) q = q.eq('region_id', regionId)
+    if (cultureId) q = q.eq('culture_id', cultureId)
+    const { data: current, error: currentError } = await q
+    if (!currentError) {
+      const prices = (current ?? []).map((r: Record<string, unknown>) => ({
+        id: `${r.culture_id}:${r.region_id}`,
+        culture_id: r.culture_id,
+        region_id: r.region_id,
+        market_name: ((r.markets as string[] | null) ?? []).join(', '),
+        price: r.price,
+        unit: 'kg',
+        currency: 'FCFA',
+        trend: r.trend,
+        verified: false,
+        created_at: `${String(r.last_observed)}T12:00:00Z`,
+        cultures: { name: r.culture_name },
+        regions: { name: r.region_name },
+        region_name: r.region_name,
+        markets: r.markets,
+        sources: r.sources,
+        n_markets: r.n_markets,
+        n_obs: r.n_obs,
+        price_min: r.price_min,
+        price_max: r.price_max,
+        previous_price: r.previous_price,
+        change_pct: r.change_pct == null ? null : Number(r.change_pct),
+        trend_known: r.trend_known,
+        history: r.history,
+      }))
+      return NextResponse.json(
+        { prices, mode: 'current' },
+        { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' } },
+      )
+    }
+    // Vue absente (42P01) ou erreur : on retombe sur les relevés bruts ci-dessous.
+  }
+
+  // Relevés bruts (filtre par canton, ou repli si la vue n'est pas disponible).
   //
   // `price_type` (gros / détail) n'existe qu'une fois la migration CPC
   // d'AgriTogo appliquée. PostgREST répond 42703 sur une colonne inconnue, ce
