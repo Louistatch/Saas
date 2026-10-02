@@ -10,6 +10,7 @@ import {
   type PriceTrend,
 } from '@/lib/market-prices/models'
 import { MarketPricesService } from '@/lib/market-prices/service'
+import { NearbyOffers } from '@/components/verify/nearby-offers'
 
 function TrendBadge({ trend }: { trend: PriceTrend | string }) {
   if (trend === 'up')
@@ -483,6 +484,16 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
           )}
         </div>
       )}
+
+      {/* Préventes publiées près de la zone et de la culture choisies ci-dessus.
+          Les annonces se GÈRENT depuis Exploitation ; ici on les DÉCOUVRE, à côté
+          des prix qui permettent de juger si une offre est correcte. */}
+      <NearbyOffers
+        regionId={selectedRegion?.id}
+        prefectureId={selectedPrefectureId || undefined}
+        cantonId={selectedCantonId || undefined}
+        culture={cultureFilter ? Culture.findById(cultureFilter)?.name : undefined}
+      />
 
       {/* Submit a price (collapsible) */}
       {!showSubmitForm ? (

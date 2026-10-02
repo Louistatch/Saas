@@ -141,8 +141,15 @@ export async function searchAnnouncements(
 
 /**
  * Zone de référence du compte, pour le tri « près de chez moi ». On la déduit
- * du profil Haroo quand il en porte une, sinon de la fiche membre. Un compte
+ * du profil Haroo (ouvrier, acheteur, agronome) quand il en porte une. Un compte
  * sans zone connue voit simplement les annonces les plus récentes.
+ *
+ * ⚠️ La fiche MEMBRE n'est volontairement pas lue ici, alors que ce commentaire
+ * le prétendait. Rattacher un compte à sa fiche passe par l'email
+ * (private.owns_member) et aucune des 16 fiches ne correspond aujourd'hui à un
+ * compte : le repli n'aurait jamais servi. Les écrans qui connaissent la carte
+ * (Exploitation, Marchés) passent donc la zone EXPLICITEMENT, par les
+ * paramètres canton / prefecture / region de l'API.
  */
 export async function resolveViewerZone(
   supabase: SupabaseClient<Database>,

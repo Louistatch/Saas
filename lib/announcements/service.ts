@@ -1,4 +1,10 @@
-import { Announcement, type AnnouncementRow, type AnnouncementType } from './models'
+import {
+  Announcement,
+  type AnnouncementDefaults,
+  type AnnouncementRow,
+  type AnnouncementType,
+  EMPTY_DEFAULTS,
+} from './models'
 
 export interface CreateAnnouncementPayload {
   type: AnnouncementType
@@ -7,8 +13,14 @@ export interface CreateAnnouncementPayload {
   culture?: string
   quantityKg?: number
   pricePerKgFcfa?: number
-  locationCanton?: string
+  /** Seulement quand la fiche membre n'a pas de préfecture : choisie à l'écran. */
+  prefectureId?: string
   contactPhone?: string
+}
+
+export interface ListAnnouncementsResult {
+  announcements: Announcement[]
+  defaults: AnnouncementDefaults
 }
 
 export interface CreateAnnouncementResult {
@@ -28,19 +40,25 @@ export class AnnouncementsService {
 
   constructor(private readonly cardNumber: string) {}
 
-  async list(): Promise<Announcement[]> {
+  async list(): Promise<ListAnnouncementsResult> {
+    const empty: ListAnnouncementsResult = { announcements: [], defaults: EMPTY_DEFAULTS }
     const controller = new AbortController()
     this.controllers.add(controller)
     try {
       const res = await fetch(`/api/verify/${encodeURIComponent(this.cardNumber)}/announcements`, {
         signal: controller.signal,
       })
-      if (!res.ok) return []
-      const data = (await res.json()) as { announcements?: AnnouncementRow[] }
-      return Announcement.fromRows(data.announcements ?? [])
-    } catch (e: unknown) {
-      if (e instanceof Error && e.name === 'AbortError') return []
-      return []
+      if (!res.ok) return empty
+      const data = (await res.json()) as {
+        announcements?: AnnouncementRow[]
+        defaults?: AnnouncementDefaults
+      }
+      return {
+        announcements: Announcement.fromRows(data.announcements ?? []),
+        defaults: data.defaults ?? EMPTY_DEFAULTS,
+      }
+    } catch {
+      return empty
     } finally {
       this.controllers.delete(controller)
     }
@@ -58,7 +76,7 @@ export class AnnouncementsService {
           culture: payload.culture,
           quantity_kg: payload.quantityKg,
           price_per_kg_fcfa: payload.pricePerKgFcfa,
-          location_canton: payload.locationCanton,
+          prefecture_id: payload.prefectureId,
           contact_phone: payload.contactPhone,
         }),
       })
@@ -71,6 +89,25 @@ export class AnnouncementsService {
         }
       }
       return { ok: false, message: data.error ?? 'Erreur' }
+    } catch {
+      return { ok: false, message: 'Erreur de connexion' }
+    }
+  }
+
+  /** Retire une annonce du Marché (statut « closed »), sans l'effacer de l'historique. */
+  async close(id: string): Promise<{ ok: boolean; message: string }> {
+    try {
+      const res = await fetch(
+        `/api/verify/${encodeURIComponent(this.cardNumber)}/announcements/${encodeURIComponent(id)}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'closed' }),
+        },
+      )
+      if (res.ok) return { ok: true, message: 'Annonce retirée du marché' }
+      const data = (await res.json().catch(() => ({}))) as { error?: string }
+      return { ok: false, message: data.error ?? 'Retrait impossible' }
     } catch {
       return { ok: false, message: 'Erreur de connexion' }
     }

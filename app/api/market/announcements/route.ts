@@ -13,6 +13,7 @@ import {
   resolveViewerZone,
   searchAnnouncements,
 } from '@/lib/market/announcements'
+import { resolveZone } from '@/lib/market/zone'
 import { createClient } from '@/lib/supabase/server'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 import { type NextRequest, NextResponse } from 'next/server'
@@ -101,6 +102,16 @@ export async function POST(request: NextRequest) {
   }
   const input = parsed.data
 
+  // Même règle de zone que l'écran Exploitation (lib/market/zone) : le parent
+  // d'un canton est celui que la base déclare. Ce chemin faisait confiance à la
+  // préfecture envoyée par le navigateur, si bien qu'un canton de la Kara
+  // pouvait être publié sous une préfecture du Maritime.
+  const zone = await resolveZone(supabase, {
+    cantonId: input.canton_id,
+    prefectureId: input.prefecture_id,
+    regionId: input.region_id,
+  })
+
   // author_id vient de la session : publier au nom d'autrui est impossible,
   // et la policy WITH CHECK le refuserait de toute façon.
   const { data, error } = await supabase
@@ -114,9 +125,10 @@ export async function POST(request: NextRequest) {
       quantity_kg: input.quantity_kg ?? null,
       price_per_kg_fcfa: input.price_per_kg_fcfa ?? null,
       contact_phone: input.contact_phone ?? null,
-      canton_id: input.canton_id ?? null,
-      prefecture_id: input.prefecture_id ?? null,
-      region_id: input.region_id ?? null,
+      canton_id: zone.cantonId,
+      prefecture_id: zone.prefectureId,
+      region_id: zone.regionId,
+      location_canton: zone.cantonName,
       status: 'active',
     })
     .select('id')

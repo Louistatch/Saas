@@ -26,6 +26,34 @@ export interface AnnouncementRow {
   created_at: string
 }
 
+/**
+ * Valeurs par défaut du formulaire, tirées de la fiche du membre : le
+ * producteur ne retape pas son numéro, et ne choisit pas un canton que la base
+ * connaît déjà.
+ */
+export interface AnnouncementDefaults {
+  phone: string | null
+  /** Zone de la fiche membre, complétée (canton → préfecture → région). */
+  zone: {
+    prefecture_id: string | null
+    /** « Lama-Kara · Kozah · Kara », prêt à afficher. */
+    label: string | null
+  }
+  /**
+   * Fourni UNIQUEMENT quand la préfecture reste inconnue : de quoi en choisir
+   * une. Ce sont des PRÉFECTURES et non des cantons, parce que les 37
+   * préfectures sont en base alors que 21 n'ont aucun canton — dont Dankpen. Un
+   * sélecteur de cantons aurait été vide pour une grande partie du pays.
+   */
+  prefectures: { id: string; name: string; region: string | null }[]
+}
+
+export const EMPTY_DEFAULTS: AnnouncementDefaults = {
+  phone: null,
+  zone: { prefecture_id: null, label: null },
+  prefectures: [],
+}
+
 /** Wraps a raw announcement row with display-ready accessors (emoji, label, formatted fields). */
 export class Announcement {
   constructor(private readonly row: AnnouncementRow) {}
@@ -44,6 +72,11 @@ export class Announcement {
 
   get title(): string {
     return this.row.title
+  }
+
+  /** Visible sur le Marché : seules les annonces « active » y figurent. */
+  get isActive(): boolean {
+    return this.row.status === 'active'
   }
 
   get description(): string | null {
