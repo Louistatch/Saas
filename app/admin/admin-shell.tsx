@@ -10,6 +10,7 @@ import {
   Briefcase,
   Building2,
   Coins,
+  CreditCard,
   Cpu,
   GraduationCap,
   LayoutDashboard,
@@ -33,6 +34,7 @@ const ADMIN_LINKS = [
   { href: '/admin/haroo', label: 'Professionnels Haroo', icon: Briefcase },
   { href: '/admin/partners', label: 'Opérateurs', icon: Award },
   { href: '/admin/partners/training', label: 'Formation Opérateurs', icon: GraduationCap },
+  { href: '/dashboard/cards', label: 'Cartes et PIN', icon: CreditCard },
   { href: '/admin/organization-earnings', label: 'Gains organisations', icon: Coins },
   { href: '/admin/analytics', label: 'Statistiques', icon: BarChart3 },
   { href: '/admin/agritogo', label: 'AgriTogo', icon: Cpu },
@@ -69,15 +71,15 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen flex flex-col md:flex-row bg-background">
       {/* Sidebar */}
       <div
-        className={`fixed md:static left-0 top-0 z-40 w-64 h-screen bg-sidebar border-r border-sidebar-border transition-transform duration-300 ${
+        className={`fixed md:static left-0 top-0 z-40 w-64 h-dvh md:h-screen flex flex-col bg-sidebar border-r border-sidebar-border transition-transform duration-300 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
-        <div className="p-6 flex items-center gap-3 border-b border-sidebar-border">
+        <div className="p-6 flex items-center gap-3 border-b border-sidebar-border shrink-0">
           <Logo size="lg" textClassName="text-sidebar-foreground" />
         </div>
 
-        <nav className="space-y-2 p-4 flex-1">
+        <nav className="space-y-2 p-4 flex-1 min-h-0 overflow-y-auto">
           {ADMIN_LINKS.map((link) => {
             const Icon = link.icon
             const isActive = pathname === link.href
@@ -99,7 +101,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="p-4 border-t border-sidebar-border space-y-2">
+        <div className="p-4 border-t border-sidebar-border space-y-2 shrink-0">
           <Link href="/dashboard">
             <Button
               variant="outline"
