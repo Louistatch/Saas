@@ -95,16 +95,26 @@ export async function POST(request: NextRequest) {
   const agritogoUrl = process.env.AGRITOGO_API_URL
   if (agritogoUrl) {
     try {
-      const agriRes = await fetch(`${agritogoUrl}/api/v1/agent/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: userMessage,
-          card_number: cardNumber,
-          audience: 'farmer',
-        }),
-        signal: AbortSignal.timeout(30000),
-      })
+      const callAgritogo = () =>
+        fetch(`${agritogoUrl}/api/v1/agent/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: userMessage,
+            card_number: cardNumber,
+            audience: 'farmer',
+          }),
+          signal: AbortSignal.timeout(30000),
+        })
+
+      let agriRes = await callAgritogo()
+      // Service endormi (Railway) : il répond 503 le temps que ses modules agents se
+      // chargent, soit quelques secondes. Un seul nouvel essai évite de basculer
+      // sur le moteur de secours pour une simple mise en route.
+      if (agriRes.status === 503) {
+        await new Promise((resolve) => setTimeout(resolve, 3000))
+        agriRes = await callAgritogo()
+      }
 
       if (agriRes.ok) {
         const data = await agriRes.json()
