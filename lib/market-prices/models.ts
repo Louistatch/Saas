@@ -109,6 +109,8 @@ export interface MarketPriceRow {
   // Ligne de la vue `market_price_current` : un prix par culture ET par région.
   regions?: { name: string } | null
   region_name?: string | null
+  scope?: string | null
+  scope_name?: string | null
   markets?: string[] | null
   sources?: string[] | null
   n_markets?: number | null
@@ -231,6 +233,11 @@ export class MarketPrice {
   /** Nom de la région du prix (« Kara »), jamais deviné côté écran. */
   get regionName(): string {
     return this.row.region_name ?? this.row.regions?.name ?? ''
+  }
+
+  /** Zone du prix : « Kara », « Binah » ou « Kétao » selon la maille choisie. */
+  get scopeName(): string {
+    return this.row.scope_name ?? this.regionName
   }
 
   /** Nombre de marchés dont le prix est la médiane. */

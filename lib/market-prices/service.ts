@@ -56,8 +56,9 @@ export class MarketPricesService {
     return data?.cantons ?? []
   }
 
-  async getPrices(regionId: string, cantonId?: string): Promise<MarketPrice[]> {
+  async getPrices(regionId: string, cantonId?: string, prefectureId?: string): Promise<MarketPrice[]> {
     let url = `/api/market-prices?region_id=${regionId}`
+    if (prefectureId) url += `&prefecture_id=${prefectureId}`
     if (cantonId) url += `&canton_id=${cantonId}`
     const data = await this.getJson<{ prices?: MarketPriceRow[] }>(url)
     return MarketPrice.fromRows(data?.prices ?? [])

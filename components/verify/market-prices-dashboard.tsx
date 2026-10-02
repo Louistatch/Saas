@@ -154,7 +154,7 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
       (a, b) => a.ageDays - b.ageDays || a.cultureName.localeCompare(b.cultureName, 'fr'),
     )
     return ordered.filter((p) => {
-      const key = `${p.cultureId}|${p.regionName}|${p.marketName.toLowerCase()}|${p.priceType}`
+      const key = `${p.cultureId}|${p.scopeName}|${p.marketName.toLowerCase()}|${p.priceType}`
       if (latest.has(key)) return false
       latest.add(key)
       return true
@@ -223,7 +223,7 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
     let cancelled = false
     setLoading(true)
     serviceRef.current
-      .getPrices(selectedRegion.id, selectedCantonId || undefined)
+      .getPrices(selectedRegion.id, selectedCantonId || undefined, selectedPrefectureId || undefined)
       .then((list) => {
         if (!cancelled) setPrices(list)
       })
@@ -233,7 +233,7 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
     return () => {
       cancelled = true
     }
-  }, [selectedRegion, selectedCantonId])
+  }, [selectedRegion, selectedPrefectureId, selectedCantonId])
 
   const handleSubmitPrice = useCallback(async () => {
     if (!submitForm.culture_id || !submitForm.price) return
@@ -474,6 +474,7 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
                         {p.regionName && (
                           <p className="mt-0.5 pl-7 text-[10.5px] text-white/35 truncate">
                             {p.regionName}
+                            {p.scopeName && p.scopeName !== p.regionName ? ` › ${p.scopeName}` : ''}
                             {p.marketCount > 1 ? ` · ${p.marketCount} marchés` : p.marketName ? ` · ${p.marketName}` : ''}
                           </p>
                         )}
