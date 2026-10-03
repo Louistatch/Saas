@@ -48,6 +48,8 @@ export default function OperatorSignupPage() {
       if (!response.ok) {
         setError(body.error ?? 'Création du compte impossible.')
         setFieldErrors(body.fields ?? {})
+      } else if (body.verify_email) {
+        window.location.assign(`/auth/verify-email?email=${encodeURIComponent(parsed.data.email)}`)
       } else {
         setPartnerCode(body.partner_code ?? '')
         setSubmitted(true)

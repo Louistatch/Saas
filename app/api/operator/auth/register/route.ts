@@ -3,6 +3,7 @@ import { generateUniquePartnerCode } from '@/lib/utils/partner-code'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 import { flattenZodErrors, operatorSignupSchema } from '@/lib/validators/schemas'
+import { isEmailConfirmationRequired, sendConfirmationEmail } from '@/lib/auth/email-confirmation'
 import { type NextRequest, NextResponse } from 'next/server'
 
 const PROFILE_WAIT_ATTEMPTS = 8
@@ -48,7 +49,8 @@ export async function POST(request: NextRequest) {
   const { data: created, error: authError } = await admin.auth.admin.createUser({
     email,
     password,
-    email_confirm: true,
+    // Confirmé d'office tant que la confirmation par e-mail n'est pas activée.
+    email_confirm: !isEmailConfirmationRequired(),
     app_metadata: { account_type: 'operator' },
     user_metadata: { first_name: firstName, last_name: lastName },
   })
@@ -150,9 +152,12 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  const verifyEmail = isEmailConfirmationRequired()
+  if (verifyEmail) await sendConfirmationEmail(email)
   return NextResponse.json({
     success: true,
     partner_code: partner.partner_code,
     redirect_to: '/operator',
+    verify_email: verifyEmail,
   })
 }

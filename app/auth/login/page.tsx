@@ -36,6 +36,8 @@ function LoginInner() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
+  // Compte créé mais adresse pas encore confirmée : on le dit et on propose le renvoi.
+  const [unconfirmed, setUnconfirmed] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [progress, setProgress] = useState('')
@@ -48,6 +50,7 @@ function LoginInner() {
       if (submitting) return
 
       setError('')
+      setUnconfirmed(false)
       setFieldErrors({})
 
       const parsed = loginSchema.safeParse({ email, password })
@@ -116,7 +119,13 @@ function LoginInner() {
       } catch (err: unknown) {
         clearTimeout(progressTimer)
         clearTimeout(slowTimer)
-        setError(errorMessage(err))
+        const raw = err instanceof Error ? err.message : ''
+        if (/email not confirmed/i.test(raw)) {
+          setUnconfirmed(true)
+          setError('Votre adresse e-mail n’est pas encore confirmée. Ouvrez le lien reçu par e-mail.')
+        } else {
+          setError(errorMessage(err))
+        }
         setSubmitting(false)
         setProgress('')
       }
@@ -173,6 +182,14 @@ function LoginInner() {
                   role="alert"
                 >
                   {error}
+                  {unconfirmed && (
+                    <Link
+                      href={`/auth/verify-email?email=${encodeURIComponent(email.trim())}`}
+                      className="mt-1 block font-medium underline"
+                    >
+                      Renvoyer l’e-mail de confirmation
+                    </Link>
+                  )}
                 </div>
               )}
 

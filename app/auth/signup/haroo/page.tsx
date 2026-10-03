@@ -80,8 +80,12 @@ function HarooSignupForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(parsed.data),
       })
-      const data: { success?: boolean; error?: string } = await res.json().catch(() => ({}))
-      if (res.ok && data.success) {
+      const data: { success?: boolean; error?: string; verify_email?: boolean } = await res
+        .json()
+        .catch(() => ({}))
+      if (res.ok && data.success && data.verify_email) {
+        window.location.assign(`/auth/verify-email?email=${encodeURIComponent(parsed.data.email)}`)
+      } else if (res.ok && data.success) {
         setSubmitted(true)
       } else {
         setError(data.error || 'Erreur lors de la création du compte. Réessayez.')

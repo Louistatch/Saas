@@ -5,6 +5,7 @@
 // (auth.users + profiles + haroo_<type>_profiles). Cette route valide,
 // rate-limite et proxifie vers AgriTogo.
 
+import { isEmailConfirmationRequired, sendConfirmationEmail } from '@/lib/auth/email-confirmation'
 import { NextResponse, type NextRequest } from 'next/server'
 import { rateLimit, clientKeyFromHeaders } from '@/lib/utils/rate-limit'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
@@ -59,11 +60,15 @@ export async function POST(request: NextRequest) {
       }),
     })
     clearTimeout(timeoutId)
-    const data: unknown = await res.json().catch(() => ({
+    const data = (await res.json().catch(() => ({
       success: false,
       error: 'Réponse invalide du service Haroo',
-    }))
-    return NextResponse.json(data, { status: res.status })
+    }))) as Record<string, unknown>
+    // AgriTogo crée le compte NON confirmé quand REQUIRE_EMAIL_CONFIRMATION
+    // est activé des deux côtés ; l'e-mail part d'ici (SMTP Supabase/Resend).
+    const verifyEmail = res.ok && data.success === true && isEmailConfirmationRequired()
+    if (verifyEmail) await sendConfirmationEmail(parsed.data.email)
+    return NextResponse.json({ ...data, verify_email: verifyEmail }, { status: res.status })
   } catch {
     clearTimeout(timeoutId)
     return NextResponse.json(
