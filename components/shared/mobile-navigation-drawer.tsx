@@ -15,8 +15,8 @@
 import { useAuth } from '@/app/context/auth-context'
 import { Sheet, SheetClose, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { PROFILE_URL, accountJourney, harooAction } from '@/lib/account/journey'
-import { type ProductContext, useProductContext } from '@/lib/navigation/product-context'
 import { performLogout } from '@/lib/auth/logout'
+import { type ProductContext, useProductContext } from '@/lib/navigation/product-context'
 import { cn } from '@/lib/utils'
 import {
   ArrowRight,
@@ -139,6 +139,29 @@ const NAVIGATION_BY_CONTEXT: Record<ProductContext, NavItem[]> = {
       tone: 'blue',
     },
   ],
+}
+
+/** Bannière de chaque espace : le texte est dans l'image, repris en aria-label. */
+const BANNER_BY_CONTEXT: Record<
+  ProductContext,
+  { src: string; width: number; height: number; href: string; label: string }
+> = {
+  faitierehub: {
+    src: '/images/menu/gestion-organisations.webp',
+    width: 1200,
+    height: 349,
+    href: '/features',
+    label:
+      'Gestion des organisations agricoles : faîtières, coopératives, membres et identification numérique',
+  },
+  haroo: {
+    src: '/images/menu/plateforme-agricole.webp',
+    width: 1200,
+    height: 224,
+    href: '/#haroo',
+    label:
+      'Plateforme agricole intégrée : des services pratiques pour les producteurs, coopératives et faîtières',
+  },
 }
 
 const SHARED_NAVIGATION: NavItem[] = [
@@ -395,6 +418,7 @@ export function MobileNavigationDrawer({ open, onClose }: { open: boolean; onClo
   const [context, setContext] = useProductContext(pathname)
   const isActive = (href: string) => !href.includes('#') && pathname === href
   const items = NAVIGATION_BY_CONTEXT[context]
+  const banner = BANNER_BY_CONTEXT[context]
 
   // Sheet (Radix Dialog) apporte focus piégé, Échap, clic extérieur et blocage
   // du défilement de la page. Son bouton de fermeture générique est masqué
@@ -438,23 +462,22 @@ export function MobileNavigationDrawer({ open, onClose }: { open: boolean; onClo
         >
           <ProductContextSwitcher value={context} onChange={setContext} />
 
-          {context === 'haroo' ? (
-            <Link
-              href="/#haroo"
-              onClick={onClose}
-              aria-label="Plateforme agricole intégrée : des services pratiques pour les producteurs, coopératives et faîtières"
-              className="mt-4 block overflow-hidden rounded-[20px] border border-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            >
-              <Image
-                src="/images/menu/plateforme-agricole.webp"
-                alt=""
-                width={1200}
-                height={224}
-                sizes="(min-width: 640px) 416px, calc(100vw - 2rem)"
-                className="h-auto w-full"
-              />
-            </Link>
-          ) : null}
+          <Link
+            href={banner.href}
+            onClick={onClose}
+            aria-label={banner.label}
+            className="mt-4 block overflow-hidden rounded-[20px] border border-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            <Image
+              key={banner.src}
+              src={banner.src}
+              alt=""
+              width={banner.width}
+              height={banner.height}
+              sizes="(min-width: 640px) 416px, calc(100vw - 2rem)"
+              className="h-auto w-full"
+            />
+          </Link>
 
           <ul className="mt-4 space-y-2">
             {items.map((item, i) => (
