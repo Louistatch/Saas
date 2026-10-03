@@ -6,13 +6,24 @@ const REGION_COORDS: Record<string, { lat: number; lon: number; city: string }> 
   'Savanes':   { lat: 10.863, lon: 0.207,  city: 'Dapaong' },
 }
 
-// ── Model weights for West Africa ensemble ────────────────────────────────────
-// ECMWF: best global accuracy, gold standard for 3-10 days
-// GFS:   good tropical skill, runs 4x/day (more frequent updates)
-// ICON:  independent European model, solid global coverage
-const W_ECMWF = 0.45
-const W_GFS   = 0.35
-const W_ICON  = 0.20
+// ── Poids de l'ensemble multi-modèles ─────────────────────────────────────────
+// Audit oct. 2026 : les anciens poids (0,45 / 0,35 / 0,20) ne reposaient sur
+// aucune vérification au Togo. Sans scores locaux (stations, CHIRPS, ERA5),
+// la littérature recommande des poids ÉGAUX. À ajuster seulement après
+// vérification des erreurs de chaque modèle sur des observations togolaises.
+const W_ECMWF = 1 / 3
+const W_GFS   = 1 / 3
+const W_ICON  = 1 / 3
+
+/** Valeur absente de l'API : NaN (jamais 0, qui fausserait les moyennes). */
+const val = (x: number | null | undefined): number => (x == null ? Number.NaN : x)
+/** Moyenne pondérée des seules valeurs connues ; NaN si aucune. */
+function finiteMean(items: { v: number; w: number }[]): number {
+  const ok = items.filter((it) => Number.isFinite(it.v))
+  const tw = ok.reduce((s, it) => s + it.w, 0)
+  return tw > 0 ? ok.reduce((s, it) => s + it.v * it.w, 0) / tw : Number.NaN
+}
+const or0 = (x: number): number => (Number.isFinite(x) ? x : 0)
 
 // ── In-memory caches (per region) ────────────────────────────────────────────
 const TTL_DAILY_MS   = 30 * 60_000
@@ -148,14 +159,14 @@ async function _fetchDailyModel(
     const d = json.daily
     const result: WeatherDayLive[] = d.time.map((date, i) => ({
       date,
-      temperature_max: d.temperature_2m_max[i] ?? 0,
-      temperature_min: d.temperature_2m_min[i] ?? 0,
-      temperature_mean: d.temperature_2m_mean[i] ?? 0,
-      precipitation_mm: d.precipitation_sum[i] ?? 0,
-      precipitation_probability: d.precipitation_probability_max[i] ?? 0,
-      wind_speed_ms: Math.round(((d.wind_speed_10m_max[i] ?? 0) / 3.6) * 10) / 10,
-      humidity_pct: d.relative_humidity_2m_mean[i] ?? 0,
-      et0_mm: d.et0_fao_evapotranspiration[i] ?? 0,
+      temperature_max: val(d.temperature_2m_max[i]),
+      temperature_min: val(d.temperature_2m_min[i]),
+      temperature_mean: val(d.temperature_2m_mean[i]),
+      precipitation_mm: val(d.precipitation_sum[i]),
+      precipitation_probability: val(d.precipitation_probability_max[i]),
+      wind_speed_ms: Math.round((val(d.wind_speed_10m_max[i]) / 3.6) * 10) / 10,
+      humidity_pct: val(d.relative_humidity_2m_mean[i]),
+      et0_mm: val(d.et0_fao_evapotranspiration[i]),
       source: 'open_meteo' as const,
       region,
       city: coords.city,
@@ -220,13 +231,13 @@ async function _fetchHourlyModel(
     const h = json.hourly
     const result: WeatherHour[] = h.time.map((time, i) => ({
       time,
-      temperature: h.temperature_2m[i] ?? 0,
-      apparent_temperature: h.apparent_temperature[i] ?? 0,
-      precipitation_probability: h.precipitation_probability[i] ?? 0,
+      temperature: val(h.temperature_2m[i]),
+      apparent_temperature: val(h.apparent_temperature[i]),
+      precipitation_probability: val(h.precipitation_probability[i]),
       weather_code: h.weather_code[i] ?? 0,
-      wind_speed_ms: Math.round(((h.wind_speed_10m[i] ?? 0) / 3.6) * 10) / 10,
-      humidity_pct: h.relative_humidity_2m[i] ?? 0,
-      uv_index: h.uv_index[i] ?? 0,
+      wind_speed_ms: Math.round((val(h.wind_speed_10m[i]) / 3.6) * 10) / 10,
+      humidity_pct: val(h.relative_humidity_2m[i]),
+      uv_index: val(h.uv_index[i]),
       is_day: h.is_day[i] ?? 1,
     }))
     toCache(cacheMap, region, result)
@@ -320,9 +331,9 @@ export async function fetchMinutely15ForRegion(region: string): Promise<WeatherM
 
 /**
  * Merges daily forecasts from ECMWF, GFS, ICON into a single ensemble.
- * - Temperature, wind, humidity: weighted average
- * - Precipitation: 70% weighted avg + 30% max (conservative for farmers)
- * - Precipitation probability: max across models (if any model says rain, show it)
+ * - Température, vent, humidité, pluie : moyenne des modèles disponibles
+ *   (valeurs absentes ignorées, poids égaux)
+ * - Probabilité de pluie : moyenne des modèles qui la fournissent
  * - ET0: from ECMWF when available (most accurate), else weighted avg
  */
 export function mergeWeatherModels(
@@ -331,52 +342,52 @@ export function mergeWeatherModels(
   icon: WeatherDayLive[]
 ): WeatherDayLive[] {
   const sources = [
-    { data: ecmwf, w: W_ECMWF },
-    { data: gfs,   w: W_GFS },
-    { data: icon,  w: W_ICON },
+    { data: ecmwf, w: W_ECMWF, ecmwf: true },
+    { data: gfs,   w: W_GFS,   ecmwf: false },
+    { data: icon,  w: W_ICON,  ecmwf: false },
   ].filter(s => s.data.length > 0)
 
   if (sources.length === 0) return []
-  if (sources.length === 1) return sources[0].data
 
-  const byDate = new Map<string, { models: { day: WeatherDayLive; w: number }[] }>()
-  for (const { data, w } of sources) {
+  const byDate = new Map<string, { day: WeatherDayLive; w: number; ecmwf: boolean }[]>()
+  for (const { data, w, ecmwf: isEcmwf } of sources) {
     for (const day of data) {
-      let entry = byDate.get(day.date)
-      if (!entry) {
-        entry = { models: [] }
-        byDate.set(day.date, entry)
-      }
-      entry.models.push({ day, w })
+      const list = byDate.get(day.date) ?? []
+      list.push({ day, w, ecmwf: isEcmwf })
+      byDate.set(day.date, list)
     }
   }
 
+  const round1 = (x: number) => Math.round(or0(x) * 10) / 10
   const result: WeatherDayLive[] = []
-  for (const [date, { models }] of byDate) {
-    const wAvg = (field: keyof WeatherDayLive): number => {
-      const valid = models.filter(m => (m.day[field] as number) > 0 || field !== 'et0_mm')
-      if (!valid.length) return 0
-      const tw = valid.reduce((s, m) => s + m.w, 0)
-      return valid.reduce((s, m) => s + (m.day[field] as number) * (m.w / tw), 0)
+  for (const [date, models] of byDate) {
+    const mean = (field: keyof WeatherDayLive) =>
+      finiteMean(models.map((m) => ({ v: m.day[field] as number, w: m.w })))
+
+    // Probabilité : moyenne des modèles qui la fournissent (l'ancien maximum
+    // gonflait les alertes). À défaut, part des modèles annonçant ≥ 1 mm.
+    let prob = mean('precipitation_probability')
+    if (!Number.isFinite(prob)) {
+      const amounts = models.map((m) => m.day.precipitation_mm).filter(Number.isFinite)
+      prob = amounts.length ? (amounts.filter((x) => x >= 1).length / amounts.length) * 100 : Number.NaN
     }
 
-    const precipAvg = wAvg('precipitation_mm')
-    const precipMax = Math.max(...models.map(m => m.day.precipitation_mm ?? 0))
-
-    // ET0 from ECMWF when available (FAO-56 reference)
-    const ecmwfEt0 = models.find(m => m.w === W_ECMWF)?.day.et0_mm
-    const et0 = ecmwfEt0 != null && ecmwfEt0 > 0 ? ecmwfEt0 : wAvg('et0_mm')
+    // ET0 FAO-56 : ECMWF en priorité quand il est fourni.
+    const ecmwfEt0 = models.find((m) => m.ecmwf)?.day.et0_mm
+    const et0 = ecmwfEt0 != null && Number.isFinite(ecmwfEt0) ? ecmwfEt0 : mean('et0_mm')
 
     result.push({
       date,
-      temperature_max:  Math.round(wAvg('temperature_max')  * 10) / 10,
-      temperature_min:  Math.round(wAvg('temperature_min')  * 10) / 10,
-      temperature_mean: Math.round(wAvg('temperature_mean') * 10) / 10,
-      precipitation_mm: Math.round((precipAvg * 0.7 + precipMax * 0.3) * 10) / 10,
-      precipitation_probability: Math.min(100, Math.max(...models.map(m => m.day.precipitation_probability ?? 0))),
-      wind_speed_ms:    Math.round(wAvg('wind_speed_ms')    * 10) / 10,
-      humidity_pct:     Math.round(wAvg('humidity_pct')),
-      et0_mm:           Math.round(et0 * 10) / 10,
+      temperature_max:  round1(mean('temperature_max')),
+      temperature_min:  round1(mean('temperature_min')),
+      temperature_mean: round1(mean('temperature_mean')),
+      // Quantité : moyenne des modèles (l'ancien mélange 70 % moyenne + 30 %
+      // maximum biaisait la pluie vers le haut sans fondement de vérification).
+      precipitation_mm: round1(mean('precipitation_mm')),
+      precipitation_probability: Math.round(Math.min(100, or0(prob))),
+      wind_speed_ms:    round1(mean('wind_speed_ms')),
+      humidity_pct:     Math.round(or0(mean('humidity_pct'))),
+      et0_mm:           round1(et0),
       source: 'open_meteo' as const,
       region: models[0].day.region,
       city:   models[0].day.city,
@@ -388,8 +399,8 @@ export function mergeWeatherModels(
 
 /**
  * Merges hourly slots from ECMWF, GFS, ICON.
- * - Temperature, wind, humidity: weighted average
- * - Precipitation probability: max across models
+ * - Température, vent, humidité : moyenne des modèles disponibles
+ * - Probabilité de pluie : moyenne des modèles qui la fournissent
  * - Weather code: from highest-weight available model (ECMWF priority)
  * - UV, is_day: from ECMWF
  */
@@ -405,7 +416,6 @@ export function mergeHourlyModels(
   ].filter(s => s.data.length > 0)
 
   if (sources.length === 0) return []
-  if (sources.length === 1) return sources[0].data
 
   const byTime = new Map<string, { slots: { slot: WeatherHour; w: number }[] }>()
   for (const { data, w } of sources) {
@@ -421,18 +431,16 @@ export function mergeHourlyModels(
 
   const result: WeatherHour[] = []
   for (const [time, { slots }] of byTime) {
-    const wAvg = (field: keyof WeatherHour): number => {
-      const tw = slots.reduce((s, m) => s + m.w, 0)
-      return slots.reduce((s, m) => s + (m.slot[field] as number) * (m.w / tw), 0)
-    }
-    // ECMWF-priority for categorical fields
-    const primary = [...slots].sort((a, b) => b.w - a.w)[0].slot
+    const wAvg = (field: keyof WeatherHour): number =>
+      or0(finiteMean(slots.map((m) => ({ v: m.slot[field] as number, w: m.w }))))
+    // Champs catégoriels (code météo, jour/nuit) : ECMWF en priorité.
+    const primary = slots[0].slot // ordre des sources : ECMWF, GFS, ICON
 
     result.push({
       time,
       temperature:              Math.round(wAvg('temperature')             * 10) / 10,
       apparent_temperature:     Math.round(wAvg('apparent_temperature')    * 10) / 10,
-      precipitation_probability: Math.min(100, Math.max(...slots.map(s => s.slot.precipitation_probability ?? 0))),
+      precipitation_probability: Math.round(Math.min(100, wAvg('precipitation_probability'))),
       weather_code:   primary.weather_code,
       wind_speed_ms:  Math.round(wAvg('wind_speed_ms') * 10) / 10,
       humidity_pct:   Math.round(wAvg('humidity_pct')),

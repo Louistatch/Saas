@@ -1,5 +1,6 @@
 'use client'
 
+import { seasonalOutlook } from '@/lib/weather/normals'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import {
@@ -1114,12 +1115,18 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
               {showSeasonal && (
                 <div className="border-t border-white/10 px-4 pb-3 pt-2 space-y-2">
                   {seasonal.map((s) => {
-                    const precipTrend =
-                      s.precipitation_mm > 150
-                        ? { label: 'Bonne pluviométrie', color: 'text-blue-300' }
-                        : s.precipitation_mm > 80
-                          ? { label: 'Normale', color: 'text-sky-300' }
-                          : { label: 'Sèche', color: 'text-orange-300' }
+                    // Lecture par rapport à la normale du mois (et non par seuils
+                    // fixes en mm, qui classaient « sèche » un mois sec par nature).
+                    const outlook = seasonalOutlook(region ?? 'Maritime', s.month, s.precipitation_mm)
+                    const precipTrend = {
+                      label: outlook.label,
+                      color:
+                        outlook.tone === 'wet'
+                          ? 'text-blue-300'
+                          : outlook.tone === 'dry'
+                            ? 'text-orange-300'
+                            : 'text-sky-300',
+                    }
                     return (
                       <div
                         key={s.month}
@@ -1153,7 +1160,8 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
                     )
                   })}
                   <p className="text-white/20 text-[9px] text-center">
-                    Modèle CFS NOAA · Ensemble saisonnier
+                    Modèle CFS NOAA · tendance indicative par rapport à la normale (fiabilité
+                    limitée en Afrique de l’Ouest)
                   </p>
                 </div>
               )}

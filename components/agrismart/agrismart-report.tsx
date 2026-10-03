@@ -47,35 +47,41 @@ async function downloadPdf(result: CalcResult, region: string, author: string) {
     head: [['Indicateur', 'Valeur']],
     body: [
       ['Surface totale', `${k.total_area_m2.toLocaleString('fr-FR')} m²`],
-      ['Volume de survie', `${Math.round(k.total_survival_m3).toLocaleString('fr-FR')} m³/an`],
-      ['Volume optimal', `${Math.round(k.total_optimal_m3).toLocaleString('fr-FR')} m³/an`],
+      ['Besoin année normale', `${Math.round(k.total_survival_m3).toLocaleString('fr-FR')} m³/an`],
+      [
+        'À prévoir (année sèche, 4 ans sur 5)',
+        `${Math.round(k.total_optimal_m3).toLocaleString('fr-FR')} m³/an`,
+      ],
       ['Mois de pointe', k.pic_mois],
       ['Débit de pompe recommandé', `${k.debit_pompe_ls.toFixed(2)} L/s (12 h/j)`],
     ],
   })
   autoTable(doc, {
     startY: after(),
-    head: [['Mois', 'Survie (m³)', 'Boost (m³)', 'Optimal (m³)']],
-    body: result.combined_monthly.map((m) => [
-      m.mois,
-      Math.round(m.volume_total).toLocaleString('fr-FR'),
-      Math.round(m.boost_vol_total).toLocaleString('fr-FR'),
-      Math.round(m.optimal_total).toLocaleString('fr-FR'),
-    ]),
+    head: [['Mois', 'Normale (m³)', 'Marge sèche (m³)', 'À prévoir (m³)']],
+    body: result.combined_monthly
+      .filter((m) => m.optimal_total > 0)
+      .map((m) => [
+        m.mois,
+        Math.round(m.volume_total).toLocaleString('fr-FR'),
+        Math.round(m.boost_vol_total).toLocaleString('fr-FR'),
+        Math.round(m.optimal_total).toLocaleString('fr-FR'),
+      ]),
   })
   autoTable(doc, {
     startY: after(),
-    head: [['Culture', 'Surface (ha)', 'Optimal (m³/an)', 'Pointe']],
+    head: [['Culture', 'Surface (ha)', 'Repiquage', 'À prévoir (m³)', 'Pointe']],
     body: result.results.map((r) => [
       r.crop,
       (r.area_m2 / 10000).toFixed(2),
+      r.planting_month ?? '—',
       Math.round(r.kpis.total_optimal_m3).toLocaleString('fr-FR'),
       r.kpis.pic_mois,
     ]),
   })
   doc.setFontSize(8)
   doc.text(
-    'Méthode FAO-56 (ETo, Kc). Estimation à ajuster selon la pluie réellement tombée.',
+    'FAO-56 : ETo Penman-Monteith, Kc par stade, bilan hydrique du sol ; pluie efficace USDA SCS ; année sèche = pluie fiable 80 %.',
     14,
     doc.internal.pageSize.getHeight() - 10,
   )

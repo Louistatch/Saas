@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'node:crypto'
 import { type NextRequest, NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
-import { fetchOpenMeteoForRegion } from '@/lib/weather/open-meteo'
+import { fetchOpenMeteoForRegion, mergeWeatherModels } from '@/lib/weather/open-meteo'
 
 const REGIONS = ['Maritime', 'Plateaux', 'Centrale', 'Kara', 'Savanes']
 
@@ -30,7 +30,8 @@ export async function GET(request: NextRequest) {
 
   for (const region of REGIONS) {
     try {
-      const days = await fetchOpenMeteoForRegion(region)
+      // Passage par la fusion : valeurs absentes de l'API ramenées proprement.
+      const days = mergeWeatherModels(await fetchOpenMeteoForRegion(region), [], [])
       if (days.length === 0) {
         results.push({ region, synced: 0, error: 'No data from Open-Meteo' })
         continue

@@ -69,6 +69,7 @@ interface MonthlyRow {
 }
 export interface CropResult {
   crop: string
+  planting_month?: string
   area_m2: number
   monthly: MonthlyRow[]
   kpis: {
@@ -109,6 +110,21 @@ export interface CalcResult {
     debit_pompe_ls: number
   }
 }
+
+const PLANTING_MONTHS = [
+  'Janvier',
+  'Février',
+  'Mars',
+  'Avril',
+  'Mai',
+  'Juin',
+  'Juillet',
+  'Août',
+  'Septembre',
+  'Octobre',
+  'Novembre',
+  'Décembre',
+]
 
 const REGIONS = [
   { id: 'Maritime', name: 'Maritime', emoji: '🌊', desc: 'Lomé · Sud' },
@@ -151,6 +167,10 @@ export function AgriSmartWater({ onBack, initialRegion, cardNumber, renderReport
   // Step 1 — cultures sélectionnées avec superficie
   const [entries, setEntries] = useState<CropEntry[]>([])
   const [pickOpen, setPickOpen] = useState(false)
+
+  // Mois de repiquage : le calcul FAO-56 suit le cycle réel de la culture
+  // (≈ 3 à 5 mois) à partir de ce mois. Novembre = maraîchage de saison sèche.
+  const [plantingMonth, setPlantingMonth] = useState('Novembre')
 
   // Step 2 — sol
   const [soil, setSoil] = useState<SoilType | null>(null)
@@ -264,6 +284,7 @@ export function AgriSmartWater({ onBack, initialRegion, cardNumber, renderReport
         })),
         soil_type: soil.name,
         system: system.id,
+        planting_month: plantingMonth,
       }
       if (gpsCoords) {
         payload.lat = gpsCoords.lat
@@ -400,6 +421,20 @@ export function AgriSmartWater({ onBack, initialRegion, cardNumber, renderReport
           <p className="text-white/60 text-sm font-medium">
             Sélectionnez vos cultures et définissez la superficie de chaque parcelle.
           </p>
+          <label className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+            <span className="text-white/70 text-xs font-semibold">Mois de repiquage / semis</span>
+            <select
+              value={plantingMonth}
+              onChange={(e) => setPlantingMonth(e.target.value)}
+              className="rounded-lg border border-white/15 bg-transparent px-2 py-1.5 text-sm text-white"
+            >
+              {PLANTING_MONTHS.map((m) => (
+                <option key={m} value={m} className="text-black">
+                  {m}
+                </option>
+              ))}
+            </select>
+          </label>
 
           {/* Importer les parcelles depuis le profil membre */}
           {cardNumber && allCrops.length > 0 && (
@@ -781,24 +816,24 @@ export function AgriSmartWater({ onBack, initialRegion, cardNumber, renderReport
             </p>
             <div className="grid grid-cols-2 gap-2.5">
               <KpiCard
-                label="Survie (pluie insuffisante)"
+                label="Année normale"
                 value={(result.combined_kpis.total_survival_m3 / 1000).toFixed(2)}
                 unit="k m³/an"
                 sub={`${(result.combined_kpis.total_area_m2).toLocaleString('fr')} m² total`}
               />
               <KpiCard
-                label="Rendement optimal +"
+                label="Marge année sèche"
                 value={(result.combined_kpis.total_boost_m3 / 1000).toFixed(2)}
                 unit="k m³/an"
-                sub={'+15% ETM · sécheresses intra-mois'}
+                sub="Pluie fiable 4 ans sur 5"
                 accent
                 icon={<TrendingUp className="h-3 w-3" />}
               />
               <KpiCard
-                label="Volume total recommandé"
+                label="À prévoir (année sèche)"
                 value={(result.combined_kpis.total_optimal_m3 / 1000).toFixed(2)}
                 unit="k m³/an"
-                sub="Survie + supplément rendement"
+                sub="Base du dimensionnement"
                 accent
               />
               <KpiCard
@@ -813,11 +848,11 @@ export function AgriSmartWater({ onBack, initialRegion, cardNumber, renderReport
             <div className="rounded-xl bg-[var(--vfp-accent)]/5 border border-[var(--vfp-accent)]/15 p-3 flex gap-2">
               <Info className="h-3.5 w-3.5 text-[var(--vfp-accent)] shrink-0 mt-0.5" />
               <p className="text-white/50 text-[10px] leading-relaxed">
-                <span className="text-[var(--vfp-accent)] font-semibold">Rendement optimal :</span>{' '}
-                Même quand la pluie couvre les besoins de survie, la pluie mensuelle est inégalement
-                répartie (CV ≈ 40% au Togo). Un supplément de{' '}
-                <strong className="text-white/70">15% de l'ETM</strong> compense les sécheresses
-                intra-mensuelles et maintient le rendement maximal. Ce volume est indiqué en vert.
+                <span className="text-[var(--vfp-accent)] font-semibold">Méthode FAO-56 :</span>{' '}
+                besoins calculés sur le cycle réel de la culture à partir du mois de repiquage, avec
+                la réserve du sol. « Année normale » utilise la pluie moyenne (30 ans) ; « année
+                sèche » la pluie atteinte <strong className="text-white/70">4 années sur 5</strong>.
+                La pompe est dimensionnée sur l’année sèche.
               </p>
             </div>
           </div>
@@ -860,14 +895,14 @@ export function AgriSmartWater({ onBack, initialRegion, cardNumber, renderReport
                   className="w-2.5 h-2.5 rounded-sm"
                   style={{ background: 'var(--vfp-accent)' }}
                 />
-                <span className="text-white/30 text-[9px]">Survie</span>
+                <span className="text-white/30 text-[9px]">Année normale</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div
                   className="w-2.5 h-2.5 rounded-sm"
                   style={{ background: 'oklch(0.72 0.18 60 / 0.7)' }}
                 />
-                <span className="text-white/30 text-[9px]">Rendement optimal</span>
+                <span className="text-white/30 text-[9px]">Marge année sèche</span>
               </div>
             </div>
           </div>
@@ -911,8 +946,8 @@ export function AgriSmartWater({ onBack, initialRegion, cardNumber, renderReport
                       <div>
                         <p className="text-white font-bold text-sm">{r.crop}</p>
                         <p className="text-white/35 text-xs">
-                          {r.area_m2.toLocaleString('fr')} m² · survie {r.kpis.total_m3.toFixed(1)}{' '}
-                          m³ · optimal {r.kpis.total_optimal_m3.toFixed(1)} m³/an
+                          {r.area_m2.toLocaleString('fr')} m² · normale {r.kpis.total_m3.toFixed(1)}{' '}
+                          m³ · année sèche {r.kpis.total_optimal_m3.toFixed(1)} m³
                         </p>
                       </div>
                     </div>
@@ -938,47 +973,49 @@ export function AgriSmartWater({ onBack, initialRegion, cardNumber, renderReport
                             <th className="text-right pb-1.5 font-semibold">ETP</th>
                             <th className="text-right pb-1.5 font-semibold">Kc</th>
                             <th className="text-right pb-1.5 font-semibold">Peff</th>
-                            <th className="text-right pb-1.5 font-semibold">Survie</th>
+                            <th className="text-right pb-1.5 font-semibold">Normale</th>
                             <th className="text-right pb-1.5 font-semibold" style={{ color }}>
-                              +Rend.
+                              +Sèche
                             </th>
                             <th className="text-right pb-1.5 font-semibold text-white/50">Total</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {r.monthly.map((row) => {
-                            const isBoosted = row.boost_mm > 0
-                            const total = row.volume_total + row.boost_vol_total
-                            return (
-                              <tr
-                                key={row.mois}
-                                className={`border-b border-white/[0.03] ${isBoosted ? 'bg-emerald-500/[0.03]' : ''}`}
-                              >
-                                <td className="py-1 pl-1 font-medium text-white/60">
-                                  {row.mois.slice(0, 4)}
-                                </td>
-                                <td className="py-1 text-right text-white/40">{row.etp}</td>
-                                <td className="py-1 text-right text-white/40">{row.kc}</td>
-                                <td className="py-1 text-right text-white/40">{row.peff}</td>
-                                <td
-                                  className={`py-1 text-right font-medium ${row.besoin_net > 0 ? 'text-white/70' : 'text-white/20'}`}
+                          {r.monthly
+                            .filter((row) => row.nb_jours !== 0)
+                            .map((row) => {
+                              const isBoosted = row.boost_mm > 0
+                              const total = row.volume_total + row.boost_vol_total
+                              return (
+                                <tr
+                                  key={row.mois}
+                                  className={`border-b border-white/[0.03] ${isBoosted ? 'bg-emerald-500/[0.03]' : ''}`}
                                 >
-                                  {row.volume_total > 0 ? row.volume_total.toFixed(1) : '—'}
-                                </td>
-                                <td
-                                  className="py-1 text-right font-medium"
-                                  style={{
-                                    color: isBoosted ? 'oklch(0.72 0.18 142 / 0.7)' : undefined,
-                                  }}
-                                >
-                                  {isBoosted ? `+${row.boost_vol_total.toFixed(1)}` : '—'}
-                                </td>
-                                <td className="py-1 text-right font-bold text-white/80">
-                                  {total > 0 ? total.toFixed(1) : '—'}
-                                </td>
-                              </tr>
-                            )
-                          })}
+                                  <td className="py-1 pl-1 font-medium text-white/60">
+                                    {row.mois.slice(0, 4)}
+                                  </td>
+                                  <td className="py-1 text-right text-white/40">{row.etp}</td>
+                                  <td className="py-1 text-right text-white/40">{row.kc}</td>
+                                  <td className="py-1 text-right text-white/40">{row.peff}</td>
+                                  <td
+                                    className={`py-1 text-right font-medium ${row.besoin_net > 0 ? 'text-white/70' : 'text-white/20'}`}
+                                  >
+                                    {row.volume_total > 0 ? row.volume_total.toFixed(1) : '—'}
+                                  </td>
+                                  <td
+                                    className="py-1 text-right font-medium"
+                                    style={{
+                                      color: isBoosted ? 'oklch(0.72 0.18 142 / 0.7)' : undefined,
+                                    }}
+                                  >
+                                    {isBoosted ? `+${row.boost_vol_total.toFixed(1)}` : '—'}
+                                  </td>
+                                  <td className="py-1 text-right font-bold text-white/80">
+                                    {total > 0 ? total.toFixed(1) : '—'}
+                                  </td>
+                                </tr>
+                              )
+                            })}
                           <tr className="border-t border-white/[0.1]">
                             <td className="pt-1.5 pl-1 font-bold text-white/50 text-[9px] uppercase tracking-wider">
                               Total
@@ -1001,8 +1038,8 @@ export function AgriSmartWater({ onBack, initialRegion, cardNumber, renderReport
                       </table>
                     </div>
                     <p className="text-white/20 text-[9px]">
-                      ETP mm/j · Kc · Peff mm · volumes m³ · Survie = besoin minimal · Rend. =
-                      supplément rendement optimal
+                      ETP mm/j · Kc · Peff mm · volumes m³ · Normale = pluie moyenne · Sèche =
+                      supplément si pluie d’une année sèche (4 ans sur 5)
                     </p>
                   </div>
                 </div>
@@ -1063,13 +1100,13 @@ export function AgriSmartWater({ onBack, initialRegion, cardNumber, renderReport
                 lines.push('')
                 lines.push('*📊 Bilan hydrique annuel :*')
                 lines.push(
-                  `• Survie minimale : ${(result.combined_kpis.total_survival_m3 / 1000).toFixed(1)} k m³`,
+                  `• Année normale : ${(result.combined_kpis.total_survival_m3 / 1000).toFixed(1)} k m³`,
                 )
                 lines.push(
-                  `• Rendement optimal : ${(result.combined_kpis.total_boost_m3 / 1000).toFixed(1)} k m³`,
+                  `• Marge année sèche : ${(result.combined_kpis.total_boost_m3 / 1000).toFixed(1)} k m³`,
                 )
                 lines.push(
-                  `• Total recommandé : ${(result.combined_kpis.total_optimal_m3 / 1000).toFixed(1)} k m³/an`,
+                  `• À prévoir (année sèche) : ${(result.combined_kpis.total_optimal_m3 / 1000).toFixed(1)} k m³/an`,
                 )
                 lines.push(`• Débit pompe : ${result.combined_kpis.debit_pompe_ls.toFixed(2)} L/s`)
                 lines.push(`• Mois de pointe : ${result.combined_kpis.pic_mois}`)
