@@ -23,6 +23,15 @@ interface Mission {
   rating: number | null
 }
 
+interface MarketMission {
+  id: string
+  title: string
+  culture: string | null
+  canton: string | null
+  prefecture: string | null
+  region: string | null
+}
+
 const LABEL: Record<string, string> = {
   DEMANDE: 'Demande reçue',
   EN_COURS: 'En cours',
@@ -33,6 +42,7 @@ const LABEL: Record<string, string> = {
 export function CardMissions({ cardNumber }: { cardNumber: string }) {
   const [pin, setPin] = useState('')
   const [missions, setMissions] = useState<Mission[] | null>(null)
+  const [market, setMarket] = useState<MarketMission[]>([])
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
 
@@ -56,9 +66,28 @@ export function CardMissions({ cardNumber }: { cardNumber: string }) {
         return
       }
       setMissions(data.missions ?? [])
+      setMarket(data.market ?? [])
     } catch {
       setError('Erreur de connexion.')
     } finally {
+      setBusy(null)
+    }
+  }
+
+  const take = async (announcementId: string) => {
+    setBusy(announcementId)
+    setError('')
+    try {
+      const res = await fetch('/api/haroo/missions/take', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ announcement_id: announcementId, card_number: cardNumber, pin }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) setError(data.error ?? 'Prise impossible.')
+      await load(pin)
+    } catch {
+      setError('Erreur de connexion.')
       setBusy(null)
     }
   }
@@ -186,6 +215,30 @@ export function CardMissions({ cardNumber }: { cardNumber: string }) {
           </div>
         ))
       )}
+      {market.length > 0 ? (
+        <div className="space-y-2 pt-2">
+          <p className="px-1 text-xs font-bold uppercase tracking-wider text-white/45">
+            Missions du marché près de chez vous
+          </p>
+          {market.map((a) => (
+            <div key={a.id} className="vfp-card rounded-2xl p-4 space-y-2">
+              <p className="text-sm font-semibold text-white">{a.title}</p>
+              <p className="text-[11px] text-white/45">
+                {[a.culture, a.canton ?? a.prefecture ?? a.region].filter(Boolean).join(' · ')}
+              </p>
+              <button
+                type="button"
+                disabled={busy === a.id}
+                onClick={() => take(a.id)}
+                className="flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-semibold"
+                style={{ background: 'var(--vfp-cta)', color: 'var(--vfp-cta-fg)' }}
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" /> Prendre cette mission
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   )
 }

@@ -2,14 +2,13 @@
  * Missions de conseil Haroo — demandes.
  *
  * GET  : missions du compte connecté (demandeur) — « Mes demandes ».
- * POST : demander une mission à un agronome à partir de sa carte. Compte
+ * POST : demander une mission à un agronome de l'annuaire. Compte
  *        requis (le demandeur est la session, jamais le corps de la requête).
  *        Seuls les agronomes VALIDÉS et porteurs d'une carte active peuvent
  *        recevoir une mission : sans carte, pas de mission.
  */
 
 import { activeAgronomeCard } from '@/lib/security/agronome-pin'
-import { normalizedCardNumber } from '@/lib/security/card-number'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
@@ -17,7 +16,9 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
 const createSchema = z.object({
-  card_number: z.string().trim().min(5).max(20),
+  // Annuaire : l'agronome est désigné par son identifiant (la carte, elle,
+  // reste personnelle et n'est jamais affichée).
+  agronome_id: z.string().uuid(),
   description: z.string().trim().min(10).max(1000),
   culture: z.string().trim().max(80).optional(),
   phone: z.string().trim().min(8).max(30),
@@ -73,14 +74,11 @@ export async function POST(request: NextRequest) {
     )
   }
   const body = parsed.data
-  const cardNumber = normalizedCardNumber(body.card_number)
-  if (!cardNumber) return NextResponse.json({ error: 'Carte invalide' }, { status: 400 })
-
   const admin = createAdminClient()
   const { data: agronome } = await admin
     .from('haroo_agronome_profiles')
     .select('id, user_id')
-    .eq('card_number', cardNumber)
+    .eq('id', body.agronome_id)
     .maybeSingle<{ id: string; user_id: string }>()
   if (!agronome || !(await activeAgronomeCard(agronome.id))) {
     return NextResponse.json(

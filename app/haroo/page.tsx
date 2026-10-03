@@ -3,6 +3,7 @@
 import { ProtectedRoute } from '@/app/components/protected-route'
 import { useAuth } from '@/app/context/auth-context'
 import { RequestOrgCard } from '@/components/account/layer-activation'
+import { MarketMissions } from '@/components/haroo/market-missions'
 import { MissionActions } from '@/components/haroo/mission-actions'
 import { HarooProfileEditor } from '@/components/haroo/profile-editor'
 import { PublishAnnouncement } from '@/components/haroo/publish-announcement'
@@ -1120,6 +1121,8 @@ function HarooSpaceInner() {
                     ))}
                   </CardContent>
                 </Card>
+
+                <MarketMissions hasCard={agronomeHasCard} onTaken={refreshMissions} />
 
                 {terminees.length > 0 && (
                   <Card className="border-border">

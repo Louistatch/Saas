@@ -6,6 +6,7 @@
  * l'espace /haroo du site — une seule source.
  */
 
+import { marketMissionsFor } from '@/lib/haroo/missions'
 import { AGRONOME_PIN_ERRORS, agronomeFromCardPin } from '@/lib/security/agronome-pin'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
@@ -41,5 +42,10 @@ export async function POST(request: NextRequest) {
     .eq('agronome_id', auth.agronomeId)
     .order('created_at', { ascending: false })
     .limit(30)
-  return NextResponse.json({ missions: data ?? [] }, { headers: { 'Cache-Control': 'no-store' } })
+  // Annonces « mission » du Marché de proximité, les plus proches d'abord.
+  const market = await marketMissionsFor(auth.agronomeId).catch(() => [])
+  return NextResponse.json(
+    { missions: data ?? [], market },
+    { headers: { 'Cache-Control': 'no-store' } },
+  )
 }

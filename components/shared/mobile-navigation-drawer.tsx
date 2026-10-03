@@ -141,9 +141,9 @@ const NAVIGATION_BY_CONTEXT: Record<ProductContext, NavItem[]> = {
       tone: 'amber',
     },
     {
-      href: '/marche?type=mission',
+      href: '/agronomes',
       label: 'Missions de conseil',
-      description: 'Expertise agronomique et suivi des missions',
+      description: 'Agronomes certifiés · demander une mission',
       icon: GraduationCap,
       tone: 'blue',
     },
