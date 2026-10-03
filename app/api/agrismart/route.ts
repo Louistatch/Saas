@@ -6,7 +6,7 @@
  *   GET  /api/agrismart?resource=soil-types
  *   POST /api/agrismart  (body: { resource: 'calculate', ...payload })
  */
-import { resolvePublicCard } from '@/lib/security/card-access'
+import { requirePrivateCard } from '@/lib/security/card-access'
 import { createClient } from '@/lib/supabase/server'
 import { effectiveHarooType } from '@/lib/utils/permissions'
 import type { HarooType, UserRole } from '@/types/domain'
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
 
 /**
  * Le détail du calcul (mois par mois, par culture) est réservé aux agronomes,
- * et à l'écran d'une carte membre valide. Vérifié ICI, côté serveur, à partir
+ * et au titulaire d'une carte membre (PIN). Vérifié ICI, côté serveur, à partir
  * de la session et de public.profiles — jamais d'un champ envoyé par le client.
  * AgriTogo ne renvoie le détail que si la clé interne accompagne l'appel.
  */
@@ -67,9 +67,12 @@ async function detailsAllowed(cardNumber: unknown): Promise<boolean> {
       .maybeSingle<{ role: UserRole; haroo_type: HarooType | null }>()
     if (data && effectiveHarooType(data.role, data.haroo_type) === 'agronome') return true
   }
+  // Carte : seulement pour son titulaire — session de carte ouverte avec le
+  // PIN (ou le code SMS), ou compte rattaché à la carte. Connaître le numéro
+  // ne suffit plus.
   if (typeof cardNumber === 'string' && cardNumber.trim()) {
     try {
-      return Boolean(await resolvePublicCard(cardNumber))
+      return (await requirePrivateCard(cardNumber)).ok
     } catch {
       return false
     }

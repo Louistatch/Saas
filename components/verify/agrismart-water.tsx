@@ -1,18 +1,19 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { CardLoginPanel } from '@/components/verify/card-login-panel'
 import {
+  AlertTriangle,
   ArrowLeft,
   Droplets,
-  RotateCcw,
-  MapPin,
+  Info,
   Loader2,
-  AlertTriangle,
+  MapPin,
   Plus,
+  RotateCcw,
   Trash2,
   TrendingUp,
-  Info,
 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -875,9 +876,20 @@ export function AgriSmartWater({
 
           {renderDetailsGate?.() ??
             (result.details_locked ? (
-              <p className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-xs text-white/60">
-                Le détail mois par mois est réservé aux agronomes inscrits.
-              </p>
+              cardNumber ? (
+                // Écran d'une carte : le détail est réservé à son titulaire.
+                // Le PIN ouvre la session de carte, puis le calcul est relancé.
+                <div className="space-y-2">
+                  <p className="text-xs text-white/60">
+                    Le détail mois par mois est réservé au titulaire de la carte.
+                  </p>
+                  <CardLoginPanel cardNumber={cardNumber} onConnected={() => void calculate()} />
+                </div>
+              ) : (
+                <p className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-xs text-white/60">
+                  Le détail mois par mois est réservé aux agronomes inscrits.
+                </p>
+              )
             ) : null)}
           {renderDetailsGate?.() || result.details_locked ? null : (
             <>
