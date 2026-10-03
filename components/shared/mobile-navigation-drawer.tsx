@@ -3,34 +3,45 @@
 /**
  * Menu mobile de la vitrine (en dessous de `xl`).
  *
- * Un seul langage visuel : les services Haroo (marché, emplois, préventes,
- * conseil) sont présentés comme des services DE FaîtiereHub, avec les mêmes
- * lignes que les autres liens. Construit à partir de données : ajouter un lien
- * = ajouter une entrée dans `PRIMARY_SERVICES` ou `OTHER_SERVICES`.
+ * FaîtiereHub est le produit ; Haroo est un ESPACE de ce produit (les
+ * opportunités), pas un autre site. Le sélecteur en haut change l'espace
+ * affiché, jamais le compte : la même identité sert aux deux.
  *
- * Comportement conservé : mêmes destinations qu'avant, fermeture au clic sur un
- * lien, sur Échap et sur le fond ; boutons de connexion pilotés par
- * `AuthButtons` (même logique).
+ * Tout est piloté par données : `NAVIGATION_BY_CONTEXT` pour les liens propres
+ * à chaque espace, `SHARED_NAVIGATION` pour les liens communs. Les actions du
+ * bas dépendent de l'état réel du compte (lib/account/journey).
  */
 
-import { AuthButtons } from '@/components/shared/auth-buttons'
+import { useAuth } from '@/app/context/auth-context'
 import { Sheet, SheetClose, SheetContent, SheetTitle } from '@/components/ui/sheet'
+import { PROFILE_URL, accountJourney, harooAction } from '@/lib/account/journey'
+import { type ProductContext, useProductContext } from '@/lib/navigation/product-context'
+import { performLogout } from '@/lib/auth/logout'
 import { cn } from '@/lib/utils'
 import {
+  ArrowRight,
   Briefcase,
   ChevronRight,
   CircleUserRound,
+  FileSpreadsheet,
   GraduationCap,
+  IdCard,
   Info,
+  LayoutDashboard,
   LayoutGrid,
+  LogIn,
+  LogOut,
   type LucideIcon,
   Package,
   Phone,
   ScanLine,
   Settings2,
   ShoppingBasket,
+  Sprout,
   Store,
   Tag,
+  UserRoundPen,
+  Users,
   X,
 } from 'lucide-react'
 import Image from 'next/image'
@@ -59,46 +70,78 @@ const TONES: Record<Tone, string> = {
   slate: 'bg-slate-100 text-slate-700',
 }
 
-const PRIMARY_SERVICES: NavItem[] = [
-  {
-    href: '/marche',
-    label: 'Marché de proximité',
-    description: 'Préventes, emplois et missions près de chez vous',
-    icon: Store,
-    tone: 'green',
-    badge: 'Populaire',
-  },
-  {
-    href: '/#haroo-ouvrier',
-    label: 'Emplois agricoles',
-    description: 'Compétences, disponibilité et offres locales',
-    icon: Briefcase,
-    tone: 'orange',
-  },
-  {
-    href: '/#haroo-acheteur',
-    label: 'Préventes de récoltes',
-    description: 'Produits recherchés et contacts producteurs',
-    icon: ShoppingBasket,
-    tone: 'amber',
-  },
-  {
-    href: '/#haroo-agronome',
-    label: 'Missions de conseil',
-    description: 'Expertise agronomique et suivi des missions',
-    icon: GraduationCap,
-    tone: 'blue',
-  },
-]
+const NAVIGATION_BY_CONTEXT: Record<ProductContext, NavItem[]> = {
+  faitierehub: [
+    {
+      href: '/dashboard',
+      label: 'Espace organisation',
+      description: 'Tableau de bord de votre faîtière ou coopérative',
+      icon: LayoutDashboard,
+      tone: 'green',
+    },
+    {
+      href: '/dashboard/members',
+      label: 'Membres',
+      description: 'Producteurs, cotisations et scores',
+      icon: Users,
+      tone: 'blue',
+    },
+    {
+      href: '/dashboard/cards',
+      label: 'Cartes membres',
+      description: 'Cartes vérifiables par QR code',
+      icon: IdCard,
+      tone: 'amber',
+    },
+    {
+      href: '/scan',
+      label: 'Scanner une carte',
+      description: 'Vérifier un membre ou un producteur',
+      icon: ScanLine,
+      tone: 'green',
+    },
+    {
+      href: '/marketplace',
+      label: 'Comptes d’exploitation',
+      description: 'Itinéraires et budgets par culture',
+      icon: FileSpreadsheet,
+      tone: 'orange',
+    },
+  ],
+  haroo: [
+    {
+      href: '/marche',
+      label: 'Marché de proximité',
+      description: 'Préventes, emplois et missions près de chez vous',
+      icon: Store,
+      tone: 'green',
+      badge: 'Populaire',
+    },
+    {
+      href: '/#haroo-ouvrier',
+      label: 'Emplois agricoles',
+      description: 'Compétences, disponibilité et offres locales',
+      icon: Briefcase,
+      tone: 'orange',
+    },
+    {
+      href: '/#haroo-acheteur',
+      label: 'Préventes de récoltes',
+      description: 'Produits recherchés et contacts producteurs',
+      icon: ShoppingBasket,
+      tone: 'amber',
+    },
+    {
+      href: '/#haroo-agronome',
+      label: 'Missions de conseil',
+      description: 'Expertise agronomique et suivi des missions',
+      icon: GraduationCap,
+      tone: 'blue',
+    },
+  ],
+}
 
-const OTHER_SERVICES: NavItem[] = [
-  {
-    href: '/scan',
-    label: 'Scanner une carte',
-    description: 'Vérifier un membre ou un producteur',
-    icon: ScanLine,
-    tone: 'green',
-  },
+const SHARED_NAVIGATION: NavItem[] = [
   {
     href: '/produit',
     label: 'Produit',
@@ -141,6 +184,11 @@ const OTHER_SERVICES: NavItem[] = [
     icon: Phone,
     tone: 'green',
   },
+]
+
+const CONTEXTS: { value: ProductContext; label: string; hint: string; icon: LucideIcon }[] = [
+  { value: 'faitierehub', label: 'FaîtiereHub', hint: 'Organisations', icon: LayoutGrid },
+  { value: 'haroo', label: 'Haroo', hint: 'Opportunités', icon: Sprout },
 ]
 
 function NavigationItem({
@@ -193,7 +241,7 @@ function NavigationItem({
             {item.label}
           </span>
           {item.badge ? (
-            <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 max-[359px]:hidden text-[0.68rem] font-semibold text-primary">
+            <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 max-[399px]:hidden text-[0.68rem] font-semibold text-primary">
               {item.badge}
             </span>
           ) : null}
@@ -217,9 +265,136 @@ function NavigationItem({
   )
 }
 
+/** Change l'espace affiché — pas le compte. */
+function ProductContextSwitcher({
+  value,
+  onChange,
+}: {
+  value: ProductContext
+  onChange: (next: ProductContext) => void
+}) {
+  return (
+    <fieldset className="grid grid-cols-2 gap-1 rounded-2xl border-0 bg-muted/70 p-1">
+      <legend className="sr-only">Espace affiché (même compte)</legend>
+      {CONTEXTS.map(({ value: v, label, hint, icon: Icon }) => {
+        const selected = v === value
+        return (
+          <button
+            key={v}
+            type="button"
+            aria-pressed={selected}
+            onClick={() => onChange(v)}
+            className={cn(
+              'flex min-h-12 items-center justify-center gap-2 rounded-xl px-2 py-1.5 text-left transition-colors duration-150',
+              'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+              selected
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-foreground/70 hover:bg-background/70',
+            )}
+          >
+            <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold leading-tight">{label}</span>
+              <span
+                className={cn(
+                  'block truncate text-[0.7rem] leading-tight',
+                  selected ? 'text-primary-foreground/80' : 'text-muted-foreground',
+                )}
+              >
+                {hint}
+              </span>
+            </span>
+          </button>
+        )
+      })}
+    </fieldset>
+  )
+}
+
+const secondaryAction =
+  'flex h-[3.25rem] w-full items-center justify-center gap-2 rounded-2xl border border-border bg-background text-[0.95rem] font-semibold text-foreground transition-colors duration-150 hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
+const primaryAction =
+  'flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[0.95rem] font-semibold text-primary-foreground shadow-sm transition-colors duration-150 hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
+
+/** Actions du bas selon l'état RÉEL du compte et l'espace choisi. */
+function DrawerActions({
+  context,
+  onNavigate,
+}: { context: ProductContext; onNavigate: () => void }) {
+  const { user } = useAuth()
+  const journey = accountJourney(user)
+
+  if (journey.stage === 'anonymous') {
+    return (
+      <div className="flex flex-col gap-2">
+        <Link href="/auth/login" onClick={onNavigate} className={secondaryAction}>
+          <LogIn aria-hidden="true" className="h-4 w-4" />
+          Se connecter
+        </Link>
+        <Link
+          href={context === 'haroo' ? '/auth/signup?espace=haroo' : '/auth/signup'}
+          onClick={onNavigate}
+          className={primaryAction}
+        >
+          Commencer maintenant
+          <ArrowRight aria-hidden="true" className="h-4 w-4" />
+        </Link>
+      </div>
+    )
+  }
+
+  const haroo = harooAction(journey)
+  const primary =
+    context === 'haroo' || journey.stage === 'profile-incomplete'
+      ? haroo
+        ? { ...haroo, icon: journey.stage === 'profile-incomplete' ? UserRoundPen : Sprout }
+        : { href: journey.homeUrl, label: 'Mon espace', icon: LayoutDashboard }
+      : { href: journey.homeUrl, label: 'Tableau de bord', icon: LayoutDashboard }
+  const PrimaryIcon = primary.icon
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Link href={primary.href} onClick={onNavigate} className={primaryAction}>
+        <PrimaryIcon aria-hidden="true" className="h-4 w-4" />
+        {primary.label}
+      </Link>
+      <div className="grid grid-cols-2 gap-2">
+        <Link
+          href={PROFILE_URL}
+          onClick={onNavigate}
+          className={cn(secondaryAction, 'h-12 text-sm')}
+        >
+          <UserRoundPen aria-hidden="true" className="h-4 w-4" />
+          Mon compte
+        </Link>
+        <button
+          type="button"
+          onClick={() => performLogout()}
+          className={cn(secondaryAction, 'h-12 text-sm')}
+        >
+          <LogOut aria-hidden="true" className="h-4 w-4" />
+          Déconnexion
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mb-3 mt-5 flex items-center gap-2 text-muted-foreground">
+      <LayoutGrid aria-hidden="true" className="h-4 w-4" />
+      <span className="text-xs font-semibold uppercase tracking-wider">{children}</span>
+      <span aria-hidden="true" className="h-px flex-1 bg-border" />
+    </div>
+  )
+}
+
 export function MobileNavigationDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname()
+  const [context, setContext] = useProductContext(pathname)
   const isActive = (href: string) => !href.includes('#') && pathname === href
+  const items = NAVIGATION_BY_CONTEXT[context]
 
   // Sheet (Radix Dialog) apporte focus piégé, Échap, clic extérieur et blocage
   // du défilement de la page. Son bouton de fermeture générique est masqué
@@ -233,6 +408,7 @@ export function MobileNavigationDrawer({ open, onClose }: { open: boolean; onClo
         className="h-dvh w-full gap-0 border-l-0 p-0 sm:max-w-md xl:hidden data-[state=open]:duration-200 data-[state=closed]:duration-150 [&>button:last-child]:hidden"
       >
         <SheetTitle className="sr-only">Menu principal</SheetTitle>
+
         {/* En-tête */}
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
           <Link href="/" onClick={onClose} className="flex min-w-0 items-center gap-3">
@@ -260,24 +436,28 @@ export function MobileNavigationDrawer({ open, onClose }: { open: boolean; onClo
           aria-label="Navigation principale"
           className="flex-1 overflow-y-auto overscroll-contain px-4 py-4"
         >
-          <Link
-            href="/#haroo"
-            onClick={onClose}
-            aria-label="Plateforme agricole intégrée : des services pratiques pour les producteurs, coopératives et faîtières"
-            className="block overflow-hidden rounded-[20px] border border-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-          >
-            <Image
-              src="/images/menu/plateforme-agricole.webp"
-              alt=""
-              width={1200}
-              height={224}
-              sizes="(min-width: 640px) 416px, calc(100vw - 2rem)"
-              className="h-auto w-full"
-            />
-          </Link>
+          <ProductContextSwitcher value={context} onChange={setContext} />
+
+          {context === 'haroo' ? (
+            <Link
+              href="/#haroo"
+              onClick={onClose}
+              aria-label="Plateforme agricole intégrée : des services pratiques pour les producteurs, coopératives et faîtières"
+              className="mt-4 block overflow-hidden rounded-[20px] border border-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              <Image
+                src="/images/menu/plateforme-agricole.webp"
+                alt=""
+                width={1200}
+                height={224}
+                sizes="(min-width: 640px) 416px, calc(100vw - 2rem)"
+                className="h-auto w-full"
+              />
+            </Link>
+          ) : null}
 
           <ul className="mt-4 space-y-2">
-            {PRIMARY_SERVICES.map((item, i) => (
+            {items.map((item, i) => (
               <li key={item.href}>
                 <NavigationItem
                   item={item}
@@ -288,30 +468,10 @@ export function MobileNavigationDrawer({ open, onClose }: { open: boolean; onClo
               </li>
             ))}
           </ul>
-          <div className="mt-2 grid grid-cols-2 gap-2 text-sm font-medium">
-            <Link
-              href="/auth/signup/haroo"
-              onClick={onClose}
-              className="flex min-h-11 items-center justify-center whitespace-nowrap rounded-xl border border-primary/20 px-2 text-[0.8rem] font-semibold text-primary hover:bg-primary/[0.06] focus-visible:outline-2 focus-visible:outline-primary"
-            >
-              Créer mon profil
-            </Link>
-            <Link
-              href="/haroo"
-              onClick={onClose}
-              className="flex min-h-11 items-center justify-center whitespace-nowrap rounded-xl border border-border px-2 text-[0.8rem] font-semibold text-foreground/80 hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-primary"
-            >
-              Mon espace Haroo
-            </Link>
-          </div>
 
-          <div className="mb-3 mt-5 flex items-center gap-2 text-muted-foreground">
-            <LayoutGrid aria-hidden="true" className="h-4 w-4" />
-            <span className="text-xs font-semibold uppercase tracking-wider">Autres services</span>
-            <span aria-hidden="true" className="h-px flex-1 bg-border" />
-          </div>
+          <SectionLabel>Plateforme</SectionLabel>
           <ul className="space-y-2">
-            {OTHER_SERVICES.map((item) => (
+            {SHARED_NAVIGATION.map((item) => (
               <li key={item.href}>
                 <NavigationItem
                   item={item}
@@ -326,7 +486,7 @@ export function MobileNavigationDrawer({ open, onClose }: { open: boolean; onClo
 
         {/* Actions, toujours visibles */}
         <div className="shrink-0 border-t border-border/60 bg-background px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <AuthButtons variant="drawer" onNavigate={onClose} />
+          <DrawerActions context={context} onNavigate={onClose} />
         </div>
       </SheetContent>
     </Sheet>

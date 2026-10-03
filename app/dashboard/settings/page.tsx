@@ -17,6 +17,7 @@ import { LogoUpload } from '@/components/shared/logo-upload'
 import { errorMessage } from '@/lib/utils/errors'
 import { cooperativeSchema, flattenZodErrors } from '@/lib/validators/schemas'
 import { roleLabel } from '@/lib/utils/permissions'
+import { ProfileIdentityForm } from '@/components/account/profile-identity-form'
 
 export default function SettingsPage() {
   const { currentCooperative, refreshCooperatives, updateCooperative } = useCooperative()
@@ -158,20 +159,8 @@ export default function SettingsPage() {
               <CardDescription>Vos informations personnelles</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Prénom</Label>
-                  <Input value={user?.firstName ?? ''} disabled className="opacity-70" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Nom</Label>
-                  <Input value={user?.lastName ?? ''} disabled className="opacity-70" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input value={user?.email ?? ''} disabled className="opacity-70" />
-              </div>
+              {/* Formulaire d'identité unique, partagé avec /compte. */}
+              <ProfileIdentityForm />
               <div className="space-y-2">
                 <Label>Rôle</Label>
                 <Input value={user?.role ? roleLabel(user.role) : ''} disabled className="opacity-70" />

@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { flattenZodErrors, harooSignupSchema } from '@/lib/validators/schemas'
+import { useAuth } from '@/app/context/auth-context'
+import { accountJourney, harooAction } from '@/lib/account/journey'
 import { ArrowLeft, CheckCircle2, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -36,6 +38,8 @@ const PROFILE_TYPES = [
  * ensuite sur /auth/login comme pour tout utilisateur de la plateforme.
  */
 function HarooSignupForm() {
+  const { user } = useAuth()
+  const journey = accountJourney(user)
   // Le profil choisi à l'étape 1 de /auth/signup arrive par ?type= : sans
   // cela l'utilisateur qui a cliqué « Agronome » retomberait sur un
   // formulaire pré-réglé sur « Ouvrier ».
@@ -144,127 +148,150 @@ function HarooSignupForm() {
           <Card className="border-black/[0.07] bg-white shadow-xl shadow-black/[0.06]">
             <CardHeader className="space-y-1">
               <CardTitle className="text-2xl font-bold text-foreground">
-                Créer un compte Haroo
+                {user ? 'Votre espace Haroo' : 'Créer votre compte'}
               </CardTitle>
               <CardDescription>
-                Ouvriers agricoles, acheteurs et agronomes — créez votre profil professionnel en
-                quelques minutes.
+                Un seul compte FaîtiereHub pour tous les services. Ouvriers agricoles, acheteurs et
+                agronomes : votre profil Haroo s’y ajoute.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="profileType">Je suis *</Label>
-                  <select
-                    id="profileType"
-                    value={formData.profileType}
-                    onChange={(e) => setFormData((f) => ({ ...f, profileType: e.target.value }))}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    {PROFILE_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-muted-foreground">
-                    {PROFILE_TYPES.find((t) => t.value === formData.profileType)?.description}
+              {user ? (
+                // Déjà connecté : on n'ouvre JAMAIS un second compte. Le profil
+                // existant reçoit l'extension Haroo (ou y donne accès).
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Vous êtes connecté en tant que{' '}
+                    <span className="font-medium text-foreground">
+                      {user.firstName} {user.lastName}
+                    </span>
+                    . Haroo utilise ce même compte et ce même profil.
                   </p>
-                  {fieldErrors.profileType && (
-                    <p className="text-xs text-destructive">{fieldErrors.profileType}</p>
-                  )}
+                  <Button asChild className="w-full">
+                    <Link href={(harooAction(journey) ?? { href: journey.homeUrl }).href}>
+                      {(harooAction(journey) ?? { label: 'Aller à mon espace' }).label}
+                    </Link>
+                  </Button>
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="firstName">Prénom *</Label>
-                    <Input
-                      id="firstName"
-                      placeholder="Prénom"
-                      value={formData.firstName}
-                      onChange={(e) => setFormData((f) => ({ ...f, firstName: e.target.value }))}
-                      aria-invalid={!!fieldErrors.firstName}
-                      required
-                    />
-                    {fieldErrors.firstName && (
-                      <p className="text-xs text-destructive">{fieldErrors.firstName}</p>
+                    <Label htmlFor="profileType">Je suis *</Label>
+                    <select
+                      id="profileType"
+                      value={formData.profileType}
+                      onChange={(e) => setFormData((f) => ({ ...f, profileType: e.target.value }))}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      {PROFILE_TYPES.map((t) => (
+                        <option key={t.value} value={t.value}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-muted-foreground">
+                      {PROFILE_TYPES.find((t) => t.value === formData.profileType)?.description}
+                    </p>
+                    {fieldErrors.profileType && (
+                      <p className="text-xs text-destructive">{fieldErrors.profileType}</p>
                     )}
                   </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="firstName">Prénom *</Label>
+                      <Input
+                        id="firstName"
+                        placeholder="Prénom"
+                        value={formData.firstName}
+                        onChange={(e) => setFormData((f) => ({ ...f, firstName: e.target.value }))}
+                        aria-invalid={!!fieldErrors.firstName}
+                        required
+                      />
+                      {fieldErrors.firstName && (
+                        <p className="text-xs text-destructive">{fieldErrors.firstName}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lastName">Nom *</Label>
+                      <Input
+                        id="lastName"
+                        placeholder="Nom"
+                        value={formData.lastName}
+                        onChange={(e) => setFormData((f) => ({ ...f, lastName: e.target.value }))}
+                        aria-invalid={!!fieldErrors.lastName}
+                        required
+                      />
+                      {fieldErrors.lastName && (
+                        <p className="text-xs text-destructive">{fieldErrors.lastName}</p>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
-                    <Label htmlFor="lastName">Nom *</Label>
+                    <Label htmlFor="phone">Téléphone *</Label>
                     <Input
-                      id="lastName"
-                      placeholder="Nom"
-                      value={formData.lastName}
-                      onChange={(e) => setFormData((f) => ({ ...f, lastName: e.target.value }))}
-                      aria-invalid={!!fieldErrors.lastName}
+                      id="phone"
+                      type="tel"
+                      placeholder="+228 90 XX XX XX"
+                      value={formData.phone}
+                      onChange={(e) => setFormData((f) => ({ ...f, phone: e.target.value }))}
+                      aria-invalid={!!fieldErrors.phone}
                       required
                     />
-                    {fieldErrors.lastName && (
-                      <p className="text-xs text-destructive">{fieldErrors.lastName}</p>
+                    {fieldErrors.phone && (
+                      <p className="text-xs text-destructive">{fieldErrors.phone}</p>
                     )}
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Téléphone *</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="+228 90 XX XX XX"
-                    value={formData.phone}
-                    onChange={(e) => setFormData((f) => ({ ...f, phone: e.target.value }))}
-                    aria-invalid={!!fieldErrors.phone}
-                    required
-                  />
-                  {fieldErrors.phone && (
-                    <p className="text-xs text-destructive">{fieldErrors.phone}</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email *</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="vous@exemple.tg"
+                      value={formData.email}
+                      onChange={(e) => setFormData((f) => ({ ...f, email: e.target.value }))}
+                      aria-invalid={!!fieldErrors.email}
+                      required
+                    />
+                    {fieldErrors.email && (
+                      <p className="text-xs text-destructive">{fieldErrors.email}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Mot de passe *</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="8 caractères minimum"
+                      value={formData.password}
+                      onChange={(e) => setFormData((f) => ({ ...f, password: e.target.value }))}
+                      aria-invalid={!!fieldErrors.password}
+                      required
+                    />
+                    {fieldErrors.password && (
+                      <p className="text-xs text-destructive">{fieldErrors.password}</p>
+                    )}
+                  </div>
+
+                  {error && (
+                    <p className="text-sm text-destructive bg-destructive/10 rounded-md p-2">
+                      {error}
+                    </p>
                   )}
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="vous@exemple.tg"
-                    value={formData.email}
-                    onChange={(e) => setFormData((f) => ({ ...f, email: e.target.value }))}
-                    aria-invalid={!!fieldErrors.email}
-                    required
-                  />
-                  {fieldErrors.email && (
-                    <p className="text-xs text-destructive">{fieldErrors.email}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password">Mot de passe *</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="8 caractères minimum"
-                    value={formData.password}
-                    onChange={(e) => setFormData((f) => ({ ...f, password: e.target.value }))}
-                    aria-invalid={!!fieldErrors.password}
-                    required
-                  />
-                  {fieldErrors.password && (
-                    <p className="text-xs text-destructive">{fieldErrors.password}</p>
-                  )}
-                </div>
-
-                {error && (
-                  <p className="text-sm text-destructive bg-destructive/10 rounded-md p-2">
-                    {error}
-                  </p>
-                )}
-
-                <Button type="submit" className="w-full gap-2" disabled={submitting}>
-                  {submitting ? <Spinner className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
-                  Créer mon compte
-                </Button>
-              </form>
+                  <Button type="submit" className="w-full gap-2" disabled={submitting}>
+                    {submitting ? (
+                      <Spinner className="h-4 w-4" />
+                    ) : (
+                      <UserPlus className="h-4 w-4" />
+                    )}
+                    Créer mon compte
+                  </Button>
+                </form>
+              )}
 
               <div className="mt-6 text-center space-y-2">
                 <p className="text-sm text-muted-foreground">
