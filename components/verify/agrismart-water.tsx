@@ -67,7 +67,7 @@ interface MonthlyRow {
   boost_mm: number
   boost_vol_total: number
 }
-interface CropResult {
+export interface CropResult {
   crop: string
   area_m2: number
   monthly: MonthlyRow[]
@@ -86,7 +86,7 @@ interface CropResult {
     nb_mois_zero: number
   }
 }
-interface CalcResult {
+export interface CalcResult {
   soil: string
   system: string
   climate_source: string
@@ -122,6 +122,8 @@ interface Props {
   onBack: () => void
   initialRegion?: string
   cardNumber?: string
+  /** Zone affichée sous les résultats (ex. rapport PDF réservé aux agronomes). */
+  renderReport?: (result: CalcResult, context: { region: string }) => React.ReactNode
 }
 
 // ─── Palette de couleurs par culture ─────────────────────────────────────────
@@ -134,7 +136,7 @@ const CROP_COLORS = [
   'oklch(0.72 0.18 160)',
 ]
 
-export function AgriSmartWater({ onBack, initialRegion, cardNumber }: Props) {
+export function AgriSmartWater({ onBack, initialRegion, cardNumber, renderReport }: Props) {
   // ── API data ──────────────────────────────────────────────────────────────
   const [allCrops, setAllCrops] = useState<Crop[]>([])
   const [systems, setSystems] = useState<IrrigationSystem[]>([])
@@ -1036,6 +1038,8 @@ export function AgriSmartWater({ onBack, initialRegion, cardNumber }: Props) {
               </li>
             </ul>
           </div>
+
+          {renderReport ? renderReport(result, { region }) : null}
 
           {/* Partage WhatsApp */}
           {result && (

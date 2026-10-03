@@ -11,15 +11,18 @@
  * potentiel arrive souvent par un lien partagé, sans compte.
  */
 
+import { useAuth } from '@/app/context/auth-context'
+import { PublishAnnouncement } from '@/components/haroo/publish-announcement'
 import { EmptyState } from '@/components/shared/empty-state'
 import { LoadingBlock } from '@/components/shared/loading'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { MapPin, Phone, Search, Sprout, Store } from 'lucide-react'
+import { Lock, MapPin, Phone, Search, Sprout, Store } from 'lucide-react'
 import Link from 'next/link'
-import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 
 interface Announcement {
   id: string
@@ -134,10 +137,61 @@ function AnnouncementCard({ item }: { item: Announcement }) {
   )
 }
 
+const URL_TYPES = ['prevente', 'job', 'mission', 'autre']
+
+/**
+ * Publier : la publication exige un compte (l'auteur vient de la session).
+ * On le dit clairement au visiteur et on le dirige, au lieu de l'envoyer vers
+ * un espace qui le refuserait sans explication.
+ */
+function PublishCallToAction({ onPublished }: { onPublished: () => void }) {
+  const { user, isLoading } = useAuth()
+  return (
+    <div className="mt-10 rounded-xl border border-border bg-muted/30 p-6 text-center">
+      <p className="text-sm text-muted-foreground">
+        Vous avez une récolte à vendre, un chantier ou un besoin de conseil ?
+      </p>
+      {isLoading ? null : user ? (
+        <div className="mt-3 flex justify-center">
+          <PublishAnnouncement onPublished={onPublished} />
+        </div>
+      ) : (
+        <div className="mx-auto mt-3 max-w-sm space-y-3">
+          <p className="flex items-center justify-center gap-1.5 text-sm font-medium text-foreground">
+            <Lock className="h-4 w-4" /> Connexion requise pour publier
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Votre annonce porte votre nom et votre contact : il faut un compte. La consultation
+            reste libre.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/auth/login?redirect=/marche">Se connecter</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/auth/signup?espace=haroo">Créer un compte</Link>
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function MarchePage() {
+  return (
+    <Suspense>
+      <MarcheContent />
+    </Suspense>
+  )
+}
+
+function MarcheContent() {
+  const params = useSearchParams()
+  const urlType = params.get('type') ?? ''
   const [items, setItems] = useState<Announcement[]>([])
   const [loading, setLoading] = useState(true)
-  const [type, setType] = useState('')
+  const [type, setType] = useState(URL_TYPES.includes(urlType) ? urlType : '')
   const [search, setSearch] = useState('')
   const [zoneKnown, setZoneKnown] = useState(false)
 
@@ -231,14 +285,7 @@ export default function MarchePage() {
             </div>
           )}
 
-          <div className="mt-10 rounded-xl border border-border bg-muted/30 p-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              Vous avez une récolte à vendre, un chantier ou un besoin de conseil ?
-            </p>
-            <Button className="mt-3" asChild>
-              <Link href="/haroo">Publier une annonce</Link>
-            </Button>
-          </div>
+          <PublishCallToAction onPublished={load} />
         </div>
       </section>
     </MarketingLayout>

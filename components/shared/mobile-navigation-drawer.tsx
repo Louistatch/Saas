@@ -23,12 +23,14 @@ import {
   Briefcase,
   ChevronRight,
   CircleUserRound,
+  Droplets,
   FileSpreadsheet,
   GraduationCap,
   IdCard,
   Info,
   LayoutDashboard,
   LayoutGrid,
+  Lock,
   LogIn,
   LogOut,
   type LucideIcon,
@@ -57,6 +59,10 @@ interface NavItem {
   icon: LucideIcon
   tone: Tone
   badge?: string
+  /** Ce qu'il faut pour utiliser la fonction : le menu guide en conséquence. */
+  access?: 'account' | 'organisation'
+  /** Indication affichée à la place de la description, calculée au rendu. */
+  note?: string
 }
 
 const TONES: Record<Tone, string> = {
@@ -74,6 +80,7 @@ const NAVIGATION_BY_CONTEXT: Record<ProductContext, NavItem[]> = {
   faitierehub: [
     {
       href: '/dashboard',
+      access: 'organisation',
       label: 'Espace organisation',
       description: 'Tableau de bord de votre faîtière ou coopérative',
       icon: LayoutDashboard,
@@ -81,6 +88,7 @@ const NAVIGATION_BY_CONTEXT: Record<ProductContext, NavItem[]> = {
     },
     {
       href: '/dashboard/members',
+      access: 'organisation',
       label: 'Membres',
       description: 'Producteurs, cotisations et scores',
       icon: Users,
@@ -88,6 +96,7 @@ const NAVIGATION_BY_CONTEXT: Record<ProductContext, NavItem[]> = {
     },
     {
       href: '/dashboard/cards',
+      access: 'organisation',
       label: 'Cartes membres',
       description: 'Cartes vérifiables par QR code',
       icon: IdCard,
@@ -118,21 +127,21 @@ const NAVIGATION_BY_CONTEXT: Record<ProductContext, NavItem[]> = {
       badge: 'Populaire',
     },
     {
-      href: '/#haroo-ouvrier',
+      href: '/marche?type=job',
       label: 'Emplois agricoles',
       description: 'Compétences, disponibilité et offres locales',
       icon: Briefcase,
       tone: 'orange',
     },
     {
-      href: '/#haroo-acheteur',
+      href: '/marche?type=prevente',
       label: 'Préventes de récoltes',
       description: 'Produits recherchés et contacts producteurs',
       icon: ShoppingBasket,
       tone: 'amber',
     },
     {
-      href: '/#haroo-agronome',
+      href: '/marche?type=mission',
       label: 'Missions de conseil',
       description: 'Expertise agronomique et suivi des missions',
       icon: GraduationCap,
@@ -165,6 +174,13 @@ const BANNER_BY_CONTEXT: Record<
 }
 
 const SHARED_NAVIGATION: NavItem[] = [
+  {
+    href: '/agrismart',
+    label: 'AgriSmart',
+    description: 'Besoins en eau, calcul gratuit · rapport pour agronomes',
+    icon: Droplets,
+    tone: 'blue',
+  },
   {
     href: '/produit',
     label: 'Produit',
@@ -213,6 +229,26 @@ const CONTEXTS: { value: ProductContext; label: string; hint: string; icon: Luci
   { value: 'faitierehub', label: 'FaîtiereHub', hint: 'Organisations', icon: LayoutGrid },
   { value: 'haroo', label: 'Haroo', hint: 'Opportunités', icon: Sprout },
 ]
+
+/**
+ * Adapte une entrée à l'utilisateur : un visiteur est envoyé à la connexion
+ * (avec retour à la page voulue) ; un compte sans organisation apprend que
+ * l'espace organisation s'ouvre via un opérateur certifié.
+ */
+function guide(item: NavItem, journey: ReturnType<typeof accountJourney>): NavItem {
+  if (!item.access) return item
+  if (journey.stage === 'anonymous') {
+    return {
+      ...item,
+      href: `/auth/login?redirect=${encodeURIComponent(item.href)}`,
+      note: 'Connexion requise',
+    }
+  }
+  if (item.access === 'organisation' && !journey.hasOrganization) {
+    return { ...item, href: '/#operateur', note: 'Ouvert par un opérateur certifié' }
+  }
+  return item
+}
 
 function NavigationItem({
   item,
@@ -277,7 +313,14 @@ function NavigationItem({
               : 'line-clamp-2 text-[0.8rem] leading-snug',
           )}
         >
-          {item.description}
+          {item.note ? (
+            <span className="inline-flex items-center gap-1 font-medium text-amber-700">
+              <Lock aria-hidden="true" className="h-3 w-3" />
+              {item.note}
+            </span>
+          ) : (
+            item.description
+          )}
         </span>
       </span>
       <ChevronRight
@@ -417,7 +460,9 @@ export function MobileNavigationDrawer({ open, onClose }: { open: boolean; onClo
   const pathname = usePathname()
   const [context, setContext] = useProductContext(pathname)
   const isActive = (href: string) => !href.includes('#') && pathname === href
-  const items = NAVIGATION_BY_CONTEXT[context]
+  const { user } = useAuth()
+  const journey = accountJourney(user)
+  const items = NAVIGATION_BY_CONTEXT[context].map((item) => guide(item, journey))
   const banner = BANNER_BY_CONTEXT[context]
 
   // Sheet (Radix Dialog) apporte focus piégé, Échap, clic extérieur et blocage
