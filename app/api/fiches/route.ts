@@ -94,6 +94,7 @@ const createFicheSchema = z.object({
   prefecture_id: z.string().uuid().optional(),
   canton_id: z.string().uuid().optional(),
   files: z.array(ficheFileSchema).min(1).max(20),
+  cover_url: z.string().url().max(500).refine((u) => u.startsWith(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/fiches-covers/`), 'Image hors du stockage FaîtiereHub').optional(),
   // 0 = accès libre. C'est ce que lit /access pour ouvrir la fiche sans carte
   // ni achat — la gratuité du lancement est portée par la donnée.
   price_non_member: z.number().int().nonnegative().max(1_000_000).default(0),

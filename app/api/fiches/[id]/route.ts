@@ -16,6 +16,16 @@ const patchSchema = z.object({
   region_id: z.string().uuid().nullable().optional(),
   prefecture_id: z.string().uuid().nullable().optional(),
   canton_id: z.string().uuid().nullable().optional(),
+  cover_url: z
+    .string()
+    .url()
+    .max(500)
+    .refine(
+      (u) => u.startsWith(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/fiches-covers/`),
+      'Image hors du stockage FaîtiereHub',
+    )
+    .nullable()
+    .optional(),
   price_non_member: z.number().int().nonnegative().max(1_000_000).optional(),
   is_free_for_members: z.boolean().optional(),
   status: z.enum(['draft', 'published', 'archived']).optional(),

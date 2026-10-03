@@ -16,7 +16,18 @@ export function FicheCard({ fiche, cultureIcon, onAccess }: FicheCardProps) {
   const faitiereName = fiche.cooperatives?.faitiere_name
 
   return (
-    <Card className="border-border hover:shadow-md transition-shadow flex flex-col h-full">
+    <Card
+      className={`border-border hover:shadow-md transition-shadow flex flex-col h-full overflow-hidden ${fiche.cover_url ? 'pt-0 gap-0' : ''}`}
+    >
+      {fiche.cover_url ? (
+        <img
+          src={fiche.cover_url}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="h-40 w-full object-cover"
+        />
+      ) : null}
       <CardContent className="pt-5 pb-4 flex-1 flex flex-col">
         {/* Header: icon + culture */}
         <div className="flex items-start gap-3 mb-3">

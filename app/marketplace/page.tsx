@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react'
 import { FicheFilterBar } from '@/components/marketplace/fiche-filter-bar'
 import { FicheGrid } from '@/components/marketplace/fiche-grid'
 import { MyPurchases } from '@/components/marketplace/my-purchases'
+import { PresalesStrip } from '@/components/marketplace/presales-strip'
 import { MarketplaceFilterBar } from '@/components/marketplace/filter-bar'
 import { ProductGrid } from '@/components/marketplace/product-grid'
 import { useMarketplaceFilters } from '@/hooks/use-marketplace-filters'
@@ -167,7 +168,8 @@ function MarketplaceContent() {
             <FichesTab />
           </TabsContent>
 
-          <TabsContent value="produits">
+          <TabsContent value="produits" className="space-y-8">
+            <PresalesStrip />
             <ProduitsTab />
           </TabsContent>
         </Tabs>
