@@ -454,7 +454,7 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
                   const sparkValues = p.history.length >= 2 ? p.history : (pricesByCulture[p.cultureId] ?? [])
                   return (
                     <tr key={p.id} className="border-b border-white/[0.04] last:border-0">
-                      <td className="px-3 py-2.5">
+                      <td className="px-2 sm:px-3 py-2.5">
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="text-base shrink-0">{p.cultureEmoji}</span>
                           <span className="text-xs font-semibold text-white truncate">
@@ -486,10 +486,12 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
                         </span>
                       </td>
                       <td className="px-3 py-2.5">
-                        <div className="flex items-center gap-2">
+                        {/* Sur téléphone, la courbe passe sous le badge pour que la
+                            colonne Prix ne déborde pas de l'écran. */}
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                           <TrendBadge trend={p.trend} />
                           {p.changePct !== null ? (
-                            <span className="text-[10.5px] font-mono text-white/45">
+                            <span className="text-[10.5px] font-mono text-white/45 whitespace-nowrap">
                               {p.changePct > 0 ? '+' : ''}
                               {p.changePct.toLocaleString('fr-FR')} %
                             </span>
@@ -501,7 +503,7 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                      <td className="px-2 sm:px-3 py-2.5 text-right whitespace-nowrap">
                         <span
                           className={`text-sm font-bold ${p.isStale ? 'text-white/45' : 'text-white'}`}
                         >
