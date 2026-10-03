@@ -1,6 +1,7 @@
 import { cardRateLimit, resolvePublicCard } from '@/lib/security/card-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
+import { fetchEnsembleRainProbability } from '@/lib/weather/ensemble'
 import {
   fetchGFSForRegion,
   fetchHourlyForRegion,
@@ -57,7 +58,7 @@ export async function GET(
   const dateTo = tenDaysLater.toISOString().split('T')[0]
 
   // All 7 fetches run in parallel — cache hit = instant, first miss = HTTP to Open-Meteo
-  const [{ data: cached }, hourlyECMWF, hourlyGFS, hourlyICON, nowcastRaw, seasonalRaw] =
+  const [{ data: cached }, hourlyECMWF, hourlyGFS, hourlyICON, nowcastRaw, seasonalRaw, ensemble] =
     await Promise.all([
       supabaseAdmin
         .from('weather_data')
@@ -74,10 +75,16 @@ export async function GET(
       fetchHourlyICONForRegion(region),
       fetchMinutely15ForRegion(region),
       fetchSeasonalForRegion(region),
+      fetchEnsembleRainProbability(region),
     ])
 
   // Merge hourly from 3 models
-  const mergedHourly = mergeHourlyModels(hourlyECMWF, hourlyGFS, hourlyICON)
+  // Probabilité de pluie par ensemble (part des membres) quand elle est
+  // disponible ; sinon celle des modèles déterministes est conservée.
+  const mergedHourly = mergeHourlyModels(hourlyECMWF, hourlyGFS, hourlyICON).map((h) => {
+    const p = ensemble?.hourly.get(h.time)
+    return p == null ? h : { ...h, precipitation_probability: p }
+  })
 
   let weather = (cached ?? []) as Array<{
     date: string
@@ -107,6 +114,11 @@ export async function GET(
       dataSource = weather.length === merged.length ? 'live' : 'partial'
     }
   }
+
+  const weatherOut = weather.map((d) => {
+    const p = ensemble?.daily.get(d.date)
+    return p == null ? d : { ...d, precipitation_probability: p }
+  })
 
   // Agronomic insights
   const futureDays = weather.filter((d) => d.date >= todayStr)
@@ -151,7 +163,7 @@ export async function GET(
   // (personal data tied to the card). Let next.config.mjs be the single source
   // of truth for caching policy on all /verify/* routes.
   return NextResponse.json({
-    weather,
+    weather: weatherOut,
     hourly: mergedHourly,
     nowcast: nowcastRaw,
     seasonal: seasonalRaw,
@@ -159,6 +171,9 @@ export async function GET(
     city,
     data_source: dataSource,
     models: ['ecmwf_ifs025', 'gfs_seamless', 'icon_seamless'],
+    rain_probability: ensemble
+      ? { method: 'ensemble', members: ensemble.members }
+      : { method: 'deterministic' },
     updated_at: new Date().toISOString(),
     agro_insights: {
       drought_risk: droughtRisk,

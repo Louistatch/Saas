@@ -14,6 +14,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { getAccessContext } from '@/lib/security/assert-access'
 import { isHarooRole } from '@/lib/utils/permissions'
 import { rateLimit, clientKeyFromHeaders } from '@/lib/utils/rate-limit'
+import { fetchEnsembleRainProbability } from '@/lib/weather/ensemble'
 import {
   fetchOpenMeteoForRegion,
   fetchGFSForRegion,
@@ -130,11 +131,12 @@ export async function GET(request: NextRequest) {
         .limit(40)
         .returns<PriceRow[]>()
 
-  const [ecmwf, gfs, icon, pricesRes] = await Promise.all([
+  const [ecmwf, gfs, icon, pricesRes, ensemble] = await Promise.all([
     fetchOpenMeteoForRegion(regionName),
     fetchGFSForRegion(regionName),
     fetchICONForRegion(regionName),
     pricesQuery,
+    fetchEnsembleRainProbability(regionName),
   ])
 
   const weather = mergeWeatherModels(ecmwf, gfs, icon)
@@ -145,7 +147,7 @@ export async function GET(request: NextRequest) {
       temperature_min: Math.round(d.temperature_min),
       temperature_max: Math.round(d.temperature_max),
       precipitation_mm: Math.round(d.precipitation_mm * 10) / 10,
-      precipitation_probability: Math.round(d.precipitation_probability),
+      precipitation_probability: ensemble?.daily.get(d.date) ?? Math.round(d.precipitation_probability),
       humidity_pct: Math.round(d.humidity_pct),
     }))
 

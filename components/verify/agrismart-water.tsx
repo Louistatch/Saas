@@ -140,6 +140,12 @@ interface Props {
   cardNumber?: string
   /** Zone affichée sous les résultats (ex. rapport PDF réservé aux agronomes). */
   renderReport?: (result: CalcResult, context: { region: string }) => React.ReactNode
+  /**
+   * Accès au résultat détaillé. Renvoie un bloc (ex. inscription agronome) pour
+   * le montrer à la place du détail ; null = détail visible. Le bilan global
+   * reste toujours affiché.
+   */
+  renderDetailsGate?: () => React.ReactNode | null
 }
 
 // ─── Palette de couleurs par culture ─────────────────────────────────────────
@@ -152,7 +158,14 @@ const CROP_COLORS = [
   'oklch(0.72 0.18 160)',
 ]
 
-export function AgriSmartWater({ onBack, initialRegion, cardNumber, renderReport }: Props) {
+export function AgriSmartWater({
+  onBack,
+  initialRegion,
+  cardNumber,
+  renderReport,
+  renderDetailsGate,
+}: Props) {
+  const detailsGate = renderDetailsGate ? renderDetailsGate() : null
   // ── API data ──────────────────────────────────────────────────────────────
   const [allCrops, setAllCrops] = useState<Crop[]>([])
   const [systems, setSystems] = useState<IrrigationSystem[]>([])
@@ -857,13 +870,16 @@ export function AgriSmartWater({ onBack, initialRegion, cardNumber, renderReport
             </div>
           </div>
 
+          {detailsGate}
+          {detailsGate ? null : (
+            <>
           {/* ── Graphique combiné 12 mois ── */}
           <div className="vfp-card rounded-2xl p-4">
             <p className="text-white/50 text-[10px] font-bold uppercase tracking-wider mb-3">
               📊 Besoins combinés par mois (m³)
             </p>
             <div className="space-y-1.5">
-              {result.combined_monthly.map((row) => {
+              {result.combined_monthly.filter((row) => row.optimal_total > 0).map((row) => {
                 const maxOpt = Math.max(...result.combined_monthly.map((r) => r.optimal_total))
                 const survPct = maxOpt > 0 ? (row.volume_total / maxOpt) * 100 : 0
                 const boostPct = maxOpt > 0 ? (row.boost_vol_total / maxOpt) * 100 : 0
@@ -1077,6 +1093,8 @@ export function AgriSmartWater({ onBack, initialRegion, cardNumber, renderReport
           </div>
 
           {renderReport ? renderReport(result, { region }) : null}
+            </>
+          )}
 
           {/* Partage WhatsApp */}
           {result && (

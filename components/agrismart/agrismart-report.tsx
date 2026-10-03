@@ -163,3 +163,67 @@ export function AgriSmartReport({ result, region }: { result: CalcResult; region
     </div>
   )
 }
+
+/**
+ * Accès au résultat détaillé de la page publique : le bilan global reste
+ * libre ; le détail (mois par mois, par culture, recommandations, PDF) est
+ * réservé aux agronomes. Placé juste sous le bilan, là où l'utilisateur
+ * cherche la suite de son calcul.
+ */
+export function AgronomeResultsGate({ signedIn }: { signedIn: boolean }) {
+  return (
+    <div
+      className="rounded-2xl border p-4 space-y-3"
+      style={{ borderColor: 'var(--vfp-accent)', background: 'rgb(255 255 255 / 0.04)' }}
+    >
+      <p className="flex items-center gap-2 text-sm font-bold text-white">
+        <Lock className="h-4 w-4" /> Voir le résultat complet
+      </p>
+      <ul className="space-y-1 text-xs text-white/60">
+        <li>• Besoins mois par mois sur le cycle de la culture</li>
+        <li>• Détail par culture : ETo, Kc, pluie efficace, réserve du sol</li>
+        <li>• Recommandations d’arrosage et dimensionnement de la pompe</li>
+        <li>• Rapport PDF à remettre au producteur</li>
+      </ul>
+      {signedIn ? (
+        <>
+          <p className="text-xs text-white/55">
+            Ce résultat est réservé aux comptes portant un profil Haroo « Agronome ».
+          </p>
+          <Link
+            href="/compte"
+            className="block rounded-xl border border-white/15 py-3 text-center text-sm font-semibold text-white/85"
+          >
+            Voir mon compte
+          </Link>
+        </>
+      ) : (
+        <>
+          <Link
+            href={AGRONOME_SIGNUP}
+            className="block rounded-xl py-3 text-center text-sm font-bold"
+            style={{ background: 'var(--vfp-cta)', color: 'var(--vfp-cta-fg)' }}
+          >
+            S’inscrire comme agronome — gratuit
+          </Link>
+          <Link
+            href="/auth/login?redirect=/agrismart"
+            className="block py-1 text-center text-xs font-semibold text-white/70 underline-offset-2 hover:underline"
+          >
+            J’ai déjà un compte agronome : me connecter
+          </Link>
+        </>
+      )}
+    </div>
+  )
+}
+
+/** true si le compte connecté porte le profil Haroo « agronome ». */
+export function useIsAgronome(): { ready: boolean; signedIn: boolean; agronome: boolean } {
+  const { user, isLoading } = useAuth()
+  return {
+    ready: !isLoading,
+    signedIn: Boolean(user),
+    agronome: user ? effectiveHarooType(user.role, user.harooType) === 'agronome' : false,
+  }
+}
