@@ -1,5 +1,6 @@
 'use client'
 
+import { ParcelYield } from '@/components/yield/yield-panel'
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   MapPin,
@@ -614,6 +615,9 @@ export default function ParcellesPage() {
                                       </a>
                                     </div>
                                   )}
+                                  <div className="mt-4">
+                                    <ParcelYield parcelId={p.id} />
+                                  </div>
                                 </div>
 
                                 {/* Member details */}

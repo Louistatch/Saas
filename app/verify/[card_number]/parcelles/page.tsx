@@ -1,3 +1,4 @@
+import { requirePrivateCard } from '@/lib/security/card-access'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
@@ -76,6 +77,27 @@ export default async function ParcellesPage({ params }: Props) {
           <p className="text-white/50 text-sm">Carte non trouvée ou inactive.</p>
           <Link href={`/verify/${card_number}`} className="inline-flex items-center gap-2 mt-4 text-[var(--vfp-accent)] text-sm font-medium">
             <ArrowLeft className="h-4 w-4" /> Retour
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  // Parcelles = données privées du titulaire : même contrôle que l'API
+  // (session de carte ouverte avec le PIN, ou compte rattaché à la carte).
+  // Auparavant, connaître le numéro de carte suffisait à les afficher.
+  const access = await requirePrivateCard(decodeURIComponent(card_number))
+  if (!access.ok) {
+    return (
+      <div className="min-h-screen vfp-bg flex items-center justify-center px-6 relative">
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: feuille de style statique locale (const vfpStyles), aucune donnee utilisateur */}
+        <style dangerouslySetInnerHTML={{ __html: vfpStyles }} />
+        <div className="text-center max-w-xs">
+          <p className="text-white/70 text-sm">
+            Vos parcelles sont privées. Ouvrez votre carte avec votre PIN pour les voir.
+          </p>
+          <Link href={`/verify/${card_number}`} className="inline-flex items-center gap-2 mt-4 text-[var(--vfp-accent)] text-sm font-medium">
+            <ArrowLeft className="h-4 w-4" /> Revenir à ma carte
           </Link>
         </div>
       </div>

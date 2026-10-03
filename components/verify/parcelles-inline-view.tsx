@@ -1,5 +1,6 @@
 'use client'
 
+import { YieldPanel, type YieldEstimateView } from '@/components/yield/yield-panel'
 import { useCallback, useEffect, useState } from 'react'
 import { ArrowLeft, Sprout, Map as MapIcon, Droplets, Navigation, CalendarDays } from 'lucide-react'
 
@@ -15,6 +16,8 @@ interface Parcelle {
   campaign_year: string | null
   source: string | null
   created_at: string
+  yield_estimate?: YieldEstimateView | null
+  observed_t_ha?: number | null
 }
 
 interface Props {
@@ -45,7 +48,7 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
   const loadData = useCallback(() => {
     setError(false)
     setLoading(true)
-    fetch(`/api/verify/${encodeURIComponent(cardNumber)}/parcelles`)
+    fetch(`/api/verify/${encodeURIComponent(cardNumber)}/parcelles?yield=1`)
       // Keep the status: a 401 is "sign in", not "something broke", and the
       // generic error offered a Réessayer button that could never succeed.
       .then((r) => {
@@ -234,6 +237,7 @@ export function ParcellesInlineView({ cardNumber, onBack, onOpenAgriSmart }: Pro
                   {/* Expanded detail */}
                   {isExpanded && (
                     <div className="px-4 pb-4 border-t border-white/[0.06] pt-3 space-y-2">
+                      <YieldPanel estimate={p.yield_estimate} observed={p.observed_t_ha} dark />
                       <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                         {surface != null && (
                           <div>
