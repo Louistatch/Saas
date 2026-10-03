@@ -59,11 +59,13 @@ export async function createCheckout(input: {
   amount: number
   description: string
   callbackUrl: string
-  customer: { name: string; email?: string | null; phone?: string | null }
+  customer: { name: string; email?: string | null; phone?: string | null; country?: 'tg' | 'bj' }
 }): Promise<{ transactionId: number; url: string }> {
   const [firstname, ...rest] = input.customer.name.trim().split(/\s+/)
   const phone = (input.customer.phone ?? '').replace(/\D/g, '')
-  const local = phone.startsWith('228') ? phone.slice(3) : phone
+  const country = input.customer.country ?? 'tg'
+  const prefix = country === 'bj' ? '229' : '228'
+  const local = phone.startsWith(prefix) && phone.length > 8 ? phone.slice(3) : phone
   const created = await call('/transactions', {
     method: 'POST',
     body: JSON.stringify({
@@ -75,12 +77,9 @@ export async function createCheckout(input: {
         firstname: firstname || 'Client',
         lastname: rest.join(' ') || '-',
         ...(input.customer.email ? { email: input.customer.email } : {}),
-        // En sandbox, on ne pré-remplit PAS le téléphone : les numéros de test
-        // FedaPay (64000001…) sont béninois, et un numéro forcé au Togo bloque
-        // le bouton « Payer » sans message. L'acheteur choisit pays et numéro.
-        ...(process.env.FEDAPAY_ENV === 'live' && local.length === 8
-          ? { phone_number: { number: local, country: 'tg' } }
-          : {}),
+        // Le pays choisi par l'acheteur fixe le drapeau du checkout FedaPay
+        // (Togo ou Bénin). Les numéros de test sandbox (64000001) sont béninois.
+        ...(local.length >= 8 ? { phone_number: { number: local, country } } : {}),
       },
     }),
   })

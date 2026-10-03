@@ -34,7 +34,7 @@ export function FicheAccessDialog({ fiche, open, onOpenChange }: FicheAccessDial
   const [error, setError] = useState<string | null>(null)
   const [files, setFiles] = useState<AccessFile[]>([])
   const [success, setSuccess] = useState(false)
-  const [buyer, setBuyer] = useState({ name: '', phone: '', email: '' })
+  const [buyer, setBuyer] = useState({ name: '', phone: '', email: '', country: 'tg' as 'tg' | 'bj' })
   const [buying, setBuying] = useState(false)
 
   const reset = useCallback(() => {
@@ -115,6 +115,7 @@ export function FicheAccessDialog({ fiche, open, onOpenChange }: FicheAccessDial
           body: JSON.stringify({
             name: buyer.name.trim(),
             phone: buyer.phone.trim(),
+            country: buyer.country,
             email: buyer.email.trim() || undefined,
           }),
         })
@@ -213,6 +214,19 @@ export function FicheAccessDialog({ fiche, open, onOpenChange }: FicheAccessDial
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="buyer_phone">Téléphone (Mobile Money)</Label>
+                  <div className="flex gap-2">
+                    <select
+                      aria-label="Pays du numéro"
+                      value={buyer.country}
+                      onChange={(e) =>
+                        setBuyer((b) => ({ ...b, country: e.target.value as 'tg' | 'bj' }))
+                      }
+                      disabled={busy}
+                      className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                    >
+                      <option value="tg">🇹🇬 Togo</option>
+                      <option value="bj">🇧🇯 Bénin</option>
+                    </select>
                   <Input
                     id="buyer_phone"
                     type="tel"
@@ -222,7 +236,9 @@ export function FicheAccessDialog({ fiche, open, onOpenChange }: FicheAccessDial
                     onChange={(e) => setBuyer((b) => ({ ...b, phone: e.target.value }))}
                     disabled={busy}
                     required
+                    className="flex-1"
                   />
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="buyer_email">E-mail (facultatif)</Label>

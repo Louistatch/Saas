@@ -11,6 +11,7 @@ const log = createLogger('api:fiches:purchase')
 const schema = z.object({
   name: z.string().trim().min(2).max(120),
   phone: z.string().trim().min(8).max(20),
+  country: z.enum(['tg', 'bj']).default('tg'),
   email: z.string().trim().email().max(200).optional().or(z.literal('')),
 })
 
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     data: { user },
   } = await supabase.auth.getUser()
 
-  const { name, phone } = parsed.data
+  const { name, phone, country } = parsed.data
   const email = parsed.data.email || user?.email || null
   const { data: purchase, error } = await admin
     .from('purchases')
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       amount: fiche.price_non_member,
       description: `Compte d'exploitation — ${fiche.title}`,
       callbackUrl: `${appUrl}/api/payments/fedapay/return?purchase=${purchase.id}`,
-      customer: { name, email, phone },
+      customer: { name, email, phone, country },
     })
     await admin
       .from('purchases')
