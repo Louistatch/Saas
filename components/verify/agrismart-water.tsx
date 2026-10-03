@@ -88,6 +88,8 @@ export interface CropResult {
   }
 }
 export interface CalcResult {
+  /** Le serveur n'a renvoyé que le bilan global (détail réservé). */
+  details_locked?: boolean
   soil: string
   system: string
   climate_source: string
@@ -165,7 +167,6 @@ export function AgriSmartWater({
   renderReport,
   renderDetailsGate,
 }: Props) {
-  const detailsGate = renderDetailsGate ? renderDetailsGate() : null
   // ── API data ──────────────────────────────────────────────────────────────
   const [allCrops, setAllCrops] = useState<Crop[]>([])
   const [systems, setSystems] = useState<IrrigationSystem[]>([])
@@ -298,6 +299,8 @@ export function AgriSmartWater({
         soil_type: soil.name,
         system: system.id,
         planting_month: plantingMonth,
+        // Écran d'une carte : le serveur vérifie la carte pour servir le détail.
+        ...(cardNumber ? { card_number: cardNumber } : {}),
       }
       if (gpsCoords) {
         payload.lat = gpsCoords.lat
@@ -870,229 +873,248 @@ export function AgriSmartWater({
             </div>
           </div>
 
-          {detailsGate}
-          {detailsGate ? null : (
+          {renderDetailsGate?.() ??
+            (result.details_locked ? (
+              <p className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-xs text-white/60">
+                Le détail mois par mois est réservé aux agronomes inscrits.
+              </p>
+            ) : null)}
+          {renderDetailsGate?.() || result.details_locked ? null : (
             <>
-          {/* ── Graphique combiné 12 mois ── */}
-          <div className="vfp-card rounded-2xl p-4">
-            <p className="text-white/50 text-[10px] font-bold uppercase tracking-wider mb-3">
-              📊 Besoins combinés par mois (m³)
-            </p>
-            <div className="space-y-1.5">
-              {result.combined_monthly.filter((row) => row.optimal_total > 0).map((row) => {
-                const maxOpt = Math.max(...result.combined_monthly.map((r) => r.optimal_total))
-                const survPct = maxOpt > 0 ? (row.volume_total / maxOpt) * 100 : 0
-                const boostPct = maxOpt > 0 ? (row.boost_vol_total / maxOpt) * 100 : 0
-                return (
-                  <div key={row.mois} className="flex items-center gap-2">
-                    <span className="text-white/40 text-[10px] w-14 shrink-0 font-mono">
-                      {row.mois.slice(0, 4)}
-                    </span>
-                    <div className="flex-1 h-4 bg-white/[0.04] rounded-full overflow-hidden flex">
-                      <div
-                        className="h-full rounded-l-full transition-all"
-                        style={{ width: `${survPct}%`, background: 'var(--vfp-accent)' }}
-                      />
-                      <div
-                        className="h-full transition-all"
-                        style={{ width: `${boostPct}%`, background: 'oklch(0.72 0.18 60 / 0.7)' }}
-                      />
-                    </div>
-                    <span className="text-white/60 text-[10px] w-16 text-right shrink-0 font-mono">
-                      {row.optimal_total.toFixed(1)} m³
-                    </span>
+              {/* ── Graphique combiné 12 mois ── */}
+              <div className="vfp-card rounded-2xl p-4">
+                <p className="text-white/50 text-[10px] font-bold uppercase tracking-wider mb-3">
+                  📊 Besoins combinés par mois (m³)
+                </p>
+                <div className="space-y-1.5">
+                  {result.combined_monthly
+                    .filter((row) => row.optimal_total > 0)
+                    .map((row) => {
+                      const maxOpt = Math.max(
+                        ...result.combined_monthly.map((r) => r.optimal_total),
+                      )
+                      const survPct = maxOpt > 0 ? (row.volume_total / maxOpt) * 100 : 0
+                      const boostPct = maxOpt > 0 ? (row.boost_vol_total / maxOpt) * 100 : 0
+                      return (
+                        <div key={row.mois} className="flex items-center gap-2">
+                          <span className="text-white/40 text-[10px] w-14 shrink-0 font-mono">
+                            {row.mois.slice(0, 4)}
+                          </span>
+                          <div className="flex-1 h-4 bg-white/[0.04] rounded-full overflow-hidden flex">
+                            <div
+                              className="h-full rounded-l-full transition-all"
+                              style={{ width: `${survPct}%`, background: 'var(--vfp-accent)' }}
+                            />
+                            <div
+                              className="h-full transition-all"
+                              style={{
+                                width: `${boostPct}%`,
+                                background: 'oklch(0.72 0.18 60 / 0.7)',
+                              }}
+                            />
+                          </div>
+                          <span className="text-white/60 text-[10px] w-16 text-right shrink-0 font-mono">
+                            {row.optimal_total.toFixed(1)} m³
+                          </span>
+                        </div>
+                      )
+                    })}
+                </div>
+                <div className="flex gap-4 mt-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <div
+                      className="w-2.5 h-2.5 rounded-sm"
+                      style={{ background: 'var(--vfp-accent)' }}
+                    />
+                    <span className="text-white/30 text-[9px]">Année normale</span>
                   </div>
-                )
-              })}
-            </div>
-            <div className="flex gap-4 mt-2.5">
-              <div className="flex items-center gap-1.5">
-                <div
-                  className="w-2.5 h-2.5 rounded-sm"
-                  style={{ background: 'var(--vfp-accent)' }}
-                />
-                <span className="text-white/30 text-[9px]">Année normale</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div
-                  className="w-2.5 h-2.5 rounded-sm"
-                  style={{ background: 'oklch(0.72 0.18 60 / 0.7)' }}
-                />
-                <span className="text-white/30 text-[9px]">Marge année sèche</span>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Onglets par culture ── */}
-          {result.results.length > 1 && (
-            <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-              {result.results.map((r, i) => (
-                <button
-                  type="button"
-                  key={r.crop}
-                  onClick={() => setActiveCropIdx(i)}
-                  className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${activeCropIdx === i ? 'text-white' : 'text-white/30 bg-white/[0.04]'}`}
-                  style={
-                    activeCropIdx === i
-                      ? {
-                          background: `${CROP_COLORS[i % CROP_COLORS.length]}33`,
-                          border: `1px solid ${CROP_COLORS[i % CROP_COLORS.length]}66`,
-                          color: CROP_COLORS[i % CROP_COLORS.length],
-                        }
-                      : {}
-                  }
-                >
-                  {entries.find((e) => e.crop.name === r.crop)?.crop.emoji} {r.crop}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* ── Détail culture active ── */}
-          {result.results[activeCropIdx] &&
-            (() => {
-              const r = result.results[activeCropIdx]
-              const entry = entries.find((e) => e.crop.name === r.crop)
-              const color = CROP_COLORS[activeCropIdx % CROP_COLORS.length]
-              return (
-                <div className="space-y-3">
-                  <div className="vfp-card rounded-2xl p-4 space-y-3">
-                    <div className="flex items-center gap-2 pb-2 border-b border-white/[0.05]">
-                      <span className="text-xl">{entry?.crop.emoji}</span>
-                      <div>
-                        <p className="text-white font-bold text-sm">{r.crop}</p>
-                        <p className="text-white/35 text-xs">
-                          {r.area_m2.toLocaleString('fr')} m² · normale {r.kpis.total_m3.toFixed(1)}{' '}
-                          m³ · année sèche {r.kpis.total_optimal_m3.toFixed(1)} m³
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Mois où la pluie suffit */}
-                    {r.kpis.nb_mois_zero > 0 && (
-                      <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/15 p-2.5">
-                        <p className="text-emerald-400/80 text-[10px]">
-                          <span className="font-bold">🌧️ Pluie suffisante</span> pendant{' '}
-                          {r.kpis.nb_mois_zero} mois :{' '}
-                          {r.kpis.mois_pluie_couvre.map((m) => m.slice(0, 4)).join(', ')} —
-                          supplément rendement calculé.
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Tableau bilan mensuel */}
-                    <div className="overflow-x-auto -mx-1">
-                      <table className="w-full text-[10px] min-w-[340px]">
-                        <thead>
-                          <tr className="text-white/25 border-b border-white/[0.06]">
-                            <th className="text-left pb-1.5 font-semibold pl-1">Mois</th>
-                            <th className="text-right pb-1.5 font-semibold">ETP</th>
-                            <th className="text-right pb-1.5 font-semibold">Kc</th>
-                            <th className="text-right pb-1.5 font-semibold">Peff</th>
-                            <th className="text-right pb-1.5 font-semibold">Normale</th>
-                            <th className="text-right pb-1.5 font-semibold" style={{ color }}>
-                              +Sèche
-                            </th>
-                            <th className="text-right pb-1.5 font-semibold text-white/50">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {r.monthly
-                            .filter((row) => row.nb_jours !== 0)
-                            .map((row) => {
-                              const isBoosted = row.boost_mm > 0
-                              const total = row.volume_total + row.boost_vol_total
-                              return (
-                                <tr
-                                  key={row.mois}
-                                  className={`border-b border-white/[0.03] ${isBoosted ? 'bg-emerald-500/[0.03]' : ''}`}
-                                >
-                                  <td className="py-1 pl-1 font-medium text-white/60">
-                                    {row.mois.slice(0, 4)}
-                                  </td>
-                                  <td className="py-1 text-right text-white/40">{row.etp}</td>
-                                  <td className="py-1 text-right text-white/40">{row.kc}</td>
-                                  <td className="py-1 text-right text-white/40">{row.peff}</td>
-                                  <td
-                                    className={`py-1 text-right font-medium ${row.besoin_net > 0 ? 'text-white/70' : 'text-white/20'}`}
-                                  >
-                                    {row.volume_total > 0 ? row.volume_total.toFixed(1) : '—'}
-                                  </td>
-                                  <td
-                                    className="py-1 text-right font-medium"
-                                    style={{
-                                      color: isBoosted ? 'oklch(0.72 0.18 142 / 0.7)' : undefined,
-                                    }}
-                                  >
-                                    {isBoosted ? `+${row.boost_vol_total.toFixed(1)}` : '—'}
-                                  </td>
-                                  <td className="py-1 text-right font-bold text-white/80">
-                                    {total > 0 ? total.toFixed(1) : '—'}
-                                  </td>
-                                </tr>
-                              )
-                            })}
-                          <tr className="border-t border-white/[0.1]">
-                            <td className="pt-1.5 pl-1 font-bold text-white/50 text-[9px] uppercase tracking-wider">
-                              Total
-                            </td>
-                            <td colSpan={3} />
-                            <td className="pt-1.5 text-right font-bold text-white/60">
-                              {r.kpis.total_m3.toFixed(1)}
-                            </td>
-                            <td
-                              className="pt-1.5 text-right font-bold"
-                              style={{ color: 'oklch(0.72 0.18 142 / 0.7)' }}
-                            >
-                              +{r.kpis.total_boost_m3.toFixed(1)}
-                            </td>
-                            <td className="pt-1.5 text-right font-bold text-white">
-                              {r.kpis.total_optimal_m3.toFixed(1)}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                    <p className="text-white/20 text-[9px]">
-                      ETP mm/j · Kc · Peff mm · volumes m³ · Normale = pluie moyenne · Sèche =
-                      supplément si pluie d’une année sèche (4 ans sur 5)
-                    </p>
+                  <div className="flex items-center gap-1.5">
+                    <div
+                      className="w-2.5 h-2.5 rounded-sm"
+                      style={{ background: 'oklch(0.72 0.18 60 / 0.7)' }}
+                    />
+                    <span className="text-white/30 text-[9px]">Marge année sèche</span>
                   </div>
                 </div>
-              )
-            })()}
+              </div>
 
-          {/* ── Recommandations ── */}
-          <div className="vfp-card rounded-2xl p-4 space-y-2">
-            <p className="text-[var(--vfp-accent)] text-xs font-bold uppercase tracking-wider">
-              💡 Recommandations
-            </p>
-            <ul className="space-y-1.5 text-white/55 text-xs">
-              <li>
-                • Pompe recommandée :{' '}
-                <strong className="text-white/70">
-                  {result.combined_kpis.debit_pompe_ls.toFixed(2)} L/s
-                </strong>{' '}
-                (12h/j au mois de pointe — {result.combined_kpis.pic_mois})
-              </li>
-              {result.results.some((r) => r.kpis.nb_mois_zero > 3) && (
-                <li>
-                  • Plusieurs mois couverts par la pluie — en saison des pluies, irriguez uniquement
-                  si 7 jours sans pluie consécutifs
-                </li>
+              {/* ── Onglets par culture ── */}
+              {result.results.length > 1 && (
+                <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+                  {result.results.map((r, i) => (
+                    <button
+                      type="button"
+                      key={r.crop}
+                      onClick={() => setActiveCropIdx(i)}
+                      className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${activeCropIdx === i ? 'text-white' : 'text-white/30 bg-white/[0.04]'}`}
+                      style={
+                        activeCropIdx === i
+                          ? {
+                              background: `${CROP_COLORS[i % CROP_COLORS.length]}33`,
+                              border: `1px solid ${CROP_COLORS[i % CROP_COLORS.length]}66`,
+                              color: CROP_COLORS[i % CROP_COLORS.length],
+                            }
+                          : {}
+                      }
+                    >
+                      {entries.find((e) => e.crop.name === r.crop)?.crop.emoji} {r.crop}
+                    </button>
+                  ))}
+                </div>
               )}
-              <li>• Irriguez tôt le matin (6h–8h) : réduction de l'évaporation de 20%</li>
-              {result.system.includes('outte') && (
-                <li>• Goutte-à-goutte : placez les goutteurs à 15–20 cm du pied de la plante</li>
-              )}
-              <li>
-                • Ajustez selon la pluviométrie réelle — soustrayez la pluie tombée la semaine
-                précédente
-              </li>
-            </ul>
-          </div>
 
-          {renderReport ? renderReport(result, { region }) : null}
+              {/* ── Détail culture active ── */}
+              {result.results[activeCropIdx] &&
+                (() => {
+                  const r = result.results[activeCropIdx]
+                  const entry = entries.find((e) => e.crop.name === r.crop)
+                  const color = CROP_COLORS[activeCropIdx % CROP_COLORS.length]
+                  return (
+                    <div className="space-y-3">
+                      <div className="vfp-card rounded-2xl p-4 space-y-3">
+                        <div className="flex items-center gap-2 pb-2 border-b border-white/[0.05]">
+                          <span className="text-xl">{entry?.crop.emoji}</span>
+                          <div>
+                            <p className="text-white font-bold text-sm">{r.crop}</p>
+                            <p className="text-white/35 text-xs">
+                              {r.area_m2.toLocaleString('fr')} m² · normale{' '}
+                              {r.kpis.total_m3.toFixed(1)} m³ · année sèche{' '}
+                              {r.kpis.total_optimal_m3.toFixed(1)} m³
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Mois où la pluie suffit */}
+                        {r.kpis.nb_mois_zero > 0 && (
+                          <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/15 p-2.5">
+                            <p className="text-emerald-400/80 text-[10px]">
+                              <span className="font-bold">🌧️ Pluie suffisante</span> pendant{' '}
+                              {r.kpis.nb_mois_zero} mois :{' '}
+                              {r.kpis.mois_pluie_couvre.map((m) => m.slice(0, 4)).join(', ')} —
+                              supplément rendement calculé.
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Tableau bilan mensuel */}
+                        <div className="overflow-x-auto -mx-1">
+                          <table className="w-full text-[10px] min-w-[340px]">
+                            <thead>
+                              <tr className="text-white/25 border-b border-white/[0.06]">
+                                <th className="text-left pb-1.5 font-semibold pl-1">Mois</th>
+                                <th className="text-right pb-1.5 font-semibold">ETP</th>
+                                <th className="text-right pb-1.5 font-semibold">Kc</th>
+                                <th className="text-right pb-1.5 font-semibold">Peff</th>
+                                <th className="text-right pb-1.5 font-semibold">Normale</th>
+                                <th className="text-right pb-1.5 font-semibold" style={{ color }}>
+                                  +Sèche
+                                </th>
+                                <th className="text-right pb-1.5 font-semibold text-white/50">
+                                  Total
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {r.monthly
+                                .filter((row) => row.nb_jours !== 0)
+                                .map((row) => {
+                                  const isBoosted = row.boost_mm > 0
+                                  const total = row.volume_total + row.boost_vol_total
+                                  return (
+                                    <tr
+                                      key={row.mois}
+                                      className={`border-b border-white/[0.03] ${isBoosted ? 'bg-emerald-500/[0.03]' : ''}`}
+                                    >
+                                      <td className="py-1 pl-1 font-medium text-white/60">
+                                        {row.mois.slice(0, 4)}
+                                      </td>
+                                      <td className="py-1 text-right text-white/40">{row.etp}</td>
+                                      <td className="py-1 text-right text-white/40">{row.kc}</td>
+                                      <td className="py-1 text-right text-white/40">{row.peff}</td>
+                                      <td
+                                        className={`py-1 text-right font-medium ${row.besoin_net > 0 ? 'text-white/70' : 'text-white/20'}`}
+                                      >
+                                        {row.volume_total > 0 ? row.volume_total.toFixed(1) : '—'}
+                                      </td>
+                                      <td
+                                        className="py-1 text-right font-medium"
+                                        style={{
+                                          color: isBoosted
+                                            ? 'oklch(0.72 0.18 142 / 0.7)'
+                                            : undefined,
+                                        }}
+                                      >
+                                        {isBoosted ? `+${row.boost_vol_total.toFixed(1)}` : '—'}
+                                      </td>
+                                      <td className="py-1 text-right font-bold text-white/80">
+                                        {total > 0 ? total.toFixed(1) : '—'}
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+                              <tr className="border-t border-white/[0.1]">
+                                <td className="pt-1.5 pl-1 font-bold text-white/50 text-[9px] uppercase tracking-wider">
+                                  Total
+                                </td>
+                                <td colSpan={3} />
+                                <td className="pt-1.5 text-right font-bold text-white/60">
+                                  {r.kpis.total_m3.toFixed(1)}
+                                </td>
+                                <td
+                                  className="pt-1.5 text-right font-bold"
+                                  style={{ color: 'oklch(0.72 0.18 142 / 0.7)' }}
+                                >
+                                  +{r.kpis.total_boost_m3.toFixed(1)}
+                                </td>
+                                <td className="pt-1.5 text-right font-bold text-white">
+                                  {r.kpis.total_optimal_m3.toFixed(1)}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                        <p className="text-white/20 text-[9px]">
+                          ETP mm/j · Kc · Peff mm · volumes m³ · Normale = pluie moyenne · Sèche =
+                          supplément si pluie d’une année sèche (4 ans sur 5)
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })()}
+
+              {/* ── Recommandations ── */}
+              <div className="vfp-card rounded-2xl p-4 space-y-2">
+                <p className="text-[var(--vfp-accent)] text-xs font-bold uppercase tracking-wider">
+                  💡 Recommandations
+                </p>
+                <ul className="space-y-1.5 text-white/55 text-xs">
+                  <li>
+                    • Pompe recommandée :{' '}
+                    <strong className="text-white/70">
+                      {result.combined_kpis.debit_pompe_ls.toFixed(2)} L/s
+                    </strong>{' '}
+                    (12h/j au mois de pointe — {result.combined_kpis.pic_mois})
+                  </li>
+                  {result.results.some((r) => r.kpis.nb_mois_zero > 3) && (
+                    <li>
+                      • Plusieurs mois couverts par la pluie — en saison des pluies, irriguez
+                      uniquement si 7 jours sans pluie consécutifs
+                    </li>
+                  )}
+                  <li>• Irriguez tôt le matin (6h–8h) : réduction de l'évaporation de 20%</li>
+                  {result.system.includes('outte') && (
+                    <li>
+                      • Goutte-à-goutte : placez les goutteurs à 15–20 cm du pied de la plante
+                    </li>
+                  )}
+                  <li>
+                    • Ajustez selon la pluviométrie réelle — soustrayez la pluie tombée la semaine
+                    précédente
+                  </li>
+                </ul>
+              </div>
+
+              {renderReport ? renderReport(result, { region }) : null}
             </>
           )}
 
