@@ -2,6 +2,7 @@
 
 import { AuthButtons } from '@/components/shared/auth-buttons'
 import { Logo } from '@/components/shared/logo'
+import { MobileNavigationDrawer } from '@/components/shared/mobile-navigation-drawer'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,7 +21,7 @@ import {
   X,
 } from 'lucide-react'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 
 const headerLinks = [
   { href: '/marche', label: 'Marché' },
@@ -110,6 +111,7 @@ const footerColumns = [
 
 export function MarketingLayout({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), [])
 
   return (
     <div className="min-h-screen flex flex-col bg-background overflow-x-hidden">
@@ -178,7 +180,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
             {/* Mobile menu toggle */}
             <button
               type="button"
-              className="xl:hidden p-2 text-muted-foreground hover:text-foreground"
+              className="xl:hidden flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted/60 hover:text-foreground"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label={mobileMenuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
               aria-expanded={mobileMenuOpen}
@@ -189,80 +191,9 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
           </div>
         </nav>
 
-        {/* Mobile nav dropdown */}
-        {mobileMenuOpen && (
-          <div
-            id="marketing-mobile-menu"
-            className="xl:hidden max-h-[calc(100dvh-4rem)] overflow-y-auto border-t border-border bg-background px-4 py-4 space-y-2"
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') setMobileMenuOpen(false)
-            }}
-          >
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-950">
-              <Link
-                href="/#haroo"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-2 py-2 font-bold"
-              >
-                Haroo · Votre réseau agricole
-              </Link>
-              {harooLinks.map(({ href, label, description, icon: Icon }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex gap-3 rounded-lg px-2 py-3 hover:bg-amber-100"
-                >
-                  <Icon aria-hidden="true" className="mt-1 h-5 w-5 shrink-0" />
-                  <span>
-                    <span className="block text-sm font-semibold">{label}</span>
-                    <span className="block text-xs">{description}</span>
-                  </span>
-                </Link>
-              ))}
-              <div className="mt-2 grid grid-cols-2 gap-2 border-t border-amber-200 pt-3 text-sm font-semibold">
-                <Link
-                  href="/auth/signup/haroo"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="rounded-lg bg-amber-800 px-3 py-3 text-center text-white"
-                >
-                  Créer mon profil
-                </Link>
-                <Link
-                  href="/haroo"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="rounded-lg border border-amber-300 px-3 py-3 text-center"
-                >
-                  Mon espace Haroo
-                </Link>
-              </div>
-            </div>
-            <Link
-              href="/scan"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-semibold text-primary bg-primary/10 hover:bg-primary/15 transition-colors"
-            >
-              <ScanLine className="h-4 w-4" />
-              Scanner une carte
-            </Link>
-            {headerLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className={
-                  'block px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent/10 transition-colors'
-                }
-              >
-                {link.label}
-              </Link>
-            ))}
-            <div className="pt-2 mt-2 border-t border-border">
-              <AuthButtons stacked />
-            </div>
-          </div>
-        )}
       </header>
+
+      <MobileNavigationDrawer open={mobileMenuOpen} onClose={closeMobileMenu} />
 
       {/* Main Content */}
       <main className="flex-1">{children}</main>
