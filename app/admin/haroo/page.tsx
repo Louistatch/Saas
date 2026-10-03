@@ -66,6 +66,8 @@ export default function HarooAdminPage() {
   const debouncedSearch = useDebounced(search, 200)
   const [typeFilter, setTypeFilter] = useState<ProfileType | 'TOUS'>('TOUS')
   const [busyId, setBusyId] = useState<string | null>(null)
+  // PIN de carte agronome : affiché UNE fois, à remettre avec la carte.
+  const [issuedPin, setIssuedPin] = useState<{ name: string; card: string; pin: string } | null>(null)
 
   const fetchProfiles = useCallback(async () => {
     setIsLoading(true)
@@ -155,6 +157,26 @@ export default function HarooAdminPage() {
   const issueCard = (row: HarooAdminRow) =>
     callApi(row, { action: 'issue', profile_type: row.type, profile_id: row.id }, 'Carte émise')
 
+  const issuePin = async (row: HarooAdminRow) => {
+    setBusyId(row.id)
+    try {
+      const res = await fetch('/api/admin/haroo-cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'issue_agronome_pin', profile_id: row.id }),
+      })
+      const data: { pin?: string; card_number?: string; error?: string } = await res.json().catch(() => ({}))
+      if (res.ok && data.pin && data.card_number) {
+        setIssuedPin({ name: `${row.first_name} ${row.last_name}`, card: data.card_number, pin: data.pin })
+      } else {
+        toast({ title: 'Erreur', description: data.error ?? 'PIN non émis', variant: 'destructive' })
+      }
+    } catch (e: unknown) {
+      toast({ title: 'Erreur', description: errorMessage(e), variant: 'destructive' })
+    }
+    setBusyId(null)
+  }
+
   const validateAgronome = (row: HarooAdminRow, decision: 'VALIDE' | 'REJETE') =>
     callApi(
       row,
@@ -168,6 +190,22 @@ export default function HarooAdminPage() {
         title="Professionnels Haroo"
         description="Validez les profils et émettez les cartes professionnelles (vérifiables par QR)"
       />
+
+      {issuedPin && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950">
+          <p className="text-sm font-semibold">
+            PIN de la carte {issuedPin.card} — {issuedPin.name}
+          </p>
+          <p className="mt-1 font-mono text-3xl font-bold tracking-[0.3em]">{issuedPin.pin}</p>
+          <p className="mt-1 text-xs">
+            Affiché une seule fois : remettez-le avec la carte. Il sera demandé pour accepter et
+            terminer chaque mission. Réémettre un PIN annule l’ancien.
+          </p>
+          <Button size="sm" variant="outline" className="mt-2" onClick={() => setIssuedPin(null)}>
+            J’ai noté le PIN
+          </Button>
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
         <div className="relative flex-1 max-w-sm">
@@ -241,9 +279,23 @@ export default function HarooAdminPage() {
 
                     <div className="flex items-center gap-2 shrink-0">
                       {row.card_number ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                          <CreditCard className="h-3.5 w-3.5" /> {row.card_number}
-                        </span>
+                        <>
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                            <CreditCard className="h-3.5 w-3.5" /> {row.card_number}
+                          </span>
+                          {isAgronome && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={isBusy}
+                              onClick={() => issuePin(row)}
+                              title="Le PIN est demandé pour accepter et terminer une mission"
+                            >
+                              {isBusy ? <Spinner className="h-3.5 w-3.5" /> : null}
+                              Émettre le PIN
+                            </Button>
+                          )}
+                        </>
                       ) : (
                         <>
                           {isAgronome && !agronomeValide && (

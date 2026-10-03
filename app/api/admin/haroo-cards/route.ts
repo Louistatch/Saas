@@ -14,6 +14,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { assertRole } from '@/lib/security/assert-access'
+import { issueAgronomePin } from '@/lib/security/agronome-pin'
 import { generateUniqueCardNumber } from '@/lib/utils/card-number'
 import { rateLimit, clientKeyFromHeaders } from '@/lib/utils/rate-limit'
 
@@ -29,6 +30,10 @@ const bodySchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('issue'),
     profile_type: z.enum(['OUVRIER', 'ACHETEUR', 'AGRONOME']),
+    profile_id: z.string().uuid(),
+  }),
+  z.object({
+    action: z.literal('issue_agronome_pin'),
     profile_id: z.string().uuid(),
   }),
   z.object({
@@ -55,6 +60,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Données invalides' }, { status: 400 })
   }
   const body = parsed.data
+
+  // ── PIN de la carte agronome ────────────────────────────────────────────────
+  // Le PIN en clair n'est renvoyé QU'ICI, une fois : à remettre avec la carte.
+  // Il est demandé pour accepter et pour terminer une mission.
+  if (body.action === 'issue_agronome_pin') {
+    const issued = await issueAgronomePin(body.profile_id, auth.ctx.userId)
+    if (!issued.ok) {
+      const message =
+        issued.reason === 'no_card'
+          ? 'Émettez d’abord la carte (agronome validé).'
+          : issued.reason === 'not_configured'
+            ? 'CARD_AUTH_SECRET non configuré.'
+            : 'Émission du PIN impossible.'
+      return NextResponse.json({ error: message }, { status: issued.reason === 'no_card' ? 409 : 500 })
+    }
+    return NextResponse.json({ success: true, pin: issued.pin, card_number: issued.cardNumber })
+  }
 
   // ── Validation d'un agronome ────────────────────────────────────────────────
   if (body.action === 'validate_agronome') {

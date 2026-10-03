@@ -148,7 +148,7 @@ interface Props {
    * le montrer à la place du détail ; null = détail visible. Le bilan global
    * reste toujours affiché.
    */
-  renderDetailsGate?: () => React.ReactNode | null
+  renderDetailsGate?: (result: CalcResult) => React.ReactNode | null
 }
 
 // ─── Palette de couleurs par culture ─────────────────────────────────────────
@@ -874,7 +874,7 @@ export function AgriSmartWater({
             </div>
           </div>
 
-          {renderDetailsGate?.() ??
+          {renderDetailsGate?.(result) ??
             (result.details_locked ? (
               cardNumber ? (
                 // Écran d'une carte : le détail est réservé à son titulaire.
@@ -891,7 +891,7 @@ export function AgriSmartWater({
                 </p>
               )
             ) : null)}
-          {renderDetailsGate?.() || result.details_locked ? null : (
+          {renderDetailsGate?.(result) || result.details_locked ? null : (
             <>
               {/* ── Graphique combiné 12 mois ── */}
               <div className="vfp-card rounded-2xl p-4">

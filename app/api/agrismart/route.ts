@@ -65,7 +65,15 @@ async function detailsAllowed(cardNumber: unknown): Promise<boolean> {
       .select('role, haroo_type')
       .eq('id', user.id)
       .maybeSingle<{ role: UserRole; haroo_type: HarooType | null }>()
-    if (data && effectiveHarooType(data.role, data.haroo_type) === 'agronome') return true
+    if (data && effectiveHarooType(data.role, data.haroo_type) === 'agronome') {
+      // Agronome VALIDÉ seulement : le rapport porte son nom comme garant.
+      const { data: ag } = await supabase
+        .from('haroo_agronome_profiles')
+        .select('badge_valide')
+        .eq('user_id', user.id)
+        .maybeSingle<{ badge_valide: boolean }>()
+      if (ag?.badge_valide) return true
+    }
   }
   // Carte : seulement pour son titulaire — session de carte ouverte avec le
   // PIN (ou le code SMS), ou compte rattaché à la carte. Connaître le numéro

@@ -35,7 +35,7 @@ export type IssueResult =
   | { ok: true; pin: string; memberId: string }
   | { ok: false; reason: 'not_configured' | 'invalid_card' | 'failed' }
 
-function derive(pin: string, salt: string): Promise<string> {
+export function derive(pin: string, salt: string): Promise<string> {
   return new Promise((resolve, reject) => {
     // Le secret serveur sert de poivre : une fuite de la seule table ne permet
     // pas de tester les 10^6 PIN hors ligne.

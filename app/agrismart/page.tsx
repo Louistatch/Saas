@@ -34,12 +34,11 @@ export default function AgriSmartPage() {
             renderReport={(result, { region }) => (
               <AgriSmartReport result={result} region={region} />
             )}
-            renderDetailsGate={() =>
-              !access.ready ? (
-                <div className="h-24 animate-pulse rounded-2xl bg-white/[0.04]" />
-              ) : access.agronome ? null : (
-                <AgronomeResultsGate signedIn={access.signedIn} />
-              )
+            // Décision du SERVEUR : il ne renvoie le détail qu'à un agronome validé.
+            renderDetailsGate={(result) =>
+              result.details_locked ? (
+                <AgronomeResultsGate signedIn={access.signedIn} agronome={access.agronome} />
+              ) : null
             }
           />
         </div>

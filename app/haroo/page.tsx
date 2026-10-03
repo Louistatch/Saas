@@ -3,6 +3,7 @@
 import { ProtectedRoute } from '@/app/components/protected-route'
 import { useAuth } from '@/app/context/auth-context'
 import { RequestOrgCard } from '@/components/account/layer-activation'
+import { MissionActions } from '@/components/haroo/mission-actions'
 import { HarooProfileEditor } from '@/components/haroo/profile-editor'
 import { PublishAnnouncement } from '@/components/haroo/publish-announcement'
 import { Spinner } from '@/components/shared/loading'
@@ -105,6 +106,10 @@ interface MissionRow {
   date_debut: string | null
   date_fin: string | null
   exploitant_name: string | null
+  culture?: string | null
+  requester_phone?: string | null
+  rating?: number | null
+  review?: string | null
 }
 
 /** Annonce publiée par le titulaire du compte sur le marché de proximité. */
@@ -280,7 +285,15 @@ function PresaleCard({ presale, highlight }: { presale: PresaleRow; highlight: b
   )
 }
 
-function MissionCard({ mission }: { mission: MissionRow }) {
+function MissionCard({
+  mission,
+  hasCard,
+  onChanged,
+}: {
+  mission: MissionRow
+  hasCard?: boolean
+  onChanged?: () => void
+}) {
   return (
     <div className="rounded-lg border border-border p-4 space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -302,7 +315,23 @@ function MissionCard({ mission }: { mission: MissionRow }) {
           <CalendarDays className="h-3 w-3" />
           {formatDate(mission.date_debut)} → {formatDate(mission.date_fin)}
         </span>
+        {mission.culture ? <span>Culture : {mission.culture}</span> : null}
+        {mission.requester_phone && mission.statut !== 'ANNULEE' ? (
+          <a href={`tel:${mission.requester_phone.replace(/\s/g, '')}`} className="text-primary">
+            {mission.requester_phone}
+          </a>
+        ) : null}
+        {mission.rating ? <span>Avis : {mission.rating}/5</span> : null}
       </div>
+      {mission.review ? <p className="text-xs italic text-muted-foreground">« {mission.review} »</p> : null}
+      {onChanged ? (
+        <MissionActions
+          missionId={mission.id}
+          statut={mission.statut}
+          hasCard={Boolean(hasCard)}
+          onChanged={onChanged}
+        />
+      ) : null}
     </div>
   )
 }
@@ -402,7 +431,9 @@ function HarooSpaceInner() {
       } else if (harooRole === 'agronome' && profileData) {
         const { data } = await supabase
           .from('haroo_missions')
-          .select('id, description, statut, budget_propose, date_debut, date_fin, exploitant_name')
+          .select(
+            'id, description, statut, budget_propose, date_debut, date_fin, exploitant_name, culture, requester_phone, rating, review',
+          )
           .eq('agronome_id', profileData.id)
           .order('created_at', { ascending: false })
           .limit(20)
@@ -472,6 +503,9 @@ function HarooSpaceInner() {
 
   const demandes = useMemo(() => missions.filter((m) => m.statut === 'DEMANDE'), [missions])
   const enCours = useMemo(() => missions.filter((m) => m.statut === 'EN_COURS'), [missions])
+  const terminees = useMemo(() => missions.filter((m) => m.statut === 'TERMINEE'), [missions])
+  const refreshMissions = () => setReloadKey((k) => k + 1)
+  const agronomeHasCard = Boolean(profile?.card_number && profile?.badge_valide)
 
   const toggleDisponible = async () => {
     if (!profile || togglingDispo) return
@@ -617,8 +651,12 @@ function HarooSpaceInner() {
                 <StatCard icon={Sprout} label="Missions en cours" value={enCours.length} />
                 <StatCard
                   icon={Star}
-                  label={`Note moyenne — ${profile?.nombre_missions ?? 0} missions réalisées`}
-                  value={`${Number(profile?.note_moyenne ?? 0).toFixed(1)} / 5`}
+                  label={`Note moyenne — ${profile?.nombre_missions ?? 0} mission${(profile?.nombre_missions ?? 0) > 1 ? 's' : ''} terminée${(profile?.nombre_missions ?? 0) > 1 ? 's' : ''}`}
+                  value={
+                    Number(profile?.note_moyenne ?? 0) > 0
+                      ? `${Number(profile?.note_moyenne).toFixed(1)} / 5`
+                      : 'Pas encore d’avis'
+                  }
                 />
               </>
             )}
@@ -1047,12 +1085,17 @@ function HarooSpaceInner() {
                   <CardContent className="space-y-4">
                     {demandes.length === 0 && (
                       <p className="text-sm text-muted-foreground">
-                        Aucune demande en attente. Les exploitants peuvent vous solliciter via votre
+                        Aucune demande en attente. Les exploitants vous sollicitent en scannant votre
                         carte professionnelle.
                       </p>
                     )}
                     {demandes.map((mission) => (
-                      <MissionCard key={mission.id} mission={mission} />
+                      <MissionCard
+                        key={mission.id}
+                        mission={mission}
+                        hasCard={agronomeHasCard}
+                        onChanged={refreshMissions}
+                      />
                     ))}
                   </CardContent>
                 </Card>
@@ -1068,8 +1111,60 @@ function HarooSpaceInner() {
                       <p className="text-sm text-muted-foreground">Aucune mission en cours.</p>
                     )}
                     {enCours.map((mission) => (
-                      <MissionCard key={mission.id} mission={mission} />
+                      <MissionCard
+                        key={mission.id}
+                        mission={mission}
+                        hasCard={agronomeHasCard}
+                        onChanged={refreshMissions}
+                      />
                     ))}
+                  </CardContent>
+                </Card>
+
+                {terminees.length > 0 && (
+                  <Card className="border-border">
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Star className="h-5 w-5 text-primary" /> Missions terminées
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {terminees.map((mission) => (
+                        <MissionCard key={mission.id} mission={mission} />
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Carte et outils : ce qui manque pour travailler, dit clairement. */}
+                <Card className="border-border">
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <CreditCard className="h-5 w-5 text-primary" /> Ma carte et mes outils
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    {!profile?.badge_valide ? (
+                      <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-900">
+                        Profil en cours de validation par FaîtiereHub. Une fois validé, votre carte
+                        professionnelle et son PIN vous seront remis : ils sont nécessaires pour
+                        prendre des missions.
+                      </p>
+                    ) : !profile?.card_number ? (
+                      <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-900">
+                        Profil validé. Votre carte est en cours d’émission : sans elle, vous ne
+                        pouvez pas encore accepter de mission.
+                      </p>
+                    ) : (
+                      <p className="text-muted-foreground">
+                        Carte {profile.card_number} active. Les exploitants vous demandent une
+                        mission en scannant votre carte ; le PIN de la carte vous est demandé pour
+                        accepter et pour terminer une mission.
+                      </p>
+                    )}
+                    <Button asChild variant="outline" className="w-full sm:w-auto">
+                      <Link href="/agrismart">Ouvrir AgriSmart (besoins en eau, rapport PDF)</Link>
+                    </Button>
                   </CardContent>
                 </Card>
               </>

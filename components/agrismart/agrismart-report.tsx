@@ -170,7 +170,10 @@ export function AgriSmartReport({ result, region }: { result: CalcResult; region
  * réservé aux agronomes. Placé juste sous le bilan, là où l'utilisateur
  * cherche la suite de son calcul.
  */
-export function AgronomeResultsGate({ signedIn }: { signedIn: boolean }) {
+export function AgronomeResultsGate({
+  signedIn,
+  agronome = false,
+}: { signedIn: boolean; agronome?: boolean }) {
   return (
     <div
       className="rounded-2xl border p-4 space-y-3"
@@ -188,7 +191,9 @@ export function AgronomeResultsGate({ signedIn }: { signedIn: boolean }) {
       {signedIn ? (
         <>
           <p className="text-xs text-white/55">
-            Ce résultat est réservé aux comptes portant un profil Haroo « Agronome ».
+            {agronome
+              ? 'Votre profil agronome est en cours de validation par FaîtiereHub : le résultat complet s’ouvre une fois validé.'
+              : 'Ce résultat est réservé aux agronomes validés (profil Haroo « Agronome »).'}
           </p>
           <Link
             href="/compte"

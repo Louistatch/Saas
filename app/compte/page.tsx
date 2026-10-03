@@ -6,6 +6,7 @@
  */
 
 import { useAuth } from '@/app/context/auth-context'
+import { MyMissions } from '@/components/account/my-missions'
 import { ProfileIdentityForm } from '@/components/account/profile-identity-form'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
 import { Button } from '@/components/ui/button'
@@ -47,6 +48,18 @@ export default function AccountPage() {
               </CardHeader>
               <CardContent>
                 <ProfileIdentityForm />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Mes demandes de mission</CardTitle>
+                <CardDescription>
+                  Missions demandées à des agronomes en scannant leur carte.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <MyMissions />
               </CardContent>
             </Card>
 
