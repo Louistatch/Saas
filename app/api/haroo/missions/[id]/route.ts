@@ -11,7 +11,12 @@
  * service_role APRÈS ces contrôles (aucune écriture directe ouverte en RLS).
  */
 
-import { activeAgronomeCard, checkAgronomePin } from '@/lib/security/agronome-pin'
+import {
+  AGRONOME_PIN_ERRORS,
+  activeAgronomeCard,
+  agronomeFromCardPin,
+  checkAgronomePin,
+} from '@/lib/security/agronome-pin'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
@@ -19,9 +24,22 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
 const schema = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('accept'), pin: z.string().trim() }),
-  z.object({ action: z.literal('complete'), pin: z.string().trim() }),
-  z.object({ action: z.literal('refuse'), reason: z.string().trim().max(300).optional() }),
+  z.object({
+    action: z.literal('accept'),
+    pin: z.string().trim(),
+    card_number: z.string().trim().max(20).optional(),
+  }),
+  z.object({
+    action: z.literal('complete'),
+    pin: z.string().trim(),
+    card_number: z.string().trim().max(20).optional(),
+  }),
+  z.object({
+    action: z.literal('refuse'),
+    reason: z.string().trim().max(300).optional(),
+    pin: z.string().trim().optional(),
+    card_number: z.string().trim().max(20).optional(),
+  }),
   z.object({ action: z.literal('cancel') }),
   z.object({
     action: z.literal('rate'),
@@ -29,15 +47,6 @@ const schema = z.discriminatedUnion('action', [
     review: z.string().trim().max(500).optional(),
   }),
 ])
-
-const PIN_ERRORS: Record<string, string> = {
-  no_card: 'Carte agronome requise : sans carte active, vous ne pouvez pas prendre de mission.',
-  no_pin: 'Aucun PIN n’a encore été émis pour votre carte. Contactez FaîtiereHub.',
-  wrong_pin: 'PIN incorrect.',
-  locked: 'Trop d’essais : la carte est fermée un moment.',
-  invalid: 'Le PIN compte 6 chiffres.',
-  not_configured: 'Vérification indisponible pour le moment.',
-}
 
 interface MissionRow {
   id: string
@@ -59,11 +68,31 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Connectez-vous.' }, { status: 401 })
 
   const parsed = schema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Action invalide' }, { status: 400 })
   const body = parsed.data
+
+  // Écran de la carte : le titulaire s'identifie par carte + PIN, sans compte.
+  const viaCard = 'card_number' in body && body.card_number && 'pin' in body && body.pin
+  let cardAgronomeId: string | null = null
+  if (viaCard) {
+    const auth = await agronomeFromCardPin(body.card_number as string, body.pin as string)
+    if (!auth.ok) {
+      return NextResponse.json(
+        {
+          error: AGRONOME_PIN_ERRORS[auth.reason] ?? 'PIN refusé',
+          code: auth.reason,
+          attempts_left: auth.attemptsLeft,
+          retry_after_seconds: auth.retryAfterSeconds,
+        },
+        { status: auth.reason === 'locked' ? 423 : 403 },
+      )
+    }
+    cardAgronomeId = auth.agronomeId
+  } else if (!user) {
+    return NextResponse.json({ error: 'Connectez-vous.' }, { status: 401 })
+  }
 
   const admin = createAdminClient()
   const { data: mission } = await admin
@@ -78,8 +107,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .select('id, user_id')
     .eq('id', mission.agronome_id)
     .maybeSingle<{ id: string; user_id: string }>()
-  const isAgronome = agronome?.user_id === user.id
-  const isRequester = mission.requester_user_id === user.id
+  const isAgronome = cardAgronomeId
+    ? cardAgronomeId === mission.agronome_id
+    : Boolean(user && agronome?.user_id === user.id)
+  const isRequester = Boolean(user && mission.requester_user_id === user.id)
   const now = new Date().toISOString()
 
   const update = async (patch: Record<string, unknown>, expected: string) => {
@@ -102,13 +133,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (body.action === 'accept' || body.action === 'complete') {
     if (!isAgronome) return NextResponse.json({ error: 'Réservé à l’agronome' }, { status: 403 })
     if (!(await activeAgronomeCard(mission.agronome_id))) {
-      return NextResponse.json({ error: PIN_ERRORS.no_card, code: 'no_card' }, { status: 403 })
+      return NextResponse.json(
+        { error: AGRONOME_PIN_ERRORS.no_card, code: 'no_card' },
+        { status: 403 },
+      )
     }
-    const pin = await checkAgronomePin(mission.agronome_id, body.pin)
+    // Par la carte, le PIN vient d'être vérifié ; par le site, on le vérifie ici.
+    const pin = cardAgronomeId
+      ? ({ ok: true } as const)
+      : await checkAgronomePin(mission.agronome_id, body.pin)
     if (!pin.ok) {
       return NextResponse.json(
         {
-          error: PIN_ERRORS[pin.reason] ?? 'PIN refusé',
+          error: AGRONOME_PIN_ERRORS[pin.reason] ?? 'PIN refusé',
           code: pin.reason,
           attempts_left: pin.attemptsLeft,
           retry_after_seconds: pin.retryAfterSeconds,

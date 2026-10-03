@@ -147,7 +147,8 @@ export async function GET(request: NextRequest) {
       temperature_min: Math.round(d.temperature_min),
       temperature_max: Math.round(d.temperature_max),
       precipitation_mm: Math.round(d.precipitation_mm * 10) / 10,
-      precipitation_probability: ensemble?.daily.get(d.date) ?? Math.round(d.precipitation_probability),
+      precipitation_probability:
+        ensemble?.daily.get(d.date) ?? Math.round(d.precipitation_probability),
       humidity_pct: Math.round(d.humidity_pct),
     }))
 

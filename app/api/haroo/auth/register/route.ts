@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
   if (!limit.ok) {
     return NextResponse.json(
       { success: false, error: 'Trop de tentatives. Réessayez dans quelques minutes.' },
-      { status: 429 }
+      { status: 429 },
     )
   }
 
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json(
       { success: false, error: 'Données invalides', fields: flattenZodErrors(parsed.error) },
-      { status: 400 }
+      { status: 400 },
     )
   }
 
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   if (!agritogoUrl) {
     return NextResponse.json(
       { success: false, error: 'Service Haroo non configuré' },
-      { status: 503 }
+      { status: 503 },
     )
   }
 
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     clearTimeout(timeoutId)
     return NextResponse.json(
       { success: false, error: 'Service Haroo indisponible. Réessayez plus tard.' },
-      { status: 502 }
+      { status: 502 },
     )
   }
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { MissionRequestForm } from '@/components/verify/mission-request-form'
+import { CardMissions } from '@/components/verify/card-missions'
 import { useState } from 'react'
 import {
   ArrowLeft,
@@ -100,6 +100,8 @@ export function AgronomeView({ cardNumber, agronome, card }: AgronomeViewProps) 
     ? rawFirst.charAt(0).toUpperCase() + rawFirst.slice(1).toLowerCase()
     : 'Agronome'
 
+  const greetHour = new Date().getHours()
+  const greeting = greetHour < 12 ? 'Bonjour' : greetHour < 18 ? 'Bon après-midi' : 'Bonsoir'
 
   const badgeLabel = VALIDATION_LABELS[agronome.statut_validation] ?? agronome.statut_validation
   const sc = statusClasses(agronome.statut_validation)
@@ -160,12 +162,14 @@ export function AgronomeView({ cardNumber, agronome, card }: AgronomeViewProps) 
       <section className="vfp-enter">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-white/60 text-sm mb-1">Carte professionnelle Haroo 🌱</p>
+            <p className="text-white/60 text-sm mb-1">
+              {greeting}, {firstName} ! 🌱
+            </p>
             <h1 className="text-[24px] font-bold text-white leading-tight">
-              {firstName} {agronome.last_name ?? ''}
+              Votre espace
               <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--vfp-accent)] to-[var(--vfp-accent-dim)]">
-                Agronome
+                Ingénieur Agronome
               </span>
             </h1>
             <p className="text-white/40 text-sm mt-2">
@@ -235,7 +239,7 @@ export function AgronomeView({ cardNumber, agronome, card }: AgronomeViewProps) 
         <div className="flex items-center justify-between mb-3 px-1">
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--vfp-accent)]" />
-            <h3 className="text-white font-semibold text-[15px]">Cet agronome</h3>
+            <h3 className="text-white font-semibold text-[15px]">Mes services</h3>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2.5">
@@ -248,7 +252,7 @@ export function AgronomeView({ cardNumber, agronome, card }: AgronomeViewProps) 
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[var(--vfp-accent)]/20 to-[var(--vfp-accent)]/5 flex items-center justify-center mb-2.5">
               <Award className="h-5 w-5 text-[var(--vfp-accent-bright)]" />
             </div>
-            <p className="font-semibold text-sm text-white mb-0.5">Certification</p>
+            <p className="font-semibold text-sm text-white mb-0.5">Mon badge</p>
             {/* Colored status indicator */}
             <span className={`inline-flex items-center gap-1 text-xs font-medium ${sc.text}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
@@ -269,10 +273,8 @@ export function AgronomeView({ cardNumber, agronome, card }: AgronomeViewProps) 
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-700/5 flex items-center justify-center mb-2.5">
               <FileText className="h-5 w-5 text-amber-300" />
             </div>
-            <p className="font-semibold text-sm text-white mb-0.5">Demander une mission</p>
-            <p className="text-xs text-white/30">
-              {agronome.badge_valide ? 'Agronome certifié' : 'Indisponible'}
-            </p>
+            <p className="font-semibold text-sm text-white mb-0.5">Mes missions</p>
+            <p className="text-xs text-white/30">Avec le PIN de la carte</p>
           </button>
 
           {/* Ma Zone */}
@@ -284,7 +286,7 @@ export function AgronomeView({ cardNumber, agronome, card }: AgronomeViewProps) 
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-500/20 to-teal-700/5 flex items-center justify-center mb-2.5">
               <MapPin className="h-5 w-5 text-teal-300" />
             </div>
-            <p className="font-semibold text-sm text-white mb-0.5">Zone d’intervention</p>
+            <p className="font-semibold text-sm text-white mb-0.5">Ma zone</p>
             <p className="text-xs text-white/30 truncate">
               {agronome.canton ?? agronome.prefecture ?? '—'}
             </p>
@@ -326,7 +328,7 @@ export function AgronomeView({ cardNumber, agronome, card }: AgronomeViewProps) 
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-yellow-400/20 to-yellow-600/5 flex items-center justify-center mb-2.5">
               <Star className="h-5 w-5 text-yellow-300" />
             </div>
-            <p className="font-semibold text-sm text-white mb-0.5">Avis</p>
+            <p className="font-semibold text-sm text-white mb-0.5">Mes évaluations</p>
             <div className="flex gap-0.5 text-xs">{renderStars(agronome.note_moyenne)}</div>
           </button>
 
@@ -449,13 +451,7 @@ export function AgronomeView({ cardNumber, agronome, card }: AgronomeViewProps) 
           >
             <ArrowLeft className="h-4 w-4" /> Réduire
           </button>
-          {agronome.badge_valide ? (
-            <MissionRequestForm cardNumber={cardNumber} agronomeName={firstName} />
-          ) : (
-            <p className="vfp-card rounded-2xl p-4 text-sm text-white/60">
-              Cet agronome n’est pas certifié : il ne peut pas recevoir de mission.
-            </p>
-          )}
+          <CardMissions cardNumber={cardNumber} />
         </div>
       )}
 
@@ -499,7 +495,7 @@ export function AgronomeView({ cardNumber, agronome, card }: AgronomeViewProps) 
       {activeView === 'evaluations' && (
         <div className="vfp-card rounded-2xl p-5 space-y-3 vfp-enter">
           <div className="flex items-center justify-between">
-            <h3 className="text-white font-bold text-base">Avis des exploitants</h3>
+            <h3 className="text-white font-bold text-base">Mes évaluations</h3>
             <button
               type="button"
               onClick={() => setActiveView('menu')}

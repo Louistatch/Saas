@@ -51,7 +51,10 @@ export type AgronomePinIssue =
   | { ok: true; pin: string; cardNumber: string }
   | { ok: false; reason: 'not_configured' | 'no_card' | 'failed' }
 
-export async function issueAgronomePin(agronomeId: string, issuedBy: string): Promise<AgronomePinIssue> {
+export async function issueAgronomePin(
+  agronomeId: string,
+  issuedBy: string,
+): Promise<AgronomePinIssue> {
   if (!isCardAuthConfigured()) return { ok: false, reason: 'not_configured' }
   const card = await activeAgronomeCard(agronomeId)
   if (!card) return { ok: false, reason: 'no_card' }
@@ -91,7 +94,10 @@ interface PinRow {
 }
 
 /** Vérifie le PIN de la carte de CET agronome. */
-export async function checkAgronomePin(agronomeId: string, rawPin: string): Promise<AgronomePinCheck> {
+export async function checkAgronomePin(
+  agronomeId: string,
+  rawPin: string,
+): Promise<AgronomePinCheck> {
   if (!isCardAuthConfigured()) return { ok: false, reason: 'not_configured' }
   const pin = rawPin.trim()
   if (!/^\d{6}$/.test(pin)) return { ok: false, reason: 'invalid' }
@@ -149,4 +155,33 @@ export async function checkAgronomePin(agronomeId: string, rawPin: string): Prom
     .eq('card_number', cardNumber)
     .eq('pin_hash', before.pin_hash)
   return { ok: true }
+}
+
+/**
+ * Le titulaire présente sa carte et son PIN (écran scanné, sans compte) :
+ * renvoie l'agronome si la carte est active et le PIN juste.
+ */
+export async function agronomeFromCardPin(
+  rawCardNumber: string,
+  rawPin: string,
+): Promise<{ ok: true; agronomeId: string } | (AgronomePinCheck & { ok: false })> {
+  const cardNumber = normalizedCardNumber(rawCardNumber)
+  if (!cardNumber) return { ok: false, reason: 'invalid' }
+  const { data: profile } = await createClient()
+    .from('haroo_agronome_profiles')
+    .select('id')
+    .eq('card_number', cardNumber)
+    .maybeSingle<{ id: string }>()
+  if (!profile) return { ok: false, reason: 'no_card' }
+  const check = await checkAgronomePin(profile.id, rawPin)
+  return check.ok ? { ok: true, agronomeId: profile.id } : check
+}
+
+export const AGRONOME_PIN_ERRORS: Record<string, string> = {
+  no_card: 'Carte agronome requise : sans carte active, vous ne pouvez pas prendre de mission.',
+  no_pin: 'Aucun PIN n’a encore été émis pour votre carte. Contactez FaîtiereHub.',
+  wrong_pin: 'PIN incorrect.',
+  locked: 'Trop d’essais : la carte est fermée un moment.',
+  invalid: 'Le PIN compte 6 chiffres.',
+  not_configured: 'Vérification indisponible pour le moment.',
 }
