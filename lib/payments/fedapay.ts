@@ -75,7 +75,12 @@ export async function createCheckout(input: {
         firstname: firstname || 'Client',
         lastname: rest.join(' ') || '-',
         ...(input.customer.email ? { email: input.customer.email } : {}),
-        ...(local.length === 8 ? { phone_number: { number: local, country: 'tg' } } : {}),
+        // En sandbox, on ne pré-remplit PAS le téléphone : les numéros de test
+        // FedaPay (64000001…) sont béninois, et un numéro forcé au Togo bloque
+        // le bouton « Payer » sans message. L'acheteur choisit pays et numéro.
+        ...(process.env.FEDAPAY_ENV === 'live' && local.length === 8
+          ? { phone_number: { number: local, country: 'tg' } }
+          : {}),
       },
     }),
   })
