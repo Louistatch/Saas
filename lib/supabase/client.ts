@@ -1,5 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr'
-import type { SupabaseClient } from '@supabase/supabase-js'
+import { type SupabaseClient, processLock } from '@supabase/supabase-js'
 
 let browserClient: SupabaseClient | null = null
 
@@ -32,6 +32,13 @@ export function createClient(): SupabaseClient {
     )
   }
 
-  browserClient = createBrowserClient(supabaseUrl, supabaseAnonKey)
+  // Verrou en mémoire (processLock) au lieu de navigator.locks : sur mobile,
+  // un onglet ou une appli PWA mis en arrière-plan peut garder le verrou
+  // inter-onglets indéfiniment, et getUser() reste alors suspendu sans même
+  // appeler le réseau → « Chargement… » infini (observé au retour du lien
+  // de confirmation e-mail). Les cookies restent la source partagée.
+  browserClient = createBrowserClient(supabaseUrl, supabaseAnonKey, {
+    auth: { lock: processLock },
+  })
   return browserClient
 }
