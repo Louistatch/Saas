@@ -162,6 +162,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initAuth()
 
+    // Filet de sécurité : jamais de « Chargement… » infini. Si rien n'a
+    // répondu après 8 s, on rend la main — sans utilisateur, les pages
+    // protégées redirigent vers la connexion (aucun contenu n'est révélé).
+    const safety = setTimeout(() => {
+      if (mounted) setIsLoading(false)
+    }, 8000)
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
@@ -211,7 +218,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setTimeout(() => {
           if (!mounted) return
           void fetchProfile(userId).then((profile) => {
-            if (mounted && profile) setUser(profile)
+            if (mounted && profile) {
+              setUser(profile)
+              // Le profil est résolu : inutile d'attendre encore initAuth,
+              // dont getUser() peut rester suspendu sur le verrou d'auth
+              // (observé au retour d'un lien de confirmation e-mail).
+              setIsLoading(false)
+            }
             // If profile is null, user stays null — treated as unauthenticated.
           })
         }, 0)
@@ -220,6 +233,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       mounted = false
+      clearTimeout(safety)
       subscription?.unsubscribe()
     }
   }, [supabase, fetchProfile, router])
