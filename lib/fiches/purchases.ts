@@ -63,7 +63,7 @@ export async function settlePurchase(purchaseId: string): Promise<PurchaseRow | 
         paid_at: new Date().toISOString(),
       }
     }
-  } else if (['declined', 'canceled', 'refunded'].includes(tx.status)) {
+  } else if (['declined', 'canceled', 'cancelled', 'expired', 'refunded'].includes(tx.status)) {
     next = { payment_status: tx.status === 'refunded' ? 'refunded' : 'failed' }
   }
   if (!next) return p

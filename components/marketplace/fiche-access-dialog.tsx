@@ -13,6 +13,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { PublicFiche } from '@/hooks/use-fiches-public'
+import { FEDAPAY_PROVIDERS } from '@/lib/payments/fedapay-providers'
 import { AlertCircle, CheckCircle2, CreditCard, Download, ShoppingCart } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -39,6 +40,8 @@ export function FicheAccessDialog({ fiche, open, onOpenChange }: FicheAccessDial
     phone: '',
     email: '',
     country: 'tg' as 'tg' | 'bj',
+    // '' = page de paiement FedaPay (cartes, autres moyens)
+    provider: 'moov_tg' as string,
   })
   const [buying, setBuying] = useState(false)
   // Paiement intégré : la page FedaPay s'affiche DANS la fenêtre, l'acheteur
@@ -152,15 +155,18 @@ export function FicheAccessDialog({ fiche, open, onOpenChange }: FicheAccessDial
             phone: buyer.phone.trim(),
             country: buyer.country,
             email: buyer.email.trim() || undefined,
+            provider: buyer.provider || undefined,
           }),
         })
         const json = await res.json().catch(() => ({}))
-        if (!res.ok || typeof json.url !== 'string') {
+        if (!res.ok || (typeof json.url !== 'string' && !json.direct)) {
           setError(json.error ?? 'Paiement indisponible pour le moment.')
           return
         }
         setPayState('pending')
-        setCheckout({ url: json.url, purchaseId: json.purchase_id })
+        // Paiement direct : pas de page FedaPay, l'acheteur valide sur son
+        // téléphone ; la fenêtre suit l'état côté serveur.
+        setCheckout({ url: json.direct ? '' : json.url, purchaseId: json.purchase_id })
       } catch {
         setError('Erreur réseau. Réessayez.')
       } finally {
@@ -222,24 +228,33 @@ export function FicheAccessDialog({ fiche, open, onOpenChange }: FicheAccessDial
               </div>
             ) : (
               <>
-                <iframe
-                  src={checkout.url}
-                  title="Paiement sécurisé FedaPay"
-                  className="h-[70vh] max-h-[640px] w-full rounded-lg border border-border"
-                  allow="payment"
-                />
+                {checkout.url ? (
+                  <iframe
+                    src={checkout.url}
+                    title="Paiement sécurisé FedaPay"
+                    className="h-[70vh] max-h-[640px] w-full rounded-lg border border-border"
+                    allow="payment"
+                  />
+                ) : (
+                  <p className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
+                    Une demande de paiement a été envoyée sur votre téléphone. Validez-la avec votre
+                    code Mobile Money.
+                  </p>
+                )}
                 <p className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Spinner className="h-3 w-3" /> Validez le paiement sur votre téléphone : cette
                   fenêtre se met à jour toute seule.
                 </p>
-                <a
-                  href={checkout.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-center text-xs text-primary underline"
-                >
-                  La page de paiement ne s’affiche pas ? Ouvrez-la ici
-                </a>
+                {checkout.url ? (
+                  <a
+                    href={checkout.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-center text-xs text-primary underline"
+                  >
+                    La page de paiement ne s’affiche pas ? Ouvrez-la ici
+                  </a>
+                ) : null}
               </>
             )}
           </div>
@@ -312,7 +327,12 @@ export function FicheAccessDialog({ fiche, open, onOpenChange }: FicheAccessDial
                       aria-label="Pays du numéro"
                       value={buyer.country}
                       onChange={(e) =>
-                        setBuyer((b) => ({ ...b, country: e.target.value as 'tg' | 'bj' }))
+                        setBuyer((b) => ({
+                          ...b,
+                          country: e.target.value as 'tg' | 'bj',
+                          provider:
+                            FEDAPAY_PROVIDERS.find((p) => p.country === e.target.value)?.id ?? '',
+                        }))
                       }
                       disabled={busy}
                       className="h-9 rounded-md border border-input bg-background px-2 text-sm"
@@ -332,6 +352,23 @@ export function FicheAccessDialog({ fiche, open, onOpenChange }: FicheAccessDial
                       className="flex-1"
                     />
                   </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="buyer_provider">Opérateur</Label>
+                  <select
+                    id="buyer_provider"
+                    value={buyer.provider}
+                    onChange={(e) => setBuyer((b) => ({ ...b, provider: e.target.value }))}
+                    disabled={busy}
+                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                  >
+                    {FEDAPAY_PROVIDERS.filter((p) => p.country === buyer.country).map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label}
+                      </option>
+                    ))}
+                    <option value="">Autre moyen (page de paiement FedaPay)</option>
+                  </select>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="buyer_email">E-mail (facultatif)</Label>
