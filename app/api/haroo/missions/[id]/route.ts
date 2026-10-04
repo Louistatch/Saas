@@ -11,6 +11,7 @@
  * service_role APRÈS ces contrôles (aucune écriture directe ouverte en RLS).
  */
 
+import { emailUser } from '@/lib/email/resend'
 import {
   AGRONOME_PIN_ERRORS,
   activeAgronomeCard,
@@ -20,7 +21,7 @@ import {
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
-import { type NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse, after } from 'next/server'
 import { z } from 'zod'
 
 const schema = z.discriminatedUnion('action', [
@@ -113,7 +114,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const isRequester = Boolean(user && mission.requester_user_id === user.id)
   const now = new Date().toISOString()
 
-  const update = async (patch: Record<string, unknown>, expected: string) => {
+  // E-mail à l'autre partie, envoyé après la réponse et seulement si le
+  // changement d'état a réellement eu lieu.
+  const toRequester = (subject: string, lines: string[]) => () =>
+    emailUser(mission.requester_user_id, subject, {
+      title: subject,
+      lines,
+      cta: { label: 'Suivre ma demande', path: '/compte' },
+    })
+  const toAgronome = (subject: string, lines: string[]) => () =>
+    emailUser(agronome?.user_id, subject, {
+      title: subject,
+      lines,
+      cta: { label: 'Ouvrir mon espace', path: '/haroo' },
+    })
+
+  const update = async (
+    patch: Record<string, unknown>,
+    expected: string,
+    notify?: () => Promise<void>,
+  ) => {
     const { data, error } = await admin
       .from('haroo_missions')
       .update({ ...patch, updated_at: now })
@@ -127,6 +147,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         { status: 409 },
       )
     }
+    if (notify) after(notify)
     return NextResponse.json({ success: true, statut: data.statut })
   }
 
@@ -154,8 +175,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
     return body.action === 'accept'
-      ? update({ statut: 'EN_COURS', accepted_at: now }, 'DEMANDE')
-      : update({ statut: 'TERMINEE', completed_at: now }, 'EN_COURS')
+      ? update(
+          { statut: 'EN_COURS', accepted_at: now },
+          'DEMANDE',
+          toRequester('Votre mission a été acceptée', [
+            'L’agronome a accepté votre demande de mission. Il va vous contacter au numéro indiqué.',
+          ]),
+        )
+      : update(
+          { statut: 'TERMINEE', completed_at: now },
+          'EN_COURS',
+          toRequester('Mission terminée : donnez votre avis', [
+            'L’agronome a indiqué que la mission est terminée.',
+            'Votre avis aide les autres exploitants à choisir un agronome.',
+          ]),
+        )
   }
 
   if (body.action === 'refuse') {
@@ -163,12 +197,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return update(
       { statut: 'ANNULEE', cancel_reason: body.reason || 'Refusée par l’agronome' },
       'DEMANDE',
+      toRequester('Votre demande de mission n’a pas été retenue', [
+        body.reason
+          ? `Motif : ${body.reason}`
+          : 'L’agronome n’est pas disponible pour cette mission.',
+        'Vous pouvez en solliciter un autre dans l’annuaire des agronomes.',
+      ]),
     )
   }
 
   if (body.action === 'cancel') {
     if (!isRequester) return NextResponse.json({ error: 'Réservé au demandeur' }, { status: 403 })
-    return update({ statut: 'ANNULEE', cancel_reason: 'Retirée par le demandeur' }, 'DEMANDE')
+    return update(
+      { statut: 'ANNULEE', cancel_reason: 'Retirée par le demandeur' },
+      'DEMANDE',
+      toAgronome('Une demande de mission a été retirée', [
+        'Le demandeur a retiré sa demande de mission. Aucune action n’est nécessaire.',
+      ]),
+    )
   }
 
   // rate

@@ -1,4 +1,5 @@
 import { timingSafeEqual } from 'node:crypto'
+import { deliverEmail, renderEmail } from '@/lib/email/resend'
 import { type DeliveryResult, deliverSms } from '@/lib/notifications/delivery'
 import { createClient } from '@/lib/supabase/admin'
 import { type NextRequest, NextResponse } from 'next/server'
@@ -18,9 +19,26 @@ interface NotificationJob {
   id: string
   channel: string
   recipient_phone: string | null
+  recipient_email: string | null
+  template_key: string | null
+  variables: Record<string, unknown> | null
   body_rendered: string | null
   attempts: number
   claim_token: string
+}
+
+/** Objet : `variables.subject` s'il est fourni, sinon un libellé générique. */
+function emailSubject(job: NotificationJob): string {
+  const subject = job.variables?.subject
+  return typeof subject === 'string' && subject.trim() ? subject.trim() : 'Notification FaîtiereHub'
+}
+
+function emailContent(job: NotificationJob) {
+  if (!job.body_rendered) return null
+  return renderEmail({
+    title: emailSubject(job),
+    lines: job.body_rendered.split(/\n{2,}/),
+  })
 }
 
 // Schedule is defined once in vercel.json. Leases prevent concurrent workers claiming the same row.
@@ -47,9 +65,11 @@ export async function GET(request: NextRequest) {
       const result: DeliveryResult =
         job.channel === 'sms'
           ? await deliverSms(job.recipient_phone, job.body_rendered)
-          : job.channel === 'in_app'
-            ? { ok: true }
-            : { ok: false, retryable: false, error: 'Unsupported notification channel' }
+          : job.channel === 'email'
+            ? await deliverEmail(job.recipient_email, emailSubject(job), emailContent(job))
+            : job.channel === 'in_app'
+              ? { ok: true }
+              : { ok: false, retryable: false, error: 'Unsupported notification channel' }
       const terminal = !result.ok && (!result.retryable || job.attempts >= 3)
       const { data: finished, error: finishError } = await supabase
         .from('notification_queue')

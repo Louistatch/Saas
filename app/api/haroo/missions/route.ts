@@ -8,11 +8,12 @@
  *        recevoir une mission : sans carte, pas de mission.
  */
 
+import { emailUser } from '@/lib/email/resend'
 import { activeAgronomeCard } from '@/lib/security/agronome-pin'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
-import { type NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse, after } from 'next/server'
 import { z } from 'zod'
 
 const createSchema = z.object({
@@ -117,5 +118,17 @@ export async function POST(request: NextRequest) {
     .single()
   if (error)
     return NextResponse.json({ error: 'Demande impossible pour le moment.' }, { status: 502 })
+  // Prévenir l'agronome (après la réponse : ne ralentit ni ne bloque la demande).
+  after(() =>
+    emailUser(agronome.user_id, 'Nouvelle demande de mission', {
+      title: 'Vous avez une nouvelle demande de mission',
+      lines: [
+        `${requesterName} vous demande une mission${body.culture ? ` (${body.culture})` : ''}.`,
+        `« ${body.description.slice(0, 300)} »`,
+        'Acceptez-la depuis votre espace Haroo avec le code PIN de votre carte.',
+      ],
+      cta: { label: 'Voir la demande', path: '/haroo' },
+    }),
+  )
   return NextResponse.json({ id: data.id, message: 'Demande envoyée à l’agronome.' })
 }
