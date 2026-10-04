@@ -1,14 +1,37 @@
 import { clip, emailAddress } from '@/lib/email/resend'
+import { assertTenantAccess } from '@/lib/security/assert-access'
 import { createClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse, after } from 'next/server'
+import { z } from 'zod'
+
+const patchSchema = z.object({
+  status: z.enum(['pending', 'scoring', 'approved', 'rejected', 'disbursed', 'repaying', 'closed', 'defaulted']),
+  amount_approved_fcfa: z.coerce.number().int().positive().max(100_000_000).optional(),
+  rejection_reason: z.string().trim().max(500).optional(),
+})
+
+/** Lit la coopérative de la demande puis vérifie que l'appelant l'administre. */
+async function guardApplication(id: string) {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+    return { ok: false as const, response: NextResponse.json({ error: 'Introuvable' }, { status: 404 }) }
+  }
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('credit_applications')
+    .select('cooperative_id')
+    .eq('id', id)
+    .maybeSingle()
+  if (!data) {
+    return { ok: false as const, response: NextResponse.json({ error: 'Introuvable' }, { status: 404 }) }
+  }
+  return assertTenantAccess(data.cooperative_id)
+}
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const guard = await guardApplication(id)
+  if (!guard.ok) return guard.response
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
   const { data: app, error } = await supabase
     .from('credit_applications')
@@ -22,14 +45,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const guard = await guardApplication(id)
+  if (!guard.ok) return guard.response
+  const user = { id: guard.ctx.userId }
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  const body = await request.json()
-  const { status, amount_approved_fcfa, rejection_reason } = body
+  const parsed = patchSchema.safeParse(await request.json().catch(() => null))
+  if (!parsed.success) return NextResponse.json({ error: 'Décision invalide' }, { status: 400 })
+  const { status, amount_approved_fcfa, rejection_reason } = parsed.data
 
   const updates: Record<string, unknown> = {
     status,
@@ -55,10 +78,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  if (error) return NextResponse.json({ error: 'Mise à jour impossible' }, { status: 400 })
 
   // Generate repayment schedule on approval
-  if (status === 'approved' && app.amount_approved_fcfa && app.duration_months) {
+  if (
+    status === 'approved' &&
+    previous?.status !== 'approved' &&
+    app.amount_approved_fcfa &&
+    app.duration_months
+  ) {
     const monthlyAmount = Math.ceil(
       (app.amount_approved_fcfa * (1 + app.interest_rate_pct / 100)) / app.duration_months,
     )

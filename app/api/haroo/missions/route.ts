@@ -36,7 +36,10 @@ export async function GET() {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ missions: [] }, { status: 401 })
-  const { data } = await supabase
+  // Client serveur : les fiches agronomes ne sont plus lisibles publiquement
+  // (téléphones). Le filtre requester_user_id = session garantit qu'on ne
+  // renvoie que les demandes de l'appelant, et seuls nom + carte sont lus.
+  const { data } = await createAdminClient()
     .from('haroo_missions')
     .select(
       'id, description, culture, statut, budget_propose, date_debut, created_at, accepted_at, completed_at, cancel_reason, rating, review, haroo_agronome_profiles(first_name, last_name, card_number)',

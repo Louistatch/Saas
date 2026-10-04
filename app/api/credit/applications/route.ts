@@ -1,15 +1,28 @@
 import { type NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { computeCreditScore } from '@/lib/credit/scoring'
+import { assertRole, assertTenantAccess } from '@/lib/security/assert-access'
+
+// Valeurs alignées sur les contraintes CHECK de credit_applications.
+const createSchema = z.object({
+  member_id: z.string().uuid(),
+  cooperative_id: z.string().uuid(),
+  amount_requested_fcfa: z.coerce.number().int().positive().max(100_000_000),
+  purpose: z.enum(['semences', 'engrais', 'equipement', 'irrigation', 'stockage', 'autre']),
+  duration_months: z.coerce.number().int().refine((n) => [3, 6, 12, 18, 24].includes(n)),
+})
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status')
   const memberId = searchParams.get('member_id')
 
+  // Les demandes de crédit relèvent des administrateurs (RLS les borne en plus
+  // aux coopératives accessibles).
+  const guard = await assertRole('cooperative_admin')
+  if (!guard.ok) return guard.response
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
   let query = supabase
     .from('credit_applications')
@@ -20,21 +33,20 @@ export async function GET(request: NextRequest) {
   if (memberId) query = query.eq('member_id', memberId)
 
   const { data, error, count } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'Lecture impossible' }, { status: 500 })
   return NextResponse.json({ applications: data ?? [], total: count ?? 0 })
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
-
-  const body = await request.json()
-  const { member_id, cooperative_id, amount_requested_fcfa, purpose, duration_months } = body
-
-  if (!member_id || !cooperative_id || !amount_requested_fcfa || !purpose || !duration_months) {
-    return NextResponse.json({ error: 'Champs obligatoires manquants' }, { status: 400 })
+  const parsed = createSchema.safeParse(await request.json().catch(() => null))
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Champs obligatoires manquants ou invalides' }, { status: 400 })
   }
+  const { member_id, cooperative_id, amount_requested_fcfa, purpose, duration_months } = parsed.data
+
+  const guard = await assertTenantAccess(cooperative_id)
+  if (!guard.ok) return guard.response
+  const supabase = await createClient()
 
   // Fetch ATS score
   const { data: atsData } = await supabase.rpc('calculate_member_ats', { p_member_id: member_id })
@@ -43,9 +55,13 @@ export async function POST(request: NextRequest) {
   // Fetch membership data
   const { data: member } = await supabase
     .from('members')
-    .select('created_at')
+    .select('created_at, cooperative_id')
     .eq('id', member_id)
     .single()
+  // Le membre doit appartenir à la coopérative de la demande.
+  if (!member || member.cooperative_id !== cooperative_id) {
+    return NextResponse.json({ error: 'Membre introuvable dans cette coopérative' }, { status: 400 })
+  }
   const membershipMonths = member?.created_at
     ? Math.floor((Date.now() - new Date(member.created_at).getTime()) / (1000 * 60 * 60 * 24 * 30))
     : 0
@@ -95,6 +111,6 @@ export async function POST(request: NextRequest) {
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  if (error) return NextResponse.json({ error: 'Demande impossible' }, { status: 400 })
   return NextResponse.json({ application: data, scoring: result }, { status: 201 })
 }
