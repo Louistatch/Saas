@@ -5,7 +5,7 @@
 
 -- ── C3 · ai_conversations : lisible et écrivable par n'importe qui ──────
 -- Écrit et lu uniquement côté serveur (service_role : routes /api/ai/*,
--- AgriTogo). La lecture admin (ai_conv_select_admin) est conservée.
+-- AgriTogo). La lecture admin est restreinte au super_admin plus bas.
 DROP POLICY IF EXISTS ai_conv_select_open ON public.ai_conversations;
 DROP POLICY IF EXISTS ai_conv_insert_open ON public.ai_conversations;
 DROP POLICY IF EXISTS ai_conv_insert_public ON public.ai_conversations;
