@@ -57,6 +57,21 @@ function trace(level: 'info' | 'error', fields: Record<string, unknown>) {
   else if (process.env.FEDAPAY_ENV !== 'live') console.info(`[FedaPay] ${line}`)
 }
 
+/**
+ * Diagnostic Sandbox UNIQUEMENT : journal détaillé d'un échange avec FedaPay.
+ * Jamais en live, jamais la clé ni l'en-tête Authorization ; le jeton de
+ * paiement est tronqué.
+ */
+function sandboxLog(tag: string, fields: Record<string, unknown>) {
+  if (process.env.FEDAPAY_ENV === 'live') return
+  const line = Object.entries(fields)
+    .map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
+    .join(' ')
+  console.info(`[${tag}] ${line}`)
+}
+
+const maskToken = (t: string) => (t.length > 8 ? `${t.slice(0, 4)}…${t.slice(-4)}` : '…')
+
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   const key = process.env.FEDAPAY_SECRET_KEY?.trim()
   if (!key) throw new Error('FedaPay non configuré')
@@ -139,7 +154,25 @@ export async function createCheckout(input: {
 }
 
 export async function getTransaction(id: number | string): Promise<FedaTransaction> {
-  return readTx(await call(`/transactions/${encodeURIComponent(String(id))}`))
+  const raw = await call(`/transactions/${encodeURIComponent(String(id))}`)
+  // biome-ignore lint/suspicious/noExplicitAny: diagnostic Sandbox
+  const t: any = (raw as any)?.['v1/transaction'] ?? raw
+  sandboxLog('FedaPay Final', {
+    transaction_id: t?.id,
+    status: t?.status,
+    reason: t?.last_error_code ?? t?.last_error_message ?? null,
+    last_error_message: t?.last_error_message,
+    payment_method: t?.mode,
+    payment_method_id: t?.payment_method_id,
+    customer_id: t?.customer_id,
+    amount: t?.amount,
+    fees: t?.fees,
+    approved_at: t?.approved_at,
+    declined_at: t?.declined_at,
+    created_at: t?.created_at,
+    raw: JSON.stringify(t).slice(0, 1500),
+  })
+  return readTx(raw)
 }
 
 /**
@@ -185,6 +218,19 @@ export async function createDirectPayment(input: {
   })
   const tx = readTx(created)
   if (!tx.id) throw new Error('FedaPay : transaction non créée')
+  // biome-ignore lint/suspicious/noExplicitAny: diagnostic Sandbox
+  const createdTx: any = (created as any)?.['v1/transaction'] ?? created
+  sandboxLog('FedaPay Create', {
+    transaction_id: tx.id,
+    environment,
+    raw_phone: input.customer.phone,
+    normalized_phone: local,
+    country: input.customer.country,
+    country_code: prefix,
+    customer_phone_sent: phone_number,
+    fedapay_status: createdTx?.status,
+    fedapay_customer_id: createdTx?.customer_id,
+  })
   trace('info', {
     environment,
     user_provider: input.provider,
@@ -194,9 +240,52 @@ export async function createDirectPayment(input: {
   })
   const token = await call<{ token?: string }>(`/transactions/${tx.id}/token`, { method: 'POST' })
   if (!token.token) throw new Error('FedaPay : jeton de paiement absent')
-  await call(`/${mode}`, {
-    method: 'POST',
-    body: JSON.stringify({ token: token.token, phone_number }),
+  const sendPayload = { token: token.token, phone_number }
+  let sendResponse: unknown
+  try {
+    sendResponse = await call(`/${mode}`, { method: 'POST', body: JSON.stringify(sendPayload) })
+  } catch (e) {
+    sandboxLog('FedaPay Send', {
+      transaction_id: tx.id,
+      environment,
+      requested_provider: input.provider,
+      resolved_provider: mode,
+      endpoint: `POST /v1/${mode}`,
+      payload: { ...sendPayload, token: maskToken(token.token) },
+      result: 'http_error',
+      error: (e as Error).message.slice(0, 300),
+    })
+    throw e
+  }
+  // Statut relu juste après l'envoi (immédiat), pour le diagnostic.
+  // biome-ignore lint/suspicious/noExplicitAny: diagnostic Sandbox
+  let after: any = null
+  if (environment === 'sandbox') {
+    try {
+      // biome-ignore lint/suspicious/noExplicitAny: diagnostic Sandbox
+      const raw: any = await call(`/transactions/${tx.id}`)
+      after = raw?.['v1/transaction'] ?? raw
+    } catch {
+      after = null
+    }
+  }
+  sandboxLog('FedaPay Send', {
+    transaction_id: tx.id,
+    environment,
+    requested_provider: input.provider,
+    resolved_provider: mode,
+    endpoint: `POST /v1/${mode}`,
+    raw_phone: input.customer.phone,
+    normalized_phone: local,
+    country: input.customer.country,
+    country_code: prefix,
+    payload: { ...sendPayload, token: maskToken(token.token) },
+    http_status: 200,
+    fedapay_response: JSON.stringify(sendResponse).slice(0, 600),
+    status_after_send: after?.status,
+    mode_after_send: after?.mode,
+    last_error_code: after?.last_error_code,
+    last_error_message: after?.last_error_message,
   })
   trace('info', { environment, resolved_provider: mode, send: 'requested', transaction_id: tx.id })
   return { transactionId: tx.id, mode }
