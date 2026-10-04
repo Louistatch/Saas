@@ -11,17 +11,18 @@
 // l'admin promeuve le compte existant plutôt que d'en créer un doublon, ce qui
 // ferait perdre au professionnel son profil et sa carte Haroo.
 
-import { NextResponse, type NextRequest } from 'next/server'
-import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
+import { clip, emailSuperAdmins } from '@/lib/email/resend'
 import { getAccessContext } from '@/lib/security/assert-access'
+import { createClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/utils/logger'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
+import { type NextRequest, NextResponse, after } from 'next/server'
+import { z } from 'zod'
 
 const log = createLogger('api:access-request')
 
 const schema = z.object({
-  organizationName: z.string().trim().min(2, 'Nom de l\'organisation requis').max(150),
+  organizationName: z.string().trim().min(2, "Nom de l'organisation requis").max(150),
   contactName: z.string().trim().min(2, 'Nom du contact requis').max(100),
   // Aligné sur accessRequestSchema (lib/validators/schemas.ts) : une règle
   // plus stricte ici produirait un rejet serveur après une validation client
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
 
   if (ctx && ctx.role !== 'none' && ctx.role !== 'guest') {
     return NextResponse.json(
-      { error: 'Ce compte dispose déjà d\'une organisation' },
+      { error: "Ce compte dispose déjà d'une organisation" },
       { status: 409 },
     )
   }
@@ -106,6 +107,20 @@ export async function POST(request: NextRequest) {
     log.error('Access request error', error)
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
+
+  after(() =>
+    emailSuperAdmins('Nouvelle demande d’accès organisation', {
+      title: 'Nouvelle demande d’accès',
+      lines: [
+        `Type : ${TYPE_LABELS[data.type] ?? data.type}`,
+        `Organisation : ${clip(data.organizationName)}`,
+        `Contact : ${clip(data.contactName)} · ${clip(data.phone)}`,
+        ctx ? 'Compte existant à promouvoir.' : 'Nouveau compte à créer.',
+        data.message ? `Message : ${clip(data.message)}` : '',
+      ].filter(Boolean),
+      cta: { label: 'Ouvrir l’administration', path: '/admin' },
+    }),
+  )
 
   return NextResponse.json({
     success: true,

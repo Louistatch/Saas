@@ -97,3 +97,62 @@ export async function emailUser(
     // Un e-mail manqué ne doit jamais casser l'action métier.
   }
 }
+
+/** Tronque un champ saisi par un tiers avant de le recopier dans un e-mail. */
+export const clip = (s: string | null | undefined, max = 300): string => {
+  const v = (s ?? '').trim()
+  return v.length > max ? `${v.slice(0, max)}…` : v
+}
+
+/**
+ * Envoi « fire-and-forget » à une adresse connue (acheteur sans compte,
+ * adresse déclarée d'un membre). Mêmes règles qu'emailUser.
+ */
+export async function emailAddress(
+  to: string | null | undefined,
+  subject: string,
+  body: Parameters<typeof renderEmail>[0],
+): Promise<void> {
+  const email = to?.trim()
+  if (!email || !email.includes('@') || email.endsWith('.internal')) return
+  try {
+    await deliverEmail(email, subject, renderEmail(body))
+  } catch {
+    // Un e-mail manqué ne doit jamais casser l'action métier.
+  }
+}
+
+/** Prévient chaque super_admin (profiles est la seule source d'autorité). */
+export async function emailSuperAdmins(
+  subject: string,
+  body: Parameters<typeof renderEmail>[0],
+): Promise<void> {
+  try {
+    const { data } = await createAdminClient()
+      .from('profiles')
+      .select('id')
+      .eq('role', 'super_admin')
+    await Promise.all((data ?? []).map((p) => emailUser(p.id, subject, body)))
+  } catch {
+    // Idem : jamais bloquant.
+  }
+}
+
+/** Prévient les administrateurs d'une coopérative. */
+export async function emailCooperativeAdmins(
+  cooperativeId: string | null | undefined,
+  subject: string,
+  body: Parameters<typeof renderEmail>[0],
+): Promise<void> {
+  if (!cooperativeId) return
+  try {
+    const { data } = await createAdminClient()
+      .from('profiles')
+      .select('id')
+      .eq('role', 'cooperative_admin')
+      .eq('cooperative_id', cooperativeId)
+    await Promise.all((data ?? []).map((p) => emailUser(p.id, subject, body)))
+  } catch {
+    // Idem : jamais bloquant.
+  }
+}

@@ -1,10 +1,11 @@
 // Marque une commande (entièrement imprimée) comme livrée à l'organisation.
 
-import { NextResponse, type NextRequest } from 'next/server'
-import { z } from 'zod'
+import { markOrderDelivered } from '@/lib/cards/print-orders'
+import { emailUser } from '@/lib/email/resend'
 import { getPartnerContext } from '@/lib/security/assert-partner-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
-import { markOrderDelivered } from '@/lib/cards/print-orders'
+import { type NextRequest, NextResponse, after } from 'next/server'
+import { z } from 'zod'
 
 export async function POST(
   _request: NextRequest,
@@ -34,5 +35,23 @@ export async function POST(
   if (!result.ok) {
     return NextResponse.json({ error: result.error ?? 'Action impossible' }, { status: 422 })
   }
+  // markOrderDelivered ne réussit que sur la transition printed → delivered.
+  after(async () => {
+    const { data: delivered } = await admin
+      .from('card_print_orders')
+      .select('requested_by')
+      .eq('id', orderId)
+      .maybeSingle()
+    await emailUser(delivered?.requested_by, 'Vos cartes ont été livrées', {
+      title: 'Commande de cartes livrée',
+      lines: [
+        'Bonjour,',
+        'Votre commande d’impression de cartes membres a été marquée comme livrée par l’Opérateur.',
+        'Merci de vérifier la réception et de nous signaler tout écart.',
+      ],
+      cta: { label: 'Voir mes cartes', path: '/dashboard/cards/print-orders' },
+    })
+  })
+
   return NextResponse.json(result)
 }

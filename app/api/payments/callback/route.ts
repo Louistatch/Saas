@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
-import { claimPaymentForSettlement } from '@/lib/payments/settle'
+import { claimPaymentForSettlement, emailPaymentReceipt } from '@/lib/payments/settle'
 import { createClient } from '@/lib/supabase/admin'
-import { type NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse, after } from 'next/server'
 
 interface OrangeCallbackBody {
   reference: string
@@ -84,6 +84,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
     return NextResponse.json({ received: true, duplicate: true })
   }
+
+  // Reçu au payeur : seulement pour la livraison qui a gagné la transition.
+  if (isSuccess) after(() => emailPaymentReceipt(supabase, payment.id))
 
   return NextResponse.json({ received: true })
 }

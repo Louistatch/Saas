@@ -1,7 +1,7 @@
 import { checkCinetPayTransaction } from '@/lib/payments/cinetpay'
-import { claimPaymentForSettlement } from '@/lib/payments/settle'
+import { claimPaymentForSettlement, emailPaymentReceipt } from '@/lib/payments/settle'
 import { createClient } from '@/lib/supabase/admin'
-import { type NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse, after } from 'next/server'
 
 /**
  * CinetPay notify_url — called after every transaction status change.
@@ -89,6 +89,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // rejouer quoi que ce soit.
     return NextResponse.json({ received: true, duplicate: true })
   }
+
+  // Reçu au payeur : seulement pour la livraison qui a gagné la transition.
+  if (isSuccess) after(() => emailPaymentReceipt(supabase, payment.id))
 
   return NextResponse.json({ received: true })
 }

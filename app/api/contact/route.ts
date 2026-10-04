@@ -1,7 +1,8 @@
-import { type NextRequest, NextResponse } from 'next/server'
+import { clip, emailSuperAdmins } from '@/lib/email/resend'
 import { createClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/utils/logger'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
+import { type NextRequest, NextResponse, after } from 'next/server'
 import { z } from 'zod'
 
 const log = createLogger('api:contact')
@@ -50,6 +51,20 @@ export async function POST(request: NextRequest) {
       log.error('Contact message insert error', error)
       return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
     }
+
+    const msg = parsed.data
+    after(() =>
+      emailSuperAdmins('Nouveau message de contact', {
+        title: 'Nouveau message via le formulaire de contact',
+        lines: [
+          `De : ${clip(msg.name)} <${clip(msg.email)}>`,
+          `Catégorie : ${msg.category}`,
+          `Sujet : ${clip(msg.subject)}`,
+          `Message : ${clip(msg.message)}`,
+        ],
+        cta: { label: 'Ouvrir l’administration', path: '/admin' },
+      }),
+    )
 
     return NextResponse.json({ success: true, message: 'Message envoyé avec succès' })
   } catch (error) {

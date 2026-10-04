@@ -1,7 +1,9 @@
 import 'server-only'
+import { emailAddress } from '@/lib/email/resend'
 import { getTransaction } from '@/lib/payments/fedapay'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { createLogger } from '@/lib/utils/logger'
+import { after } from 'next/server'
 
 const log = createLogger('fiches:purchases')
 
@@ -75,5 +77,28 @@ export async function settlePurchase(purchaseId: string): Promise<PurchaseRow | 
       'id, fiche_id, amount, currency, payment_status, access_granted, provider, provider_transaction_id, paid_at',
     )
     .maybeSingle<PurchaseRow>()
+
+  // Reçu : uniquement pour l'appel qui a gagné la transition pending →
+  // completed (garde ci-dessus), donc jamais deux fois.
+  if (updated?.payment_status === 'completed') {
+    after(async () => {
+      const [{ data: buyer }, { data: fiche }] = await Promise.all([
+        sb.from('purchases').select('buyer_email').eq('id', p.id).maybeSingle(),
+        sb.from('fiches_techniques').select('title').eq('id', p.fiche_id).maybeSingle(),
+      ])
+      await emailAddress(buyer?.buyer_email, 'Reçu de paiement FaîtiereHub', {
+        title: 'Paiement confirmé',
+        lines: [
+          'Bonjour,',
+          `Nous confirmons la réception de votre paiement de ${p.amount.toLocaleString('fr-FR')} ${p.currency}.`,
+          `Achat : fiche technique « ${fiche?.title ?? 'fiche technique'} »`,
+          `Référence : ${p.provider_transaction_id}`,
+          'Merci pour votre confiance.',
+        ],
+        cta: { label: 'Accéder à mon achat', path: `/marketplace/achat/${p.id}` },
+      })
+    })
+  }
+
   return updated ?? { ...p, ...next }
 }

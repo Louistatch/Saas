@@ -11,11 +11,12 @@
 // Un compte existant peut se porter candidat directement — pas de second
 // email, pas de second compte (§24).
 
+import { clip, emailSuperAdmins, emailUser } from '@/lib/email/resend'
 import { getAccessContext } from '@/lib/security/assert-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { generateUniquePartnerCode, prefectureCode } from '@/lib/utils/partner-code'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
-import { type NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse, after } from 'next/server'
 import { z } from 'zod'
 
 const bodySchema = z.object({
@@ -127,6 +128,30 @@ export async function POST(request: NextRequest) {
     await admin.from('partners').delete().eq('id', partner.id)
     return NextResponse.json({ error: 'Candidature impossible' }, { status: 502 })
   }
+
+  // Accusé de réception au candidat + alerte aux super_admins, après coup.
+  after(() =>
+    Promise.all([
+      emailUser(userId, 'Candidature Opérateur reçue', {
+        title: 'Nous avons bien reçu votre candidature',
+        lines: [
+          'Bonjour,',
+          `Votre candidature Opérateur (code ${partner.partner_code}) est enregistrée.`,
+          'Prochaines étapes : la formation puis l’examen de certification. Nous revenons vers vous rapidement.',
+        ],
+        cta: { label: 'Suivre ma candidature', path: '/operator' },
+      }),
+      emailSuperAdmins('Nouvelle candidature Opérateur', {
+        title: 'Nouvelle candidature Opérateur',
+        lines: [
+          `Candidat : ${clip(display_name)}`,
+          business_name ? `Structure : ${clip(business_name)}` : '',
+          `Code : ${partner.partner_code}`,
+        ].filter(Boolean),
+        cta: { label: 'Voir les Partenaires', path: '/admin/partners' },
+      }),
+    ]),
+  )
 
   return NextResponse.json({
     success: true,

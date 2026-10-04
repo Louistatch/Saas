@@ -1,7 +1,8 @@
-import { type NextRequest, NextResponse } from 'next/server'
+import { clip, emailSuperAdmins } from '@/lib/email/resend'
 import { createClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/utils/logger'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
+import { type NextRequest, NextResponse, after } from 'next/server'
 import { z } from 'zod'
 
 const log = createLogger('api:contact-request')
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
   const parsed = contactSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Données invalides', issues: parsed.error.issues.map(i => i.message) },
+      { error: 'Données invalides', issues: parsed.error.issues.map((i) => i.message) },
       { status: 400 },
     )
   }
@@ -68,6 +69,19 @@ export async function POST(request: NextRequest) {
       log.error('Contact request insert error', error)
       return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
     }
+
+    const req = parsed.data
+    after(() =>
+      emailSuperAdmins('Nouvelle demande de contact fournisseur', {
+        title: 'Nouvelle demande de contact fournisseur',
+        lines: [
+          `Acheteur : ${clip(req.buyer_name)}${req.buyer_phone ? ` · ${clip(req.buyer_phone)}` : ''}`,
+          `Membre visé : ${req.member_id}`,
+          `Message : ${clip(req.message)}`,
+        ],
+        cta: { label: 'Ouvrir l’administration', path: '/admin' },
+      }),
+    )
 
     return NextResponse.json({ success: true, message: 'Demande envoyée avec succès' })
   } catch (error) {
