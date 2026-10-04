@@ -1,20 +1,20 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { Spinner } from '@/components/shared/loading'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Spinner } from '@/components/shared/loading'
-import { CreditCard, Download, AlertCircle, CheckCircle2, ShoppingCart } from 'lucide-react'
 import type { PublicFiche } from '@/hooks/use-fiches-public'
+import { AlertCircle, CheckCircle2, CreditCard, Download, ShoppingCart } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 
 interface AccessFile {
   name: string
@@ -34,8 +34,41 @@ export function FicheAccessDialog({ fiche, open, onOpenChange }: FicheAccessDial
   const [error, setError] = useState<string | null>(null)
   const [files, setFiles] = useState<AccessFile[]>([])
   const [success, setSuccess] = useState(false)
-  const [buyer, setBuyer] = useState({ name: '', phone: '', email: '', country: 'tg' as 'tg' | 'bj' })
+  const [buyer, setBuyer] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    country: 'tg' as 'tg' | 'bj',
+  })
   const [buying, setBuying] = useState(false)
+  // Paiement intégré : la page FedaPay s'affiche DANS la fenêtre, l'acheteur
+  // ne quitte jamais le site. L'état est relu côté serveur (jamais d'après
+  // l'iframe) jusqu'à confirmation ou refus.
+  const [checkout, setCheckout] = useState<{ url: string; purchaseId: string } | null>(null)
+  const [payState, setPayState] = useState<'pending' | 'completed' | 'failed'>('pending')
+
+  useEffect(() => {
+    if (!checkout || payState !== 'pending') return
+    let stop = false
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/purchases/${checkout.purchaseId}?refresh=1`, {
+          cache: 'no-store',
+        })
+        const json = await res.json().catch(() => ({}))
+        if (stop) return
+        if (json.status === 'completed') setPayState('completed')
+        else if (json.status === 'failed' || json.status === 'refunded') setPayState('failed')
+      } catch {
+        // Réseau instable : on réessaie au prochain tour.
+      }
+    }
+    const timer = setInterval(poll, 4000)
+    return () => {
+      stop = true
+      clearInterval(timer)
+    }
+  }, [checkout, payState])
 
   const reset = useCallback(() => {
     setCardNumber('')
@@ -43,6 +76,8 @@ export function FicheAccessDialog({ fiche, open, onOpenChange }: FicheAccessDial
     setFiles([])
     setSuccess(false)
     setLoading(false)
+    setCheckout(null)
+    setPayState('pending')
   }, [])
 
   const handleClose = useCallback(
@@ -124,8 +159,8 @@ export function FicheAccessDialog({ fiche, open, onOpenChange }: FicheAccessDial
           setError(json.error ?? 'Paiement indisponible pour le moment.')
           return
         }
-        // Redirection vers la page de paiement FedaPay (Mobile Money / carte).
-        window.location.assign(json.url)
+        setPayState('pending')
+        setCheckout({ url: json.url, purchaseId: json.purchase_id })
       } catch {
         setError('Erreur réseau. Réessayez.')
       } finally {
@@ -150,7 +185,65 @@ export function FicheAccessDialog({ fiche, open, onOpenChange }: FicheAccessDial
           </DialogDescription>
         </DialogHeader>
 
-        {success ? (
+        {checkout ? (
+          <div className="space-y-3">
+            {payState === 'completed' ? (
+              <div className="space-y-3 py-2">
+                <div className="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-3">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
+                  <p className="text-sm font-medium text-green-900">
+                    Paiement confirmé. Votre fiche est débloquée.
+                  </p>
+                </div>
+                <Button asChild className="w-full gap-2">
+                  <a href={`/marketplace/achat/${checkout.purchaseId}`}>
+                    <Download className="h-4 w-4" /> Télécharger ma fiche
+                  </a>
+                </Button>
+              </div>
+            ) : payState === 'failed' ? (
+              <div className="space-y-3 py-2">
+                <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3">
+                  <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+                  <p className="text-sm text-destructive">
+                    Le paiement a été refusé. Aucun montant n’a été prélevé.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setCheckout(null)
+                    setPayState('pending')
+                  }}
+                >
+                  Réessayer
+                </Button>
+              </div>
+            ) : (
+              <>
+                <iframe
+                  src={checkout.url}
+                  title="Paiement sécurisé FedaPay"
+                  className="h-[70vh] max-h-[640px] w-full rounded-lg border border-border"
+                  allow="payment"
+                />
+                <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Spinner className="h-3 w-3" /> Validez le paiement sur votre téléphone : cette
+                  fenêtre se met à jour toute seule.
+                </p>
+                <a
+                  href={checkout.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-center text-xs text-primary underline"
+                >
+                  La page de paiement ne s’affiche pas ? Ouvrez-la ici
+                </a>
+              </>
+            )}
+          </div>
+        ) : success ? (
           <div className="space-y-4 py-2">
             <div className="flex items-start gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
               <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
@@ -227,17 +320,17 @@ export function FicheAccessDialog({ fiche, open, onOpenChange }: FicheAccessDial
                       <option value="tg">🇹🇬 Togo</option>
                       <option value="bj">🇧🇯 Bénin</option>
                     </select>
-                  <Input
-                    id="buyer_phone"
-                    type="tel"
-                    inputMode="tel"
-                    placeholder="90 00 00 00"
-                    value={buyer.phone}
-                    onChange={(e) => setBuyer((b) => ({ ...b, phone: e.target.value }))}
-                    disabled={busy}
-                    required
-                    className="flex-1"
-                  />
+                    <Input
+                      id="buyer_phone"
+                      type="tel"
+                      inputMode="tel"
+                      placeholder="90 00 00 00"
+                      value={buyer.phone}
+                      onChange={(e) => setBuyer((b) => ({ ...b, phone: e.target.value }))}
+                      disabled={busy}
+                      required
+                      className="flex-1"
+                    />
                   </div>
                 </div>
                 <div className="space-y-1.5">
