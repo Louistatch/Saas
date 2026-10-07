@@ -33,6 +33,35 @@ export interface HarooCardData {
    * Jamais de donnée personnelle dans le QR.
    */
   verifyToken?: string | null
+  /**
+   * Libellé du métier (ex. « Technicien agricole ») imprimé en capitales.
+   * Absent → libellé par défaut du type.
+   */
+  professionLabel?: string | null
+  /** Profil validé (badge + statut VALIDE) : seul cas où « PROFIL VÉRIFIÉ » s'affiche. */
+  verified?: boolean
+  /** Qualification certifiée (ex. « Agronome certifié ») — fournie seulement si validé. */
+  qualification?: string | null
+  /** Statut imprimé : ACTIF / SUSPENDU / RÉVOQUÉ / EXPIRÉ. */
+  statusLabel?: string | null
+  /** « Valide jusqu'au JJ/MM/AAAA », calculé depuis expiry_date. */
+  validUntil?: string | null
+  /** « Membre validé par la faîtière X » — profil validé et faîtière connue. */
+  validatedBy?: string | null
+}
+
+const STATUS_TONE: Record<string, { fill: string; text: string }> = {
+  ACTIF: { fill: '#E7F6EC', text: '#14532d' },
+  SUSPENDU: { fill: '#FEF3C7', text: '#92400E' },
+  RÉVOQUÉ: { fill: '#FEE2E2', text: '#991B1B' },
+  EXPIRÉ: { fill: '#E4E4E7', text: '#3F3F46' },
+}
+
+/** Libellé de métier → une ou deux lignes en capitales (coupure au 1er espace). */
+function labelLines(label: string): [string] | [string, string] {
+  const upper = label.trim().toUpperCase()
+  const i = upper.indexOf(' ')
+  return i > 0 ? [upper.slice(0, i), upper.slice(i + 1)] : [upper]
 }
 
 /** Origine publique des liens de vérification imprimés sur les cartes. */
@@ -132,8 +161,14 @@ function qrPath(text: string): { path: string; modules: number } {
  * une URL distante ne se charge pas dans un SVG rasterisé via canvas (le
  * canvas serait « tainted »). En prévisualisation serveur, l'URL brute suffit.
  */
-export function renderHarooCardSvg(data: HarooCardData, photoDataUrl?: string | null): string {
+export function renderHarooCardSvg(
+  data: HarooCardData,
+  photoDataUrl?: string | null,
+  /** Logo FaîtiereHub (public/logo.png) en data URL ; absent → emblème vectoriel. */
+  logoDataUrl?: string | null,
+): string {
   const theme = THEMES[data.type]
+  const lines = data.professionLabel ? labelLines(data.professionLabel) : theme.lines
   // Les identifiants SVG (gradients, masques) sont globaux au document : deux
   // cartes affichées côte à côte se voleraient leurs dégradés, la première
   // définition gagnant pour tout le monde. On les suffixe par carte.
@@ -158,7 +193,47 @@ export function renderHarooCardSvg(data: HarooCardData, photoDataUrl?: string | 
         </g>
       </g>`
 
-  const roleLines = theme.lines
+  // Emblème du logo officiel (cercle de public/logo.png, recadré) quand il est
+  // fourni en data URL ; sinon l'emblème vectoriel historique.
+  const logoEmblem = logoDataUrl
+    ? `<circle cx="0" cy="0" r="24" fill="#ffffff"/><image href="${escapeXml(logoDataUrl)}" xlink:href="${escapeXml(logoDataUrl)}" x="-66.7" y="-28" width="133.3" height="89" clip-path="url(#hLogo-${uid})"/>`
+    : `<circle cx="0" cy="0" r="22" fill="#15803d"/>
+      <path d="M-9 6 C -3 -6, 5 -9, 10 -10 C 9 -2, 4 6, -9 6 Z" fill="#ffffff"/>
+      <path d="M-9 8 h18" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"/>`
+
+  const verified = data.verified === true
+  const statusTone = data.statusLabel ? (STATUS_TONE[data.statusLabel] ?? STATUS_TONE.EXPIRÉ) : null
+  const statusBlock = statusTone
+    ? `<g transform="translate(878 318)">
+      <rect x="0" y="0" width="240" height="44" rx="22" fill="${statusTone.fill}"/>
+      <text x="120" y="29" text-anchor="middle" font-size="18" font-weight="800" fill="${statusTone.text}" letter-spacing="2" font-family="Arial, sans-serif">${escapeXml(data.statusLabel ?? '')}</text>
+    </g>`
+    : ''
+  const validityBlock = data.validUntil
+    ? `<text x="998" y="398" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff" opacity="0.85" font-family="Arial, sans-serif">${escapeXml(data.validUntil)}</text>`
+    : ''
+  const verifiedPill = verified
+    ? `<g transform="translate(866 20)" filter="url(#hShadow-${uid})">
+      <rect x="0" y="0" width="248" height="48" rx="24" fill="#E7F6EC" stroke="#bfe3cc" stroke-width="1.5"/>
+      <g transform="translate(30 24)">
+        <path d="M0 -13 l11 5 v8 c0 7 -5 12 -11 14 c-6 -2 -11 -7 -11 -14 v-8 z" fill="#15803d"/>
+        <path d="${CHECK_ICON}" transform="translate(0 1) scale(0.62)" fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+      <text x="58" y="30" font-size="16" font-weight="800" fill="#14532d" letter-spacing="1.6" font-family="Arial, sans-serif">PROFIL VÉRIFIÉ</text>
+    </g>`
+    : ''
+  const photoCheck = verified
+    ? `<g transform="translate(272 476)" filter="url(#hShadow-${uid})">
+      <circle cx="0" cy="0" r="24" fill="#ffffff"/>
+      <g transform="translate(0 -1)">
+        <path d="M0 -12 l10 4 v7 c0 6 -4 11 -10 13 c-6 -2 -10 -7 -10 -13 v-7 z" fill="${escapeXml(accent)}"/>
+        <path d="${CHECK_ICON}" transform="translate(0 1) scale(0.55)" fill="none" stroke="#ffffff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </g>`
+    : ''
+  const identitySubtitle = data.qualification || 'Membre de la communauté agricole'
+
+  const roleLines = lines
     .map(
       (line, i) =>
         `<text x="0" y="${i * 52}" font-size="46" font-weight="800" fill="#ffffff" letter-spacing="1">${escapeXml(line)}</text>`,
@@ -187,6 +262,7 @@ export function renderHarooCardSvg(data: HarooCardData, photoDataUrl?: string | 
     </filter>
     <clipPath id="hCard-${uid}"><rect x="0" y="0" width="1180" height="740" rx="34" ry="34"/></clipPath>
     <clipPath id="hPhoto-${uid}"><circle cx="200" cy="404" r="104"/></clipPath>
+    <clipPath id="hLogo-${uid}"><circle cx="0" cy="0" r="23"/></clipPath>
   </defs>
 
   <g clip-path="url(#hCard-${uid})">
@@ -208,34 +284,19 @@ export function renderHarooCardSvg(data: HarooCardData, photoDataUrl?: string | 
 
     <!-- Logo + intitulé -->
     <g transform="translate(64 42)">
-      <circle cx="0" cy="0" r="22" fill="#15803d"/>
-      <path d="M-9 6 C -3 -6, 5 -9, 10 -10 C 9 -2, 4 6, -9 6 Z" fill="#ffffff"/>
-      <path d="M-9 8 h18" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"/>
+      ${logoEmblem}
       <text x="36" y="9" font-size="30" font-weight="800" fill="#12261a" font-family="Arial, sans-serif">Faîtiere<tspan fill="#15803d">Hub</tspan></text>
       <rect x="252" y="-14" width="2" height="28" fill="#c9d2c4"/>
       <text x="272" y="7" font-size="15" font-weight="700" fill="#4a5a4d" letter-spacing="2.4" font-family="Arial, sans-serif">CARTE PROFESSIONNELLE</text>
     </g>
 
-    <!-- Pastille « profil vérifiable » -->
-    <g transform="translate(846 20)" filter="url(#hShadow-${uid})">
-      <rect x="0" y="0" width="268" height="48" rx="24" fill="#E7F6EC" stroke="#bfe3cc" stroke-width="1.5"/>
-      <g transform="translate(30 24)">
-        <path d="M0 -13 l11 5 v8 c0 7 -5 12 -11 14 c-6 -2 -11 -7 -11 -14 v-8 z" fill="#15803d"/>
-        <path d="${CHECK_ICON}" transform="translate(0 1) scale(0.62)" fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
-      </g>
-      <text x="58" y="30" font-size="16" font-weight="800" fill="#14532d" letter-spacing="1.6" font-family="Arial, sans-serif">PROFIL VÉRIFIABLE</text>
-    </g>
+    <!-- Pastille « profil vérifié » : uniquement si le profil est validé -->
+    ${verifiedPill}
 
     <!-- Photo, cerclée -->
     <circle cx="200" cy="404" r="112" fill="none" stroke="url(#hRing-${uid})" stroke-width="12"/>
     ${photoBlock}
-    <g transform="translate(272 476)" filter="url(#hShadow-${uid})">
-      <circle cx="0" cy="0" r="24" fill="#ffffff"/>
-      <g transform="translate(0 -1)">
-        <path d="M0 -12 l10 4 v7 c0 6 -4 11 -10 13 c-6 -2 -10 -7 -10 -13 v-7 z" fill="${escapeXml(accent)}"/>
-        <path d="${CHECK_ICON}" transform="translate(0 1) scale(0.55)" fill="none" stroke="#ffffff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
-      </g>
-    </g>
+    ${photoCheck}
 
     <!-- Médaillon du rôle -->
     <g transform="translate(408 330)">
@@ -244,10 +305,10 @@ export function renderHarooCardSvg(data: HarooCardData, photoDataUrl?: string | 
     </g>
 
     <!-- Intitulé du rôle + numéro de carte -->
-    <g transform="translate(486 ${theme.lines.length === 2 ? 312 : 338})" font-family="Arial, sans-serif">
+    <g transform="translate(486 ${lines.length === 2 ? 312 : 338})" font-family="Arial, sans-serif">
       ${roleLines}
     </g>
-    <g transform="translate(486 ${theme.lines.length === 2 ? 428 : 372})">
+    <g transform="translate(486 ${lines.length === 2 ? 428 : 372})">
       <rect x="0" y="0" width="268" height="50" rx="25" fill="${darken(accent, 0.6)}" stroke="${escapeXml(accent)}" stroke-width="2.5"/>
       <text x="134" y="33" text-anchor="middle" font-size="23" font-weight="800" fill="${escapeXml(accentSoft)}" letter-spacing="2.2" font-family="Arial, sans-serif">${escapeXml(data.cardNumber)}</text>
     </g>
@@ -258,7 +319,7 @@ export function renderHarooCardSvg(data: HarooCardData, photoDataUrl?: string | 
         <circle cx="0" cy="-6" r="8"/><path d="M-14 14 C -14 1, 14 1, 14 14 Z"/>
       </g>
       <text x="44" y="0" font-size="${nameSize}" font-weight="800" fill="#ffffff" letter-spacing="0.6">${escapeXml(truncate(fullName, 34))}</text>
-      <text x="44" y="24" font-size="16" fill="#ffffff" opacity="0.72">Membre de la communauté agricole</text>
+      <text x="44" y="24" font-size="16" fill="#ffffff" opacity="0.72">${escapeXml(truncate(identitySubtitle, 40))}</text>
     </g>
 
     <!-- Filet séparateur -->
@@ -276,7 +337,12 @@ export function renderHarooCardSvg(data: HarooCardData, photoDataUrl?: string | 
       </g>
       <text x="44" y="0" font-size="19" font-weight="800" fill="#ffffff" letter-spacing="0.6">ORGANISATION</text>
       <text x="44" y="24" font-size="16" fill="#ffffff" opacity="0.72">${escapeXml(truncate(data.organisation || 'Indépendant', 34))}</text>
+      ${data.validatedBy ? `<text x="44" y="48" font-size="14" font-weight="700" fill="${escapeXml(accentSoft)}">${escapeXml(truncate(data.validatedBy, 42))}</text>` : ''}
     </g>
+
+    <!-- Statut et validité de la carte -->
+    ${statusBlock}
+    ${validityBlock}
 
     <!-- Bloc QR -->
     <g transform="translate(878 424)" filter="url(#hShadow-${uid})">

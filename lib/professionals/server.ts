@@ -15,12 +15,15 @@ import { generateUniqueCardNumber } from '@/lib/utils/card-number'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   type CardIssueStore,
+  DOCUMENT_BUCKET,
+  DOCUMENT_SIGNED_URL_TTL,
   type DecisionResult,
   type IssueResult,
   type ProfessionalType,
   type ValidationDecision,
   buildProfessionalPublicPayload,
   decideCanValidate,
+  isValidFaitiere,
   issueCardWith,
   resolveProfessionalDecision,
 } from './core'
@@ -85,6 +88,40 @@ export async function canValidateProfessional(
   return decideCanValidate({ role: ctx?.role ?? null, faitiereId, mandatedFaitiereIds: mandated })
 }
 
+// ── Faîtières ────────────────────────────────────────────────────────────────
+
+export interface FaitiereOption {
+  id: string
+  name: string
+}
+
+/**
+ * Faîtières proposées au rattachement : level='faitiere', non supprimées,
+ * hors comptes de démonstration. Pas de colonne de statut sur cooperatives :
+ * deleted_at en tient lieu.
+ */
+export async function listFaitieres(admin: AdminClient): Promise<FaitiereOption[]> {
+  const { data } = await admin
+    .from('cooperatives')
+    .select('id, name')
+    .eq('level', 'faitiere')
+    .is('deleted_at', null)
+    .eq('is_demo', false)
+    .order('name')
+    .returns<FaitiereOption[]>()
+  return data ?? []
+}
+
+/** Vrai si l'identifiant désigne une faîtière existante et active. */
+export async function isExistingFaitiere(admin: AdminClient, id: string): Promise<boolean> {
+  const { data } = await admin
+    .from('cooperatives')
+    .select('id, level, deleted_at')
+    .eq('id', id)
+    .maybeSingle<{ id: string; level: string | null; deleted_at: string | null }>()
+  return isValidFaitiere(data)
+}
+
 // ── Émission ─────────────────────────────────────────────────────────────────
 
 function supabaseIssueStore(admin: AdminClient): CardIssueStore {
@@ -92,7 +129,7 @@ function supabaseIssueStore(admin: AdminClient): CardIssueStore {
     async getProfile(type, profileId) {
       const cols =
         type === 'AGRONOME'
-          ? 'id, user_id, first_name, card_number, statut_validation'
+          ? 'id, user_id, first_name, card_number, statut_validation, profession'
           : 'id, user_id, first_name, card_number'
       const { data } = await admin
         .from(PROFILE_TABLE[type])
@@ -256,9 +293,12 @@ export const CARD_PUBLIC_COLUMNS =
 export async function buildAgronomePublicResponse(admin: AdminClient, card: CardRow) {
   const { data: profile } = await admin
     .from('haroo_agronome_profiles')
-    .select('first_name, last_name, photo_url, badge_valide, statut_validation, faitiere_id')
+    .select(
+      'first_name, last_name, photo_url, badge_valide, statut_validation, faitiere_id, profession',
+    )
     .eq('card_number', card.card_number)
     .maybeSingle<{
+      profession: string | null
       first_name: string | null
       last_name: string | null
       photo_url: string | null
@@ -306,4 +346,50 @@ export async function fetchAgritogoHarooVerify(cardNumber: string): Promise<unkn
   } finally {
     clearTimeout(timeoutId)
   }
+}
+
+// ── Justificatifs ────────────────────────────────────────────────────────────
+
+export interface ProfessionalDocumentOut {
+  id: string
+  kind: string
+  original_name: string | null
+  created_at: string
+  /** URL signée courte (DOCUMENT_SIGNED_URL_TTL) — jamais d'URL publique. */
+  url: string | null
+}
+
+/** Justificatifs d'un titulaire, avec URL de lecture signées (10 min). */
+export async function listDocumentsWithSignedUrls(
+  admin: AdminClient,
+  userId: string,
+): Promise<ProfessionalDocumentOut[]> {
+  const { data } = await admin
+    .from('professional_documents')
+    .select('id, kind, storage_path, original_name, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
+    .returns<
+      {
+        id: string
+        kind: string
+        storage_path: string
+        original_name: string | null
+        created_at: string
+      }[]
+    >()
+  const rows = data ?? []
+  if (rows.length === 0) return []
+  const { data: signed } = await admin.storage.from(DOCUMENT_BUCKET).createSignedUrls(
+    rows.map((r) => r.storage_path),
+    DOCUMENT_SIGNED_URL_TTL,
+  )
+  const byPath = new Map((signed ?? []).map((s) => [s.path, s.signedUrl]))
+  return rows.map((r) => ({
+    id: r.id,
+    kind: r.kind,
+    original_name: r.original_name,
+    created_at: r.created_at,
+    url: byPath.get(r.storage_path) ?? null,
+  }))
 }

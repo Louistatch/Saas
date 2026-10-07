@@ -7,14 +7,19 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import type { Profession } from '@/lib/professionals/core'
 import { flattenZodErrors, harooSignupSchema } from '@/lib/validators/schemas'
 import { useAuth } from '@/app/context/auth-context'
 import { accountJourney, harooAction } from '@/lib/account/journey'
 import { ArrowLeft, CheckCircle2, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 
+/**
+ * Choix affichés. Technicien et conseiller sont des professions de la
+ * famille AGRONOME (même table, même haroo_type) : `profession` les distingue.
+ */
 const PROFILE_TYPES = [
   {
     value: 'OUVRIER',
@@ -27,6 +32,38 @@ const PROFILE_TYPES = [
     label: 'Agronome',
     description: 'Missions de conseil auprès des exploitants',
   },
+  {
+    value: 'TECHNICIEN',
+    label: 'Technicien agricole',
+    description: 'Appui technique de terrain auprès des producteurs',
+  },
+  {
+    value: 'CONSEILLER',
+    label: 'Conseiller agricole',
+    description: 'Conseil et accompagnement des exploitations',
+  },
+] as const
+
+type ChoiceValue = (typeof PROFILE_TYPES)[number]['value']
+
+const ADVISOR_PROFESSION: Partial<Record<ChoiceValue, Profession>> = {
+  AGRONOME: 'agronome',
+  TECHNICIEN: 'technicien',
+  CONSEILLER: 'conseiller',
+}
+
+/** Spécialités proposées (colonne specialisations, modifiable ensuite). */
+const SPECIALITES = [
+  'Fertilité des sols',
+  'Protection des cultures',
+  'Irrigation',
+  'Maraîchage',
+  'Cultures de rente',
+  'Céréales',
+  'Agroforesterie',
+  'Agroécologie',
+  'Élevage',
+  'Post-récolte',
 ] as const
 
 /**
@@ -50,7 +87,9 @@ function HarooSignupForm() {
     : 'OUVRIER'
 
   const [formData, setFormData] = useState({
-    profileType: initialType,
+    profileType: initialType as string,
+    faitiereId: '',
+    specialisations: [] as string[],
     firstName: '',
     lastName: '',
     phone: '',
@@ -61,13 +100,48 @@ function HarooSignupForm() {
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [faitieres, setFaitieres] = useState<{ id: string; name: string }[] | null>(null)
+
+  const profession = ADVISOR_PROFESSION[formData.profileType as ChoiceValue]
+  const isAdvisor = profession !== undefined
+
+  useEffect(() => {
+    if (!isAdvisor || faitieres !== null) return
+    fetch('/api/faitieres')
+      .then((r) => (r.ok ? r.json() : { faitieres: [] }))
+      .then((d: { faitieres?: { id: string; name: string }[] }) => setFaitieres(d.faitieres ?? []))
+      .catch(() => setFaitieres([]))
+  }, [isAdvisor, faitieres])
+
+  const toggleSpecialite = (value: string) =>
+    setFormData((f) => ({
+      ...f,
+      specialisations: f.specialisations.includes(value)
+        ? f.specialisations.filter((s) => s !== value)
+        : [...f.specialisations, value],
+    }))
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setFieldErrors({})
 
-    const parsed = harooSignupSchema.safeParse(formData)
+    // Technicien / conseiller → type AGRONOME + profession.
+    const parsed = harooSignupSchema.safeParse({
+      profileType: isAdvisor ? 'AGRONOME' : formData.profileType,
+      ...(isAdvisor
+        ? {
+            profession,
+            faitiereId: formData.faitiereId || undefined,
+            specialisations: formData.specialisations,
+          }
+        : {}),
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      phone: formData.phone,
+      email: formData.email,
+      password: formData.password,
+    })
     if (!parsed.success) {
       setFieldErrors(flattenZodErrors(parsed.error))
       return
@@ -80,9 +154,13 @@ function HarooSignupForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(parsed.data),
       })
-      const data: { success?: boolean; error?: string; verify_email?: boolean } = await res
-        .json()
-        .catch(() => ({}))
+      const data: {
+        success?: boolean
+        error?: string
+        verify_email?: boolean
+        fields?: Record<string, string>
+      } = await res.json().catch(() => ({}))
+      if (data.fields) setFieldErrors(data.fields)
       if (res.ok && data.success && data.verify_email) {
         window.location.assign(`/auth/verify-email?email=${encodeURIComponent(parsed.data.email)}`)
       } else if (res.ok && data.success) {
@@ -131,7 +209,7 @@ function HarooSignupForm() {
         benefits={[
           'Emploi saisonnier pour les ouvriers agricoles',
           'Préventes de production pour les acheteurs',
-          'Missions de conseil pour les agronomes',
+          'Missions de conseil pour les agronomes, techniciens et conseillers',
           'Carte professionnelle vérifiable par QR code',
         ]}
       />
@@ -200,6 +278,67 @@ function HarooSignupForm() {
                       <p className="text-xs text-destructive">{fieldErrors.profileType}</p>
                     )}
                   </div>
+
+                  {isAdvisor && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="faitiereId">Faîtière de rattachement *</Label>
+                        <select
+                          id="faitiereId"
+                          value={formData.faitiereId}
+                          onChange={(e) =>
+                            setFormData((f) => ({ ...f, faitiereId: e.target.value }))
+                          }
+                          aria-invalid={!!fieldErrors.faitiereId}
+                          required
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        >
+                          <option value="">
+                            {faitieres === null ? 'Chargement…' : '— Choisissez votre faîtière —'}
+                          </option>
+                          {(faitieres ?? []).map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {f.name}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-muted-foreground">
+                          Un opérateur officier de cette faîtière vérifiera votre dossier avant
+                          l’émission de votre carte professionnelle.
+                        </p>
+                        {fieldErrors.faitiereId && (
+                          <p className="text-xs text-destructive">{fieldErrors.faitiereId}</p>
+                        )}
+                      </div>
+
+                      <fieldset className="space-y-2">
+                        <legend className="text-sm font-medium">Spécialités</legend>
+                        <div className="flex flex-wrap gap-2">
+                          {SPECIALITES.map((spec) => {
+                            const active = formData.specialisations.includes(spec)
+                            return (
+                              <button
+                                key={spec}
+                                type="button"
+                                aria-pressed={active}
+                                onClick={() => toggleSpecialite(spec)}
+                                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                                  active
+                                    ? 'border-primary bg-primary/10 text-primary'
+                                    : 'border-border text-muted-foreground hover:bg-muted'
+                                }`}
+                              >
+                                {spec}
+                              </button>
+                            )
+                          })}
+                        </div>
+                        {fieldErrors.specialisations && (
+                          <p className="text-xs text-destructive">{fieldErrors.specialisations}</p>
+                        )}
+                      </fieldset>
+                    </>
+                  )}
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">

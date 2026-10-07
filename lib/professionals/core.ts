@@ -27,6 +27,67 @@ export const PROFESSION_LABEL: Record<ProfessionalType, string> = {
   AGRONOME: 'Ingénieur agronome',
 }
 
+// ── Professions du conseil agricole (F11) ────────────────────────────────────
+//
+// Agronome, technicien et conseiller partagent la même table
+// (haroo_agronome_profiles), le même haroo_type ('agronome') et le même
+// card_type ('AGRONOME') : seule la colonne `profession` les distingue. Aucun
+// changement d'enum ni de rôle ; les lignes existantes valent 'agronome'.
+
+export const PROFESSIONS = ['agronome', 'technicien', 'conseiller'] as const
+export type Profession = (typeof PROFESSIONS)[number]
+
+interface ProfessionInfo {
+  /** Libellé du métier (annuaire, page de vérification). */
+  label: string
+  /** Mention affichée UNIQUEMENT si le profil est validé. */
+  qualification: string
+  /** Préfixe du numéro de carte (card_type reste 'AGRONOME'). */
+  prefix: string
+}
+
+export const PROFESSION_INFO: Record<Profession, ProfessionInfo> = {
+  agronome: { label: 'Ingénieur agronome', qualification: 'Agronome certifié', prefix: 'AGR' },
+  technicien: {
+    label: 'Technicien agricole',
+    qualification: 'Technicien agricole certifié',
+    prefix: 'TEC',
+  },
+  conseiller: {
+    label: 'Conseiller agricole',
+    qualification: 'Conseiller agricole certifié',
+    prefix: 'CON',
+  },
+}
+
+/** Toute valeur inconnue ou absente vaut 'agronome' (lignes antérieures). */
+export function normalizeProfession(value: string | null | undefined): Profession {
+  const v = (value ?? '').toLowerCase().trim()
+  return (PROFESSIONS as readonly string[]).includes(v) ? (v as Profession) : 'agronome'
+}
+
+export function professionLabel(type: ProfessionalType, profession?: string | null): string {
+  return type === 'AGRONOME'
+    ? PROFESSION_INFO[normalizeProfession(profession)].label
+    : PROFESSION_LABEL[type]
+}
+
+/** Qualification certifiée : null tant que le profil n'est pas vérifié. */
+export function qualificationFor(
+  type: ProfessionalType,
+  profession: string | null | undefined,
+  verified: boolean,
+): string | null {
+  if (!verified || type !== 'AGRONOME') return null
+  return PROFESSION_INFO[normalizeProfession(profession)].qualification
+}
+
+export function cardPrefixFor(type: ProfessionalType, profession?: string | null): string {
+  return type === 'AGRONOME'
+    ? PROFESSION_INFO[normalizeProfession(profession)].prefix
+    : CARD_PREFIX[type]
+}
+
 /** 2 ans, comme les cartes FAITIERE par défaut. */
 export const CARD_VALIDITY_DAYS = 730
 
@@ -67,6 +128,25 @@ export function computeCardStatus(
   return 'ACTIVE'
 }
 
+/** Libellé imprimé sur la carte. */
+export const CARD_STATUS_LABEL: Record<CardPublicStatus, string> = {
+  ACTIVE: 'ACTIF',
+  SUSPENDED: 'SUSPENDU',
+  REVOKED: 'RÉVOQUÉ',
+  EXPIRED: 'EXPIRÉ',
+}
+
+/** « Valide jusqu'au JJ/MM/AAAA » depuis expiry_date ; null sans date. */
+export function formatValidUntil(expiry: string | null | undefined): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(expiry ?? '')
+  return m ? `Valide jusqu’au ${m[3]}/${m[2]}/${m[1]}` : null
+}
+
+/** Mention de validation par la faîtière : profil vérifié ET faîtière connue. */
+export function validatedByLine(verified: boolean, faitiereName: string | null): string | null {
+  return verified && faitiereName ? `Membre validé par la faîtière ${faitiereName}` : null
+}
+
 export const CARD_STATUS_MESSAGE: Record<CardPublicStatus, string> = {
   ACTIVE: 'Carte valide',
   SUSPENDED: 'Carte suspendue — elle ne doit pas être acceptée pour le moment.',
@@ -94,6 +174,7 @@ export interface PublicPayloadInput {
     photo_url: string | null
     badge_valide: boolean | null
     statut_validation: string | null
+    profession?: string | null
   }
   faitiereName: string | null
 }
@@ -103,6 +184,8 @@ export interface ProfessionalPublic {
   last_name: string | null
   photo_url: string | null
   profession_label: string
+  /** 'agronome' | 'technicien' | 'conseiller' pour la famille AGRONOME. */
+  profession: Profession | null
   /** « Agronome certifié » uniquement si vérifié, sinon null. */
   qualification: string | null
   verified: boolean
@@ -146,8 +229,10 @@ export function buildProfessionalPublicPayload(
     first_name: input.profile.first_name,
     last_name: input.profile.last_name,
     photo_url: input.profile.photo_url,
-    profession_label: PROFESSION_LABEL[input.cardType],
-    qualification: verified && input.cardType === 'AGRONOME' ? 'Agronome certifié' : null,
+    profession_label: professionLabel(input.cardType, input.profile.profession),
+    profession:
+      input.cardType === 'AGRONOME' ? normalizeProfession(input.profile.profession) : null,
+    qualification: qualificationFor(input.cardType, input.profile.profession, verified),
     verified,
     badge_valide: input.profile.badge_valide === true,
     statut_validation: input.profile.statut_validation ?? 'EN_ATTENTE',
@@ -200,6 +285,7 @@ export interface IssueStoreProfile {
   first_name: string | null
   card_number: string | null
   statut_validation?: string | null
+  profession?: string | null
 }
 
 /** Accès aux données nécessaires à l'émission — implémenté sur Supabase ou en mémoire. */
@@ -259,7 +345,7 @@ export async function issueCardWith(
     }
   }
 
-  const cardNumber = await store.newCardNumber(CARD_PREFIX[type])
+  const cardNumber = await store.newCardNumber(cardPrefixFor(type, profile.profession))
   const expiry = expiryFrom(now)
   const inserted = await store.insertCard({
     card_number: cardNumber,
@@ -385,4 +471,100 @@ export async function resolveProfessionalDecision(
     card_number: issued.card_number,
     card_created: issued.created,
   }
+}
+
+// ── Faîtière de rattachement (F10) ───────────────────────────────────────────
+
+export interface FaitiereCandidate {
+  id: string
+  level: string | null
+  deleted_at?: string | null
+}
+
+/** Une faîtière valide existe, est de niveau 'faitiere' et n'est pas supprimée. */
+export function isValidFaitiere(row: FaitiereCandidate | null | undefined): boolean {
+  return !!row && row.level === 'faitiere' && !row.deleted_at
+}
+
+/**
+ * Faîtière d'un professionnel inscrit par un tiers : un Opérateur officier ne
+ * peut inscrire que pour une faîtière de ses mandats ; le super_admin pour
+ * toute faîtière valide (la validité est vérifiée séparément).
+ */
+export function decideRegistrationFaitiere(params: {
+  role: string | null
+  requestedFaitiereId: string
+  mandatedFaitiereIds: readonly string[]
+}): boolean {
+  if (params.role === 'super_admin') return true
+  return params.mandatedFaitiereIds.includes(params.requestedFaitiereId)
+}
+
+// ── Justificatifs (F2) ───────────────────────────────────────────────────────
+
+export const DOCUMENT_KINDS = ['diplome', 'attestation', 'piece_identite', 'autre'] as const
+export type DocumentKind = (typeof DOCUMENT_KINDS)[number]
+
+export const DOCUMENT_KIND_LABEL: Record<DocumentKind, string> = {
+  diplome: 'Diplôme',
+  attestation: 'Attestation',
+  piece_identite: 'Pièce d’identité',
+  autre: 'Autre',
+}
+
+export const DOCUMENT_MAX_BYTES = 5 * 1024 * 1024
+export const DOCUMENT_MIME_EXT: Record<string, string> = {
+  'application/pdf': 'pdf',
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+}
+/** Durée de validité des URL signées de lecture (10 min). */
+export const DOCUMENT_SIGNED_URL_TTL = 600
+export const DOCUMENT_BUCKET = 'professional-documents'
+
+export function validateDocumentUpload(file: {
+  mime: string
+  size: number
+}): { ok: true; ext: string } | { ok: false; error: string } {
+  const ext = DOCUMENT_MIME_EXT[file.mime]
+  if (!ext) return { ok: false, error: 'Format accepté : PDF, JPEG ou PNG' }
+  if (file.size <= 0) return { ok: false, error: 'Fichier vide' }
+  if (file.size > DOCUMENT_MAX_BYTES) return { ok: false, error: 'Fichier trop lourd (5 Mo max)' }
+  return { ok: true, ext }
+}
+
+/** Chemin de stockage : toujours sous le dossier <user_id>/ du titulaire. */
+export function documentStoragePath(
+  userId: string,
+  kind: DocumentKind,
+  ext: string,
+  nonce: string,
+): string {
+  return `${userId}/${kind}-${nonce}.${ext}`
+}
+
+/**
+ * Accès aux justificatifs d'un dossier : le titulaire, le super_admin, ou un
+ * Opérateur officier mandaté sur la faîtière du dossier (même règle que la
+ * validation). Les URL servies sont signées et courtes.
+ */
+export function decideDocumentAccess(params: {
+  callerId: string | null
+  ownerUserId: string | null
+  role: string | null
+  faitiereId: string | null
+  mandatedFaitiereIds: readonly string[]
+}): boolean {
+  if (!params.callerId) return false
+  if (params.ownerUserId && params.callerId === params.ownerUserId) return true
+  return decideCanValidate({
+    role: params.role,
+    faitiereId: params.faitiereId,
+    mandatedFaitiereIds: params.mandatedFaitiereIds,
+  })
+}
+
+/** Le titulaire ne peut déposer/retirer des pièces que tant que le dossier n'est pas validé. */
+export function canHolderEditDocuments(statutValidation: string | null | undefined): boolean {
+  return statutValidation !== 'VALIDE'
 }

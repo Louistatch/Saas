@@ -1,4 +1,5 @@
-// Inscription Haroo (OUVRIER / ACHETEUR / AGRONOME).
+// Inscription Haroo (OUVRIER / ACHETEUR / AGRONOME — agronome, technicien ou
+// conseiller, avec faîtière de rattachement obligatoire).
 //
 // FaîtiereHub ne crée pas le compte lui-même : la logique Haroo vit dans le
 // backend AgriTogo (déjà déployé), qui écrit dans la même base Supabase
@@ -6,6 +7,8 @@
 // rate-limite et proxifie vers AgriTogo.
 
 import { isEmailConfirmationRequired, sendConfirmationEmail } from '@/lib/auth/email-confirmation'
+import { isExistingFaitiere } from '@/lib/professionals/server'
+import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse, type NextRequest } from 'next/server'
 import { rateLimit, clientKeyFromHeaders } from '@/lib/utils/rate-limit'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
@@ -35,6 +38,23 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // Faîtière de rattachement (famille AGRONOME) : vérifiée ICI aussi —
+  // AgriTogo la revérifie, mais on ne relaie pas un identifiant arbitraire.
+  if (
+    parsed.data.faitiereId &&
+    !(await isExistingFaitiere(createAdminClient(), parsed.data.faitiereId))
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Faîtière inconnue',
+        fields: { faitiereId: 'Choisissez une faîtière dans la liste' },
+      },
+      { status: 400 },
+    )
+  }
+  const isAdvisor = parsed.data.profileType === 'AGRONOME'
+
   const agritogoUrl = process.env.AGRITOGO_API_URL
   if (!agritogoUrl) {
     return NextResponse.json(
@@ -57,6 +77,13 @@ export async function POST(request: NextRequest) {
         first_name: parsed.data.firstName,
         last_name: parsed.data.lastName,
         phone: parsed.data.phone,
+        ...(isAdvisor
+          ? {
+              faitiere_id: parsed.data.faitiereId,
+              profession: parsed.data.profession ?? 'agronome',
+              specialisations: parsed.data.specialisations ?? [],
+            }
+          : {}),
       }),
     })
     clearTimeout(timeoutId)

@@ -3,14 +3,19 @@
 /**
  * Professionnels à valider — Espace Opérateur.
  *
- * Un Opérateur officier voit les dossiers agronomes rattachés aux faîtières
+ * Un Opérateur officier voit les dossiers (agronome, technicien, conseiller)
+ * rattachés aux faîtières
  * sur lesquelles il détient un mandat actif portant 'professionals.validate'
  * (filtrage et contrôle côté serveur : /api/professionals/pending et
  * /api/professionals/[id]/decision). Le super_admin voit tout.
- * Valider émet automatiquement la carte professionnelle.
+ * Valider émet automatiquement la carte professionnelle. Il peut aussi
+ * inscrire un professionnel pour une faîtière de ses mandats
+ * (/api/professionals/register) ; le dossier suit la même validation.
  */
 
 import { ProtectedRoute } from '@/app/components/protected-route'
+import { DossierDocuments } from '@/components/professionals/dossier-documents'
+import { RegisterProfessionalForm } from '@/components/professionals/register-form'
 import { Spinner } from '@/components/shared/loading'
 import { Logo } from '@/components/shared/logo'
 import { Button } from '@/components/ui/button'
@@ -32,6 +37,7 @@ interface Dossier {
   statut_validation: DossierStatus
   card_number: string | null
   faitiere_name: string | null
+  profession_label?: string
   validated_at: string | null
   rejection_reason: string | null
   created_at: string | null
@@ -103,7 +109,8 @@ function DossierCard({ dossier, onDone }: { dossier: Dossier; onDone: () => void
               {dossier.first_name} {dossier.last_name}
             </p>
             <p className="truncate text-xs text-muted-foreground">
-              Agronome · {dossier.faitiere_name ?? 'Sans faîtière'}
+              {dossier.profession_label ?? 'Ingénieur agronome'} ·{' '}
+              {dossier.faitiere_name ?? 'Sans faîtière'}
               {dossier.card_number ? ` · ${dossier.card_number}` : ''}
             </p>
           </div>
@@ -113,6 +120,7 @@ function DossierCard({ dossier, onDone }: { dossier: Dossier; onDone: () => void
             Spécialisations : {dossier.specialisations.join(', ')}
           </p>
         )}
+        <DossierDocuments profileId={dossier.id} />
         {dossier.rejection_reason && (
           <p className="text-xs text-destructive">Motif : {dossier.rejection_reason}</p>
         )}
@@ -234,10 +242,13 @@ function ProfessionalsContent() {
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            Dossiers des agronomes rattachés aux faîtières de vos mandats. Valider émet la carte
-            professionnelle ; un rejet doit être motivé.
+            Dossiers des agronomes, techniciens et conseillers rattachés aux faîtières de vos
+            mandats. Examinez les justificatifs : valider émet la carte professionnelle ; un rejet
+            doit être motivé.
           </CardContent>
         </Card>
+
+        {canValidate && <RegisterProfessionalForm onRegistered={load} />}
 
         <div className="mb-4 flex gap-2">
           {TABS.map((t) => (

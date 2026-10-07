@@ -265,3 +265,248 @@ test('décision : refus sans mandat, rejet motivé, rollback de carte', async ()
   const refused = await issueCardWith(pending.store, 'AGRONOME', 'p1', TODAY)
   assert.equal(refused.ok ? null : refused.reason, 'not_validated')
 })
+
+// ── Phase 2 ──────────────────────────────────────────────────────────────────
+
+import {
+  CARD_STATUS_LABEL,
+  DOCUMENT_MAX_BYTES,
+  canHolderEditDocuments,
+  cardPrefixFor,
+  decideDocumentAccess,
+  decideRegistrationFaitiere,
+  documentStoragePath,
+  formatValidUntil,
+  isValidFaitiere,
+  normalizeProfession,
+  professionLabel,
+  qualificationFor,
+  validateDocumentUpload,
+  validatedByLine,
+} from '../lib/professionals/core'
+import { harooSignupSchema, professionalRegisterSchema } from '../lib/professionals/schemas'
+
+const FAITIERE = '11111111-1111-4111-8111-111111111111'
+
+test('isValidFaitiere : niveau faitiere, non supprimée', () => {
+  assert.equal(isValidFaitiere({ id: FAITIERE, level: 'faitiere', deleted_at: null }), true)
+  assert.equal(isValidFaitiere({ id: FAITIERE, level: 'union' }), false)
+  assert.equal(isValidFaitiere({ id: FAITIERE, level: 'cooperative' }), false)
+  assert.equal(
+    isValidFaitiere({ id: FAITIERE, level: 'faitiere', deleted_at: '2026-01-01T00:00:00Z' }),
+    false,
+  )
+  assert.equal(isValidFaitiere(null), false)
+})
+
+test('decideRegistrationFaitiere : OO limité à ses mandats, super_admin libre', () => {
+  assert.equal(
+    decideRegistrationFaitiere({
+      role: 'none',
+      requestedFaitiereId: 'f1',
+      mandatedFaitiereIds: ['f1'],
+    }),
+    true,
+  )
+  assert.equal(
+    decideRegistrationFaitiere({
+      role: 'none',
+      requestedFaitiereId: 'f2',
+      mandatedFaitiereIds: ['f1'],
+    }),
+    false,
+  )
+  assert.equal(
+    decideRegistrationFaitiere({
+      role: 'super_admin',
+      requestedFaitiereId: 'f2',
+      mandatedFaitiereIds: [],
+    }),
+    true,
+  )
+})
+
+test('professions : libellés, qualification (si vérifié seulement), préfixes', () => {
+  assert.equal(normalizeProfession(null), 'agronome')
+  assert.equal(normalizeProfession('inconnu'), 'agronome')
+  assert.equal(normalizeProfession('TECHNICIEN'), 'technicien')
+  assert.equal(professionLabel('AGRONOME', null), 'Ingénieur agronome')
+  assert.equal(professionLabel('AGRONOME', 'technicien'), 'Technicien agricole')
+  assert.equal(professionLabel('AGRONOME', 'conseiller'), 'Conseiller agricole')
+  assert.equal(professionLabel('OUVRIER', 'technicien'), 'Ouvrier agricole')
+  assert.equal(qualificationFor('AGRONOME', 'agronome', true), 'Agronome certifié')
+  assert.equal(qualificationFor('AGRONOME', 'technicien', true), 'Technicien agricole certifié')
+  assert.equal(qualificationFor('AGRONOME', 'conseiller', true), 'Conseiller agricole certifié')
+  assert.equal(qualificationFor('AGRONOME', 'technicien', false), null)
+  assert.equal(qualificationFor('OUVRIER', null, true), null)
+  assert.equal(cardPrefixFor('AGRONOME', null), 'AGR')
+  assert.equal(cardPrefixFor('AGRONOME', 'technicien'), 'TEC')
+  assert.equal(cardPrefixFor('AGRONOME', 'conseiller'), 'CON')
+  assert.equal(cardPrefixFor('OUVRIER'), 'OUV')
+})
+
+test('charge utile publique : profession et qualification du technicien', () => {
+  const payload = buildProfessionalPublicPayload(
+    {
+      cardType: 'AGRONOME',
+      card: {
+        card_number: 'TEC-123456',
+        status: 'active',
+        expiry_date: '2028-10-07',
+        created_at: null,
+      },
+      profile: {
+        first_name: 'A',
+        last_name: 'B',
+        photo_url: null,
+        badge_valide: true,
+        statut_validation: 'VALIDE',
+        profession: 'technicien',
+      },
+      faitiereName: 'F',
+    },
+    TODAY,
+  )
+  assert.equal(payload.professional.profession, 'technicien')
+  assert.equal(payload.professional.profession_label, 'Technicien agricole')
+  assert.equal(payload.professional.qualification, 'Technicien agricole certifié')
+})
+
+test('carte : statut imprimé, validité, mention de faîtière', () => {
+  assert.deepEqual(CARD_STATUS_LABEL, {
+    ACTIVE: 'ACTIF',
+    SUSPENDED: 'SUSPENDU',
+    REVOKED: 'RÉVOQUÉ',
+    EXPIRED: 'EXPIRÉ',
+  })
+  assert.equal(
+    CARD_STATUS_LABEL[computeCardStatus({ status: 'active', expiry_date: '2026-01-01' }, TODAY)],
+    'EXPIRÉ',
+  )
+  assert.equal(formatValidUntil('2028-10-07'), 'Valide jusqu’au 07/10/2028')
+  assert.equal(formatValidUntil(null), null)
+  assert.equal(validatedByLine(true, 'FUCEC'), 'Membre validé par la faîtière FUCEC')
+  assert.equal(validatedByLine(false, 'FUCEC'), null)
+  assert.equal(validatedByLine(true, null), null)
+})
+
+test('émission : préfixe TEC- pour un technicien validé', async () => {
+  let prefix = ''
+  const store: CardIssueStore = {
+    getProfile: async () => ({
+      id: 'p',
+      user_id: 'u',
+      first_name: 'A',
+      card_number: null,
+      statut_validation: 'VALIDE',
+      profession: 'technicien',
+    }),
+    newCardNumber: async (p) => {
+      prefix = p
+      return `${p}-123456`
+    },
+    newVerifyToken: () => 't',
+    insertCard: async () => ({ id: 'c' }),
+    linkProfile: async () => ({}),
+    deleteCard: async () => {},
+  }
+  const r = await issueCardWith(store, 'AGRONOME', 'p', TODAY)
+  assert.equal(prefix, 'TEC')
+  assert.ok(r.ok && r.card_number === 'TEC-123456')
+})
+
+test('justificatifs : règle d’accès (titulaire, super_admin, OO mandaté)', () => {
+  const base = { ownerUserId: 'owner', faitiereId: 'f1', mandatedFaitiereIds: [] as string[] }
+  assert.equal(decideDocumentAccess({ ...base, callerId: 'owner', role: 'none' }), true)
+  assert.equal(decideDocumentAccess({ ...base, callerId: 'x', role: 'super_admin' }), true)
+  assert.equal(decideDocumentAccess({ ...base, callerId: 'x', role: 'none' }), false)
+  assert.equal(
+    decideDocumentAccess({ ...base, callerId: 'oo', role: 'none', mandatedFaitiereIds: ['f1'] }),
+    true,
+  )
+  assert.equal(
+    decideDocumentAccess({ ...base, callerId: 'oo', role: 'none', mandatedFaitiereIds: ['f2'] }),
+    false,
+  )
+  // Dossier sans faîtière : aucun OO.
+  assert.equal(
+    decideDocumentAccess({
+      ...base,
+      faitiereId: null,
+      callerId: 'oo',
+      role: 'cooperative_admin',
+      mandatedFaitiereIds: ['f1'],
+    }),
+    false,
+  )
+  assert.equal(decideDocumentAccess({ ...base, callerId: null, role: 'super_admin' }), false)
+  assert.equal(canHolderEditDocuments('EN_ATTENTE'), true)
+  assert.equal(canHolderEditDocuments('REJETE'), true)
+  assert.equal(canHolderEditDocuments('VALIDE'), false)
+})
+
+test('justificatifs : format, taille, chemin sous <user_id>/', () => {
+  assert.deepEqual(validateDocumentUpload({ mime: 'application/pdf', size: 1000 }), {
+    ok: true,
+    ext: 'pdf',
+  })
+  assert.equal(validateDocumentUpload({ mime: 'image/gif', size: 1000 }).ok, false)
+  assert.equal(
+    validateDocumentUpload({ mime: 'image/png', size: DOCUMENT_MAX_BYTES + 1 }).ok,
+    false,
+  )
+  assert.equal(validateDocumentUpload({ mime: 'image/png', size: 0 }).ok, false)
+  assert.equal(documentStoragePath('u1', 'diplome', 'pdf', 'ab'), 'u1/diplome-ab.pdf')
+})
+
+test('schéma d’inscription : faîtière obligatoire pour le conseil agricole', () => {
+  const base = {
+    firstName: 'Kossi',
+    lastName: 'Amegah',
+    phone: '+228 90 00 00 00',
+    email: 'K@Example.tg',
+    password: 'motdepasse1',
+  }
+  assert.equal(harooSignupSchema.safeParse({ ...base, profileType: 'OUVRIER' }).success, true)
+  const noFaitiere = harooSignupSchema.safeParse({ ...base, profileType: 'AGRONOME' })
+  assert.equal(noFaitiere.success, false)
+  assert.ok(!noFaitiere.success && noFaitiere.error.issues.some((i) => i.path[0] === 'faitiereId'))
+  const ok = harooSignupSchema.safeParse({
+    ...base,
+    profileType: 'AGRONOME',
+    profession: 'conseiller',
+    faitiereId: FAITIERE,
+    specialisations: ['Irrigation'],
+  })
+  assert.ok(ok.success && ok.data.email === 'k@example.tg' && ok.data.profession === 'conseiller')
+  assert.equal(
+    harooSignupSchema.safeParse({ ...base, profileType: 'AGRONOME', faitiereId: 'pas-un-uuid' })
+      .success,
+    false,
+  )
+  assert.equal(
+    harooSignupSchema.safeParse({
+      ...base,
+      profileType: 'AGRONOME',
+      faitiereId: FAITIERE,
+      profession: 'medecin',
+    }).success,
+    false,
+  )
+  assert.equal(
+    harooSignupSchema.safeParse({ ...base, profileType: 'ACHETEUR', profession: 'technicien' })
+      .success,
+    false,
+  )
+  assert.equal(
+    professionalRegisterSchema.safeParse({
+      profession: 'technicien',
+      faitiereId: FAITIERE,
+      firstName: 'Ama',
+      lastName: 'Kodjo',
+      phone: '90000000',
+      email: 'ama@example.tg',
+    }).success,
+    true,
+  )
+})

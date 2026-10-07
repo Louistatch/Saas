@@ -42,6 +42,9 @@ export interface EditableHarooProfile {
   type_acheteur?: string | null
   prefecture_id?: string | null
   canton_id?: string | null
+  /** Famille AGRONOME : faîtière de rattachement, modifiable tant que non validé. */
+  faitiere_id?: string | null
+  statut_validation?: string | null
 }
 
 interface Canton {
@@ -120,6 +123,19 @@ export function HarooProfileEditor({
   const [prefectureId, setPrefectureId] = useState(profile.prefecture_id ?? '')
   const [cantonId, setCantonId] = useState(profile.canton_id ?? '')
   const [selectedCantons, setSelectedCantons] = useState<string[]>(myCantonIds)
+  const [faitiereId, setFaitiereId] = useState(profile.faitiere_id ?? '')
+  const [faitieres, setFaitieres] = useState<{ id: string; name: string }[]>([])
+  // Le trigger protect_haroo_privileges fige la faîtière une fois le dossier
+  // VALIDE ; on ne propose donc le choix qu'avant.
+  const canChangeFaitiere = harooRole === 'agronome' && profile.statut_validation !== 'VALIDE'
+
+  useEffect(() => {
+    if (!open || !canChangeFaitiere || faitieres.length > 0) return
+    fetch('/api/faitieres')
+      .then((r) => (r.ok ? r.json() : { faitieres: [] }))
+      .then((d: { faitieres?: { id: string; name: string }[] }) => setFaitieres(d.faitieres ?? []))
+      .catch(() => setFaitieres([]))
+  }, [open, canChangeFaitiere, faitieres.length])
 
   // Le référentiel géographique est en lecture publique : pas besoin d'un
   // aller-retour serveur pour le charger.
@@ -146,6 +162,7 @@ export function HarooProfileEditor({
     setPrefectureId(profile.prefecture_id ?? '')
     setCantonId(profile.canton_id ?? '')
     setSelectedCantons(myCantonIds)
+    setFaitiereId(profile.faitiere_id ?? '')
     setError(null)
   }, [open, profile, initialTags, myCantonIds])
 
@@ -175,6 +192,7 @@ export function HarooProfileEditor({
     }
     if (harooRole === 'agronome') {
       patch.canton_id = cantonId || null
+      if (canChangeFaitiere && faitiereId) patch.faitiere_id = faitiereId
     }
 
     const { error: updateError } = await supabase
@@ -314,6 +332,29 @@ export function HarooProfileEditor({
                   </select>
                 </div>
               </>
+            )}
+
+            {canChangeFaitiere && (
+              <div className="space-y-2">
+                <Label htmlFor="haroo-faitiere">Faîtière de rattachement</Label>
+                <select
+                  id="haroo-faitiere"
+                  className={SELECT_CLASS}
+                  value={faitiereId}
+                  onChange={(e) => setFaitiereId(e.target.value)}
+                >
+                  <option value="">— Non renseignée —</option>
+                  {faitieres.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Un opérateur officier de cette faîtière instruit votre dossier. Elle ne pourra
+                  plus être changée après validation.
+                </p>
+              </div>
             )}
 
             {harooRole === 'agronome' && (

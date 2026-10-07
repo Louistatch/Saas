@@ -150,20 +150,8 @@ export type AccessRequestInput = z.infer<typeof accessRequestSchema>
  * Le compte est créé dans la Supabase partagée via le backend AgriTogo
  * (POST /api/v1/haroo/auth/register).
  */
-export const harooSignupSchema = z.object({
-  profileType: z.enum(['OUVRIER', 'ACHETEUR', 'AGRONOME']),
-  firstName: z.string().trim().min(2, 'Le prénom est requis').max(100),
-  lastName: z.string().trim().min(2, 'Le nom est requis').max(100),
-  phone: z
-    .string()
-    .trim()
-    .min(8, 'Le téléphone est requis')
-    .max(40)
-    .regex(/^[+0-9 ()\-.]*$/, 'Le téléphone ne peut contenir que des chiffres, espaces et + - ( )'),
-  email: emailSchema,
-  password: z.string().min(8, 'Le mot de passe doit contenir au moins 8 caractères').max(128),
-})
-export type HarooSignupInput = z.infer<typeof harooSignupSchema>
+// Défini dans lib/professionals/schemas.ts (testable sans alias), ré-exporté ici.
+export { harooSignupSchema, type HarooSignupInput } from '@/lib/professionals/schemas'
 
 /** Inscription autonome d'un compte exclusivement Opérateur. */
 export const operatorSignupSchema = z.object({

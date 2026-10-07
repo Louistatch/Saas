@@ -32,3 +32,23 @@ export async function loadCardFonts(): Promise<Uint8Array[]> {
   )
   return cached
 }
+
+let logoCached: string | null | undefined
+
+/**
+ * Logo officiel (public/logo.png) en data URL pour les cartes rasterisées :
+ * resvg ne charge pas d'URL distante, une data URL si. `null` si le fichier
+ * est absent (la carte retombe alors sur l'emblème vectoriel).
+ */
+export async function loadCardLogoDataUrl(): Promise<string | null> {
+  if (logoCached !== undefined) return logoCached
+  try {
+    const { readFile } = await import('node:fs/promises')
+    const { join } = await import('node:path')
+    const buf = await readFile(join(process.cwd(), 'public', 'logo.png'))
+    logoCached = `data:image/png;base64,${buf.toString('base64')}`
+  } catch {
+    logoCached = null
+  }
+  return logoCached
+}

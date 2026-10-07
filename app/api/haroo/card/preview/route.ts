@@ -11,7 +11,7 @@
  * Endpoint public et mis en cache — il ne dépend d'aucune session.
  */
 
-import { CARD_FONT_FAMILY, loadCardFonts } from '@/lib/card-engine/fonts'
+import { CARD_FONT_FAMILY, loadCardFonts, loadCardLogoDataUrl } from '@/lib/card-engine/fonts'
 import { type HarooCardType, renderHarooCardSvg } from '@/lib/card-engine/haroo-card'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 import { Resvg, initWasm } from '@resvg/resvg-wasm'
@@ -55,13 +55,19 @@ export async function GET(request: NextRequest) {
   const type = typeParam as HarooCardType
   const specimen = SPECIMENS[type]
 
-  const svg = renderHarooCardSvg({
-    type,
-    firstName: 'Prénom',
-    lastName: 'NOM',
-    cardNumber: specimen.cardNumber,
-    organisation: specimen.organisation,
-  })
+  // Spécimen : jamais « PROFIL VÉRIFIÉ » (aucun profil réel derrière).
+  const svg = renderHarooCardSvg(
+    {
+      type,
+      firstName: 'Prénom',
+      lastName: 'NOM',
+      cardNumber: specimen.cardNumber,
+      organisation: specimen.organisation,
+      statusLabel: 'SPÉCIMEN',
+    },
+    null,
+    await loadCardLogoDataUrl(),
+  )
 
   await ensureWasm()
   const png = new Resvg(svg, {

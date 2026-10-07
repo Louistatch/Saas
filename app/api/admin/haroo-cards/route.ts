@@ -9,11 +9,17 @@
 //   → VALIDE (badge accordé + carte émise automatiquement) ou REJETE (motif).
 //   Logique partagée : lib/professionals/server.ts (decideProfessional).
 //
+// POST { action: 'set_faitiere', profile_id, faitiere_id | null }
+//   → rattache (ou détache) un dossier agronome/technicien/conseiller à une
+//   faîtière. super_admin uniquement ; écrit en service_role, donc possible
+//   même après validation (supervision).
+//
 // La carte émise est immédiatement vérifiable par QR via le flux existant
 // (/api/verify/[card] → AgriTogo /api/v1/haroo/verify/[card]).
 
 import {
   decideProfessional,
+  isExistingFaitiere,
   issueProfessionalCard,
   notifyCardIssued,
 } from '@/lib/professionals/server'
@@ -33,6 +39,11 @@ const bodySchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('issue_agronome_pin'),
     profile_id: z.string().uuid(),
+  }),
+  z.object({
+    action: z.literal('set_faitiere'),
+    profile_id: z.string().uuid(),
+    faitiere_id: z.string().uuid().nullable(),
   }),
   z.object({
     action: z.literal('validate_agronome'),
@@ -76,6 +87,22 @@ export async function POST(request: NextRequest) {
       )
     }
     return NextResponse.json({ success: true, pin: issued.pin, card_number: issued.cardNumber })
+  }
+
+  // ── Rattachement à une faîtière ─────────────────────────────────────────────
+  if (body.action === 'set_faitiere') {
+    const admin = createAdminClient()
+    if (body.faitiere_id && !(await isExistingFaitiere(admin, body.faitiere_id))) {
+      return NextResponse.json({ error: 'Faîtière inconnue' }, { status: 400 })
+    }
+    const { data, error } = await admin
+      .from('haroo_agronome_profiles')
+      .update({ faitiere_id: body.faitiere_id, updated_at: new Date().toISOString() })
+      .eq('id', body.profile_id)
+      .select('id')
+    if (error) return NextResponse.json({ error: 'Mise à jour impossible' }, { status: 500 })
+    if (!data?.length) return NextResponse.json({ error: 'Dossier introuvable' }, { status: 404 })
+    return NextResponse.json({ success: true })
   }
 
   // ── Validation d'un agronome ────────────────────────────────────────────────

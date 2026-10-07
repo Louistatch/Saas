@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { PROFESSION_INFO, type Profession } from '@/lib/professionals/core'
 import { Award, CheckCircle2, Loader2, Lock, MapPin, Star } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
@@ -20,6 +21,8 @@ interface Agronome {
   id: string
   name: string
   photo_url: string | null
+  profession: Profession
+  profession_label: string
   specialisations: string[]
   note_moyenne: number
   nombre_missions: number
@@ -102,24 +105,28 @@ export default function AgronomesPage() {
   const [items, setItems] = useState<Agronome[] | null>(null)
   const [open, setOpen] = useState<string | null>(null)
   const [sent, setSent] = useState<string | null>(null)
+  const [profession, setProfession] = useState<Profession | 'tous'>('tous')
 
   useEffect(() => {
-    fetch('/api/haroo/agronomes')
+    setItems(null)
+    const qs = profession === 'tous' ? '' : `?profession=${profession}`
+    fetch(`/api/haroo/agronomes${qs}`)
       .then((r) => (r.ok ? r.json() : { agronomes: [] }))
       .then((d) => setItems(d.agronomes ?? []))
       .catch(() => setItems([]))
-  }, [])
+  }, [profession])
 
   return (
     <MarketingLayout>
       <section className="border-b border-border bg-card/50 py-10">
         <div className="mx-auto max-w-5xl px-4">
           <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
-            Agronomes certifiés
+            Conseil agricole certifié
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
-            Des agronomes validés par FaîtiereHub, porteurs d’une carte professionnelle. Décrivez
-            votre besoin : l’agronome vous recontacte et prend la mission avec sa carte.
+            Agronomes, techniciens et conseillers agricoles validés par leur faîtière, porteurs
+            d’une carte professionnelle active. Décrivez votre besoin : le professionnel vous
+            recontacte et prend la mission avec sa carte.
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
             Vous préférez publier votre besoin pour tous les agronomes de votre zone ?{' '}
@@ -127,15 +134,41 @@ export default function AgronomesPage() {
               Publier sur le Marché de proximité
             </Link>
           </p>
+          <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold text-foreground">
+                Vous êtes agronome, technicien ou conseiller agricole ?
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Rattachez-vous à votre faîtière et obtenez une carte vérifiable par QR code.
+              </p>
+            </div>
+            <Button asChild className="shrink-0">
+              <Link href="/auth/signup?espace=haroo">Demandez votre carte professionnelle</Link>
+            </Button>
+          </div>
         </div>
       </section>
 
       <section className="mx-auto max-w-5xl px-4 py-8">
+        <div className="mb-5 flex flex-wrap gap-2">
+          {(['tous', 'agronome', 'technicien', 'conseiller'] as const).map((p) => (
+            <Button
+              key={p}
+              size="sm"
+              variant={profession === p ? 'default' : 'outline'}
+              aria-pressed={profession === p}
+              onClick={() => setProfession(p)}
+            >
+              {p === 'tous' ? 'Tous les métiers' : PROFESSION_INFO[p].label}
+            </Button>
+          ))}
+        </div>
         {items === null ? (
           <p className="text-sm text-muted-foreground">Chargement…</p>
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Aucun agronome certifié pour le moment. Publiez votre besoin sur le{' '}
+            Aucun professionnel certifié pour le moment. Publiez votre besoin sur le{' '}
             <Link href="/marche?type=mission" className="text-primary hover:underline">
               Marché de proximité
             </Link>
@@ -164,6 +197,9 @@ export default function AgronomesPage() {
                         <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
                           Certifié
                         </span>
+                      </p>
+                      <p className="mt-0.5 text-xs font-medium text-primary">
+                        {a.profession_label}
                       </p>
                       <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
                         <MapPin className="h-3 w-3" />

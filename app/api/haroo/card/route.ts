@@ -13,8 +13,18 @@
  * par @resvg/resvg-wasm.
  */
 
-import { CARD_FONT_FAMILY, loadCardFonts } from '@/lib/card-engine/fonts'
+import { CARD_FONT_FAMILY, loadCardFonts, loadCardLogoDataUrl } from '@/lib/card-engine/fonts'
 import { type HarooCardType, renderHarooCardSvg } from '@/lib/card-engine/haroo-card'
+import {
+  CARD_STATUS_LABEL,
+  type ProfessionalType,
+  computeCardStatus,
+  formatValidUntil,
+  isProfessionalVerified,
+  professionLabel,
+  qualificationFor,
+  validatedByLine,
+} from '@/lib/professionals/core'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
@@ -29,7 +39,7 @@ const PROFILE_TABLE = {
   agronome: 'haroo_agronome_profiles',
 } as const
 
-const CARD_TYPE: Record<keyof typeof PROFILE_TABLE, HarooCardType> = {
+const CARD_TYPE: Record<keyof typeof PROFILE_TABLE, HarooCardType & ProfessionalType> = {
   ouvrier: 'OUVRIER',
   acheteur: 'ACHETEUR',
   agronome: 'AGRONOME',
@@ -75,15 +85,25 @@ export async function GET(request: NextRequest) {
   }
   const key = harooType as keyof typeof PROFILE_TABLE
 
+  // Famille AGRONOME : validation, faîtière et profession pour les mentions
+  // de la carte (qualification, « validé par la faîtière », badge).
   const { data: haroo } = await supabase
     .from(PROFILE_TABLE[key])
-    .select('first_name, last_name, card_number, photo_url')
+    .select(
+      key === 'agronome'
+        ? 'first_name, last_name, card_number, photo_url, badge_valide, statut_validation, faitiere_id, profession'
+        : 'first_name, last_name, card_number, photo_url',
+    )
     .eq('user_id', user.id)
     .maybeSingle<{
       first_name: string | null
       last_name: string | null
       card_number: string | null
       photo_url: string | null
+      badge_valide?: boolean | null
+      statut_validation?: string | null
+      faitiere_id?: string | null
+      profession?: string | null
     }>()
 
   if (!haroo?.card_number) {
@@ -105,21 +125,58 @@ export async function GET(request: NextRequest) {
   // Jeton de vérification opaque de la carte (si émise après la phase 1).
   // Lecture service_role ciblée : le numéro vient du profil du porteur de la
   // session, jamais d'un paramètre.
-  const { data: cardRow } = await createAdminClient()
+  const admin = createAdminClient()
+  const { data: cardRow } = await admin
     .from('member_cards')
-    .select('verify_token')
+    .select('verify_token, status, expiry_date, revoked_at, suspended_at')
     .eq('card_number', haroo.card_number)
-    .maybeSingle<{ verify_token: string | null }>()
+    .maybeSingle<{
+      verify_token: string | null
+      status: string
+      expiry_date: string | null
+      revoked_at: string | null
+      suspended_at: string | null
+    }>()
 
-  const svg = renderHarooCardSvg({
-    type: CARD_TYPE[key],
-    firstName: haroo.first_name ?? '',
-    lastName: haroo.last_name ?? '',
-    cardNumber: haroo.card_number,
-    organisation,
-    photoUrl: haroo.photo_url,
-    verifyToken: cardRow?.verify_token ?? null,
-  })
+  const cardType = CARD_TYPE[key]
+  // « PROFIL VÉRIFIÉ » seulement après une vérification réelle : famille
+  // AGRONOME validée (badge ET statut VALIDE). Ouvrier / acheteur n'ont pas de
+  // circuit de vérification : pas de pastille.
+  const verified =
+    key === 'agronome' &&
+    isProfessionalVerified({
+      badge_valide: haroo.badge_valide ?? null,
+      statut_validation: haroo.statut_validation ?? null,
+    })
+  let faitiereName: string | null = null
+  if (verified && haroo.faitiere_id) {
+    const { data: f } = await admin
+      .from('cooperatives')
+      .select('name')
+      .eq('id', haroo.faitiere_id)
+      .maybeSingle<{ name: string | null }>()
+    faitiereName = f?.name ?? null
+  }
+
+  const svg = renderHarooCardSvg(
+    {
+      type: cardType,
+      firstName: haroo.first_name ?? '',
+      lastName: haroo.last_name ?? '',
+      cardNumber: haroo.card_number,
+      organisation,
+      photoUrl: haroo.photo_url,
+      verifyToken: cardRow?.verify_token ?? null,
+      professionLabel: professionLabel(cardType, haroo.profession),
+      verified,
+      qualification: qualificationFor(cardType, haroo.profession, verified),
+      statusLabel: cardRow ? CARD_STATUS_LABEL[computeCardStatus(cardRow)] : null,
+      validUntil: formatValidUntil(cardRow?.expiry_date),
+      validatedBy: validatedByLine(verified, faitiereName),
+    },
+    null,
+    await loadCardLogoDataUrl(),
+  )
 
   await ensureWasm()
   const png = new Resvg(svg, {

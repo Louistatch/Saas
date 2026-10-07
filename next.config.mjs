@@ -70,10 +70,12 @@ const nextConfig = {
     '/api/haroo/card': [
       './node_modules/@resvg/resvg-wasm/index_bg.wasm',
       './lib/card-engine/fonts/*.ttf',
+      './public/logo.png',
     ],
     '/api/haroo/card/preview': [
       './node_modules/@resvg/resvg-wasm/index_bg.wasm',
       './lib/card-engine/fonts/*.ttf',
+      './public/logo.png',
     ],
   },
   async headers() {

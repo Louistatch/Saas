@@ -68,6 +68,18 @@ const HAROO_CHOICES: { value: string; label: string; blurb: string; icon: Lucide
     blurb: 'Recevez des demandes de mission de conseil',
     icon: BookOpen,
   },
+  {
+    value: 'TECHNICIEN',
+    label: 'Technicien agricole',
+    blurb: 'Carte professionnelle et missions d’appui technique',
+    icon: BookOpen,
+  },
+  {
+    value: 'CONSEILLER',
+    label: 'Conseiller agricole',
+    blurb: 'Carte professionnelle et missions de conseil',
+    icon: BookOpen,
+  },
 ]
 
 function ChoiceButton({
@@ -186,6 +198,17 @@ function SignupChooser() {
                   ))}
             </CardContent>
           </Card>
+
+          {space === 'haroo' && (
+            <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 text-sm">
+              <p className="font-semibold text-foreground">Demandez votre carte professionnelle</p>
+              <p className="mt-1 text-muted-foreground">
+                Agronome, technicien ou conseiller agricole : choisissez votre métier ci-dessus et
+                votre faîtière. Après vérification de vos justificatifs par un opérateur officier,
+                votre carte vérifiable par QR code est émise.
+              </p>
+            </div>
+          )}
 
           <p className="text-center text-sm text-muted-foreground">
             Vous avez déjà un compte ?{' '}

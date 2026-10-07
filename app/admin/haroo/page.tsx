@@ -20,7 +20,8 @@ import { LoadingBlock, Spinner } from '@/components/shared/loading'
 import { EmptyState } from '@/components/shared/empty-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { errorMessage } from '@/lib/utils/errors'
-import { type CardPublicStatus, computeCardStatus } from '@/lib/professionals/core'
+import { DossierDocuments } from '@/components/professionals/dossier-documents'
+import { type CardPublicStatus, computeCardStatus, professionLabel } from '@/lib/professionals/core'
 
 /**
  * Administration des professionnels Haroo (super_admin).
@@ -46,6 +47,8 @@ interface HarooAdminRow {
   validated_by?: string | null
   validated_at?: string | null
   rejection_reason?: string | null
+  faitiere_id?: string | null
+  profession?: string | null
 }
 
 interface CardInfo {
@@ -92,6 +95,14 @@ export default function HarooAdminPage() {
   const [issuedPin, setIssuedPin] = useState<{ name: string; card: string; pin: string } | null>(null)
   const [cards, setCards] = useState<Record<string, CardInfo>>({})
   const [validatorNames, setValidatorNames] = useState<Record<string, string>>({})
+  const [faitieres, setFaitieres] = useState<{ id: string; name: string }[]>([])
+
+  useEffect(() => {
+    fetch('/api/faitieres')
+      .then((r) => (r.ok ? r.json() : { faitieres: [] }))
+      .then((d: { faitieres?: { id: string; name: string }[] }) => setFaitieres(d.faitieres ?? []))
+      .catch(() => setFaitieres([]))
+  }, [])
 
   const fetchProfiles = useCallback(async () => {
     setIsLoading(true)
@@ -107,7 +118,7 @@ export default function HarooAdminPage() {
       supabase
         .from('haroo_agronome_profiles')
         .select(
-          'id, first_name, last_name, phone, card_number, statut_validation, badge_valide, created_at, validated_by, validated_at, rejection_reason',
+          'id, first_name, last_name, phone, card_number, statut_validation, badge_valide, created_at, validated_by, validated_at, rejection_reason, faitiere_id, profession',
         )
         .order('created_at', { ascending: false }),
     ])
@@ -183,7 +194,7 @@ export default function HarooAdminPage() {
   }, [rows, typeFilter, debouncedSearch])
 
   const callApi = useCallback(
-    async (row: HarooAdminRow, payload: Record<string, string>, successTitle: string) => {
+    async (row: HarooAdminRow, payload: Record<string, string | null>, successTitle: string) => {
       setBusyId(row.id)
       try {
         const res = await fetch('/api/admin/haroo-cards', {
@@ -235,6 +246,13 @@ export default function HarooAdminPage() {
     }
     setBusyId(null)
   }
+
+  const setFaitiere = (row: HarooAdminRow, faitiereId: string) =>
+    callApi(
+      row,
+      { action: 'set_faitiere', profile_id: row.id, faitiere_id: faitiereId || null },
+      faitiereId ? 'Faîtière de rattachement mise à jour' : 'Dossier détaché de sa faîtière',
+    )
 
   const validateAgronome = (row: HarooAdminRow, decision: 'VALIDE' | 'REJETE') => {
     let reason: string | undefined
@@ -393,6 +411,26 @@ export default function HarooAdminPage() {
                               : ''}
                           </p>
                         )}
+                        {isAgronome && (
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <span>{professionLabel('AGRONOME', row.profession)} · Faîtière :</span>
+                            <select
+                              aria-label="Faîtière de rattachement"
+                              className="rounded border border-input bg-background px-1.5 py-0.5 text-xs"
+                              value={row.faitiere_id ?? ''}
+                              disabled={isBusy}
+                              onChange={(e) => setFaitiere(row, e.target.value)}
+                            >
+                              <option value="">— Aucune —</option>
+                              {faitieres.map((f) => (
+                                <option key={f.id} value={f.id}>
+                                  {f.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                        {isAgronome && <DossierDocuments profileId={row.id} />}
                         {isAgronome && row.rejection_reason && (
                           <p className="text-xs text-destructive">Motif : {row.rejection_reason}</p>
                         )}

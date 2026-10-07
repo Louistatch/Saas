@@ -7,6 +7,7 @@ import { MarketMissions } from '@/components/haroo/market-missions'
 import { MissionActions } from '@/components/haroo/mission-actions'
 import { HarooProfileEditor } from '@/components/haroo/profile-editor'
 import { PublishAnnouncement } from '@/components/haroo/publish-announcement'
+import { MyProfessionalDocuments } from '@/components/professionals/my-documents'
 import { Spinner } from '@/components/shared/loading'
 import { Logo } from '@/components/shared/logo'
 import { Button } from '@/components/ui/button'
@@ -76,6 +77,8 @@ interface HarooProfile {
   nombre_missions?: number
   canton_id?: string | null
   cantons?: { name: string } | null
+  faitiere_id?: string | null
+  profession?: string | null
 }
 
 interface JobRow {
@@ -894,6 +897,26 @@ function HarooSpaceInner() {
             )}
           </CardContent>
         </Card>
+
+        {/* Justificatifs du dossier (agronome / technicien / conseiller) :
+            déposés tant que le dossier n'est pas validé, lus par l'opérateur
+            officier de la faîtière via des URL signées. */}
+        {harooRole === 'agronome' && profile && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="text-base">Mes justificatifs</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!profile.faitiere_id && profile.statut_validation !== 'VALIDE' && (
+                <p className="mb-3 text-sm text-amber-700">
+                  Choisissez votre faîtière de rattachement (« Modifier mon profil ») : sans elle,
+                  aucun opérateur officier ne peut instruire votre dossier.
+                </p>
+              )}
+              <MyProfessionalDocuments />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Carte professionnelle — servie par /api/haroo/card, toujours celle
             du porteur de la session. Sans numéro émis, rien à afficher. */}

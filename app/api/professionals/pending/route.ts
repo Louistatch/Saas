@@ -5,6 +5,7 @@
 //   - Opérateur officier : dossiers des faîtières de ses mandats portant
 //     'professionals.validate'. Aucun mandat → liste vide.
 
+import { professionLabel } from '@/lib/professionals/core'
 import { getMandatedFaitiereIds } from '@/lib/professionals/server'
 import { assertAuthenticated } from '@/lib/security/assert-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
@@ -24,6 +25,7 @@ interface DossierRow {
   badge_valide: boolean
   card_number: string | null
   faitiere_id: string | null
+  profession: string | null
   validated_at: string | null
   rejection_reason: string | null
   created_at: string | null
@@ -50,7 +52,7 @@ export async function GET(request: NextRequest) {
   let query = admin
     .from('haroo_agronome_profiles')
     .select(
-      'id, first_name, last_name, photo_url, specialisations, statut_validation, badge_valide, card_number, faitiere_id, validated_at, rejection_reason, created_at, faitiere:cooperatives!haroo_agronome_profiles_faitiere_id_fkey(name)',
+      'id, first_name, last_name, photo_url, specialisations, statut_validation, badge_valide, card_number, faitiere_id, profession, validated_at, rejection_reason, created_at, faitiere:cooperatives!haroo_agronome_profiles_faitiere_id_fkey(name)',
     )
     .eq('statut_validation', status.data)
     .order('created_at', { ascending: true })
@@ -73,6 +75,7 @@ export async function GET(request: NextRequest) {
       card_number: d.card_number,
       faitiere_id: d.faitiere_id,
       faitiere_name: d.faitiere?.name ?? null,
+      profession_label: professionLabel('AGRONOME', d.profession),
       validated_at: d.validated_at,
       rejection_reason: d.rejection_reason,
       created_at: d.created_at,
