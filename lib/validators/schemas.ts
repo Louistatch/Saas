@@ -1,4 +1,4 @@
-import { PRODUCT_CATEGORIES, USER_ROLES } from '@/types/domain'
+import { ASSIGNABLE_ROLES, PRODUCT_CATEGORIES } from '@/types/domain'
 import { z } from 'zod'
 
 const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
@@ -69,7 +69,7 @@ export const generateCardSchema = z.object({
 })
 
 export const profileUpdateSchema = z.object({
-  role: z.enum(USER_ROLES),
+  role: z.enum(ASSIGNABLE_ROLES),
   cooperative_id: uuidSchema.nullable(),
 })
 

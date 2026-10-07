@@ -1,25 +1,19 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/admin'
-import { createClient as createServerClient } from '@/lib/supabase/server'
+import { assertRole } from '@/lib/security/assert-access'
+import { rateLimit } from '@/lib/utils/rate-limit'
 import { processPhotoFaceCrop } from '@/lib/photos/process-photo'
 
 // Admin-only maintenance route: batch re-run face-crop on all member photos.
-// Requires an authenticated cooperative_admin or super_admin session.
+// Plateforme entière : réservé au super_admin, rate-limité, lots bornés.
+const BATCH_LIMIT = 50
 export async function POST(req: NextRequest) {
-  const serverClient = await createServerClient()
-  const { data: { user }, error: authError } = await serverClient.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
-  }
+  const guard = await assertRole('super_admin')
+  if (!guard.ok) return guard.response
 
-  const { data: profile } = await serverClient
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile || !['cooperative_admin', 'super_admin'].includes(profile.role)) {
-    return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
+  const rl = rateLimit(`photos-process-all:${guard.ctx.userId}`, 3, 60_000)
+  if (!rl.ok) {
+    return NextResponse.json({ error: 'Trop de requêtes. Réessayez dans quelques instants.' }, { status: 429 })
   }
 
   const supabase = createClient()
@@ -36,11 +30,13 @@ export async function POST(req: NextRequest) {
         .from('members')
         .select('id, photo_url, photo_original_url')
         .not('photo_url', 'is', null)
+        .limit(BATCH_LIMIT)
     : await supabase
         .from('members')
         .select('id, photo_url, photo_original_url')
         .not('photo_url', 'is', null)
         .not('photo_url', 'like', '%-face.jpg%')
+        .limit(BATCH_LIMIT)
 
   if (!members?.length) return NextResponse.json({ processed: 0, force })
 
@@ -73,5 +69,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ processed, skipped, failed, total: members.length, force })
+  return NextResponse.json({ processed, skipped, failed, total: members.length, batchLimit: BATCH_LIMIT, force })
 }

@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/admin'
-import { createClient as createServerClient } from '@/lib/supabase/server'
+import { assertRole, assertTenantAccess } from '@/lib/security/assert-access'
 import { processPhotoFaceCrop } from '@/lib/photos/process-photo'
 
 // Admin-only maintenance route: re-run face-crop for a specific member.
@@ -9,34 +9,26 @@ export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ memberId: string }> },
 ) {
-  const serverClient = await createServerClient()
-  const { data: { user }, error: authError } = await serverClient.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
-  }
-
-  const { data: profile } = await serverClient
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile || !['cooperative_admin', 'super_admin'].includes(profile.role)) {
-    return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
-  }
+  const guard = await assertRole('cooperative_admin')
+  if (!guard.ok) return guard.response
 
   const { memberId } = await params
   const supabase = createClient()
 
   const { data: member, error } = await supabase
     .from('members')
-    .select('photo_url, photo_original_url')
+    .select('photo_url, photo_original_url, cooperative_id')
     .eq('id', memberId)
     .single()
 
   if (error || !member?.photo_url) {
     return NextResponse.json({ error: 'Membre introuvable ou sans photo' }, { status: 404 })
   }
+
+  // Le client service-role contourne la RLS : vérifier ici que le membre
+  // appartient à une coopérative accessible à l'appelant.
+  const tenant = await assertTenantAccess(member.cooperative_id)
+  if (!tenant.ok) return tenant.response
 
   // Recadrer depuis l'ORIGINAL quand il existe : repartir du recadrage déjà
   // fait ne peut que perdre de l'information. `force` permet de reprendre une

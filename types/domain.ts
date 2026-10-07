@@ -40,6 +40,21 @@ export const USER_ROLES = [
   'agronome',
 ] as const satisfies readonly UserRole[]
 
+/** Rôles organisationnels attribuables. Ne jamais écrire guest/ouvrier/acheteur/agronome. */
+export const ASSIGNABLE_ROLES = [
+  'super_admin',
+  'cooperative_admin',
+  'member',
+  'none',
+] as const satisfies readonly UserRole[]
+
+export const ASSIGNABLE_ROLE_LABELS: Record<(typeof ASSIGNABLE_ROLES)[number], string> = {
+  super_admin: 'Super administrateur',
+  cooperative_admin: 'Administrateur de coopérative',
+  member: 'Membre',
+  none: 'Aucune organisation',
+}
+
 /** Couche Haroo. `null` = non activée. Un seul profil à la fois. */
 export type HarooType = 'ouvrier' | 'acheteur' | 'agronome'
 

@@ -17,7 +17,7 @@ import { PaginationBar } from '@/components/shared/pagination'
 import { RoleBadge } from '@/components/shared/status-badge'
 import { errorMessage } from '@/lib/utils/errors'
 import { profileUpdateSchema } from '@/lib/validators/schemas'
-import { USER_ROLES, type Profile, type UserRole } from '@/types/domain'
+import { ASSIGNABLE_ROLES, ASSIGNABLE_ROLE_LABELS, type Profile, type UserRole } from '@/types/domain'
 import { useResetPageOnChange } from '@/hooks/use-reset-page'
 
 const PAGE_SIZE = 20
@@ -80,7 +80,8 @@ export default function UsersAdminPage() {
   const openEdit = (user: Profile) => {
     setEditUser(user)
     setEditForm({
-      role: user.role,
+      // Rôles dépréciés (guest, ouvrier…) : proposer « Aucune organisation ».
+      role: (ASSIGNABLE_ROLES as readonly UserRole[]).includes(user.role) ? user.role : 'none',
       cooperative_id: user.cooperative_id ?? '',
     })
   }
@@ -221,9 +222,9 @@ export default function UsersAdminPage() {
                   setEditForm((f) => ({ ...f, role: e.target.value as UserRole }))
                 }
               >
-                {USER_ROLES.map((r) => (
+                {ASSIGNABLE_ROLES.map((r) => (
                   <option key={r} value={r}>
-                    {r.replace('_', ' ')}
+                    {ASSIGNABLE_ROLE_LABELS[r]}
                   </option>
                 ))}
               </select>
