@@ -87,41 +87,12 @@ begin
 end;
 $function$;
 
--- ── 3. Justificatifs : stockage privé ────────────────────────────────────────
-INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES (
-  'professional-documents',
-  'professional-documents',
-  false,
-  5242880,
-  ARRAY['application/pdf', 'image/jpeg', 'image/png']
-)
-ON CONFLICT (id) DO UPDATE
-  SET public = false,
-      file_size_limit = EXCLUDED.file_size_limit,
-      allowed_mime_types = EXCLUDED.allowed_mime_types;
 
--- Le titulaire dépose / lit / retire dans SON dossier <user_id>/… ; le
--- super_admin lit tout. Aucune policy pour anon : pas de lecture publique.
-DROP POLICY IF EXISTS "pro documents owner insert" ON storage.objects;
-CREATE POLICY "pro documents owner insert" ON storage.objects
-  FOR INSERT TO authenticated
-  WITH CHECK (bucket_id = 'professional-documents'
-    AND (storage.foldername(name))[1] = (SELECT auth.uid())::text);
-
-DROP POLICY IF EXISTS "pro documents owner or admin read" ON storage.objects;
-CREATE POLICY "pro documents owner or admin read" ON storage.objects
-  FOR SELECT TO authenticated
-  USING (bucket_id = 'professional-documents'
-    AND ((storage.foldername(name))[1] = (SELECT auth.uid())::text
-         OR EXISTS (SELECT 1 FROM public.profiles p
-                    WHERE p.id = (SELECT auth.uid()) AND p.role = 'super_admin')));
-
-DROP POLICY IF EXISTS "pro documents owner delete" ON storage.objects;
-CREATE POLICY "pro documents owner delete" ON storage.objects
-  FOR DELETE TO authenticated
-  USING (bucket_id = 'professional-documents'
-    AND (storage.foldername(name))[1] = (SELECT auth.uid())::text);
+-- NB : le bucket privé « professional-documents » se crée dans le tableau de
+-- bord (Storage → New bucket, Public décoché). Aucune règle sur
+-- storage.objects n'est nécessaire : l'envoi et la lecture des justificatifs
+-- passent exclusivement par le serveur (clé service_role, URL signées), et
+-- l'éditeur SQL de Supabase refuse de créer des règles sur storage.objects.
 
 -- ── 4. Justificatifs : métadonnées ───────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.professional_documents (
