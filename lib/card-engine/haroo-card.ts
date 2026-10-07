@@ -27,6 +27,23 @@ export interface HarooCardData {
   /** Coopérative ou groupement de rattachement — facultatif. */
   organisation?: string | null
   photoUrl?: string | null
+  /**
+   * Jeton de vérification opaque (member_cards.verify_token). Présent → le QR
+   * encode /verify/t/<jeton> ; absent (cartes antérieures) → /verify/<numéro>.
+   * Jamais de donnée personnelle dans le QR.
+   */
+  verifyToken?: string | null
+}
+
+/** Origine publique des liens de vérification imprimés sur les cartes. */
+export const CARD_VERIFY_ORIGIN = 'https://www.faitierehub.com'
+
+export function harooCardVerifyUrl(
+  data: Pick<HarooCardData, 'cardNumber' | 'verifyToken'>,
+): string {
+  return data.verifyToken
+    ? `${CARD_VERIFY_ORIGIN}/verify/t/${encodeURIComponent(data.verifyToken)}`
+    : `${CARD_VERIFY_ORIGIN}/verify/${encodeURIComponent(data.cardNumber)}`
 }
 
 interface HarooTheme {
@@ -127,7 +144,7 @@ export function renderHarooCardSvg(data: HarooCardData, photoDataUrl?: string | 
   const fullName = `${data.firstName} ${data.lastName}`.trim().toUpperCase() || 'NOM PRÉNOM'
   const nameSize = fullName.length > 28 ? 15 : fullName.length > 22 ? 17 : 19
 
-  const payload = `https://www.faitierehub.com/verify/${encodeURIComponent(data.cardNumber)}`
+  const payload = harooCardVerifyUrl(data)
   const qr = qrPath(payload)
   const qrScale = 196 / qr.modules
 

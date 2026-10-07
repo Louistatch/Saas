@@ -142,6 +142,7 @@ const ASSIGNABLE_SCOPE_LABEL: Record<PartnerAccessScope, string> = {
   'reports.generate': 'Génération de rapports',
   'projects.manage': 'Gestion de projets',
   'support.manage': 'Support',
+  'professionals.validate': 'Validation des professionnels',
 }
 
 /**

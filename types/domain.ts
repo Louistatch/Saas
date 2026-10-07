@@ -299,6 +299,7 @@ export type PartnerAccessScope =
   | 'reports.generate'
   | 'projects.manage'
   | 'support.manage'
+  | 'professionals.validate'
 
 export const PARTNER_ACCESS_SCOPES = [
   'members.read',
@@ -312,6 +313,7 @@ export const PARTNER_ACCESS_SCOPES = [
   'reports.generate',
   'projects.manage',
   'support.manage',
+  'professionals.validate',
 ] as const satisfies readonly PartnerAccessScope[]
 
 export interface Partner {

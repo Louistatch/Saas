@@ -40,6 +40,7 @@ import {
   Printer,
   ShieldAlert,
   Truck,
+  UserCheck,
   Wallet,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -645,6 +646,14 @@ function OperatorPageContent() {
           <div className="mt-6">
             <PrintQueueCard />
           </div>
+        )}
+
+        {status?.status === 'active' && (
+          <Button variant="outline" className="mt-6 w-full" asChild>
+            <Link href="/operator/professionals">
+              <UserCheck className="mr-1.5 h-4 w-4" /> Professionnels à valider
+            </Link>
+          </Button>
         )}
       </main>
     </div>

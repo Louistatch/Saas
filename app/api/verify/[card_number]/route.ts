@@ -8,6 +8,12 @@
 //   3. If AgriTogo also returns nothing → 404
 
 import { queueInAppNotification } from '@/lib/notifications/queue'
+import { computeCardStatus } from '@/lib/professionals/core'
+import {
+  type CardRow,
+  buildAgronomePublicResponse,
+  fetchAgritogoHarooVerify,
+} from '@/lib/professionals/server'
 import { createClient } from '@/lib/supabase/admin'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
@@ -108,10 +114,10 @@ export async function GET(
   const { data: card, error: cardError } = await supabase
     .from('member_cards')
     .select(
-      'id, card_number, status, expiry_date, created_at, member_id, cooperative_id, card_type',
+      'id, card_number, status, expiry_date, created_at, member_id, cooperative_id, card_type, revoked_at, suspended_at',
     )
     .in('card_number', variants)
-    .in('status', ['active', 'expired'])
+    .in('status', ['active', 'expired', 'suspended', 'revoked'])
     .is('deleted_at', null)
     .limit(1)
     .maybeSingle()
@@ -157,40 +163,50 @@ export async function GET(
   }
 
   // ── Step 2bis: carte Haroo (OUVRIER / ACHETEUR / AGRONOME) ─────────────────
-  // Les cartes Haroo vivent aussi dans member_cards, mais leur profil enrichi
-  // (compétences, offres, préventes, missions) est servi par AgriTogo.
+  // AGRONOME : projection publique construite ici (lib/professionals), même
+  // forme que /api/verify/t/<jeton> — sans téléphone, missions ni notes, avec
+  // un statut suspendu / révoqué / expiré explicite.
+  // OUVRIER / ACHETEUR : profil enrichi servi par AgriTogo.
   if (card.card_type !== 'FAITIERE') {
-    const agritogoUrl = process.env.AGRITOGO_API_URL
-    if (agritogoUrl) {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 5000)
-      try {
-        const agriRes = await fetch(
-          `${agritogoUrl}/api/v1/haroo/verify/${encodeURIComponent(card.card_number)}`,
-          { signal: controller.signal, headers: { Accept: 'application/json' } },
-        )
-        clearTimeout(timeoutId)
-        if (agriRes.ok) {
-          const data: unknown = await agriRes.json()
-          return NextResponse.json(data)
-        }
-      } catch {
-        clearTimeout(timeoutId)
-      }
+    const harooCard: CardRow = {
+      id: card.id,
+      card_number: card.card_number,
+      card_type: card.card_type,
+      status: card.status,
+      expiry_date: card.expiry_date,
+      created_at: card.created_at,
+      revoked_at: card.revoked_at,
+      suspended_at: card.suspended_at,
+    }
+    if (card.card_type === 'AGRONOME') {
+      const payload = await buildAgronomePublicResponse(supabase, harooCard)
+      if (payload) return NextResponse.json(payload)
+    }
+    const harooStatus = computeCardStatus(harooCard)
+    if (harooStatus === 'ACTIVE') {
+      const data = await fetchAgritogoHarooVerify(card.card_number)
+      if (data) return NextResponse.json(data)
     }
     // Repli minimal si AgriTogo est indisponible : la carte reste vérifiable.
-    const harooExpired = card.expiry_date && new Date(card.expiry_date) < new Date()
     return NextResponse.json({
-      valid: card.status === 'active' && !harooExpired,
+      valid: harooStatus === 'ACTIVE',
       source: 'haroo' as const,
       card_type: card.card_type,
       card: {
         card_number: card.card_number,
-        status: harooExpired ? 'expired' : card.status,
+        status: harooStatus.toLowerCase(),
+        public_status: harooStatus,
         expiry_date: card.expiry_date,
         created_at: card.created_at,
       },
     })
+  }
+
+  // Carte FAITIERE suspendue ou révoquée : même réponse qu'avant ce
+  // changement (elle n'était pas trouvée).
+  if (card.status !== 'active' && card.status !== 'expired') {
+    await new Promise((r) => setTimeout(r, 100))
+    return NextResponse.json({ valid: false, error: 'Carte non trouvée' }, { status: 404 })
   }
 
   // ── Step 3: Found in Supabase → handle as FAITIERE ────────────────────────

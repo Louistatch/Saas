@@ -15,6 +15,7 @@
 
 import { CARD_FONT_FAMILY, loadCardFonts } from '@/lib/card-engine/fonts'
 import { type HarooCardType, renderHarooCardSvg } from '@/lib/card-engine/haroo-card'
+import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 import { Resvg, initWasm } from '@resvg/resvg-wasm'
@@ -101,6 +102,15 @@ export async function GET(request: NextRequest) {
     organisation = coop?.name ?? null
   }
 
+  // Jeton de vérification opaque de la carte (si émise après la phase 1).
+  // Lecture service_role ciblée : le numéro vient du profil du porteur de la
+  // session, jamais d'un paramètre.
+  const { data: cardRow } = await createAdminClient()
+    .from('member_cards')
+    .select('verify_token')
+    .eq('card_number', haroo.card_number)
+    .maybeSingle<{ verify_token: string | null }>()
+
   const svg = renderHarooCardSvg({
     type: CARD_TYPE[key],
     firstName: haroo.first_name ?? '',
@@ -108,6 +118,7 @@ export async function GET(request: NextRequest) {
     cardNumber: haroo.card_number,
     organisation,
     photoUrl: haroo.photo_url,
+    verifyToken: cardRow?.verify_token ?? null,
   })
 
   await ensureWasm()

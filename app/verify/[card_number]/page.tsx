@@ -7,7 +7,11 @@ import { AcheteurView } from '@/components/verify/acheteur-view'
 import { AgriSmartWater } from '@/components/verify/agrismart-water'
 import { vfpStyles } from '@/components/verify/vfp-styles'
 import { AgriSmartReport } from '@/components/agrismart/agrismart-report'
-import { AgronomeView } from '@/components/verify/agronome-view'
+import {
+  type AgronomeCardStatus,
+  type AgronomePublicProfile,
+  AgronomeView,
+} from '@/components/verify/agronome-view'
 import { MarketAdvisor } from '@/components/verify/market-advisor'
 import { Card3D } from '@/components/verify/card-3d'
 import { CotisationView } from '@/components/verify/cotisation-view'
@@ -50,7 +54,14 @@ interface VerifyResult {
   valid: boolean
   card_type?: 'FAITIERE' | 'OUVRIER' | 'ACHETEUR' | 'AGRONOME'
   source?: 'faitierehub' | 'haroo'
-  card?: { card_number: string; status: string; expiry_date: string | null; created_at: string }
+  card?: {
+    card_number: string
+    status: string
+    public_status?: AgronomeCardStatus
+    status_message?: string
+    expiry_date: string | null
+    created_at: string
+  }
   member?: {
     first_name: string | null
     last_name: string | null
@@ -107,30 +118,8 @@ interface VerifyResult {
     canton: string
     description: string | null
   }>
-  agronome?: {
-    first_name: string | null
-    last_name: string | null
-    phone: string | null
-    photo_url: string | null
-    specialisations: string[]
-    canton: string | null
-    prefecture: string | null
-    region: string | null
-    badge_valide: boolean
-    statut_validation: string
-    disponible_missions: boolean
-    note_moyenne: number
-    nombre_missions: number
-  }
-  missions?: Array<{
-    id: string
-    titre: string
-    culture: string | null
-    description: string | null
-    canton: string
-    budget: number | null
-    date_souhaitee: string | null
-  }>
+  /** Projection publique (lib/professionals/core.ts) : ni téléphone, ni notes, ni missions. */
+  agronome?: AgronomePublicProfile
   error?: string
 }
 
@@ -581,7 +570,9 @@ export default function VerifyCardPage() {
     )
   }
 
-  if (result.valid && result.card && cardType === 'AGRONOME' && result.agronome) {
+  // Carte agronome : affichée même suspendue / révoquée / expirée, avec un
+  // bandeau rouge explicite (AgronomeView).
+  if (result.card && cardType === 'AGRONOME' && result.agronome) {
     return (
       <div
         className="min-h-screen vfp-bg relative overflow-hidden"
@@ -664,7 +655,6 @@ export default function VerifyCardPage() {
           <AgronomeView
             cardNumber={cardNumber}
             agronome={result.agronome}
-            missions={result.missions ?? []}
             card={result.card}
           />
           <div

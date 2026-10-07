@@ -20,6 +20,7 @@ import { LoadingBlock, Spinner } from '@/components/shared/loading'
 import { EmptyState } from '@/components/shared/empty-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { errorMessage } from '@/lib/utils/errors'
+import { type CardPublicStatus, computeCardStatus } from '@/lib/professionals/core'
 
 /**
  * Administration des professionnels Haroo (super_admin).
@@ -42,6 +43,27 @@ interface HarooAdminRow {
   statut_validation: string | null
   badge_valide: boolean | null
   created_at: string
+  validated_by?: string | null
+  validated_at?: string | null
+  rejection_reason?: string | null
+}
+
+interface CardInfo {
+  card_number: string
+  status: string
+  expiry_date: string | null
+  revoked_at: string | null
+  suspended_at: string | null
+  revoked_reason: string | null
+}
+
+type CardAction = 'suspend' | 'reactivate' | 'revoke' | 'renew'
+
+const CARD_STATUS_META: Record<CardPublicStatus, { label: string; tone: string }> = {
+  ACTIVE: { label: 'Active', tone: 'bg-emerald-100 text-emerald-800' },
+  SUSPENDED: { label: 'Suspendue', tone: 'bg-amber-100 text-amber-800' },
+  REVOKED: { label: 'Révoquée', tone: 'bg-red-100 text-red-800' },
+  EXPIRED: { label: 'Expirée', tone: 'bg-zinc-200 text-zinc-800' },
 }
 
 const TYPE_META: Record<ProfileType, { label: string; icon: typeof Briefcase; tone: string }> = {
@@ -68,6 +90,8 @@ export default function HarooAdminPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   // PIN de carte agronome : affiché UNE fois, à remettre avec la carte.
   const [issuedPin, setIssuedPin] = useState<{ name: string; card: string; pin: string } | null>(null)
+  const [cards, setCards] = useState<Record<string, CardInfo>>({})
+  const [validatorNames, setValidatorNames] = useState<Record<string, string>>({})
 
   const fetchProfiles = useCallback(async () => {
     setIsLoading(true)
@@ -82,7 +106,9 @@ export default function HarooAdminPage() {
         .order('created_at', { ascending: false }),
       supabase
         .from('haroo_agronome_profiles')
-        .select('id, first_name, last_name, phone, card_number, statut_validation, badge_valide, created_at')
+        .select(
+          'id, first_name, last_name, phone, card_number, statut_validation, badge_valide, created_at, validated_by, validated_at, rejection_reason',
+        )
         .order('created_at', { ascending: false }),
     ])
 
@@ -102,6 +128,39 @@ export default function HarooAdminPage() {
       ...(agronomes.data ?? []).map((r) => ({ ...r, type: 'AGRONOME' as const })),
     ]
     combined.sort((a, b) => b.created_at.localeCompare(a.created_at))
+
+    // Statut des cartes émises et noms des validateurs (traçabilité).
+    const numbers = combined.map((r) => r.card_number).filter((n): n is string => !!n)
+    const validators = [
+      ...new Set(combined.map((r) => r.validated_by).filter((v): v is string => !!v)),
+    ]
+    const [cardsRes, validatorsRes] = await Promise.all([
+      numbers.length
+        ? supabase
+            .from('member_cards')
+            .select('card_number, status, expiry_date, revoked_at, suspended_at, revoked_reason')
+            .in('card_number', numbers)
+        : Promise.resolve({ data: [] as CardInfo[] }),
+      validators.length
+        ? supabase.from('profiles').select('id, first_name, last_name, email').in('id', validators)
+        : Promise.resolve({
+            data: [] as Array<{
+              id: string
+              first_name: string | null
+              last_name: string | null
+              email: string
+            }>,
+          }),
+    ])
+    setCards(Object.fromEntries((cardsRes.data ?? []).map((c) => [c.card_number, c as CardInfo])))
+    setValidatorNames(
+      Object.fromEntries(
+        (validatorsRes.data ?? []).map((v) => [
+          v.id,
+          `${v.first_name ?? ''} ${v.last_name ?? ''}`.trim() || v.email,
+        ]),
+      ),
+    )
     setRows(combined)
     setIsLoading(false)
   }, [supabase])
@@ -177,12 +236,62 @@ export default function HarooAdminPage() {
     setBusyId(null)
   }
 
-  const validateAgronome = (row: HarooAdminRow, decision: 'VALIDE' | 'REJETE') =>
-    callApi(
+  const validateAgronome = (row: HarooAdminRow, decision: 'VALIDE' | 'REJETE') => {
+    let reason: string | undefined
+    if (decision === 'REJETE') {
+      reason = window.prompt('Motif du rejet (communiqué au professionnel) :')?.trim()
+      if (!reason) return
+    }
+    return callApi(
       row,
-      { action: 'validate_agronome', profile_id: row.id, decision },
-      decision === 'VALIDE' ? 'Agronome validé' : 'Agronome rejeté',
+      { action: 'validate_agronome', profile_id: row.id, decision, ...(reason ? { reason } : {}) },
+      decision === 'VALIDE' ? 'Agronome validé — carte émise' : 'Agronome rejeté',
     )
+  }
+
+  const CARD_ACTION_LABEL: Record<CardAction, string> = {
+    suspend: 'Carte suspendue',
+    reactivate: 'Carte réactivée',
+    revoke: 'Carte révoquée',
+    renew: 'Carte renouvelée (nouveau QR)',
+  }
+
+  const cardAction = async (row: HarooAdminRow, action: CardAction) => {
+    if (!row.card_number) return
+    let reason: string | undefined
+    if (action === 'revoke') {
+      reason = window.prompt('Motif de la révocation (définitive) :')?.trim()
+      if (!reason) return
+    } else if (action === 'suspend') {
+      reason = window.prompt('Motif de la suspension (facultatif) :')?.trim() || undefined
+    } else if (
+      action === 'renew' &&
+      !window.confirm('Renouveler la carte ? Le QR actuel par jeton cessera de fonctionner.')
+    ) {
+      return
+    }
+    setBusyId(row.id)
+    try {
+      const res = await fetch(
+        `/api/admin/professional-cards/${encodeURIComponent(row.card_number)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, ...(reason ? { reason } : {}) }),
+        },
+      )
+      const data: { success?: boolean; error?: string } = await res.json().catch(() => ({}))
+      if (res.ok && data.success) {
+        toast({ title: CARD_ACTION_LABEL[action], description: row.card_number })
+        await fetchProfiles()
+      } else {
+        toast({ title: 'Erreur', description: data.error ?? 'Action impossible', variant: 'destructive' })
+      }
+    } catch (e: unknown) {
+      toast({ title: 'Erreur', description: errorMessage(e), variant: 'destructive' })
+    }
+    setBusyId(null)
+  }
 
   return (
     <div className="space-y-6">
@@ -248,6 +357,8 @@ export default function HarooAdminPage() {
             const isAgronome = row.type === 'AGRONOME'
             const agronomeValide = row.statut_validation === 'VALIDE'
             const agronomeRejete = row.statut_validation === 'REJETE'
+            const card = row.card_number ? cards[row.card_number] : undefined
+            const cardStatus = card ? computeCardStatus(card) : null
 
             return (
               <Card key={`${row.type}-${row.id}`} className="border-border">
@@ -274,15 +385,78 @@ export default function HarooAdminPage() {
                             </>
                           )}
                         </p>
+                        {isAgronome && row.validated_at && (
+                          <p className="text-xs text-muted-foreground">
+                            Décision du {new Date(row.validated_at).toLocaleString('fr-FR')}
+                            {row.validated_by
+                              ? ` par ${validatorNames[row.validated_by] ?? row.validated_by.slice(0, 8)}`
+                              : ''}
+                          </p>
+                        )}
+                        {isAgronome && row.rejection_reason && (
+                          <p className="text-xs text-destructive">Motif : {row.rejection_reason}</p>
+                        )}
+                        {card?.revoked_reason && (
+                          <p className="text-xs text-destructive">
+                            Révocation : {card.revoked_reason}
+                          </p>
+                        )}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
                       {row.card_number ? (
                         <>
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                             <CreditCard className="h-3.5 w-3.5" /> {row.card_number}
                           </span>
+                          {cardStatus && (
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${CARD_STATUS_META[cardStatus].tone}`}
+                            >
+                              {CARD_STATUS_META[cardStatus].label}
+                            </span>
+                          )}
+                          {cardStatus && cardStatus !== 'REVOKED' && (
+                            <>
+                              {cardStatus === 'SUSPENDED' ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={isBusy}
+                                  onClick={() => cardAction(row, 'reactivate')}
+                                >
+                                  Réactiver
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={isBusy}
+                                  onClick={() => cardAction(row, 'suspend')}
+                                >
+                                  Suspendre
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={isBusy}
+                                onClick={() => cardAction(row, 'renew')}
+                              >
+                                Renouveler
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-destructive"
+                                disabled={isBusy}
+                                onClick={() => cardAction(row, 'revoke')}
+                              >
+                                Révoquer
+                              </Button>
+                            </>
+                          )}
                           {isAgronome && (
                             <Button
                               size="sm"

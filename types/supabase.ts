@@ -1814,6 +1814,7 @@ export type Database = {
           badge_valide: boolean
           canton_id: string | null
           card_number: string | null
+          faitiere_id: string | null
           created_at: string | null
           first_name: string
           id: string
@@ -1823,15 +1824,19 @@ export type Database = {
           note_moyenne: number
           phone: string | null
           photo_url: string | null
+          rejection_reason: string | null
           specialisations: string[]
           statut_validation: string
           updated_at: string | null
           user_id: string | null
+          validated_at: string | null
+          validated_by: string | null
         }
         Insert: {
           badge_valide?: boolean
           canton_id?: string | null
           card_number?: string | null
+          faitiere_id?: string | null
           created_at?: string | null
           first_name: string
           id?: string
@@ -1841,15 +1846,19 @@ export type Database = {
           note_moyenne?: number
           phone?: string | null
           photo_url?: string | null
+          rejection_reason?: string | null
           specialisations?: string[]
           statut_validation?: string
           updated_at?: string | null
           user_id?: string | null
+          validated_at?: string | null
+          validated_by?: string | null
         }
         Update: {
           badge_valide?: boolean
           canton_id?: string | null
           card_number?: string | null
+          faitiere_id?: string | null
           created_at?: string | null
           first_name?: string
           id?: string
@@ -1859,10 +1868,13 @@ export type Database = {
           note_moyenne?: number
           phone?: string | null
           photo_url?: string | null
+          rejection_reason?: string | null
           specialisations?: string[]
           statut_validation?: string
           updated_at?: string | null
           user_id?: string | null
+          validated_at?: string | null
+          validated_by?: string | null
         }
         Relationships: [
           {
@@ -2930,8 +2942,12 @@ export type Database = {
           id: string
           member_id: string | null
           qr_data: string | null
+          revoked_at: string | null
+          revoked_reason: string | null
           status: string
+          suspended_at: string | null
           updated_at: string | null
+          verify_token: string | null
         }
         Insert: {
           card_number: string
@@ -2943,8 +2959,12 @@ export type Database = {
           id?: string
           member_id?: string | null
           qr_data?: string | null
+          revoked_at?: string | null
+          revoked_reason?: string | null
           status?: string
+          suspended_at?: string | null
           updated_at?: string | null
+          verify_token?: string | null
         }
         Update: {
           card_number?: string
@@ -2956,8 +2976,12 @@ export type Database = {
           id?: string
           member_id?: string | null
           qr_data?: string | null
+          revoked_at?: string | null
+          revoked_reason?: string | null
           status?: string
+          suspended_at?: string | null
           updated_at?: string | null
+          verify_token?: string | null
         }
         Relationships: [
           {
@@ -4889,6 +4913,7 @@ export type Database = {
         | "reports.generate"
         | "projects.manage"
         | "support.manage"
+        | "professionals.validate"
       partner_assignment_status: "active" | "revoked" | "ended"
       partner_ledger_entry_type:
         | "CREDIT"
@@ -5081,6 +5106,7 @@ export const Constants = {
         "reports.generate",
         "projects.manage",
         "support.manage",
+        "professionals.validate",
       ],
       partner_assignment_status: ["active", "revoked", "ended"],
       partner_ledger_entry_type: [
