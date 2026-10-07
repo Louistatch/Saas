@@ -10,6 +10,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
+import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 import {
   getDeepSeekKey,
   markDeepSeekKeyExhausted,
@@ -31,10 +32,20 @@ import {
 import OpenAI from 'openai'
 import { createLogger } from '@/lib/utils/logger'
 
+const ALLOWED_IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp'])
+
 export async function POST(request: NextRequest) {
   const log = createLogger('api:ai:vision')
   const rateLimited = await applyRateLimit(request, 'ai-vision')
   if (rateLimited) return rateLimited
+  // In-memory fallback: applyRateLimit returns null when Upstash is not configured.
+  const memLimit = rateLimit(`ai-vision:${clientKeyFromHeaders(request.headers)}`, 10, 60_000)
+  if (!memLimit.ok) {
+    return NextResponse.json(
+      { error: 'Trop de requêtes. Réessayez dans quelques instants.' },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil((memLimit.resetAt - Date.now()) / 1000)) } },
+    )
+  }
 
   try {
     const body = await request.json()
@@ -45,6 +56,12 @@ export async function POST(request: NextRequest) {
     }
     if (image_base64.length > 5_000_000) {
       return NextResponse.json({ error: 'Image trop lourde (max 3 Mo)' }, { status: 400 })
+    }
+    if (!ALLOWED_IMAGE_MIME.has(mime_type)) {
+      return NextResponse.json({ error: 'Format image non supporté (JPEG, PNG ou WebP).' }, { status: 400 })
+    }
+    if (question !== undefined && (typeof question !== 'string' || question.length > 2000)) {
+      return NextResponse.json({ error: 'Question invalide (2000 caractères max).' }, { status: 400 })
     }
 
     const systemText = [

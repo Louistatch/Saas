@@ -21,6 +21,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
+import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 import { parseQuery } from '@/lib/agritogo/nlp-router'
 import { tryDirectAction } from '@/lib/agritogo/direct-actions'
 import { buildProducerContext } from '@/lib/agritogo/producer-context'
@@ -43,6 +44,14 @@ export async function POST(request: NextRequest) {
   const log = createLogger('api:ai:chat')
   const rateLimited = await applyRateLimit(request, 'ai-chat')
   if (rateLimited) return rateLimited
+  // In-memory fallback: applyRateLimit returns null when Upstash is not configured.
+  const memLimit = rateLimit(`ai-chat:${clientKeyFromHeaders(request.headers)}`, 20, 60_000)
+  if (!memLimit.ok) {
+    return NextResponse.json(
+      { error: 'Trop de requêtes. Réessayez dans quelques instants.' },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil((memLimit.resetAt - Date.now()) / 1000)) } },
+    )
+  }
 
   let body: { card_number?: string; message?: string }
   try {
@@ -164,10 +173,11 @@ export async function POST(request: NextRequest) {
     .from('ai_conversations')
     .select('role, content')
     .eq('card_number', cardNumber)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(MAX_HISTORY)
 
-  const historyMessages: OpenAI.Chat.ChatCompletionMessageParam[] = (history ?? []).map((h) => ({
+  // Fetched newest-first so we keep the most recent N; restore chronological order.
+  const historyMessages: OpenAI.Chat.ChatCompletionMessageParam[] = (history ?? []).reverse().map((h) => ({
     role: (h.role === 'assistant' ? 'assistant' : 'user') as 'user' | 'assistant',
     content: h.content,
   }))
@@ -236,26 +246,23 @@ export async function POST(request: NextRequest) {
           // then reporting "all keys exhausted" hid the real cause — which is
           // exactly why a correctly configured key still looked broken.
           if (err.status === 400 || err.status === 401 || err.status === 402 || err.status === 404) {
-            log.error(`DeepSeek rejected the request (${err.status})`, {
-              model: DEEPSEEK_MODEL,
-              message: msg,
-            })
             // `error` is read aloud to a farmer in the chat bubble, so it stays
             // plain French with no environment variable names. The operator's
-            // diagnosis goes to the log and to `detail`.
+            // diagnosis goes to the server log only.
             const hint =
               err.status === 401
                 ? 'Clé DEEPSEEK_API_KEY refusée par DeepSeek.'
                 : err.status === 402
                   ? 'Solde DeepSeek insuffisant.'
                   : `Requête refusée — vérifier DEEPSEEK_MODEL (actuellement « ${DEEPSEEK_MODEL} »).`
+            log.error(`DeepSeek rejected the request (${err.status})`, {
+              model: DEEPSEEK_MODEL,
+              message: msg,
+              hint,
+            })
             return NextResponse.json(
               {
                 error: "L'assistant n'est pas disponible pour le moment. Réessayez plus tard.",
-                detail: hint,
-                raw: msg,
-                model_used: DEEPSEEK_MODEL,
-                status: err.status,
               },
               { status: 502 },
             )
@@ -286,8 +293,6 @@ export async function POST(request: NextRequest) {
   return NextResponse.json(
     {
       error: "L'assistant est très sollicité. Réessayez dans quelques minutes.",
-      detail: lastError || null,
-      model_used: DEEPSEEK_MODEL,
     },
     { status: 429 },
   )

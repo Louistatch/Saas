@@ -18,6 +18,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
+import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 import { buildProducerContext } from '@/lib/agritogo/producer-context'
 import {
   getGeminiKey,
@@ -39,6 +40,14 @@ const MAX_HISTORY = 8
 export async function POST(request: NextRequest) {
   const rateLimited = await applyRateLimit(request, 'ai-voice')
   if (rateLimited) return rateLimited
+  // In-memory fallback: applyRateLimit returns null when Upstash is not configured.
+  const memLimit = rateLimit(`ai-voice:${clientKeyFromHeaders(request.headers)}`, 10, 60_000)
+  if (!memLimit.ok) {
+    return NextResponse.json(
+      { error: 'Trop de requêtes. Réessayez dans quelques instants.' },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil((memLimit.resetAt - Date.now()) / 1000)) } },
+    )
+  }
 
   let body: { audio_base64?: string; mime_type?: string; card_number?: string }
   try {
@@ -66,11 +75,12 @@ export async function POST(request: NextRequest) {
       .from('ai_conversations')
       .select('role, content')
       .eq('card_number', card_number)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
       .limit(MAX_HISTORY),
   ])
   const { systemPrompt, memberName } = contextResult
-  const history = historyResult.data ?? []
+  // Fetched newest-first to keep the most recent N; restore chronological order.
+  const history = (historyResult.data ?? []).reverse()
 
   // ─── ÉTAPE 1 : Transcription audio via Gemini ─────────────────
   const geminiKey = getGeminiKey()
@@ -167,6 +177,7 @@ export async function POST(request: NextRequest) {
 
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Erreur inconnue'
+    console.error('[api:ai:voice] DeepSeek error', { status: err instanceof OpenAI.APIError ? err.status : undefined, model: DEEPSEEK_MODEL, message: msg })
     if (err instanceof OpenAI.APIError) {
       if (err.status === 429) {
         markDeepSeekKeyExhausted()
@@ -183,22 +194,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             error: "L'assistant n'est pas disponible pour le moment.",
-            detail:
-              err.status === 401
-                ? 'Clé DEEPSEEK_API_KEY refusée par DeepSeek.'
-                : err.status === 402
-                  ? 'Solde DeepSeek insuffisant.'
-                  : `Requête refusée — vérifier DEEPSEEK_MODEL (actuellement « ${DEEPSEEK_MODEL} »).`,
-            raw: msg,
-            model_used: DEEPSEEK_MODEL,
-            status: err.status,
           },
           { status: 502 },
         )
       }
     }
     return NextResponse.json(
-      { error: "L'assistant n'a pas pu répondre.", detail: msg, model_used: DEEPSEEK_MODEL },
+      { error: "L'assistant n'a pas pu répondre." },
       { status: 500 },
     )
   }
