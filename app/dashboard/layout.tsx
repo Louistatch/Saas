@@ -64,7 +64,7 @@ const NAV_SECTIONS: NavSection[] = [
         href: '/dashboard',
         label: "Vue d'ensemble",
         icon: Home,
-        roles: ['super_admin', 'cooperative_admin', 'member', 'guest'],
+        roles: ['super_admin', 'cooperative_admin', 'member', 'none'],
       },
       {
         href: '/dashboard/members',
@@ -151,7 +151,7 @@ const NAV_SECTIONS: NavSection[] = [
         href: '/dashboard/marketplace',
         label: 'Exploitations',
         icon: ShoppingCart,
-        roles: ['super_admin', 'cooperative_admin', 'member', 'guest'],
+        roles: ['super_admin', 'cooperative_admin', 'member', 'none'],
       },
       {
         href: '/dashboard/templates',
@@ -393,6 +393,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <SheetTrigger asChild>
             <button
               type="button"
+              aria-label="Ouvrir le menu"
               className="md:hidden fixed top-3 left-3 z-50 flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background shadow-sm text-muted-foreground hover:text-foreground"
             >
               <Menu className="h-5 w-5" />

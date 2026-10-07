@@ -61,7 +61,10 @@ export default function AgriAcademyPage() {
   const [category, setCategory] = useState('tous')
   const [level, setLevel] = useState('')
   const [selected, setSelected] = useState<AcademyModule | null>(null)
-  const [isAdmin] = useState(user?.role === 'super_admin' || user?.role === 'cooperative_admin')
+  // Calculé à chaque rendu : le profil peut arriver après le premier affichage.
+  const isAdmin = user?.role === 'super_admin' || user?.role === 'cooperative_admin'
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState('')
   const [moduleDialog, setModuleDialog] = useState(false)
   const [lessonDialog, setLessonDialog] = useState(false)
   const [moduleForm, setModuleForm] = useState({ title: '', description: '', category: 'agronomie', level: 'debutant', culture: '', duration_min: '' })
@@ -83,21 +86,40 @@ export default function AgriAcademyPage() {
     else setSelected(mod)
   }
 
+  /** Envoi commun : bouton bloqué pendant l'envoi, erreur affichée sinon. */
+  const submit = async (url: string, payload: object): Promise<boolean> => {
+    setSaving(true)
+    setFormError('')
+    try {
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      if (res.ok) return true
+      const d = await res.json().catch(() => ({}))
+      setFormError(d.error ?? 'Enregistrement impossible. Réessayez.')
+      return false
+    } catch {
+      setFormError('Erreur réseau. Réessayez.')
+      return false
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const createModule = async () => {
-    if (!currentCooperative) return
-    const res = await fetch('/api/academy/modules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...moduleForm, duration_min: moduleForm.duration_min ? Number(moduleForm.duration_min) : null, cooperative_id: currentCooperative.id }) })
-    if (res.ok) { setModuleDialog(false); void load() }
+    if (!currentCooperative || moduleForm.title.trim().length < 2) {
+      setFormError('Le titre est obligatoire.')
+      return
+    }
+    const ok = await submit('/api/academy/modules', { ...moduleForm, duration_min: moduleForm.duration_min ? Number(moduleForm.duration_min) : null, cooperative_id: currentCooperative.id })
+    if (ok) { setModuleDialog(false); void load() }
   }
 
   const createLesson = async () => {
-    if (!selected) return
-    const res = await fetch(`/api/academy/modules/${selected.id}/lessons`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...lessonForm, duration_min: lessonForm.duration_min ? Number(lessonForm.duration_min) : null }) })
-    if (res.ok) { setLessonDialog(false); void loadDetail(selected) }
-  }
-
-  const markComplete = async (lessonId: string) => {
-    if (!selected || !user) return
-    await fetch('/api/academy/progress', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ member_id: user.id, module_id: selected.id, lesson_id: lessonId, status: 'completed' }) })
+    if (!selected || lessonForm.title.trim().length < 2) {
+      setFormError('Le titre est obligatoire.')
+      return
+    }
+    const ok = await submit(`/api/academy/modules/${selected.id}/lessons`, { ...lessonForm, duration_min: lessonForm.duration_min ? Number(lessonForm.duration_min) : null })
+    if (ok) { setLessonDialog(false); void loadDetail(selected) }
   }
 
   return (
@@ -123,7 +145,8 @@ export default function AgriAcademyPage() {
                 </Select>
                 <Input placeholder="Culture (optionnel)" value={moduleForm.culture} onChange={e => setModuleForm(f => ({ ...f, culture: e.target.value }))} />
                 <Input type="number" placeholder="Durée (minutes)" value={moduleForm.duration_min} onChange={e => setModuleForm(f => ({ ...f, duration_min: e.target.value }))} />
-                <Button onClick={createModule} className="w-full">Créer</Button>
+                {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+                <Button onClick={createModule} className="w-full" disabled={saving}>Créer</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -203,7 +226,10 @@ export default function AgriAcademyPage() {
                       {lesson.content_body && (
                         <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-sans bg-muted/50 rounded p-2 max-h-24 overflow-auto">{lesson.content_body}</pre>
                       )}
-                      <Button size="sm" variant="outline" className="w-full text-xs" onClick={() => markComplete(lesson.id)}>✓ Marquer comme terminé</Button>
+                      {/* « Marquer comme terminé » retiré : il envoyait l'identifiant du
+                          compte comme member_id (fiche membre ≠ compte), et chaque
+                          enregistrement échouait. La progression est saisie par un
+                          administrateur via /api/academy/progress. */}
                     </div>
                   )
                 })}
@@ -223,7 +249,8 @@ export default function AgriAcademyPage() {
                     </Select>
                     <Textarea placeholder="Contenu (texte, URL vidéo, JSON quiz...)" value={lessonForm.content_body} onChange={e => setLessonForm(f => ({ ...f, content_body: e.target.value }))} rows={4} />
                     <Input type="number" placeholder="Durée estimée (minutes)" value={lessonForm.duration_min} onChange={e => setLessonForm(f => ({ ...f, duration_min: e.target.value }))} />
-                    <Button onClick={createLesson} className="w-full">Ajouter</Button>
+                    {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+                    <Button onClick={createLesson} className="w-full" disabled={saving}>Ajouter</Button>
                   </div>
                 </DialogContent>
               </Dialog>
