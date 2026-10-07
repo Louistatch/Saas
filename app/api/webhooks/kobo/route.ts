@@ -28,6 +28,7 @@ import { waitUntil } from '@vercel/functions'
 import { timingSafeEqual, createHmac } from 'node:crypto'
 import { createClient } from '@/lib/supabase/admin'
 import { createLogger } from '@/lib/utils/logger'
+import { decryptSecret, isEncrypted } from '@/lib/utils/crypto'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 import { koboWebhookPayloadSchema } from '@/lib/validators/kobo'
 import {
@@ -362,7 +363,18 @@ async function processSubmissionAsync(
           })
         } else {
           // Fetch API token for photo download
-          const apiKey = (integ?.config as Record<string, string>)?.api_key ?? null
+          // config.api_key is stored encrypted (AES-256-GCM); decrypt before use.
+          const storedKey = (integ?.config as Record<string, string>)?.api_key ?? null
+          let apiKey: string | null = null
+          if (storedKey && isEncrypted(storedKey)) {
+            try {
+              apiKey = decryptSecret(storedKey)
+            } catch {
+              log.error('Failed to decrypt Kobo API key', { submissionId })
+            }
+          } else if (storedKey) {
+            apiKey = storedKey // legacy plaintext value
+          }
           await enrollNewMemberFromSubmission(submissionId, cooperativeId, payload, apiKey)
         }
     }
@@ -573,6 +585,7 @@ async function processHarvestSubmission(
     .from('member_cards')
     .select('member_id')
     .eq('card_number', cardNumber)
+    .eq('cooperative_id', cooperativeId)
     .maybeSingle()
 
   if (!card) {
@@ -632,6 +645,7 @@ async function processPlotSurveySubmission(
     .from('member_cards')
     .select('member_id')
     .eq('card_number', cardNumber)
+    .eq('cooperative_id', cooperativeId)
     .maybeSingle()
 
   if (!card) {

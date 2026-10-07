@@ -12,6 +12,7 @@ import 'server-only'
 
 import { createClient } from '@/lib/supabase/admin'
 import { createLogger } from '@/lib/utils/logger'
+import { isAllowedKoboAttachmentUrl } from '@/lib/kobo/attachment-url'
 import { processPhotoFaceCrop } from '@/lib/photos/process-photo'
 import {
   cooperativeNameSchema,
@@ -268,6 +269,10 @@ export async function enrollNewMemberFromSubmission(
       (xpathKey ? attachments.find((a) => a.question_xpath === xpathKey) : null) ??
       (filenameValue ? attachments.find((a) => a.filename?.includes(filenameValue)) : null)
     if (!att?.download_url) return null
+    if (!isAllowedKoboAttachmentUrl(att.download_url)) {
+      log.warn('Rejected non-Kobo attachment URL', { bucket })
+      return null
+    }
     const field = filenameValue ?? xpathKey ?? 'file'
     try {
       const resp = await fetch(att.download_url, {

@@ -17,6 +17,7 @@ import 'server-only'
 import { createClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/utils/logger'
 import { decryptSecret } from '@/lib/utils/crypto'
+import { isAllowedKoboAttachmentUrl } from '@/lib/kobo/attachment-url'
 import {
   enrollNewMemberFromSubmission,
   processCooperativeRegistration,
@@ -825,6 +826,10 @@ export class KoboSyncService {
         attachments.find((a) => a.question_xpath?.includes(field.split('/').pop() ?? field)) ??
         attachments.find((a) => a.filename?.includes(field))
       if (!att?.download_url) return null
+      if (!isAllowedKoboAttachmentUrl(att.download_url, [new URL(KOBO_API_BASE).hostname])) {
+        console.warn('[kobo:sync] Rejected non-Kobo attachment URL', { bucket })
+        return null
+      }
       try {
         const resp = await fetch(att.download_url, { headers: { Authorization: `Token ${apiToken}` } })
         if (!resp.ok) return null
