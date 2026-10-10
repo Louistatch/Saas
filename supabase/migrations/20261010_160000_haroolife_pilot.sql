@@ -7,6 +7,8 @@ CREATE TABLE public.haroolife_pilot (
   canton_id uuid REFERENCES public.cantons(id),
   team_target integer NOT NULL DEFAULT 8 CHECK (team_target BETWEEN 2 AND 30),
   area_target numeric(10,4) NOT NULL DEFAULT 10 CHECK (area_target > 0),
+  -- Plafond accepté au-delà de la cible (la dernière parcelle peut la dépasser, jamais ce plafond).
+  area_max numeric(10,4) NOT NULL DEFAULT 16 CHECK (area_max >= area_target),
   formation_hours integer NOT NULL DEFAULT 48 CHECK (formation_hours BETWEEN 1 AND 168),
   CHECK (NOT enabled OR (cooperative_id IS NOT NULL AND canton_id IS NOT NULL))
 );
@@ -106,7 +108,7 @@ BEGIN
     WHERE pa.cooperative_id=cfg.cooperative_id AND m.cooperative_id=cfg.cooperative_id
       AND pa.superficie_ha>0 AND private.owns_member(m.cooperative_id,m.email);
   RETURN jsonb_build_object('access',access,'groups',groups,'parcels',parcels,
-    'pilot',jsonb_build_object('team_target',cfg.team_target,'area_target',cfg.area_target,'formation_hours',cfg.formation_hours,
+    'pilot',jsonb_build_object('team_target',cfg.team_target,'area_target',cfg.area_target,'area_max',cfg.area_max,'formation_hours',cfg.formation_hours,
       'canton',(SELECT name FROM public.cantons WHERE id=cfg.canton_id),
       'cooperative',(SELECT name FROM public.cooperatives WHERE id=cfg.cooperative_id)));
 END $$;
@@ -181,6 +183,9 @@ BEGIN
       IF contribution IS NULL OR contribution::text IN ('NaN','Infinity','-Infinity') OR contribution<=0 OR parcel.superficie_ha IS NULL
         OR contribution>parcel.superficie_ha OR contribution<>round(contribution,4) THEN
         RAISE EXCEPTION 'Surface supérieure à la parcelle ou invalide' USING ERRCODE='22023';
+      END IF;
+      IF total+contribution>cfg.area_max THEN
+        RAISE EXCEPTION 'Cette surface dépasserait le maximum du regroupement (% ha)',cfg.area_max USING ERRCODE='22023';
       END IF;
       IF EXISTS(SELECT 1 FROM public.haroolife_participations x JOIN public.haroolife_groups other ON other.id=x.group_id
         WHERE x.parcel_id=parcel.id AND x.left_at IS NULL AND other.cancelled_at IS NULL AND other.expires_at>now()

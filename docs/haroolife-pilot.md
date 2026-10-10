@@ -45,6 +45,9 @@ Prochaines tranches : accès carte/délégation avec consentement ; rapprochemen
 
 Les 11 tests HarooLife (dont le test parent SQL), les 32 tests de durcissement existants et la compilation ont été exécutés. Un contrôle HTTP du build confirme la page de préparation et les réponses GET/POST 503 sans cache lorsque le pilote est désactivé. La recette navigateur/mobile et la concurrence multi-connexion restent à réaliser. Aucune migration distante ni aucun déploiement n’ont été effectués. Le contrôle de pré-déploiement exige également `KOBO_WEBHOOK_SECRET`, absent de cet environnement : le configurer par le canal sécurisé habituel avant déploiement.
 
+## Surface
+La cible reste 10 ha (`area_target`). La dernière parcelle peut la dépasser, mais le total ne peut jamais excéder `area_max` (16 ha par défaut, réglable dans `haroolife_pilot`).
+
 ## Retour arrière
 1. Mettre `HAROOLIFE_ENABLED` et `NEXT_PUBLIC_HAROOLIFE_ENABLED` à `false` (ou les supprimer) : l'API répond 503 et les entrées disparaissent.
 2. Optionnel : `UPDATE public.haroolife_pilot SET enabled=false;` (conserve les données).
