@@ -11,8 +11,34 @@ import {
   progress,
 } from '@/lib/haroolife/core'
 import { ClipboardList, RefreshCw, Sprout, Users } from 'lucide-react'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
+
+const Village3D = dynamic(() => import('./village-3d'), { ssr: false })
+
+// 3D optionnelle : drapeau explicite, WebGL2, et aucune préférence de sobriété (animations, données, mémoire).
+function useRich3d() {
+  const [ok, setOk] = useState(false)
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_HAROOLIFE_3D !== 'true') return
+    try {
+      const nav = navigator as Navigator & {
+        deviceMemory?: number
+        connection?: { saveData?: boolean }
+      }
+      const sober =
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+        nav.connection?.saveData === true ||
+        (nav.deviceMemory !== undefined && nav.deviceMemory < 4)
+      const gl = document.createElement('canvas').getContext('webgl2')
+      setOk(!sober && gl !== null)
+    } catch {
+      setOk(false)
+    }
+  }, [])
+  return ok
+}
 
 const actionClass =
   'rounded-xl bg-emerald-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50'
@@ -76,6 +102,7 @@ export function HarooLifeWorkspace() {
   const [joining, setJoining] = useState<Group | null>(null)
   const [pending, setPending] = useState<Command | null>(null)
   const [now, setNow] = useState(Date.now())
+  const rich3d = useRich3d()
   const lock = useRef(false)
   const sequence = useRef(0)
   const section = useRef<HTMLElement>(null)
@@ -199,6 +226,13 @@ export function HarooLifeWorkspace() {
 
   const disabled = busy || loading || pending !== null || error !== ''
   const tomorrow = new Date(now + 86_400_000).toISOString().slice(0, 10)
+  const villageCounts = {
+    team:
+      board?.groups.filter((g) => g.kind === 'team' && displayState(g, now) === 'open').length ?? 0,
+    work:
+      board?.groups.filter((g) => g.kind === 'work' && displayState(g, now) === 'open').length ?? 0,
+    all: board?.groups.filter((g) => g.joined).length ?? 0,
+  }
   const shown = board?.groups.filter((g) => place === 'all' || g.kind === place) ?? []
   return (
     <main className="mx-auto max-w-6xl space-y-7 px-5 py-8">
@@ -286,18 +320,11 @@ export function HarooLifeWorkspace() {
               <p className="relative mb-4 text-sm text-emerald-950">
                 Choisissez un lieu pour agir · représentation stylisée du territoire
               </p>
-              <VillageScene
-                counts={{
-                  team: board.groups.filter(
-                    (g) => g.kind === 'team' && displayState(g, now) === 'open',
-                  ).length,
-                  work: board.groups.filter(
-                    (g) => g.kind === 'work' && displayState(g, now) === 'open',
-                  ).length,
-                  all: board.groups.filter((g) => g.joined).length,
-                }}
-                onChoose={choosePlace}
-              />
+              {rich3d ? (
+                <Village3D counts={villageCounts} onChoose={choosePlace} />
+              ) : (
+                <VillageScene counts={villageCounts} onChoose={choosePlace} />
+              )}
               <div className="relative grid gap-5 sm:grid-cols-3">
                 {(
                   [

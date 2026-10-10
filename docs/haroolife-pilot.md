@@ -52,3 +52,6 @@ La cible reste 10 ha (`area_target`). La dernière parcelle peut la dépasser, m
 1. Mettre `HAROOLIFE_ENABLED` et `NEXT_PUBLIC_HAROOLIFE_ENABLED` à `false` (ou les supprimer) : l'API répond 503 et les entrées disparaissent.
 2. Optionnel : `UPDATE public.haroolife_pilot SET enabled=false;` (conserve les données).
 3. Suppression complète : `supabase/rollbacks/20261010_160000_haroolife_pilot_down.sql` (n'affecte aucune table existante).
+
+## Village 3D (optionnel)
+`NEXT_PUBLIC_HAROOLIFE_3D=true` active un village 3D (PlayCanvas, MIT, chargé uniquement dans le navigateur). Il est ignoré, et l'illustration SVG reste affichée, si WebGL2 est absent, si « réduire les animations » ou « économiser les données » est demandé, ou si l'appareil déclare moins de 4 Go de mémoire. Désactivé par défaut. Retour arrière : remettre la variable à `false`.
