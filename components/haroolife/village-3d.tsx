@@ -2,14 +2,59 @@
 // Chargé avec dynamic(() => import('./village-3d'), { ssr: false }) : WebGL n'existe pas côté serveur.
 import { Application, Entity } from '@playcanvas/react'
 import { Camera, Light, Render } from '@playcanvas/react/components'
+import { useAsset } from '@playcanvas/react/hooks'
 import { Color, StandardMaterial } from 'playcanvas'
-import { useMemo, useState } from 'react'
+import { type ReactNode, createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { Place } from './village-scene'
 
 const LABELS: Record<Place, string> = {
   work: 'Nos parcelles',
   all: 'Place du village',
   team: 'Maison des équipes',
+}
+
+// Modèles GLB optionnels (voir public/haroolife/models/README.md). Un fichier absent = formes simples.
+const MODELS = {
+  hut: { src: '/haroolife/models/hut.glb', scale: 1.6 },
+  tree: { src: '/haroolife/models/tree.glb', scale: 1.8 },
+  villager: { src: '/haroolife/models/villager.glb', scale: 1 },
+} as const
+type ModelKey = keyof typeof MODELS
+const Available = createContext<Partial<Record<ModelKey, boolean>>>({})
+
+function useAvailableModels() {
+  const [found, setFound] = useState<Partial<Record<ModelKey, boolean>>>({})
+  useEffect(() => {
+    let live = true
+    for (const key of Object.keys(MODELS) as ModelKey[]) {
+      fetch(MODELS[key].src, { method: 'HEAD' })
+        .then((r) => {
+          const type = r.headers.get('content-type') ?? ''
+          if (live && r.ok && !type.includes('text/html')) setFound((f) => ({ ...f, [key]: true }))
+        })
+        .catch(() => undefined)
+    }
+    return () => {
+      live = false
+    }
+  }, [])
+  return found
+}
+
+function GlbLoaded({ kind, fallback }: { kind: ModelKey; fallback: ReactNode }) {
+  const { asset, error } = useAsset(MODELS[kind].src, 'container')
+  if (error || !asset) return <>{fallback}</>
+  const k = MODELS[kind].scale
+  return (
+    <Entity scale={[k, k, k]}>
+      <Render type="asset" asset={asset} />
+    </Entity>
+  )
+}
+
+function Model({ kind, fallback }: { kind: ModelKey; fallback: ReactNode }) {
+  const available = useContext(Available)
+  return available[kind] ? <GlbLoaded kind={kind} fallback={fallback} /> : <>{fallback}</>
 }
 
 function paint(hex: string) {
@@ -25,15 +70,22 @@ function paint(hex: string) {
 function Hut({ x, z, s = 1, mat }: { x: number; z: number; s?: number; mat: Mats }) {
   return (
     <Entity position={[x, 0, z]} scale={[s, s, s]}>
-      <Entity position={[0, 0.45, 0]} scale={[1.2, 0.9, 1.2]}>
-        <Render type="cylinder" material={mat.wall} />
-      </Entity>
-      <Entity position={[0, 1.4, 0]} scale={[1.9, 1, 1.9]}>
-        <Render type="cone" material={mat.thatch} />
-      </Entity>
-      <Entity position={[0, 0.3, 0.6]} scale={[0.4, 0.6, 0.1]}>
-        <Render type="box" material={mat.door} />
-      </Entity>
+      <Model
+        kind="hut"
+        fallback={
+          <>
+            <Entity position={[0, 0.45, 0]} scale={[1.2, 0.9, 1.2]}>
+              <Render type="cylinder" material={mat.wall} />
+            </Entity>
+            <Entity position={[0, 1.4, 0]} scale={[1.9, 1, 1.9]}>
+              <Render type="cone" material={mat.thatch} />
+            </Entity>
+            <Entity position={[0, 0.3, 0.6]} scale={[0.4, 0.6, 0.1]}>
+              <Render type="box" material={mat.door} />
+            </Entity>
+          </>
+        }
+      />
     </Entity>
   )
 }
@@ -41,15 +93,22 @@ function Hut({ x, z, s = 1, mat }: { x: number; z: number; s?: number; mat: Mats
 function Tree({ x, z, s = 1, mat }: { x: number; z: number; s?: number; mat: Mats }) {
   return (
     <Entity position={[x, 0, z]} scale={[s, s, s]}>
-      <Entity position={[0, 0.7, 0]} scale={[0.28, 1.4, 0.28]}>
-        <Render type="cylinder" material={mat.trunk} />
-      </Entity>
-      <Entity position={[0, 2.1, 0]} scale={[2, 1.7, 2]}>
-        <Render type="sphere" material={mat.leaf} />
-      </Entity>
-      <Entity position={[-0.6, 1.8, 0.2]} scale={[1.3, 1.1, 1.3]}>
-        <Render type="sphere" material={mat.leafLight} />
-      </Entity>
+      <Model
+        kind="tree"
+        fallback={
+          <>
+            <Entity position={[0, 0.7, 0]} scale={[0.28, 1.4, 0.28]}>
+              <Render type="cylinder" material={mat.trunk} />
+            </Entity>
+            <Entity position={[0, 2.1, 0]} scale={[2, 1.7, 2]}>
+              <Render type="sphere" material={mat.leaf} />
+            </Entity>
+            <Entity position={[-0.6, 1.8, 0.2]} scale={[1.3, 1.1, 1.3]}>
+              <Render type="sphere" material={mat.leafLight} />
+            </Entity>
+          </>
+        }
+      />
     </Entity>
   )
 }
@@ -72,12 +131,19 @@ function People({
         const key = SHIRTS[i % SHIRTS.length]
         return (
           <Entity key={a} position={[x + Math.cos(a) * radius, 0, z + Math.sin(a) * radius]}>
-            <Entity position={[0, 0.5, 0]} scale={[0.3, 0.5, 0.3]}>
-              <Render type="capsule" material={mat[key]} />
-            </Entity>
-            <Entity position={[0, 1.15, 0]} scale={[0.34, 0.34, 0.34]}>
-              <Render type="sphere" material={mat.skin} />
-            </Entity>
+            <Model
+              kind="villager"
+              fallback={
+                <>
+                  <Entity position={[0, 0.5, 0]} scale={[0.3, 0.5, 0.3]}>
+                    <Render type="capsule" material={mat[key]} />
+                  </Entity>
+                  <Entity position={[0, 1.15, 0]} scale={[0.34, 0.34, 0.34]}>
+                    <Render type="sphere" material={mat.skin} />
+                  </Entity>
+                </>
+              }
+            />
           </Entity>
         )
       })}
@@ -115,6 +181,7 @@ export default function Village3D({
   onChoose: (place: Place) => void
 }) {
   const mat = useMemo(makeMaterials, [])
+  const available = useAvailableModels()
   const [hover, setHover] = useState<Place | null>(null)
   const grow = (p: Place): [number, number, number] =>
     hover === p ? [1.06, 1.06, 1.06] : [1, 1, 1]
@@ -135,53 +202,55 @@ export default function Village3D({
           className="h-full w-full"
           style={{ width: '100%', height: '100%', cursor: hover ? 'pointer' : 'default' }}
         >
-          <Entity position={[14, 11.4, 14]} rotation={[-30, 45, 0]}>
-            <Camera fov={30} clearColor="#bfe3f5" />
-          </Entity>
-          <Entity rotation={[50, 30, 0]}>
-            <Light type="directional" intensity={1.15} />
-          </Entity>
-          <Entity rotation={[-30, 200, 0]}>
-            <Light type="directional" intensity={0.35} />
-          </Entity>
+          <Available.Provider value={available}>
+            <Entity position={[14, 11.4, 14]} rotation={[-30, 45, 0]}>
+              <Camera fov={30} clearColor="#bfe3f5" />
+            </Entity>
+            <Entity rotation={[50, 30, 0]}>
+              <Light type="directional" intensity={1.15} />
+            </Entity>
+            <Entity rotation={[-30, 200, 0]}>
+              <Light type="directional" intensity={0.35} />
+            </Entity>
 
-          <Entity position={[0, -0.05, 0]} scale={[90, 1, 60]}>
-            <Render type="plane" material={mat.ground} />
-          </Entity>
-          <Entity position={[0.4, 0, 3.4]} rotation={[0, 8, 0]} scale={[1.6, 1, 6]}>
-            <Render type="plane" material={mat.sand} />
-          </Entity>
+            <Entity position={[0, -0.05, 0]} scale={[90, 1, 60]}>
+              <Render type="plane" material={mat.ground} />
+            </Entity>
+            <Entity position={[0.4, 0, 3.4]} rotation={[0, 8, 0]} scale={[1.6, 1, 6]}>
+              <Render type="plane" material={mat.sand} />
+            </Entity>
 
-          <Entity position={[-4.3, 0, 0]} scale={grow('work')} {...bind('work')}>
-            {[-1.3, -0.65, 0, 0.65, 1.3].map((z, i) => (
-              <Entity key={z} position={[0, 0.08, z]} scale={[3.6, 0.16, 0.5]}>
-                <Render type="box" material={i % 2 ? mat.straw : mat.crop} />
+            <Entity position={[-4.3, 0, 0]} scale={grow('work')} {...bind('work')}>
+              {[-1.3, -0.65, 0, 0.65, 1.3].map((z, i) => (
+                <Entity key={z} position={[0, 0.08, z]} scale={[3.6, 0.16, 0.5]}>
+                  <Render type="box" material={i % 2 ? mat.straw : mat.crop} />
+                </Entity>
+              ))}
+              <People n={counts.work} x={0} z={0} radius={2.4} mat={mat} />
+              <Entity position={[0, 0.02, 0]} scale={[4, 0.04, 3.6]}>
+                <Render type="box" material={mat.soil} />
               </Entity>
-            ))}
-            <People n={counts.work} x={0} z={0} radius={2.4} mat={mat} />
-            <Entity position={[0, 0.02, 0]} scale={[4, 0.04, 3.6]}>
-              <Render type="box" material={mat.soil} />
             </Entity>
-          </Entity>
 
-          <Entity position={[0, 0, 0.2]} scale={grow('all')} {...bind('all')}>
-            <Entity position={[0, 0.03, 0]} scale={[3.6, 0.06, 3.6]}>
-              <Render type="cylinder" material={mat.sand} />
+            <Entity position={[0, 0, 0.2]} scale={grow('all')} {...bind('all')}>
+              <Entity position={[0, 0.03, 0]} scale={[3.6, 0.06, 3.6]}>
+                <Render type="cylinder" material={mat.sand} />
+              </Entity>
+              <Tree x={0} z={0} s={1.2} mat={mat} />
+              <People n={counts.all} x={0} z={0} radius={2.1} mat={mat} />
             </Entity>
-            <Tree x={0} z={0} s={1.2} mat={mat} />
-            <People n={counts.all} x={0} z={0} radius={2.1} mat={mat} />
-          </Entity>
 
-          <Entity position={[3.9, 0, 0]} scale={grow('team')} {...bind('team')}>
-            <Hut x={-1.2} z={-0.9} s={0.9} mat={mat} />
-            <Hut x={1.1} z={-0.7} s={1} mat={mat} />
-            <Hut x={-0.2} z={1.0} s={1.15} mat={mat} />
-            <People n={counts.team} x={0} z={0.2} radius={2.4} mat={mat} />
-          </Entity>
+            <Entity position={[3.9, 0, 0]} scale={grow('team')} {...bind('team')}>
+              <Hut x={-1.2} z={-0.9} s={0.9} mat={mat} />
+              <Hut x={1.1} z={-0.7} s={1} mat={mat} />
+              <Hut x={-0.2} z={1.0} s={1.15} mat={mat} />
+              <People n={counts.team} x={0} z={0.2} radius={2.4} mat={mat} />
+            </Entity>
 
-          <Tree x={-9} z={-3.5} s={0.9} mat={mat} />
-          <Tree x={9} z={-4} s={1} mat={mat} />
-          <Tree x={-3} z={-5} s={0.7} mat={mat} />
+            <Tree x={-9} z={-3.5} s={0.9} mat={mat} />
+            <Tree x={9} z={-4} s={1} mat={mat} />
+            <Tree x={-3} z={-5} s={0.7} mat={mat} />
+          </Available.Provider>
         </Application>
       </div>
 
