@@ -1,5 +1,6 @@
 'use client'
 
+import { VillageScene } from '@/components/haroolife/village-scene'
 import {
   ACTIVITIES,
   type Board,
@@ -282,13 +283,21 @@ export function HarooLifeWorkspace() {
               aria-label="Votre village interactif"
               className="relative overflow-hidden rounded-3xl border border-emerald-200 bg-gradient-to-b from-sky-100 via-emerald-50 to-emerald-200 p-6 sm:p-10"
             >
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute -right-8 -top-12 h-40 w-40 rounded-full bg-amber-200/70"
-              />
-              <p className="relative mb-7 text-sm text-emerald-950">
+              <p className="relative mb-4 text-sm text-emerald-950">
                 Choisissez un lieu pour agir · représentation stylisée du territoire
               </p>
+              <VillageScene
+                counts={{
+                  team: board.groups.filter(
+                    (g) => g.kind === 'team' && displayState(g, now) === 'open',
+                  ).length,
+                  work: board.groups.filter(
+                    (g) => g.kind === 'work' && displayState(g, now) === 'open',
+                  ).length,
+                  all: board.groups.filter((g) => g.joined).length,
+                }}
+                onChoose={choosePlace}
+              />
               <div className="relative grid gap-5 sm:grid-cols-3">
                 {(
                   [
