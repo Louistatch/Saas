@@ -54,6 +54,37 @@ function Tree({ x, z, s = 1, mat }: { x: number; z: number; s?: number; mat: Mat
   )
 }
 
+const SHIRTS = ['shirtA', 'shirtB', 'shirtC', 'shirtD'] as const
+
+// Villageois : un par groupe/participation (plafonné pour rester lisible et léger).
+function People({
+  n,
+  x,
+  z,
+  radius,
+  mat,
+}: { n: number; x: number; z: number; radius: number; mat: Mats }) {
+  const count = Math.min(Math.max(n, 0), 5)
+  return (
+    <>
+      {Array.from({ length: count }, (_, i) => {
+        const a = (i / 5) * Math.PI * 2 + 0.6
+        const key = SHIRTS[i % SHIRTS.length]
+        return (
+          <Entity key={a} position={[x + Math.cos(a) * radius, 0, z + Math.sin(a) * radius]}>
+            <Entity position={[0, 0.5, 0]} scale={[0.3, 0.5, 0.3]}>
+              <Render type="capsule" material={mat[key]} />
+            </Entity>
+            <Entity position={[0, 1.15, 0]} scale={[0.34, 0.34, 0.34]}>
+              <Render type="sphere" material={mat.skin} />
+            </Entity>
+          </Entity>
+        )
+      })}
+    </>
+  )
+}
+
 type Mats = ReturnType<typeof makeMaterials>
 function makeMaterials() {
   return {
@@ -68,6 +99,11 @@ function makeMaterials() {
     trunk: paint('#7a5230'),
     leaf: paint('#2f7d4f'),
     leafLight: paint('#3b8f5c'),
+    skin: paint('#8a5a3c'),
+    shirtA: paint('#d6453d'),
+    shirtB: paint('#2f6fb5'),
+    shirtC: paint('#f0b429'),
+    shirtD: paint('#ffffff'),
   }
 }
 
@@ -122,6 +158,7 @@ export default function Village3D({
                 <Render type="box" material={i % 2 ? mat.straw : mat.crop} />
               </Entity>
             ))}
+            <People n={counts.work} x={0} z={0} radius={2.4} mat={mat} />
             <Entity position={[0, 0.02, 0]} scale={[4, 0.04, 3.6]}>
               <Render type="box" material={mat.soil} />
             </Entity>
@@ -132,12 +169,14 @@ export default function Village3D({
               <Render type="cylinder" material={mat.sand} />
             </Entity>
             <Tree x={0} z={0} s={1.2} mat={mat} />
+            <People n={counts.all} x={0} z={0} radius={2.1} mat={mat} />
           </Entity>
 
           <Entity position={[3.9, 0, 0]} scale={grow('team')} {...bind('team')}>
             <Hut x={-1.2} z={-0.9} s={0.9} mat={mat} />
             <Hut x={1.1} z={-0.7} s={1} mat={mat} />
             <Hut x={-0.2} z={1.0} s={1.15} mat={mat} />
+            <People n={counts.team} x={0} z={0.2} radius={2.4} mat={mat} />
           </Entity>
 
           <Tree x={-9} z={-3.5} s={0.9} mat={mat} />
