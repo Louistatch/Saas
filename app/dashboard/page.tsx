@@ -13,6 +13,7 @@ import { PageHeader } from '@/components/shared/page-header'
 import { AgriScoreWidget } from '@/components/dashboard/agri-score-widget'
 import { timeAgo } from '@/lib/utils/time'
 import { ActivateHarooCard } from '@/components/account/layer-activation'
+import { HarooLifeEntry } from '@/components/haroolife/entry'
 
 interface Stats {
   totalMembers: number
@@ -188,6 +189,7 @@ export default function DashboardPage() {
       {/* Seconde couche du compte : ne s'affiche que si Haroo n'est pas
           déjà activé (le composant se masque lui-même). */}
       <ActivateHarooCard />
+      <HarooLifeEntry />
 
       <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
         {statCards.map((stat) => {

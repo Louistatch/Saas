@@ -42,6 +42,13 @@ export const rateLimiters = redis
         prefix: 'rl:embed',
       }),
 
+      // HarooLife commands have a separate budget from login and existing services.
+      haroolife: new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(20, '60 s'),
+        prefix: 'rl:haroolife',
+      }),
+
       // Auth endpoints : 5/minute — anti brute-force login
       auth: new Ratelimit({
         redis,
@@ -93,7 +100,7 @@ export const rateLimiters = redis
  */
 export async function applyRateLimit(
   request: NextRequest,
-  limiter: 'verify' | 'marketplace' | 'embed' | 'auth' | 'webhook' | 'ai-chat' | 'ai-vision' | 'ai-voice' | 'kobo-sync'
+  limiter: 'haroolife' | 'verify' | 'marketplace' | 'embed' | 'auth' | 'webhook' | 'ai-chat' | 'ai-vision' | 'ai-voice' | 'kobo-sync'
 ): Promise<NextResponse | null> {
   if (!rateLimiters) {
     // Upstash not configured — fall through to in-memory rate limiter in route handlers

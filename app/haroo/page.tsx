@@ -4,6 +4,7 @@ import { ProtectedRoute } from '@/app/components/protected-route'
 import { useAuth } from '@/app/context/auth-context'
 import { RequestOrgCard } from '@/components/account/layer-activation'
 import { MarketMissions } from '@/components/haroo/market-missions'
+import { HarooLifeEntry } from '@/components/haroolife/entry'
 import { MissionActions } from '@/components/haroo/mission-actions'
 import { HarooProfileEditor } from '@/components/haroo/profile-editor'
 import { PublishAnnouncement } from '@/components/haroo/publish-announcement'
@@ -568,6 +569,7 @@ function HarooSpaceInner() {
         {/* Seconde couche du compte : masquée si une organisation est déjà
             rattachée (le composant se masque lui-même). */}
         <RequestOrgCard />
+        <HarooLifeEntry />
 
         {/* Accueil personnalisé */}
         <div>
