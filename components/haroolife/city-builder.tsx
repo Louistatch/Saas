@@ -130,6 +130,7 @@ export function CityBuilder(){
             <p className="text-xs text-emerald-100">Construisez une ville togolaise • Stratégie isométrique</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <Link href="/haroolife/territoire/lome" className="rounded-lg bg-emerald-300 px-3 py-2 text-xs font-extrabold text-emerald-950 hover:bg-emerald-200">Jouer à Lomé Life 3D</Link>
             <Link href="/haroolife/territoire/carte" className="rounded-lg border border-white/40 px-3 py-2 text-xs font-semibold hover:bg-white/10">Carte du Togo</Link>
             <button type="button" onClick={()=>setTutorial(v=>!v)} className="rounded-lg border border-white/40 p-2" aria-label="Afficher ou masquer l'aide"><BookOpen className="h-5 w-5" /></button>
             <button type="button" onClick={restart} className="rounded-lg border border-white/40 p-2" aria-label="Recommencer"><RotateCcw className="h-5 w-5"/></button>
