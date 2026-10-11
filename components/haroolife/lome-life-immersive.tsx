@@ -445,10 +445,11 @@ export function LomeLifeImmersive() {
           </button>
           {here && (
             <span
-              className="hidden shrink-0 items-center gap-1 rounded-xl bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-800 sm:flex"
+              className="flex shrink-0 items-center gap-1 rounded-xl bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-800"
               title={'Habitants de ' + here.canton.canton + ' présents dans le quartier'}
             >
-              <Users size={14} /> {here.residents.length} · {here.canton.canton}
+              <Users size={14} /> {here.residents.length}
+              <span className="hidden sm:inline"> · {here.canton.canton}</span>
             </span>
           )}
           <span className="h-6 w-px bg-slate-200" />

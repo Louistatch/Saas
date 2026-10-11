@@ -23,7 +23,7 @@ export default defineConfig({
     {name:'mobile-android',use:{...devices['Pixel 7'],viewport:{width:412,height:915}}},
   ],
   webServer: {
-    command:'npm run build && npm run start -- --hostname 127.0.0.1',
+    command: '[ -f .next/BUILD_ID ] || npm run build; npm run start -- --hostname 127.0.0.1',
     url:'http://127.0.0.1:3000/haroolife/territoire/lome',
     reuseExistingServer:!process.env.CI,
     timeout:300_000,
