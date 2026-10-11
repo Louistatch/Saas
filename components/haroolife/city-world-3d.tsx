@@ -1,5 +1,6 @@
 'use client'
 
+import { appendModel } from '@/lib/haroolife/city/pack'
 import { districtIndexAt, isShore } from '@/lib/haroolife/lome-districts'
 import { type Action, type LifeState, trafficVehicles } from '@/lib/haroolife/lome-life-engine'
 import type { Transport } from '@/lib/haroolife/lome-life-engine'
@@ -21,9 +22,12 @@ import { ZOOM_IN_FACTOR, ZOOM_OUT_FACTOR } from '@/lib/haroolife/vendor/house-bu
  */
 import { Application, Entity, Gltf } from '@playcanvas/react'
 import { Camera, Light, Render } from '@playcanvas/react/components'
-import { useMaterial, useModel } from '@playcanvas/react/hooks'
+import { useApp, useMaterial, useModel, useParent } from '@playcanvas/react/hooks'
 import { Compass, Maximize2, Minus, Plus, RotateCcw } from 'lucide-react'
+import * as pc from 'playcanvas'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { MeshBuilder } from './city/city-chunks'
+import { type Bank, bakedMaterial, loadBank } from './city/model-bank'
 import LomeLifeRoom3D from './lome-life-room-3d'
 import { PAGNES } from './pagnes'
 import { Ride } from './travel-scene-3d'
@@ -734,6 +738,91 @@ function useEstateMats(): MaterialSet {
  * origin of its parent entity: the city world places it at its world offset. Camera, lights,
  * ground, traffic and the player figure are the parent's responsibility.
  */
+type RGB = [number, number, number]
+const hex = (h: string): RGB => [
+  Number.parseInt(h.slice(1, 3), 16) / 255,
+  Number.parseInt(h.slice(3, 5), 16) / 255,
+  Number.parseInt(h.slice(5, 7), 16) / 255,
+]
+/** Same palette as the materials, for the merged ground. */
+const GROUND = {
+  road: hex('#a88a65'),
+  farm: hex('#9b744b'),
+  water: hex('#59b4ca'),
+  forest: hex('#659c59'),
+  sand: hex('#e2cf9a'),
+  dryGrass: hex('#90b76b'),
+  districts: [hex('#86b35e'), hex('#7cab5b'), hex('#79aa59'), hex('#8fb366'), hex('#a3b96a')],
+}
+/**
+ * The estate's ground as one merged mesh (484 tiles, shoreline, woodland, bushes) instead
+ * of one entity per tile: a single draw call. Rebuilt only when the buildings change.
+ */
+function EstateGround({ city }: { city: City }) {
+  const app = useApp()
+  const parent = useParent()
+  const [bank, setBank] = useState<Bank | null>(null)
+  useEffect(() => {
+    let alive = true
+    loadBank()
+      .then((b) => alive && setBank(b))
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [])
+  useEffect(() => {
+    if (!app || !parent) return
+    const objects = new Map(city.buildings.map((b) => [`${b.x}:${b.y}`, b]))
+    const b = new MeshBuilder()
+    const H = CELL * 0.498
+    for (let x = 0; x < SIZE; x++)
+      for (let y = 0; y < SIZE; y++) {
+        const [px, , pz] = positionOf(x, y)
+        const type = terrainAt(x, y)
+        const building = objects.get(`${x}:${y}`)
+        const color =
+          building?.type === 'road'
+            ? GROUND.road
+            : building?.type === 'farm'
+              ? GROUND.farm
+              : type === 'water'
+                ? GROUND.water
+                : type === 'forest'
+                  ? GROUND.forest
+                  : isShore(x, y)
+                    ? GROUND.sand
+                    : (x * 13 + y * 7) % 7 === 0
+                      ? GROUND.dryGrass
+                      : GROUND.districts[districtIndexAt(x, y)]
+        b.box(px - H, -0.07, pz - H, px + H, -0.003, pz + H, color)
+        if (!bank || building) continue
+        if (type === 'forest' && (x * 11 + y * 5) % 7 < 2) {
+          const key = (x + y) % 4 === 0 ? 'palm' : (x + y) % 3 === 0 ? 'oak' : 'tree'
+          appendModel(b, bank.model(key), {
+            x: px,
+            y: 0,
+            z: pz,
+            rot: (x * 41 + y * 19) % 360,
+            scale: (x + y) % 4 === 0 ? 2.1 : 1.7,
+          })
+        } else if (type === 'grass' && (x * 3 + y * 11) % 43 === 0) {
+          appendModel(b, bank.model('bush'), { x: px, y: 0, z: pz, scale: 1.1 })
+        }
+      }
+    const mesh = b.build(app.graphicsDevice)
+    if (!mesh) return
+    const entity = new pc.Entity('Sol de la parcelle')
+    entity.addComponent('render', { meshInstances: [new pc.MeshInstance(mesh, bakedMaterial())] })
+    parent.addChild(entity)
+    return () => {
+      entity.destroy()
+      mesh.destroy()
+    }
+  }, [app, parent, bank, city.buildings])
+  return null
+}
+
 export function EstateTiles({
   city,
   tool,
@@ -751,7 +840,6 @@ export function EstateTiles({
   visitors?: PlacedResident[]
   onBillboard?: (id: string) => void
 }) {
-  const [hover, setHover] = useState<Cell | null>(null)
   const mats = useEstateMats()
   const panelHouse = useMaterial({ diffuse: '#0f766e', emissive: '#0b3d38', gloss: 0.3 })
   const panelFree = useMaterial({ diffuse: '#f5f1e6', emissive: '#4b4a44', gloss: 0.3 })
@@ -769,37 +857,51 @@ export function EstateTiles({
     () => new Map(city.buildings.map((b) => [b.x + ':' + b.y, b])),
     [city.buildings],
   )
-  const plots = useMemo(() => {
-    const result: Cell[] = []
-    for (let x = 0; x < SIZE; x++) for (let y = 0; y < SIZE; y++) result.push({ x, y })
-    return result
-  }, [])
   const isBlocked =
-    hover && tool !== 'inspect' && tool !== 'demolish'
-      ? canBuild(city, hover.x, hover.y, tool) !== null
+    selected && tool !== 'inspect' && tool !== 'demolish'
+      ? canBuild(city, selected.x, selected.y, tool) !== null
       : false
   return (
     <>
       <Entity position={[0, -0.09, 0]} scale={[SIZE * CELL + 0.4, 0.12, SIZE * CELL + 0.4]}>
         <Render type="box" material={mats.sand} />
       </Entity>
-      {plots.map(({ x, y }) => (
-        <Tile
-          key={x + ':' + y}
-          x={x}
-          y={y}
-          type={terrainAt(x, y)}
-          building={objects.get(x + ':' + y)}
-          selected={selected?.x === x && selected?.y === y}
-          hovered={hover?.x === x && hover?.y === y}
-          blocked={Boolean(isBlocked)}
-          mats={mats}
+      <EstateGround city={city} />
+      {city.buildings.map((bd) => (
+        <Entity
+          key={`${bd.x}:${bd.y}`}
+          name={`Plot ${bd.x + 1}-${bd.y + 1}`}
+          position={positionOf(bd.x, bd.y)}
           onClick={() => {
-            if (canTap()) onTile(x, y)
+            if (canTap()) onTile(bd.x, bd.y)
           }}
-          onHover={() => setHover((prev) => (prev?.x === x && prev?.y === y ? prev : { x, y }))}
-        />
+        >
+          <BuildingModel building={bd} />
+          {bd.type === 'well' && (
+            <>
+              <Entity scale={[0.46, 0.45, 0.46]} position={[0, 0.28, 0]}>
+                <Render type="cylinder" material={mats.road} />
+              </Entity>
+              <Entity scale={[0.38, 0.035, 0.38]} position={[0, 0.53, 0]}>
+                <Render type="cylinder" material={mats.water} />
+              </Entity>
+            </>
+          )}
+        </Entity>
       ))}
+      {selected && (
+        <Entity
+          name="Case choisie"
+          position={[
+            positionOf(selected.x, selected.y)[0],
+            0.01,
+            positionOf(selected.x, selected.y)[2],
+          ]}
+          scale={[CELL * 0.98, 0.02, CELL * 0.98]}
+        >
+          <Render type="box" material={isBlocked ? mats.blocked : mats.selected} />
+        </Entity>
+      )}
       {visitors.map((v) => (
         <Entity
           key={'visitor-' + v.resident.display_name + v.x + ':' + v.y}

@@ -36,6 +36,8 @@ export function Character({
   anim = 'idle',
   scale = 1,
   name,
+  active = true,
+  onEntity,
 }: {
   model: string
   position: [number, number, number]
@@ -43,6 +45,10 @@ export function Character({
   anim?: NpcAnim
   scale?: number
   name?: string
+  /** False freezes the skeleton (off-screen or far characters cost no animation time). */
+  active?: boolean
+  /** Receives the root entity, so a parent can move it imperatively between renders. */
+  onEntity?: (e: pc.Entity | null) => void
 }) {
   const app = useApp()
   const { asset } = useModel(`${CHARACTER_BASE}${model}.glb`)
@@ -61,6 +67,7 @@ export function Character({
     app.root.addChild(root)
     holder.current = root
     figure.current = fig
+    onEntity?.(root)
     const clips = container.animations
       .map((a) => a.resource as pc.AnimTrack | null)
       .filter((t): t is pc.AnimTrack => Boolean(t))
@@ -86,12 +93,18 @@ export function Character({
       current.current = first
     }
     return () => {
+      onEntity?.(null)
       root.destroy()
       holder.current = null
       figure.current = null
       current.current = null
     }
   }, [app, asset, model, name])
+  // Freeze or resume the skeleton.
+  useEffect(() => {
+    const fig = figure.current
+    if (fig?.anim) fig.anim.playing = active
+  }, [active])
 
   // Follow position, rotation and scale from props without re-instantiating.
   useEffect(() => {

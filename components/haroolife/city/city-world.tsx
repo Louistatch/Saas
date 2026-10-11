@@ -9,6 +9,7 @@ import {
   renders,
   watchLongTasks,
 } from '@/lib/haroolife/city/perf'
+import { PRESETS, type Quality } from '@/lib/haroolife/city/quality'
 import { type Agent, agentsNear } from '@/lib/haroolife/city/traffic'
 import {
   CATEGORY_OF,
@@ -36,7 +37,7 @@ import { Camera, Light, Render } from '@playcanvas/react/components'
 import { useApp, useAppEvent, useMaterial, useModel } from '@playcanvas/react/hooks'
 import { Compass, Maximize2, Minus, Plus, RotateCcw } from 'lucide-react'
 import * as pc from 'playcanvas'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ESTATE_ASSETS, EstateTiles } from '../city-world-3d'
 import { Ride } from '../travel-scene-3d'
 import { Character } from './character'
@@ -95,12 +96,14 @@ function Baked({
   rotation = 0,
   scale = 1,
   name,
+  onEntity,
 }: {
   model: string
   position: [number, number, number]
   rotation?: number
   scale?: number
   name?: string
+  onEntity?: (e: pc.Entity | null) => void
 }) {
   const app = useApp()
   const bank = useBank()
@@ -115,11 +118,13 @@ function Baked({
     })
     app.root.addChild(e)
     ref.current = e
+    onEntity?.(e)
     return () => {
+      onEntity?.(null)
       e.destroy()
       ref.current = null
     }
-  }, [app, bank, model, name])
+  }, [app, bank, model, name, onEntity])
   useEffect(() => {
     const e = ref.current
     if (!e) return
@@ -130,58 +135,124 @@ function Baked({
   return null
 }
 
-/** Vehicles and pedestrians, moved smoothly between traffic steps. */
-function Agents({ agents, step }: { agents: Agent[]; step: number }) {
+/** Where an agent's figure sits relative to its road cell (lane side, kerb). */
+function agentOffset(a: Agent): [number, number, number] {
+  if (a.kind === 'walker') return [0.42, 0.04, 0.42]
+  if (a.kind === 'zem') return [-0.25, 0.05, 0]
+  return a.fx !== 0 ? [0, 0.02, 0.26 * Math.sign(a.fx)] : [-0.26 * Math.sign(a.fy || 1), 0.02, 0]
+}
+const NPC_STATIC = ['npc-a', 'npc-b', 'npc-c', 'npc-d']
+
+/**
+ * Vehicles and pedestrians. React only decides who exists (once per traffic step); the
+ * smooth motion between steps is applied imperatively to the entities every frame, so no
+ * component re-renders per frame. Only the nearest pedestrians are skinned and animated;
+ * the others are static baked figures.
+ */
+const Agents = memo(function Agents({
+  agents,
+  step,
+  animated,
+}: { agents: Agent[]; step: number; animated: Set<number> }) {
   bump('agents')
-  const [phase, setPhase] = useState(0)
   const last = useRef({ step, at: performance.now() })
   if (last.current.step !== step) last.current = { step, at: performance.now() }
+  const entities = useRef(new Map<number, pc.Entity>())
+  const byId = useRef(new Map<number, Agent>())
+  byId.current = new Map(agents.map((a) => [a.id, a]))
+  const registrars = useRef(new Map<number, (e: pc.Entity | null) => void>())
+  const register = (id: number) => {
+    let fn = registrars.current.get(id)
+    if (!fn) {
+      fn = (e: pc.Entity | null) => {
+        if (e) entities.current.set(id, e)
+        else entities.current.delete(id)
+      }
+      registrars.current.set(id, fn)
+    }
+    return fn
+  }
   useAppEvent('update', () => {
     const p = Math.min(1, (performance.now() - last.current.at) / 700)
-    setPhase((old) => (Math.abs(old - p) > 0.02 ? p : old))
+    for (const [id, e] of entities.current) {
+      const a = byId.current.get(id)
+      if (!a) continue
+      const pos = worldPos(a.x + a.fx * p, a.y + a.fy * p)
+      const off = agentOffset(a)
+      e.setLocalPosition(pos[0] + off[0], off[1], pos[2] + off[2])
+    }
   })
   return (
     <>
       {agents.map((a) => {
-        const pos = worldPos(a.x + a.fx * phase, a.y + a.fy * phase)
+        const base = worldPos(a.x, a.y)
+        const off = agentOffset(a)
+        const pos: [number, number, number] = [base[0] + off[0], off[1], base[2] + off[2]]
         if (a.kind === 'walker')
-          return (
+          return animated.has(a.id) ? (
             <Character
               key={a.id}
               name={`piéton ${a.id}`}
               model={a.model ?? 'character-male-a'}
-              position={[pos[0] + 0.42, 0.04, pos[2] + 0.42]}
+              position={pos}
               rotation={a.heading}
               anim={a.activity === 'run' ? 'run' : 'walk'}
               scale={0.95}
+              onEntity={register(a.id)}
+            />
+          ) : (
+            <Baked
+              key={a.id}
+              name={`piéton ${a.id}`}
+              model={NPC_STATIC[a.id % NPC_STATIC.length]}
+              position={pos}
+              rotation={a.heading}
+              scale={0.95}
+              onEntity={register(a.id)}
             />
           )
         if (a.kind === 'zem')
           return (
-            <Entity
+            <Character
               key={a.id}
-              position={[pos[0] - 0.25, 0.05, pos[2]]}
-              rotation={[0, a.heading, 0]}
-            >
-              <Character model="character-male-b" position={[0, 0, 0]} anim="rest" scale={0.85} />
-              <Baked model="hatchback" position={[0, 0, 0]} scale={0.001} />
-            </Entity>
+              name={`zémidjan ${a.id}`}
+              model="character-male-b"
+              position={pos}
+              rotation={a.heading}
+              anim="rest"
+              scale={0.85}
+              active={animated.has(a.id)}
+              onEntity={register(a.id)}
+            />
           )
-        const lane = a.fx !== 0 ? [0, 0.26 * Math.sign(a.fx)] : [-0.26 * Math.sign(a.fy || 1), 0]
         return (
           <Baked
             key={a.id}
             name={`véhicule ${a.kind}`}
             model={a.kind}
-            position={[pos[0] + lane[0], 0.02, pos[2] + lane[1]]}
+            position={pos}
             rotation={a.heading + 180}
             scale={0.36}
+            onEntity={register(a.id)}
           />
         )
       })}
     </>
   )
+})
+
+/** Applies the quality preset's render resolution to the device. */
+function QualityController({ quality }: { quality: Quality }) {
+  const app = useApp()
+  useEffect(() => {
+    if (!app) return
+    app.graphicsDevice.maxPixelRatio = PRESETS[quality].maxPixelRatio
+    app.resizeCanvas()
+  }, [app, quality])
+  return null
 }
+
+const EstateTilesMemo = memo(EstateTiles)
 
 function PlayerFigure({
   position,
@@ -280,6 +351,30 @@ function Picker({
   const app = useApp()
   const cam = useRef(camera)
   cam.current = camera
+  // Pending pan since the last React commit: applied to the camera entity every frame,
+  // handed to React at most every 120 ms (and when the finger lifts).
+  const pending = useRef({ dx: 0, dz: 0, since: 0 })
+  const flush = useCallback(() => {
+    const p = pending.current
+    if (p.dx === 0 && p.dz === 0) return
+    pending.current = { dx: 0, dz: 0, since: 0 }
+    onPan(p.dx, p.dz)
+  }, [onPan])
+  useAppEvent('update', () => {
+    const p = pending.current
+    if (!app || (p.dx === 0 && p.dz === 0)) return
+    const camEntity = app.root.findByName('CityCamera') as pc.Entity | null
+    if (camEntity) {
+      const c = cam.current
+      const az = (c.angle * Math.PI) / 180
+      camEntity.setLocalPosition(
+        c.tx + p.dx + Math.sin(az) * c.distance * 0.72,
+        c.distance * 0.9,
+        c.tz + p.dz + Math.cos(az) * c.distance * 0.72,
+      )
+    }
+    if (performance.now() - p.since > 120) flush()
+  })
   useEffect(() => {
     if (!app) return
     const canvas = app.graphicsDevice.canvas as HTMLCanvasElement
@@ -321,11 +416,15 @@ function Picker({
       const a = (cam.current.angle * Math.PI) / 180
       const gx = -(dx * Math.cos(a) - dy * Math.sin(a)) * k
       const gz = -(dx * Math.sin(a) + dy * Math.cos(a)) * k
-      onPan(gx, gz)
+      const p = pending.current
+      if (p.dx === 0 && p.dz === 0) p.since = performance.now()
+      p.dx += gx
+      p.dz += gz
     }
     const up = (e: PointerEvent) => {
       const wasSingle = pointers.size === 1
       pointers.delete(e.pointerId)
+      flush()
       if (!wasSingle || moved) {
         if (pointers.size === 0) last = null
         return
@@ -356,7 +455,7 @@ function Picker({
       window.removeEventListener('pointerup', up)
       window.removeEventListener('pointercancel', up)
     }
-  }, [app, onPan, onZoom, onTap])
+  }, [app, onZoom, onTap, flush])
   return null
 }
 
@@ -413,10 +512,12 @@ function StatsProbe({ onFrame }: { onFrame: (s: { drawCalls: number; fps: number
       w.__LOME_APP = undefined
     }
   }, [app])
-  useAppEvent('update', (dt: number) => {
+  const prev = useRef(0)
+  useAppEvent('update', () => {
     if (!app) return
-    ring.current.push(dt * 1000)
     const now = performance.now()
+    if (prev.current) ring.current.push(now - prev.current)
+    prev.current = now
     if (now - last.current < 500) return
     last.current = now
     const stats = app.stats as unknown as {
@@ -427,11 +528,18 @@ function StatsProbe({ onFrame }: { onFrame: (s: { drawCalls: number; fps: number
     let meshInstances = 0
     let animated = 0
     let animating = 0
+    let triangles = 0
     app.root.forEach((e) => {
       const ent = e as pc.Entity
       if (ent.render) {
         renderEntities++
-        meshInstances += ent.render.meshInstances?.length ?? 0
+        const list = ent.render.meshInstances ?? []
+        meshInstances += list.length
+        for (const mi of list) {
+          if (!mi.visible || !ent.enabled) continue
+          const prim = mi.mesh?.primitive?.[0]
+          if (prim) triangles += Math.floor(prim.count / 3)
+        }
       }
       if (ent.anim) {
         animated++
@@ -443,7 +551,7 @@ function StatsProbe({ onFrame }: { onFrame: (s: { drawCalls: number; fps: number
       at: Math.round(now),
       frame: ring.current.summary(),
       drawCalls: stats.drawCalls.total,
-      triangles: stats.frame.triangles,
+      triangles: Number.isFinite(stats.frame.triangles) ? stats.frame.triangles : triangles,
       renderEntities,
       meshInstances,
       animated,
@@ -488,6 +596,7 @@ export default function CityWorld({
   labelsHidden,
   onStats,
   onFrame,
+  quality = 'balanced',
 }: {
   city: City
   tool: EditTool
@@ -515,15 +624,33 @@ export default function CityWorld({
   labelsHidden: boolean
   onStats?: (s: ChunkStats) => void
   onFrame?: (s: { drawCalls: number; fps: number }) => void
+  quality?: Quality
 }) {
   bump('world')
+  const preset = PRESETS[quality]
   const overlay = useRef<HTMLDivElement | null>(null)
   const dragging = useRef(false)
   const centerCell = useMemo(() => cellOf(camera.tx, camera.tz), [camera.tx, camera.tz])
   const agents = useMemo(
-    () => agentsNear(step, centerCell.x, centerCell.y, 22),
-    [step, centerCell.x, centerCell.y],
+    () => agentsNear(step, centerCell.x, centerCell.y, preset.vehicleRadius, preset.maxWalkers),
+    [step, centerCell.x, centerCell.y, preset.vehicleRadius, preset.maxWalkers],
   )
+  // Skinned animation budget: the pedestrians and riders nearest the camera target.
+  const animated = useMemo(() => {
+    const movers = agents
+      .filter((a) => a.kind === 'walker' || a.kind === 'zem')
+      .map((a) => ({ id: a.id, d: Math.hypot(a.x - centerCell.x, a.y - centerCell.y) }))
+      .sort((a, b) => a.d - b.d)
+      .slice(0, preset.maxAnimated)
+    return new Set(movers.map((m) => m.id))
+  }, [agents, centerCell.x, centerCell.y, preset.maxAnimated])
+  // Stable callbacks so the memoised estate does not re-render on every HUD change.
+  const onTileRef = useRef(onTile)
+  onTileRef.current = onTile
+  const stableOnTile = useCallback((x: number, y: number) => onTileRef.current(x, y), [])
+  const onBillboardRef = useRef(onBillboard)
+  onBillboardRef.current = onBillboard
+  const stableOnBillboard = useCallback((id: string) => onBillboardRef.current(id), [])
   const labels = useMemo(() => {
     const all = landmarks().filter((l) => filter === 'all' || CATEGORY_OF[l.type] === filter)
     const radius = camera.distance < 40 ? 20 : 34
@@ -554,14 +681,16 @@ export default function CityWorld({
   const onTap = useCallback(
     (cell: { x: number; y: number }) => {
       if (interior || ride) return
-      // Estate tiles have their own click handlers.
+      // The estate ground is one mesh: route its taps to the estate handler (local cells).
       if (
         cell.x >= ESTATE.x0 &&
         cell.y >= ESTATE.y0 &&
         cell.x < ESTATE.x0 + ESTATE.size &&
         cell.y < ESTATE.y0 + ESTATE.size
-      )
+      ) {
+        onTileRef.current(cell.x - ESTATE.x0, cell.y - ESTATE.y0)
         return
+      }
       onCell(cell)
     },
     [interior, ride, onCell],
@@ -600,11 +729,20 @@ export default function CityWorld({
       data-testid="city-world"
     >
       <Application
-        graphicsDeviceOptions={{ antialias: true }}
+        key={preset.antialias ? 'aa' : 'noaa'}
+        graphicsDeviceOptions={{ antialias: preset.antialias }}
         className="h-full w-full"
         style={{ width: '100%', height: '100%' }}
       >
         {onFrame && <StatsProbe onFrame={onFrame} />}
+        <QualityController quality={quality} />
+        <CityChunks
+          centerX={centerCell.x}
+          centerY={centerCell.y}
+          onStats={onStats}
+          rings={{ near: preset.nearRing, mid: preset.midRing, far: preset.farRing }}
+          hidden={Boolean(scene)}
+        />
         {ride ? (
           <Ride transport={ride.transport} rain={ride.rain} />
         ) : interior ? (
@@ -626,23 +764,24 @@ export default function CityWorld({
             <Entity rotation={[56, 28, 0]}>
               <Light type="directional" intensity={light.sun} color={light.sunColor} />
             </Entity>
-            <Entity rotation={[22, 200, 0]}>
-              <Light
-                type="directional"
-                intensity={light.night ? 0.2 : 0.55}
-                color={light.night ? '#8fa8ff' : '#ffffff'}
-              />
-            </Entity>
-            <CityChunks centerX={centerCell.x} centerY={centerCell.y} onStats={onStats} />
+            {preset.fillLight && (
+              <Entity rotation={[22, 200, 0]}>
+                <Light
+                  type="directional"
+                  intensity={light.night ? 0.2 : 0.55}
+                  color={light.night ? '#8fa8ff' : '#ffffff'}
+                />
+              </Entity>
+            )}
             <Entity position={estateCenter}>
-              <EstateTiles
+              <EstateTilesMemo
                 city={city}
                 tool={tool}
                 selected={selected}
-                onTile={onTile}
+                onTile={stableOnTile}
                 canTap={canTap}
                 visitors={visitors}
-                onBillboard={onBillboard}
+                onBillboard={stableOnBillboard}
               />
             </Entity>
             {selPos && selectedLot && (
@@ -652,7 +791,7 @@ export default function CityWorld({
                 d={selectedLot.h * CELL + 0.3}
               />
             )}
-            <Agents agents={agents} step={step} />
+            <Agents agents={agents} step={step} animated={animated} />
             <PlayerFigure position={playerPos} rotation={playerRotation} moving={moving} />
             <Picker camera={camera} onPan={onPan} onZoom={onZoom} onTap={onTap} />
             <LabelProjector overlay={overlay} lots={labels} />

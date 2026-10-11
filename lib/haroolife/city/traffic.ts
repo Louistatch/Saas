@@ -224,6 +224,15 @@ export function walkersNear(
   return out
 }
 /** Everyone moving near a point. */
-export function agentsNear(step: number, cx: number, cy: number, radius = 26): Agent[] {
-  return [...vehiclesNear(step, cx, cy, radius), ...walkersNear(step, cx, cy, Math.min(radius, 22))]
+export function agentsNear(
+  step: number,
+  cx: number,
+  cy: number,
+  radius = 26,
+  maxWalkers = 18,
+): Agent[] {
+  return [
+    ...vehiclesNear(step, cx, cy, radius),
+    ...walkersNear(step, cx, cy, Math.min(radius, 22), maxWalkers),
+  ]
 }

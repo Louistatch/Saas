@@ -25,6 +25,7 @@ import {
 } from '@/lib/haroolife/city/life'
 import { findPath } from '@/lib/haroolife/city/navigation'
 import { bump } from '@/lib/haroolife/city/perf'
+import { PRESETS, type Quality, detectQuality, rememberQuality } from '@/lib/haroolife/city/quality'
 import {
   CATEGORY_LABELS,
   CATEGORY_OF,
@@ -250,7 +251,9 @@ export function LomeLifeImmersive() {
     tris: 0,
     detailed: false,
   })
-  const [frame, setFrame] = useState({ drawCalls: 0, fps: 0 })
+  const frameRef = useRef({ drawCalls: 0, fps: 0 })
+  const [quality, setQuality] = useState<Quality>('balanced')
+  useEffect(() => setQuality(detectQuality()), [])
   const heading = useRef(180)
   const insideAny = Boolean(cityLife.insideLot || life.inside)
   const interior = cityLife.insideLot
@@ -409,7 +412,8 @@ export function LomeLifeImmersive() {
     const layout = room ? layoutFor(room) : null
     ;(window as unknown as { __LOME_CITY?: unknown }).__LOME_CITY = {
       ...chunkStats,
-      ...frame,
+      ...frameRef.current,
+      quality,
       at: cityLife.at,
       route: cityLife.route.length,
       inside: cityLife.insideLot ?? life.inside,
@@ -422,7 +426,7 @@ export function LomeLifeImmersive() {
     }
   }, [
     chunkStats,
-    frame,
+    quality,
     cityLife.at,
     cityLife.route.length,
     cityLife.insideLot,
@@ -695,8 +699,20 @@ export function LomeLifeImmersive() {
             filter={cityFilter}
             selectedLot={selectedLot}
             labelsHidden={panel !== null}
-            onStats={setChunkStats}
-            onFrame={setFrame}
+            onStats={(s) =>
+              setChunkStats((old) =>
+                old.chunks === s.chunks &&
+                old.buildings === s.buildings &&
+                old.tris === s.tris &&
+                old.detailed === s.detailed
+                  ? old
+                  : s,
+              )
+            }
+            onFrame={(f) => {
+              frameRef.current = f
+            }}
+            quality={quality}
           />
         )}
       </div>
@@ -1346,6 +1362,30 @@ export function LomeLifeImmersive() {
               )}
               {panel === 'phone' && (
                 <>
+                  <div className="rounded-2xl bg-slate-50 p-3">
+                    <p className="text-xs font-bold text-slate-700">Qualité graphique</p>
+                    <p className="text-[11px] text-slate-500">{PRESETS[quality].hint}</p>
+                    <div className="mt-2 flex gap-1" role="group" aria-label="Qualité graphique">
+                      {(['eco', 'balanced', 'high'] as const).map((q) => (
+                        <button
+                          type="button"
+                          key={q}
+                          aria-pressed={quality === q}
+                          onClick={() => {
+                            setQuality(q)
+                            rememberQuality(q)
+                          }}
+                          className={`flex-1 rounded-xl px-2 py-2 text-xs font-bold ${
+                            quality === q
+                              ? 'bg-slate-900 text-white'
+                              : 'bg-white text-slate-800 ring-1 ring-slate-200'
+                          }`}
+                        >
+                          {PRESETS[q].label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <div className="rounded-[24px] bg-gradient-to-br from-indigo-700 via-violet-700 to-orange-400 p-4 text-white">
                     <p className="text-3xl font-light">{String(life.hour).padStart(2, '0')}:00</p>
                     <p className="text-xs opacity-90">Jour {life.day} · Lomé</p>

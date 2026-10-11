@@ -8,7 +8,7 @@ import { type Lot, WORLD_H, WORLD_W, worldLots } from './world'
 export const CHUNK = 16
 export const CHUNKS_X = Math.ceil(WORLD_W / CHUNK)
 export const CHUNKS_Y = Math.ceil(WORLD_H / CHUNK)
-export type Lod = 'near' | 'far'
+export type Lod = 'near' | 'mid' | 'far'
 export interface ChunkRef {
   cx: number
   cy: number
@@ -45,10 +45,11 @@ export function lotsInChunk(cx: number, cy: number): Lot[] {
 }
 
 /**
- * Chunks to keep loaded around a world cell: a near ring (full detail) and a far ring
- * (merged boxes only). Sorted nearest first so the first frames fill the centre.
+ * Chunks to keep loaded around a world cell: a near ring (full detail), a middle ring
+ * (main models only) and a far ring (merged volumes only). Sorted nearest first so the
+ * first frames fill the centre.
  */
-export function chunksAround(x: number, y: number, near = 1, far = 3): ChunkRef[] {
+export function chunksAround(x: number, y: number, near = 1, far = 3, mid = near): ChunkRef[] {
   const c = chunkOfCell(x, y)
   const out: ChunkRef[] = []
   for (let dy = -far; dy <= far; dy++)
@@ -57,7 +58,12 @@ export function chunksAround(x: number, y: number, near = 1, far = 3): ChunkRef[
       const cy = c.cy + dy
       if (cx < 0 || cy < 0 || cx >= CHUNKS_X || cy >= CHUNKS_Y) continue
       const ring = Math.max(Math.abs(dx), Math.abs(dy))
-      out.push({ cx, cy, key: chunkKey(cx, cy), lod: ring <= near ? 'near' : 'far' })
+      out.push({
+        cx,
+        cy,
+        key: chunkKey(cx, cy),
+        lod: ring <= near ? 'near' : ring <= mid ? 'mid' : 'far',
+      })
     }
   return out.sort(
     (a, b) => Math.hypot(a.cx - c.cx, a.cy - c.cy) - Math.hypot(b.cx - c.cx, b.cy - c.cy),

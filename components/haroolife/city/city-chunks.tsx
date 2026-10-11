@@ -81,7 +81,7 @@ const COLORS = {
   concrete: rgb('#9a9a94'),
 }
 
-class MeshBuilder implements Geometry {
+export class MeshBuilder implements Geometry {
   pos: number[] = []
   nrm: number[] = []
   col: number[] = []
@@ -465,6 +465,8 @@ function drawExtra(b: MeshBuilder, e: Extra) {
   }
 }
 
+const SMALL_EXTRAS = new Set(['sign', 'bench', 'flag', 'wall', 'cross'])
+
 function buildChunk(
   device: pc.GraphicsDevice,
   c: ChunkRef,
@@ -474,6 +476,7 @@ function buildChunk(
   const x0 = c.cx * CHUNK
   const y0 = c.cy * CHUNK
   const near = c.lod === 'near' && bank !== null
+  const mid = c.lod === 'mid' && bank !== null
   const place = (
     key: string,
     cx: number,
@@ -578,7 +581,7 @@ function buildChunk(
       b.box(fx0 + 0.26, 0.45, fz0 + 0.47, fx1 - 0.26, 1.22, fz0 + 0.5, rgb('#f0b429'))
       continue
     }
-    if (near) {
+    if (near || mid) {
       for (const e of spec.extras) if (e.kind === 'ground') drawExtra(b, e)
       if (spec.main)
         place(
@@ -590,8 +593,11 @@ function buildChunk(
           spec.main.lift ?? 0,
           spec.main.tint,
         )
-      for (const p of spec.props) place(p.model, p.cx, p.cy, p.rot, p.scale, p.lift ?? 0, p.tint)
-      for (const e of spec.extras) if (e.kind !== 'ground') drawExtra(b, e)
+      // Middle ring: the building and its silhouette features, without small props.
+      if (near)
+        for (const p of spec.props) place(p.model, p.cx, p.cy, p.rot, p.scale, p.lift ?? 0, p.tint)
+      for (const e of spec.extras)
+        if (e.kind !== 'ground' && (near || !SMALL_EXTRAS.has(e.kind))) drawExtra(b, e)
       continue
     }
     // Far level of detail: a coloured volume with the right roof silhouette.
@@ -650,14 +656,27 @@ export interface ChunkStats {
   detailed: boolean
 }
 
+export interface Rings {
+  near: number
+  mid: number
+  far: number
+}
+export const DEFAULT_RINGS: Rings = { near: 1, mid: 2, far: 3 }
+
 export default function CityChunks({
   centerX,
   centerY,
   onStats,
+  rings = DEFAULT_RINGS,
+  hidden = false,
 }: {
   centerX: number
   centerY: number
   onStats?: (s: ChunkStats) => void
+  /** Chunk rings per level of detail (from the quality preset). */
+  rings?: Rings
+  /** Keep the chunks alive but invisible (interiors, rides): no rebuild on return. */
+  hidden?: boolean
 }) {
   bump('chunks')
   const app = useApp()
@@ -678,7 +697,9 @@ export default function CityChunks({
 
   useEffect(() => {
     if (!app) return
-    const wanted = chunksAround(centerX, centerY, 1, 3)
+    for (const v of live.current) v[1].entity.enabled = !hidden
+    if (hidden) return
+    const wanted = chunksAround(centerX, centerY, rings.near, rings.far, rings.mid)
     const keep = new Set(wanted.map((c) => c.key))
     for (const [k, v] of live.current) {
       if (!keep.has(k)) {
@@ -690,7 +711,7 @@ export default function CityChunks({
     let buildings = 0
     let budget = bank ? 4 : 6 // chunks built per effect run; the rest come on the next frames
     for (const c of wanted) {
-      const lodKey = c.lod === 'near' ? (bank ? 'near' : 'near-plain') : 'far'
+      const lodKey = c.lod === 'far' ? 'far' : bank ? c.lod : `${c.lod}-plain`
       const have = live.current.get(c.key)
       if (have && have.lod === lodKey) continue
       if (budget-- <= 0) break
@@ -720,7 +741,7 @@ export default function CityChunks({
     onStats?.({ chunks: live.current.size, buildings, tris, detailed: bank !== null })
     // Finish the remaining chunks shortly after, so the first frame is not blocked.
     const pending = wanted.some((c) => {
-      const lodKey = c.lod === 'near' ? (bank ? 'near' : 'near-plain') : 'far'
+      const lodKey = c.lod === 'far' ? 'far' : bank ? c.lod : `${c.lod}-plain`
       return live.current.get(c.key)?.lod !== lodKey
     })
     if (!pending) return
