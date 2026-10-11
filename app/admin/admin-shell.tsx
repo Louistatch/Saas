@@ -6,7 +6,6 @@ import { performLogout } from '@/lib/auth/logout'
 import {
   Activity,
   Award,
-  BarChart3,
   Briefcase,
   Building2,
   Coins,
@@ -17,6 +16,7 @@ import {
   LayoutDashboard,
   Leaf,
   LogOut,
+  Mail,
   Menu,
   Settings,
   TrendingUp,
@@ -29,25 +29,58 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
-const ADMIN_LINKS = [
-  { href: '/admin', label: "Vue d'ensemble", icon: TrendingUp },
-  // Le super_admin instruit aussi les dossiers, comme un opérateur officier (console installable).
-  { href: '/operator/professionals', label: 'Dossiers à valider', icon: UserCheck },
-  { href: '/admin/cooperatives', label: 'Coopératives', icon: Building2 },
-  { href: '/admin/users', label: 'Utilisateurs', icon: Users },
-  { href: '/admin/haroo', label: 'Professionnels Haroo', icon: Briefcase },
-  { href: '/admin/partners', label: 'Opérateurs', icon: Award },
-  { href: '/admin/partners/training', label: 'Formation Opérateurs', icon: GraduationCap },
-  { href: '/admin/cartes', label: 'Cartes et PIN', icon: CreditCard },
-  { href: '/admin/comptes-exploitation', label: "Comptes d'exploitation", icon: FileText },
-  { href: '/admin/organization-earnings', label: 'Gains organisations', icon: Coins },
-  { href: '/admin/analytics', label: 'Statistiques', icon: BarChart3 },
-  { href: '/admin/agritogo', label: 'AgriTogo', icon: Cpu },
-  { href: '/admin/agrismat', label: 'Agrismat', icon: Leaf },
-  { href: '/admin/logs', label: 'Suivi du site', icon: Activity },
-  { href: '/admin/demo-accounts', label: 'Comptes de démo', icon: Users2 },
-  { href: '/admin/settings', label: 'Paramètres', icon: Settings },
-] as const
+type AdminLink = { href: string; label: string; icon: typeof TrendingUp; badge?: string }
+
+// Menu par thème. Les badges reprennent les compteurs du centre de pilotage (/api/admin/inbox).
+const ADMIN_SECTIONS: { title: string; links: AdminLink[] }[] = [
+  {
+    title: 'Pilotage',
+    links: [
+      { href: '/admin', label: 'Centre de pilotage', icon: TrendingUp },
+      // Le super_admin instruit aussi les dossiers, comme un opérateur officier.
+      {
+        href: '/operator/professionals',
+        label: 'Dossiers à valider',
+        icon: UserCheck,
+        badge: 'dossiers',
+      },
+      { href: '/admin/messages', label: 'Messages', icon: Mail, badge: 'messages' },
+    ],
+  },
+  {
+    title: 'Organisations et comptes',
+    links: [
+      { href: '/admin/cooperatives', label: 'Coopératives', icon: Building2 },
+      { href: '/admin/users', label: 'Utilisateurs et rôles', icon: Users },
+      { href: '/admin/partners', label: 'Opérateurs', icon: Award },
+      { href: '/admin/partners/training', label: 'Formation des opérateurs', icon: GraduationCap },
+    ],
+  },
+  {
+    title: 'Haroo et cartes',
+    links: [
+      { href: '/admin/haroo', label: 'Professionnels Haroo', icon: Briefcase },
+      { href: '/admin/cartes', label: 'Cartes et PIN', icon: CreditCard },
+    ],
+  },
+  {
+    title: 'Économie',
+    links: [
+      { href: '/admin/comptes-exploitation', label: "Comptes d'exploitation", icon: FileText },
+      { href: '/admin/organization-earnings', label: 'Gains des organisations', icon: Coins },
+    ],
+  },
+  {
+    title: 'Plateforme',
+    links: [
+      { href: '/admin/agritogo', label: 'AgriTogo', icon: Cpu },
+      { href: '/admin/agrismat', label: 'Agrismat', icon: Leaf },
+      { href: '/admin/logs', label: 'Suivi du site', icon: Activity },
+      { href: '/admin/demo-accounts', label: 'Comptes de démo', icon: Users2 },
+      { href: '/admin/settings', label: 'Paramètres', icon: Settings },
+    ],
+  },
+]
 
 /**
  * Pure presentational shell for the admin area.
@@ -58,17 +91,18 @@ const ADMIN_LINKS = [
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [pending, setPending] = useState(0)
+  const [badges, setBadges] = useState<Record<string, number>>({})
 
-  // Compteur des dossiers à valider (même périmètre que la console).
+  // Compteurs du centre de pilotage, rafraîchis à chaque changement de page.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: recharger à chaque navigation
   useEffect(() => {
-    fetch('/api/admin/activity', { cache: 'no-store' })
+    fetch('/api/admin/inbox', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { dossiers?: { pending?: number } | null } | null) =>
-        setPending(d?.dossiers?.pending ?? 0),
+      .then((d: { items?: { key: string; count: number }[] } | null) =>
+        setBadges(Object.fromEntries((d?.items ?? []).map((i) => [i.key, i.count]))),
       )
       .catch(() => undefined)
-  }, [])
+  }, [pathname])
 
   // Fermer le tiroir mobile à l'échappement — l'arrière-plan lui-même n'est
   // jamais une cible clavier légitime (un utilisateur au clavier ne peut de
@@ -95,34 +129,43 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           <Logo size="lg" textClassName="text-sidebar-foreground" />
         </div>
 
-        <nav className="space-y-2 p-4 flex-1 min-h-0 overflow-y-auto">
-          {ADMIN_LINKS.map((link) => {
-            const Icon = link.icon
-            const isActive = pathname === link.href
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setSidebarOpen(false)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                  isActive
-                    ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent/10'
-                }`}
-              >
-                <Icon className="h-5 w-5" />
-                {link.label}
-                {link.href === '/operator/professionals' && pending > 0 && (
-                  <span
-                    className="ml-auto rounded-full bg-red-600 px-2 py-0.5 text-xs font-semibold text-white"
-                    aria-label={`${pending} dossier(s) en attente`}
+        <nav className="space-y-3 p-4 flex-1 min-h-0 overflow-y-auto">
+          {ADMIN_SECTIONS.map((section) => (
+            <div key={section.title} className="space-y-1">
+              <p className="px-4 pb-1 pt-3 text-xs font-medium text-sidebar-foreground/60 first:pt-0">
+                {section.title}
+              </p>
+              {section.links.map((link) => {
+                const Icon = link.icon
+                const isActive = pathname === link.href
+                const count = link.badge ? (badges[link.badge] ?? 0) : 0
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    aria-current={isActive ? 'page' : undefined}
+                    onClick={() => setSidebarOpen(false)}
+                    className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 transition-colors ${
+                      isActive
+                        ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent/10'
+                    }`}
                   >
-                    {pending}
-                  </span>
-                )}
-              </Link>
-            )
-          })}
+                    <Icon className="h-5 w-5" />
+                    {link.label}
+                    {count > 0 && (
+                      <span
+                        className="ml-auto rounded-full bg-red-600 px-2 py-0.5 text-xs font-semibold text-white"
+                        aria-label={`${count} en attente`}
+                      >
+                        {count}
+                      </span>
+                    )}
+                  </Link>
+                )
+              })}
+            </div>
+          ))}
         </nav>
 
         <div className="p-4 border-t border-sidebar-border space-y-2 shrink-0">
