@@ -5,7 +5,7 @@
 //   - Opérateur officier : dossiers des faîtières de ses mandats portant
 //     'professionals.validate'. Aucun mandat → liste vide.
 
-import { professionLabel } from '@/lib/professionals/core'
+import { assessDossier, compareForReview, professionLabel } from '@/lib/professionals/core'
 import { getMandatedFaitiereIds } from '@/lib/professionals/server'
 import { assertAuthenticated } from '@/lib/security/assert-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
@@ -17,6 +17,7 @@ const statusSchema = z.enum(['EN_ATTENTE', 'VALIDE', 'REJETE']).default('EN_ATTE
 
 interface DossierRow {
   id: string
+  user_id: string | null
   first_name: string | null
   last_name: string | null
   photo_url: string | null
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
   let query = admin
     .from('haroo_agronome_profiles')
     .select(
-      'id, first_name, last_name, photo_url, specialisations, statut_validation, badge_valide, card_number, faitiere_id, profession, validated_at, rejection_reason, created_at, faitiere:cooperatives!haroo_agronome_profiles_faitiere_id_fkey(name)',
+      'id, user_id, first_name, last_name, photo_url, specialisations, statut_validation, badge_valide, card_number, faitiere_id, profession, validated_at, rejection_reason, created_at, faitiere:cooperatives!haroo_agronome_profiles_faitiere_id_fkey(name)',
     )
     .eq('statut_validation', status.data)
     .order('created_at', { ascending: true })
@@ -62,9 +63,31 @@ export async function GET(request: NextRequest) {
   const { data, error } = await query.returns<DossierRow[]>()
   if (error) return NextResponse.json({ error: 'Lecture impossible' }, { status: 500 })
 
+  // Pièces déposées par dossier : de quoi dire tout de suite ce qui manque.
+  const rows = data ?? []
+  const userIds = [...new Set(rows.map((d) => d.user_id).filter((u): u is string => Boolean(u)))]
+  const kindsByUser = new Map<string, string[]>()
+  if (userIds.length > 0) {
+    const { data: docs } = await admin
+      .from('professional_documents')
+      .select('user_id, kind')
+      .eq('profile_type', 'AGRONOME')
+      .in('user_id', userIds)
+      .returns<{ user_id: string; kind: string }[]>()
+    for (const doc of docs ?? []) {
+      kindsByUser.set(doc.user_id, [...(kindsByUser.get(doc.user_id) ?? []), doc.kind])
+    }
+  }
+  const assessed = rows.map((d) => ({
+    row: d,
+    assessment: assessDossier(d, d.user_id ? (kindsByUser.get(d.user_id) ?? []) : []),
+  }))
+  if (status.data === 'EN_ATTENTE')
+    assessed.sort((a, b) => compareForReview(a.assessment, b.assessment))
+
   return NextResponse.json({
     can_validate: true,
-    dossiers: (data ?? []).map((d) => ({
+    dossiers: assessed.map(({ row: d, assessment }) => ({
       id: d.id,
       first_name: d.first_name,
       last_name: d.last_name,
@@ -79,6 +102,7 @@ export async function GET(request: NextRequest) {
       validated_at: d.validated_at,
       rejection_reason: d.rejection_reason,
       created_at: d.created_at,
+      assessment,
     })),
   })
 }
