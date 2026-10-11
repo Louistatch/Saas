@@ -112,7 +112,11 @@ export function interact(state:LifeState,action:Action):LifeState {
   }
   if(action==='enter'){
     if(state.inside)return events(state,'Sors avant de changer de bâtiment.')
-    const building=state.city.buildings.find(b=>venues.has(b.type as Venue)&&manhattan(b,state.pos)===1)
+    // Prefer the venue the player selected. Adjacent buildings can share a door-side street.
+    const targeted=state.target&&state.city.buildings.find(b=>b.x===state.target!.x&&b.y===state.target!.y)
+    const building=targeted&&venues.has(targeted.type as Venue)&&manhattan(targeted,state.pos)===1
+      ?targeted
+      :state.city.buildings.find(b=>venues.has(b.type as Venue)&&manhattan(b,state.pos)===1)
     if(!building)return events(state,'Approche-toi de la porte d’un bâtiment accessible.')
     return events({...state,inside:building.type as Venue,route:[]},'Tu entres : '+CATALOG[building.type as BuildType]?.label+'.')
   }
