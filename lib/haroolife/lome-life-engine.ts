@@ -95,6 +95,43 @@ export function directTo(state:LifeState,destination:RoadPoint):LifeState {
   if(route.length<=1)return events({...state,target:destination,route:[]},'Tu es arrivé à destination.')
   return events({...state,target:destination,route:route.slice(1)},'Trajet commencé : '+(route.length-1)+' cases.')
 }
+export type Transport = 'walk' | 'moto' | 'taxi'
+export const TRAVEL_COST: Record<Transport, number> = { walk: 0, moto: 350, taxi: 900 }
+
+/** Moves the avatar one connected road tile without advancing an entire day-hour.
+ * Call only during active on-screen play: never perform background progress. */
+export function walkLifeStep(state: LifeState): LifeState {
+  if (state.inside || state.route.length === 0) return state
+  const nextPos = state.route[0]
+  const roads = roadNetwork(state.city.buildings)
+  if (!roads.has(id(nextPos))) {
+    return events({...state, route: [], target: null}, 'Le trajet a été interrompu : route supprimée.')
+  }
+  const next: LifeState = {
+    ...state,
+    pos: {...nextPos},
+    route: state.route.slice(1),
+    trafficStep: state.trafficStep + 1,
+    needs: {...state.needs, energy: clamp(state.needs.energy - 1)},
+  }
+  return next.route.length === 0
+    ? events(next, 'Destination atteinte : entre dans le bâtiment ou choisis une action.')
+    : next
+}
+/** Single trip fee (not paid each tick). All currency remains fictitious. */
+export function chooseTransport(state: LifeState, transport: Transport): LifeState {
+  if (state.route.length === 0) return events(state, 'Choisis une destination avant un transport.')
+  const cost = TRAVEL_COST[transport]
+  if (cost > state.wallet) return events(state, 'Solde insuffisant pour ce déplacement.')
+  if (cost === 0) return events(state, 'Déplacement à pied sélectionné.')
+  return events({
+    ...state,
+    wallet: state.wallet - cost,
+    spent: state.spent + cost,
+    city: {...state.city, coins: state.city.coins + cost},
+  }, (transport==='moto'?'Moto-taxi':'Taxi')+' réservé : −'+cost+' FCFA (simulation).')
+}
+
 export function selectJob(state:LifeState,job:Career):LifeState {
   return events({...state,job},'Métier choisi : '+job+'. Rejoins ton lieu de travail pour être payé.')
 }
