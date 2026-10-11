@@ -10,6 +10,7 @@ import {
   Bug,
   Building2,
   Coins,
+  Copy,
   Cpu,
   CreditCard,
   FileText,
@@ -65,6 +66,7 @@ const ADMIN_SECTIONS: { title: string; links: AdminLink[] }[] = [
     links: [
       { href: '/admin/cooperatives', label: 'Coopératives', icon: Building2 },
       { href: '/admin/users', label: 'Utilisateurs et rôles', icon: Users },
+      { href: '/admin/doublons', label: 'Doublons', icon: Copy },
       { href: '/admin/partners', label: 'Opérateurs', icon: Award },
       { href: '/admin/partners/training', label: 'Formation des opérateurs', icon: GraduationCap },
     ],

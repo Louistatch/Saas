@@ -187,3 +187,10 @@ export function samePerson(a: PersonLike, b: PersonLike): { same: boolean; score
   }
   return { same: false, score: name }
 }
+
+/** Clé de regroupement d'un nom de personne, indépendante de l'ordre prénom / nom. */
+export function personKey(p: PersonLike): string {
+  return tokens(`${p.first_name ?? ''} ${p.last_name ?? ''}`, null)
+    .sort()
+    .join(' ')
+}
