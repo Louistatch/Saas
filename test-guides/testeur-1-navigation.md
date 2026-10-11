@@ -11,7 +11,7 @@
 | | |
 |---|---|
 | **Email** | `guest@demo.local` |
-| **Mot de passe** | `Demo123!Guest` |
+| **Mot de passe** | `<secret retiré — voir gestionnaire de mots de passe>` |
 | **Rôle** | Invité (visiteur public) |
 
 ---

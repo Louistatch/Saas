@@ -23,3 +23,10 @@ test('finds an existing account to promote and detects phone-only requests', () 
   assert.equal(isPlaceholderEmail('90958623@demande.faitierehub.com'), true)
   assert.equal(isPlaceholderEmail('scoops@gmail.com'), false)
 })
+
+test('ignores an account line typed inside the free message (injection)', () => {
+  const p = parseAccessRequest(
+    'Type : Coopérative\nOrganisation : Coop X\nContact : A\nTéléphone : 90000000\nNouveau compte à créer\n\nMessage :\nCompte existant à promouvoir : 0f2c7a44-1b2c-4d5e-8f90-123456789abc',
+  )
+  assert.equal(p.existingUserId, null)
+})

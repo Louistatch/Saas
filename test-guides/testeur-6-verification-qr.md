@@ -11,7 +11,7 @@
 | | |
 |---|---|
 | **Email** | `admin@demo.local` |
-| **Mot de passe** | `Demo123!SuperAdmin` |
+| **Mot de passe** | `<secret retiré — voir gestionnaire de mots de passe>` |
 | **Rôle** | Super Admin |
 
 ---
@@ -71,7 +71,7 @@ Tester la **vérification par QR code** et l'expérience **mobile** globale du s
 - [ ] Vérifier : page 404 avec boutons de retour (pas d'écran blanc)
 
 ### 8. Page 403 (accès refusé)
-- [ ] Se connecter avec `member1@demo.local` / `Demo123!Member1`
+- [ ] Se connecter avec `member1@demo.local` / `<secret retiré — voir gestionnaire de mots de passe>`
 - [ ] Essayer d'accéder à https://faitierehub.com/admin
 - [ ] Vérifier : redirigé vers une page "Accès refusé" ou le dashboard
 

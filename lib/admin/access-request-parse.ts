@@ -10,8 +10,13 @@ export interface ParsedAccessRequest {
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
 
 export function parseAccessRequest(message: string | null): ParsedAccessRequest {
+  // Seul l'en-tête écrit par le serveur fait foi : tout ce qui suit « Message : » a été tapé par
+  // le demandeur et pourrait imiter une ligne « Compte existant à promouvoir : <uuid> ».
+  const lines = (message ?? '').split('\n')
+  const end = lines.findIndex((l) => l.trim() === 'Message :')
+  const header = end === -1 ? lines : lines.slice(0, end)
   const field = (label: string) => {
-    const line = (message ?? '').split('\n').find((l) => l.startsWith(`${label} :`))
+    const line = header.find((l) => l.startsWith(`${label} :`))
     const value = line?.slice(label.length + 2).trim()
     return value ? value : null
   }

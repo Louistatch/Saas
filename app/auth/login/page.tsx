@@ -79,7 +79,19 @@ function LoginInner() {
 
         setProgress('Redirection…')
 
-        const safeRedirect = redirectTo && /^\/[^/]/.test(redirectTo) ? redirectTo : null
+        // Chemin interne uniquement : « /\evil.com » passait l'ancien contrôle et le navigateur
+        // le lit comme « //evil.com ». On résout l'adresse et on exige la même origine.
+        const safeRedirect = (() => {
+          if (!redirectTo || !redirectTo.startsWith('/') || redirectTo.includes('\\')) return null
+          try {
+            const url = new URL(redirectTo, window.location.origin)
+            return url.origin === window.location.origin
+              ? `${url.pathname}${url.search}${url.hash}`
+              : null
+          } catch {
+            return null
+          }
+        })()
         // Un professionnel Haroo ne doit jamais être renvoyé vers le dashboard
         // coopérative, même si ?redirect=/dashboard a été posé par le middleware
         // lors d'une visite déconnectée — son espace est /haroo.
@@ -122,7 +134,9 @@ function LoginInner() {
         const raw = err instanceof Error ? err.message : ''
         if (/email not confirmed/i.test(raw)) {
           setUnconfirmed(true)
-          setError('Votre adresse e-mail n’est pas encore confirmée. Ouvrez le lien reçu par e-mail.')
+          setError(
+            'Votre adresse e-mail n’est pas encore confirmée. Ouvrez le lien reçu par e-mail.',
+          )
         } else {
           setError(errorMessage(err))
         }

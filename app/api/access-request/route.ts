@@ -77,11 +77,13 @@ export async function POST(request: NextRequest) {
   // ce que fait déjà le formulaire public.
   const email = data.email || `${data.phone.replace(/\D/g, '')}@demande.faitierehub.com`
 
+  // Champs d'une ligne : un retour à la ligne permettrait d'ajouter une fausse ligne d'en-tête.
+  const oneLine = (v: string) => v.replace(/[\r\n]+/g, ' ').trim()
   const details = [
     `Type : ${TYPE_LABELS[data.type] ?? data.type}`,
-    `Organisation : ${data.organizationName}`,
-    `Contact : ${data.contactName}`,
-    `Téléphone : ${data.phone}`,
+    `Organisation : ${oneLine(data.organizationName)}`,
+    `Contact : ${oneLine(data.contactName)}`,
+    `Téléphone : ${oneLine(data.phone)}`,
     ctx ? `Compte existant à promouvoir : ${ctx.userId}` : 'Nouveau compte à créer',
     ctx?.harooType ? `Profil Haroo à conserver : ${ctx.harooType}` : null,
     data.message ? `\nMessage :\n${data.message}` : null,

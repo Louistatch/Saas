@@ -163,13 +163,13 @@ SUPABASE_URL=<staging-url>
 SUPABASE_ANON_KEY=<anon-key>
 SUPABASE_SERVICE_KEY=<service-key-for-cleanup>
 E2E_ADMIN_EMAIL=admin@demo.local
-E2E_ADMIN_PASSWORD=Demo123!SuperAdmin
+E2E_ADMIN_PASSWORD=<secret retiré — voir gestionnaire de mots de passe>
 E2E_COOP_EMAIL=coop-admin@demo.local
-E2E_COOP_PASSWORD=Demo123!CoopAdmin
+E2E_COOP_PASSWORD=<secret retiré — voir gestionnaire de mots de passe>
 E2E_FENOMAT_EMAIL=fenomat@demo.local
-E2E_FENOMAT_PASSWORD=Demo123!CoopAdmin
+E2E_FENOMAT_PASSWORD=<secret retiré — voir gestionnaire de mots de passe>
 E2E_MEMBER_EMAIL=member1@demo.local
-E2E_MEMBER_PASSWORD=Demo123!Member1
+E2E_MEMBER_PASSWORD=<secret retiré — voir gestionnaire de mots de passe>
 ```
 
 ## Correctness Properties
