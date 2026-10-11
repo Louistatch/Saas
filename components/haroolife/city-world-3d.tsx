@@ -13,6 +13,8 @@ import {
 } from '@/lib/haroolife/townsmen-engine'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { Compass, Maximize2, Minus, Plus, RotateCcw } from 'lucide-react'
+import { type LifeState, simulatedTraffic } from '@/lib/haroolife/lome-life-engine'
+import { ZOOM_IN_FACTOR, ZOOM_OUT_FACTOR } from '@/lib/haroolife/vendor/house-builder-camera-zoom'
 
 type EditTool = BuildType | 'inspect' | 'demolish'
 type Cell = { x: number; y: number }
@@ -164,9 +166,10 @@ function Tile({
 }
 
 function SettlementScene({
-  city, tool, selected, pan, distance, angle, onTile, canTap,
+  city, tool, selected, pan, distance, angle, onTile, canTap, life,
 }: {
   city: City
+  life?: LifeState
   tool: EditTool
   selected: Cell | null
   pan: { x: number; z: number }
@@ -226,7 +229,31 @@ function SettlementScene({
           onHover={() => setHover(prev => prev?.x === x && prev?.y === y ? prev : {x,y})}
         />
       ))}
-      {city.buildings.filter(b => b.type === 'road').slice(0, 7).map((b, i) => {
+      {life ? (
+        <>
+          {!life.inside && (
+            <Entity name="Joueur de Lomé" position={positionOf(life.pos.x,life.pos.y)}>
+              <Model url={ASSETS.villager} scale={0.43} rotation={(life.trafficStep*37)%360} position={[0,0.065,0]} />
+              <Entity position={[0,0.025,0]} scale={[0.65,0.025,0.65]}><Render type="cylinder" material={highlighted} /></Entity>
+            </Entity>
+          )}
+          {simulatedTraffic(life).map((npc,i) => {
+            const at=positionOf(npc.x,npc.y)
+            return <Entity key={'traffic'+i} position={at}>
+              <Model url={ASSETS.villager} scale={0.26} rotation={i*94} />
+            </Entity>
+          })}
+          {life.inside && (
+            <Entity name="Intérieur accessible" position={positionOf(life.pos.x,life.pos.y)}>
+              <Entity position={[0,2,0]} scale={[6,0.25,5]}><Render type="box" material={road}/></Entity>
+              <Entity position={[0,2.75,2.25]} scale={[5.8,1.3,0.18]}><Render type="box" material={dryGrass}/></Entity>
+              <Entity position={[-2.9,2.75,0]} scale={[0.18,1.3,4.5]}><Render type="box" material={dryGrass}/></Entity>
+              <Entity position={[-0.4,2.4,0.5]} scale={[1.4,0.6,1]}><Render type="box" material={forest}/></Entity>
+              <Entity position={[0,2.15,-0.5]}><Model url={ASSETS.villager} scale={0.65}/></Entity>
+            </Entity>
+          )}
+        </>
+      ) : city.buildings.filter(b => b.type === 'road').slice(0, 7).map((b, i) => {
         const at = positionOf(b.x, b.y)
         return <Entity key={'citizen'+i} position={[at[0] + ((i % 3)-1)*0.3,0.01,at[2] + (i % 2 ? 0.24 : -0.25)]}>
           <Model url={ASSETS.villager} scale={0.28} rotation={(i*57)%360} />
@@ -237,14 +264,15 @@ function SettlementScene({
 }
 
 export default function CityWorld3D({
-  city, tool, inspect, onTile,
+  city, tool, inspect, onTile, life,
 }: {
   city: City
+  life?: LifeState
   tool: EditTool
   inspect: Cell | null
   onTile: (x: number, y: number) => void
 }) {
-  const [distance, setDistance] = useState(37)
+  const [distance, setDistance] = useState(life ? 21 : 37)
   const [angle, setAngle] = useState(45)
   const [pan, setPan] = useState({ x: 0, z: 0 })
   const [dragState, setDragState] = useState(false)
@@ -283,24 +311,25 @@ export default function CityWorld3D({
       >
         <Application graphicsDeviceOptions={{ antialias:true }} className="h-full w-full" style={{ width:'100%',height:'100%' }}>
           <SettlementScene
-            city={city} tool={tool} selected={inspect}
-            pan={pan} distance={distance} angle={angle}
+            city={city} tool={tool} selected={inspect} life={life}
+            pan={life ? {x:positionOf(life.pos.x,life.pos.y)[0]+pan.x,z:positionOf(life.pos.x,life.pos.y)[2]+pan.z} : pan}
+            distance={life?.inside ? 11 : distance} angle={angle}
             onTile={onTile} canTap={checkClick}
           />
         </Application>
       </div>
       <div className="pointer-events-none absolute left-3 top-3 rounded-xl bg-emerald-950/85 px-3 py-2 text-xs font-bold text-white shadow">
         <Compass className="mr-1 inline h-4 w-4" aria-hidden="true" />
-        HAROOVILLE 3D · JOUR {city.day} · CC0 KENNEY
+        {life ? 'LOMÉ LIFE 3D · JOUR '+life.day+' · '+life.hour+' H' : 'HAROOVILLE 3D · JOUR '+city.day} · CC0 KENNEY
       </div>
       <div className="absolute right-3 top-3 flex flex-col gap-2">
-        <button type="button" title="Zoom avant" aria-label="Zoom avant" onClick={()=>setDistance(d=>Math.max(17,d-3))} className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"><Plus className="h-5 w-5" /></button>
-        <button type="button" title="Zoom arrière" aria-label="Zoom arrière" onClick={()=>setDistance(d=>Math.min(58,d+3))} className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"><Minus className="h-5 w-5" /></button>
+        <button type="button" title="Zoom avant" aria-label="Zoom avant" onClick={()=>setDistance(d=>Math.max(9,d*ZOOM_IN_FACTOR))} className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"><Plus className="h-5 w-5" /></button>
+        <button type="button" title="Zoom arrière" aria-label="Zoom arrière" onClick={()=>setDistance(d=>Math.min(60,d*ZOOM_OUT_FACTOR))} className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"><Minus className="h-5 w-5" /></button>
         <button type="button" title="Tourner la caméra" aria-label="Tourner la caméra" onClick={()=>setAngle(a=>(a+45)%360)} className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"><RotateCcw className="h-5 w-5" /></button>
-        <button type="button" title="Recentrer la vue" aria-label="Recentrer la vue" onClick={()=>{setDistance(37);setAngle(45);setPan({x:0,z:0})}} className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"><Maximize2 className="h-5 w-5" /></button>
+        <button type="button" title="Recentrer la vue" aria-label="Recentrer la vue" onClick={()=>{setDistance(life?21:37);setAngle(45);setPan({x:0,z:0})}} className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"><Maximize2 className="h-5 w-5" /></button>
       </div>
       <div className="pointer-events-none absolute bottom-3 left-3 max-w-[70%] rounded-lg bg-emerald-950/85 px-3 py-2 text-xs text-white">
-        Touchez une parcelle pour {tool==='inspect'?'inspecter':tool==='demolish'?'démolir':'construire'} · Glissez pour déplacer · +/− pour zoomer
+        Touchez une parcelle pour {life&&tool==='inspect'?'vous déplacer':tool==='inspect'?'inspecter':tool==='demolish'?'démolir':'construire'} · Glissez pour déplacer · +/− pour zoomer
       </div>
     </div>
   )
