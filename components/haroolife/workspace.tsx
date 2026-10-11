@@ -1,5 +1,6 @@
 'use client'
 
+import { AccessGuide } from '@/components/haroolife/access-guide'
 import { VillageScene } from '@/components/haroolife/village-scene'
 import {
   ACTIVITIES,
@@ -238,10 +239,7 @@ export function HarooLifeWorkspace() {
     <main className="mx-auto max-w-6xl space-y-7 px-5 py-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">
-            HarooLife · pilote de regroupement
-          </p>
-          <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Ensemble, préparons les travaux.</h1>
+          <h1 className="text-3xl font-bold sm:text-4xl">Ensemble, préparons les travaux.</h1>
           <p className="mt-3 max-w-2xl text-slate-600">
             Votre équipe, vos parcelles et vos prochains travaux, au même endroit.
           </p>
@@ -262,7 +260,8 @@ export function HarooLifeWorkspace() {
         </button>
       </div>
       <output aria-live="polite">{loading ? 'Actualisation du territoire…' : message}</output>
-      {error && (
+      {status === 403 && !board && <AccessGuide />}
+      {error && status !== 403 && (
         <div
           role="alert"
           className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950"

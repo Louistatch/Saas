@@ -52,8 +52,10 @@ export function VillageScene({
   onChoose,
 }: {
   counts: Record<Place, number>
-  onChoose: (place: Place) => void
+  onChoose?: (place: Place) => void
 }) {
+  // Sans onChoose, la scène est un simple décor : aucune zone focalisable ni cliquable.
+  const live = onChoose !== undefined
   const spots: Spot[] = [
     { key: 'work', label: 'Nos parcelles', count: `${counts.work} ouvert(s)`, x: 190, y: 400 },
     {
@@ -69,7 +71,7 @@ export function VillageScene({
   function onKey(event: KeyboardEvent<SVGGElement>, key: Place) {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
-      onChoose(key)
+      onChoose?.(key)
     }
   }
 
@@ -116,12 +118,11 @@ export function VillageScene({
 
       <g
         className={hotspot}
-        // biome-ignore lint/a11y/useSemanticElements: un <button> HTML ne peut pas être inclus dans un SVG
-        role="button"
-        tabIndex={0}
+        role={live ? 'button' : undefined}
+        tabIndex={live ? 0 : undefined}
         aria-label={`Nos parcelles, ${counts.work} groupe(s) ouvert(s)`}
-        onClick={() => onChoose('work')}
-        onKeyDown={(e) => onKey(e, 'work')}
+        onClick={live ? () => onChoose('work') : undefined}
+        onKeyDown={live ? (e) => onKey(e, 'work') : undefined}
       >
         <rect
           x="35"
@@ -153,12 +154,11 @@ export function VillageScene({
 
       <g
         className={hotspot}
-        // biome-ignore lint/a11y/useSemanticElements: un <button> HTML ne peut pas être inclus dans un SVG
-        role="button"
-        tabIndex={0}
+        role={live ? 'button' : undefined}
+        tabIndex={live ? 0 : undefined}
         aria-label={`Place du village, ${counts.all} participation(s)`}
-        onClick={() => onChoose('all')}
-        onKeyDown={(e) => onKey(e, 'all')}
+        onClick={live ? () => onChoose('all') : undefined}
+        onKeyDown={live ? (e) => onKey(e, 'all') : undefined}
       >
         <rect
           x="320"
@@ -179,12 +179,11 @@ export function VillageScene({
 
       <g
         className={hotspot}
-        // biome-ignore lint/a11y/useSemanticElements: un <button> HTML ne peut pas être inclus dans un SVG
-        role="button"
-        tabIndex={0}
+        role={live ? 'button' : undefined}
+        tabIndex={live ? 0 : undefined}
         aria-label={`Maison des équipes, ${counts.team} groupe(s) ouvert(s)`}
-        onClick={() => onChoose('team')}
-        onKeyDown={(e) => onKey(e, 'team')}
+        onClick={live ? () => onChoose('team') : undefined}
+        onKeyDown={live ? (e) => onKey(e, 'team') : undefined}
       >
         <rect
           x="500"

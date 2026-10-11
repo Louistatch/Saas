@@ -10,9 +10,9 @@ export default function HarooLifePage() {
       <header className="border-b border-emerald-900/10 bg-white px-5 py-4">
         <nav
           aria-label="Navigation HarooLife"
-          className="mx-auto flex max-w-6xl flex-wrap items-center gap-5 text-sm"
+          className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-2 text-sm"
         >
-          <Link href="/" className="mr-auto font-bold text-emerald-900">
+          <Link href="/" className="w-full font-bold text-emerald-900 sm:mr-auto sm:w-auto">
             FaîtiereHub <span className="font-normal">/ HarooLife</span>
           </Link>
           <Link href="/dashboard">Mon organisation</Link>
