@@ -1,13 +1,12 @@
-import { HarooLifeWorkspace } from '@/components/haroolife/workspace'
-import { SupportButton } from '@/components/support/support-button'
+import { TogoLife } from '@/components/haroolife/togo-life'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'HarooLife — Mon territoire en action' }
+export const metadata = { title: 'HarooLife — La vie agricole du Togo' }
 
 export default function HarooLifePage() {
   return (
-    <div className="min-h-screen bg-[#f6f7ef] text-slate-900">
+    <div className="min-h-screen bg-[#FAFAF7] text-[#1F2A44]">
       <header className="border-b border-emerald-900/10 bg-white px-5 py-4">
         <nav
           aria-label="Navigation HarooLife"
@@ -22,12 +21,15 @@ export default function HarooLifePage() {
         </nav>
       </header>
       {process.env.HAROOLIFE_ENABLED === 'true' ? (
-        <HarooLifeWorkspace />
+        <TogoLife />
       ) : (
         <main className="mx-auto max-w-2xl space-y-5 px-5 py-16">
           <p className="text-sm font-semibold text-emerald-700">HAROOLIFE</p>
           <h1 className="text-3xl font-bold">Votre territoire agricole, en action.</h1>
-          <p>Former une équipe et regrouper les travaux : ce nouvel espace est en préparation.</p>
+          <p>
+            Votre canton, vos voisins producteurs et ouvriers, le marché et le ciel : ce nouvel
+            espace est en préparation.
+          </p>
           <p>Vos cartes, vos annonces et vos services FaîtiereHub restent accessibles.</p>
           <Link
             href="/haroo"
@@ -37,7 +39,6 @@ export default function HarooLifePage() {
           </Link>
         </main>
       )}
-      <SupportButton />
     </div>
   )
 }
