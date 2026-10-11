@@ -6,6 +6,7 @@ export interface Group {
   id: string
   kind: Kind
   title: string
+  beneficiary?: string | null
   activity: keyof typeof ACTIVITIES
   starts_on: string
   ends_on: string
@@ -18,7 +19,7 @@ export interface Group {
   state: 'open' | 'ready' | 'expired' | 'cancelled'
 }
 export interface Board {
-  access: { can_team: boolean; can_work: boolean }
+  access: { can_team: boolean; can_work: boolean; can_recruit?: boolean }
   pilot: {
     canton: string
     cooperative: string
@@ -53,6 +54,7 @@ export const commandSchema = z.discriminatedUnion('action', [
           activity: z.enum(['recolte', 'semis', 'desherbage']),
           starts_on: date,
           ends_on: date,
+          beneficiary: z.string().trim().min(3).max(120).optional(),
           ...contribution,
         })
         .strict(),

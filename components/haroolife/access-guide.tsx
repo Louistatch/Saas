@@ -20,8 +20,8 @@ const WAYS = [
   {
     icon: Microscope,
     who: 'Vous êtes agronome',
-    how: 'Ce premier pilote s’adresse aux ouvriers et aux producteurs. Votre accès conseil viendra ensuite ; vos missions restent dans votre espace Haroo.',
-    action: 'Voir mes missions',
+    how: 'Une fois votre dossier validé par votre faîtière, vous pourrez recruter des équipes d’ouvriers pour les coopératives et les exploitants.',
+    action: 'Suivre mon dossier',
     href: '/haroo',
   },
   {

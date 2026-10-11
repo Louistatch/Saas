@@ -171,7 +171,9 @@ export function HarooLifeWorkspace() {
           ? 'Groupe annulé.'
           : command.action === 'leave'
             ? 'Votre participation a été retirée.'
-            : 'Votre participation est enregistrée. Aucun contrat de travail n’a été signé.',
+            : command.action === 'create' && 'beneficiary' in command.payload
+              ? 'Équipe ouverte au recrutement. Les ouvriers disponibles peuvent s’inscrire.'
+              : 'Votre participation est enregistrée. Aucun contrat de travail n’a été signé.',
       )
       await load()
     } catch {
@@ -184,6 +186,9 @@ export function HarooLifeWorkspace() {
     }
   }
 
+  // Agronome validé sans profil ouvrier : il recrute l'équipe pour un tiers, sans y prendre place.
+  const recruiting =
+    creating === 'team' && !board?.access.can_team && board?.access.can_recruit === true
   function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!creating) return
@@ -200,6 +205,7 @@ export function HarooLifeWorkspace() {
         ...(creating === 'work'
           ? { parcel_id: String(data.get('parcel_id')), amount: Number(data.get('amount')) }
           : {}),
+        ...(recruiting ? { beneficiary: String(data.get('beneficiary')) } : {}),
       },
     })
   }
@@ -397,7 +403,7 @@ export function HarooLifeWorkspace() {
                 ))}
               </div>
               <div className="flex flex-wrap gap-2">
-                {board.access.can_team && (
+                {(board.access.can_team || board.access.can_recruit) && (
                   <button
                     type="button"
                     className={actionClass}
@@ -407,7 +413,7 @@ export function HarooLifeWorkspace() {
                       setJoining(null)
                     }}
                   >
-                    Créer une équipe
+                    {board.access.can_team ? 'Créer une équipe' : 'Recruter une équipe'}
                   </button>
                 )}
                 {board.access.can_work && (
@@ -425,7 +431,7 @@ export function HarooLifeWorkspace() {
                 )}
               </div>
             </div>
-            {!board.access.can_team && !board.access.can_work && (
+            {!board.access.can_team && !board.access.can_work && !board.access.can_recruit && (
               <p className="rounded-xl bg-white p-4 text-sm">
                 Vous consultez le pilote. Chaque ouvrier et chaque titulaire de parcelle confirme sa
                 propre participation ; l’administrateur ne l’engage pas à sa place.
@@ -438,17 +444,21 @@ export function HarooLifeWorkspace() {
                 aria-label="Créer un groupe"
               >
                 <h2 className="text-xl font-bold">
-                  {creating === 'team'
-                    ? 'Constituer mon équipe'
-                    : 'Proposer un regroupement de travaux'}
+                  {recruiting
+                    ? 'Recruter une équipe d’ouvriers'
+                    : creating === 'team'
+                      ? 'Constituer mon équipe'
+                      : 'Proposer un regroupement de travaux'}
                 </h2>
                 <p className="text-sm text-slate-600">
                   Objectif :{' '}
                   {creating === 'team'
                     ? `${board.pilot.team_target} personnes`
                     : `${board.pilot.area_target} ha`}
-                  . Délai : {board.pilot.formation_hours} h maximum, avant le début prévu. Votre
-                  participation est ajoutée dès la création.
+                  . Délai : {board.pilot.formation_hours} h maximum, avant le début prévu.{' '}
+                  {recruiting
+                    ? 'Les ouvriers disponibles du canton s’inscrivent eux-mêmes ; vous ne comptez pas dans l’équipe.'
+                    : 'Votre participation est ajoutée dès la création.'}
                 </p>
                 <fieldset disabled={disabled} className="grid gap-4 sm:grid-cols-2">
                   <label className="text-sm font-medium">
@@ -492,11 +502,25 @@ export function HarooLifeWorkspace() {
                       className={inputClass}
                     />
                   </label>
+                  {recruiting && (
+                    <label className="text-sm font-medium sm:col-span-2">
+                      Pour qui recrutez-vous ?
+                      <input
+                        name="beneficiary"
+                        required
+                        minLength={3}
+                        maxLength={120}
+                        className={inputClass}
+                        placeholder="Coopérative, exploitant ou exploitation"
+                      />
+                    </label>
+                  )}
                   {creating === 'work' && <ParcelFields board={board} />}
                   <label className="flex items-start gap-2 text-sm sm:col-span-2">
                     <input type="checkbox" required className="mt-1" />
-                    Je confirme ma disponibilité sur cette période et ma participation à la
-                    préparation du groupe.
+                    {recruiting
+                      ? 'Je confirme recruter pour ce bénéficiaire, qui a besoin de cette équipe sur cette période.'
+                      : 'Je confirme ma disponibilité sur cette période et ma participation à la préparation du groupe.'}
                   </label>
                   <button type="submit" className={actionClass}>
                     {busy ? 'Enregistrement…' : 'Confirmer la création'}
@@ -571,6 +595,11 @@ export function HarooLifeWorkspace() {
                       </span>
                     </div>
                     <h2 className="text-lg font-bold">{g.title}</h2>
+                    {g.beneficiary && (
+                      <p className="text-sm font-medium text-emerald-900">
+                        Recrutement pour {g.beneficiary}
+                      </p>
+                    )}
                     <p className="text-sm text-slate-600">
                       {ACTIVITIES[g.activity]} · {dateLabel(g.starts_on)} au {dateLabel(g.ends_on)}
                     </p>

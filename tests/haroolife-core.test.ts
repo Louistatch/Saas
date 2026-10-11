@@ -39,3 +39,21 @@ test('expiry overrides readiness but preserves cancellation; progress stays boun
   assert.equal(progress({ total: 4, target: 10 }), 40)
   assert.equal(progress({ total: 1, target: 0 }), 0)
 })
+
+test('accepts a recruiter beneficiary only within bounds', () => {
+  const payload = {
+    kind: 'team',
+    title: 'Récolte maïs',
+    activity: 'recolte',
+    starts_on: '2099-02-28',
+    ends_on: '2099-03-01',
+  }
+  const parse = (beneficiary?: unknown) =>
+    commandSchema.safeParse({ action: 'create', request_id, payload: { ...payload, beneficiary } })
+      .success
+  assert.equal(parse('Coopérative FENOMAT'), true)
+  assert.equal(parse(undefined), true)
+  assert.equal(parse('ab'), false)
+  assert.equal(parse('x'.repeat(121)), false)
+  assert.equal(parse(42), false)
+})

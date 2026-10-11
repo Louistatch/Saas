@@ -55,3 +55,6 @@ La cible reste 10 ha (`area_target`). La dernière parcelle peut la dépasser, m
 
 ## Village 3D (optionnel)
 `NEXT_PUBLIC_HAROOLIFE_3D=true` active un village 3D (PlayCanvas, MIT, chargé uniquement dans le navigateur). Il est ignoré, et l'illustration SVG reste affichée, si WebGL2 est absent, si « réduire les animations » ou « économiser les données » est demandé, ou si l'appareil déclare moins de 4 Go de mémoire. Désactivé par défaut. Retour arrière : remettre la variable à `false`.
+
+## Agronomes recruteurs
+Un agronome **validé** (`badge_valide` ou `statut_validation = 'VALIDE'`) peut créer une équipe pour une coopérative ou un exploitant (champ « Pour qui recrutez-vous ? », obligatoire). Il n'occupe pas de place dans l'équipe ; les ouvriers disponibles du canton s'inscrivent eux-mêmes et il peut annuler son équipe. Un dossier non validé n'a pas accès, pour éviter de faux recruteurs. Migration : `20261011_090000_haroolife_recruiters.sql`.
