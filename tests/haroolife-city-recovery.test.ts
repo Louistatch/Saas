@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
-  initialCity, place, tick, cityWarning, emergencyRelief, nextObjective, decodeCity,
+  initialCity, place, tick, cityWarning, emergencyRelief, nextObjective, decodeCity, type City,
 } from '../lib/haroolife/townsmen-engine'
 
 test('empty food means no taxation and triggers a critical warning', () => {
@@ -14,7 +14,7 @@ test('empty food means no taxation and triggers a critical warning', () => {
 })
 
 test('saved older v1 cities remain valid and can receive help exactly once', () => {
-  const old = {...initialCity(), day: 572, population: 2, food: 0, happiness: 18}
+  const old: City = {...initialCity(), day: 572, population: 2, food: 0, happiness: 18}
   delete old.reliefUsed
   const restored = decodeCity(JSON.parse(JSON.stringify(old)))
   assert.ok(restored)
