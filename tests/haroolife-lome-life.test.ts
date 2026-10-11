@@ -64,10 +64,10 @@ test('jobs pay once a day only near workplace with municipal funds',()=>{
 test('construction preserves city budget and personal savings',()=>{
   const s=initialLomeLife()
   const beforeWallet=s.wallet
-  const built=buildInLome(s,12,14,'house')
+  const built=buildInLome(s,10,13,'house')
   assert.equal(built.wallet,beforeWallet)
   assert.equal(built.city.coins,s.city.coins-85)
-  assert.ok(built.city.buildings.some(b=>b.type==='house'&&b.x===12&&b.y===14))
+  assert.ok(built.city.buildings.some(b=>b.type==='house'&&b.x===10&&b.y===13))
   assert.ok(built.events.length<=8)
 })
 test('needs diminish while time passes, city recalculates on day boundary',()=>{
