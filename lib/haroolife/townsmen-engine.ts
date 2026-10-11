@@ -20,6 +20,8 @@ export interface City {
   food: number
   population: number
   happiness: number
+  /** Optional to preserve compatibility with v1 localStorage save files. */
+  reliefUsed?: boolean
   buildings: Building[]
   log: string[]
 }
@@ -58,8 +60,8 @@ export function initialCity(): City {
     { x: 14, y: 10, type: 'house' },
   ]
   return {
-    version: 1, day: 1, coins: 1250, wood: 65, maize: 0, flour: 0, food: 35,
-    population: 10, happiness: 60, buildings, log: [
+    version: 1, day: 1, coins: 1250, wood: 65, maize: 0, flour: 0, food: 60,
+    population: 10, happiness: 60, reliefUsed: false, buildings, log: [
       'Bienvenue à HarooVille ! Relie tes bâtiments aux routes de la mairie.',
       'Construis un champ de maïs, puis un moulin et une boulangerie.',
     ],
@@ -157,18 +159,24 @@ export function tick(city: City): City {
   let workers = next.population
   let operated = 0
   const buildings = next.buildings.filter(b => b.type !== 'hall' && b.type !== 'road' && isConnected(b, next))
-  // All sites are evaluated in a stable order; workers are scarce, not magic.
-  for (const type of ['lumberyard', 'farm', 'mill', 'bakery', 'market'] as const) {
+  // Protect the essential food supply: food-producing jobs get priority before
+  // logging, then cash sales. Idle factories consume no workers.
+  for (const type of ['farm', 'mill', 'bakery', 'lumberyard', 'market'] as const) {
     for (const b of buildings.filter(b => b.type === type)) {
       const need = CATALOG[type].workers
       if (workers < need) continue
+      if (type === 'mill' && next.maize < 4) continue
+      if (type === 'bakery' && next.flour < 3) continue
+      if (type === 'lumberyard' && !hasForest(b.x, b.y)) continue
+      // Market reserves food for domestic consumption before exports.
+      if (type === 'market' && next.food < Math.ceil(next.population / 4) + 3) continue
       workers -= need
       operated++
-      if (type === 'lumberyard' && hasForest(b.x, b.y)) next.wood += 5
+      if (type === 'lumberyard') next.wood += 5
       if (type === 'farm') next.maize += 7
-      if (type === 'mill' && next.maize >= 4) { next.maize -= 4; next.flour += 3 }
-      if (type === 'bakery' && next.flour >= 3) { next.flour -= 3; next.food += 7 }
-      if (type === 'market' && next.food >= 3) { next.food -= 3; next.coins += 40 }
+      if (type === 'mill') { next.maize -= 4; next.flour += 3 }
+      if (type === 'bakery') { next.flour -= 3; next.food += 7 }
+      if (type === 'market') { next.food -= 3; next.coins += 40 }
     }
   }
   const consumption = Math.ceil(next.population / 4)
@@ -182,9 +190,10 @@ export function tick(city: City): City {
   const parks = next.buildings.filter(b => b.type === 'park' && isConnected(b, next)).length
   next.happiness = Math.max(5, Math.min(100,
     49 + (fed ? 15 : -28) + (next.population <= houseCount * 6 ? 9 : -20) +
-    (hasWell ? 12 : -6) + (hasMarket ? 9 : -6) + Math.min(12, parks * 4) +
-    (workers < 0 ? -10 : 0)))
-  next.coins += Math.floor(next.population * next.happiness / 20)
+    (hasWell ? 12 : -6) + (hasMarket ? 9 : -6) + Math.min(12, parks * 4)))
+  // Taxes require an actual functioning and fed settlement. Avoid the prior
+  // exploit of growing rich for hundreds of starving days.
+  if (fed) next.coins += Math.floor(next.population * next.happiness / 20)
   if (fed && next.happiness >= 68 && next.day % 3 === 0 && next.population < houseCount * 6) {
     next.population += 1
     pushLog(next, 'Une nouvelle famille s’installe dans la ville.')
@@ -193,11 +202,51 @@ export function tick(city: City): City {
     next.population -= 1
     pushLog(next, 'Pénurie alimentaire : un habitant quitte la ville.')
   }
+  if (!fed && city.food > 0) {
+    pushLog(next, 'CRISE : les réserves alimentaires sont épuisées. Mettez le temps en pause.')
+  }
   if (next.day % 4 === 0) {
     pushLog(next, 'Jour ' + next.day + ' : ' + operated + ' atelier(s) actif(s), bonheur ' + next.happiness + ' %.')
   }
   return next
 }
+
+/** One-time tutorial recovery: never alters real accounts or farm parcels. */
+export function emergencyRelief(city: City): { city: City; error: string | null } {
+  if (city.reliefUsed) return { city, error: 'Le secours exceptionnel a déjà été utilisé.' }
+  const next: City = {
+    ...city,
+    coins: Math.max(city.coins, 700),
+    wood: Math.max(city.wood, 45),
+    food: Math.max(city.food, 65),
+    population: Math.min(capacity(city), Math.max(city.population, 10)),
+    happiness: Math.max(city.happiness, 60),
+    reliefUsed: true,
+    log: [...city.log],
+  }
+  pushLog(next, 'Soutien exceptionnel : vivres, bois et ouvriers temporaires pour relancer la ville.')
+  return { city: next, error: null }
+}
+
+export function cityWarning(city: City): { kind: 'critical' | 'warning' | 'healthy'; message: string } {
+  const dailyNeed = Math.ceil(city.population / 4)
+  const supplies = count(city, 'farm') > 0 && count(city, 'mill') > 0 && count(city, 'bakery') > 0
+  if (city.food < dailyNeed || city.population <= 3)
+    return { kind: 'critical', message: 'Urgence alimentaire : mettez en pause et relancez la chaîne de production.' }
+  if (city.food <= Math.max(12, dailyNeed * 4) && !supplies)
+    return { kind: 'warning', message: 'Réserves faibles : construisez rapidement un champ, un moulin et une boulangerie.' }
+  return { kind: 'healthy', message: 'Votre village peut continuer son développement.' }
+}
+
+export function nextObjective(city: City): string {
+  if (count(city, 'farm') === 0) return '1. Sélectionnez « Champ de maïs », puis construisez-le contre une route proche de la mairie.'
+  if (count(city, 'mill') === 0) return '2. Ajoutez un moulin relié aux routes pour transformer le maïs récolté.'
+  if (count(city, 'bakery') === 0) return '3. Placez une boulangerie reliée : le moulin fournira la farine pour les repas.'
+  if (count(city, 'well') === 0) return '4. Construisez un puits près des maisons pour améliorer le bonheur.'
+  if (city.population < 15) return '5. Construisez des maisons, puis maintenez nourriture et eau pour accueillir de nouveaux habitants.'
+  return 'Développez les commerces, les espaces verts et un quartier autosuffisant.'
+}
+
 export function goal(city: City): { done: number; total: number; steps: string[] } {
   const steps = [
     count(city, 'farm') > 0 ? '✓ Produire du maïs' : '○ Construire un champ de maïs',
@@ -228,5 +277,6 @@ export function decodeCity(value: unknown): City | null {
     occupied.add(key(b.x, b.y))
   }
   if (v.buildings.filter(b => b.type === 'hall').length !== 1) return null
+  if (v.reliefUsed !== undefined && typeof v.reliefUsed !== 'boolean') return null
   return v as City
 }
