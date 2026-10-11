@@ -9,6 +9,7 @@ import {
   lotsInChunk,
 } from '@/lib/haroolife/city/chunks'
 import { type Geometry, appendModel } from '@/lib/haroolife/city/pack'
+import { bump } from '@/lib/haroolife/city/perf'
 import {
   CELL,
   WORLD_H,
@@ -658,6 +659,7 @@ export default function CityChunks({
   centerY: number
   onStats?: (s: ChunkStats) => void
 }) {
+  bump('chunks')
   const app = useApp()
   const live = useRef(
     new Map<string, { entity: pc.Entity; mesh: pc.Mesh | null; lod: string; tris: number }>(),

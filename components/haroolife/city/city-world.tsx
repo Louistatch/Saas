@@ -2,6 +2,13 @@
 
 import { type NpcAnim, type Prop, layoutFor } from '@/lib/haroolife/city/interiors'
 import type { Interior } from '@/lib/haroolife/city/life'
+import {
+  FrameRing,
+  type PerfSnapshot,
+  bump,
+  renders,
+  watchLongTasks,
+} from '@/lib/haroolife/city/perf'
 import { type Agent, agentsNear } from '@/lib/haroolife/city/traffic'
 import {
   CATEGORY_OF,
@@ -125,6 +132,7 @@ function Baked({
 
 /** Vehicles and pedestrians, moved smoothly between traffic steps. */
 function Agents({ agents, step }: { agents: Agent[]; step: number }) {
+  bump('agents')
   const [phase, setPhase] = useState(0)
   const last = useRef({ step, at: performance.now() })
   if (last.current.step !== step) last.current = { step, at: performance.now() }
@@ -390,17 +398,66 @@ function LabelProjector({
   return null
 }
 
-/** Frame statistics for the debug hook and the e2e performance check. */
+/** Frame statistics for the debug hook, the statistics overlay and the e2e performance scenarios. */
 function StatsProbe({ onFrame }: { onFrame: (s: { drawCalls: number; fps: number }) => void }) {
   const app = useApp()
   const last = useRef(0)
-  useAppEvent('update', () => {
+  const ring = useRef(new FrameRing(600))
+  const tasks = useRef(watchLongTasks())
+  useEffect(() => {
+    const w = window as unknown as { __LOME_PERF_RESET?: () => void; __LOME_APP?: unknown }
+    w.__LOME_PERF_RESET = () => ring.current.reset()
+    w.__LOME_APP = app
+    return () => {
+      w.__LOME_PERF_RESET = undefined
+      w.__LOME_APP = undefined
+    }
+  }, [app])
+  useAppEvent('update', (dt: number) => {
     if (!app) return
+    ring.current.push(dt * 1000)
     const now = performance.now()
-    if (now - last.current < 1000) return
+    if (now - last.current < 500) return
     last.current = now
-    const stats = app.stats as unknown as { drawCalls: { total: number }; frame: { fps: number } }
-    onFrame({ drawCalls: stats.drawCalls.total, fps: Math.round(stats.frame.fps) })
+    const stats = app.stats as unknown as {
+      drawCalls: { total: number }
+      frame: { fps: number; triangles: number }
+    }
+    let renderEntities = 0
+    let meshInstances = 0
+    let animated = 0
+    let animating = 0
+    app.root.forEach((e) => {
+      const ent = e as pc.Entity
+      if (ent.render) {
+        renderEntities++
+        meshInstances += ent.render.meshInstances?.length ?? 0
+      }
+      if (ent.anim) {
+        animated++
+        if (ent.anim.playing) animating++
+      }
+    })
+    const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory
+    const snap: PerfSnapshot = {
+      at: Math.round(now),
+      frame: ring.current.summary(),
+      drawCalls: stats.drawCalls.total,
+      triangles: stats.frame.triangles,
+      renderEntities,
+      meshInstances,
+      animated,
+      animating,
+      heapMB: mem ? Math.round(mem.usedJSHeapSize / 1048576) : null,
+      longTasks: tasks.current.count(),
+      longTaskMs: tasks.current.totalMs(),
+      renders: { ...renders },
+      assets: app.assets.list().filter((a) => a.loaded).length,
+      pixelRatio: app.graphicsDevice.maxPixelRatio,
+      resolution: [app.graphicsDevice.width, app.graphicsDevice.height],
+    }
+    ;(window as unknown as { __LOME_PERF?: PerfSnapshot }).__LOME_PERF = snap
+    onFrame({ drawCalls: snap.drawCalls, fps: snap.frame.fps })
   })
   return null
 }
@@ -459,6 +516,7 @@ export default function CityWorld({
   onStats?: (s: ChunkStats) => void
   onFrame?: (s: { drawCalls: number; fps: number }) => void
 }) {
+  bump('world')
   const overlay = useRef<HTMLDivElement | null>(null)
   const dragging = useRef(false)
   const centerCell = useMemo(() => cellOf(camera.tx, camera.tz), [camera.tx, camera.tz])

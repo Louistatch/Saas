@@ -24,6 +24,7 @@ import {
   walkStep,
 } from '@/lib/haroolife/city/life'
 import { findPath } from '@/lib/haroolife/city/navigation'
+import { bump } from '@/lib/haroolife/city/perf'
 import {
   CATEGORY_LABELS,
   CATEGORY_OF,
@@ -231,6 +232,7 @@ function DailyStatus({ life }: { life: LifeState }) {
 }
 
 export function LomeLifeImmersive() {
+  bump('immersive')
   const [cityLife, setCityLife] = useState<CityLife>(initialCityLife)
   const life = cityLife.life
   const setLife = useCallback(
