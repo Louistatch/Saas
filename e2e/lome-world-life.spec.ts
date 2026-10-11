@@ -168,15 +168,15 @@ test('night falls on the city and the sky changes', async ({ page }) => {
     .toBeGreaterThan(10)
   const world = page.getByTestId('city-world')
   const day = await world.evaluate((el) => getComputedStyle(el).backgroundColor)
-  // Wait for the first autosave, then force a night save: 22h.
+  // Force a night save (22h) before the app boots again, so no autosave can overwrite it.
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem('haroolife.lome-city.v1') !== null), {
       timeout: 30000,
     })
     .toBe(true)
-  await page.evaluate(() => {
+  await page.addInitScript(() => {
     const raw = JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? 'null')
-    if (raw) {
+    if (raw && raw.life.hour !== 22) {
       raw.life.hour = 22
       localStorage.setItem('haroolife.lome-city.v1', JSON.stringify(raw))
     }
