@@ -37,6 +37,11 @@ const ASSETS = {
   bush: BASE + 'nature/plant-bush.glb',
   rock: BASE + 'nature/rock-largea.glb',
   villager: BASE + 'characters/character-female-a.glb',
+  taxi: BASE + 'car-kit/taxi.glb',
+  sedan: BASE + 'car-kit/sedan.glb',
+  van: BASE + 'car-kit/van.glb',
+  streetLight: BASE + 'city-kit-roads/light-curved.glb',
+  streetSign: BASE + 'city-kit-roads/road-sign-street.glb',
 } as const
 
 function positionOf(x: number, y: number): Vec3 {
@@ -243,9 +248,18 @@ function SettlementScene({
           {simulatedTraffic(life).map((npc,i) => {
             const at=positionOf(npc.x,npc.y)
             return <Entity key={'traffic'+i} position={at}>
-              <Model url={ASSETS.villager} scale={0.48} rotation={i*94} />
+              {i===0 ? <Model url={ASSETS.taxi} scale={0.9} rotation={life.trafficStep%2?90:0}/> :
+               i===1 ? <Model url={ASSETS.sedan} scale={0.83} rotation={life.trafficStep%2?0:90}/> :
+               i===2 ? <Model url={ASSETS.van} scale={0.78} rotation={180}/> :
+               <Model url={ASSETS.villager} scale={0.48} rotation={i*94}/>}
             </Entity>
           })}
+          {life.city.buildings.filter(b=>b.type==='road').slice(0,2).map((b,i)=>(
+            <Entity key={'street-furniture-'+i} position={positionOf(b.x,b.y)}>
+              <Model url={i===0?ASSETS.streetLight:ASSETS.streetSign} scale={i===0?1.45:0.8}
+                position={[0.48,0,-0.38]} rotation={90}/>
+            </Entity>
+          ))}
           {life.inside && (
             <Entity name="Intérieur accessible" position={positionOf(life.pos.x,life.pos.y)}>
               <Entity position={[0,2,0]} scale={[6,0.25,5]}><Render type="box" material={road}/></Entity>
