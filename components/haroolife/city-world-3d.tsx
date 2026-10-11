@@ -1,6 +1,7 @@
 'use client'
 
 import { type Action, type LifeState, trafficVehicles } from '@/lib/haroolife/lome-life-engine'
+import type { Transport } from '@/lib/haroolife/lome-life-engine'
 import type { PlacedResident } from '@/lib/haroolife/lome-presence'
 import {
   type BuildType,
@@ -23,6 +24,7 @@ import { Compass, Maximize2, Minus, Plus, RotateCcw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import LomeLifeRoom3D from './lome-life-room-3d'
 import { PAGNES } from './pagnes'
+import { Ride } from './travel-scene-3d'
 
 type EditTool = BuildType | 'inspect' | 'demolish'
 type Cell = { x: number; y: number }
@@ -216,8 +218,10 @@ function SettlementScene({
   life,
   onInteriorAction,
   visitors = [],
+  ride,
 }: {
   visitors?: PlacedResident[]
+  ride?: { transport: Transport; rain: boolean } | null
   city: City
   life?: LifeState
   onInteriorAction?: (action: Action) => void
@@ -282,6 +286,7 @@ function SettlementScene({
       ? canBuild(city, hover.x, hover.y, tool) !== null
       : false
 
+  if (ride) return <Ride transport={ride.transport} rain={ride.rain} />
   if (life?.inside)
     return (
       <LomeLifeRoom3D
@@ -438,8 +443,10 @@ export default function CityWorld3D({
   immersive = false,
   onInteriorAction,
   visitors,
+  ride,
 }: {
   visitors?: PlacedResident[]
+  ride?: { transport: Transport; rain: boolean } | null
   city: City
   life?: LifeState
   onInteriorAction?: (action: Action) => void
@@ -518,6 +525,7 @@ export default function CityWorld3D({
             selected={inspect}
             life={life}
             visitors={visitors}
+            ride={ride}
             pan={
               life
                 ? {

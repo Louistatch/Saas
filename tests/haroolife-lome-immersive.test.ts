@@ -103,3 +103,17 @@ test('traffic drives along adjacent road tiles instead of teleporting', () => {
   })
   assert.deepEqual(trafficVehicles({ ...state, city: { ...state.city, buildings: [] } }), [])
 })
+
+import { skipTravel } from '../lib/haroolife/lome-life-engine'
+
+test('skipping a ride lands on the last road tile of the route without extra cost', () => {
+  const start = initialLomeLife()
+  const moving = directTo(start, { x: 12, y: 11 })
+  const last = moving.route[moving.route.length - 1]
+  const landed = skipTravel(moving)
+  assert.deepEqual(landed.pos, last)
+  assert.equal(landed.route.length, 0)
+  assert.equal(landed.wallet, moving.wallet)
+  assert.equal(Math.abs(landed.pos.x - 12) + Math.abs(landed.pos.y - 11), 1)
+  assert.equal(skipTravel(start), start)
+})

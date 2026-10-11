@@ -196,6 +196,15 @@ export function chooseTransport(state: LifeState, transport: Transport): LifeSta
   )
 }
 
+/** End the ride now: the player lands on the last road tile of the route. */
+export function skipTravel(state: LifeState): LifeState {
+  if (state.route.length === 0) return state
+  const last = state.route[state.route.length - 1]
+  return events(
+    { ...state, pos: { ...last }, route: [], trafficStep: state.trafficStep + state.route.length },
+    'Arrivé à destination : entre dans le bâtiment ou choisis une action.',
+  )
+}
 export function selectJob(state: LifeState, job: Career): LifeState {
   return events(
     { ...state, job },

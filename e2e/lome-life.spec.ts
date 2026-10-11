@@ -38,6 +38,21 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
     )
     .toEqual(before)
 
+  // Paid ride: the travel scene opens on the boulevard; "Passer" lands at destination.
+  await navigation.getByRole('button', { name: 'Carte' }).click()
+  await page.getByRole('button', { name: /Chez moi/ }).click()
+  await navigation.getByRole('button', { name: 'Carte' }).click()
+  await page.getByRole('button', { name: /Moto/ }).click()
+  const ride = page.getByLabel('Trajet en cours')
+  await expect(ride).toBeVisible()
+  await expect(ride.getByText('Boulevard du Mono')).toBeVisible()
+  await expect(page.locator('canvas').first()).toBeVisible({ timeout: 20000 })
+  await page.waitForTimeout(1500)
+  const rideShot = path.join('test-results', 'lome-visual', testInfo.project.name + '-ride.png')
+  fs.mkdirSync(path.dirname(rideShot), { recursive: true })
+  await page.screenshot({ path: rideShot })
+  await ride.getByRole('button', { name: /Passer/ }).click()
+  await expect(ride).toBeHidden()
   await navigation.getByRole('button', { name: 'Carte' }).click()
   await expect(page.getByRole('dialog', { name: 'Explorer Lomé' })).toBeVisible()
   await page.getByRole('button', { name: /Marché de quartier/ }).click()
@@ -71,7 +86,7 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
         return save ? JSON.parse(save).wallet : 0
       }),
     )
-    .toBe(10750)
+    .toBe(10400)
   await page.getByRole('button', { name: 'Fermer', exact: true }).click()
   await navigation.getByRole('button', { name: 'Maison' }).click()
   await page.getByRole('button', { name: 'Entrer', exact: true }).click()
