@@ -1,5 +1,5 @@
 import { VillageScene } from '@/components/haroolife/village-scene'
-import { Building2, HardHat, Sprout } from 'lucide-react'
+import { Building2, HardHat, Microscope, Sprout } from 'lucide-react'
 import Link from 'next/link'
 
 const WAYS = [
@@ -16,6 +16,13 @@ const WAYS = [
     how: 'Connectez-vous avec l’adresse e-mail enregistrée sur votre fiche de membre. Vos parcelles apparaîtront ici pour regrouper les travaux.',
     action: 'Vérifier mon compte',
     href: '/compte',
+  },
+  {
+    icon: Microscope,
+    who: 'Vous êtes agronome',
+    how: 'Ce premier pilote s’adresse aux ouvriers et aux producteurs. Votre accès conseil viendra ensuite ; vos missions restent dans votre espace Haroo.',
+    action: 'Voir mes missions',
+    href: '/haroo',
   },
   {
     icon: Building2,

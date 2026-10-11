@@ -15,7 +15,7 @@ export default function HarooLifePage() {
           <Link href="/" className="w-full font-bold text-emerald-900 sm:mr-auto sm:w-auto">
             FaîtiereHub <span className="font-normal">/ HarooLife</span>
           </Link>
-          <Link href="/dashboard">Mon organisation</Link>
+          <Link href="/dashboard">Mon tableau de bord</Link>
           <Link href="/haroo">Mon espace Haroo</Link>
           <Link href="/marche">Le marché</Link>
         </nav>

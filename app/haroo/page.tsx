@@ -167,6 +167,12 @@ const MISSION_STATUT_STYLE: Record<string, string> = {
   ANNULEE: 'bg-destructive/10 text-destructive',
 }
 
+function validationLabel(status?: string | null): string {
+  if (status === 'VALIDE') return 'Dossier validé'
+  if (status === 'REJETE') return 'Dossier à compléter'
+  return 'Dossier en cours de vérification'
+}
+
 function formatDate(value: string | null): string {
   if (!value) return '—'
   return new Date(value).toLocaleDateString('fr-FR', {
@@ -860,12 +866,22 @@ function HarooSpaceInner() {
                     </p>
                   ) : (
                     <p className="text-muted-foreground">
-                      Validation : {profile.statut_validation ?? 'EN_ATTENTE'}
+                      {validationLabel(profile.statut_validation)}
                     </p>
                   )}
                 </div>
               )}
             </div>
+
+            {harooRole === 'agronome' && profile && !profile.badge_valide && (
+              <p className="mt-4 rounded-lg bg-muted px-4 py-3 text-sm text-foreground">
+                {!profile.faitiere_id
+                  ? 'Étape suivante : choisissez votre faîtière de rattachement avec « Modifier mon profil ». Elle vérifiera votre dossier, puis votre carte sera émise.'
+                  : profile.statut_validation === 'REJETE'
+                    ? 'Votre faîtière demande des compléments : ajoutez les justificatifs manquants ci-dessous.'
+                    : 'Votre faîtière vérifie votre dossier. Votre carte professionnelle sera émise dès la validation : ajoutez vos justificatifs ci-dessous pour accélérer.'}
+              </p>
+            )}
 
             {tags.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-2">
