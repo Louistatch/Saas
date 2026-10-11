@@ -1,3 +1,4 @@
+import { EVENT_IDS, rollEvent } from './lome-events'
 /**
  * HarooLife — Lomé life/city gameplay slice, entirely fictitious.
  * Models life needs, real player movement on connected in-game streets,
@@ -31,9 +32,21 @@ export type Action =
   | 'sleep'
   | 'wash'
   | 'socialize'
+  | 'relax'
+  | 'toilet'
   | 'enter'
   | 'leave'
-export type Needs = { hunger: number; energy: number; hygiene: number; social: number }
+export type Needs = {
+  hunger: number
+  energy: number
+  hygiene: number
+  social: number
+  /** Loisir : télé, jardin, fête. */
+  fun: number
+  /** Toilettes : à vider régulièrement. */
+  bladder: number
+}
+export const NEED_KEYS = ['hunger', 'energy', 'hygiene', 'social', 'fun', 'bladder'] as const
 export interface LifeState {
   version: 1
   city: City
@@ -53,6 +66,8 @@ export interface LifeState {
   trafficStep: number
   lastEvent: string
   events: string[]
+  /** Id de l'événement à choix en attente (voir lome-events.ts), sinon null. */
+  pendingEvent: string | null
 }
 export const SALARIES: Record<Career, number> = {
   vendeur: 3400,
@@ -101,11 +116,12 @@ export function initialLomeLife(): LifeState {
     spent: 0,
     meals: 1,
     job: 'vendeur',
-    needs: { hunger: 75, energy: 85, hygiene: 75, social: 70 },
+    needs: { hunger: 75, energy: 85, hygiene: 75, social: 70, fun: 70, bladder: 80 },
     workToday: false,
     trafficStep: 0,
     lastEvent: 'Choisis un lieu, rejoins-le et interagis avec lui.',
     events: ['Une nouvelle journée commence dans ton quartier fictif de Lomé.'],
+    pendingEvent: null,
   }
 }
 const events = (state: LifeState, msg: string): LifeState => ({
@@ -268,7 +284,11 @@ export function interact(state: LifeState, action: Action): LifeState {
       {
         ...state,
         meals: state.meals - 1,
-        needs: { ...state.needs, hunger: clamp(state.needs.hunger + 45) },
+        needs: {
+          ...state.needs,
+          hunger: clamp(state.needs.hunger + 45),
+          bladder: clamp(state.needs.bladder - 10),
+        },
       },
       'Tu as mangé. Faim réduite.',
     )
@@ -293,6 +313,21 @@ export function interact(state: LifeState, action: Action): LifeState {
       'Tu as discuté avec des voisins.',
     )
   }
+  if (action === 'relax') {
+    if (!nearVenue(state, 'house') && !nearVenue(state, 'park'))
+      return events(state, 'Rentre chez toi (télé) ou va au jardin pour te détendre.')
+    return events(
+      { ...state, needs: { ...state.needs, fun: clamp(state.needs.fun + 40) } },
+      nearVenue(state, 'park')
+        ? 'Un moment au jardin : loisir restauré.'
+        : 'Un film à la télé : loisir restauré.',
+    )
+  }
+  if (action === 'toilet') {
+    if (!nearVenue(state, 'house') && !nearVenue(state, 'hall') && !nearVenue(state, 'market'))
+      return events(state, 'Des toilettes : chez toi, à la mairie ou au marché.')
+    return events({ ...state, needs: { ...state.needs, bladder: 100 } }, 'Soulagé.')
+  }
   return state
 }
 export function advanceLifeHour(state: LifeState): LifeState {
@@ -304,6 +339,8 @@ export function advanceLifeHour(state: LifeState): LifeState {
     energy: clamp(state.needs.energy - (hour >= 22 || hour <= 5 ? 3 : 2)),
     hygiene: clamp(state.needs.hygiene - 1),
     social: clamp(state.needs.social - 1),
+    fun: clamp(state.needs.fun - 2),
+    bladder: clamp(state.needs.bladder - 4),
   }
   let next: LifeState = {
     ...state,
@@ -323,6 +360,10 @@ export function advanceLifeHour(state: LifeState): LifeState {
     next = events(next, 'Destination atteinte : sélectionne une interaction.')
   if (needs.hunger < 15 || needs.energy < 12)
     next = events(next, 'Besoins critiques : mange ou repose-toi.')
+  else if (needs.bladder < 15) next = events(next, 'Il te faut des toilettes, vite.')
+  const drawn = rollEvent(next)
+  if (drawn)
+    next = events({ ...next, pendingEvent: drawn }, 'Il se passe quelque chose dans le quartier…')
   return next
 }
 export function buildInLome(state: LifeState, x: number, y: number, type: BuildType): LifeState {
@@ -466,9 +507,21 @@ export function decodeLomeLife(value: unknown): LifeState | null {
     v.lastEvent.length > 300 ||
     !(['hunger', 'energy', 'hygiene', 'social'] as const).every(
       (k) => Number.isInteger(v.needs?.[k]) && v.needs![k] >= 0 && v.needs![k] <= 100,
+    ) ||
+    !(['fun', 'bladder'] as const).every(
+      (k) =>
+        v.needs![k] === undefined ||
+        (Number.isInteger(v.needs![k]) && v.needs![k] >= 0 && v.needs![k] <= 100),
+    ) ||
+    !(
+      v.pendingEvent == null ||
+      (typeof v.pendingEvent === 'string' && EVENT_IDS.has(v.pendingEvent))
     )
   )
     return null
+  // Saves written before the six-needs update: fill the two new gauges and the event slot.
+  v.needs = { ...v.needs!, fun: v.needs!.fun ?? 70, bladder: v.needs!.bladder ?? 80 }
+  v.pendingEvent = v.pendingEvent ?? null
   const road = roadNetwork(v.city!.buildings)
   if (!road.has(id(v.pos)) || !v.route.every((p) => p && road.has(id(p)))) return null
   if (v.target && !Number.isInteger(v.target.x)) return null
