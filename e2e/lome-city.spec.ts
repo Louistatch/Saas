@@ -66,7 +66,15 @@ test('Lomé Life 3D opens on a dense, explorable city and completes a full outin
     .toBeGreaterThanOrEqual(20)
   const first = await stats(page)
   expect(first?.buildings ?? 0).toBeGreaterThanOrEqual(250)
-  await page.waitForTimeout(2500) // let the GLB agents and estate models land
+  await expect
+    .poll(
+      () => stats(page).then((s) => (s as unknown as { detailed?: boolean })?.detailed ?? false),
+      {
+        timeout: 60000,
+      },
+    )
+    .toBe(true)
+  await page.waitForTimeout(3500) // let the baked chunks, agents and estate models land
   const dir = path.join('test-results', 'lome-city')
   fs.mkdirSync(dir, { recursive: true })
   const shot = path.join(dir, `${testInfo.project.name}-city.png`)
@@ -98,7 +106,7 @@ test('Lomé Life 3D opens on a dense, explorable city and completes a full outin
   await navigation.getByRole('button', { name: 'Carte' }).click()
   await page
     .getByRole('group', { name: 'Filtrer la ville' })
-    .getByRole('button', { name: 'Services' })
+    .getByRole('button', { name: 'Éducation' })
     .click()
   await expect(page.getByRole('button', { name: /Université de Lomé/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /Grand marché d’Assigamé/ })).toBeHidden()
@@ -145,7 +153,7 @@ test('Lomé Life 3D opens on a dense, explorable city and completes a full outin
   // 5. A second interior type (a place of worship) and a third (a clinic) are reachable.
   for (const [filter, name] of [
     ['Cultes', /Grande mosquée de Lomé/],
-    ['Services', /CHU de Tokoin/],
+    ['Santé', /CHU de Tokoin/],
   ] as const) {
     await navigation.getByRole('button', { name: 'Carte' }).click()
     await page

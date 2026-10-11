@@ -116,23 +116,32 @@ export type LotType =
   | 'port'
   | 'townhall'
   | 'billboard'
-export type Category = 'homes' | 'shops' | 'services' | 'leisure' | 'worship' | 'lots'
+export type Category =
+  | 'homes'
+  | 'shops'
+  | 'education'
+  | 'health'
+  | 'transport'
+  | 'services'
+  | 'leisure'
+  | 'worship'
+  | 'lots'
 export const CATEGORY_OF: Record<LotType, Category> = {
   house: 'homes',
   apartment: 'homes',
   shop: 'shops',
   market: 'shops',
   hotel: 'shops',
-  school: 'services',
-  university: 'services',
+  school: 'education',
+  university: 'education',
   bank: 'services',
-  hospital: 'services',
-  station: 'services',
+  hospital: 'health',
+  station: 'transport',
   townhall: 'services',
   sport: 'leisure',
   stadium: 'leisure',
   park: 'leisure',
-  port: 'leisure',
+  port: 'transport',
   billboard: 'leisure',
   worship: 'worship',
   lot: 'lots',
@@ -140,6 +149,9 @@ export const CATEGORY_OF: Record<LotType, Category> = {
 export const CATEGORY_LABELS: Record<Category, string> = {
   homes: 'Maisons',
   shops: 'Commerces',
+  education: 'Éducation',
+  health: 'Santé',
+  transport: 'Transport',
   services: 'Services',
   leisure: 'Loisirs',
   worship: 'Cultes',

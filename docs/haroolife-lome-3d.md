@@ -168,3 +168,23 @@ centre de l'écran : desktop bleu 3 %, bâti 49 %, 666 teintes ; mobile bleu 4 %
 Limites connues : la parcelle 22×22 reste visuellement lourde (carré de gazon) au milieu de
 Tokoin ; le tracé des quartiers est simplifié et non issu d'OpenStreetMap ; Kara et Sokodé
 réutilisent la même disposition ; la présence des comptes réels reste limitée à la parcelle.
+
+## Phase 2 : le monde vivant (qualité, diversité, animation, interactivité)
+
+Objectif : passer des volumes extrudés à un vrai simulateur de vie. Rien du moteur n'est
+reconstruit ; la grille, les chunks, les routes, les sauvegardes et l'économie sont inchangés.
+
+| Chantier | Ce qui est livré | Fichiers |
+|---|---|---|
+| Catalogue de bâtiments | 72 modèles Kenney CC0 cuits en couleurs par sommet (14 immeubles commerciaux, 21 maisons, auvents, clôtures, lampadaires, étals, 9 véhicules, arbres). Chaque parcelle reçoit un modèle, une orientation vers sa porte, une échelle ajustée à l'emprise et une teinte déterministes ; mosquées (dôme, minarets), églises (clocher, croix), hôpitaux (croix, ambulance), marchés (auvents rayés, étals de fruits et de pain), stades (pelouse, tribunes), ports (ponton, pirogues), stations (taxis garés), écoles et mairies (drapeaux, enseignes). Jamais plus de 20 % de la ville sur le même modèle. | `scripts/haroolife-bake-models.mjs`, `lib/haroolife/city/pack.ts`, `lib/haroolife/city/catalogue.ts`, `components/haroolife/city/model-bank.ts` |
+| Environnement urbain | Trottoirs le long des parcelles, passages piétons aux carrefours, lampadaires et arbres sur les avenues, cocotiers sur le littoral, murs de concession avec portail côté porte, enseignes, niveau de détail lointain avec toits à pignon, parapets, dômes et clochers | `components/haroolife/city/city-chunks.tsx` |
+| Intérieurs | Plans de pièces en données : salle de sport (3 tapis de course, 2 vélos, 2 bancs de musculation, râtelier d'haltères, tapis de yoga, miroir, 3 casiers, 2 douches, toilettes, accueil, fontaine à eau, plantes), maison, commerce, bureau public, lieu de culte, clinique, jardin. Chaque équipement est un objet 3D cliquable ; mobilier Kenney (lit, douche, toilettes, bureau, ordinateur, plantes) | `lib/haroolife/city/interiors.ts`, `components/haroolife/city/interior-scene.tsx` |
+| Personnages animés | Kenney Mini Characters (squelette et 32 clips : idle, walk, sprint, sit, crouch, holding…) via le composant `anim` de PlayCanvas ; PNJ en salle (coach à l'accueil, coureuse sur tapis, haltérophile, yogi, cliente vers les vestiaires), au marché, au bureau, au culte, à la clinique, au jardin ; piétons de la ville sur de vrais trajets porte à porte (48 itinéraires, BFS sur les rues) ; véhicules de 9 types sur la boucle de rues. Le joueur marche (walk) ou court sur le tapis (sprint). Les PNJ sont étiquetés « personnages du jeu (pas de vrais joueurs) ». | `components/haroolife/city/character.tsx`, `lib/haroolife/city/traffic.ts` |
+| Jour et nuit | Soleil, ciel et lumière ambiante suivent l'heure de la partie (aube et crépuscule dorés, nuit bleue) | `daylight()` dans `city-world.tsx` |
+| Gameplay | Condition physique (0–100) ; tapis de course, vélo, musculation, yoga, coach, douche, toilettes ; coût, énergie, hygiène, loisir ; animation du joueur sur l'équipement choisi pendant 3 s ; sauvegarde compatible (champ `fitness` absent → 0) | `lib/haroolife/city/life.ts` |
+| Interface | Puces de catégories au-dessus de la ville (Tous, Maisons, Commerces, Éducation, Santé, Transport, Services, Loisirs, Cultes), étiquettes nommées projetées sur les lieux, surbrillance au sol du lieu choisi, fiche de lieu (activités, personnages sur place, choix d'une activité, cartes À pied / Zémidjan / Taxi avec durée estimée), bouton « Activités · <lieu> » à l'intérieur | `components/haroolife/lome-life-immersive.tsx` |
+
+Vérification : `tests/haroolife-city-catalogue.test.ts` (pack décodable, catalogue déterministe et
+ajusté aux emprises, repères habillés selon leur nature, mobilier urbain, intérieurs meublés,
+tapis de course : énergie −15, forme +6, −500 FCFA) et `e2e/lome-world-life.spec.ts`
+(parcours complet en 11 étapes sur 1440×900 et 390×844, circulation autonome, nuit).

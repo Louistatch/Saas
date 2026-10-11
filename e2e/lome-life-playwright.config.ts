@@ -2,11 +2,11 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './',
-  testMatch: ['lome-life.spec.ts', 'lome-presence.spec.ts', 'lome-city.spec.ts'],
+  testMatch: ['lome-life.spec.ts', 'lome-presence.spec.ts', 'lome-city.spec.ts', 'lome-world-life.spec.ts'],
   reporter: [['list'], ['html', { outputFolder: 'test-results/lome-report', open: 'never' }]],
   fullyParallel: false,
   workers: 1,
-  timeout: 90_000,
+  timeout: 160_000,
   expect: { timeout: 20_000 },
   use: {
     baseURL: 'http://127.0.0.1:3000',

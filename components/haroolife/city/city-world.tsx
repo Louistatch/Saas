@@ -1,9 +1,11 @@
 'use client'
 
+import { type NpcAnim, type Prop, layoutFor } from '@/lib/haroolife/city/interiors'
 import type { Interior } from '@/lib/haroolife/city/life'
 import { type Agent, agentsNear } from '@/lib/haroolife/city/traffic'
 import {
   CATEGORY_OF,
+  CELL,
   type Category,
   ESTATE,
   type Lot,
@@ -15,22 +17,25 @@ import type { Transport } from '@/lib/haroolife/lome-life-engine'
 import type { PlacedResident } from '@/lib/haroolife/lome-presence'
 import type { BuildType, City } from '@/lib/haroolife/townsmen-engine'
 /**
- * The city of Lomé in 3D: streamed chunk geometry, the player's estate embedded at its
- * world offset, vehicles and pedestrians on the streets, the player, a free aerial camera
- * (drag to pan, pinch or buttons to zoom, Q/E or button to rotate), ground picking, and
- * landmark icons projected over the canvas. Interiors and rides replace the city view in
- * the same PlayCanvas application, as before.
+ * The city of Lomé in 3D: streamed chunks of real buildings, the player's estate embedded
+ * at its world offset, vehicles and pedestrians on real routes, day and night, the player,
+ * a free aerial camera (drag to pan, pinch or buttons to zoom, Q/E or button to rotate),
+ * ground picking, the selected place highlighted on the ground, and named place labels
+ * projected over the canvas. Interiors and rides replace the city view in the same
+ * PlayCanvas application.
  */
 import { Application, Entity, Gltf } from '@playcanvas/react'
 import { Camera, Light, Render } from '@playcanvas/react/components'
 import { useApp, useAppEvent, useMaterial, useModel } from '@playcanvas/react/hooks'
 import { Compass, Maximize2, Minus, Plus, RotateCcw } from 'lucide-react'
 import * as pc from 'playcanvas'
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ESTATE_ASSETS, EstateTiles } from '../city-world-3d'
-import LomeLifeRoom3D from '../lome-life-room-3d'
 import { Ride } from '../travel-scene-3d'
+import { Character } from './character'
 import CityChunks, { type ChunkStats, cellOf, worldPos } from './city-chunks'
+import InteriorScene from './interior-scene'
+import { type Bank, bakedMaterial, loadBank, meshFor } from './model-bank'
 
 export type CameraState = { tx: number; tz: number; distance: number; angle: number }
 /** Frame the player with the dense city around: the target sits a little south-east of them. */
@@ -39,6 +44,8 @@ export const CAMERA_HOME = (x: number, y: number): CameraState => {
   return { tx: px, tz: pz, distance: 28, angle: 35 }
 }
 type EditTool = BuildType | 'inspect' | 'demolish'
+/** The player's own look (a Kenney Mini Character). */
+export const PLAYER_MODEL = 'character-female-a'
 
 function Model({
   url,
@@ -60,53 +67,194 @@ function Model({
   )
 }
 
-function AgentModel({ a }: { a: Agent }) {
-  const pos = worldPos(a.x, a.y)
-  if (a.kind === 'walker')
-    return (
-      <Model
-        url={ESTATE_ASSETS.villager}
-        position={[pos[0] + 0.35, 0, pos[2] + 0.3]}
-        scale={0.8}
-        rotation={a.heading}
-      />
-    )
-  if (a.kind === 'zem')
-    return (
-      <Model
-        url={ESTATE_ASSETS.villager}
-        position={[pos[0] - 0.2, 0.05, pos[2]]}
-        scale={0.75}
-        rotation={a.heading}
-      />
-    )
-  const url =
-    a.kind === 'taxi'
-      ? ESTATE_ASSETS.taxi
-      : a.kind === 'van'
-        ? ESTATE_ASSETS.van
-        : ESTATE_ASSETS.sedan
-  return <Model url={url} position={pos} scale={0.72} rotation={a.heading} />
+function useBank(): Bank | null {
+  const [bank, setBank] = useState<Bank | null>(null)
+  useEffect(() => {
+    let alive = true
+    loadBank()
+      .then((b) => alive && setBank(b))
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [])
+  return bank
+}
+
+/** One baked model as its own entity (vehicles): shares the pack's GPU mesh. */
+function Baked({
+  model,
+  position,
+  rotation = 0,
+  scale = 1,
+  name,
+}: {
+  model: string
+  position: [number, number, number]
+  rotation?: number
+  scale?: number
+  name?: string
+}) {
+  const app = useApp()
+  const bank = useBank()
+  const ref = useRef<pc.Entity | null>(null)
+  useEffect(() => {
+    if (!app || !bank) return
+    const e = new pc.Entity(name ?? model)
+    e.addComponent('render', {
+      meshInstances: [
+        new pc.MeshInstance(meshFor(app.graphicsDevice, bank, model), bakedMaterial()),
+      ],
+    })
+    app.root.addChild(e)
+    ref.current = e
+    return () => {
+      e.destroy()
+      ref.current = null
+    }
+  }, [app, bank, model, name])
+  useEffect(() => {
+    const e = ref.current
+    if (!e) return
+    e.setLocalPosition(position[0], position[1], position[2])
+    e.setLocalEulerAngles(0, rotation, 0)
+    e.setLocalScale(scale, scale, scale)
+  })
+  return null
+}
+
+/** Vehicles and pedestrians, moved smoothly between traffic steps. */
+function Agents({ agents, step }: { agents: Agent[]; step: number }) {
+  const [phase, setPhase] = useState(0)
+  const last = useRef({ step, at: performance.now() })
+  if (last.current.step !== step) last.current = { step, at: performance.now() }
+  useAppEvent('update', () => {
+    const p = Math.min(1, (performance.now() - last.current.at) / 700)
+    setPhase((old) => (Math.abs(old - p) > 0.02 ? p : old))
+  })
+  return (
+    <>
+      {agents.map((a) => {
+        const pos = worldPos(a.x + a.fx * phase, a.y + a.fy * phase)
+        if (a.kind === 'walker')
+          return (
+            <Character
+              key={a.id}
+              name={`piéton ${a.id}`}
+              model={a.model ?? 'character-male-a'}
+              position={[pos[0] + 0.42, 0.04, pos[2] + 0.42]}
+              rotation={a.heading}
+              anim={a.activity === 'run' ? 'run' : 'walk'}
+              scale={0.95}
+            />
+          )
+        if (a.kind === 'zem')
+          return (
+            <Entity
+              key={a.id}
+              position={[pos[0] - 0.25, 0.05, pos[2]]}
+              rotation={[0, a.heading, 0]}
+            >
+              <Character model="character-male-b" position={[0, 0, 0]} anim="rest" scale={0.85} />
+              <Baked model="hatchback" position={[0, 0, 0]} scale={0.001} />
+            </Entity>
+          )
+        const lane = a.fx !== 0 ? [0, 0.26 * Math.sign(a.fx)] : [-0.26 * Math.sign(a.fy || 1), 0]
+        return (
+          <Baked
+            key={a.id}
+            name={`véhicule ${a.kind}`}
+            model={a.kind}
+            position={[pos[0] + lane[0], 0.02, pos[2] + lane[1]]}
+            rotation={a.heading + 180}
+            scale={0.36}
+          />
+        )
+      })}
+    </>
+  )
 }
 
 function PlayerFigure({
   position,
   rotation,
-}: { position: [number, number, number]; rotation: number }) {
+  moving,
+}: { position: [number, number, number]; rotation: number; moving: boolean }) {
   const highlighted = useMaterial({ diffuse: '#e7d07e', emissive: '#6b5a1a', gloss: 0.2 })
   return (
     <Entity name="Joueur" position={position}>
-      <Model
-        url={ESTATE_ASSETS.villager}
-        position={[0, 0.05, 0]}
-        scale={1.45}
+      <Character
+        model={PLAYER_MODEL}
+        position={[position[0], 0.05, position[2]]}
         rotation={rotation}
+        anim={moving ? 'walk' : 'idle'}
+        scale={1.15}
       />
       <Entity position={[0, 0.02, 0]} scale={[0.9, 0.025, 0.9]}>
         <Render type="cylinder" material={highlighted} />
       </Entity>
     </Entity>
   )
+}
+
+/** A glowing plate under the selected place. */
+function SelectionRing({
+  position,
+  w,
+  d,
+}: { position: [number, number, number]; w: number; d: number }) {
+  const ring = useMaterial({ diffuse: '#34d399', emissive: '#10b981', gloss: 0.4 })
+  return (
+    <Entity name="Sélection" position={position} scale={[w, 0.02, d]}>
+      <Render type="box" material={ring} />
+    </Entity>
+  )
+}
+
+/** Sun, sky and ambient light for an hour of the day. */
+export function daylight(hour: number) {
+  const t = Math.max(0, Math.sin(((hour - 6) / 12) * Math.PI)) // 0 at night, 1 at noon
+  const dawn = hour >= 5 && hour <= 8 ? 1 - Math.abs(hour - 6.5) / 1.5 : 0
+  const dusk = hour >= 17 && hour <= 20 ? 1 - Math.abs(hour - 18.5) / 1.5 : 0
+  const warm = Math.max(0, dawn, dusk)
+  const mix = (
+    a: [number, number, number],
+    b: [number, number, number],
+    k: number,
+  ): [number, number, number] => [
+    a[0] + (b[0] - a[0]) * k,
+    a[1] + (b[1] - a[1]) * k,
+    a[2] + (b[2] - a[2]) * k,
+  ]
+  const night: [number, number, number] = [0.1, 0.16, 0.3]
+  const day: [number, number, number] = [0.62, 0.82, 0.91]
+  const gold: [number, number, double] = [0.96, 0.68, 0.45] as unknown as [number, number, number]
+  let sky = mix(night, day, Math.min(1, t * 1.6))
+  sky = mix(sky, gold as unknown as [number, number, number], warm * 0.7)
+  const hex = (c: [number, number, number]) =>
+    `#${c
+      .map((v) =>
+        Math.round(Math.min(1, Math.max(0, v)) * 255)
+          .toString(16)
+          .padStart(2, '0'),
+      )
+      .join('')}`
+  const sun = 0.25 + t * 1.3
+  const sunColor = hex(
+    mix([0.8, 0.85, 1], mix([1, 1, 0.96], [1, 0.78, 0.55], warm), Math.min(1, t * 2)),
+  )
+  const ambient = hex(mix([0.12, 0.16, 0.28], [0.72, 0.8, 0.86], Math.min(1, t * 1.8)))
+  return { sky: hex(sky), sun, sunColor, ambient, night: t < 0.08 }
+}
+type double = number
+
+function Ambient({ color }: { color: string }) {
+  const app = useApp()
+  useEffect(() => {
+    if (!app) return
+    app.scene.ambientLight = new pc.Color().fromString(color)
+  }, [app, color])
+  return null
 }
 
 /** Pointer handling on the canvas: drag pans, pinch zooms, tap picks a world cell. */
@@ -204,8 +352,8 @@ function Picker({
   return null
 }
 
-/** Projects landmark icons onto the overlay each frame, without React re-renders. */
-function IconProjector({
+/** Projects place labels onto the overlay each frame, without React re-renders. */
+function LabelProjector({
   overlay,
   lots,
 }: { overlay: React.RefObject<HTMLDivElement | null>; lots: Lot[] }) {
@@ -226,18 +374,33 @@ function IconProjector({
       const lot = lots[i]
       if (!lot) continue
       const [px, , pz] = worldPos(lot.x + (lot.w - 1) / 2, lot.y + (lot.h - 1) / 2)
-      const h = 0.55 + lot.floors * 0.55 + 0.9
+      const h = 0.6 + lot.floors * 0.5 + 0.9
       const p = cc.worldToScreen(new pc.Vec3(px, h, pz), tmp.current)
       const visible =
         p.z > 0 &&
-        p.x >= -40 &&
+        p.x >= -60 &&
         p.y >= -40 &&
-        p.x * kx <= rect.width + 40 &&
+        p.x * kx <= rect.width + 60 &&
         p.y * ky <= rect.height + 40
       el.style.display = visible ? '' : 'none'
       if (visible)
         el.style.transform = `translate(${Math.round(p.x * kx)}px, ${Math.round(p.y * ky)}px) translate(-50%, -100%)`
     }
+  })
+  return null
+}
+
+/** Frame statistics for the debug hook and the e2e performance check. */
+function StatsProbe({ onFrame }: { onFrame: (s: { drawCalls: number; fps: number }) => void }) {
+  const app = useApp()
+  const last = useRef(0)
+  useAppEvent('update', () => {
+    if (!app) return
+    const now = performance.now()
+    if (now - last.current < 1000) return
+    last.current = now
+    const stats = app.stats as unknown as { drawCalls: { total: number }; frame: { fps: number } }
+    onFrame({ drawCalls: stats.drawCalls.total, fps: Math.round(stats.frame.fps) })
   })
   return null
 }
@@ -249,18 +412,25 @@ export default function CityWorld({
   onTile,
   player,
   playerRotation,
+  moving,
   camera,
   onCamera,
   step,
+  hour,
   interior,
-  onInteriorAction,
+  interiorTitle,
+  activity,
+  onUseProp,
   ride,
   visitors,
   onBillboard,
   onCell,
   onLotIcon,
   filter,
+  selectedLot,
+  labelsHidden,
   onStats,
+  onFrame,
 }: {
   city: City
   tool: EditTool
@@ -269,18 +439,25 @@ export default function CityWorld({
   /** Player world cell. */
   player: { x: number; y: number }
   playerRotation: number
+  moving: boolean
   camera: CameraState
   onCamera: (c: CameraState) => void
   step: number
+  hour: number
   interior: Interior | null
-  onInteriorAction: (a: string) => void
+  interiorTitle: string
+  activity: { prop: string; anim: NpcAnim } | null
+  onUseProp: (p: Prop) => void
   ride: { transport: Transport; rain: boolean } | null
   visitors: PlacedResident[]
   onBillboard: (id: string) => void
   onCell: (cell: { x: number; y: number }) => void
   onLotIcon: (lot: Lot) => void
   filter: Category | 'all'
+  selectedLot: Lot | null
+  labelsHidden: boolean
   onStats?: (s: ChunkStats) => void
+  onFrame?: (s: { drawCalls: number; fps: number }) => void
 }) {
   const overlay = useRef<HTMLDivElement | null>(null)
   const dragging = useRef(false)
@@ -289,12 +466,16 @@ export default function CityWorld({
     () => agentsNear(step, centerCell.x, centerCell.y, 22),
     [step, centerCell.x, centerCell.y],
   )
-  const icons = useMemo(() => {
+  const labels = useMemo(() => {
     const all = landmarks().filter((l) => filter === 'all' || CATEGORY_OF[l.type] === filter)
+    const radius = camera.distance < 40 ? 20 : 34
     return all
-      .filter((l) => Math.abs(l.x - centerCell.x) < 34 && Math.abs(l.y - centerCell.y) < 26)
-      .slice(0, 40)
-  }, [centerCell.x, centerCell.y, filter])
+      .filter(
+        (l) => Math.abs(l.x - centerCell.x) < radius && Math.abs(l.y - centerCell.y) < radius * 0.8,
+      )
+      .slice(0, 28)
+  }, [centerCell.x, centerCell.y, filter, camera.distance])
+  const light = useMemo(() => daylight(hour), [hour])
 
   const onPan = useCallback(
     (dx: number, dz: number) => {
@@ -350,10 +531,14 @@ export default function CityWorld({
   const playerPos = worldPos(player.x, player.y)
   const estateCenter = worldPos(ESTATE.x0 + (SIZE_HINT - 1) / 2, ESTATE.y0 + (SIZE_HINT - 1) / 2)
   const scene = interior || ride
+  const selPos = selectedLot
+    ? worldPos(selectedLot.x + (selectedLot.w - 1) / 2, selectedLot.y + (selectedLot.h - 1) / 2)
+    : null
 
   return (
     <div
-      className="relative h-full w-full touch-none overflow-hidden bg-[#9fd1e8]"
+      className="relative h-full w-full touch-none overflow-hidden"
+      style={{ background: light.sky }}
       data-testid="city-world"
     >
       <Application
@@ -361,25 +546,34 @@ export default function CityWorld({
         className="h-full w-full"
         style={{ width: '100%', height: '100%' }}
       >
+        {onFrame && <StatsProbe onFrame={onFrame} />}
         {ride ? (
           <Ride transport={ride.transport} rain={ride.rain} />
         ) : interior ? (
-          <LomeLifeRoom3D
-            venue={interior}
+          <InteriorScene
+            layout={layoutFor(interior)}
+            title={interiorTitle}
             angle={camera.angle}
             distance={24}
-            onInteract={onInteriorAction}
+            activity={activity}
+            playerModel={PLAYER_MODEL}
+            onUse={onUseProp}
           />
         ) : (
           <>
             <Entity name="CityCamera" position={camPos} rotation={[-52, camera.angle, 0]}>
-              <Camera fov={46} nearClip={0.5} farClip={420} clearColor="#9fd1e8" />
+              <Camera fov={46} nearClip={0.5} farClip={420} clearColor={light.sky} />
             </Entity>
+            <Ambient color={light.ambient} />
             <Entity rotation={[56, 28, 0]}>
-              <Light type="directional" intensity={1.5} />
+              <Light type="directional" intensity={light.sun} color={light.sunColor} />
             </Entity>
             <Entity rotation={[22, 200, 0]}>
-              <Light type="directional" intensity={0.65} />
+              <Light
+                type="directional"
+                intensity={light.night ? 0.2 : 0.55}
+                color={light.night ? '#8fa8ff' : '#ffffff'}
+              />
             </Entity>
             <CityChunks centerX={centerCell.x} centerY={centerCell.y} onStats={onStats} />
             <Entity position={estateCenter}>
@@ -393,27 +587,43 @@ export default function CityWorld({
                 onBillboard={onBillboard}
               />
             </Entity>
-            {agents.map((a) => (
-              <AgentModel key={a.id} a={a} />
-            ))}
-            <PlayerFigure position={playerPos} rotation={playerRotation} />
+            {selPos && selectedLot && (
+              <SelectionRing
+                position={[selPos[0], 0.03, selPos[2]]}
+                w={selectedLot.w * CELL + 0.3}
+                d={selectedLot.h * CELL + 0.3}
+              />
+            )}
+            <Agents agents={agents} step={step} />
+            <PlayerFigure position={playerPos} rotation={playerRotation} moving={moving} />
             <Picker camera={camera} onPan={onPan} onZoom={onZoom} onTap={onTap} />
-            <IconProjector overlay={overlay} lots={icons} />
+            <LabelProjector overlay={overlay} lots={labels} />
           </>
         )}
       </Application>
       {!scene && (
-        <div ref={overlay} className="pointer-events-none absolute inset-0" aria-hidden="true">
-          {icons.map((lot) => (
+        <div
+          ref={overlay}
+          className="pointer-events-none absolute inset-0"
+          aria-hidden={labelsHidden ? 'true' : undefined}
+          style={{ visibility: labelsHidden ? 'hidden' : 'visible' }}
+        >
+          {labels.map((lot) => (
             <button
               type="button"
               key={lot.id}
               onClick={() => onLotIcon(lot)}
-              className="pointer-events-auto absolute left-0 top-0 flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-white/95 text-base shadow-md"
+              tabIndex={labelsHidden ? -1 : 0}
+              className={`pointer-events-auto absolute left-0 top-0 flex max-w-[170px] items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-bold shadow-md ${
+                selectedLot?.id === lot.id
+                  ? 'border-emerald-700 bg-emerald-700 text-white'
+                  : 'border-white bg-white/95 text-slate-900'
+              }`}
               title={lot.name ?? ''}
               style={{ display: 'none' }}
             >
-              {TYPE_ICONS[lot.type]}
+              <span className="text-sm leading-none">{TYPE_ICONS[lot.type]}</span>
+              <span className="truncate">{lot.name}</span>
             </button>
           ))}
         </div>
@@ -463,3 +673,4 @@ export default function CityWorld({
     </div>
   )
 }
+export { Model as CityModel, ESTATE_ASSETS as CITY_ESTATE_ASSETS }

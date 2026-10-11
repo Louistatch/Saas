@@ -1,5 +1,6 @@
 'use client'
 
+import { type Prop, animFor, layoutFor } from '@/lib/haroolife/city/interiors'
 import {
   type CityAction,
   type CityLife,
@@ -16,9 +17,13 @@ import {
   interiorFor,
   lotAtDoor,
   payRide,
+  roadsOf,
   stepDir,
+  stopActivity,
+  useProp,
   walkStep,
 } from '@/lib/haroolife/city/life'
+import { findPath } from '@/lib/haroolife/city/navigation'
 import {
   CATEGORY_LABELS,
   CATEGORY_OF,
@@ -88,7 +93,7 @@ import {
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CAMERA_HOME, type CameraState } from './city/city-world'
 import { sayOnPlace, usePresence } from './use-presence'
 
@@ -237,7 +242,14 @@ export function LomeLifeImmersive() {
   const [follow, setFollow] = useState(true)
   const [selectedLot, setSelectedLot] = useState<Lot | null>(null)
   const [cityFilter, setCityFilter] = useState<Category | 'all'>('all')
-  const [chunkStats, setChunkStats] = useState({ chunks: 0, buildings: 0 })
+  const [chunkStats, setChunkStats] = useState({
+    chunks: 0,
+    buildings: 0,
+    tris: 0,
+    detailed: false,
+  })
+  const [frame, setFrame] = useState({ drawCalls: 0, fps: 0 })
+  const heading = useRef(180)
   const insideAny = Boolean(cityLife.insideLot || life.inside)
   const interior = cityLife.insideLot
     ? interiorFor(lotById(cityLife.insideLot)?.type ?? 'lot')
@@ -314,6 +326,13 @@ export function LomeLifeImmersive() {
       ? (LIFE_LOCATIONS.find((x) => x.x === life.target!.x && x.y === life.target!.y)?.name ??
         'ta destination')
       : 'ta destination'
+  if (cityLife.route.length) {
+    const n = cityLife.route[0]
+    heading.current = Math.round(
+      (Math.atan2(n.x - cityLife.at.x, n.y - cityLife.at.y) * 180) / Math.PI,
+    )
+  }
+  const playerHeading = heading.current
   const [placeDraft, setPlaceDraft] = useState('')
   const [placeError, setPlaceError] = useState('')
   const [placeBusy, setPlaceBusy] = useState(false)
@@ -382,13 +401,41 @@ export function LomeLifeImmersive() {
   }, [cityLife, loaded])
   // Live state for the end-to-end tests (chunks loaded, buildings, position, interior).
   useEffect(() => {
+    const room = cityLife.insideLot
+      ? interiorFor(lotById(cityLife.insideLot)?.type ?? 'lot')
+      : (life.inside as Interior | null)
+    const layout = room ? layoutFor(room) : null
     ;(window as unknown as { __LOME_CITY?: unknown }).__LOME_CITY = {
       ...chunkStats,
+      ...frame,
       at: cityLife.at,
       route: cityLife.route.length,
       inside: cityLife.insideLot ?? life.inside,
+      interiorProps: layout?.props.length ?? 0,
+      npcs: layout?.npcs.length ?? 0,
+      activity: cityLife.activity,
+      fitness: cityLife.fitness,
+      energy: life.needs.energy,
+      hour: life.hour,
     }
-  }, [chunkStats, cityLife.at, cityLife.route.length, cityLife.insideLot, life.inside])
+  }, [
+    chunkStats,
+    frame,
+    cityLife.at,
+    cityLife.route.length,
+    cityLife.insideLot,
+    cityLife.activity,
+    cityLife.fitness,
+    life.inside,
+    life.needs.energy,
+    life.hour,
+  ])
+  // An activity animation lasts a few seconds, then the player stands idle again.
+  useEffect(() => {
+    if (!cityLife.activity) return
+    const id = window.setTimeout(() => setCityLife((old) => stopActivity(old)), 3200)
+    return () => window.clearTimeout(id)
+  }, [cityLife.activity])
   // The camera follows the player while walking, until the player pans by hand.
   useEffect(() => {
     if (!follow) return
@@ -517,9 +564,23 @@ export function LomeLifeImmersive() {
     setCityLife((old) => cityInteract(old, a))
     if (a === 'enter' || a === 'leave') setPanel(null)
   }
-  function roomAction(a: string) {
-    if (cityLife.insideLot) cityAction(a as CityAction)
-    else action(a as Action)
+  function useEquipment(p: Prop) {
+    if (!p.action) return
+    setPanel(null)
+    if (cityLife.insideLot) {
+      setCityLife((old) => useProp(old, p.id))
+      return
+    }
+    // Estate interiors keep their original actions; the animation plays on the prop.
+    action(p.action as Action)
+    setCityLife((old) => ({ ...old, activity: { prop: p.id, anim: animFor(p.kind) } }))
+  }
+  /** Starts an activity from the sheet: the first prop in the room that offers it. */
+  function startActivity(a: CityAction) {
+    const room = cityLife.insideLot ? interiorFor(lotById(cityLife.insideLot)?.type ?? 'lot') : null
+    const prop = room ? layoutFor(room).props.find((p) => p.action === a) : null
+    if (prop) useEquipment(prop)
+    else cityAction(a)
   }
   function tile(x: number, y: number) {
     setSelection({ x, y })
@@ -591,15 +652,24 @@ export function LomeLifeImmersive() {
             selected={selection}
             onTile={tile}
             player={cityLife.at}
-            playerRotation={(life.trafficStep * 37) % 360}
+            playerRotation={playerHeading}
+            moving={cityLife.route.length > 0}
             camera={camera}
             onCamera={(c) => {
               if (c.tx !== camera.tx || c.tz !== camera.tz) setFollow(false)
               setCamera(c)
             }}
             step={life.trafficStep}
+            hour={life.hour}
             interior={interior}
-            onInteriorAction={roomAction}
+            interiorTitle={
+              cityLife.insideLot
+                ? (lotById(cityLife.insideLot)?.name ??
+                  TYPE_LABELS[lotById(cityLife.insideLot)?.type ?? 'lot'])
+                : (VENUE_LABELS[life.inside ?? ''] ?? '')
+            }
+            activity={cityLife.activity}
+            onUseProp={useEquipment}
             ride={riding && cityLife.route.length > 0 && !insideAny ? { transport, rain } : null}
             visitors={visitors}
             onBillboard={(id) => {
@@ -621,7 +691,10 @@ export function LomeLifeImmersive() {
               setPanel('lot')
             }}
             filter={cityFilter}
+            selectedLot={selectedLot}
+            labelsHidden={panel !== null}
             onStats={setChunkStats}
+            onFrame={setFrame}
           />
         )}
       </div>
@@ -643,6 +716,58 @@ export function LomeLifeImmersive() {
         />
       )}
 
+      {!insideAny && !riding && webgl !== false && (
+        <div
+          role="group"
+          aria-label="Catégories de lieux"
+          className="pointer-events-auto absolute left-3 right-16 top-[104px] z-10 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] sm:top-[114px]"
+        >
+          {(
+            [
+              'all',
+              'homes',
+              'shops',
+              'education',
+              'health',
+              'transport',
+              'services',
+              'leisure',
+              'worship',
+            ] as const
+          ).map((f) => (
+            <button
+              type="button"
+              key={f}
+              aria-pressed={cityFilter === f}
+              onClick={() => setCityFilter(f)}
+              className={
+                'shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold shadow ' +
+                (cityFilter === f
+                  ? 'border-emerald-700 bg-emerald-700 text-white'
+                  : 'border-white/70 bg-white/95 text-slate-800')
+              }
+            >
+              {f === 'all' ? 'Tous' : CATEGORY_LABELS[f]}
+            </button>
+          ))}
+        </div>
+      )}
+      {cityLife.insideLot && webgl !== false && (
+        <button
+          type="button"
+          aria-label="Activités du lieu"
+          onClick={() => {
+            const lot = lotById(cityLife.insideLot ?? '')
+            if (lot) {
+              setSelectedLot(lot)
+              open('lot')
+            }
+          }}
+          className="pointer-events-auto absolute left-3 top-[104px] z-10 rounded-full border border-emerald-700 bg-emerald-700 px-4 py-2 text-xs font-bold text-white shadow sm:top-[114px]"
+        >
+          Activités · {lotById(cityLife.insideLot)?.name ?? 'ce lieu'}
+        </button>
+      )}
       <header className="pointer-events-none absolute inset-x-0 top-0 z-20 px-3 pt-[max(12px,env(safe-area-inset-top))] sm:px-5">
         <div className="pointer-events-auto mx-auto flex max-w-[900px] items-center gap-2 rounded-[24px] border border-white/65 bg-white/95 p-2 shadow-lg shadow-slate-900/10 backdrop-blur-lg">
           <div className="flex shrink-0 items-center gap-1 rounded-2xl px-2 text-xs font-bold sm:text-sm">
@@ -1021,7 +1146,18 @@ export function LomeLifeImmersive() {
                   </p>
                   <div className="flex flex-wrap gap-1" role="group" aria-label="Filtrer la ville">
                     {(
-                      ['all', 'shops', 'services', 'leisure', 'worship', 'homes', 'lots'] as const
+                      [
+                        'all',
+                        'homes',
+                        'shops',
+                        'education',
+                        'health',
+                        'transport',
+                        'services',
+                        'leisure',
+                        'worship',
+                        'lots',
+                      ] as const
                     ).map((f) => (
                       <button
                         type="button"
@@ -1550,79 +1686,155 @@ export function LomeLifeImmersive() {
                   </div>
                 </>
               )}
-              {panel === 'lot' && selectedLot && (
-                <>
-                  <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-4">
-                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-2xl shadow">
-                      {TYPE_ICONS[selectedLot.type]}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-lg font-black">
-                        {selectedLot.name ?? TYPE_LABELS[selectedLot.type]}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {TYPE_LABELS[selectedLot.type]} ·{' '}
-                        {DISTRICTS.find((d) => d.id === selectedLot.district)?.name}
-                        {selectedLot.floors > 1 ? ` · ${selectedLot.floors} niveaux` : ''}
-                      </p>
-                    </div>
-                  </div>
-                  {actionsFor(selectedLot.type).length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-bold text-slate-700">Sur place</p>
-                      {actionsFor(selectedLot.type).map((a) => {
-                        const here =
-                          cityLife.insideLot === selectedLot.id || doorLot?.id === selectedLot.id
-                        return (
-                          <button
-                            type="button"
-                            key={a.id}
-                            disabled={!here}
-                            onClick={() => cityAction(a.id)}
-                            className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm disabled:opacity-50"
-                          >
-                            <span className="font-bold">{a.label}</span>
-                            <span className="text-xs text-slate-500">{a.hint}</span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )}
-                  {doorLot?.id === selectedLot.id &&
-                    !insideAny &&
-                    interiorFor(selectedLot.type) && (
-                      <ActionButton title="Entrer" onClick={() => cityAction('enter')} />
-                    )}
-                  {cityLife.insideLot === selectedLot.id && (
-                    <ActionButton title="Sortir" outline onClick={() => cityAction('leave')} />
-                  )}
-                  {doorLot?.id !== selectedLot.id && cityLife.insideLot !== selectedLot.id && (
+              {panel === 'lot' &&
+                selectedLot &&
+                (() => {
+                  const lot = selectedLot
+                  const here = cityLife.insideLot === lot.id || doorLot?.id === lot.id
+                  const insideHere = cityLife.insideLot === lot.id
+                  const room = interiorFor(lot.type)
+                  const layout = room ? layoutFor(room) : null
+                  const acts = actionsFor(lot.type)
+                  const path = here ? null : findPath(cityLife.at, lot.door, roadsOf(cityLife))
+                  const cells = path ? path.length - 1 : null
+                  const eta = (perCell: number) =>
+                    cells === null
+                      ? 'hors réseau'
+                      : `~ ${Math.max(1, Math.round(cells * perCell))} min`
+                  return (
                     <>
-                      <ActionButton
-                        title="Y aller à pied · gratuit"
-                        onClick={() => goLot(selectedLot)}
-                      />
-                      <div className="grid grid-cols-2 gap-2">
-                        <ActionButton
-                          title={'Zémidjan · ' + money(TRAVEL_COST.moto)}
-                          outline
-                          onClick={() => rideTo(selectedLot, 'moto')}
-                        />
-                        <ActionButton
-                          title={'Taxi · ' + money(TRAVEL_COST.taxi)}
-                          outline
-                          onClick={() => rideTo(selectedLot, 'taxi')}
-                        />
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-100 text-3xl">
+                          {TYPE_ICONS[lot.type]}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-xl font-black">
+                            {lot.name ?? TYPE_LABELS[lot.type]}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            📍 {DISTRICTS.find((d) => d.id === lot.district)?.name}, {cityDef.name}{' '}
+                            · {TYPE_LABELS[lot.type]}
+                            {lot.floors > 1 ? ` · ${lot.floors} niveaux` : ''}
+                          </p>
+                        </div>
                       </div>
+                      {acts.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5" aria-label="Activités proposées">
+                          {acts.map((a) => (
+                            <span
+                              key={a.id}
+                              className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-800"
+                            >
+                              {a.label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {layout && layout.npcs.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold text-slate-700">Personnages sur place</p>
+                          <div className="flex items-center gap-1">
+                            {layout.npcs.slice(0, 5).map((n, i) => (
+                              <span
+                                key={n.id}
+                                title={n.role}
+                                className={
+                                  'flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-[11px] font-black text-white ' +
+                                  [
+                                    'bg-emerald-600',
+                                    'bg-amber-500',
+                                    'bg-sky-600',
+                                    'bg-rose-500',
+                                    'bg-violet-600',
+                                  ][i % 5]
+                                }
+                              >
+                                {n.role
+                                  .replace(/^(Le |La |L’|Un |Une |Coach )/, '')
+                                  .slice(0, 2)
+                                  .toUpperCase()}
+                              </span>
+                            ))}
+                            <span className="ml-1 text-[11px] text-slate-500">
+                              {layout.npcs.length} personnages du jeu (pas de vrais joueurs)
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {insideHere && acts.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-xs font-bold text-slate-700">Choisir une activité</p>
+                          {acts.map((a) => (
+                            <button
+                              type="button"
+                              key={a.id}
+                              onClick={() => startActivity(a.id)}
+                              className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm"
+                            >
+                              <span className="font-bold">{a.label}</span>
+                              <span className="text-xs text-slate-500">{a.hint}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {here && !insideAny && room && (
+                        <ActionButton title="Entrer" onClick={() => cityAction('enter')} />
+                      )}
+                      {insideHere && (
+                        <ActionButton title="Sortir" outline onClick={() => cityAction('leave')} />
+                      )}
+                      {!here && (
+                        <div
+                          className="grid grid-cols-3 gap-2"
+                          role="group"
+                          aria-label="Comment y aller"
+                        >
+                          {(
+                            [
+                              {
+                                t: 'walk' as const,
+                                icon: '🚶',
+                                label: 'À pied',
+                                price: 'Gratuit',
+                                eta: eta(0.4),
+                              },
+                              {
+                                t: 'moto' as const,
+                                icon: '🛵',
+                                label: 'Zémidjan',
+                                price: money(TRAVEL_COST.moto),
+                                eta: eta(0.12),
+                              },
+                              {
+                                t: 'taxi' as const,
+                                icon: '🚕',
+                                label: 'Taxi',
+                                price: money(TRAVEL_COST.taxi),
+                                eta: eta(0.1),
+                              },
+                            ] as const
+                          ).map((o) => (
+                            <button
+                              type="button"
+                              key={o.t}
+                              onClick={() => (o.t === 'walk' ? goLot(lot) : rideTo(lot, o.t))}
+                              className="flex flex-col items-center gap-0.5 rounded-2xl border border-slate-200 bg-white px-2 py-3 text-center"
+                            >
+                              <span className="text-2xl">{o.icon}</span>
+                              <span className="text-sm font-bold">{o.label}</span>
+                              <span className="text-xs text-slate-600">{o.price}</span>
+                              <span className="text-[11px] text-slate-400">{o.eta}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-[11px] text-slate-500">
+                        {cityLife.visited.includes(lot.id) ? 'Déjà visité.' : 'Jamais visité.'}{' '}
+                        Condition physique : {cityLife.fitness}/100.
+                      </p>
                     </>
-                  )}
-                  <p className="text-[11px] text-slate-500">
-                    {cityLife.visited.includes(selectedLot.id) ? 'Déjà visité.' : 'Jamais visité.'}{' '}
-                    Les habitants connectés présents apparaissent ici quand le serveur temps réel
-                    sera ouvert.
-                  </p>
-                </>
-              )}
+                  )
+                })()}
               {panel === 'billboard' && board && (
                 <>
                   <div

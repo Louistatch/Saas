@@ -10,6 +10,7 @@ import {
   decodeLomeLife,
   initialLomeLife,
 } from '../lome-life-engine'
+import { type NpcAnim, animFor, layoutFor } from './interiors'
 import {
   ESTATE_GATE,
   type WorldPoint,
@@ -42,6 +43,13 @@ export type CityAction =
   | 'relax'
   | 'bank'
   | 'work-city'
+  | 'use-treadmill'
+  | 'use-bike'
+  | 'use-weights'
+  | 'use-yoga'
+  | 'use-shower'
+  | 'coach'
+  | 'toilet'
 
 export interface CityLife {
   v: 1
@@ -53,6 +61,10 @@ export interface CityLife {
   insideLot: string | null
   skills: number
   visited: string[]
+  /** Physical condition 0–100, built up by training. */
+  fitness: number
+  /** Equipment in use right now (drives the player's animation inside a room). */
+  activity: { prop: string; anim: NpcAnim } | null
 }
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)))
@@ -65,6 +77,10 @@ const bump = (s: CityLife, d: Partial<LifeState['needs']>): CityLife => {
   for (const k of Object.keys(d) as (keyof typeof needs)[]) needs[k] = clamp(needs[k] + (d[k] ?? 0))
   return { ...s, life: { ...s.life, needs } }
 }
+const fit = (s: CityLife, gain: number): CityLife => ({
+  ...s,
+  fitness: Math.max(0, Math.min(100, s.fitness + gain)),
+})
 const pay = (s: CityLife, amount: number): CityLife | null =>
   s.life.wallet < amount
     ? null
@@ -90,6 +106,8 @@ export function initialCityLife(): CityLife {
     insideLot: null,
     skills: 0,
     visited: [],
+    fitness: 0,
+    activity: null,
   }
 }
 /** A save from before the city layer: the player stands where the estate save left them. */
@@ -103,6 +121,8 @@ export function fromLegacy(life: LifeState): CityLife {
     insideLot: null,
     skills: 0,
     visited: [],
+    fitness: 0,
+    activity: null,
   }
 }
 export function decodeCityLife(value: unknown): CityLife | null {
@@ -134,6 +154,8 @@ export function decodeCityLife(value: unknown): CityLife | null {
     insideLot: v.insideLot ?? null,
     skills: v.skills!,
     visited: v.visited,
+    fitness: Number.isInteger(v.fitness) && v.fitness! >= 0 && v.fitness! <= 100 ? v.fitness! : 0,
+    activity: null,
   }
 }
 
@@ -340,11 +362,26 @@ export function actionsFor(t: LotType): { id: CityAction; label: string; hint: s
       return [{ id: 'buy-meal', label: 'Acheter un repas', hint: '650 FCFA' }]
     case 'sport':
     case 'stadium':
-      return [{ id: 'train', label: 'S’entraîner', hint: 'Loisir +20 · Énergie −15 · 500 FCFA' }]
+      return [
+        {
+          id: 'use-treadmill',
+          label: 'Tapis de course',
+          hint: 'Forme +6 · Énergie −15 · 500 FCFA',
+        },
+        { id: 'use-weights', label: 'Musculation', hint: 'Forme +8 · Énergie −20 · 500 FCFA' },
+        { id: 'use-bike', label: 'Vélo', hint: 'Forme +4 · Énergie −10 · 500 FCFA' },
+        { id: 'use-yoga', label: 'Yoga', hint: 'Loisir +12 · Forme +3' },
+        { id: 'coach', label: 'Coach', hint: 'Forme +5 · 1 000 FCFA' },
+        { id: 'use-shower', label: 'Douche', hint: 'Hygiène +40' },
+        { id: 'train', label: 'S’entraîner', hint: 'Loisir +20 · Énergie −15 · 500 FCFA' },
+      ]
     case 'worship':
       return [{ id: 'pray', label: 'Prier avec la communauté', hint: 'Social +20 · Loisir +10' }]
     case 'hospital':
-      return [{ id: 'care', label: 'Consultation', hint: 'Énergie +30 · Hygiène +20 · 1 500 FCFA' }]
+      return [
+        { id: 'care', label: 'Consultation', hint: 'Énergie +30 · Hygiène +20 · 1 500 FCFA' },
+        { id: 'toilet', label: 'Toilettes', hint: 'Vessie 100' },
+      ]
     case 'school':
     case 'university':
       return [{ id: 'learn', label: 'Suivre un cours', hint: 'Compétence +1 · 1 000 FCFA' }]
@@ -401,7 +438,7 @@ export function lotAtDoor(s: CityLife): Lot | null {
 export function cityInteract(s: CityLife, action: CityAction): CityLife {
   if (action === 'leave') {
     if (!s.insideLot) return note(s, 'Tu es déjà dehors.')
-    return note({ ...s, insideLot: null }, 'Tu es sorti.')
+    return note({ ...s, insideLot: null, activity: null }, 'Tu es sorti.')
   }
   if (action === 'enter') {
     if (s.insideLot || s.life.inside) return note(s, 'Sors avant de changer de bâtiment.')
@@ -477,6 +514,33 @@ export function cityInteract(s: CityLife, action: CityAction): CityLife {
       )
     case 'relax':
       return note(bump(s, { fun: 25 }), 'Un moment au calme.')
+    case 'use-treadmill':
+    case 'use-bike':
+    case 'use-weights': {
+      const paid = pay(s, 500)
+      if (!paid) return note(s, 'Solde insuffisant.')
+      if (s.life.needs.energy < 15) return note(s, 'Trop fatigué pour cet exercice.')
+      const gain = action === 'use-weights' ? 8 : action === 'use-treadmill' ? 6 : 4
+      const cost = action === 'use-weights' ? 20 : action === 'use-treadmill' ? 15 : 10
+      return note(
+        bump(fit(paid, gain), { fun: 15, energy: -cost, hygiene: -10 }),
+        `${action === 'use-weights' ? 'Séance de musculation' : action === 'use-treadmill' ? 'Course sur tapis' : 'Vélo'} : forme ${Math.min(100, s.fitness + gain)}. −500 FCFA.`,
+      )
+    }
+    case 'use-yoga':
+      return note(bump(fit(s, 3), { fun: 12, energy: -5 }), 'Séance de yoga : le calme revient.')
+    case 'use-shower':
+      return note(bump(s, { hygiene: 40 }), 'Douche prise.')
+    case 'toilet':
+      return note(bump(s, { bladder: 100 }), 'Soulagé.')
+    case 'coach': {
+      const paid = pay(s, 1000)
+      if (!paid) return note(s, 'Solde insuffisant pour le coach.')
+      return note(
+        bump(fit(paid, 5), { energy: -10 }),
+        'Le coach corrige ta posture : forme +5. −1 000 FCFA.',
+      )
+    }
     case 'work-city': {
       if (s.life.workToday) return note(s, 'Tu as déjà travaillé aujourd’hui.')
       if (s.life.hour < 7 || s.life.hour >= 19)
@@ -508,3 +572,20 @@ export function cityInteract(s: CityLife, action: CityAction): CityLife {
 }
 
 export const GATE = ESTATE_GATE
+
+/** Use a piece of equipment in the current room: applies its action and starts the animation. */
+export function useProp(s: CityLife, propId: string): CityLife {
+  const lot = s.insideLot ? lotById(s.insideLot) : null
+  const room: Interior | null = lot ? interiorFor(lot.type) : null
+  if (!room) return note(s, 'Entre d’abord dans un lieu.')
+  const prop = layoutFor(room).props.find((p) => p.id === propId)
+  if (!prop || !prop.action) return note(s, 'Rien à faire avec cet objet.')
+  const next = cityInteract(s, prop.action as CityAction)
+  if (next === s || next.life.lastEvent === s.life.lastEvent) return next
+  const refused =
+    next.life.wallet === s.life.wallet &&
+    next.fitness === s.fitness &&
+    next.life.needs === s.life.needs
+  return refused ? next : { ...next, activity: { prop: prop.id, anim: animFor(prop.kind) } }
+}
+export const stopActivity = (s: CityLife): CityLife => (s.activity ? { ...s, activity: null } : s)
