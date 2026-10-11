@@ -3,8 +3,17 @@
 // « Voir comme » : le super_admin ouvre l'espace d'une coopérative, d'un opérateur ou de Haroo
 // pour voir exactement ce que voit chaque rôle. Rien n'est modifié sur le compte.
 import { useCooperative } from '@/app/context/cooperative-context'
+import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+
+interface OrgOption {
+  id: string
+  name: string
+  created_at: string
+}
+
+const RECENT_MS = 30 * 24 * 3600 * 1000
 
 export const VIEW_AS_SPACES = [
   { href: '/dashboard', label: 'Coopérative', hint: 'Tableau de bord d’une coopérative choisie' },
@@ -36,11 +45,28 @@ export function useOpenCooperative() {
 }
 
 export function ViewAsPanel() {
-  const { cooperatives } = useCooperative()
   const openCooperative = useOpenCooperative()
   const [coopId, setCoopId] = useState('')
   const [busy, setBusy] = useState(false)
-  const sorted = [...cooperatives].sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+  const [orgs, setOrgs] = useState<OrgOption[]>([])
+
+  // Liste lue à l'ouverture du centre de pilotage (pas celle de la connexion) : une
+  // organisation créée entre-temps y figure, et les plus récentes sont proposées en tête.
+  useEffect(() => {
+    void (async () => {
+      const { data } = await createClient()
+        .from('cooperatives')
+        .select('id, name, created_at')
+        .is('deleted_at', null)
+      setOrgs(
+        ((data as OrgOption[] | null) ?? []).sort((a, b) => a.name.localeCompare(b.name, 'fr')),
+      )
+    })()
+  }, [])
+  const now = Date.now()
+  const recent = orgs
+    .filter((o) => now - new Date(o.created_at).getTime() < RECENT_MS)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
   return (
     <section aria-labelledby="viewas-title" className="space-y-3">
       <h2 id="viewas-title" className="text-lg font-semibold text-foreground">
@@ -58,11 +84,22 @@ export function ViewAsPanel() {
             className="w-full rounded-md border border-border bg-background p-2 text-sm"
           >
             <option value="">Choisir une organisation</option>
-            {sorted.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
+            {recent.length > 0 && (
+              <optgroup label="Créées ces 30 derniers jours">
+                {recent.map((c) => (
+                  <option key={`r-${c.id}`} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            <optgroup label={`Toutes (${orgs.length})`}>
+              {orgs.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </optgroup>
           </select>
         </label>
         <button
