@@ -3,10 +3,11 @@
 // super_admin uniquement ; chaque étape est journalisée. Aucune suppression.
 import { parseAccessRequest } from '@/lib/admin/access-request-parse'
 import { audit, checkParent, organisationSchema } from '@/lib/admin/cooperatives'
+import { emailUser } from '@/lib/email/resend'
 import { assertRole } from '@/lib/security/assert-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
-import { type NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse, after } from 'next/server'
 import { z } from 'zod'
 
 const bodySchema = z.object({
@@ -162,5 +163,31 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const emailed = created
     ? await sendPasswordSetupEmail(input.email, request.nextUrl.origin)
     : false
+  // Bienvenue : ce que la coopérative peut faire dès maintenant, et, si sa faîtière n'est pas
+  // encore inscrite, l'inviter à lui en parler et à devenir opérateur.
+  const orgName = input.organisation.name
+  const pendingFaitiere = input.organisation.parent_id ? '' : (input.faitiere_name?.trim() ?? '')
+  const welcomeTo = userId
+  after(() =>
+    emailUser(welcomeTo, `Bienvenue sur FaîtiereHub, ${orgName}`, {
+      title: `${orgName} est ouverte sur FaîtiereHub`,
+      lines: [
+        `Bonjour ${input.first_name},`,
+        'Votre organisation est prête. Vous pouvez dès aujourd’hui inscrire vos membres, émettre leurs cartes de membre et suivre leurs parcelles, productions et cotisations.',
+        ...(pendingFaitiere
+          ? [
+              `Vous nous avez indiqué ${pendingFaitiere} comme faîtière. ${pendingFaitiere} n’est pas encore sur FaîtiereHub : parlez-lui-en, à elle et à ses autres coopératives. Une fois inscrite, elle suivra l’activité de ses membres en un seul endroit et percevra une part sur chaque carte imprimée pour eux.`,
+              'Vous pouvez aussi porter ce mouvement vous-même : un membre de votre équipe peut devenir opérateur certifié (formation, puis certification) pour ouvrir et accompagner les organisations de votre région. C’est une activité qui peut vous apporter des revenus.',
+            ]
+          : []),
+        created
+          ? 'Vous allez recevoir un second e-mail pour définir votre mot de passe.'
+          : 'Connectez-vous avec votre compte habituel : votre nouveau rôle est déjà actif.',
+      ],
+      cta: pendingFaitiere
+        ? { label: 'Découvrir le parcours opérateur', path: '/operator' }
+        : { label: 'Ouvrir mon tableau de bord', path: '/dashboard' },
+    }),
+  )
   return NextResponse.json({ ok: true, cooperative_id: coop.id, account_created: created, emailed })
 }

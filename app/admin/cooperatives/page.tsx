@@ -21,6 +21,7 @@ import { useResetPageOnChange } from '@/hooks/use-reset-page'
 import { useToast } from '@/hooks/use-toast'
 import { createClient } from '@/lib/supabase/client'
 import { errorMessage } from '@/lib/utils/errors'
+import { TOGO_FAITIERES, faitiereLabel } from '@/lib/faitieres-togo'
 import { cooperativeSchema, flattenZodErrors } from '@/lib/validators/schemas'
 import { Archive, ArchiveRestore, CreditCard, Edit2, Plus, Search } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -460,9 +461,21 @@ export default function CooperativesAdminPage() {
               <Input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Coopérative du Nord"
+                placeholder={form.level === 'faitiere' ? 'Choisir ou écrire, ex. : REJEPPAT' : 'Coopérative du Nord'}
+                list={form.level === 'faitiere' ? 'togo-faitieres' : undefined}
                 aria-invalid={!!formErrors.name}
               />
+              {form.level === 'faitiere' && (
+                <datalist id="togo-faitieres">
+                  {TOGO_FAITIERES.filter(
+                    (f) => !cooperatives.some((c) => c.name.toLowerCase() === f.acronym.toLowerCase()),
+                  ).map((f) => (
+                    <option key={f.acronym} value={f.acronym}>
+                      {faitiereLabel(f)}, {f.sector}
+                    </option>
+                  ))}
+                </datalist>
+              )}
               {formErrors.name ? (
                 <p className="text-xs text-destructive">{formErrors.name}</p>
               ) : null}

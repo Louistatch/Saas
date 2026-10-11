@@ -6,6 +6,7 @@
  */
 
 import { isPlaceholderEmail, parseAccessRequest } from '@/lib/admin/access-request-parse'
+import { TOGO_FAITIERES, faitiereLabel } from '@/lib/faitieres-togo'
 import { createClient } from '@/lib/supabase/client'
 import { Building2, Mail, Phone } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
@@ -129,18 +130,50 @@ function ApproveForm({
         )}
         {form.level !== 'faitiere' && !form.parent_id && (
           <label className="space-y-1 text-sm sm:col-span-2">
-            Faîtière prévue (facultatif)
+            Faîtière de la coopérative (choisir ou écrire)
             <input
               className={field}
+              list={`faitieres-${message.id}`}
               value={form.faitiere_name}
-              onChange={set('faitiere_name')}
+              onChange={(e) => {
+                const typed = e.target.value
+                // Faîtière déjà inscrite : on la rattache directement.
+                const known = parents.find(
+                  (p) =>
+                    p.level === 'faitiere' &&
+                    p.name.trim().toLowerCase() === typed.trim().toLowerCase(),
+                )
+                setForm((f) => ({ ...f, faitiere_name: typed, parent_id: known ? known.id : '' }))
+              }}
               placeholder="Ex. : REJEPPAT"
             />
+            <datalist id={`faitieres-${message.id}`}>
+              {parents
+                .filter((p) => p.level === 'faitiere')
+                .map((p) => (
+                  <option key={p.id} value={p.name}>
+                    Déjà sur FaîtiereHub
+                  </option>
+                ))}
+              {TOGO_FAITIERES.filter(
+                (f) => !parents.some((p) => p.name.toLowerCase() === f.acronym.toLowerCase()),
+              ).map((f) => (
+                <option key={f.acronym} value={f.acronym}>
+                  {faitiereLabel(f)}, {f.sector}
+                </option>
+              ))}
+            </datalist>
             <span className="block text-xs text-muted-foreground">
-              La coopérative fonctionne seule en attendant. Rattachez-la depuis Coopératives dès que
-              sa faîtière sera inscrite.
+              Pas encore inscrite : la coopérative fonctionne seule en attendant, et l’e-mail de
+              bienvenue l’invitera à parler de FaîtiereHub à sa faîtière. Rattachez-la depuis
+              Coopératives dès que la faîtière sera inscrite.
             </span>
           </label>
+        )}
+        {form.parent_id && form.faitiere_name && (
+          <p className="text-xs text-primary sm:col-span-2">
+            {form.faitiere_name} est déjà sur FaîtiereHub : la coopérative y sera rattachée.
+          </p>
         )}
         <label className="space-y-1 text-sm">
           Prénom
