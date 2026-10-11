@@ -68,7 +68,7 @@ function Farm({ built }: { built: Building }) {
             key={'corn-' + x + '-' + z}
             url={ASSETS.crop}
             position={[x, 0.02, z]}
-            scale={0.7}
+            scale={1.12}
             rotation={x > 0 ? 90 : 0}
           />
         )),
@@ -80,17 +80,17 @@ function Farm({ built }: { built: Building }) {
 function BuildingModel({ building }: { building: Building }) {
   switch (building.type) {
     case 'hall':
-      return <Model url={ASSETS.hall} scale={0.8} rotation={90} />
+      return <Model url={ASSETS.hall} scale={1.6} rotation={90} />
     case 'house':
-      return <Model url={ASSETS.house} scale={0.83} rotation={90} />
+      return <Model url={ASSETS.house} scale={1.65} rotation={90} />
     case 'lumberyard':
-      return <Model url={ASSETS.lumberyard} scale={0.75} rotation={180} />
+      return <Model url={ASSETS.lumberyard} scale={1.55} rotation={180} />
     case 'mill':
-      return <Model url={ASSETS.mill} scale={0.76} />
+      return <Model url={ASSETS.mill} scale={1.45} />
     case 'bakery':
-      return <Model url={ASSETS.bakery} scale={0.77} />
+      return <Model url={ASSETS.bakery} scale={1.5} />
     case 'market':
-      return <Model url={ASSETS.market} scale={0.78} rotation={270} />
+      return <Model url={ASSETS.market} scale={1.6} rotation={270} />
     case 'farm':
       return <Farm built={building} />
     case 'park':
@@ -233,14 +233,14 @@ function SettlementScene({
         <>
           {!life.inside && (
             <Entity name="Joueur de Lomé" position={positionOf(life.pos.x,life.pos.y)}>
-              <Model url={ASSETS.villager} scale={0.43} rotation={(life.trafficStep*37)%360} position={[0,0.065,0]} />
+              <Model url={ASSETS.villager} scale={0.8} rotation={(life.trafficStep*37)%360} position={[0,0.065,0]} />
               <Entity position={[0,0.025,0]} scale={[0.65,0.025,0.65]}><Render type="cylinder" material={highlighted} /></Entity>
             </Entity>
           )}
           {simulatedTraffic(life).map((npc,i) => {
             const at=positionOf(npc.x,npc.y)
             return <Entity key={'traffic'+i} position={at}>
-              <Model url={ASSETS.villager} scale={0.26} rotation={i*94} />
+              <Model url={ASSETS.villager} scale={0.48} rotation={i*94} />
             </Entity>
           })}
           {life.inside && (
@@ -272,7 +272,7 @@ export default function CityWorld3D({
   inspect: Cell | null
   onTile: (x: number, y: number) => void
 }) {
-  const [distance, setDistance] = useState(life ? 21 : 37)
+  const [distance, setDistance] = useState(life ? 14 : 37)
   const [angle, setAngle] = useState(45)
   const [pan, setPan] = useState({ x: 0, z: 0 })
   const [dragState, setDragState] = useState(false)
@@ -326,7 +326,7 @@ export default function CityWorld3D({
         <button type="button" title="Zoom avant" aria-label="Zoom avant" onClick={()=>setDistance(d=>Math.max(9,d*ZOOM_IN_FACTOR))} className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"><Plus className="h-5 w-5" /></button>
         <button type="button" title="Zoom arrière" aria-label="Zoom arrière" onClick={()=>setDistance(d=>Math.min(60,d*ZOOM_OUT_FACTOR))} className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"><Minus className="h-5 w-5" /></button>
         <button type="button" title="Tourner la caméra" aria-label="Tourner la caméra" onClick={()=>setAngle(a=>(a+45)%360)} className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"><RotateCcw className="h-5 w-5" /></button>
-        <button type="button" title="Recentrer la vue" aria-label="Recentrer la vue" onClick={()=>{setDistance(life?21:37);setAngle(45);setPan({x:0,z:0})}} className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"><Maximize2 className="h-5 w-5" /></button>
+        <button type="button" title="Recentrer la vue" aria-label="Recentrer la vue" onClick={()=>{setDistance(life?14:37);setAngle(45);setPan({x:0,z:0})}} className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"><Maximize2 className="h-5 w-5" /></button>
       </div>
       <div className="pointer-events-none absolute bottom-3 left-3 max-w-[70%] rounded-lg bg-emerald-950/85 px-3 py-2 text-xs text-white">
         Touchez une parcelle pour {life&&tool==='inspect'?'vous déplacer':tool==='inspect'?'inspecter':tool==='demolish'?'démolir':'construire'} · Glissez pour déplacer · +/− pour zoomer
