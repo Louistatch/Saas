@@ -14,6 +14,7 @@ import {
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { Compass, Maximize2, Minus, Plus, RotateCcw } from 'lucide-react'
 import { type LifeState, simulatedTraffic } from '@/lib/haroolife/lome-life-engine'
+import LomeLifeRoom3D from './lome-life-room-3d'
 import { ZOOM_IN_FACTOR, ZOOM_OUT_FACTOR } from '@/lib/haroolife/vendor/house-builder-camera-zoom'
 
 type EditTool = BuildType | 'inspect' | 'demolish'
@@ -206,6 +207,8 @@ function SettlementScene({
   const isBlocked = hover && tool !== 'inspect' && tool !== 'demolish'
     ? canBuild(city, hover.x, hover.y, tool) !== null : false
 
+  if (life?.inside) return <LomeLifeRoom3D venue={life.inside} angle={angle}/>
+
   return (
     <>
       <Entity position={camera} rotation={[-52, angle, 0]}>
@@ -264,10 +267,11 @@ function SettlementScene({
 }
 
 export default function CityWorld3D({
-  city, tool, inspect, onTile, life,
+  city, tool, inspect, onTile, life, immersive=false,
 }: {
   city: City
   life?: LifeState
+  immersive?: boolean
   tool: EditTool
   inspect: Cell | null
   onTile: (x: number, y: number) => void
@@ -318,19 +322,19 @@ export default function CityWorld3D({
           />
         </Application>
       </div>
-      <div className="pointer-events-none absolute left-3 top-3 rounded-xl bg-emerald-950/85 px-3 py-2 text-xs font-bold text-white shadow">
+      {!immersive&&<div className="pointer-events-none absolute left-3 top-3 rounded-xl bg-emerald-950/85 px-3 py-2 text-xs font-bold text-white shadow">
         <Compass className="mr-1 inline h-4 w-4" aria-hidden="true" />
         {life ? 'LOMÉ LIFE 3D · JOUR '+life.day+' · '+life.hour+' H' : 'HAROOVILLE 3D · JOUR '+city.day} · CC0 KENNEY
-      </div>
-      <div className="absolute right-3 top-3 flex flex-col gap-2">
+      </div>}
+      <div className={immersive?'absolute right-3 top-[33%] flex flex-col gap-2':'absolute right-3 top-3 flex flex-col gap-2'}>
         <button type="button" title="Zoom avant" aria-label="Zoom avant" onClick={()=>setDistance(d=>Math.max(9,d*ZOOM_IN_FACTOR))} className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"><Plus className="h-5 w-5" /></button>
         <button type="button" title="Zoom arrière" aria-label="Zoom arrière" onClick={()=>setDistance(d=>Math.min(60,d*ZOOM_OUT_FACTOR))} className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"><Minus className="h-5 w-5" /></button>
         <button type="button" title="Tourner la caméra" aria-label="Tourner la caméra" onClick={()=>setAngle(a=>(a+45)%360)} className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"><RotateCcw className="h-5 w-5" /></button>
         <button type="button" title="Recentrer la vue" aria-label="Recentrer la vue" onClick={()=>{setDistance(life?14:37);setAngle(45);setPan({x:0,z:0})}} className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"><Maximize2 className="h-5 w-5" /></button>
       </div>
-      <div className="pointer-events-none absolute bottom-3 left-3 max-w-[70%] rounded-lg bg-emerald-950/85 px-3 py-2 text-xs text-white">
+      {!immersive&&<div className="pointer-events-none absolute bottom-3 left-3 max-w-[70%] rounded-lg bg-emerald-950/85 px-3 py-2 text-xs text-white">
         Touchez une parcelle pour {life&&tool==='inspect'?'vous déplacer':tool==='inspect'?'inspecter':tool==='demolish'?'démolir':'construire'} · Glissez pour déplacer · +/− pour zoomer
-      </div>
+      </div>}
     </div>
   )
 }
