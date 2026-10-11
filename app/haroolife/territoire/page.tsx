@@ -1,16 +1,9 @@
-import { TerritorySandbox } from '@/components/haroolife/territory-sandbox'
+import { CityBuilder } from '@/components/haroolife/city-builder'
 import type { Metadata } from 'next'
-import 'leaflet/dist/leaflet.css'
-
 export const metadata: Metadata = {
-  title: 'HarooLife — Simulation du territoire togolais',
-  description: 'Explorez le Togo et testez une chaîne économique fictive entre Kpalimé et Lomé.',
+  title: 'HarooVille — Jeu de construction de ville',
+  description: 'Construisez et gérez une ville togolaise isométrique, ses habitants, routes et chaînes de production.',
 }
-
-export default function HarooLifeTerritoryPage() {
-  return (
-    <div className="min-h-screen bg-[#f6f7ef]">
-      <TerritorySandbox />
-    </div>
-  )
+export default function HarooVillePage() {
+  return <CityBuilder />
 }
