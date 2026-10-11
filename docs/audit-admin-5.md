@@ -13,8 +13,8 @@
 | Lien « Statistiques » mort (redirige vers `/admin`) | Moyenne | **Corrigé** : retiré |
 | Menu plat de 16 entrées, sans regroupement | Moyenne | **Corrigé** : 5 thèmes |
 | Commandes de cartes (`card_print_orders`), demandes de crédit, paiements opérateurs bloqués, notifications en échec : aucun compteur admin | Moyenne | **Corrigé** : comptés dans le centre de pilotage (lien vers la page la plus proche) |
-| Rôles : la page Utilisateurs modifie `role` et coopérative, pas le type Haroo (ouvrier, acheteur, agronome) | Moyenne | À faire |
-| Changements de rôle écrits depuis le navigateur, sans journal d'audit dédié | Moyenne | À faire : passer par une route serveur journalisée |
+| Rôles : la page Utilisateurs modifie `role` et coopérative, pas le type Haroo (ouvrier, acheteur, agronome) | Moyenne | **Corrigé** : type Haroo modifiable, fiche créée si besoin |
+| Changements de rôle écrits depuis le navigateur, sans journal d'audit dédié | Moyenne | **Corrigé** : `PATCH /api/admin/users/[id]`, journal `audit_logs` et historique dans la fiche ; pas de retrait de son propre rôle ni du dernier super_admin |
 | Coopératives et Paramètres écrivent aussi depuis le navigateur (RLS + trigger protègent, mais pas de journal) | Basse | À faire |
 | Pas d'écran dédié aux commandes d'impression de cartes ni aux demandes de crédit | Basse | À faire |
 | Un dossier « rejeté » (pièces demandées) ne repasse peut-être pas seul en attente quand il est complété | À vérifier | À vérifier |
