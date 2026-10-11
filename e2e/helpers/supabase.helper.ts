@@ -4,8 +4,8 @@
  * Uses the service role key for admin-level operations.
  */
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { TEST_PREFIX, CARD_PREFIX } from './constants'
+import { type SupabaseClient, createClient } from '@supabase/supabase-js'
+import { CARD_PREFIX, TEST_PREFIX } from './constants'
 
 let adminClient: SupabaseClient | null = null
 
@@ -17,7 +17,7 @@ export function getAdminClient(): SupabaseClient {
     if (!url || !serviceKey) {
       throw new Error(
         'Missing SUPABASE_URL or SUPABASE_SERVICE_KEY in environment. ' +
-        'These are required for E2E test data management.'
+          'These are required for E2E test data management.',
       )
     }
 
@@ -45,24 +45,31 @@ export function getAnonClient(): SupabaseClient {
  * Create a test member with E2E_TEST_ prefix.
  * Returns the created member record.
  */
-export async function createTestMember(cooperativeId: string, overrides?: {
-  firstName?: string
-  lastName?: string
-  email?: string
-  phone?: string
-}) {
+export async function createTestMember(
+  cooperativeId: string,
+  overrides?: {
+    firstName?: string
+    lastName?: string
+    email?: string
+    phone?: string
+  },
+) {
   const client = getAdminClient()
   const firstName = overrides?.firstName || `${TEST_PREFIX}Jean`
   const lastName = overrides?.lastName || `${TEST_PREFIX}Dupont`
 
-  const { data, error } = await client.from('members').insert({
-    cooperative_id: cooperativeId,
-    first_name: firstName,
-    last_name: lastName,
-    email: overrides?.email || `e2e-${Date.now()}@test.local`,
-    phone: overrides?.phone || '+228 90 00 00 00',
-    status: 'active',
-  }).select().single()
+  const { data, error } = await client
+    .from('members')
+    .insert({
+      cooperative_id: cooperativeId,
+      first_name: firstName,
+      last_name: lastName,
+      email: overrides?.email || `e2e-${Date.now()}@test.local`,
+      phone: overrides?.phone || '+228 90 00 00 00',
+      status: 'active',
+    })
+    .select()
+    .single()
 
   if (error) throw new Error(`Failed to create test member: ${error.message}`)
   return data
@@ -72,22 +79,32 @@ export async function createTestMember(cooperativeId: string, overrides?: {
  * Create a test card with E2E_ prefix card number.
  * Returns the created card record.
  */
-export async function createTestCard(memberId: string, cooperativeId: string, overrides?: {
-  status?: string
-  expiryDate?: string
-}) {
+export async function createTestCard(
+  memberId: string,
+  cooperativeId: string,
+  overrides?: {
+    status?: string
+    expiryDate?: string
+  },
+) {
   const client = getAdminClient()
   const cardNumber = `${CARD_PREFIX}-${Date.now().toString().slice(-5)}`
-  const expiryDate = overrides?.expiryDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  const expiryDate =
+    overrides?.expiryDate ||
+    new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
-  const { data, error } = await client.from('member_cards').insert({
-    cooperative_id: cooperativeId,
-    member_id: memberId,
-    card_number: cardNumber,
-    status: overrides?.status || 'active',
-    expiry_date: expiryDate,
-    qr_data: `/verify/${encodeURIComponent(cardNumber)}`,
-  }).select().single()
+  const { data, error } = await client
+    .from('member_cards')
+    .insert({
+      cooperative_id: cooperativeId,
+      member_id: memberId,
+      card_number: cardNumber,
+      status: overrides?.status || 'active',
+      expiry_date: expiryDate,
+      qr_data: `/verify/${encodeURIComponent(cardNumber)}`,
+    })
+    .select()
+    .single()
 
   if (error) throw new Error(`Failed to create test card: ${error.message}`)
   return data
@@ -153,7 +170,7 @@ export async function getCooperativeForUser(email: string): Promise<string | nul
 
   // First get the user ID
   const { data: userData } = await client.auth.admin.listUsers()
-  const user = userData?.users?.find(u => u.email === email)
+  const user = userData?.users?.find((u) => u.email === email)
   if (!user) return null
 
   // Then get their cooperative

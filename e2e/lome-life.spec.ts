@@ -20,7 +20,7 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
 
   // Direct control: one step on the on-screen pad moves the character to a neighbouring road tile.
   const before = await page.evaluate(
-    () => JSON.parse(localStorage.getItem('haroolife.lome-life.v1') ?? '{}').pos,
+    () => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? '{}').life.pos,
   )
   await page
     .getByRole('group', { name: 'Déplacer le personnage' })
@@ -28,13 +28,17 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
     .click()
   await expect
     .poll(() =>
-      page.evaluate(() => JSON.parse(localStorage.getItem('haroolife.lome-life.v1') ?? '{}').pos),
+      page.evaluate(
+        () => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? '{}').life.pos,
+      ),
     )
     .toEqual({ x: before.x - 1, y: before.y })
   await page.keyboard.press('ArrowRight')
   await expect
     .poll(() =>
-      page.evaluate(() => JSON.parse(localStorage.getItem('haroolife.lome-life.v1') ?? '{}').pos),
+      page.evaluate(
+        () => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? '{}').life.pos,
+      ),
     )
     .toEqual(before)
 
@@ -97,7 +101,7 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
     .poll(
       async () => {
         return page.evaluate(() => {
-          const save = localStorage.getItem('haroolife.lome-life.v1')
+          const save = localStorage.getItem('haroolife.lome-city.v1')
           return save ? JSON.parse(save).route.length : 99
         })
       },
@@ -118,8 +122,8 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
   await expect
     .poll(async () =>
       page.evaluate(() => {
-        const save = localStorage.getItem('haroolife.lome-life.v1')
-        return save ? JSON.parse(save).wallet : 0
+        const save = localStorage.getItem('haroolife.lome-city.v1')
+        return save ? JSON.parse(save).life.wallet : 0
       }),
     )
     .toBe(10400)
@@ -129,8 +133,8 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
   await expect
     .poll(async () =>
       page.evaluate(() => {
-        const save = localStorage.getItem('haroolife.lome-life.v1')
-        return save ? JSON.parse(save).inside : null
+        const save = localStorage.getItem('haroolife.lome-city.v1')
+        return save ? JSON.parse(save).life.inside : null
       }),
     )
     .toBe('market')

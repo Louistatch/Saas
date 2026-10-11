@@ -1,5 +1,5 @@
-import { defineConfig, devices } from '@playwright/test'
 import path from 'node:path'
+import { defineConfig, devices } from '@playwright/test'
 import dotenv from 'dotenv'
 
 // Load E2E-specific env vars
@@ -64,10 +64,12 @@ export default defineConfig({
     },
   ],
   // Web server — only start if testing locally
-  webServer: baseURL.includes('localhost') ? {
-    command: 'npm run dev',
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  } : undefined,
+  webServer: baseURL.includes('localhost')
+    ? {
+        command: 'npm run dev',
+        url: baseURL,
+        reuseExistingServer: !process.env.CI,
+        timeout: 120_000,
+      }
+    : undefined,
 })

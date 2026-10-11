@@ -1,5 +1,5 @@
-import { test as base, type Page, type BrowserContext } from '@playwright/test'
 import path from 'node:path'
+import { type BrowserContext, type Page, test as base } from '@playwright/test'
 import { ACCOUNTS } from '../helpers/constants'
 
 /**

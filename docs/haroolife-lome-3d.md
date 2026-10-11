@@ -136,3 +136,24 @@ service payé, entrée dans un intérieur 3D, mode construction. Captures dans
   les emplacements libres renvoient vers la page contact. Résumé d'inventaire pour le dossier
   investisseur (`inventorySummary`), repris dans `investor-readiness/business-model.md` comme
   hypothèse.
+
+## Tranche 7 : la ville entière (remplace le petit plateau)
+
+Architecture en cinq couches, chacune dans son module :
+
+| Couche | Fichier | Rôle |
+|---|---|---|
+| Monde urbain | `lib/haroolife/city/world.ts` | Grille 120×80, terrain (terre, sable, lagune de Bè, océan), six quartiers (Agoè, Adidogomé, Tokoin, Centre-ville·Dékon, Bè, Baguida), avenues tous les 12 et 10 cellules, rues de quartier selon la densité, boulevard de la plage, deux ponts, 46 lieux nommés et plus de 2 000 bâtiments générés de façon déterministe |
+| Streaming | `lib/haroolife/city/chunks.ts`, `components/haroolife/city/city-chunks.tsx` | Chunks de 16×16 ; un maillage fusionné (couleurs par sommet) par chunk ; anneau proche détaillé (marquage, fenêtres, arbres) et anneau lointain simplifié ; construction progressive, destruction hors portée |
+| Parcelle du joueur | `townsmen-engine.ts` inchangé, `EstateTiles` | La parcelle 22×22 est encastrée à Tokoin et reliée à l'avenue par une allée ; construction, économie et sauvegardes inchangées |
+| Vie urbaine | `lib/haroolife/city/life.ts`, `navigation.ts`, `traffic.ts` | Position monde, chemins sur routes et ponts (BFS), entrée dans les lieux, actions par catégorie (repas, sport, culte, soins, cours, hôtel, banque, petit boulot), 24 véhicules et piétons sur une boucle de rues, migration des anciennes sauvegardes |
+| Intérieurs | `lome-life-room-3d.tsx` | Salle de sport, lieu de culte et clinique ajoutés aux six intérieurs existants |
+
+Interface : caméra aérienne libre (glisser, pincer, Q/E, recentrer, vue de la ville), sélection
+au sol, icônes de lieux projetées au-dessus des bâtiments, filtres par catégorie, fiche de lieu
+coulissante (activités, Y aller à pied, zémidjan, taxi, Entrer), statut et HUD inchangés.
+
+Vérification : `tests/haroolife-city-world.test.ts`, `tests/haroolife-city-life.test.ts`, et
+`e2e/lome-city.spec.ts` (390×844 et 1440×900) : chunks chargés, ≥ 250 bâtiments, analyse de
+pixels interdisant qu'un plateau isolé occupe le centre d'une surface vide, caméra, fiche de
+lieu, trajet, trois intérieurs, persistance au rechargement.

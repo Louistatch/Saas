@@ -1,0 +1,509 @@
+/**
+ * Life in the city: the player's world position and routes, visits to city lots and their
+ * interiors, and the actions each kind of place offers. Wraps the estate engine state
+ * (`LifeState`, local coordinates, construction rules, saves) without changing it.
+ */
+import {
+  type LifeState,
+  TRAVEL_COST,
+  type Transport,
+  decodeLomeLife,
+  initialLomeLife,
+} from '../lome-life-engine'
+import {
+  ESTATE_GATE,
+  type WorldPoint,
+  estateRoadsOf,
+  findPath,
+  nearestWalkable,
+  walkable,
+} from './navigation'
+import { type Lot, type LotType, inEstate, lotAt, lotById, toLocal, toWorld } from './world'
+
+export type Interior =
+  | 'house'
+  | 'market'
+  | 'bakery'
+  | 'hall'
+  | 'well'
+  | 'park'
+  | 'gym'
+  | 'chapel'
+  | 'clinic'
+export type CityAction =
+  | 'enter'
+  | 'leave'
+  | 'train'
+  | 'pray'
+  | 'care'
+  | 'learn'
+  | 'rest'
+  | 'buy-meal'
+  | 'relax'
+  | 'bank'
+  | 'work-city'
+
+export interface CityLife {
+  v: 1
+  life: LifeState
+  at: WorldPoint
+  route: WorldPoint[]
+  /** Lot the player is heading to or standing at the door of. */
+  target: string | null
+  insideLot: string | null
+  skills: number
+  visited: string[]
+}
+
+const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)))
+const note = (s: CityLife, msg: string): CityLife => ({
+  ...s,
+  life: { ...s.life, lastEvent: msg, events: [msg, ...s.life.events].slice(0, 8) },
+})
+const bump = (s: CityLife, d: Partial<LifeState['needs']>): CityLife => {
+  const needs = { ...s.life.needs }
+  for (const k of Object.keys(d) as (keyof typeof needs)[]) needs[k] = clamp(needs[k] + (d[k] ?? 0))
+  return { ...s, life: { ...s.life, needs } }
+}
+const pay = (s: CityLife, amount: number): CityLife | null =>
+  s.life.wallet < amount
+    ? null
+    : {
+        ...s,
+        life: {
+          ...s.life,
+          wallet: s.life.wallet - amount,
+          spent: s.life.spent + amount,
+          city: { ...s.life.city, coins: s.life.city.coins + amount },
+        },
+      }
+
+export function initialCityLife(): CityLife {
+  const life = initialLomeLife()
+  return {
+    v: 1,
+    life,
+    at: toWorld(life.pos),
+    route: [],
+    target: null,
+    insideLot: null,
+    skills: 0,
+    visited: [],
+  }
+}
+/** A save from before the city layer: the player stands where the estate save left them. */
+export function fromLegacy(life: LifeState): CityLife {
+  return {
+    v: 1,
+    life: { ...life, route: [], target: null },
+    at: toWorld(life.pos),
+    route: [],
+    target: null,
+    insideLot: null,
+    skills: 0,
+    visited: [],
+  }
+}
+export function decodeCityLife(value: unknown): CityLife | null {
+  if (typeof value !== 'object' || value === null) return null
+  const v = value as Partial<CityLife>
+  if (v.v !== 1) return null
+  const life = decodeLomeLife(v.life)
+  if (!life) return null
+  const roads = estateRoadsOf(life.city.buildings)
+  if (!v.at || !Number.isInteger(v.at.x) || !Number.isInteger(v.at.y)) return null
+  const at = nearestWalkable(v.at, roads) ?? toWorld(life.pos)
+  if (!Number.isInteger(v.skills) || v.skills! < 0 || v.skills! > 100000) return null
+  if (
+    !Array.isArray(v.visited) ||
+    v.visited.length > 50 ||
+    !v.visited.every((s) => typeof s === 'string')
+  )
+    return null
+  if (v.target !== null && v.target !== undefined && !lotById(v.target)) return null
+  if (v.insideLot !== null && v.insideLot !== undefined && !lotById(v.insideLot)) return null
+  return {
+    v: 1,
+    life: syncEstate(life, at),
+    at,
+    route: Array.isArray(v.route)
+      ? v.route.filter((p) => p && walkable(p.x, p.y, roads)).slice(0, 400)
+      : [],
+    target: v.target ?? null,
+    insideLot: v.insideLot ?? null,
+    skills: v.skills!,
+    visited: v.visited,
+  }
+}
+
+/** Keep the estate engine's local position in step with the world position while inside the fence. */
+function syncEstate(life: LifeState, at: WorldPoint): LifeState {
+  if (!inEstate(at.x, at.y)) return life
+  const l = toLocal(at)
+  const roads = estateRoadsOf(life.city.buildings)
+  if (!roads.has(`${l.x}:${l.y}`)) return life
+  return life.pos.x === l.x && life.pos.y === l.y
+    ? life
+    : { ...life, pos: l, route: [], target: null }
+}
+
+export const roadsOf = (s: CityLife) => estateRoadsOf(s.life.city.buildings)
+
+/** Walk to a city lot: the route ends on its door cell. */
+export function goToLot(s: CityLife, lot: Lot): CityLife {
+  if (s.insideLot || s.life.inside) return note(s, 'Sors du bâtiment avant de partir.')
+  const path = findPath(s.at, lot.door, roadsOf(s))
+  if (!path) return note(s, 'Aucune route ne mène là-bas pour le moment.')
+  return note(
+    { ...s, route: path.slice(1), target: lot.id, life: { ...s.life, target: null } },
+    path.length <= 1
+      ? `Tu es devant : ${lot.name ?? 'ce lieu'}.`
+      : `En route vers ${lot.name ?? 'ce lieu'} : ${path.length - 1} cases.`,
+  )
+}
+/** Walk to an estate building (local coordinates), ending on a road next to it. */
+export function goToEstate(s: CityLife, bx: number, by: number): CityLife {
+  if (s.insideLot || s.life.inside) return note(s, 'Sors du bâtiment avant de partir.')
+  const roads = roadsOf(s)
+  let best: WorldPoint[] | null = null
+  for (const [dx, dy] of [
+    [0, 1],
+    [1, 0],
+    [-1, 0],
+    [0, -1],
+  ] as const) {
+    const door = toWorld({ x: bx + dx, y: by + dy })
+    const path = findPath(s.at, door, roads)
+    if (path && (!best || path.length < best.length)) best = path
+  }
+  if (!best) return note(s, 'Lieu inaccessible : il faut le relier aux routes de la mairie.')
+  return note(
+    {
+      ...s,
+      route: best.slice(1),
+      target: null,
+      life: { ...s.life, target: toLocal(toWorld({ x: bx, y: by })) },
+    },
+    best.length <= 1 ? 'Tu es arrivé.' : `En route : ${best.length - 1} cases.`,
+  )
+}
+/** Walk to any world cell (tap on the ground): the nearest walkable cell. */
+export function goToPoint(s: CityLife, p: WorldPoint): CityLife {
+  const lot = lotAt(p.x, p.y)
+  if (lot) return goToLot(s, lot)
+  const roads = roadsOf(s)
+  const dest = nearestWalkable(p, roads, 4)
+  if (!dest) return note(s, 'Pas de route par ici.')
+  const path = findPath(s.at, dest, roads)
+  if (!path) return note(s, 'Aucune route ne mène là-bas pour le moment.')
+  return note({ ...s, route: path.slice(1), target: null }, `En route : ${path.length - 1} cases.`)
+}
+
+/** One cell along the route. Never advances the clock; call during visible play only. */
+export function walkStep(s: CityLife): CityLife {
+  if (s.insideLot || s.life.inside || s.route.length === 0) return s
+  const next = s.route[0]
+  if (!walkable(next.x, next.y, roadsOf(s)))
+    return note({ ...s, route: [], target: null }, 'Le trajet a été interrompu.')
+  const at = next
+  const life = syncEstate(
+    {
+      ...s.life,
+      trafficStep: s.life.trafficStep + 1,
+      needs: { ...s.life.needs, energy: clamp(s.life.needs.energy - 1) },
+    },
+    at,
+  )
+  const out: CityLife = { ...s, at, life, route: s.route.slice(1) }
+  if (out.route.length === 0) {
+    const lot = out.target ? lotById(out.target) : null
+    return note(
+      out,
+      lot
+        ? `Tu es devant : ${lot.name ?? labelOf(lot.type)}. Appuie sur Entrer.`
+        : 'Destination atteinte.',
+    )
+  }
+  return out
+}
+/** Land at the end of the route at once (after a ride, or when skipping). */
+export function arrive(s: CityLife): CityLife {
+  if (s.route.length === 0) return s
+  const last = s.route[s.route.length - 1]
+  const life = syncEstate({ ...s.life, trafficStep: s.life.trafficStep + s.route.length }, last)
+  const out: CityLife = { ...s, at: last, life, route: [] }
+  const lot = out.target ? lotById(out.target) : null
+  return note(out, lot ? `Arrivé : ${lot.name ?? labelOf(lot.type)}.` : 'Arrivé à destination.')
+}
+/** Pay a ride for the current route (one fee, fictional money to the city treasury). */
+export function payRide(s: CityLife, transport: Transport): CityLife {
+  if (s.route.length === 0) return note(s, 'Choisis une destination avant un transport.')
+  const cost = TRAVEL_COST[transport]
+  if (cost === 0) return s
+  const paid = pay(s, cost)
+  if (!paid) return note(s, 'Solde insuffisant pour ce déplacement.')
+  return note(paid, `${transport === 'moto' ? 'Zémidjan' : 'Taxi'} : −${cost} FCFA.`)
+}
+/** Manual step (arrow keys, on-screen pad). Facing a lot selects it as the target. */
+export function stepDir(s: CityLife, dx: -1 | 0 | 1, dy: -1 | 0 | 1): CityLife {
+  if (s.insideLot || s.life.inside) return note(s, 'Sors du bâtiment avant de marcher.')
+  if (dx === 0 && dy === 0) return s
+  const next = { x: s.at.x + dx, y: s.at.y + dy }
+  if (walkable(next.x, next.y, roadsOf(s))) {
+    const life = syncEstate(
+      {
+        ...s.life,
+        trafficStep: s.life.trafficStep + 1,
+        needs: { ...s.life.needs, energy: clamp(s.life.needs.energy - 1) },
+      },
+      next,
+    )
+    return { ...s, at: next, life, route: [], target: null }
+  }
+  const lot = lotAt(next.x, next.y)
+  if (lot)
+    return note(
+      { ...s, route: [], target: lot.id },
+      `Tu es devant : ${lot.name ?? labelOf(lot.type)}. Appuie sur Entrer.`,
+    )
+  if (inEstate(next.x, next.y)) {
+    const l = toLocal(next)
+    const b = s.life.city.buildings.find((b) => b.x === l.x && b.y === l.y && b.type !== 'road')
+    if (b)
+      return note(
+        { ...s, route: [], life: { ...s.life, target: l } },
+        'Tu es devant un bâtiment du quartier. Appuie sur Entrer.',
+      )
+  }
+  return note(s, 'Pas de route dans cette direction.')
+}
+
+export const labelOf = (t: LotType) =>
+  (
+    ({
+      house: 'une maison',
+      apartment: 'un immeuble',
+      shop: 'une boutique',
+      market: 'le marché',
+      school: 'l’école',
+      university: 'l’université',
+      bank: 'la banque',
+      hospital: 'l’hôpital',
+      sport: 'la salle de sport',
+      stadium: 'le stade',
+      worship: 'le lieu de culte',
+      park: 'le jardin',
+      lot: 'un terrain',
+      hotel: 'l’hôtel',
+      station: 'la gare routière',
+      port: 'le port',
+      townhall: 'l’hôtel de ville',
+      billboard: 'le panneau',
+    }) as Record<LotType, string>
+  )[t]
+
+export function interiorFor(t: LotType): Interior | null {
+  switch (t) {
+    case 'house':
+    case 'apartment':
+    case 'hotel':
+      return 'house'
+    case 'shop':
+    case 'market':
+      return 'market'
+    case 'bank':
+    case 'townhall':
+    case 'school':
+    case 'university':
+    case 'station':
+      return 'hall'
+    case 'sport':
+    case 'stadium':
+      return 'gym'
+    case 'worship':
+      return 'chapel'
+    case 'hospital':
+      return 'clinic'
+    case 'park':
+    case 'port':
+      return 'park'
+    default:
+      return null
+  }
+}
+/** Actions a lot offers, in display order. */
+export function actionsFor(t: LotType): { id: CityAction; label: string; hint: string }[] {
+  switch (t) {
+    case 'shop':
+    case 'market':
+      return [{ id: 'buy-meal', label: 'Acheter un repas', hint: '650 FCFA' }]
+    case 'sport':
+    case 'stadium':
+      return [{ id: 'train', label: 'S’entraîner', hint: 'Loisir +20 · Énergie −15 · 500 FCFA' }]
+    case 'worship':
+      return [{ id: 'pray', label: 'Prier avec la communauté', hint: 'Social +20 · Loisir +10' }]
+    case 'hospital':
+      return [{ id: 'care', label: 'Consultation', hint: 'Énergie +30 · Hygiène +20 · 1 500 FCFA' }]
+    case 'school':
+    case 'university':
+      return [{ id: 'learn', label: 'Suivre un cours', hint: 'Compétence +1 · 1 000 FCFA' }]
+    case 'hotel':
+      return [
+        {
+          id: 'rest',
+          label: 'Prendre une chambre',
+          hint: 'Énergie 100 · Hygiène 100 · 3 000 FCFA',
+        },
+      ]
+    case 'bank':
+      return [{ id: 'bank', label: 'Voir mon compte', hint: 'Solde et dépenses' }]
+    case 'park':
+    case 'port':
+      return [{ id: 'relax', label: 'Se détendre', hint: 'Loisir +25' }]
+    case 'townhall':
+    case 'station':
+      return [
+        {
+          id: 'work-city',
+          label: 'Petit boulot',
+          hint: '+1 500 FCFA · Énergie −20 · une fois par jour',
+        },
+      ]
+    default:
+      return []
+  }
+}
+
+/** The lot whose door the player stands on (or next to its footprint). */
+export function lotAtDoor(s: CityLife): Lot | null {
+  const t = s.target ? lotById(s.target) : null
+  const near = (lot: Lot) => {
+    if (lot.door.x === s.at.x && lot.door.y === s.at.y) return true
+    for (let i = 0; i < lot.w; i++)
+      for (let j = 0; j < lot.h; j++)
+        if (Math.abs(lot.x + i - s.at.x) + Math.abs(lot.y + j - s.at.y) === 1) return true
+    return false
+  }
+  if (t && near(t)) return t
+  for (const [dx, dy] of [
+    [0, -1],
+    [1, 0],
+    [0, 1],
+    [-1, 0],
+  ] as const) {
+    const lot = lotAt(s.at.x + dx, s.at.y + dy)
+    if (lot && interiorFor(lot.type)) return lot
+  }
+  return null
+}
+
+export function cityInteract(s: CityLife, action: CityAction): CityLife {
+  if (action === 'leave') {
+    if (!s.insideLot) return note(s, 'Tu es déjà dehors.')
+    return note({ ...s, insideLot: null }, 'Tu es sorti.')
+  }
+  if (action === 'enter') {
+    if (s.insideLot || s.life.inside) return note(s, 'Sors avant de changer de bâtiment.')
+    const lot = lotAtDoor(s)
+    if (!lot) return note(s, 'Approche-toi de la porte d’un bâtiment.')
+    if (!interiorFor(lot.type)) return note(s, 'Rien à visiter ici.')
+    const visited = s.visited.includes(lot.id) ? s.visited : [...s.visited, lot.id].slice(-50)
+    return note(
+      { ...s, insideLot: lot.id, route: [], target: lot.id, visited },
+      `Tu entres : ${lot.name ?? labelOf(lot.type)}.`,
+    )
+  }
+  const lot = s.insideLot ? lotById(s.insideLot) : lotAtDoor(s)
+  if (!lot) return note(s, 'Entre d’abord dans un lieu.')
+  const allowed = actionsFor(lot.type).some((a) => a.id === action)
+  if (!allowed) return note(s, 'Ce lieu ne propose pas cette activité.')
+  switch (action) {
+    case 'buy-meal': {
+      const paid = pay(s, 650)
+      if (!paid) return note(s, 'Solde insuffisant.')
+      if (paid.life.city.food < 1)
+        return note(s, 'Rupture de stock : la ville doit produire des repas.')
+      return note(
+        {
+          ...paid,
+          life: {
+            ...paid.life,
+            meals: paid.life.meals + 1,
+            city: { ...paid.life.city, food: paid.life.city.food - 1 },
+          },
+        },
+        'Un repas acheté : −650 FCFA.',
+      )
+    }
+    case 'train': {
+      const paid = pay(s, 500)
+      if (!paid) return note(s, 'Solde insuffisant.')
+      return note(
+        bump(paid, { fun: 20, energy: -15, hygiene: -10 }),
+        'Bonne séance. Une douche s’impose.',
+      )
+    }
+    case 'pray':
+      return note(bump(s, { social: 20, fun: 10 }), 'Un moment avec la communauté.')
+    case 'care': {
+      const paid = pay(s, 1500)
+      if (!paid) return note(s, 'Solde insuffisant pour la consultation.')
+      return note(bump(paid, { energy: 30, hygiene: 20 }), 'Consultation faite : −1 500 FCFA.')
+    }
+    case 'learn': {
+      const paid = pay(s, 1000)
+      if (!paid) return note(s, 'Solde insuffisant pour le cours.')
+      return note(
+        { ...paid, skills: paid.skills + 1 },
+        `Cours suivi : compétence ${paid.skills + 1}. −1 000 FCFA.`,
+      )
+    }
+    case 'rest': {
+      const paid = pay(s, 3000)
+      if (!paid) return note(s, 'Solde insuffisant pour la chambre.')
+      return note(
+        {
+          ...paid,
+          life: { ...paid.life, needs: { ...paid.life.needs, energy: 100, hygiene: 100 } },
+        },
+        'Nuit à l’hôtel : −3 000 FCFA.',
+      )
+    }
+    case 'bank':
+      return note(
+        s,
+        `Solde : ${s.life.wallet.toLocaleString('fr-FR')} FCFA · gagné ${s.life.earned.toLocaleString('fr-FR')} · dépensé ${s.life.spent.toLocaleString('fr-FR')}.`,
+      )
+    case 'relax':
+      return note(bump(s, { fun: 25 }), 'Un moment au calme.')
+    case 'work-city': {
+      if (s.life.workToday) return note(s, 'Tu as déjà travaillé aujourd’hui.')
+      if (s.life.hour < 7 || s.life.hour >= 19)
+        return note(s, 'Les petits boulots se trouvent entre 7 h et 19 h.')
+      if (s.life.needs.energy < 20) return note(s, 'Repose-toi avant de travailler.')
+      const wage = 1500
+      if (s.life.city.coins < wage)
+        return note(s, 'La caisse municipale ne peut pas payer aujourd’hui.')
+      return note(
+        bump(
+          {
+            ...s,
+            life: {
+              ...s.life,
+              wallet: s.life.wallet + wage,
+              earned: s.life.earned + wage,
+              workToday: true,
+              city: { ...s.life.city, coins: s.life.city.coins - wage },
+            },
+          },
+          { energy: -20 },
+        ),
+        'Petit boulot fait : +1 500 FCFA.',
+      )
+    }
+    default:
+      return s
+  }
+}
+
+export const GATE = ESTATE_GATE

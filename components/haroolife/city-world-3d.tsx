@@ -328,7 +328,7 @@ function SettlementScene({
         venue={life.inside}
         angle={angle}
         distance={distance * 1.9}
-        onInteract={onInteriorAction}
+        onInteract={(a) => onInteriorAction?.(a as Action)}
       />
     )
 
@@ -677,3 +677,166 @@ export default function CityWorld3D({
     </div>
   )
 }
+
+/** Materials shared by the estate tiles (same palette as the standalone editor). */
+function useEstateMats(): MaterialSet {
+  const grass = useMaterial({ diffuse: '#79aa59', gloss: 0.08 })
+  const dryGrass = useMaterial({ diffuse: '#90b76b', gloss: 0.08 })
+  const forest = useMaterial({ diffuse: '#659c59', gloss: 0.06 })
+  const water = useMaterial({ diffuse: '#59b4ca', gloss: 0.35 })
+  const road = useMaterial({ diffuse: '#a88a65', gloss: 0.05 })
+  const farm = useMaterial({ diffuse: '#9b744b', gloss: 0.05 })
+  const hover = useMaterial({ diffuse: '#b8e9a0', emissive: '#385b29', gloss: 0.1 })
+  const blocked = useMaterial({ diffuse: '#dc886b', gloss: 0.1 })
+  const selected = useMaterial({ diffuse: '#e7d07e', gloss: 0.1 })
+  const sand = useMaterial({ diffuse: '#e2cf9a', gloss: 0.04 })
+  const d0 = useMaterial({ diffuse: '#86b35e', gloss: 0.08 })
+  const d1 = useMaterial({ diffuse: '#7cab5b', gloss: 0.08 })
+  const d2 = useMaterial({ diffuse: '#79aa59', gloss: 0.08 })
+  const d3 = useMaterial({ diffuse: '#8fb366', gloss: 0.08 })
+  const d4 = useMaterial({ diffuse: '#a3b96a', gloss: 0.08 })
+  return useMemo(
+    () => ({
+      grass,
+      dryGrass,
+      forest,
+      water,
+      road,
+      farm,
+      hover,
+      blocked,
+      selected,
+      sand,
+      districts: [d0, d1, d2, d3, d4],
+    }),
+    [
+      grass,
+      dryGrass,
+      forest,
+      water,
+      road,
+      farm,
+      hover,
+      blocked,
+      selected,
+      sand,
+      d0,
+      d1,
+      d2,
+      d3,
+      d4,
+    ],
+  )
+}
+
+/**
+ * The player's estate (22×22, townsmen-engine) as tiles and models only, centred on the
+ * origin of its parent entity: the city world places it at its world offset. Camera, lights,
+ * ground, traffic and the player figure are the parent's responsibility.
+ */
+export function EstateTiles({
+  city,
+  tool,
+  selected,
+  onTile,
+  canTap,
+  visitors = [],
+  onBillboard,
+}: {
+  city: City
+  tool: EditTool
+  selected: Cell | null
+  onTile: (x: number, y: number) => void
+  canTap: () => boolean
+  visitors?: PlacedResident[]
+  onBillboard?: (id: string) => void
+}) {
+  const [hover, setHover] = useState<Cell | null>(null)
+  const mats = useEstateMats()
+  const panelHouse = useMaterial({ diffuse: '#0f766e', emissive: '#0b3d38', gloss: 0.3 })
+  const panelFree = useMaterial({ diffuse: '#f5f1e6', emissive: '#4b4a44', gloss: 0.3 })
+  const panelFrame = useMaterial({ diffuse: '#2d2d2d', gloss: 0.4 })
+  const pagne0 = useMaterial({ diffuse: PAGNES[0], gloss: 0.1 })
+  const pagne1 = useMaterial({ diffuse: PAGNES[1], gloss: 0.1 })
+  const pagne2 = useMaterial({ diffuse: PAGNES[2], gloss: 0.1 })
+  const pagne3 = useMaterial({ diffuse: PAGNES[3], gloss: 0.1 })
+  const pagne4 = useMaterial({ diffuse: PAGNES[4], gloss: 0.1 })
+  const pagne5 = useMaterial({ diffuse: PAGNES[5], gloss: 0.1 })
+  const pagne6 = useMaterial({ diffuse: PAGNES[6], gloss: 0.1 })
+  const pagne7 = useMaterial({ diffuse: PAGNES[7], gloss: 0.1 })
+  const pagnes = [pagne0, pagne1, pagne2, pagne3, pagne4, pagne5, pagne6, pagne7]
+  const objects = useMemo(
+    () => new Map(city.buildings.map((b) => [b.x + ':' + b.y, b])),
+    [city.buildings],
+  )
+  const plots = useMemo(() => {
+    const result: Cell[] = []
+    for (let x = 0; x < SIZE; x++) for (let y = 0; y < SIZE; y++) result.push({ x, y })
+    return result
+  }, [])
+  const isBlocked =
+    hover && tool !== 'inspect' && tool !== 'demolish'
+      ? canBuild(city, hover.x, hover.y, tool) !== null
+      : false
+  return (
+    <>
+      <Entity position={[0, -0.09, 0]} scale={[SIZE * CELL + 0.4, 0.12, SIZE * CELL + 0.4]}>
+        <Render type="box" material={mats.sand} />
+      </Entity>
+      {plots.map(({ x, y }) => (
+        <Tile
+          key={x + ':' + y}
+          x={x}
+          y={y}
+          type={terrainAt(x, y)}
+          building={objects.get(x + ':' + y)}
+          selected={selected?.x === x && selected?.y === y}
+          hovered={hover?.x === x && hover?.y === y}
+          blocked={Boolean(isBlocked)}
+          mats={mats}
+          onClick={() => {
+            if (canTap()) onTile(x, y)
+          }}
+          onHover={() => setHover((prev) => (prev?.x === x && prev?.y === y ? prev : { x, y }))}
+        />
+      ))}
+      {visitors.map((v) => (
+        <Entity
+          key={'visitor-' + v.resident.display_name + v.x + ':' + v.y}
+          name={'Habitant ' + v.resident.display_name}
+          position={positionOf(v.x, v.y)}
+        >
+          <Model url={ASSETS.villager} scale={1.35} rotation={v.rotation} position={[0, 0.05, 0]} />
+          <Entity position={[0, 0.02, 0]} scale={[0.75, 0.02, 0.75]}>
+            <Render type="cylinder" material={pagnes[(v.resident.pagne - 1 + 8) % 8]} />
+          </Entity>
+        </Entity>
+      ))}
+      {BILLBOARDS.filter((bb) => !objects.has(bb.x + ':' + bb.y)).map((bb) => (
+        <Entity
+          key={bb.id}
+          name={'Panneau ' + bb.id}
+          position={positionOf(bb.x, bb.y)}
+          rotation={[0, bb.rotation, 0]}
+          onClick={() => {
+            if (canTap()) onBillboard?.(bb.id)
+          }}
+        >
+          <Entity position={[-0.3, 0.7, 0]} scale={[0.08, 1.4, 0.08]}>
+            <Render type="cylinder" material={panelFrame} />
+          </Entity>
+          <Entity position={[0.3, 0.7, 0]} scale={[0.08, 1.4, 0.08]}>
+            <Render type="cylinder" material={panelFrame} />
+          </Entity>
+          <Entity position={[0, 1.85, 0]} scale={[1.3, 0.8, 0.08]}>
+            <Render type="box" material={panelFrame} />
+          </Entity>
+          <Entity position={[0, 1.85, 0.05]} scale={[1.18, 0.68, 0.02]}>
+            <Render type="box" material={bb.status === 'house' ? panelHouse : panelFree} />
+          </Entity>
+        </Entity>
+      ))}
+    </>
+  )
+}
+export { ASSETS as ESTATE_ASSETS, Model as EstateModel }
