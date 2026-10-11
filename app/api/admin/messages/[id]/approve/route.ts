@@ -14,6 +14,8 @@ const bodySchema = z.object({
   email: z.string().trim().toLowerCase().email().max(120),
   first_name: z.string().trim().min(1).max(60),
   last_name: z.string().trim().min(1).max(60),
+  // Faîtière annoncée mais pas encore inscrite : nom affiché (cartes), rattachement plus tard.
+  faitiere_name: z.string().trim().max(120).optional(),
 })
 
 async function waitForProfile(admin: ReturnType<typeof createAdminClient>, userId: string) {
@@ -110,6 +112,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       level: input.organisation.level,
       parent_id:
         input.organisation.level === 'faitiere' ? null : (input.organisation.parent_id ?? null),
+      faitiere_name: input.organisation.parent_id ? null : input.faitiere_name || null,
     })
     .select('id')
     .single()

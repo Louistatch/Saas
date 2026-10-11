@@ -14,10 +14,13 @@ export type OrganisationInput = z.infer<typeof organisationSchema>
 type Admin = ReturnType<typeof createAdminClient>
 type Json = Database['public']['Tables']['audit_logs']['Insert']['details']
 
-/** Une union se rattache à une faîtière ; une coopérative à une union ou une faîtière. */
+/**
+ * Une union se rattache à une faîtière ; une coopérative à une union ou une faîtière.
+ * Le rattachement est facultatif : une coopérative peut fonctionner seule en attendant.
+ */
 export async function checkParent(admin: Admin, input: OrganisationInput, selfId?: string) {
-  if (input.level === 'faitiere') return null
-  if (!input.parent_id) return 'Choisissez l’organisation de rattachement.'
+  // Sans rattachement : organisation indépendante, à rattacher quand sa faîtière sera inscrite.
+  if (input.level === 'faitiere' || !input.parent_id) return null
   if (input.parent_id === selfId) return 'Une organisation ne peut pas être son propre parent.'
   const { data: parent } = await admin
     .from('cooperatives')

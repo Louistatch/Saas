@@ -49,6 +49,7 @@ function ApproveForm({
     email: isPlaceholderEmail(message.email) ? '' : (message.email ?? ''),
     first_name: first ?? '',
     last_name: rest.join(' '),
+    faitiere_name: '',
   })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -75,6 +76,7 @@ function ApproveForm({
         email: form.email,
         first_name: form.first_name,
         last_name: form.last_name,
+        faitiere_name: form.faitiere_name || undefined,
       }),
     }).catch(() => null)
     const data: { error?: string; account_created?: boolean; emailed?: boolean } = res
@@ -116,13 +118,28 @@ function ApproveForm({
           <label className="space-y-1 text-sm">
             Rattachée à
             <select className={field} value={form.parent_id} onChange={set('parent_id')}>
-              <option value="">Choisir…</option>
+              <option value="">Aucune pour l’instant (indépendante)</option>
               {options.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
               ))}
             </select>
+          </label>
+        )}
+        {form.level !== 'faitiere' && !form.parent_id && (
+          <label className="space-y-1 text-sm sm:col-span-2">
+            Faîtière prévue (facultatif)
+            <input
+              className={field}
+              value={form.faitiere_name}
+              onChange={set('faitiere_name')}
+              placeholder="Ex. : REJEPPAT"
+            />
+            <span className="block text-xs text-muted-foreground">
+              La coopérative fonctionne seule en attendant. Rattachez-la depuis Coopératives dès que
+              sa faîtière sera inscrite.
+            </span>
           </label>
         )}
         <label className="space-y-1 text-sm">
