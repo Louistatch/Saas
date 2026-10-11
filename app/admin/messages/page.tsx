@@ -7,6 +7,7 @@
 
 import { isPlaceholderEmail, parseAccessRequest } from '@/lib/admin/access-request-parse'
 import { TOGO_FAITIERES, faitiereLabel } from '@/lib/faitieres-togo'
+import { messageCategoryLabel } from '@/lib/support'
 import { createClient } from '@/lib/supabase/client'
 import { Building2, Mail, Phone } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
@@ -326,7 +327,7 @@ export default function AdminMessagesPage() {
               <p className="text-sm text-muted-foreground">
                 {m.name || 'Sans nom'}
                 {m.email ? `, ${m.email}` : ''}
-                {m.category ? ` (${m.category})` : ''}
+                {m.category ? ` (${messageCategoryLabel(m.category)})` : ''}
               </p>
               {m.message && (
                 <p className="whitespace-pre-line text-sm text-foreground">{m.message}</p>

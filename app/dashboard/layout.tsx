@@ -1,5 +1,6 @@
 'use client'
 
+import { SupportButton } from '@/components/support/support-button'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
@@ -446,6 +447,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           {/* Page content */}
           <div className="flex-1 p-4 md:p-6 lg:p-8">{children}</div>
+          <SupportButton />
         </main>
       </div>
     </ProtectedRoute>

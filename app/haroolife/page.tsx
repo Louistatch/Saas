@@ -1,4 +1,5 @@
 import { HarooLifeWorkspace } from '@/components/haroolife/workspace'
+import { SupportButton } from '@/components/support/support-button'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -36,6 +37,7 @@ export default function HarooLifePage() {
           </Link>
         </main>
       )}
+      <SupportButton />
     </div>
   )
 }

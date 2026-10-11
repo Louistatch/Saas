@@ -1,5 +1,6 @@
 'use client'
 
+import { SupportButton } from '@/components/support/support-button'
 import { ProtectedRoute } from '@/app/components/protected-route'
 import { useAuth } from '@/app/context/auth-context'
 import { RequestOrgCard } from '@/components/account/layer-activation'
@@ -1224,6 +1225,7 @@ export default function HarooSpacePage() {
   return (
     <ProtectedRoute>
       <HarooSpaceInner />
+      <SupportButton />
     </ProtectedRoute>
   )
 }

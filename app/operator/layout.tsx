@@ -1,3 +1,4 @@
+import { SupportButton } from '@/components/support/support-button'
 import type { Metadata, Viewport } from 'next'
 import type { ReactNode } from 'react'
 
@@ -10,5 +11,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: '#0d3d22' }
 
 export default function OperatorLayout({ children }: { children: ReactNode }) {
-  return children
+  return (
+    <>
+      {children}
+      <SupportButton />
+    </>
+  )
 }
