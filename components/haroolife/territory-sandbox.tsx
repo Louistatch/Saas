@@ -17,7 +17,7 @@ import { useState } from 'react'
 const TerritoryMap = dynamic(() => import('./territory-map'), {
   ssr: false,
   loading: () => (
-    <div className="flex h-[390px] items-center justify-center rounded-2xl bg-emerald-50 text-emerald-900 sm:h-[510px]">
+    <div className="flex h-[500px] items-center justify-center rounded-2xl bg-emerald-50 text-emerald-900 sm:h-[560px]">
       Chargement de la carte…
     </div>
   ),
@@ -106,7 +106,7 @@ export function TerritorySandbox() {
               Jour {world.day}
             </span>
           </div>
-          <TerritoryMap selected={selected} onSelect={setSelected} />
+          <TerritoryMap selected={selected} onSelect={setSelected} routeActive={world.projects.truck} />
           <div className="mt-4 flex flex-wrap gap-2" aria-label="Choisir une ville">
             {HUBS.map((city) => (
               <button
