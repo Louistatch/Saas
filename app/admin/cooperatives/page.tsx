@@ -1,5 +1,6 @@
 'use client'
 
+import { useOpenCooperative } from '@/components/admin/view-as'
 import { useConfirm } from '@/components/shared/confirm-dialog'
 import { EmptyState } from '@/components/shared/empty-state'
 import { LoadingBlock, Spinner } from '@/components/shared/loading'
@@ -19,12 +20,19 @@ import { Label } from '@/components/ui/label'
 import { useDebounced } from '@/hooks/use-debounced'
 import { useResetPageOnChange } from '@/hooks/use-reset-page'
 import { useToast } from '@/hooks/use-toast'
+import { TOGO_FAITIERES, faitiereLabel } from '@/lib/faitieres-togo'
 import { createClient } from '@/lib/supabase/client'
 import { errorMessage } from '@/lib/utils/errors'
-import { TOGO_FAITIERES, faitiereLabel } from '@/lib/faitieres-togo'
 import { cooperativeSchema, flattenZodErrors } from '@/lib/validators/schemas'
-import { Archive, ArchiveRestore, CreditCard, Edit2, Plus, Search } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import {
+  Archive,
+  ArchiveRestore,
+  CreditCard,
+  Edit2,
+  LayoutDashboard,
+  Plus,
+  Search,
+} from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 const PAGE_SIZE = 20
@@ -73,7 +81,6 @@ const emptyForm = {
 
 export default function CooperativesAdminPage() {
   const supabase = useMemo(() => createClient(), [])
-  const router = useRouter()
   const { toast } = useToast()
   const { confirm, confirmNode } = useConfirm()
 
@@ -176,12 +183,8 @@ export default function CooperativesAdminPage() {
   }
 
   /** Ouvre le flux de génération de cartes existant, ciblé sur cette structure. */
-  const openCards = (item: CooperativeAdminRow) => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('current_coop_id', item.id)
-    }
-    router.push('/dashboard/cards')
-  }
+  const openCooperative = useOpenCooperative()
+  const openCards = (item: CooperativeAdminRow) => void openCooperative(item.id, '/dashboard/cards')
 
   // Parents possibles selon le niveau choisi : une union se rattache à une
   // faîtière, une coopérative à une union ou une faîtière.
@@ -360,6 +363,16 @@ export default function CooperativesAdminPage() {
                               size="sm"
                               variant="outline"
                               className="border-border gap-1.5"
+                              onClick={() => void openCooperative(coop.id)}
+                              aria-label={`Ouvrir le tableau de bord de ${coop.name}`}
+                            >
+                              <LayoutDashboard className="h-4 w-4" />
+                              Tableau de bord
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-border gap-1.5"
                               onClick={() => openCards(coop)}
                               aria-label={`Gérer les cartes de ${coop.name}`}
                               title="Générer / gérer les cartes membres"
@@ -461,14 +474,19 @@ export default function CooperativesAdminPage() {
               <Input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder={form.level === 'faitiere' ? 'Choisir ou écrire, ex. : REJEPPAT' : 'Coopérative du Nord'}
+                placeholder={
+                  form.level === 'faitiere'
+                    ? 'Choisir ou écrire, ex. : REJEPPAT'
+                    : 'Coopérative du Nord'
+                }
                 list={form.level === 'faitiere' ? 'togo-faitieres' : undefined}
                 aria-invalid={!!formErrors.name}
               />
               {form.level === 'faitiere' && (
                 <datalist id="togo-faitieres">
                   {TOGO_FAITIERES.filter(
-                    (f) => !cooperatives.some((c) => c.name.toLowerCase() === f.acronym.toLowerCase()),
+                    (f) =>
+                      !cooperatives.some((c) => c.name.toLowerCase() === f.acronym.toLowerCase()),
                   ).map((f) => (
                     <option key={f.acronym} value={f.acronym}>
                       {faitiereLabel(f)}, {f.sector}

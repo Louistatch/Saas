@@ -52,6 +52,15 @@ const ADMIN_SECTIONS: { title: string; links: AdminLink[] }[] = [
     ],
   },
   {
+    title: 'Voir comme',
+    links: [
+      { href: '/dashboard', label: 'Coopérative', icon: LayoutDashboard },
+      { href: '/operator', label: 'Opérateur', icon: Award },
+      { href: '/haroo', label: 'Professionnel Haroo', icon: Briefcase },
+      { href: '/haroolife', label: 'HarooLife', icon: Leaf },
+    ],
+  },
+  {
     title: 'Organisations et comptes',
     links: [
       { href: '/admin/cooperatives', label: 'Coopératives', icon: Building2 },

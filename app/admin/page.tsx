@@ -10,6 +10,7 @@
  */
 
 import { useAuth } from '@/app/context/auth-context'
+import { ViewAsPanel } from '@/components/admin/view-as'
 import { ChevronRight, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
@@ -167,6 +168,8 @@ export default function AdminHome() {
           </ol>
         )}
       </section>
+
+      <ViewAsPanel />
 
       {inbox && (
         <section aria-labelledby="pulse-title">
