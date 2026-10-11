@@ -126,3 +126,13 @@ service payé, entrée dans un intérieur 3D, mode construction. Captures dans
   choix de la ville. Changer de ville garde la grille, l'argent et la partie : seuls les noms
   changent (relevé géographique réel : tranche ultérieure). Les tuiles 3D prennent une teinte
   par quartier.
+
+## Tranche 6 : surfaces de monétisation
+
+- `lib/haroolife/lome-sponsors.ts` : cinq panneaux publicitaires (un par quartier, posés dans
+  la scène 3D, cliquables) et six emplacements d'applis dans le téléphone (trois services
+  FaîtiereHub gratuits, trois partenaires ouverts). Tarifs affichés : 15 000 à 25 000 FCFA la
+  semaine de panneau, 50 000 FCFA le mois d'appli. Aucun annonceur inventé, aucune facturation :
+  les emplacements libres renvoient vers la page contact. Résumé d'inventaire pour le dossier
+  investisseur (`inventorySummary`), repris dans `investor-readiness/business-model.md` comme
+  hypothèse.
