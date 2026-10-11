@@ -213,7 +213,7 @@ function SettlementScene({
   const isBlocked = hover && tool !== 'inspect' && tool !== 'demolish'
     ? canBuild(city, hover.x, hover.y, tool) !== null : false
 
-  if (life?.inside) return <LomeLifeRoom3D venue={life.inside} angle={angle} onInteract={onInteriorAction}/>
+  if (life?.inside) return <LomeLifeRoom3D venue={life.inside} angle={angle} distance={distance*1.9} onInteract={onInteriorAction}/>
 
   return (
     <>
@@ -242,8 +242,8 @@ function SettlementScene({
         <>
           {!life.inside && (
             <Entity name="Joueur de Lomé" position={positionOf(life.pos.x,life.pos.y)}>
-              <Model url={ASSETS.villager} scale={0.8} rotation={(life.trafficStep*37)%360} position={[0,0.065,0]} />
-              <Entity position={[0,0.025,0]} scale={[0.65,0.025,0.65]}><Render type="cylinder" material={highlighted} /></Entity>
+              <Model url={ASSETS.villager} scale={1.55} rotation={(life.trafficStep*37)%360} position={[0,0.065,0]} />
+              <Entity position={[0,0.025,0]} scale={[0.9,0.025,0.9]}><Render type="cylinder" material={highlighted} /></Entity>
             </Entity>
           )}
           {simulatedTraffic(life).map((npc,i) => {
@@ -252,7 +252,7 @@ function SettlementScene({
               {i===0 ? <Model url={ASSETS.taxi} scale={0.9} rotation={life.trafficStep%2?90:0}/> :
                i===1 ? <Model url={ASSETS.sedan} scale={0.83} rotation={life.trafficStep%2?0:90}/> :
                i===2 ? <Model url={ASSETS.van} scale={0.78} rotation={180}/> :
-               <Model url={ASSETS.villager} scale={0.48} rotation={i*94}/>}
+               <Model url={ASSETS.villager} scale={0.85} rotation={i*94}/>}
             </Entity>
           })}
           {life.city.buildings.filter(b=>b.type==='road').slice(0,2).map((b,i)=>(
