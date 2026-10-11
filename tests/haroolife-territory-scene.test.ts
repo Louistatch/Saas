@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { DISTRICT_SCENES, visualSignals } from '../lib/haroolife/territory-scene'
-import { HUBS, initialTerritoryWorld, invest, advanceTerritoryDays } from '../lib/haroolife/territory-simulation'
+import {
+  HUBS,
+  advanceTerritoryDays,
+  initialTerritoryWorld,
+  invest,
+} from '../lib/haroolife/territory-simulation'
 
 test('every selectable real geographic hub has its own illustrative district', () => {
   for (const hub of HUBS) {

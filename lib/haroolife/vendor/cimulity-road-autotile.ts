@@ -18,20 +18,20 @@
  *       can cosmetically false-positive that corner as `diagonal` — ACCEPTED.
  */
 
-export const N = 1;
-export const E = 2;
-export const S = 4;
-export const W = 8;
+export const N = 1
+export const E = 2
+export const S = 4
+export const W = 8
 
-type OrthoDirName = 'N' | 'E' | 'S' | 'W';
+type OrthoDirName = 'N' | 'E' | 'S' | 'W'
 
 /** Single source of truth for the ordered orthogonal direction table. */
 const ORTHO_DIRS = [
-  { name: 'N' as OrthoDirName, dx: 0,  dy: -1, bit: N },
-  { name: 'E' as OrthoDirName, dx: 1,  dy:  0, bit: E },
-  { name: 'S' as OrthoDirName, dx: 0,  dy:  1, bit: S },
-  { name: 'W' as OrthoDirName, dx: -1, dy:  0, bit: W },
-] as const;
+  { name: 'N' as OrthoDirName, dx: 0, dy: -1, bit: N },
+  { name: 'E' as OrthoDirName, dx: 1, dy: 0, bit: E },
+  { name: 'S' as OrthoDirName, dx: 0, dy: 1, bit: S },
+  { name: 'W' as OrthoDirName, dx: -1, dy: 0, bit: W },
+] as const
 
 export type RoadSpriteKind =
   | 'isolated'
@@ -40,54 +40,52 @@ export type RoadSpriteKind =
   | 'corner'
   | 'tee'
   | 'cross'
-  | 'diagonal';
+  | 'diagonal'
 
 export interface RoadDescriptor {
-  kind: RoadSpriteKind;
-  mask: number;
-  arms: ReadonlyArray<OrthoDirName>;
+  kind: RoadSpriteKind
+  mask: number
+  arms: ReadonlyArray<OrthoDirName>
 }
 
 export function roadAutoTile(isRoad: (dx: number, dy: number) => boolean): RoadDescriptor {
   // Build the 4-bit orthogonal mask.
-  let mask = 0;
+  let mask = 0
   for (const { bit, dx, dy } of ORTHO_DIRS) {
-    if (isRoad(dx, dy)) mask |= bit;
+    if (isRoad(dx, dy)) mask |= bit
   }
 
   // Collect arms in N,E,S,W order.
-  const arms = ORTHO_DIRS
-    .filter(a => (mask & a.bit) !== 0)
-    .map(a => a.name);
+  const arms = ORTHO_DIRS.filter((a) => (mask & a.bit) !== 0).map((a) => a.name)
 
-  const popcount = arms.length;
+  const popcount = arms.length
 
   // Base classification from orthogonal mask.
-  let kind: RoadSpriteKind;
+  let kind: RoadSpriteKind
 
   if (popcount === 0) {
-    kind = 'isolated';
+    kind = 'isolated'
   } else if (popcount === 1) {
-    kind = 'end';
+    kind = 'end'
   } else if (popcount === 2) {
     // Two bits: straight (opposite) or corner (adjacent).
     if (mask === (N | S) || mask === (E | W)) {
-      kind = 'straight';
+      kind = 'straight'
     } else {
-      kind = 'corner';
+      kind = 'corner'
     }
   } else if (popcount === 3) {
-    kind = 'tee';
+    kind = 'tee'
   } else {
-    kind = 'cross';
+    kind = 'cross'
   }
 
   // Diagonal-staircase reclassification — only applies to 'corner'.
   if (kind === 'corner') {
-    kind = classifyCornerDiagonal(mask, isRoad);
+    kind = classifyCornerDiagonal(mask, isRoad)
   }
 
-  return { kind, mask, arms };
+  return { kind, mask, arms }
 }
 
 /**
@@ -104,16 +102,16 @@ function classifyCornerDiagonal(
   mask: number,
   isRoad: (dx: number, dy: number) => boolean,
 ): RoadSpriteKind {
-  const nw = isRoad(-1, -1);
-  const ne = isRoad( 1, -1);
-  const se = isRoad( 1,  1);
-  const sw = isRoad(-1,  1);
+  const nw = isRoad(-1, -1)
+  const ne = isRoad(1, -1)
+  const se = isRoad(1, 1)
+  const sw = isRoad(-1, 1)
 
   if (mask === (N | E) || mask === (S | W)) {
     // Arm-diagonal axis: NE–SW; perpendicular-axis diagonals: NW, SE.
-    return (nw || se) ? 'diagonal' : 'corner';
+    return nw || se ? 'diagonal' : 'corner'
   }
   // mask === (E | S) || mask === (N | W)
   // Arm-diagonal axis: NW–SE; perpendicular-axis diagonals: NE, SW.
-  return (ne || sw) ? 'diagonal' : 'corner';
+  return ne || sw ? 'diagonal' : 'corner'
 }

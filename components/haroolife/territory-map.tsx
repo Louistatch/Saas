@@ -1,13 +1,13 @@
 'use client'
 
 import { HUBS, type HubId } from '@/lib/haroolife/territory-simulation'
-import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CircleMarker, Map, Polyline } from 'leaflet'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 // Geographic framing only: this rectangle is NOT an administrative border.
 const TOGO_VIEW_BOUNDS: [[number, number], [number, number]] = [
   [6.05, -0.22],
-  [11.20, 1.85],
+  [11.2, 1.85],
 ]
 
 /** Browser-only Leaflet map. Real basemap; economic overlays are illustrative. */
@@ -185,8 +185,8 @@ export default function TerritoryMap({
         </p>
       )}
       <p className="mt-2 text-xs text-slate-500">
-        Carte réelle, cinq repères géographiques. La ligne Kpalimé–Lomé est schématique,
-        sans itinéraire ni distance routière calculés. Touchez une ville pour zoomer.
+        Carte réelle, cinq repères géographiques. La ligne Kpalimé–Lomé est schématique, sans
+        itinéraire ni distance routière calculés. Touchez une ville pour zoomer.
       </p>
     </div>
   )

@@ -6,32 +6,49 @@
  */
 export const SKETCH_TOWN_SOURCE = '/haroolife/vendor/kenney-sketch-town/'
 export const SKETCH_TOWN_ASSETS = [
-  'grass_center_S.png', 'dirt_center_S.png', 'grass_path_S.png',
-  'grass_pathCrossing_S.png', 'grass_pathBend_S.png', 'grass_pathCorner_S.png',
-  'grass_pathSplit_S.png', 'grass_pathEnd_S.png',
-  'water_center_S.png', 'grass_river_S.png', 'tree_single_S.png',
-  'tree_multiple_S.png', 'building_doorBeige_S.png',
-  'building_doorWindowsBeige_S.png', 'building_windowBeige_S.png',
-  'building_centerBeige_S.png', 'roof_gableBrown_S.png',
-  'roof_gableGreen_S.png', 'roof_roundBeige_S.png',
-  'roof_pointBrown_S.png', 'roof_churchBrown_S.png',
-  'castle_towerBrown_S.png', 'rocks_grass_S.png', 'grass_water_S.png',
+  'grass_center_S.png',
+  'dirt_center_S.png',
+  'grass_path_S.png',
+  'grass_pathCrossing_S.png',
+  'grass_pathBend_S.png',
+  'grass_pathCorner_S.png',
+  'grass_pathSplit_S.png',
+  'grass_pathEnd_S.png',
+  'water_center_S.png',
+  'grass_river_S.png',
+  'tree_single_S.png',
+  'tree_multiple_S.png',
+  'building_doorBeige_S.png',
+  'building_doorWindowsBeige_S.png',
+  'building_windowBeige_S.png',
+  'building_centerBeige_S.png',
+  'roof_gableBrown_S.png',
+  'roof_gableGreen_S.png',
+  'roof_roundBeige_S.png',
+  'roof_pointBrown_S.png',
+  'roof_churchBrown_S.png',
+  'castle_towerBrown_S.png',
+  'rocks_grass_S.png',
+  'grass_water_S.png',
 ] as const
 
-export type SketchSprite = typeof SKETCH_TOWN_ASSETS[number]
+export type SketchSprite = (typeof SKETCH_TOWN_ASSETS)[number]
 export type SketchSprites = Partial<Record<SketchSprite, HTMLImageElement>>
 
 /** Each sprite is tiny; failure of a single URL must not block the game. */
 export async function preloadSketchTown(): Promise<SketchSprites> {
-  const entries = await Promise.all(SKETCH_TOWN_ASSETS.map((name) =>
-    new Promise<readonly [SketchSprite, HTMLImageElement] | null>((resolve) => {
-      const image = new Image()
-      image.decoding = 'async'
-      image.onload = () => resolve([name, image])
-      image.onerror = () => resolve(null)
-      image.src = SKETCH_TOWN_SOURCE + name
-    }),
-  ))
+  const entries = await Promise.all(
+    SKETCH_TOWN_ASSETS.map(
+      (name) =>
+        new Promise<readonly [SketchSprite, HTMLImageElement] | null>((resolve) => {
+          const image = new Image()
+          image.decoding = 'async'
+          image.onload = () => resolve([name, image])
+          image.onerror = () => resolve(null)
+          image.src = SKETCH_TOWN_SOURCE + name
+        }),
+    ),
+  )
   const images: SketchSprites = {}
   for (const entry of entries) {
     if (entry) images[entry[0]] = entry[1]

@@ -76,8 +76,7 @@ export function initialTerritoryWorld(): TerritoryWorld {
   }
 }
 
-const log = (world: TerritoryWorld, entry: string) =>
-  [entry, ...world.events].slice(0, 7)
+const log = (world: TerritoryWorld, entry: string) => [entry, ...world.events].slice(0, 7)
 
 export function invest(
   world: TerritoryWorld,

@@ -1,5 +1,15 @@
 'use client'
 
+import { type Action, type LifeState, trafficVehicles } from '@/lib/haroolife/lome-life-engine'
+import {
+  type BuildType,
+  type Building,
+  type City,
+  SIZE,
+  canBuild,
+  terrainAt,
+} from '@/lib/haroolife/townsmen-engine'
+import { ZOOM_IN_FACTOR, ZOOM_OUT_FACTOR } from '@/lib/haroolife/vendor/house-builder-camera-zoom'
 /**
  * HarooVille 3D editor: PlayCanvas React + CC0 Kenney GLB kits.
  * Shares exactly the existing city-builder state, construction rules and saves.
@@ -8,14 +18,9 @@
 import { Application, Entity, Gltf } from '@playcanvas/react'
 import { Camera, Light, Render } from '@playcanvas/react/components'
 import { useMaterial, useModel } from '@playcanvas/react/hooks'
-import {
-  SIZE, canBuild, terrainAt, type BuildType, type City, type Building,
-} from '@/lib/haroolife/townsmen-engine'
-import { useCallback, useMemo, useRef, useState } from 'react'
 import { Compass, Maximize2, Minus, Plus, RotateCcw } from 'lucide-react'
-import { type Action, type LifeState, simulatedTraffic } from '@/lib/haroolife/lome-life-engine'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import LomeLifeRoom3D from './lome-life-room-3d'
-import { ZOOM_IN_FACTOR, ZOOM_OUT_FACTOR } from '@/lib/haroolife/vendor/house-builder-camera-zoom'
 
 type EditTool = BuildType | 'inspect' | 'demolish'
 type Cell = { x: number; y: number }
@@ -49,7 +54,10 @@ function positionOf(x: number, y: number): Vec3 {
 }
 
 function Model({
-  url, scale = 1, position = [0, 0, 0], rotation = 0,
+  url,
+  scale = 1,
+  position = [0, 0, 0],
+  rotation = 0,
 }: {
   url: string
   scale?: number
@@ -119,24 +127,46 @@ type MaterialSet = {
 }
 
 function Tile({
-  x, y, type, selected, hovered, blocked, building, mats, onClick, onHover,
+  x,
+  y,
+  type,
+  selected,
+  hovered,
+  blocked,
+  building,
+  mats,
+  onClick,
+  onHover,
 }: {
-  x: number; y: number; type: ReturnType<typeof terrainAt>
-  selected: boolean; hovered: boolean; blocked: boolean
+  x: number
+  y: number
+  type: ReturnType<typeof terrainAt>
+  selected: boolean
+  hovered: boolean
+  blocked: boolean
   building?: Building
   mats: MaterialSet
   onClick: () => void
   onHover: () => void
 }) {
   const pos = positionOf(x, y)
-  const tint =
-    hovered ? (blocked ? mats.blocked : mats.hover) :
-      selected ? mats.selected :
-      building?.type === 'road' ? mats.road :
-      building?.type === 'farm' ? mats.farm :
-      type === 'water' ? mats.water :
-      type === 'forest' ? mats.forest :
-      (x * 13 + y * 7) % 7 === 0 ? mats.dryGrass : mats.grass
+  const tint = hovered
+    ? blocked
+      ? mats.blocked
+      : mats.hover
+    : selected
+      ? mats.selected
+      : building?.type === 'road'
+        ? mats.road
+        : building?.type === 'farm'
+          ? mats.farm
+          : type === 'water'
+            ? mats.water
+            : type === 'forest'
+              ? mats.forest
+              : (x * 13 + y * 7) % 7 === 0
+                ? mats.dryGrass
+                : mats.grass
   return (
     <Entity
       name={'Plot ' + (x + 1) + '-' + (y + 1)}
@@ -150,7 +180,8 @@ function Tile({
       {building ? (
         <BuildingModel building={building} />
       ) : type === 'forest' && (x * 11 + y * 5) % 7 < 2 ? (
-        <Model url={(x + y) % 4 === 0 ? ASSETS.palm : (x + y) % 3 === 0 ? ASSETS.oak : ASSETS.tree}
+        <Model
+          url={(x + y) % 4 === 0 ? ASSETS.palm : (x + y) % 3 === 0 ? ASSETS.oak : ASSETS.tree}
           scale={(x + y) % 4 === 0 ? 2.1 : 1.7}
           rotation={(x * 41 + y * 19) % 360}
         />
@@ -172,7 +203,16 @@ function Tile({
 }
 
 function SettlementScene({
-  city, tool, selected, pan, distance, angle, onTile, canTap, life, onInteriorAction,
+  city,
+  tool,
+  selected,
+  pan,
+  distance,
+  angle,
+  onTile,
+  canTap,
+  life,
+  onInteriorAction,
 }: {
   city: City
   life?: LifeState
@@ -195,94 +235,178 @@ function SettlementScene({
   const hoveredMaterial = useMaterial({ diffuse: '#b8e9a0', emissive: '#385b29', gloss: 0.1 })
   const blocked = useMaterial({ diffuse: '#dc886b', gloss: 0.1 })
   const highlighted = useMaterial({ diffuse: '#e7d07e', gloss: 0.1 })
-  const mats = useMemo(() => ({
-    grass, dryGrass, forest, water, road, farm, hover: hoveredMaterial, blocked, selected: highlighted,
-  }), [grass, dryGrass, forest, water, road, farm, hoveredMaterial, blocked, highlighted])
-  const objects = useMemo(() => new Map(city.buildings.map(b => [b.x + ':' + b.y, b])), [city.buildings])
+  const mats = useMemo(
+    () => ({
+      grass,
+      dryGrass,
+      forest,
+      water,
+      road,
+      farm,
+      hover: hoveredMaterial,
+      blocked,
+      selected: highlighted,
+    }),
+    [grass, dryGrass, forest, water, road, farm, hoveredMaterial, blocked, highlighted],
+  )
+  const objects = useMemo(
+    () => new Map(city.buildings.map((b) => [b.x + ':' + b.y, b])),
+    [city.buildings],
+  )
   const plots = useMemo(() => {
     const result: Cell[] = []
     for (let x = 0; x < SIZE; x++) for (let y = 0; y < SIZE; y++) result.push({ x, y })
     return result
   }, [])
-  const azimuth = angle * Math.PI / 180
+  const azimuth = (angle * Math.PI) / 180
   const camera: Vec3 = [
     pan.x + Math.sin(azimuth) * distance * 0.78,
     distance * 0.84,
     pan.z + Math.cos(azimuth) * distance * 0.78,
   ]
-  const isBlocked = hover && tool !== 'inspect' && tool !== 'demolish'
-    ? canBuild(city, hover.x, hover.y, tool) !== null : false
+  const isBlocked =
+    hover && tool !== 'inspect' && tool !== 'demolish'
+      ? canBuild(city, hover.x, hover.y, tool) !== null
+      : false
 
-  if (life?.inside) return <LomeLifeRoom3D venue={life.inside} angle={angle} distance={distance*1.9} onInteract={onInteriorAction}/>
+  if (life?.inside)
+    return (
+      <LomeLifeRoom3D
+        venue={life.inside}
+        angle={angle}
+        distance={distance * 1.9}
+        onInteract={onInteriorAction}
+      />
+    )
 
   return (
     <>
       <Entity position={camera} rotation={[-52, angle, 0]}>
         <Camera fov={47} nearClip={0.2} farClip={140} clearColor="#bde0df" />
       </Entity>
-      <Entity rotation={[56, 28, 0]}><Light type="directional" intensity={1.55} /></Entity>
-      <Entity rotation={[22, 200, 0]}><Light type="directional" intensity={0.7} /></Entity>
+      <Entity rotation={[56, 28, 0]}>
+        <Light type="directional" intensity={1.55} />
+      </Entity>
+      <Entity rotation={[22, 200, 0]}>
+        <Light type="directional" intensity={0.7} />
+      </Entity>
       <Entity position={[0, -0.14, 0]} scale={[SIZE * CELL + 2, 0.22, SIZE * CELL + 2]}>
         <Render type="box" material={grass} />
       </Entity>
-      {plots.map(({x,y}) => (
+      {plots.map(({ x, y }) => (
         <Tile
           key={x + ':' + y}
-          x={x} y={y} type={terrainAt(x,y)}
+          x={x}
+          y={y}
+          type={terrainAt(x, y)}
           building={objects.get(x + ':' + y)}
           selected={selected?.x === x && selected?.y === y}
           hovered={hover?.x === x && hover?.y === y}
           blocked={Boolean(isBlocked)}
           mats={mats}
-          onClick={() => { if (canTap()) onTile(x,y) }}
-          onHover={() => setHover(prev => prev?.x === x && prev?.y === y ? prev : {x,y})}
+          onClick={() => {
+            if (canTap()) onTile(x, y)
+          }}
+          onHover={() => setHover((prev) => (prev?.x === x && prev?.y === y ? prev : { x, y }))}
         />
       ))}
       {life ? (
         <>
           {!life.inside && (
-            <Entity name="Joueur de Lomé" position={positionOf(life.pos.x,life.pos.y)}>
-              <Model url={ASSETS.villager} scale={1.55} rotation={(life.trafficStep*37)%360} position={[0,0.065,0]} />
-              <Entity position={[0,0.025,0]} scale={[0.9,0.025,0.9]}><Render type="cylinder" material={highlighted} /></Entity>
+            <Entity name="Joueur de Lomé" position={positionOf(life.pos.x, life.pos.y)}>
+              <Model
+                url={ASSETS.villager}
+                scale={1.55}
+                rotation={(life.trafficStep * 37) % 360}
+                position={[0, 0.065, 0]}
+              />
+              <Entity position={[0, 0.025, 0]} scale={[0.9, 0.025, 0.9]}>
+                <Render type="cylinder" material={highlighted} />
+              </Entity>
             </Entity>
           )}
-          {simulatedTraffic(life).map((npc,i) => {
-            const at=positionOf(npc.x,npc.y)
-            return <Entity key={'traffic'+i} position={at}>
-              {i===0 ? <Model url={ASSETS.taxi} scale={0.9} rotation={life.trafficStep%2?90:0}/> :
-               i===1 ? <Model url={ASSETS.sedan} scale={0.83} rotation={life.trafficStep%2?0:90}/> :
-               i===2 ? <Model url={ASSETS.van} scale={0.78} rotation={180}/> :
-               <Model url={ASSETS.villager} scale={0.85} rotation={i*94}/>}
-            </Entity>
+          {trafficVehicles(life).map((v) => {
+            const at = positionOf(v.x, v.y)
+            return (
+              <Entity key={'traffic-' + v.kind} position={at}>
+                {v.kind === 'taxi' ? (
+                  <Model url={ASSETS.taxi} scale={0.9} rotation={v.heading} />
+                ) : v.kind === 'sedan' ? (
+                  <Model url={ASSETS.sedan} scale={0.83} rotation={v.heading} />
+                ) : v.kind === 'van' ? (
+                  <Model url={ASSETS.van} scale={0.78} rotation={v.heading} />
+                ) : (
+                  <Model
+                    url={ASSETS.villager}
+                    scale={0.85}
+                    rotation={v.heading}
+                    position={[0.4, 0, 0.4]}
+                  />
+                )}
+              </Entity>
+            )
           })}
-          {life.city.buildings.filter(b=>b.type==='road').slice(0,2).map((b,i)=>(
-            <Entity key={'street-furniture-'+i} position={positionOf(b.x,b.y)}>
-              <Model url={i===0?ASSETS.streetLight:ASSETS.streetSign} scale={i===0?1.45:0.8}
-                position={[0.48,0,-0.38]} rotation={90}/>
-            </Entity>
-          ))}
+          {life.city.buildings
+            .filter((b) => b.type === 'road')
+            .slice(0, 2)
+            .map((b, i) => (
+              <Entity key={'street-furniture-' + i} position={positionOf(b.x, b.y)}>
+                <Model
+                  url={i === 0 ? ASSETS.streetLight : ASSETS.streetSign}
+                  scale={i === 0 ? 1.45 : 0.8}
+                  position={[0.48, 0, -0.38]}
+                  rotation={90}
+                />
+              </Entity>
+            ))}
           {life.inside && (
-            <Entity name="Intérieur accessible" position={positionOf(life.pos.x,life.pos.y)}>
-              <Entity position={[0,2,0]} scale={[6,0.25,5]}><Render type="box" material={road}/></Entity>
-              <Entity position={[0,2.75,2.25]} scale={[5.8,1.3,0.18]}><Render type="box" material={dryGrass}/></Entity>
-              <Entity position={[-2.9,2.75,0]} scale={[0.18,1.3,4.5]}><Render type="box" material={dryGrass}/></Entity>
-              <Entity position={[-0.4,2.4,0.5]} scale={[1.4,0.6,1]}><Render type="box" material={forest}/></Entity>
-              <Entity position={[0,2.15,-0.5]}><Model url={ASSETS.villager} scale={0.65}/></Entity>
+            <Entity name="Intérieur accessible" position={positionOf(life.pos.x, life.pos.y)}>
+              <Entity position={[0, 2, 0]} scale={[6, 0.25, 5]}>
+                <Render type="box" material={road} />
+              </Entity>
+              <Entity position={[0, 2.75, 2.25]} scale={[5.8, 1.3, 0.18]}>
+                <Render type="box" material={dryGrass} />
+              </Entity>
+              <Entity position={[-2.9, 2.75, 0]} scale={[0.18, 1.3, 4.5]}>
+                <Render type="box" material={dryGrass} />
+              </Entity>
+              <Entity position={[-0.4, 2.4, 0.5]} scale={[1.4, 0.6, 1]}>
+                <Render type="box" material={forest} />
+              </Entity>
+              <Entity position={[0, 2.15, -0.5]}>
+                <Model url={ASSETS.villager} scale={0.65} />
+              </Entity>
             </Entity>
           )}
         </>
-      ) : city.buildings.filter(b => b.type === 'road').slice(0, 7).map((b, i) => {
-        const at = positionOf(b.x, b.y)
-        return <Entity key={'citizen'+i} position={[at[0] + ((i % 3)-1)*0.3,0.01,at[2] + (i % 2 ? 0.24 : -0.25)]}>
-          <Model url={ASSETS.villager} scale={0.28} rotation={(i*57)%360} />
-        </Entity>
-      })}
+      ) : (
+        city.buildings
+          .filter((b) => b.type === 'road')
+          .slice(0, 7)
+          .map((b, i) => {
+            const at = positionOf(b.x, b.y)
+            return (
+              <Entity
+                key={'citizen' + i}
+                position={[at[0] + ((i % 3) - 1) * 0.3, 0.01, at[2] + (i % 2 ? 0.24 : -0.25)]}
+              >
+                <Model url={ASSETS.villager} scale={0.28} rotation={(i * 57) % 360} />
+              </Entity>
+            )
+          })
+      )}
     </>
   )
 }
 
 export default function CityWorld3D({
-  city, tool, inspect, onTile, life, immersive=false, onInteriorAction,
+  city,
+  tool,
+  inspect,
+  onTile,
+  life,
+  immersive = false,
+  onInteriorAction,
 }: {
   city: City
   life?: LifeState
@@ -296,61 +420,157 @@ export default function CityWorld3D({
   const [angle, setAngle] = useState(45)
   const [pan, setPan] = useState({ x: 0, z: 0 })
   const [dragState, setDragState] = useState(false)
-  const pointer = useRef<{x:number;y:number;px:number;pz:number;moved:boolean} | null>(null)
+  const pointer = useRef<{ x: number; y: number; px: number; pz: number; moved: boolean } | null>(
+    null,
+  )
   const ignoreClickUntil = useRef(0)
 
-  const checkClick = useCallback(() => !dragState && Date.now() > ignoreClickUntil.current, [dragState])
+  const checkClick = useCallback(
+    () => !dragState && Date.now() > ignoreClickUntil.current,
+    [dragState],
+  )
+  // Keyboard camera: Q/E rotate by 45°, +/- zoom. Arrow keys are left to the player controls.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      const k = e.key.toLowerCase()
+      if (k === 'q') setAngle((a) => (a + 315) % 360)
+      else if (k === 'e') setAngle((a) => (a + 45) % 360)
+      else if (k === '+' || k === '=') setDistance((d) => Math.max(9, d * ZOOM_IN_FACTOR))
+      else if (k === '-') setDistance((d) => Math.min(60, d * ZOOM_OUT_FACTOR))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const onStart = (e: React.PointerEvent<HTMLDivElement>) => {
-    pointer.current = { x:e.clientX, y:e.clientY, px:pan.x, pz:pan.z, moved:false }
+    pointer.current = { x: e.clientX, y: e.clientY, px: pan.x, pz: pan.z, moved: false }
   }
   const onMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const p = pointer.current
     if (!p) return
-    const dx = e.clientX-p.x, dy = e.clientY-p.y
-    if (Math.hypot(dx,dy)>8) p.moved = true
+    const dx = e.clientX - p.x,
+      dy = e.clientY - p.y
+    if (Math.hypot(dx, dy) > 8) p.moved = true
     if (p.moved) {
       setDragState(true)
       // Navigate on a ground plane; CSS pixels mapped to world-space units.
-      setPan({x:Math.max(-13,Math.min(13,p.px-dx/(25*(37/distance)))),
-        z:Math.max(-13,Math.min(13,p.pz-dy/(25*(37/distance))))})
+      setPan({
+        x: Math.max(-13, Math.min(13, p.px - dx / (25 * (37 / distance)))),
+        z: Math.max(-13, Math.min(13, p.pz - dy / (25 * (37 / distance)))),
+      })
     }
   }
   const onEnd = () => {
-    if(pointer.current?.moved) ignoreClickUntil.current=Date.now()+180
-    pointer.current=null
+    if (pointer.current?.moved) ignoreClickUntil.current = Date.now() + 180
+    pointer.current = null
     setDragState(false)
   }
   return (
     <div className="relative h-full w-full overflow-hidden bg-[#aad1c5]">
-      <div className="h-full w-full touch-none"
+      <div
+        className="h-full w-full touch-none"
         onPointerDownCapture={onStart}
         onPointerMoveCapture={onMove}
         onPointerUpCapture={onEnd}
         onPointerCancelCapture={onEnd}
       >
-        <Application graphicsDeviceOptions={{ antialias:true }} className="h-full w-full" style={{ width:'100%',height:'100%' }}>
+        <Application
+          graphicsDeviceOptions={{ antialias: true }}
+          className="h-full w-full"
+          style={{ width: '100%', height: '100%' }}
+        >
           <SettlementScene
-            city={city} tool={tool} selected={inspect} life={life}
-            pan={life ? {x:positionOf(life.pos.x,life.pos.y)[0]+pan.x,z:positionOf(life.pos.x,life.pos.y)[2]+pan.z} : pan}
-            distance={life?.inside ? 11 : distance} angle={angle}
-            onTile={onTile} canTap={checkClick} onInteriorAction={onInteriorAction}
+            city={city}
+            tool={tool}
+            selected={inspect}
+            life={life}
+            pan={
+              life
+                ? {
+                    x: positionOf(life.pos.x, life.pos.y)[0] + pan.x,
+                    z: positionOf(life.pos.x, life.pos.y)[2] + pan.z,
+                  }
+                : pan
+            }
+            distance={life?.inside ? 11 : distance}
+            angle={angle}
+            onTile={onTile}
+            canTap={checkClick}
+            onInteriorAction={onInteriorAction}
           />
         </Application>
       </div>
-      {!immersive&&<div className="pointer-events-none absolute left-3 top-3 rounded-xl bg-emerald-950/85 px-3 py-2 text-xs font-bold text-white shadow">
-        <Compass className="mr-1 inline h-4 w-4" aria-hidden="true" />
-        {life ? 'LOMÉ LIFE 3D · JOUR '+life.day+' · '+life.hour+' H' : 'HAROOVILLE 3D · JOUR '+city.day} · CC0 KENNEY
-      </div>}
-      <div className={immersive?'absolute right-3 top-[33%] flex flex-col gap-2':'absolute right-3 top-3 flex flex-col gap-2'}>
-        <button type="button" title="Zoom avant" aria-label="Zoom avant" onClick={()=>setDistance(d=>Math.max(9,d*ZOOM_IN_FACTOR))} className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"><Plus className="h-5 w-5" /></button>
-        <button type="button" title="Zoom arrière" aria-label="Zoom arrière" onClick={()=>setDistance(d=>Math.min(60,d*ZOOM_OUT_FACTOR))} className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"><Minus className="h-5 w-5" /></button>
-        <button type="button" title="Tourner la caméra" aria-label="Tourner la caméra" onClick={()=>setAngle(a=>(a+45)%360)} className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"><RotateCcw className="h-5 w-5" /></button>
-        <button type="button" title="Recentrer la vue" aria-label="Recentrer la vue" onClick={()=>{setDistance(life?14:37);setAngle(45);setPan({x:0,z:0})}} className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"><Maximize2 className="h-5 w-5" /></button>
+      {!immersive && (
+        <div className="pointer-events-none absolute left-3 top-3 rounded-xl bg-emerald-950/85 px-3 py-2 text-xs font-bold text-white shadow">
+          <Compass className="mr-1 inline h-4 w-4" aria-hidden="true" />
+          {life
+            ? 'LOMÉ LIFE 3D · JOUR ' + life.day + ' · ' + life.hour + ' H'
+            : 'HAROOVILLE 3D · JOUR ' + city.day}{' '}
+          · CC0 KENNEY
+        </div>
+      )}
+      <div
+        className={
+          immersive
+            ? 'absolute right-3 top-[33%] flex flex-col gap-2'
+            : 'absolute right-3 top-3 flex flex-col gap-2'
+        }
+      >
+        <button
+          type="button"
+          title="Zoom avant"
+          aria-label="Zoom avant"
+          onClick={() => setDistance((d) => Math.max(9, d * ZOOM_IN_FACTOR))}
+          className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
+        >
+          <Plus className="h-5 w-5" />
+        </button>
+        <button
+          type="button"
+          title="Zoom arrière"
+          aria-label="Zoom arrière"
+          onClick={() => setDistance((d) => Math.min(60, d * ZOOM_OUT_FACTOR))}
+          className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
+        >
+          <Minus className="h-5 w-5" />
+        </button>
+        <button
+          type="button"
+          title="Tourner la caméra"
+          aria-label="Tourner la caméra"
+          onClick={() => setAngle((a) => (a + 45) % 360)}
+          className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
+        >
+          <RotateCcw className="h-5 w-5" />
+        </button>
+        <button
+          type="button"
+          title="Recentrer la vue"
+          aria-label="Recentrer la vue"
+          onClick={() => {
+            setDistance(life ? 14 : 37)
+            setAngle(45)
+            setPan({ x: 0, z: 0 })
+          }}
+          className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
+        >
+          <Maximize2 className="h-5 w-5" />
+        </button>
       </div>
-      {!immersive&&<div className="pointer-events-none absolute bottom-3 left-3 max-w-[70%] rounded-lg bg-emerald-950/85 px-3 py-2 text-xs text-white">
-        Touchez une parcelle pour {life&&tool==='inspect'?'vous déplacer':tool==='inspect'?'inspecter':tool==='demolish'?'démolir':'construire'} · Glissez pour déplacer · +/− pour zoomer
-      </div>}
+      {!immersive && (
+        <div className="pointer-events-none absolute bottom-3 left-3 max-w-[70%] rounded-lg bg-emerald-950/85 px-3 py-2 text-xs text-white">
+          Touchez une parcelle pour{' '}
+          {life && tool === 'inspect'
+            ? 'vous déplacer'
+            : tool === 'inspect'
+              ? 'inspecter'
+              : tool === 'demolish'
+                ? 'démolir'
+                : 'construire'}{' '}
+          · Glissez pour déplacer · +/− pour zoomer
+        </div>
+      )}
     </div>
   )
 }

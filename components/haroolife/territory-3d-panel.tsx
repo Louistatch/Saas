@@ -2,9 +2,9 @@
 
 import { DISTRICT_SCENES, visualSignals } from '@/lib/haroolife/territory-scene'
 import {
-  UPGRADES,
   type HubId,
   type TerritoryWorld,
+  UPGRADES,
   type UpgradeId,
 } from '@/lib/haroolife/territory-simulation'
 import { ChevronLeft, ChevronRight, Eye, EyeOff, RotateCcw, Sparkles } from 'lucide-react'
@@ -67,30 +67,43 @@ export function Territory3DPanel({
   }, [])
 
   return (
-    <section aria-label="Monde 3D HarooLife" className="overflow-hidden rounded-3xl border border-emerald-900/20 bg-[#0d2723] text-white shadow-lg">
+    <section
+      aria-label="Monde 3D HarooLife"
+      className="overflow-hidden rounded-3xl border border-emerald-900/20 bg-[#0d2723] text-white shadow-lg"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3 p-4 sm:p-6">
         <div className="space-y-1">
           <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-300">
             HarooLife · Exploration 3D
           </p>
-          <h2 className="text-2xl font-bold sm:text-3xl">{hub === 'kpalime' ? 'Kpalimé' : hub === 'lome' ? 'Lomé' : hub === 'kara' ? 'Kara' : hub === 'sokode' ? 'Sokodé' : 'Dapaong'} — {scene.title}</h2>
+          <h2 className="text-2xl font-bold sm:text-3xl">
+            {hub === 'kpalime'
+              ? 'Kpalimé'
+              : hub === 'lome'
+                ? 'Lomé'
+                : hub === 'kara'
+                  ? 'Kara'
+                  : hub === 'sokode'
+                    ? 'Sokodé'
+                    : 'Dapaong'}{' '}
+            — {scene.title}
+          </h2>
           <p className="text-sm text-emerald-100">{scene.subtitle}</p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
-          <span className="rounded-full bg-emerald-700/70 px-3 py-1.5 font-medium">Jour {world.day}</span>
-          <span className="rounded-full border border-emerald-500/30 px-3 py-1.5">Quartier stylisé</span>
+          <span className="rounded-full bg-emerald-700/70 px-3 py-1.5 font-medium">
+            Jour {world.day}
+          </span>
+          <span className="rounded-full border border-emerald-500/30 px-3 py-1.5">
+            Quartier stylisé
+          </span>
         </div>
       </div>
 
       <div className="relative mx-3 overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-[#618b91] via-[#8cb2a7] to-[#4d7659] sm:mx-5">
         {enabled && capability !== 'unsupported' ? (
           <div className="h-[310px] w-full sm:h-[440px] lg:h-[520px]">
-            <World3D
-              hub={hub}
-              world={world}
-              heading={angle}
-              onPick={setSelectedAsset}
-            />
+            <World3D hub={hub} world={world} heading={angle} onPick={setSelectedAsset} />
           </div>
         ) : (
           <div className="flex h-[310px] flex-col items-center justify-center gap-3 px-5 text-center sm:h-[440px]">
@@ -100,12 +113,16 @@ export function Territory3DPanel({
             ) : capability === 'unsupported' ? (
               <>
                 <p className="font-semibold">WebGL2 n'est pas disponible dans ce navigateur.</p>
-                <p className="max-w-md text-sm">La carte interactive et la simulation économique fonctionnent sans la scène 3D.</p>
+                <p className="max-w-md text-sm">
+                  La carte interactive et la simulation économique fonctionnent sans la scène 3D.
+                </p>
               </>
             ) : (
               <>
                 <p className="font-semibold">Mode léger activé pour économiser les ressources.</p>
-                <p className="max-w-md text-sm">La vue 3D peut consommer davantage de données et de batterie sur Android.</p>
+                <p className="max-w-md text-sm">
+                  La vue 3D peut consommer davantage de données et de batterie sur Android.
+                </p>
                 <button
                   type="button"
                   onClick={() => setEnabled(true)}
@@ -177,24 +194,35 @@ export function Territory3DPanel({
           <>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-300">Construire dans le quartier</p>
-                <p className="text-sm text-emerald-100">Sélectionne un bâtiment, une parcelle ou une option ci-dessous.</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-300">
+                  Construire dans le quartier
+                </p>
+                <p className="text-sm text-emerald-100">
+                  Sélectionne un bâtiment, une parcelle ou une option ci-dessous.
+                </p>
               </div>
               <Sparkles aria-hidden="true" className="h-5 w-5 text-emerald-300" />
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Choix d'équipement 3D">
+            <div
+              className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+              aria-label="Choix d'équipement 3D"
+            >
               {(['factory', 'irrigation', 'truck', 'solar'] as const).map((id) => (
                 <button
                   key={id}
                   type="button"
                   aria-pressed={selectedAsset === id}
                   onClick={() => setSelectedAsset(id)}
-                  className={selectedAsset === id
-                    ? 'rounded-xl border border-emerald-300 bg-emerald-700 px-3 py-3 text-left text-sm font-semibold text-white'
-                    : 'rounded-xl border border-white/20 bg-white/5 px-3 py-3 text-left text-sm text-emerald-50 hover:bg-white/15'}
+                  className={
+                    selectedAsset === id
+                      ? 'rounded-xl border border-emerald-300 bg-emerald-700 px-3 py-3 text-left text-sm font-semibold text-white'
+                      : 'rounded-xl border border-white/20 bg-white/5 px-3 py-3 text-left text-sm text-emerald-50 hover:bg-white/15'
+                  }
                 >
                   {UPGRADES[id].title}
-                  {world.projects[id] && <span className="mt-1 block text-xs text-emerald-200">Construit</span>}
+                  {world.projects[id] && (
+                    <span className="mt-1 block text-xs text-emerald-200">Construit</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -209,7 +237,11 @@ export function Territory3DPanel({
                 onClick={() => onInvest(selectedAsset)}
                 className="rounded-lg bg-emerald-300 px-4 py-3 text-sm font-bold text-emerald-950 hover:bg-emerald-200 disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/70"
               >
-                {world.projects[selectedAsset] ? 'Déjà construit' : world.treasury < asset.cost ? 'Budget insuffisant' : 'Construire · ' + currency(asset.cost)}
+                {world.projects[selectedAsset]
+                  ? 'Déjà construit'
+                  : world.treasury < asset.cost
+                    ? 'Budget insuffisant'
+                    : 'Construire · ' + currency(asset.cost)}
               </button>
             </div>
           </>
@@ -217,10 +249,15 @@ export function Territory3DPanel({
           <div className="space-y-1 text-sm">
             <p className="font-semibold">Exploration disponible</p>
             <p className="text-emerald-100">
-              Cette ville possède une scène 3D représentative. Les investissements restent disponibles
-              seulement dans le scénario Kpalimé → Lomé. Choisis Kpalimé sur la carte pour construire.
+              Cette ville possède une scène 3D représentative. Les investissements restent
+              disponibles seulement dans le scénario Kpalimé → Lomé. Choisis Kpalimé sur la carte
+              pour construire.
             </p>
-            {state.delivered && <p className="font-semibold text-emerald-300">Des livraisons simulées ont atteint le marché de Lomé.</p>}
+            {state.delivered && (
+              <p className="font-semibold text-emerald-300">
+                Des livraisons simulées ont atteint le marché de Lomé.
+              </p>
+            )}
           </div>
         )}
       </div>

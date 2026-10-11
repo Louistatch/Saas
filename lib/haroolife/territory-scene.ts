@@ -1,4 +1,4 @@
-import { type HubId, type TerritoryWorld } from './territory-simulation'
+import type { HubId, TerritoryWorld } from './territory-simulation'
 
 /**
  * Stylised districts share real city labels/locations with the map; their

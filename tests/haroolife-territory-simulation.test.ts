@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
-  advanceTerritoryDays,
   advanceTerritoryDay,
+  advanceTerritoryDays,
   initialTerritoryWorld,
   invest,
 } from '../lib/haroolife/territory-simulation'

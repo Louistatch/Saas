@@ -11,7 +11,10 @@ test('preview Vercel domains stay on their preview deployments', () => {
 
 test('production Vercel aliases keep canonical domain redirect', () => {
   assert.equal(redirectProductionVercelHost('saas-one-teal-62.vercel.app', 'production'), true)
-  assert.equal(redirectProductionVercelHost('saas-issodo052-7639s-projects.vercel.app', 'production'), true)
+  assert.equal(
+    redirectProductionVercelHost('saas-issodo052-7639s-projects.vercel.app', 'production'),
+    true,
+  )
 })
 
 test('canonical hosts and deceptive suffixes are not redirected', () => {

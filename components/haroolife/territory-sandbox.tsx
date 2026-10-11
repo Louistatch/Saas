@@ -1,15 +1,15 @@
 'use client'
 
+import { Territory3DPanel } from '@/components/haroolife/territory-3d-panel'
 import {
   HUBS,
+  type HubId,
   UPGRADES,
+  type UpgradeId,
   advanceTerritoryDays,
   initialTerritoryWorld,
   invest,
-  type HubId,
-  type UpgradeId,
 } from '@/lib/haroolife/territory-simulation'
-import { Territory3DPanel } from '@/components/haroolife/territory-3d-panel'
 import { ArrowRight, Factory, MapPinned, RotateCcw, Sprout, TrendingUp, Truck } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
@@ -56,7 +56,9 @@ export function TerritorySandbox() {
   return (
     <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 text-slate-900 sm:px-6 sm:py-10">
       <nav aria-label="Fil d’Ariane" className="flex flex-wrap gap-2 text-sm text-emerald-900">
-        <Link href="/haroolife" className="underline underline-offset-4">HarooLife</Link>
+        <Link href="/haroolife" className="underline underline-offset-4">
+          HarooLife
+        </Link>
         <span aria-hidden="true">/</span>
         <span>Territoire du Togo</span>
       </nav>
@@ -70,18 +72,21 @@ export function TerritorySandbox() {
             Le Togo devient votre terrain de stratégie
           </h1>
           <p className="text-slate-600">
-            Explorez les villes puis développez une chaîne agricole de Kpalimé à Lomé.
-            Chaque décision modifie les stocks, les coûts et la trésorerie.
+            Explorez les villes puis développez une chaîne agricole de Kpalimé à Lomé. Chaque
+            décision modifie les stocks, les coûts et la trésorerie.
           </p>
         </div>
         <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           <strong className="block">Démonstration fictive</strong>
-          Aucun argent réel, contrat, chantier ou parcelle n’est engagé.
-          Le scénario n’est pas sauvegardé.
+          Aucun argent réel, contrat, chantier ou parcelle n’est engagé. Le scénario n’est pas
+          sauvegardé.
         </div>
       </header>
 
-      <section aria-label="Indicateurs de la simulation" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <section
+        aria-label="Indicateurs de la simulation"
+        className="grid grid-cols-2 gap-3 lg:grid-cols-4"
+      >
         {[
           { title: 'Trésorerie', value: money(world.treasury), icon: TrendingUp },
           { title: 'Gingembre frais', value: `${number(world.rawKg)} kg`, icon: Sprout },
@@ -96,12 +101,7 @@ export function TerritorySandbox() {
         ))}
       </section>
 
-      <Territory3DPanel
-        hub={selected}
-        world={world}
-        onInvest={buy}
-        onAdvance={() => next(1)}
-      />
+      <Territory3DPanel hub={selected} world={world} onInvest={buy} onAdvance={() => next(1)} />
 
       <section className="grid gap-5 lg:grid-cols-[minmax(0,1.65fr)_minmax(310px,1fr)]">
         <div className="rounded-3xl border border-emerald-100 bg-white p-3 shadow-sm sm:p-5">
@@ -114,7 +114,11 @@ export function TerritorySandbox() {
               Jour {world.day}
             </span>
           </div>
-          <TerritoryMap selected={selected} onSelect={setSelected} routeActive={world.projects.truck} />
+          <TerritoryMap
+            selected={selected}
+            onSelect={setSelected}
+            routeActive={world.projects.truck}
+          />
           <div className="mt-4 flex flex-wrap gap-2" aria-label="Choisir une ville">
             {HUBS.map((city) => (
               <button
@@ -132,7 +136,9 @@ export function TerritorySandbox() {
 
         <div className="space-y-4">
           <section className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Ville sélectionnée</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+              Ville sélectionnée
+            </p>
             <h2 className="mt-1 text-2xl font-bold">{hub.name}</h2>
             <p className="mt-1 text-sm text-slate-600">{hub.role}</p>
             <p className="mt-3 text-sm text-slate-700">
@@ -146,8 +152,8 @@ export function TerritorySandbox() {
           <section className="rounded-3xl bg-emerald-950 p-5 text-white shadow-sm">
             <h2 className="text-xl font-bold">Pilotez votre économie</h2>
             <p className="mt-2 text-sm text-emerald-100">
-              Achetez une usine, organisez son transport et avancez dans le temps.
-              Sans camion, la production reste en stock.
+              Achetez une usine, organisez son transport et avancez dans le temps. Sans camion, la
+              production reste en stock.
             </p>
             <div className="mt-5 grid grid-cols-2 gap-2">
               <button
@@ -194,7 +200,9 @@ export function TerritorySandbox() {
                 <article key={id} className="flex flex-col rounded-2xl border border-slate-200 p-4">
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="font-bold">{label}</h3>
-                    {installed && <span className="text-xs font-bold text-emerald-700">Installé</span>}
+                    {installed && (
+                      <span className="text-xs font-bold text-emerald-700">Installé</span>
+                    )}
                   </div>
                   <p className="mt-1 text-xs text-slate-500">{upgrade.location}</p>
                   <p className="mt-3 flex-1 text-sm text-slate-700">{upgrade.detail}</p>
@@ -204,7 +212,11 @@ export function TerritorySandbox() {
                     onClick={() => buy(id)}
                     className="mt-4 rounded-xl bg-emerald-800 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-600"
                   >
-                    {installed ? 'Déjà construit' : world.treasury < upgrade.cost ? 'Budget insuffisant' : `Investir ${money(upgrade.cost)}`}
+                    {installed
+                      ? 'Déjà construit'
+                      : world.treasury < upgrade.cost
+                        ? 'Budget insuffisant'
+                        : `Investir ${money(upgrade.cost)}`}
                   </button>
                 </article>
               )
@@ -222,11 +234,15 @@ export function TerritorySandbox() {
             <span className="rounded-lg bg-emerald-100 px-2 py-1">Lomé</span>
           </div>
           <p className="mt-3 text-xs text-slate-500">
-            Ventes cumulées : {number(world.soldKg)} kg · Charges d’exploitation : {money(world.expenses)}.
+            Ventes cumulées : {number(world.soldKg)} kg · Charges d’exploitation :{' '}
+            {money(world.expenses)}.
           </p>
           <ol className="mt-4 space-y-3 text-sm text-slate-700">
             {world.events.map((event, index) => (
-              <li key={`${world.day}-${index}-${event}`} className="border-l-2 border-emerald-200 pl-3">
+              <li
+                key={`${world.day}-${index}-${event}`}
+                className="border-l-2 border-emerald-200 pl-3"
+              >
                 {event}
               </li>
             ))}
@@ -235,7 +251,8 @@ export function TerritorySandbox() {
       </section>
       <footer className="border-t border-emerald-100 pt-5 text-xs text-slate-500">
         Simulation économique pédagogique, distincte des activités réelles de FaîtiereHub et Haroo.
-        La carte sert à explorer le pays ; seuls Kpalimé et Lomé ont une chaîne économique simulée dans cette version.
+        La carte sert à explorer le pays ; seuls Kpalimé et Lomé ont une chaîne économique simulée
+        dans cette version.
       </footer>
     </main>
   )
