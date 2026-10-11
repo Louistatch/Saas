@@ -7,6 +7,12 @@ import {
   type BuildType, type City,
 } from '@/lib/haroolife/townsmen-engine'
 import { CityIsometricCanvas } from './city-isometric-canvas'
+import dynamic from 'next/dynamic'
+
+const CityWorld3D = dynamic(() => import('./city-world-3d'), {
+  ssr: false,
+  loading: () => <div className="flex h-full items-center justify-center bg-[#b4d9bf] text-sm font-semibold text-emerald-950">Chargement des modèles Kenney 3D…</div>,
+})
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import {
@@ -37,6 +43,8 @@ export function CityBuilder(){
   const [city,setCity]=useState<City>(initialCity)
   const [loaded,setLoaded]=useState(false)
   const [tool,setTool]=useState<Tool>('road')
+  const [graphics,setGraphics]=useState<'3d'|'2d'>('3d')
+  const [webglReady,setWebglReady]=useState(false)
   const [speed,setSpeed]=useState<0|1|3>(0)
   const [selection,setSelection]=useState<Cell|null>(null)
   const [message,setMessage]=useState('Choisis une construction puis touche une case près des routes.')
@@ -46,6 +54,14 @@ export function CityBuilder(){
   const warning=useMemo(()=>cityWarning(city),[city])
   const selected=selection?city.buildings.find(b=>b.x===selection.x&&b.y===selection.y):null
 
+  useEffect(()=>{
+    try {
+      const test=document.createElement('canvas')
+      const valid=Boolean(test.getContext('webgl2'))
+      setWebglReady(valid)
+      if(!valid)setGraphics('2d')
+    }catch{setWebglReady(false);setGraphics('2d')}
+  },[])
   useEffect(()=>{
     try {
       const saved=localStorage.getItem(STORAGE)
@@ -182,8 +198,19 @@ export function CityBuilder(){
                   <button type="button" onClick={()=>setCity(c=>tick(c))} className="rounded-md bg-amber-300 px-3 py-2 text-xs font-bold" title="Avancer un jour">+ 1 jour</button>
                 </div>
               </div>
-              <div className="h-[55vh] min-h-[380px] max-h-[730px] w-full sm:h-[67vh]">
-                <CityIsometricCanvas city={city} tool={tool} onTile={onTile} inspect={selection}/>
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-emerald-50 px-3 py-2 text-xs">
+                <span className="font-semibold text-emerald-900">Visite immersive · 3D temps réel</span>
+                <div className="flex gap-2">
+                  <button type="button" disabled={!webglReady} aria-pressed={graphics==='3d'} onClick={()=>setGraphics('3d')}
+                    className={graphics==='3d'?'rounded-md bg-emerald-900 px-4 py-2 font-bold text-white':'rounded-md border border-emerald-200 bg-white px-4 py-2 font-bold disabled:opacity-40'}>Ville 3D</button>
+                  <button type="button" aria-pressed={graphics==='2d'} onClick={()=>setGraphics('2d')}
+                    className={graphics==='2d'?'rounded-md bg-emerald-900 px-4 py-2 font-bold text-white':'rounded-md border border-emerald-200 bg-white px-4 py-2 font-bold'}>Plan léger</button>
+                </div>
+              </div>
+              <div className="h-[57vh] min-h-[395px] max-h-[820px] w-full sm:h-[72vh]">
+                {graphics==='3d' && webglReady
+                  ? <CityWorld3D city={city} tool={tool} onTile={onTile} inspect={selection}/>
+                  : <CityIsometricCanvas city={city} tool={tool} onTile={onTile} inspect={selection}/>}
               </div>
               <p role="status" aria-live="polite" className="min-h-10 border-t border-emerald-200 bg-white px-4 py-3 text-sm font-semibold text-emerald-950">{message}</p>
             </section>
