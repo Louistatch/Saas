@@ -9,6 +9,7 @@ import {
   type HubId,
   type UpgradeId,
 } from '@/lib/haroolife/territory-simulation'
+import { Territory3DPanel } from '@/components/haroolife/territory-3d-panel'
 import { ArrowRight, Factory, MapPinned, RotateCcw, Sprout, TrendingUp, Truck } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
@@ -94,6 +95,13 @@ export function TerritorySandbox() {
           </div>
         ))}
       </section>
+
+      <Territory3DPanel
+        hub={selected}
+        world={world}
+        onInvest={buy}
+        onAdvance={() => next(1)}
+      />
 
       <section className="grid gap-5 lg:grid-cols-[minmax(0,1.65fr)_minmax(310px,1fr)]">
         <div className="rounded-3xl border border-emerald-100 bg-white p-3 shadow-sm sm:p-5">
