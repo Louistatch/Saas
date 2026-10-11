@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './',
-  testMatch: 'lome-life.spec.ts',
+  testMatch: ['lome-life.spec.ts', 'lome-presence.spec.ts'],
   reporter: [['list'],['html',{outputFolder:'test-results/lome-report',open:'never'}]],
   fullyParallel: false,
   workers: 1,

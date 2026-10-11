@@ -93,3 +93,15 @@ service payé, entrée dans un intérieur 3D, mode construction. Captures dans
   marché fermé, grève des zémidjans, fête de quartier. Tirage déterministe par (jour, heure), de jour
   seulement, jamais en déplacement ; chaque événement propose deux choix aux conséquences affichées,
   et les dépenses passent par le portefeuille fictif vers la caisse municipale.
+
+## Tranche 3 : présence réelle des comptes
+
+- Le quartier 3D lit `/api/haroolife/world` (même API que le village SVG) : les habitants du canton
+  du compte connecté apparaissent dans la scène, chacun près du bâtiment de son rôle
+  (`lib/haroolife/lome-presence.ts` : producteur au champ, acheteur au marché, coopérative et
+  opérateur à la mairie, agronome au point d'eau, ouvrier au jardin), avec un socle à la couleur
+  de son pagne. Aucune donnée de contact.
+- En entrant dans un lieu, « Ici maintenant » liste les personnes attachées à ce lieu.
+- L'appli Messages du téléphone devient la place du canton : messages réels des habitants,
+  envoi via `/api/haroolife/say` (200 caractères, cadence en base). Sans compte ou si HarooLife
+  est désactivé, le jeu reste jouable seul avec le personnage scénarisé.

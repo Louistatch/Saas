@@ -1,6 +1,7 @@
 'use client'
 
 import { type Action, type LifeState, trafficVehicles } from '@/lib/haroolife/lome-life-engine'
+import type { PlacedResident } from '@/lib/haroolife/lome-presence'
 import {
   type BuildType,
   type Building,
@@ -21,6 +22,7 @@ import { useMaterial, useModel } from '@playcanvas/react/hooks'
 import { Compass, Maximize2, Minus, Plus, RotateCcw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import LomeLifeRoom3D from './lome-life-room-3d'
+import { PAGNES } from './pagnes'
 
 type EditTool = BuildType | 'inspect' | 'demolish'
 type Cell = { x: number; y: number }
@@ -213,7 +215,9 @@ function SettlementScene({
   canTap,
   life,
   onInteriorAction,
+  visitors = [],
 }: {
+  visitors?: PlacedResident[]
   city: City
   life?: LifeState
   onInteriorAction?: (action: Action) => void
@@ -235,6 +239,15 @@ function SettlementScene({
   const hoveredMaterial = useMaterial({ diffuse: '#b8e9a0', emissive: '#385b29', gloss: 0.1 })
   const blocked = useMaterial({ diffuse: '#dc886b', gloss: 0.1 })
   const highlighted = useMaterial({ diffuse: '#e7d07e', gloss: 0.1 })
+  const pagne0 = useMaterial({ diffuse: PAGNES[0], gloss: 0.1 })
+  const pagne1 = useMaterial({ diffuse: PAGNES[1], gloss: 0.1 })
+  const pagne2 = useMaterial({ diffuse: PAGNES[2], gloss: 0.1 })
+  const pagne3 = useMaterial({ diffuse: PAGNES[3], gloss: 0.1 })
+  const pagne4 = useMaterial({ diffuse: PAGNES[4], gloss: 0.1 })
+  const pagne5 = useMaterial({ diffuse: PAGNES[5], gloss: 0.1 })
+  const pagne6 = useMaterial({ diffuse: PAGNES[6], gloss: 0.1 })
+  const pagne7 = useMaterial({ diffuse: PAGNES[7], gloss: 0.1 })
+  const pagnes = [pagne0, pagne1, pagne2, pagne3, pagne4, pagne5, pagne6, pagne7]
   const mats = useMemo(
     () => ({
       grass,
@@ -325,6 +338,23 @@ function SettlementScene({
               </Entity>
             </Entity>
           )}
+          {visitors.map((v) => (
+            <Entity
+              key={'visitor-' + v.resident.display_name + v.x + ':' + v.y}
+              name={'Habitant ' + v.resident.display_name}
+              position={positionOf(v.x, v.y)}
+            >
+              <Model
+                url={ASSETS.villager}
+                scale={1.35}
+                rotation={v.rotation}
+                position={[0, 0.05, 0]}
+              />
+              <Entity position={[0, 0.02, 0]} scale={[0.75, 0.02, 0.75]}>
+                <Render type="cylinder" material={pagnes[(v.resident.pagne - 1 + 8) % 8]} />
+              </Entity>
+            </Entity>
+          ))}
           {trafficVehicles(life).map((v) => {
             const at = positionOf(v.x, v.y)
             return (
@@ -407,7 +437,9 @@ export default function CityWorld3D({
   life,
   immersive = false,
   onInteriorAction,
+  visitors,
 }: {
+  visitors?: PlacedResident[]
   city: City
   life?: LifeState
   onInteriorAction?: (action: Action) => void
@@ -485,6 +517,7 @@ export default function CityWorld3D({
             tool={tool}
             selected={inspect}
             life={life}
+            visitors={visitors}
             pan={
               life
                 ? {
