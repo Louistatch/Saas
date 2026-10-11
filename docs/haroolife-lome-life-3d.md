@@ -35,3 +35,12 @@ Dedicated GitHub Actions workflow tests desktop Chromium and an Android-sized Pi
 
 ## Next steps
 Improve camera tracking and touch path interpolation, expand indoor geometry, implement road-following vehicle trips with capacity/traffic, introduce NPC daily schedules and performance limits for mobile GPU.
+## Validated browser QA — 2026-10-11
+
+The built production-mode Next.js app was served ONLY on GitHub Actions localhost; it was not deployed. All eight TS life simulation tests and the existing full hardening suite completed successfully. CI typecheck, repository security controls and production build passed. Playwright tests completed successfully in real Chromium desktop viewport (1440×900) and Chromium Pixel 7 mobile emulation viewport (412×915), both with WebGL2 enabled and actual PlayCanvas canvas visible. The full market → buy food → eat → work → paid FCFA loop succeeded with no uncaught page errors.
+
+QA workflow: https://github.com/Louistatch/Saas/actions/runs/38151010359
+
+Screenshots: https://github.com/Louistatch/Saas/actions/runs/38151010359/artifacts (artifact name haroolife-lome-visual-qa; desktop.png and mobile-android.png).
+
+**Qualification:** Pixel 7 is browser/device emulation, NOT a physical Android device. No physical device FPS, memory consumption, hardware acceleration behavior or real touch gesture latency has been validated. The visual art remains low-poly/stylized and the characters use discrete movement; production release is not approved until live device review.
