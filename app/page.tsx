@@ -576,7 +576,7 @@ export default function Home() {
             <div className="flex items-center gap-8 rounded-2xl border border-border bg-card/60 px-8 py-6 shadow-sm hover:shadow-md transition-shadow">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/images/partners/fenomat.png"
+                src="/images/partners/fenomat.webp"
                 alt="Logo FENOMAT — Fédération Nationale des Organisations de Maraîchers du Togo"
                 className="h-14 w-auto object-contain sm:h-16"
               />

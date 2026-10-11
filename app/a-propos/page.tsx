@@ -17,7 +17,7 @@ const teamMembers = [
 const partners = [
   {
     name: 'FENOMAT',
-    logo: '/images/partners/fenomat.png',
+    logo: '/images/partners/fenomat.webp',
     description: 'Fédération Nationale des Organisations de Maraîchers du Togo',
   },
 ]
