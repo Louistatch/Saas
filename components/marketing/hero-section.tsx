@@ -164,7 +164,7 @@ export function HeroSection() {
               />
               <div className="relative overflow-hidden rounded-2xl lg:rounded-3xl">
                 <Image
-                  src="/hero-farmer-app.png"
+                  src="/hero-farmer-app.webp"
                   alt="Agricultrice consultant le tableau de bord FaîtiereHub, à côté d'une carte membre vérifiable par QR code"
                   width={1122}
                   height={1402}
