@@ -1,6 +1,7 @@
 // Messages d'assistance de la zone d'un opérateur (jamais les siens) et leur traitement.
 import { assertAuthenticated } from '@/lib/security/assert-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
+import { repliesFor } from '@/lib/support-threads'
 import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -10,12 +11,21 @@ export async function GET(request: NextRequest) {
   const auth = await assertAuthenticated()
   if (!auth.ok) return auth.response
   const status = request.nextUrl.searchParams.get('status') === 'traite' ? 'traite' : 'nouveau'
-  const { data, error } = await createAdminClient().rpc('operator_support_messages', {
+  const admin = createAdminClient()
+  const { data, error } = await admin.rpc('operator_support_messages', {
     p_user: auth.ctx.userId,
     p_status: status,
   })
   if (error) return NextResponse.json({ error: 'Lecture impossible' }, { status: 500 })
-  return NextResponse.json({ messages: data ?? [] }, { headers: { 'Cache-Control': 'no-store' } })
+  const rows = (data ?? []) as { id: string }[]
+  const replies = await repliesFor(
+    admin,
+    rows.map((r) => r.id),
+  )
+  return NextResponse.json(
+    { messages: rows.map((r) => ({ ...r, replies: replies.get(r.id) ?? [] })) },
+    { headers: { 'Cache-Control': 'no-store' } },
+  )
 }
 
 const patchSchema = z.object({ id: z.string().uuid(), status: z.enum(['nouveau', 'traite']) })

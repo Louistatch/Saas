@@ -2,8 +2,9 @@
 
 // Messages d'assistance des organisations de la zone de l'opérateur (jamais les siens).
 import { ProtectedRoute } from '@/app/components/protected-route'
+import { ReplyBox, Thread, type ThreadReply, postReply } from '@/components/support/thread'
 import { messageCategoryLabel } from '@/lib/support'
-import { ArrowLeft, Mail } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -16,6 +17,7 @@ interface Msg {
   message: string | null
   created_at: string
   cooperative_name: string | null
+  replies?: ThreadReply[]
 }
 
 function Inbox() {
@@ -113,18 +115,22 @@ function Inbox() {
                   minute: '2-digit',
                 })}
               </p>
-              {m.message && (
-                <p className="whitespace-pre-line text-sm text-foreground">{m.message}</p>
-              )}
+              <Thread
+                original={m.message ?? ''}
+                createdAt={m.created_at}
+                senderName={m.name ?? 'Expéditeur'}
+                replies={m.replies ?? []}
+                viewer="equipe"
+              />
+              <ReplyBox
+                hint="La réponse s’affiche dans son tableau de bord (« Mes échanges ») et lui est envoyée par e-mail."
+                onSend={async (body) => {
+                  const err = await postReply(`/api/operator/messages/${m.id}/reply`, body)
+                  if (!err) void load()
+                  return err
+                }}
+              />
               <div className="flex flex-wrap gap-2">
-                {m.email && (
-                  <a
-                    href={`mailto:${m.email}?subject=${encodeURIComponent(`Re : ${m.subject ?? 'FaîtiereHub'}`)}`}
-                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-                  >
-                    <Mail aria-hidden="true" className="h-4 w-4" /> Répondre par e-mail
-                  </a>
-                )}
                 <button
                   type="button"
                   onClick={() => void mark(m.id)}

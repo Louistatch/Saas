@@ -5,10 +5,11 @@
  * lire. Les plus anciens d'abord ; « Marquer comme traité » les sort de la file.
  */
 
+import { ReplyBox, Thread, type ThreadReply, postReply } from '@/components/support/thread'
 import { isPlaceholderEmail, parseAccessRequest } from '@/lib/admin/access-request-parse'
 import { TOGO_FAITIERES, faitiereLabel } from '@/lib/faitieres-togo'
-import { messageCategoryLabel } from '@/lib/support'
 import { createClient } from '@/lib/supabase/client'
+import { messageCategoryLabel } from '@/lib/support'
 import { Building2, Mail, Phone } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -21,6 +22,8 @@ interface Message {
   message: string | null
   status: string
   created_at: string
+  user_id?: string | null
+  replies?: ThreadReply[]
 }
 
 const LEVEL_FROM_TYPE: Record<string, 'faitiere' | 'union' | 'cooperative'> = {
@@ -329,8 +332,33 @@ export default function AdminMessagesPage() {
                 {m.email ? `, ${m.email}` : ''}
                 {m.category ? ` (${messageCategoryLabel(m.category)})` : ''}
               </p>
-              {m.message && (
-                <p className="whitespace-pre-line text-sm text-foreground">{m.message}</p>
+              {m.user_id ? (
+                <Thread
+                  original={m.message ?? ''}
+                  createdAt={m.created_at}
+                  senderName={m.name ?? 'Expéditeur'}
+                  replies={m.replies ?? []}
+                  viewer="equipe"
+                />
+              ) : (
+                m.message && (
+                  <p className="whitespace-pre-line text-sm text-foreground">{m.message}</p>
+                )
+              )}
+              {m.user_id && (
+                <ReplyBox
+                  hint="La personne voit votre réponse dans son tableau de bord et la reçoit aussi par e-mail."
+                  onSend={async (body) => {
+                    const err = await postReply(`/api/admin/messages/${m.id}/reply`, body)
+                    if (!err) {
+                      setDone(
+                        'Réponse envoyée. La conversation passe dans « Traités » jusqu’à une nouvelle réponse.',
+                      )
+                      void load()
+                    }
+                    return err
+                  }}
+                />
               )}
               <div className="flex flex-wrap gap-2">
                 {m.category === 'cooperative' && tab === 'nouveau' && (
@@ -350,7 +378,7 @@ export default function AdminMessagesPage() {
                     <Phone aria-hidden="true" className="h-4 w-4" /> Appeler
                   </a>
                 )}
-                {m.email && !isPlaceholderEmail(m.email) && (
+                {!m.user_id && m.email && !isPlaceholderEmail(m.email) && (
                   <a
                     href={`mailto:${m.email}?subject=${encodeURIComponent(`Re : ${m.subject ?? 'FaîtiereHub'}`)}`}
                     className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm"

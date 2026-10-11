@@ -1,6 +1,7 @@
 // Boîte de réception super_admin : messages de contact et demandes d'accès (contact_messages).
 import { assertRole } from '@/lib/security/assert-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
+import { repliesFor } from '@/lib/support-threads'
 import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -10,15 +11,21 @@ export async function GET(request: NextRequest) {
   const guard = await assertRole('super_admin')
   if (!guard.ok) return guard.response
   const status = request.nextUrl.searchParams.get('status') === 'traite' ? 'traite' : 'nouveau'
-  const { data, error } = await createAdminClient()
+  const admin = createAdminClient()
+  const { data, error } = await admin
     .from('contact_messages')
-    .select('id, name, email, category, subject, message, status, created_at')
+    .select('id, name, email, category, subject, message, status, created_at, user_id')
     .eq('status', status)
     .order('created_at', { ascending: status === 'nouveau' })
     .limit(100)
   if (error) return NextResponse.json({ error: 'Lecture impossible' }, { status: 500 })
+  const rows = data ?? []
+  const replies = await repliesFor(
+    admin,
+    rows.map((r) => r.id),
+  )
   return NextResponse.json(
-    { messages: data ?? [] },
+    { messages: rows.map((r) => ({ ...r, replies: replies.get(r.id) ?? [] })) },
     { headers: { 'Cache-Control': 'private, no-store' } },
   )
 }
