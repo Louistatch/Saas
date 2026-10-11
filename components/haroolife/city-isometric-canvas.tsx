@@ -1,6 +1,10 @@
 'use client'
 
 import { type City, type BuildType, SIZE, terrainAt, canBuild, type Building } from '@/lib/haroolife/townsmen-engine'
+import { roadAutoTile } from '@/lib/haroolife/vendor/cimulity-road-autotile'
+import {
+  preloadSketchTown, drawTileSprite, drawObjectSprite, type SketchSprites,
+} from '@/lib/haroolife/vendor/sketch-town-sprites'
 import { useEffect, useRef, useState } from 'react'
 
 const TILE_W = 60
@@ -90,6 +94,40 @@ function drawBuilding(ctx:CanvasRenderingContext2D,b:Building,x:number,y:number,
   ctx.restore()
 }
 
+/**
+ * Artwork from Kenney Sketch Town (CC0), via shorepine/kenney.
+ * Building stacking follows the tile-image layers instead of drawing polygons.
+ * Keep primitive fallback while assets are loading or unavailable.
+ */
+function kenneyBuilding(
+  ctx: CanvasRenderingContext2D,
+  images: SketchSprites,
+  b: Building,
+  x: number,
+  y: number,
+  scale: number,
+): boolean {
+  if (b.type === 'road' || b.type === 'farm' || b.type === 'well') return false
+  if (b.type === 'park') return drawObjectSprite(ctx, images, 'tree_multiple_S.png', x, y, scale)
+  if (b.type === 'hall') return drawObjectSprite(ctx, images, 'castle_towerBrown_S.png', x, y, scale, 9)
+  const walls = b.type === 'lumberyard'
+    ? 'building_centerBeige_S.png'
+    : b.type === 'market' || b.type === 'bakery'
+      ? 'building_doorWindowsBeige_S.png'
+      : 'building_doorBeige_S.png'
+  const roofs: Record<string, 'roof_gableBrown_S.png' | 'roof_gableGreen_S.png' | 'roof_roundBeige_S.png' | 'roof_pointBrown_S.png' | 'roof_churchBrown_S.png'> = {
+    house: 'roof_gableBrown_S.png',
+    lumberyard: 'roof_gableGreen_S.png',
+    mill: 'roof_roundBeige_S.png',
+    bakery: 'roof_churchBrown_S.png',
+    market: 'roof_pointBrown_S.png',
+  }
+  const base = drawObjectSprite(ctx, images, walls, x, y, scale)
+  if (!base) return false
+  drawObjectSprite(ctx, images, roofs[b.type] ?? 'roof_gableBrown_S.png', x, y, scale, 22)
+  return true
+}
+
 export function CityIsometricCanvas({
  city,tool,onTile,inspect,
 }:{
@@ -101,6 +139,14 @@ export function CityIsometricCanvas({
  const [zoom,setZoom]=useState(1)
  const [hover,setHover]=useState<Tile|null>(null)
  const [frame,setFrame]=useState(0)
+ const [sketchSprites,setSketchSprites]=useState<SketchSprites>({})
+ useEffect(()=>{
+   let active=true
+   void preloadSketchTown().then(images=>{
+     if(active)setSketchSprites(images)
+   })
+   return()=>{active=false}
+ },[])
  const panRef=useRef(pan)
  panRef.current=pan
  const zoomRef=useRef(zoom)
@@ -152,10 +198,24 @@ export function CityIsometricCanvas({
        const b=occupied.get(x+':'+y)
        const grass=(x+y)%3===0?'#80b563':(x+y)%3===1?'#87bc68':'#7bb261'
        const shade=ter==='water'?'#55a9bc':ter==='forest'?'#5a9752':grass
-       diamond(ctx,cx,cy,TILE_W*z+1,TILE_H*z+1,shade,'#6a9e5b')
-       if(b)drawBuilding(ctx,b,cx,cy,z)
-       else if(ter==='forest'&&((x+y)%2===0||x%3===0))drawTree(ctx,cx,cy,z*.76)
-       else if(ter==='water'){
+       diamond(ctx,cx,cy,TILE_W*z+1,TILE_H*z+1,shade)
+       const ground = ter === 'water' ? 'water_center_S.png'
+         : ter === 'forest' ? 'dirt_center_S.png' : 'grass_center_S.png'
+       drawTileSprite(ctx,sketchSprites,ground,cx,cy,z)
+       if(b?.type==='road'){
+         const kind=roadAutoTile((dx,dy)=>occupied.get((x+dx)+':'+(y+dy))?.type==='road').kind
+         const sprite=kind==='cross'?'grass_pathCrossing_S.png'
+           :kind==='tee'?'grass_pathSplit_S.png'
+           :kind==='corner'||kind==='diagonal'?'grass_pathBend_S.png'
+           :kind==='end'||kind==='isolated'?'grass_pathEnd_S.png'
+           :'grass_path_S.png'
+         if(!drawTileSprite(ctx,sketchSprites,sprite,cx,cy,z))drawBuilding(ctx,b,cx,cy,z)
+       }else if(b){
+         if(!kenneyBuilding(ctx,sketchSprites,b,cx,cy,z))drawBuilding(ctx,b,cx,cy,z)
+       }else if(ter==='forest'&&((x+y)%2===0||x%3===0)){
+         const name=(x+y)%3===0?'tree_multiple_S.png':'tree_single_S.png'
+         if(!drawObjectSprite(ctx,sketchSprites,name,cx,cy,z*.9))drawTree(ctx,cx,cy,z*.76)
+       }else if(ter==='water'){
          ctx.strokeStyle='#b9e8df';ctx.lineWidth=z
          ctx.beginPath();ctx.moveTo(cx-9*z,cy);ctx.lineTo(cx+4*z,cy-3*z);ctx.stroke()
        }
@@ -187,7 +247,7 @@ export function CityIsometricCanvas({
    render()
    const ro=new ResizeObserver(render);ro.observe(el)
    return()=>ro.disconnect()
- },[city,pan,zoom,hover,inspect,tool,frame])
+ },[city,pan,zoom,hover,inspect,tool,frame,sketchSprites])
 
  function onPointerDown(e:React.PointerEvent<HTMLCanvasElement>){
    e.currentTarget.setPointerCapture(e.pointerId)
