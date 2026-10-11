@@ -193,6 +193,7 @@ export function LomeLifeImmersive(){
         <p>Le rendu 3D exige WebGL2. Ouvre ce jeu dans Chrome avec l’accélération graphique activée.</p>
       </div>:<World3D
         immersive city={life.city} life={life} inspect={selection} onTile={tile}
+        onInteriorAction={action}
         tool={mode==='walk'?'inspect':mode==='demolish'?'demolish':building}
       />}
     </div>
