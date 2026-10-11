@@ -78,12 +78,13 @@ const pay = (s: CityLife, amount: number): CityLife | null =>
         },
       }
 
+/** A new game starts at the estate gate, on the avenue, with the whole city around. */
 export function initialCityLife(): CityLife {
   const life = initialLomeLife()
   return {
     v: 1,
     life,
-    at: toWorld(life.pos),
+    at: { ...ESTATE_GATE },
     route: [],
     target: null,
     insideLot: null,

@@ -38,18 +38,15 @@ async function cityDensity(file: string) {
   return { blue: blue / n, green: green / n, built: built / n, colours: palette.size }
 }
 
-const STATS = () =>
-  (
-    window as unknown as {
-      __LOME_CITY?: {
-        chunks: number
-        buildings: number
-        at: { x: number; y: number }
-        route: number
-        inside: string | null
-      }
-    }
-  ).__LOME_CITY
+type CityStats = {
+  chunks: number
+  buildings: number
+  at: { x: number; y: number }
+  route: number
+  inside: string | null
+}
+const stats = (page: import('@playwright/test').Page) =>
+  page.evaluate(() => (window as unknown as { __LOME_CITY?: CityStats }).__LOME_CITY ?? null)
 
 test('Lomé Life 3D opens on a dense, explorable city and completes a full outing', async ({
   page,
@@ -65,10 +62,10 @@ test('Lomé Life 3D opens on a dense, explorable city and completes a full outin
 
   // 1. Streaming: chunks around the camera are built and carry hundreds of buildings.
   await expect
-    .poll(() => page.evaluate(() => STATS()?.chunks ?? 0), { timeout: 30000 })
+    .poll(() => stats(page).then((s) => s?.chunks ?? 0), { timeout: 30000 })
     .toBeGreaterThanOrEqual(20)
-  const stats = await page.evaluate(() => STATS())
-  expect(stats?.buildings ?? 0).toBeGreaterThanOrEqual(250)
+  const first = await stats(page)
+  expect(first?.buildings ?? 0).toBeGreaterThanOrEqual(250)
   await page.waitForTimeout(2500) // let the GLB agents and estate models land
   const dir = path.join('test-results', 'lome-city')
   fs.mkdirSync(dir, { recursive: true })
@@ -118,10 +115,10 @@ test('Lomé Life 3D opens on a dense, explorable city and completes a full outin
     .getByLabel('Trajet en cours')
     .getByRole('button', { name: /Passer/ })
     .click()
-  await expect.poll(() => page.evaluate(() => STATS()?.route ?? 99), { timeout: 15000 }).toBe(0)
+  await expect.poll(() => stats(page).then((s) => s?.route ?? 99), { timeout: 15000 }).toBe(0)
   await page.getByRole('button', { name: 'Entrer ou sortir' }).click()
   await expect
-    .poll(() => page.evaluate(() => STATS()?.inside ?? null), { timeout: 10000 })
+    .poll(() => stats(page).then((s) => s?.inside ?? null), { timeout: 10000 })
     .not.toBeNull()
   await page.waitForTimeout(1200)
   await page.screenshot({ path: path.join(dir, `${testInfo.project.name}-gym.png`) })
@@ -143,7 +140,7 @@ test('Lomé Life 3D opens on a dense, explorable city and completes a full outin
     )
     .toBe(wallet - 500)
   await page.getByRole('button', { name: 'Sortir', exact: true }).click()
-  await expect.poll(() => page.evaluate(() => STATS()?.inside ?? null)).toBeNull()
+  await expect.poll(() => stats(page).then((s) => s?.inside ?? null)).toBeNull()
 
   // 5. A second interior type (a place of worship) and a third (a clinic) are reachable.
   for (const [filter, name] of [
@@ -161,20 +158,20 @@ test('Lomé Life 3D opens on a dense, explorable city and completes a full outin
       .getByLabel('Trajet en cours')
       .getByRole('button', { name: /Passer/ })
       .click()
-    await expect.poll(() => page.evaluate(() => STATS()?.route ?? 99), { timeout: 15000 }).toBe(0)
+    await expect.poll(() => stats(page).then((s) => s?.route ?? 99), { timeout: 15000 }).toBe(0)
     await page.getByRole('button', { name: 'Entrer ou sortir' }).click()
     await expect
-      .poll(() => page.evaluate(() => STATS()?.inside ?? null), { timeout: 10000 })
+      .poll(() => stats(page).then((s) => s?.inside ?? null), { timeout: 10000 })
       .not.toBeNull()
     await page.getByRole('button', { name: 'Entrer ou sortir' }).click()
   }
 
   // 6. Persistence: reload lands at the same world position with the same wallet.
-  const before = await page.evaluate(() => STATS())
+  const before = await stats(page)
   await page.reload({ waitUntil: 'domcontentloaded' })
   await expect(page.locator('canvas').first()).toBeVisible({ timeout: 30000 })
   await expect
-    .poll(() => page.evaluate(() => STATS()?.at ?? null), { timeout: 30000 })
+    .poll(() => stats(page).then((s) => s?.at ?? null), { timeout: 30000 })
     .toEqual(before?.at)
 
   expect(errors, 'No uncaught client runtime errors').toEqual([])

@@ -20,25 +20,21 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
 
   // Direct control: one step on the on-screen pad moves the character to a neighbouring road tile.
   const before = await page.evaluate(
-    () => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? '{}').life.pos,
+    () => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? '{}').at,
   )
   await page
     .getByRole('group', { name: 'Déplacer le personnage' })
-    .getByRole('button', { name: 'Gauche' })
+    .getByRole('button', { name: 'Reculer' })
     .click()
   await expect
     .poll(() =>
-      page.evaluate(
-        () => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? '{}').life.pos,
-      ),
+      page.evaluate(() => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? '{}').at),
     )
-    .toEqual({ x: before.x - 1, y: before.y })
-  await page.keyboard.press('ArrowRight')
+    .toEqual({ x: before.x, y: before.y + 1 })
+  await page.keyboard.press('ArrowUp')
   await expect
     .poll(() =>
-      page.evaluate(
-        () => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? '{}').life.pos,
-      ),
+      page.evaluate(() => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? '{}').at),
     )
     .toEqual(before)
 

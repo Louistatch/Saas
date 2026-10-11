@@ -33,9 +33,10 @@ import { Ride } from '../travel-scene-3d'
 import CityChunks, { type ChunkStats, cellOf, worldPos } from './city-chunks'
 
 export type CameraState = { tx: number; tz: number; distance: number; angle: number }
+/** Frame the player with the dense city around: the target sits a little south-east of them. */
 export const CAMERA_HOME = (x: number, y: number): CameraState => {
-  const [px, , pz] = worldPos(x, y)
-  return { tx: px, tz: pz, distance: 36, angle: 35 }
+  const [px, , pz] = worldPos(x - 4, y + 3)
+  return { tx: px, tz: pz, distance: 28, angle: 35 }
 }
 type EditTool = BuildType | 'inspect' | 'demolish'
 
@@ -86,6 +87,26 @@ function AgentModel({ a }: { a: Agent }) {
         ? ESTATE_ASSETS.van
         : ESTATE_ASSETS.sedan
   return <Model url={url} position={pos} scale={0.72} rotation={a.heading} />
+}
+
+function PlayerFigure({
+  position,
+  rotation,
+}: { position: [number, number, number]; rotation: number }) {
+  const highlighted = useMaterial({ diffuse: '#e7d07e', emissive: '#6b5a1a', gloss: 0.2 })
+  return (
+    <Entity name="Joueur" position={position}>
+      <Model
+        url={ESTATE_ASSETS.villager}
+        position={[0, 0.05, 0]}
+        scale={1.45}
+        rotation={rotation}
+      />
+      <Entity position={[0, 0.02, 0]} scale={[0.9, 0.025, 0.9]}>
+        <Render type="cylinder" material={highlighted} />
+      </Entity>
+    </Entity>
+  )
 }
 
 /** Pointer handling on the canvas: drag pans, pinch zooms, tap picks a world cell. */
@@ -274,7 +295,6 @@ export default function CityWorld({
       .filter((l) => Math.abs(l.x - centerCell.x) < 34 && Math.abs(l.y - centerCell.y) < 26)
       .slice(0, 40)
   }, [centerCell.x, centerCell.y, filter])
-  const highlighted = useMaterial({ diffuse: '#e7d07e', emissive: '#6b5a1a', gloss: 0.2 })
 
   const onPan = useCallback(
     (dx: number, dz: number) => {
@@ -376,17 +396,7 @@ export default function CityWorld({
             {agents.map((a) => (
               <AgentModel key={a.id} a={a} />
             ))}
-            <Entity name="Joueur" position={playerPos}>
-              <Model
-                url={ESTATE_ASSETS.villager}
-                position={[0, 0.05, 0]}
-                scale={1.45}
-                rotation={playerRotation}
-              />
-              <Entity position={[0, 0.02, 0]} scale={[0.9, 0.025, 0.9]}>
-                <Render type="cylinder" material={highlighted} />
-              </Entity>
-            </Entity>
+            <PlayerFigure position={playerPos} rotation={playerRotation} />
             <Picker camera={camera} onPan={onPan} onZoom={onZoom} onTap={onTap} />
             <IconProjector overlay={overlay} lots={icons} />
           </>

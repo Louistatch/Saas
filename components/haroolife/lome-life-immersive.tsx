@@ -237,6 +237,7 @@ export function LomeLifeImmersive() {
   const [follow, setFollow] = useState(true)
   const [selectedLot, setSelectedLot] = useState<Lot | null>(null)
   const [cityFilter, setCityFilter] = useState<Category | 'all'>('all')
+  const [chunkStats, setChunkStats] = useState({ chunks: 0, buildings: 0 })
   const insideAny = Boolean(cityLife.insideLot || life.inside)
   const interior = cityLife.insideLot
     ? interiorFor(lotById(cityLife.insideLot)?.type ?? 'lot')
@@ -379,6 +380,15 @@ export function LomeLifeImmersive() {
       /* Offline game supports blocked storage. */
     }
   }, [cityLife, loaded])
+  // Live state for the end-to-end tests (chunks loaded, buildings, position, interior).
+  useEffect(() => {
+    ;(window as unknown as { __LOME_CITY?: unknown }).__LOME_CITY = {
+      ...chunkStats,
+      at: cityLife.at,
+      route: cityLife.route.length,
+      inside: cityLife.insideLot ?? life.inside,
+    }
+  }, [chunkStats, cityLife.at, cityLife.route.length, cityLife.insideLot, life.inside])
   // The camera follows the player while walking, until the player pans by hand.
   useEffect(() => {
     if (!follow) return
@@ -472,6 +482,22 @@ export function LomeLifeImmersive() {
     setTransport('walk')
     setFollow(true)
     setCityLife((old) => goToLot(old, lot))
+  }
+  function rideTo(lot: Lot, t: Transport) {
+    if (life.wallet < TRAVEL_COST[t]) {
+      setNotice('Solde insuffisant pour ce transport fictif.')
+      goLot(lot)
+      return
+    }
+    setMode('walk')
+    setPanel(null)
+    setFollow(true)
+    setTransport(t)
+    setCityLife((old) => {
+      const going = goToLot(old, lot)
+      return going.route.length ? payRide(going, t) : going
+    })
+    setRiding(true)
   }
   function action(a: Action) {
     if (a === 'enter' && !insideAny && doorLot && !life.target) {
@@ -595,14 +621,7 @@ export function LomeLifeImmersive() {
               setPanel('lot')
             }}
             filter={cityFilter}
-            onStats={(st) => {
-              ;(window as unknown as { __LOME_CITY?: unknown }).__LOME_CITY = {
-                ...st,
-                at: cityLife.at,
-                route: cityLife.route.length,
-                inside: cityLife.insideLot ?? life.inside,
-              }
-            }}
+            onStats={setChunkStats}
           />
         )}
       </div>
@@ -1587,18 +1606,12 @@ export function LomeLifeImmersive() {
                         <ActionButton
                           title={'Zémidjan · ' + money(TRAVEL_COST.moto)}
                           outline
-                          onClick={() => {
-                            goLot(selectedLot)
-                            window.setTimeout(() => trip('moto'), 0)
-                          }}
+                          onClick={() => rideTo(selectedLot, 'moto')}
                         />
                         <ActionButton
                           title={'Taxi · ' + money(TRAVEL_COST.taxi)}
                           outline
-                          onClick={() => {
-                            goLot(selectedLot)
-                            window.setTimeout(() => trip('taxi'), 0)
-                          }}
+                          onClick={() => rideTo(selectedLot, 'taxi')}
                         />
                       </div>
                     </>

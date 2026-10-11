@@ -21,10 +21,15 @@ const byName = (n: string) => landmarks().find((l) => l.name === n)!
 
 test('the player starts in the estate and the engine position stays in sync while inside', () => {
   const s = initialCityLife()
-  assert.deepEqual(s.at, toWorld(s.life.pos))
-  const left = stepDir(s, -1, 0)
-  assert.deepEqual(left.at, { x: s.at.x - 1, y: s.at.y })
-  assert.deepEqual(left.life.pos, { x: s.life.pos.x - 1, y: s.life.pos.y })
+  assert.deepEqual(s.at, { x: 48, y: 34 }) // the estate gate, on avenue x = 48
+  const down = stepDir(s, 0, 1)
+  assert.deepEqual(down.at, { x: 48, y: 35 })
+  assert.deepEqual(down.life.pos, s.life.pos) // outside the fence the estate position is parked
+  assert.deepEqual(stepDir(s, -1, 0).at, s.at) // west of the gate: a building, not a road
+  // Walking back through the driveway syncs the estate position again.
+  let back = goToEstate(s, 11, 10)
+  for (let i = 0; i < 40 && back.route.length; i++) back = walkStep(back)
+  assert.deepEqual(toWorld(back.life.pos), back.at)
   // Estate venues still work through the engine when standing next to them.
   const home = goToEstate(s, 9, 9)
   let w = home
