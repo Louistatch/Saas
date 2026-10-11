@@ -25,7 +25,7 @@ export default function TerritoryMap({
   const markers = useRef<Partial<Record<HubId, CircleMarker>>>({})
   const corridor = useRef<Polyline | null>(null)
   const selectRef = useRef(onSelect)
-  const firstSelectedRender = useRef(true)
+  const previousSelected = useRef<HubId>(selected)
   const [error, setError] = useState('')
   const [ready, setReady] = useState(false)
 
@@ -136,10 +136,10 @@ export default function TerritoryMap({
         weight: hub.id === selected ? 4 : 3,
       })
     }
-    if (firstSelectedRender.current) {
-      firstSelectedRender.current = false
-      return
-    }
+    // A layout-ready change must NOT count as a user selection.
+    const changed = previousSelected.current !== selected
+    previousSelected.current = selected
+    if (!changed) return
     const hub = HUBS.find((item) => item.id === selected)
     if (hub && ready && leafletMap.current) {
       const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
