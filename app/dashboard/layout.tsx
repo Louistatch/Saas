@@ -7,13 +7,6 @@ import { Logo } from '@/components/shared/logo'
 import { NotificationBell } from '@/components/shared/notification-bell'
 import { ServiceLauncher } from '@/components/shared/service-launcher'
 import { SupportButton } from '@/components/support/support-button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { performLogout } from '@/lib/auth/logout'
 import { hasOrgLayer, isHarooRole } from '@/lib/utils/permissions'
@@ -201,8 +194,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
   const { user } = useAuth()
-  const { currentCooperative, cooperatives, switchCooperative, refreshCooperatives } =
-    useCooperative()
+  const { currentCooperative, cooperatives } = useCooperative()
   const [gestionOpen, setGestionOpen] = useState(false)
 
   // Un compte peut porter les deux couches : on ne renvoie vers /haroo que
@@ -265,25 +257,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         )}
         {/* Cooperative switcher for super_admin */}
         {user?.role === 'super_admin' && cooperatives.length > 1 && (
-          <Select
-            value={currentCooperative?.id || ''}
-            onValueChange={switchCooperative}
-            onOpenChange={(open) => {
-              // Une organisation créée depuis l'admin apparaît sans recharger la page.
-              if (open) void refreshCooperatives()
-            }}
-          >
-            <SelectTrigger className="mt-2 h-7 text-xs">
-              <SelectValue placeholder="Choisir une coopérative" />
-            </SelectTrigger>
-            <SelectContent>
-              {cooperatives.map((c) => (
-                <SelectItem key={c.id} value={c.id} className="text-xs">
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <CoopSwitcher className="mt-2 h-8 w-full text-xs" />
         )}
       </div>
 
@@ -384,9 +358,51 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   )
 }
 
+/**
+ * Choix de l'organisation affichée (super_admin). Liste native : sur téléphone, la liste
+ * personnalisée pouvait choisir l'élément situé sous le doigt à l'ouverture et changer
+ * d'organisation sans le vouloir.
+ */
+function CoopSwitcher({ className }: { className: string }) {
+  const { currentCooperative, cooperatives, switchCooperative } = useCooperative()
+  return (
+    <select
+      aria-label="Organisation affichée"
+      value={currentCooperative?.id ?? ''}
+      onChange={(e) => {
+        if (e.target.value) switchCooperative(e.target.value)
+      }}
+      className={`rounded-md border border-border bg-background px-2 text-foreground ${className}`}
+    >
+      {!currentCooperative && <option value="">Choisir une organisation</option>}
+      {cooperatives.map((c) => (
+        <option key={c.id} value={c.id}>
+          {c.name}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+/** Rappel permanent pour le super_admin : quel espace il regarde, et le retour à l'admin. */
+function ViewAsBanner() {
+  const { user } = useAuth()
+  const { currentCooperative } = useCooperative()
+  if (user?.role !== 'super_admin' || !currentCooperative) return null
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-violet-200 bg-violet-50 px-4 py-2 text-sm text-violet-950 print:hidden">
+      <span>
+        Vous voyez l’espace de <strong>{currentCooperative.name}</strong>
+      </span>
+      <Link href="/admin" className="font-medium underline underline-offset-2">
+        Retour à l’admin
+      </Link>
+    </div>
+  )
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { currentCooperative, cooperatives, switchCooperative, refreshCooperatives } =
-    useCooperative()
+  const { currentCooperative, cooperatives } = useCooperative()
   const { user } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -436,30 +452,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* Right: cooperative switcher + notification bell */}
             <div className="flex items-center gap-2">
               {user?.role === 'super_admin' && cooperatives.length > 1 && (
-                <Select
-                  value={currentCooperative?.id || ''}
-                  onValueChange={switchCooperative}
-                  onOpenChange={(open) => {
-                    // Une organisation créée depuis l'admin apparaît sans recharger la page.
-                    if (open) void refreshCooperatives()
-                  }}
-                >
-                  <SelectTrigger className="hidden md:flex h-8 text-xs w-44">
-                    <SelectValue placeholder="Coopérative" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {cooperatives.map((c) => (
-                      <SelectItem key={c.id} value={c.id} className="text-xs">
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CoopSwitcher className="hidden h-8 w-44 text-xs md:block" />
               )}
               <ServiceLauncher role={user?.role} />
               {currentCooperative && <NotificationBell cooperativeId={currentCooperative.id} />}
             </div>
           </header>
+          <ViewAsBanner />
 
           {/* Page content */}
           <div className="flex-1 p-4 md:p-6 lg:p-8">{children}</div>
