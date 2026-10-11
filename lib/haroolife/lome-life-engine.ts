@@ -1,3 +1,4 @@
+import { CITIES, type CityId, isCityId } from './lome-districts'
 import { EVENT_IDS, rollEvent } from './lome-events'
 /**
  * HarooLife — Lomé life/city gameplay slice, entirely fictitious.
@@ -68,6 +69,8 @@ export interface LifeState {
   events: string[]
   /** Id de l'événement à choix en attente (voir lome-events.ts), sinon null. */
   pendingEvent: string | null
+  /** Ville dont les quartiers nomment la grille (voir lome-districts.ts). */
+  cityId: CityId
 }
 export const SALARIES: Record<Career, number> = {
   vendeur: 3400,
@@ -122,6 +125,7 @@ export function initialLomeLife(): LifeState {
     lastEvent: 'Choisis un lieu, rejoins-le et interagis avec lui.',
     events: ['Une nouvelle journée commence dans ton quartier fictif de Lomé.'],
     pendingEvent: null,
+    cityId: 'lome',
   }
 }
 const events = (state: LifeState, msg: string): LifeState => ({
@@ -204,6 +208,12 @@ export function skipTravel(state: LifeState): LifeState {
     { ...state, pos: { ...last }, route: [], trafficStep: state.trafficStep + state.route.length },
     'Arrivé à destination : entre dans le bâtiment ou choisis une action.',
   )
+}
+/** Change the named city: same grid, same savings, new district names. */
+export function selectCity(state: LifeState, cityId: CityId): LifeState {
+  if (state.cityId === cityId) return state
+  const city = CITIES[cityId]
+  return events({ ...state, cityId }, 'Bienvenue à ' + city.name + ' (' + city.region + ').')
 }
 export function selectJob(state: LifeState, job: Career): LifeState {
   return events(
@@ -525,12 +535,14 @@ export function decodeLomeLife(value: unknown): LifeState | null {
     !(
       v.pendingEvent == null ||
       (typeof v.pendingEvent === 'string' && EVENT_IDS.has(v.pendingEvent))
-    )
+    ) ||
+    !(v.cityId === undefined || isCityId(v.cityId))
   )
     return null
   // Saves written before the six-needs update: fill the two new gauges and the event slot.
   v.needs = { ...v.needs!, fun: v.needs!.fun ?? 70, bladder: v.needs!.bladder ?? 80 }
   v.pendingEvent = v.pendingEvent ?? null
+  v.cityId = v.cityId ?? 'lome'
   const road = roadNetwork(v.city!.buildings)
   if (!road.has(id(v.pos)) || !v.route.every((p) => p && road.has(id(p)))) return null
   if (v.target && !Number.isInteger(v.target.x)) return null

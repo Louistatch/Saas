@@ -1,5 +1,14 @@
 'use client'
 
+import {
+  CITIES,
+  CITY_IDS,
+  MAP_FILTERS,
+  type MapFilter,
+  districtAt,
+  matchesFilter,
+  placeNameAt,
+} from '@/lib/haroolife/lome-districts'
 import { eventById, resolveEvent } from '@/lib/haroolife/lome-events'
 import {
   type Action,
@@ -19,6 +28,7 @@ import {
   initialLomeLife,
   interact,
   jobVenue,
+  selectCity,
   selectJob,
   skipTravel,
   stepPlayer,
@@ -193,6 +203,9 @@ export function LomeLifeImmersive() {
   const [playing, setPlaying] = useState(false)
   const [transport, setTransport] = useState<Transport>('walk')
   const [riding, setRiding] = useState(false)
+  const [mapFilter, setMapFilter] = useState<MapFilter>('all')
+  const cityDef = CITIES[life.cityId]
+  const whereAmI = placeNameAt(life.cityId, life.pos.x, life.pos.y)
   const [chatDraft, setChatDraft] = useState('')
   const [chat, setChat] = useState<{ by: 'me' | 'npc'; body: string }[]>([
     {
@@ -453,6 +466,7 @@ export function LomeLifeImmersive() {
           transport={transport}
           rain={rain}
           destination={destinationName}
+          boulevard={cityDef.boulevard}
           onMap={() => {
             setRiding(false)
             open('map')
@@ -470,6 +484,7 @@ export function LomeLifeImmersive() {
             <Sun size={17} className="text-amber-500" />{' '}
             <span>
               J{life.day} · {String(life.hour).padStart(2, '0')}h
+              <span className="hidden text-emerald-800 sm:inline"> · {whereAmI}</span>
             </span>
           </div>
           <span className="h-6 w-px bg-slate-200" />
@@ -836,19 +851,84 @@ export function LomeLifeImmersive() {
                     Explore les lieux en 3D. Sélectionne un endroit : ton personnage empruntera les
                     routes du quartier.
                   </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {LIFE_LOCATIONS.map((place, i) => (
+                  <div className="flex flex-wrap gap-1" role="group" aria-label="Filtrer la carte">
+                    {MAP_FILTERS.map((f) => (
                       <button
                         type="button"
-                        key={place.name}
-                        onClick={() => go(place.x, place.y)}
-                        className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left hover:border-emerald-400"
+                        key={f.id}
+                        aria-pressed={mapFilter === f.id}
+                        onClick={() => setMapFilter(f.id)}
+                        className={
+                          'rounded-full px-3 py-1.5 text-xs font-semibold ' +
+                          (mapFilter === f.id
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-slate-100 text-slate-700')
+                        }
                       >
-                        <span className="text-xl">{LOCATION_ICONS[i]}</span>
-                        <span className="min-w-0 text-xs font-bold">{place.name}</span>
-                        <ArrowRight size={14} className="ml-auto shrink-0 text-emerald-700" />
+                        {f.label}
                       </button>
                     ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {LIFE_LOCATIONS.filter((place) => matchesFilter(mapFilter, place.venue)).map(
+                      (place) => (
+                        <button
+                          type="button"
+                          key={place.name}
+                          onClick={() => go(place.x, place.y)}
+                          className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left hover:border-emerald-400"
+                        >
+                          <span className="text-xl">
+                            {LOCATION_ICONS[LIFE_LOCATIONS.indexOf(place)]}
+                          </span>
+                          <span className="min-w-0 text-xs font-bold">
+                            {place.name}
+                            <span className="block font-normal text-slate-500">
+                              {districtAt(life.cityId, place.x, place.y).name}
+                            </span>
+                          </span>
+                          <ArrowRight size={14} className="ml-auto shrink-0 text-emerald-700" />
+                        </button>
+                      ),
+                    )}
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 p-3 text-sm">
+                    <strong>Les quartiers de {cityDef.name}</strong>
+                    <ul className="mt-2 space-y-1 text-xs text-slate-600">
+                      {cityDef.districts.map((d) => (
+                        <li key={d.id}>
+                          <strong className="text-slate-800">{d.name}</strong> · {d.note}
+                        </li>
+                      ))}
+                      <li>
+                        <strong className="text-sky-800">{cityDef.water.northEast}</strong> au
+                        nord-est,{' '}
+                        <strong className="text-sky-800">{cityDef.water.southWest}</strong> au
+                        sud-ouest.
+                      </li>
+                    </ul>
+                    <div className="mt-3 flex gap-1" role="group" aria-label="Changer de ville">
+                      {CITY_IDS.map((id) => (
+                        <button
+                          type="button"
+                          key={id}
+                          aria-pressed={life.cityId === id}
+                          onClick={() => setLife((old) => selectCity(old, id))}
+                          className={
+                            'rounded-full px-3 py-1.5 text-xs font-semibold ' +
+                            (life.cityId === id
+                              ? 'bg-emerald-700 text-white'
+                              : 'bg-white text-slate-700 ring-1 ring-slate-200')
+                          }
+                        >
+                          {CITIES[id].name}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Même quartier de jeu, noms et lieux de la ville choisie. Relevé géographique à
+                      venir.
+                    </p>
                   </div>
                   <div className="rounded-2xl bg-slate-50 p-3 text-sm">
                     <strong>Déplacement</strong>
