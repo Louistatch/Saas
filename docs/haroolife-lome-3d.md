@@ -157,3 +157,14 @@ Vérification : `tests/haroolife-city-world.test.ts`, `tests/haroolife-city-life
 `e2e/lome-city.spec.ts` (390×844 et 1440×900) : chunks chargés, ≥ 250 bâtiments, analyse de
 pixels interdisant qu'un plateau isolé occupe le centre d'une surface vide, caméra, fiche de
 lieu, trajet, trois intérieurs, persistance au rechargement.
+
+Résultats mesurés (exécution locale, Chromium swiftshader, build de production, 11 octobre 2026) :
+6 scénarios Playwright passés (ville, vie, présence × desktop 1440×900 et Android 390×844).
+Statistiques du monde au lancement : 35 chunks chargés, 2 062 bâtiments. Analyse de pixels du
+centre de l'écran : desktop bleu 3 %, bâti 49 %, 666 teintes ; mobile bleu 4 %, bâti 52 %,
+489 teintes (seuils : bleu < 30 %, bâti > 30 %, > 60 teintes). Captures dans
+`test-results/lome-city/` (`*-city.png`, `*-overview.png`, `*-gym.png`).
+
+Limites connues : la parcelle 22×22 reste visuellement lourde (carré de gazon) au milieu de
+Tokoin ; le tracé des quartiers est simplifié et non issu d'OpenStreetMap ; Kara et Sokodé
+réutilisent la même disposition ; la présence des comptes réels reste limitée à la parcelle.
