@@ -79,11 +79,16 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
   // Monetisation surfaces: a billboard sheet from the map, partner slots in the phone.
   await page.getByRole('button', { name: /Adidogomé · Disponible/ }).click()
   await expect(page.getByRole('dialog', { name: 'Panneau publicitaire' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Réserver ce panneau' })).toHaveAttribute('href', /contact/)
+  await expect(page.getByRole('link', { name: 'Réserver ce panneau' })).toHaveAttribute(
+    'href',
+    /contact/,
+  )
   await page.getByRole('button', { name: 'Fermer', exact: true }).click()
   await navigation.getByRole('button', { name: 'Téléphone' }).click()
   await expect(page.getByText('Services et partenaires')).toBeVisible()
-  await expect(page.getByRole('link', { name: /Partenaire.*50 000 FCFA\/mois/ }).first()).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: /Partenaire.*50 000 FCFA\/mois/ }).first(),
+  ).toBeVisible()
   await page.getByRole('button', { name: 'Fermer', exact: true }).click()
   await navigation.getByRole('button', { name: 'Carte' }).click()
   await page.getByRole('button', { name: /Marché de quartier/ }).click()
