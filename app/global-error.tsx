@@ -1,8 +1,9 @@
 'use client'
 
+import { Button } from '@/components/ui/button'
+import { reportClientError } from '@/lib/errors/report-client'
 import * as Sentry from '@sentry/nextjs'
 import { useEffect } from 'react'
-import { Button } from '@/components/ui/button'
 
 export default function GlobalError({
   error,
@@ -13,6 +14,7 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     Sentry.captureException(error)
+    reportClientError(error)
   }, [error])
 
   return (

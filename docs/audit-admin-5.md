@@ -31,3 +31,7 @@
 - Double authentification des super administrateurs : à activer dans Supabase Auth (MFA).
 - Pages AgriTogo, Agrismat, Haroo, Opérateurs, Comptes d'exploitation, Gains : lectures et écritures passent déjà par des routes serveur ; restyle 5.0 non fait.
 - Repasser automatiquement en attente un dossier complété après une demande de pièces : à vérifier.
+
+## Suivi des erreurs et demandes d'accès (11/10/2026)
+- **Erreurs du site** (`/admin/erreurs`) : erreurs serveur (`onRequestError` dans `instrumentation.ts`) et écrans d'erreur du navigateur (`/api/errors`, limité en débit et en taille), regroupées par empreinte avec compteur ; « résolue » se rouvre si l'erreur revient. Comptées dans le centre de pilotage (urgent si survenue sous 24 h). Sentry reste branché en parallèle. Migration `20261011_150000_app_errors.sql`.
+- **Demandes d'accès** : avant le 4/10, aucun e-mail ne partait (Resend non configuré) ; depuis, seuls les super admins sont prévenus, pas le demandeur. Nouveau bouton « Créer le compte » dans Messages : crée l'organisation, crée ou promeut le compte en administrateur, envoie « définir mon mot de passe », classe le message, journalise.

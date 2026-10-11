@@ -43,6 +43,8 @@ export async function GET() {
     cardsToPrint,
     credits,
     notifFailed,
+    errorsOpen,
+    errorsToday,
     paymentsStuck,
     coops,
     members,
@@ -75,6 +77,14 @@ export async function GET() {
         .not('status', 'in', `(${CREDIT_DONE.join(',')})`),
     ),
     count(db.from('notification_queue').select('id', head).in('status', ['failed', 'dead'])),
+    count(db.from('app_errors').select('fingerprint', head).eq('status', 'nouvelle')),
+    count(
+      db
+        .from('app_errors')
+        .select('fingerprint', head)
+        .eq('status', 'nouvelle')
+        .gt('last_seen', new Date(Date.now() - DAY).toISOString()),
+    ),
     count(
       db
         .from('partner_payment_intents')
@@ -127,6 +137,17 @@ export async function GET() {
     title: 'Paiements d’opérateurs bloqués',
     detail: 'En attente depuis plus de 30 min : vérifiez auprès du prestataire.',
     href: '/admin/partners',
+  })
+  push({
+    key: 'errors',
+    count: errorsOpen,
+    level: errorsToday > 0 ? 'urgent' : 'attention',
+    title: 'Erreurs du site à traiter',
+    detail:
+      errorsToday > 0
+        ? `${errorsToday} survenue(s) dans les dernières 24 h.`
+        : 'Aucune nouvelle occurrence depuis 24 h.',
+    href: '/admin/erreurs',
   })
   push({
     key: 'notifications',

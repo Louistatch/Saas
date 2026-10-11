@@ -1,10 +1,11 @@
 'use client'
 
-import * as Sentry from '@sentry/nextjs'
-import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { reportClientError } from '@/lib/errors/report-client'
+import * as Sentry from '@sentry/nextjs'
 import { AlertCircle, RefreshCw } from 'lucide-react'
+import { useEffect } from 'react'
 
 export default function AdminError({
   error,
@@ -15,6 +16,7 @@ export default function AdminError({
 }) {
   useEffect(() => {
     Sentry.captureException(error)
+    reportClientError(error)
   }, [error])
 
   return (

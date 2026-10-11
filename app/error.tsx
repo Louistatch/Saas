@@ -1,8 +1,9 @@
 'use client'
 
+import { Button } from '@/components/ui/button'
+import { reportClientError } from '@/lib/errors/report-client'
 import * as Sentry from '@sentry/nextjs'
 import { useEffect } from 'react'
-import { Button } from '@/components/ui/button'
 
 /**
  * Error boundary applicatif (toutes les routes sous le layout racine).
@@ -20,6 +21,7 @@ export default function AppError({
 }) {
   useEffect(() => {
     Sentry.captureException(error)
+    reportClientError(error)
   }, [error])
 
   return (

@@ -7,6 +7,7 @@ import {
   Activity,
   Award,
   Briefcase,
+  Bug,
   Building2,
   Coins,
   Cpu,
@@ -47,6 +48,7 @@ const ADMIN_SECTIONS: { title: string; links: AdminLink[] }[] = [
         badge: 'dossiers',
       },
       { href: '/admin/messages', label: 'Messages', icon: Mail, badge: 'messages' },
+      { href: '/admin/erreurs', label: 'Erreurs du site', icon: Bug, badge: 'errors' },
     ],
   },
   {
