@@ -171,11 +171,35 @@ test('HarooLife national : rôles, maison, monde et vie privée', async (t) => {
     },
   )
 
+  await t.test(
+    'parler sur la place : résidents seulement, une fois par 20 s, visible ici',
+    async () => {
+      await as(44)
+      const mid = (
+        await rows('SELECT haroolife_say($1,$2) AS id', [id(21), '  Bonjour   la famille  '])
+      )[0].id
+      assert.ok(mid)
+      await assert.rejects(rows('SELECT haroolife_say($1,$2)', [id(21), 'Encore']), /Attendez/)
+      await assert.rejects(rows('SELECT haroolife_say($1,$2)', [id(21), '   ']), /vide/)
+      await as(41)
+      await assert.rejects(rows('SELECT haroolife_say($1,$2)', [id(21), 'Coucou']), /maison/)
+      await as(43)
+      const w = await world()
+      assert.deepEqual(
+        w.here.messages.map((m) => [m.display_name, m.body, m.is_me]),
+        [['Kossi', 'Bonjour la famille', false]],
+      )
+      assert.equal((await world(id(23))).here.messages.length, 0, 'un autre canton n’entend pas')
+    },
+  )
+
   await t.test('un visiteur anonyme ne peut rien lire ni écrire', async () => {
     await sql(`RESET ROLE; SET ROLE anon; SELECT set_config('request.jwt.claim.sub','',false)`)
     await assert.rejects(rows('SELECT haroolife_world(NULL)'), /permission denied/)
     await assert.rejects(rows('SELECT * FROM haroolife_residents'), /permission denied/)
+    await assert.rejects(rows('SELECT haroolife_say($1,$2)', [id(21), 'x']), /permission denied/)
     await sql('RESET ROLE; SET ROLE authenticated')
+    await assert.rejects(rows('SELECT * FROM haroolife_messages'), /permission denied/)
     await assert.rejects(rows('SELECT * FROM haroolife_residents'), /permission denied/)
   })
 })

@@ -74,6 +74,35 @@ export interface SkyDay {
   precipitation_mm: number
   precipitation_probability: number
 }
+export interface Message {
+  id: string
+  display_name: string
+  pagne: number
+  body: string
+  created_at: string
+  is_me: boolean
+}
+/** Les lieux du village et les rôles qui s'y tiennent d'habitude. */
+export const PLACES = {
+  champs: { label: 'Les champs', roles: ['producteur'] },
+  equipes: { label: 'La maison des équipes', roles: ['ouvrier'] },
+  marche: { label: 'Le marché', roles: ['acheteur'] },
+  cooperative: { label: 'La coopérative', roles: ['admin_coop', 'union', 'faitiere'] },
+  ecole: { label: 'L’école des champs', roles: ['agronome'] },
+  bureau: { label: 'Le bureau de l’opérateur', roles: ['operateur'] },
+  place: { label: 'La place du village', roles: ['equipe'] },
+} as const
+export type PlaceKey = keyof typeof PLACES
+export function anchorFor(roles: Role[]): PlaceKey {
+  for (const [key, place] of Object.entries(PLACES) as [PlaceKey, { roles: readonly string[] }][]) {
+    if (roles.some((r) => place.roles.includes(r))) return key
+  }
+  return 'place'
+}
+export const sayMessageSchema = z
+  .object({ canton_id: z.string().uuid(), body: z.string().trim().min(1).max(200) })
+  .strict()
+
 export interface World {
   me: {
     roles: Role[]
@@ -91,6 +120,7 @@ export interface World {
     groups: HereGroup[]
     market: MarketLine[]
     sky: SkyDay[]
+    messages: Message[]
   } | null
 }
 

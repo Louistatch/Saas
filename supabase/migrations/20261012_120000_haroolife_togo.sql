@@ -86,6 +86,42 @@ BEGIN
         pagne = excluded.pagne, visible = excluded.visible, updated_at = now();
 END $$;
 
+-- 4b. Parler sur la place du canton : messages courts, visibles par les habitants connectés.
+--     Réservé aux personnes qui ont une maison ; une par 20 secondes ; effacement par le serveur.
+CREATE TABLE public.haroolife_messages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  canton_id uuid NOT NULL REFERENCES public.cantons(id),
+  user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  body text NOT NULL CHECK (length(body) BETWEEN 1 AND 200),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  deleted_at timestamptz
+);
+CREATE INDEX haroolife_messages_canton ON public.haroolife_messages(canton_id, created_at DESC) WHERE deleted_at IS NULL;
+ALTER TABLE public.haroolife_messages ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.haroolife_messages FROM PUBLIC, anon, authenticated;
+GRANT ALL ON public.haroolife_messages TO service_role;
+
+CREATE OR REPLACE FUNCTION public.haroolife_say(p_canton uuid, p_body text)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE actor uuid := (SELECT auth.uid()); body text := regexp_replace(trim(p_body), '\s+', ' ', 'g'); new_id uuid;
+BEGIN
+  IF actor IS NULL THEN RAISE EXCEPTION 'Connexion requise' USING ERRCODE = '42501'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.haroolife_residents WHERE user_id = actor) THEN
+    RAISE EXCEPTION 'Choisissez d''abord votre maison' USING ERRCODE = '42501';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.cantons WHERE id = p_canton) THEN
+    RAISE EXCEPTION 'Canton inconnu' USING ERRCODE = '22023';
+  END IF;
+  IF length(body) < 1 OR length(body) > 200 THEN
+    RAISE EXCEPTION 'Message vide ou trop long (200 caractères)' USING ERRCODE = '22023';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.haroolife_messages WHERE user_id = actor AND created_at > now() - interval '20 seconds') THEN
+    RAISE EXCEPTION 'Attendez quelques secondes avant de reparler' USING ERRCODE = '22023';
+  END IF;
+  INSERT INTO public.haroolife_messages(canton_id, user_id, body) VALUES (p_canton, actor, body) RETURNING id INTO new_id;
+  RETURN new_id;
+END $$;
+
 -- 5. Le monde : territoire avec effectifs réels, et « ici » pour un canton. Lecture seule.
 --    Aucun téléphone, aucun e-mail : nom affiché, pagne, rôles.
 CREATE OR REPLACE FUNCTION public.haroolife_world(p_canton uuid DEFAULT NULL)
@@ -156,13 +192,23 @@ BEGIN
           'expires_at', g.expires_at, 'is_owner', g.owner_id = actor
         ) ORDER BY g.starts_on), '[]')
         FROM public.haroolife_groups g
-        WHERE g.canton_id = here AND g.cancelled_at IS NULL AND g.expires_at > now())
+        WHERE g.canton_id = here AND g.cancelled_at IS NULL AND g.expires_at > now()),
+      'messages', (
+        SELECT coalesce(jsonb_agg(m ORDER BY m->>'created_at'), '[]') FROM (
+          SELECT jsonb_build_object(
+            'id', x.id, 'body', x.body, 'created_at', x.created_at, 'is_me', x.user_id = actor,
+            'display_name', coalesce(h.display_name, 'Habitant'), 'pagne', coalesce(h.pagne, 1)
+          ) AS m
+          FROM public.haroolife_messages x
+          LEFT JOIN public.haroolife_residents h ON h.user_id = x.user_id
+          WHERE x.canton_id = here AND x.deleted_at IS NULL
+          ORDER BY x.created_at DESC LIMIT 30) t)
     ) END
   );
 END $$;
 
 REVOKE ALL ON FUNCTION private.haroolife_roles(uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.haroolife_suggest_canton(), public.haroolife_set_home(uuid, text, integer, boolean),
-  public.haroolife_world(uuid) FROM PUBLIC, anon;
+  public.haroolife_world(uuid), public.haroolife_say(uuid, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.haroolife_suggest_canton(), public.haroolife_set_home(uuid, text, integer, boolean),
-  public.haroolife_world(uuid) TO authenticated, service_role;
+  public.haroolife_world(uuid), public.haroolife_say(uuid, text) TO authenticated, service_role;

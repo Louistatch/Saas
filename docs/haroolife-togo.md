@@ -15,6 +15,17 @@ tranche donne à **chaque compte une place sur le territoire** et un **rôle dé
   lieux : les champs (travaux proposés), la maison des équipes, le marché (derniers prix relevés
   dans la région, `market_prices`), le ciel (prévision régionale Open-Meteo), les coopératives qui
   ont des membres dans le canton, le bureau de l'opérateur.
+- **Village** : le canton dessiné en isométrie (SVG, aucun modèle à télécharger). Chaque bâtiment
+  est un lieu réel : les champs, la maison des équipes, le marché (panneau avec un vrai prix relevé),
+  la coopérative (nom réel), l'école des champs, le bureau de l'opérateur, la place (grand arbre).
+  Chaque personnage est un habitant réel, placé près du lieu de son rôle, avec son nom et sa
+  dernière parole (dix minutes). Mon personnage marche vers le lieu touché. Il pleut à l'écran
+  quand la prévision du jour dépasse 50 % de pluie. Touchez un lieu : actions selon le rôle,
+  données réelles, « ici maintenant », « Y aller ».
+- **La place** : parler aux habitants du canton (`haroolife_messages`, 200 caractères, une fois par
+  20 secondes, réservé aux personnes qui ont une maison ; réponses rapides). Les messages restent
+  dans le canton. Le serveur peut en effacer (`deleted_at`).
+- **Ma maison** : une pièce en isométrie avec mon personnage, mes rôles, la porte vers le village.
 - **Téléphone** : raccourcis vers les services existants (équipes, marché, messages, tableau de
   bord ou espace opérateur / Haroo, académie).
 - **Équipes** : le pilote existant, inchangé.
@@ -28,7 +39,7 @@ certifié). Une personne ne déclare jamais son rôle.
 
 ## Vie privée
 
-`haroolife_world` ne renvoie que : nom affiché, pagne, rôles, effectifs. Jamais de téléphone,
+`haroolife_world` ne renvoie que : nom affiché, pagne, rôles, effectifs, paroles sur la place. Jamais de téléphone,
 d'e-mail ni d'identifiant de compte d'autrui. Une personne invisible se voit elle-même seulement.
 La table `haroolife_residents` n'est accessible qu'au serveur (RLS, aucun droit client).
 
@@ -45,5 +56,5 @@ l'ouverture des équipes à tous les cantons est la tranche suivante.
 ## Vérification
 
 `node --test tests/haroolife-togo.test.mjs` exécute la migration dans PGlite : rôles, suggestion de
-canton, maison, effectifs par région, visibilité, absence de données de contact, refus des
-anonymes. Captures mobiles prises en local contre un faux Supabase (voir la PR).
+canton, maison, effectifs par région, visibilité, absence de données de contact, paroles sur la
+place (cadence, résidence), refus des anonymes. Captures mobiles prises en local contre un faux Supabase (voir la PR).

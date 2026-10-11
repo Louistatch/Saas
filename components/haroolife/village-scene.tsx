@@ -6,7 +6,7 @@ type Spot = { key: Place; label: string; count: string; x: number; y: number }
 
 const FIELD_ROWS = [0, 1, 2, 3, 4, 5]
 
-function Hut({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) {
+export function Hut({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) {
   return (
     <g transform={`translate(${x} ${y}) scale(${scale})`}>
       <ellipse cx="0" cy="46" rx="42" ry="9" fill="#0f3d2a" opacity="0.18" />
@@ -20,7 +20,7 @@ function Hut({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) {
   )
 }
 
-function Tree({ x, y, s = 1 }: { x: number; y: number; s?: number }) {
+export function Tree({ x, y, s = 1 }: { x: number; y: number; s?: number }) {
   return (
     <g transform={`translate(${x} ${y}) scale(${s})`}>
       <ellipse cx="0" cy="40" rx="34" ry="7" fill="#0f3d2a" opacity="0.18" />
@@ -32,7 +32,7 @@ function Tree({ x, y, s = 1 }: { x: number; y: number; s?: number }) {
   )
 }
 
-function Palm({ x, y }: { x: number; y: number }) {
+export function Palm({ x, y }: { x: number; y: number }) {
   return (
     <g transform={`translate(${x} ${y})`}>
       <path d="M0 40Q6 10 2-24" stroke="#7a5230" strokeWidth="5" fill="none" />

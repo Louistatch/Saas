@@ -1,37 +1,31 @@
 'use client'
 
 /**
- * HarooLife national : la vie agricole togolaise, canton par canton. Trois écrans : la carte
- * (où sont les gens), « Ici » (habitants, lieux, équipes d'un canton) et le téléphone (raccourcis).
- * Tout chiffre affiché vient de la base ou d'une source réelle (météo, prix). 2D légère : rien de
- * lourd à télécharger, lisible sur un téléphone d'entrée de gamme.
+ * HarooLife : la vie agricole togolaise, canton par canton. Quatre écrans : ma maison, le village
+ * (habitants réels, lieux, paroles), la carte du pays (où sont les gens) et le téléphone
+ * (raccourcis). Tout chiffre affiché vient de la base ou d'une source réelle (météo, prix).
  */
 import { useAuth } from '@/app/context/auth-context'
 import {
   type HereGroup,
+  PLACES,
+  type PlaceKey,
   ROLE_LABELS,
   type Resident,
   type Role,
   type World,
+  anchorFor,
   initials,
 } from '@/lib/haroolife/world'
-import { CloudRain, Home, MapPin, Phone, Sprout, Store, Sun, Users, Warehouse } from 'lucide-react'
+import { CloudRain, Home, Map as MapIcon, Phone, Sun, Trees } from 'lucide-react'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { HomeRoom } from './home-room'
+import { PAGNES } from './pagnes'
 import { TogoMap } from './togo-map'
+import { VillageIso } from './village-iso'
 import { HarooLifeWorkspace } from './workspace'
 
-// Huit pagnes : la couleur de l'avatar, choisie par la personne.
-export const PAGNES = [
-  '#B5541F',
-  '#2F7D4F',
-  '#E0B341',
-  '#3B82B9',
-  '#8E3B8E',
-  '#C2410C',
-  '#0F766E',
-  '#1F2A44',
-]
 const ROLE_TONE: Record<Role, string> = {
   producteur: 'bg-[#2F7D4F]/15 text-[#1f5a38]',
   ouvrier: 'bg-[#E0B341]/25 text-[#6b4f0a]',
@@ -48,9 +42,19 @@ const ACTIVITY: Record<string, string> = {
   semis: 'Semis',
   desherbage: 'Désherbage',
 }
-
+const QUICK = [
+  'Bonjour la famille 👋',
+  'Qui est libre demain ?',
+  'Prix du maïs aujourd’hui ?',
+  'On se retrouve au champ',
+]
 const fmtDay = (iso: string) =>
   new Date(`${iso}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })
+const fmtTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+const field = 'w-full rounded-xl border border-[#1F2A44]/20 bg-white p-3 text-base text-[#1F2A44]'
+const primary = 'rounded-xl bg-[#2F7D4F] px-4 py-3 font-semibold text-white disabled:opacity-50'
+const secondary = 'rounded-xl border border-[#1F2A44]/20 px-4 py-3'
 
 export function Avatar({ name, pagne, size = 40 }: { name: string; pagne: number; size?: number }) {
   const tone = PAGNES[(pagne - 1) % PAGNES.length] ?? PAGNES[0]
@@ -85,42 +89,15 @@ function RoleChips({ roles }: { roles: Role[] }) {
   )
 }
 
-function Place({
-  icon: Icon,
-  title,
-  summary,
-  children,
-  open,
-  onToggle,
-}: {
-  icon: typeof Sprout
-  title: string
-  summary: string
-  children?: React.ReactNode
-  open: boolean
-  onToggle: () => void
-}) {
-  return (
-    <li className="rounded-2xl border border-[#1F2A44]/10 bg-white">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        className="flex w-full items-center gap-3 p-4 text-left"
-      >
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#2F7D4F]/10 text-[#2F7D4F]">
-          <Icon aria-hidden="true" className="h-6 w-6" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block font-semibold text-[#1F2A44]">{title}</span>
-          <span className="block truncate text-sm text-[#1F2A44]/70">{summary}</span>
-        </span>
-      </button>
-      {open && children && (
-        <div className="border-t border-[#1F2A44]/10 p-4 text-sm">{children}</div>
-      )}
-    </li>
-  )
+async function post(url: string, body: unknown): Promise<string | null> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).catch(() => null)
+  if (res?.ok) return null
+  const data: { error?: string } = res ? await res.json().catch(() => ({})) : {}
+  return data.error ?? 'Connexion interrompue. Réessayez.'
 }
 
 function HomeDialog({
@@ -139,12 +116,12 @@ function HomeDialog({
     for (const r of world.territory)
       for (const p of r.prefectures)
         if (p.cantons.some((c) => c.id === cantonId))
-          return { region: r.id, prefecture: p.id, canton: cantonId }
+          return { region: r.id, prefecture: p.id, canton: cantonId ?? '' }
     return { region: world.territory[0]?.id ?? '', prefecture: '', canton: '' }
   }, [world])
   const [region, setRegion] = useState(initial.region)
   const [prefecture, setPrefecture] = useState(initial.prefecture)
-  const [canton, setCanton] = useState(initial.canton ?? '')
+  const [canton, setCanton] = useState(initial.canton)
   const [name, setName] = useState(world.me.display_name ?? defaultName)
   const [pagne, setPagne] = useState(world.me.pagne ?? 1)
   const [visible, setVisible] = useState(world.me.visible ?? true)
@@ -156,20 +133,16 @@ function HomeDialog({
   async function save() {
     setBusy(true)
     setError('')
-    const res = await fetch('/api/haroolife/home', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ canton_id: canton, display_name: name, pagne, visible }),
-    }).catch(() => null)
-    const data: { error?: string } = res ? await res.json().catch(() => ({})) : {}
+    const err = await post('/api/haroolife/home', {
+      canton_id: canton,
+      display_name: name,
+      pagne,
+      visible,
+    })
     setBusy(false)
-    if (!res?.ok) {
-      setError(data.error ?? 'Connexion interrompue : votre maison n’est pas enregistrée.')
-      return
-    }
-    onDone()
+    if (err) setError(err)
+    else onDone()
   }
-  const field = 'w-full rounded-xl border border-[#1F2A44]/20 bg-white p-3 text-base text-[#1F2A44]'
   return (
     <div
       // biome-ignore lint/a11y/useSemanticElements: feuille modale plein écran sur mobile, hors flux du document
@@ -288,16 +261,12 @@ function HomeDialog({
             type="button"
             disabled={busy || !canton || name.trim().length === 0}
             onClick={() => void save()}
-            className="flex-1 rounded-xl bg-[#2F7D4F] px-4 py-3 font-semibold text-white disabled:opacity-50"
+            className={`flex-1 ${primary}`}
           >
             {busy ? 'Enregistrement…' : 'M’installer ici'}
           </button>
           {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-[#1F2A44]/20 px-4 py-3"
-            >
+            <button type="button" onClick={onClose} className={secondary}>
               Annuler
             </button>
           )}
@@ -307,13 +276,7 @@ function HomeDialog({
   )
 }
 
-function Explorer({
-  world,
-  onVisit,
-}: {
-  world: World
-  onVisit: (canton: string) => void
-}) {
+function Explorer({ world, onVisit }: { world: World; onVisit: (canton: string) => void }) {
   const homeRegion = world.territory.find((r) => r.name === world.me.home?.region)?.id ?? null
   const [region, setRegion] = useState<string | null>(homeRegion)
   const [prefecture, setPrefecture] = useState<string | null>(null)
@@ -341,11 +304,7 @@ function Explorer({
                   type="button"
                   aria-pressed={prefecture === pf.id}
                   onClick={() => setPrefecture(pf.id)}
-                  className={`rounded-full border px-3 py-1.5 text-sm ${
-                    prefecture === pf.id
-                      ? 'border-[#1F2A44] bg-[#1F2A44] text-white'
-                      : 'border-[#1F2A44]/20 bg-white'
-                  }`}
+                  className={`rounded-full border px-3 py-1.5 text-sm ${prefecture === pf.id ? 'border-[#1F2A44] bg-[#1F2A44] text-white' : 'border-[#1F2A44]/20 bg-white'}`}
                 >
                   {pf.name}
                   {pf.residents > 0 && <span className="ml-1 opacity-70">· {pf.residents}</span>}
@@ -384,162 +343,183 @@ function Explorer({
   )
 }
 
-function Here({
+function Sheet({
+  title,
+  subtitle,
+  onClose,
+  children,
+}: { title: string; subtitle?: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-40 mx-auto max-h-[70dvh] max-w-3xl overflow-y-auto rounded-t-3xl border-t border-[#1F2A44]/10 bg-white p-5 pb-24 shadow-2xl">
+      <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-[#1F2A44]/15" />
+      <div className="mb-3 flex items-start gap-3">
+        <div className="flex-1">
+          <h2 className="text-xl font-bold text-[#1F2A44]">{title}</h2>
+          {subtitle && <p className="text-sm text-[#1F2A44]/70">{subtitle}</p>}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-full border border-[#1F2A44]/15 px-3 py-1 text-sm"
+        >
+          Fermer
+        </button>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function groupLine(g: HereGroup) {
+  return `${ACTIVITY[g.activity] ?? g.activity} · ${fmtDay(g.starts_on)} · ${g.people} personne${g.people > 1 ? 's' : ''}${
+    g.kind === 'work' ? ` · ${g.total} / ${g.target} ha` : ` / ${g.target}`
+  }`
+}
+
+function PlaceSheet({
+  place,
   world,
-  onOpenTeams,
-  onGoHome,
+  myPlace,
+  onGo,
+  onClose,
+  onTeams,
+  onSaid,
 }: {
+  place: PlaceKey
   world: World
-  onOpenTeams: () => void
-  onGoHome: () => void
+  myPlace: PlaceKey
+  onGo: () => void
+  onClose: () => void
+  onTeams: () => void
+  onSaid: () => void
 }) {
   const here = world.here
-  const [open, setOpen] = useState<string | null>(null)
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
   if (!here) return null
-  const toggle = (k: string) => setOpen((o) => (o === k ? null : k))
-  const atHome = world.me.home?.canton_id === here.canton.canton_id
+  const roles = world.me.roles
+  const people = here.residents.filter((r) =>
+    r.is_me ? myPlace === place : anchorFor(r.roles) === place,
+  )
   const teams = here.groups.filter((g) => g.kind === 'team')
   const works = here.groups.filter((g) => g.kind === 'work')
-  const roles = world.me.roles
-  const operators = here.residents.filter((r) => r.roles.includes('operateur')).length
   const today = here.sky[0]
-  const groupLine = (g: HereGroup) =>
-    `${ACTIVITY[g.activity] ?? g.activity} · ${fmtDay(g.starts_on)} · ${g.people} personne${g.people > 1 ? 's' : ''}${
-      g.kind === 'work' ? ` · ${g.total} / ${g.target} ha` : ` / ${g.target}`
-    }`
+  const operators = here.residents.filter((r) => r.roles.includes('operateur')).length
+
+  async function say(body: string) {
+    setBusy(true)
+    setError('')
+    const err = await post('/api/haroolife/say', { canton_id: here?.canton.canton_id, body })
+    setBusy(false)
+    if (err) setError(err)
+    else {
+      setText('')
+      onSaid()
+    }
+  }
+
+  const actions: { label: string; onClick?: () => void; href?: string }[] =
+    place === 'champs'
+      ? [
+          ...(roles.includes('producteur') || roles.includes('admin_coop')
+            ? [{ label: '🌾 Proposer des travaux', onClick: onTeams }]
+            : []),
+          { label: '📒 Mon carnet', href: '/dashboard/carnet' },
+          { label: '🗺️ Mes parcelles', href: '/dashboard/parcelles' },
+        ]
+      : place === 'equipes'
+        ? [
+            ...(roles.includes('ouvrier')
+              ? [{ label: '🤝 Rejoindre une équipe', onClick: onTeams }]
+              : []),
+            ...(roles.includes('agronome')
+              ? [{ label: '📣 Recruter une équipe', onClick: onTeams }]
+              : []),
+            { label: '👀 Voir les équipes', onClick: onTeams },
+          ]
+        : place === 'marche'
+          ? [
+              { label: '📈 Tous les prix', href: '/marche' },
+              { label: '🛍️ AgriMarket', href: '/dashboard/agrimarket' },
+            ]
+          : place === 'cooperative'
+            ? [
+                { label: '🪪 Ma carte membre', href: '/dashboard/cards' },
+                { label: '💰 Cotisations', href: '/dashboard/cotisations' },
+                { label: '🏛️ Demander un accès', href: '/#acces' },
+              ]
+            : place === 'ecole'
+              ? [{ label: '🎓 AgriAcadémie', href: '/dashboard/academy' }]
+              : place === 'bureau'
+                ? [
+                    {
+                      label: roles.includes('operateur')
+                        ? '🧑‍💼 Mon espace opérateur'
+                        : '🧑‍💼 Devenir opérateur',
+                      href: '/operator',
+                    },
+                  ]
+                : [{ label: '✉️ Écrire à l’équipe', href: '/dashboard' }]
+
   return (
-    <div className="space-y-5">
-      <header className="space-y-1">
-        <p className="text-sm text-[#1F2A44]/70">
-          {here.canton.prefecture}, région {here.canton.region}
-        </p>
-        <h1 className="text-2xl font-bold text-[#1F2A44]">
-          {here.canton.canton}
-          {atHome && (
-            <span className="ml-2 rounded-full bg-[#E0B341]/30 px-2 text-sm font-medium">
-              chez moi
-            </span>
+    <Sheet
+      title={PLACES[place].label}
+      subtitle={`${here.canton.canton}, ${here.canton.prefecture}`}
+      onClose={onClose}
+    >
+      <ul className="mb-4 flex flex-wrap gap-2">
+        {actions.map((a) => (
+          <li key={a.label}>
+            {a.href ? (
+              <Link
+                href={a.href}
+                className="inline-block rounded-full bg-[#1F2A44]/5 px-3 py-2 text-sm font-medium"
+              >
+                {a.label}
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={a.onClick}
+                className="rounded-full bg-[#1F2A44]/5 px-3 py-2 text-sm font-medium"
+              >
+                {a.label}
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      {place === 'champs' && (
+        <ul className="mb-4 space-y-1 text-sm">
+          {works.length === 0 && (
+            <li className="text-[#1F2A44]/70">Aucun travail proposé pour l’instant.</li>
           )}
-        </h1>
-        {!atHome && world.me.home && (
-          <button
-            type="button"
-            onClick={onGoHome}
-            className="text-sm font-medium text-[#2F7D4F] underline"
-          >
-            Revenir chez moi, à {world.me.home.canton}
-          </button>
-        )}
-      </header>
-
-      <section aria-labelledby="hab-title" className="space-y-2">
-        <h2 id="hab-title" className="font-semibold text-[#1F2A44]">
-          {here.residents.length === 0
-            ? 'Personne ne s’est encore installé ici'
-            : `${here.residents.length} habitant${here.residents.length > 1 ? 's' : ''}`}
-        </h2>
-        {here.residents.length === 0 ? (
-          <p className="text-sm text-[#1F2A44]/70">
-            Les habitants sont les comptes qui ont choisi ce canton. Invitez vos voisins producteurs
-            et ouvriers.
-          </p>
-        ) : (
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {here.residents.map((r: Resident, i) => (
-              <li
-                key={`${r.display_name}-${i}`}
-                className={`flex items-center gap-3 rounded-2xl border p-3 ${
-                  r.is_me ? 'border-[#E0B341] bg-[#E0B341]/10' : 'border-[#1F2A44]/10 bg-white'
-                }`}
-              >
-                <Avatar name={r.display_name} pagne={r.pagne} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium text-[#1F2A44]">
-                    {r.display_name}
-                    {r.is_me && <span className="text-[#1F2A44]/60"> (moi)</span>}
-                  </span>
-                  <RoleChips roles={r.roles} />
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section aria-labelledby="lieux-title" className="space-y-2">
-        <h2 id="lieux-title" className="font-semibold text-[#1F2A44]">
-          Les lieux
-        </h2>
-        <ul className="space-y-2">
-          <Place
-            icon={Sprout}
-            title="Les champs"
-            summary={
-              works.length === 0
-                ? 'Aucun travail proposé pour l’instant'
-                : works.length === 1
-                  ? '1 travail proposé'
-                  : `${works.length} travaux proposés`
-            }
-            open={open === 'champs'}
-            onToggle={() => toggle('champs')}
-          >
-            <ul className="space-y-1">
-              {works.map((g) => (
-                <li key={g.id}>
-                  <strong>{g.title}</strong> — {groupLine(g)}
-                </li>
-              ))}
-            </ul>
-            {(roles.includes('producteur') || roles.includes('admin_coop')) && (
-              <button
-                type="button"
-                onClick={onOpenTeams}
-                className="mt-3 rounded-xl bg-[#2F7D4F] px-4 py-2 font-medium text-white"
-              >
-                Proposer des travaux sur mes parcelles
-              </button>
-            )}
-          </Place>
-          <Place
-            icon={Users}
-            title="La maison des équipes"
-            summary={
-              teams.length === 0
-                ? 'Aucune équipe en formation'
-                : `${teams.length} équipe${teams.length > 1 ? 's' : ''} en formation`
-            }
-            open={open === 'equipes'}
-            onToggle={() => toggle('equipes')}
-          >
-            <ul className="space-y-1">
-              {teams.map((g) => (
-                <li key={g.id}>
-                  <strong>{g.title}</strong> — {groupLine(g)}
-                </li>
-              ))}
-            </ul>
-            {(roles.includes('ouvrier') || roles.includes('agronome')) && (
-              <button
-                type="button"
-                onClick={onOpenTeams}
-                className="mt-3 rounded-xl bg-[#2F7D4F] px-4 py-2 font-medium text-white"
-              >
-                {roles.includes('agronome') ? 'Recruter une équipe' : 'Rejoindre une équipe'}
-              </button>
-            )}
-          </Place>
-          <Place
-            icon={Store}
-            title="Le marché"
-            summary={
-              here.market.length === 0
-                ? 'Pas de prix relevé ces 14 derniers jours dans la région'
-                : `${here.market[0].culture} à ${here.market[0].price} FCFA/${here.market[0].unit}${here.market.length > 1 ? `, et ${here.market.length - 1} autres` : ''}`
-            }
-            open={open === 'marche'}
-            onToggle={() => toggle('marche')}
-          >
+          {works.map((g) => (
+            <li key={g.id}>
+              <strong>{g.title}</strong> — {groupLine(g)}
+            </li>
+          ))}
+        </ul>
+      )}
+      {place === 'equipes' && (
+        <ul className="mb-4 space-y-1 text-sm">
+          {teams.length === 0 && <li className="text-[#1F2A44]/70">Aucune équipe en formation.</li>}
+          {teams.map((g) => (
+            <li key={g.id}>
+              <strong>{g.title}</strong> — {groupLine(g)}
+            </li>
+          ))}
+        </ul>
+      )}
+      {place === 'marche' && (
+        <div className="mb-4 text-sm">
+          {here.market.length === 0 ? (
+            <p className="text-[#1F2A44]/70">
+              Pas de prix relevé ces 14 derniers jours dans la région.
+            </p>
+          ) : (
             <ul className="divide-y divide-[#1F2A44]/10">
               {here.market.map((m) => (
                 <li key={m.culture} className="flex items-center justify-between py-1.5">
@@ -554,86 +534,418 @@ function Here({
                 </li>
               ))}
             </ul>
-            <Link href="/marche" className="mt-3 inline-block font-medium text-[#2F7D4F] underline">
-              Tous les prix du marché
-            </Link>
-          </Place>
-          <Place
-            icon={today && today.precipitation_probability >= 50 ? CloudRain : Sun}
-            title="Le ciel"
-            summary={
-              today
-                ? `Aujourd’hui ${Math.round(today.temperature_min)}–${Math.round(today.temperature_max)} °C, pluie ${Math.round(today.precipitation_probability)} %`
-                : 'Prévisions indisponibles pour le moment'
-            }
-            open={open === 'ciel'}
-            onToggle={() => toggle('ciel')}
-          >
-            <ul className="grid grid-cols-3 gap-2 text-center">
-              {here.sky.map((d) => (
-                <li key={d.date} className="rounded-xl bg-[#3B82B9]/10 p-2">
-                  <span className="block text-xs text-[#1F2A44]/70">{fmtDay(d.date)}</span>
-                  <span className="block font-semibold">
-                    {Math.round(d.temperature_min)}–{Math.round(d.temperature_max)} °C
-                  </span>
-                  <span className="block text-xs">
-                    pluie {Math.round(d.precipitation_probability)} %
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-2 text-xs text-[#1F2A44]/60">
-              Prévision régionale ({here.canton.region}), modèles Open-Meteo.
-            </p>
-          </Place>
-          <Place
-            icon={Warehouse}
-            title="Les coopératives"
-            summary={
-              here.cooperatives.length === 0
-                ? 'Aucune coopérative n’a encore de membre inscrit dans ce canton'
-                : here.cooperatives.map((c) => c.name).join(', ')
-            }
-            open={open === 'coops'}
-            onToggle={() => toggle('coops')}
-          >
-            <ul className="space-y-1">
-              {here.cooperatives.map((c) => (
-                <li key={c.id}>
-                  <strong>{c.name}</strong> · {c.members} membre{c.members > 1 ? 's' : ''} ici
-                </li>
-              ))}
-            </ul>
-            <p className="mt-2 text-sm text-[#1F2A44]/70">
-              Pas encore de coopérative ? Demandez un accès depuis la page d’accueil.
-            </p>
-          </Place>
-          <Place
-            icon={MapPin}
-            title="Le bureau de l’opérateur"
-            summary={
-              operators === 0
-                ? 'Aucun opérateur certifié installé ici'
-                : `${operators} opérateur${operators > 1 ? 's' : ''} de zone`
-            }
-            open={open === 'operateur'}
-            onToggle={() => toggle('operateur')}
-          >
-            <p>
-              L’opérateur de zone émet les cartes membres et accompagne les coopératives.{' '}
-              {roles.includes('operateur') ? (
-                <Link href="/operator" className="font-medium text-[#2F7D4F] underline">
-                  Ouvrir mon espace opérateur
-                </Link>
-              ) : (
-                <Link href="/operator" className="font-medium text-[#2F7D4F] underline">
-                  Devenir opérateur
-                </Link>
-              )}
-            </p>
-          </Place>
+          )}
+        </div>
+      )}
+      {place === 'cooperative' && (
+        <ul className="mb-4 space-y-1 text-sm">
+          {here.cooperatives.length === 0 && (
+            <li className="text-[#1F2A44]/70">
+              Aucune coopérative n’a encore de membre inscrit ici.
+            </li>
+          )}
+          {here.cooperatives.map((c) => (
+            <li key={c.id}>
+              <strong>{c.name}</strong> · {c.members} membre{c.members > 1 ? 's' : ''} dans ce
+              canton
+            </li>
+          ))}
         </ul>
-      </section>
+      )}
+      {place === 'bureau' && (
+        <p className="mb-4 text-sm">
+          {operators === 0
+            ? 'Aucun opérateur certifié installé ici. '
+            : `${operators} opérateur${operators > 1 ? 's' : ''} de zone ici. `}
+          L’opérateur émet les cartes membres et accompagne les coopératives.
+        </p>
+      )}
+      {place === 'place' && (
+        <div className="mb-4 space-y-3">
+          <div className="rounded-2xl bg-[#3B82B9]/10 p-3 text-sm">
+            {today ? (
+              <>
+                {today.precipitation_probability >= 50 ? '🌧️' : '☀️'} Aujourd’hui{' '}
+                {Math.round(today.temperature_min)}–{Math.round(today.temperature_max)} °C, pluie{' '}
+                {Math.round(today.precipitation_probability)} %
+                {here.sky.slice(1).map((d) => (
+                  <span key={d.date} className="block text-[#1F2A44]/70">
+                    {fmtDay(d.date)} : {Math.round(d.temperature_max)} °C, pluie{' '}
+                    {Math.round(d.precipitation_probability)} %
+                  </span>
+                ))}
+              </>
+            ) : (
+              'Prévisions indisponibles pour le moment.'
+            )}
+          </div>
+          <ul className="max-h-48 space-y-2 overflow-y-auto">
+            {here.messages.length === 0 && (
+              <li className="text-sm text-[#1F2A44]/70">
+                Personne n’a encore parlé ici. Dites bonjour.
+              </li>
+            )}
+            {here.messages.map((m) => (
+              <li key={m.id} className={`flex gap-2 ${m.is_me ? 'flex-row-reverse' : ''}`}>
+                <Avatar name={m.display_name} pagne={m.pagne} size={28} />
+                <span
+                  className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.is_me ? 'bg-[#2563eb] text-white' : 'bg-[#1F2A44]/5'}`}
+                >
+                  <span className="block text-xs opacity-70">
+                    {m.display_name} · {fmtTime(m.created_at)}
+                  </span>
+                  {m.body}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="flex flex-wrap gap-2">
+            {QUICK.map((q) => (
+              <button
+                key={q}
+                type="button"
+                disabled={busy || !world.me.home}
+                onClick={() => void say(q)}
+                className="rounded-full bg-[#1F2A44]/5 px-3 py-1.5 text-sm"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (text.trim()) void say(text)
+            }}
+          >
+            <input
+              className={field}
+              value={text}
+              maxLength={200}
+              disabled={!world.me.home}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={`Dire quelque chose aux ${here.residents.length} habitant${here.residents.length > 1 ? 's' : ''} ici…`}
+              aria-label="Message pour la place"
+            />
+            <button type="submit" disabled={busy || !text.trim()} className={primary}>
+              Dire
+            </button>
+          </form>
+          {error && (
+            <p role="alert" className="text-sm text-red-700">
+              {error}
+            </p>
+          )}
+        </div>
+      )}
+
+      <h3 className="mb-2 text-sm font-semibold text-[#1F2A44]">Ici maintenant</h3>
+      {people.length === 0 ? (
+        <p className="mb-4 text-sm text-[#1F2A44]/70">Personne pour l’instant.</p>
+      ) : (
+        <ul className="mb-4 flex flex-wrap gap-2">
+          {people.map((r, i) => (
+            <li
+              key={`${r.display_name}-${i}`}
+              className="flex items-center gap-2 rounded-full bg-[#1F2A44]/5 py-1 pr-3 pl-1"
+            >
+              <Avatar name={r.display_name} pagne={r.pagne} size={28} />
+              <span className="text-sm font-medium">{r.display_name}</span>
+              <RoleChips roles={r.roles} />
+            </li>
+          ))}
+        </ul>
+      )}
+      <button
+        type="button"
+        onClick={onGo}
+        disabled={myPlace === place}
+        className={`w-full ${primary}`}
+      >
+        {myPlace === place ? 'Vous êtes ici' : 'Y aller · à pied, gratuit'}
+      </button>
+    </Sheet>
+  )
+}
+
+export function TogoLife() {
+  const { user } = useAuth()
+  const [world, setWorld] = useState<World | null>(null)
+  const [status, setStatus] = useState<'loading' | 'ready' | 'unavailable' | 'error'>('loading')
+  const [canton, setCanton] = useState<string | null>(null)
+  const [tab, setTab] = useState<'maison' | 'village' | 'carte' | 'telephone' | 'equipes'>(
+    'village',
+  )
+  const [editingHome, setEditingHome] = useState(false)
+  const [myPlace, setMyPlace] = useState<PlaceKey>('place')
+  const [sheet, setSheet] = useState<PlaceKey | null>(null)
+  const [met, setMet] = useState<Resident | null>(null)
+
+  const load = useCallback(async (c: string | null) => {
+    const res = await fetch(`/api/haroolife/world${c ? `?canton=${c}` : ''}`, {
+      cache: 'no-store',
+    }).catch(() => null)
+    if (!res) return setStatus('error')
+    if (res.status === 503) return setStatus('unavailable')
+    if (!res.ok) return setStatus('error')
+    const w = (await res.json()) as World
+    setWorld(w)
+    setStatus('ready')
+  }, [])
+  useEffect(() => {
+    void load(canton)
+  }, [load, canton])
+  // Mon personnage se tient d'abord au lieu de mon rôle.
+  useEffect(() => {
+    if (world?.me.roles) setMyPlace(anchorFor(world.me.roles))
+  }, [world?.me.roles])
+  // Le village vit : rechargement léger toutes les 45 secondes.
+  useEffect(() => {
+    if (status !== 'ready') return
+    const timer = window.setInterval(() => void load(canton), 45_000)
+    return () => window.clearInterval(timer)
+  }, [status, load, canton])
+
+  if (status === 'unavailable')
+    return (
+      <p className="p-6 text-[#1F2A44]">
+        HarooLife est en préparation. Vos services habituels restent disponibles.
+      </p>
+    )
+  if (status === 'error')
+    return (
+      <p role="alert" className="p-6 text-[#1F2A44]">
+        Chargement impossible. Vérifiez votre connexion puis actualisez.
+      </p>
+    )
+  if (!world) return <p className="p-6 text-[#1F2A44]/70">Le territoire se prépare…</p>
+
+  const needsHome = !world.me.home
+  const defaultName = [user?.firstName, user?.lastName?.[0] ? `${user.lastName[0]}.` : '']
+    .filter(Boolean)
+    .join(' ')
+  const myName = world.me.display_name ?? defaultName ?? 'Habitant'
+  const myPagne = world.me.pagne ?? 1
+  const here = world.here
+  const today = here?.sky[0]
+  const atHome = !!here && world.me.home?.canton_id === here.canton.canton_id
+  const tabs = [
+    ['maison', 'Maison', Home],
+    ['village', 'Village', Trees],
+    ['carte', 'Carte', MapIcon],
+    ['telephone', 'Téléphone', Phone],
+  ] as const
+  const marketLine = here?.market[0]
+    ? `${here.market[0].culture} ${here.market[0].price} F/${here.market[0].unit}`
+    : null
+
+  return (
+    <div className="mx-auto max-w-3xl pb-24 text-[#1F2A44]">
+      <div className="sticky top-0 z-30 flex items-center gap-2 border-b border-[#1F2A44]/10 bg-[#FAFAF7]/95 px-3 py-2 text-sm backdrop-blur">
+        {today ? (
+          today.precipitation_probability >= 50 ? (
+            <CloudRain aria-hidden="true" className="h-4 w-4 text-[#3B82B9]" />
+          ) : (
+            <Sun aria-hidden="true" className="h-4 w-4 text-[#E0B341]" />
+          )
+        ) : null}
+        <span>
+          {new Date().toLocaleDateString('fr-FR', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+          })}
+          {today && (
+            <span className="text-[#1F2A44]/70"> · {Math.round(today.temperature_max)} °C</span>
+          )}
+        </span>
+        {here && (
+          <span className="rounded-full bg-[#2F7D4F]/10 px-2 py-0.5 text-xs font-medium text-[#1f5a38]">
+            {here.residents.length} habitant{here.residents.length > 1 ? 's' : ''} ·{' '}
+            {here.canton.canton}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => setEditingHome(true)}
+          className="ml-auto rounded-full"
+          aria-label="Ma maison et mon avatar"
+        >
+          <Avatar name={myName} pagne={myPagne} size={34} />
+        </button>
+      </div>
+
+      <main className={tab === 'village' ? 'py-2' : 'px-4 py-5'}>
+        {tab === 'maison' &&
+          (world.me.home ? (
+            <HomeRoom
+              name={myName}
+              pagne={myPagne}
+              roles={world.me.roles}
+              canton={world.me.home.canton}
+              onLeave={() => setTab('village')}
+              onEdit={() => setEditingHome(true)}
+            />
+          ) : (
+            <button type="button" onClick={() => setEditingHome(true)} className={primary}>
+              Choisir ma maison
+            </button>
+          ))}
+
+        {tab === 'village' &&
+          (here ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 px-4">
+                <h1 className="text-lg font-bold">
+                  {here.canton.canton}
+                  <span className="ml-2 text-sm font-normal text-[#1F2A44]/70">
+                    {here.canton.prefecture}, {here.canton.region}
+                  </span>
+                </h1>
+                {!atHome && world.me.home && (
+                  <button
+                    type="button"
+                    onClick={() => setCanton(null)}
+                    className="ml-auto text-sm font-medium text-[#2F7D4F] underline"
+                  >
+                    Rentrer à {world.me.home.canton}
+                  </button>
+                )}
+              </div>
+              <VillageIso
+                residents={here.residents}
+                messages={here.messages}
+                me={world.me.home ? { display_name: myName, pagne: myPagne } : null}
+                myPlace={myPlace}
+                sky={today}
+                marketLine={marketLine}
+                coopName={here.cooperatives[0]?.name ?? null}
+                onPlace={(p) => setSheet(p)}
+                onResident={(r) => setMet(r)}
+              />
+              {here.residents.length <= 1 && (
+                <p className="px-4 text-sm text-[#1F2A44]/70">
+                  Le village se remplit avec les comptes qui choisissent ce canton. Invitez vos
+                  voisins producteurs et ouvriers.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3 px-4">
+              <h1 className="text-2xl font-bold">Bienvenue sur le territoire</h1>
+              <p>Choisissez votre canton pour entrer dans votre village.</p>
+              <button type="button" onClick={() => setEditingHome(true)} className={primary}>
+                Choisir ma maison
+              </button>
+            </div>
+          ))}
+
+        {tab === 'carte' && (
+          <Explorer
+            world={world}
+            onVisit={(c) => {
+              setCanton(c)
+              setTab('village')
+            }}
+          />
+        )}
+
+        {tab === 'telephone' && (
+          <PhoneScreen
+            world={world}
+            onTeams={() => setTab('equipes')}
+            onMap={() => setTab('carte')}
+          />
+        )}
+
+        {tab === 'equipes' && (
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => setTab('village')}
+              className="text-sm font-medium text-[#2F7D4F] underline"
+            >
+              ← Retour au village
+            </button>
+            <HarooLifeWorkspace />
+          </div>
+        )}
+      </main>
+
+      <nav
+        aria-label="Navigation HarooLife"
+        className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-3xl justify-around border-t border-[#1F2A44]/10 bg-white py-2"
+      >
+        {tabs.map(([key, label, Icon]) => (
+          <button
+            key={key}
+            type="button"
+            aria-current={tab === key ? 'page' : undefined}
+            onClick={() => {
+              setTab(key)
+              setSheet(null)
+            }}
+            className={`flex flex-col items-center gap-0.5 rounded-xl px-4 py-1 text-xs ${tab === key ? 'bg-[#1F2A44] text-white' : 'text-[#1F2A44]/80'}`}
+          >
+            <Icon aria-hidden="true" className="h-5 w-5" />
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {sheet && here && (
+        <PlaceSheet
+          place={sheet}
+          world={world}
+          myPlace={myPlace}
+          onGo={() => {
+            setMyPlace(sheet)
+            setSheet(null)
+          }}
+          onClose={() => setSheet(null)}
+          onTeams={() => {
+            setSheet(null)
+            setTab('equipes')
+          }}
+          onSaid={() => void load(canton)}
+        />
+      )}
+      {met && (
+        <Sheet
+          title={met.display_name}
+          subtitle={met.roles.map((r) => ROLE_LABELS[r]).join(' · ')}
+          onClose={() => setMet(null)}
+        >
+          <div className="flex items-center gap-3">
+            <Avatar name={met.display_name} pagne={met.pagne} size={56} />
+            <p className="text-sm text-[#1F2A44]/70">
+              Habitant de {here?.canton.canton}. Pour lui parler, passez par la place du village.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setMet(null)
+              setSheet('place')
+            }}
+            className={`mt-4 w-full ${primary}`}
+          >
+            Aller sur la place
+          </button>
+        </Sheet>
+      )}
+      {(needsHome || editingHome) && (
+        <HomeDialog
+          world={world}
+          defaultName={defaultName || 'Habitant'}
+          onDone={() => {
+            setEditingHome(false)
+            void load(canton)
+          }}
+          onClose={needsHome ? undefined : () => setEditingHome(false)}
+        />
+      )}
     </div>
   )
 }
@@ -692,174 +1004,6 @@ function PhoneScreen({
           )
         })}
       </ul>
-    </div>
-  )
-}
-
-export function TogoLife() {
-  const { user } = useAuth()
-  const [world, setWorld] = useState<World | null>(null)
-  const [status, setStatus] = useState<'loading' | 'ready' | 'unavailable' | 'error'>('loading')
-  const [canton, setCanton] = useState<string | null>(null)
-  const [tab, setTab] = useState<'carte' | 'ici' | 'telephone' | 'equipes'>('ici')
-  const [editingHome, setEditingHome] = useState(false)
-
-  const load = useCallback(async (c: string | null) => {
-    const res = await fetch(`/api/haroolife/world${c ? `?canton=${c}` : ''}`, {
-      cache: 'no-store',
-    }).catch(() => null)
-    if (!res) return setStatus('error')
-    if (res.status === 503) return setStatus('unavailable')
-    if (!res.ok) return setStatus('error')
-    setWorld((await res.json()) as World)
-    setStatus('ready')
-  }, [])
-  useEffect(() => {
-    void load(canton)
-  }, [load, canton])
-
-  if (status === 'unavailable')
-    return (
-      <p className="p-6 text-[#1F2A44]">
-        HarooLife est en préparation. Vos services habituels restent disponibles.
-      </p>
-    )
-  if (status === 'error')
-    return (
-      <p role="alert" className="p-6 text-[#1F2A44]">
-        Chargement impossible. Vérifiez votre connexion puis actualisez.
-      </p>
-    )
-  if (!world) return <p className="p-6 text-[#1F2A44]/70">Le territoire se prépare…</p>
-
-  const needsHome = !world.me.home
-  const defaultName = [user?.firstName, user?.lastName?.[0] ? `${user.lastName[0]}.` : '']
-    .filter(Boolean)
-    .join(' ')
-  const today = world.here?.sky[0]
-  const tabs = [
-    ['carte', 'Carte', MapPin],
-    ['ici', 'Ici', Home],
-    ['telephone', 'Téléphone', Phone],
-  ] as const
-
-  return (
-    <div className="mx-auto max-w-3xl pb-24 text-[#1F2A44]">
-      <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-[#1F2A44]/10 bg-[#FAFAF7]/95 px-4 py-2 backdrop-blur">
-        <span className="text-sm">
-          {new Date().toLocaleDateString('fr-FR', {
-            weekday: 'short',
-            day: 'numeric',
-            month: 'short',
-          })}
-          {today && (
-            <span className="ml-2 text-[#1F2A44]/70">
-              · {Math.round(today.temperature_max)} °C, pluie{' '}
-              {Math.round(today.precipitation_probability)} %
-            </span>
-          )}
-        </span>
-        <button
-          type="button"
-          onClick={() => setEditingHome(true)}
-          className="ml-auto flex items-center gap-2 rounded-full pr-2 hover:bg-[#1F2A44]/5"
-          aria-label="Ma maison et mon avatar"
-        >
-          <Avatar
-            name={world.me.display_name ?? defaultName ?? '?'}
-            pagne={world.me.pagne ?? 1}
-            size={36}
-          />
-          <span className="hidden text-sm font-medium sm:inline">
-            {world.me.display_name ?? 'Ma maison'}
-          </span>
-        </button>
-      </div>
-
-      <main className="px-4 py-5">
-        {tab === 'carte' && (
-          <Explorer
-            world={world}
-            onVisit={(c) => {
-              setCanton(c)
-              setTab('ici')
-            }}
-          />
-        )}
-        {tab === 'ici' &&
-          (world.here ? (
-            <Here
-              world={world}
-              onOpenTeams={() => setTab('equipes')}
-              onGoHome={() => setCanton(null)}
-            />
-          ) : (
-            <div className="space-y-3">
-              <h1 className="text-2xl font-bold">Bienvenue sur le territoire</h1>
-              <p>
-                Choisissez votre canton pour voir vos voisins, les équipes, le marché et le ciel.
-              </p>
-              <button
-                type="button"
-                onClick={() => setEditingHome(true)}
-                className="rounded-xl bg-[#2F7D4F] px-4 py-3 font-semibold text-white"
-              >
-                Choisir ma maison
-              </button>
-            </div>
-          ))}
-        {tab === 'telephone' && (
-          <PhoneScreen
-            world={world}
-            onTeams={() => setTab('equipes')}
-            onMap={() => setTab('carte')}
-          />
-        )}
-        {tab === 'equipes' && (
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => setTab('ici')}
-              className="text-sm font-medium text-[#2F7D4F] underline"
-            >
-              ← Retour au canton
-            </button>
-            <HarooLifeWorkspace />
-          </div>
-        )}
-      </main>
-
-      <nav
-        aria-label="Navigation HarooLife"
-        className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-3xl justify-around border-t border-[#1F2A44]/10 bg-white py-2"
-      >
-        {tabs.map(([key, label, Icon]) => (
-          <button
-            key={key}
-            type="button"
-            aria-current={tab === key ? 'page' : undefined}
-            onClick={() => setTab(key)}
-            className={`flex flex-col items-center gap-0.5 rounded-xl px-5 py-1 text-xs ${
-              tab === key ? 'bg-[#1F2A44] text-white' : 'text-[#1F2A44]/80'
-            }`}
-          >
-            <Icon aria-hidden="true" className="h-5 w-5" />
-            {label}
-          </button>
-        ))}
-      </nav>
-
-      {(needsHome || editingHome) && (
-        <HomeDialog
-          world={world}
-          defaultName={defaultName || 'Habitant'}
-          onDone={() => {
-            setEditingHome(false)
-            void load(canton)
-          }}
-          onClose={needsHome ? undefined : () => setEditingHome(false)}
-        />
-      )}
     </div>
   )
 }
