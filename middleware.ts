@@ -1,3 +1,4 @@
+import { redirectProductionVercelHost } from '@/lib/routing/vercel-canonical-host'
 import { createServerClient } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
 
@@ -17,12 +18,10 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const hostname = request.headers.get('host') ?? ''
 
-  // Domain redirect: force all Vercel preview/production URLs to www.faitierehub.com
-  const isVercelDomain =
-    hostname.endsWith('.vercel.app') || hostname === 'saas-one-teal-62.vercel.app'
-  const isProductionDomain = hostname === 'www.faitierehub.com' || hostname === 'faitierehub.com'
-
-  if (isVercelDomain && !isProductionDomain) {
+  // Production Vercel aliases use the canonical domain, but previews must
+  // stay on their own URL; otherwise new routes resolve on the old live site (404).
+  // NODE_ENV cannot distinguish these because all Vercel builds use production mode.
+  if (redirectProductionVercelHost(hostname, process.env.VERCEL_ENV)) {
     const url = new URL(request.url)
     url.hostname = 'www.faitierehub.com'
     url.port = ''
