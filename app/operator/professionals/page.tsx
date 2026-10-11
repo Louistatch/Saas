@@ -14,6 +14,7 @@
  */
 
 import { ProtectedRoute } from '@/app/components/protected-route'
+import { useAuth } from '@/app/context/auth-context'
 import { ConsoleApp } from '@/components/operator/console-app'
 import { DossierDocuments } from '@/components/professionals/dossier-documents'
 import { RegisterProfessionalForm } from '@/components/professionals/register-form'
@@ -195,6 +196,8 @@ function DossierCard({ dossier, onDone }: { dossier: Dossier; onDone: () => void
 }
 
 function ProfessionalsContent() {
+  const { user } = useAuth()
+  const isSuperAdmin = user?.role === 'super_admin'
   const [tab, setTab] = useState<DossierStatus>('EN_ATTENTE')
   const [dossiers, setDossiers] = useState<Dossier[]>([])
   const [canValidate, setCanValidate] = useState(true)
@@ -230,8 +233,9 @@ function ProfessionalsContent() {
       <header className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-6">
         <Logo size="md" />
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/operator">
-            <ArrowLeft className="mr-1.5 h-4 w-4" /> Espace Opérateur
+          <Link href={isSuperAdmin ? '/admin' : '/operator'}>
+            <ArrowLeft className="mr-1.5 h-4 w-4" />{' '}
+            {isSuperAdmin ? 'Administration' : 'Espace Opérateur'}
           </Link>
         </Button>
       </header>

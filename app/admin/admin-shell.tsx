@@ -10,8 +10,8 @@ import {
   Briefcase,
   Building2,
   Coins,
-  CreditCard,
   Cpu,
+  CreditCard,
   FileText,
   GraduationCap,
   LayoutDashboard,
@@ -20,6 +20,7 @@ import {
   Menu,
   Settings,
   TrendingUp,
+  UserCheck,
   Users,
   Users2,
   X,
@@ -30,6 +31,8 @@ import { useEffect, useState } from 'react'
 
 const ADMIN_LINKS = [
   { href: '/admin', label: "Vue d'ensemble", icon: TrendingUp },
+  // Le super_admin instruit aussi les dossiers, comme un opérateur officier (console installable).
+  { href: '/operator/professionals', label: 'Dossiers à valider', icon: UserCheck },
   { href: '/admin/cooperatives', label: 'Coopératives', icon: Building2 },
   { href: '/admin/users', label: 'Utilisateurs', icon: Users },
   { href: '/admin/haroo', label: 'Professionnels Haroo', icon: Briefcase },
@@ -55,6 +58,17 @@ const ADMIN_LINKS = [
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [pending, setPending] = useState(0)
+
+  // Compteur des dossiers à valider (même périmètre que la console).
+  useEffect(() => {
+    fetch('/api/admin/activity', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { dossiers?: { pending?: number } | null } | null) =>
+        setPending(d?.dossiers?.pending ?? 0),
+      )
+      .catch(() => undefined)
+  }, [])
 
   // Fermer le tiroir mobile à l'échappement — l'arrière-plan lui-même n'est
   // jamais une cible clavier légitime (un utilisateur au clavier ne peut de
@@ -98,6 +112,14 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               >
                 <Icon className="h-5 w-5" />
                 {link.label}
+                {link.href === '/operator/professionals' && pending > 0 && (
+                  <span
+                    className="ml-auto rounded-full bg-red-600 px-2 py-0.5 text-xs font-semibold text-white"
+                    aria-label={`${pending} dossier(s) en attente`}
+                  >
+                    {pending}
+                  </span>
+                )}
               </Link>
             )
           })}
