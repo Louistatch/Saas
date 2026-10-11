@@ -3,6 +3,7 @@
 import {
   BUILDING_TYPES, CATALOG, capacity, count, decodeCity, goal, initialCity,
   isConnected, place, removeBuilding, tick, workforce,
+  cityWarning, nextObjective, emergencyRelief,
   type BuildType, type City,
 } from '@/lib/haroolife/townsmen-engine'
 import { CityIsometricCanvas } from './city-isometric-canvas'
@@ -42,6 +43,7 @@ export function CityBuilder(){
   const [tutorial,setTutorial]=useState(true)
   const achievement=useMemo(()=>goal(city),[city])
   const workers=useMemo(()=>workforce(city),[city])
+  const warning=useMemo(()=>cityWarning(city),[city])
   const selected=selection?city.buildings.find(b=>b.x===selection.x&&b.y===selection.y):null
 
   useEffect(()=>{
@@ -59,10 +61,19 @@ export function CityBuilder(){
     try{localStorage.setItem(STORAGE,JSON.stringify(city))}catch{/* storage is optional */}
   },[city,loaded])
   useEffect(()=>{
-    if(!speed||!loaded)return
+    if (!speed || !loaded) return
     const id=window.setInterval(()=>setCity(current=>tick(current)),speed===1?1700:560)
     return()=>window.clearInterval(id)
   },[speed,loaded])
+  useEffect(()=>{
+    if (!loaded) return
+    if (warning.kind!=='healthy') setSpeed(0)
+  },[loaded,warning.kind])
+  useEffect(()=>{
+    const pause=()=>{if(document.visibilityState==='hidden')setSpeed(0)}
+    document.addEventListener('visibilitychange',pause)
+    return()=>document.removeEventListener('visibilitychange',pause)
+  },[])
 
   function onTile(x:number,y:number){
     setSelection({x,y})
@@ -80,6 +91,13 @@ export function CityBuilder(){
     const result=place(city,x,y,tool)
     setCity(result.city)
     setMessage(result.error??CATALOG[tool].label+' construit !')
+  }
+  function requestRelief(){
+    setSpeed(0)
+    const result=emergencyRelief(city)
+    if(result.error){setMessage(result.error);return}
+    setCity(result.city)
+    setMessage('Soutien reçu : vous avez du temps pour construire vos bâtiments de production.')
   }
   function restart(){
     if(!window.confirm('Recommencer la ville ? Votre sauvegarde locale sera remplacée.'))return
@@ -118,6 +136,26 @@ export function CityBuilder(){
             <button type="button" onClick={()=>setTutorial(false)} className="absolute right-3 top-3" aria-label="Fermer le tutoriel"><X className="h-4 w-4"/></button>
             <p className="pr-8 font-bold">Objectif : du petit village à une ville prospère</p>
             <p className="mt-1">Construis des <strong>routes</strong> et connecte un <strong>champ de maïs → moulin → boulangerie</strong>. Ajoute des maisons, un puits et un marché ; embauche suffisamment d'habitants pour faire fonctionner la ville. Les bâtiments non reliés aux routes ne produisent rien.</p>
+            <p className="mt-2 rounded-lg bg-white/90 px-3 py-2 font-semibold text-emerald-950">Prochaine action : {nextObjective(city)}</p>
+          </section>
+        )}
+
+        {warning.kind!=='healthy'&&(
+          <section role="alert" className={warning.kind==='critical'
+            ? 'flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-red-400 bg-red-50 px-4 py-3 text-red-950'
+            : 'flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-amber-400 bg-amber-50 px-4 py-3 text-amber-950'}>
+            <div>
+              <p className="font-black">{warning.kind==='critical'?'Ville en crise — temps mis en pause':'Attention aux réserves — temps mis en pause'}</p>
+              <p className="text-sm">{warning.message}</p>
+              <p className="mt-1 text-xs font-semibold">{nextObjective(city)}</p>
+            </div>
+            {!city.reliefUsed&&(
+              <button type="button" onClick={requestRelief}
+                className="rounded-lg bg-emerald-800 px-4 py-3 text-sm font-extrabold text-white hover:bg-emerald-700">
+                Recevoir un secours exceptionnel
+              </button>
+            )}
+            {city.reliefUsed&&<span className="text-xs font-semibold">Secours déjà utilisé pour cette partie.</span>}
           </section>
         )}
 
@@ -136,7 +174,7 @@ export function CityBuilder(){
                     {value:1 as const,label:'1×',icon:Play},
                     {value:3 as const,label:'3×',icon:Play},
                   ]).map(({value,label,icon:Icon})=>(
-                    <button key={value} type="button" title={label} aria-pressed={speed===value} onClick={()=>setSpeed(value)}
+                    <button key={value} type="button" title={label} aria-pressed={speed===value} onClick={()=>{if(value!==0 && warning.kind!=='healthy'){setMessage('Résolvez la pénurie avant de reprendre le temps.');return}setSpeed(value)}}
                       className={speed===value?'rounded-md bg-emerald-800 px-3 py-2 text-xs font-bold text-white':'rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs font-bold hover:bg-emerald-50'}>
                       {label==='Pause'?<Icon className="inline h-4 w-4"/>:label}
                     </button>
