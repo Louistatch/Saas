@@ -14,6 +14,12 @@ function Citizen({position,scale=0.85}:{position:[number,number,number];scale?:n
   if(!asset)return null
   return <Entity position={position} scale={[scale,scale,scale]} rotation={[0,125,0]}><Gltf asset={asset}/></Entity>
 }
+/** Real open-source 3D furniture assets, not polygon placeholders. */
+function Furniture({name,position,scale=1,rotation=0}:{name:string;position:[number,number,number];scale?:number;rotation?:number}){
+  const {asset}=useModel(BASE+'furniture-kit/'+name+'.glb')
+  if(!asset)return null
+  return <Entity position={position} rotation={[0,rotation,0]} scale={[scale,scale,scale]}><Gltf asset={asset}/></Entity>
+}
 function Block({position,scale,material,rotation}:{position:[number,number,number];scale:[number,number,number];material:ReturnType<typeof useMaterial>;rotation?:[number,number,number]}){
   return <Entity position={position} scale={scale} rotation={rotation}><Render type="box" material={material}/></Entity>
 }
@@ -57,6 +63,12 @@ export default function LomeLifeRoom3D({venue,angle=45}:{venue:Venue;angle?:numb
       <Block position={[-1.0,1.2,1.55]} scale={[2.2,0.7,0.25]} material={seat}/>
       <Block position={[1.2,0.62,1.2]} scale={[1.5,0.22,1.3]} material={furniture}/>
       <Block position={[1.2,0.32,1.2]} scale={[0.24,0.5,0.24]} material={shadow}/>
+      <Furniture name="bedsingle" position={[2.35,0.18,-2.0]} scale={1.13} rotation={90}/>
+      <Furniture name="loungesofa" position={[-0.95,0.09,1.2]} scale={1.3} rotation={180}/>
+      <Furniture name="kitchenfridgesmall" position={[-3.3,0.12,-2.8]} scale={1.1}/>
+      <Furniture name="kitchenstove" position={[-2.15,0.12,-3.1]} scale={1.05}/>
+      <Furniture name="televisionmodern" position={[1.2,0.85,-3.45]} scale={0.9}/>
+      <Furniture name="pottedplant" position={[3.65,0.15,2.7]} scale={1.4}/>
     </>:venue==='market'||venue==='bakery'?<>
       {/* Open shop with counter, shelves and colorful products. */}
       <Block position={[0.3,0.85,-1.4]} scale={[5.8,1.45,0.85]} material={furniture}/>
@@ -70,12 +82,17 @@ export default function LomeLifeRoom3D({venue,angle=45}:{venue:Venue;angle?:numb
       <Block position={[-2.2,0.75,2.1]} scale={[1.4,0.26,1.25]} material={furniture}/>
       <Block position={[-2.2,0.42,2.1]} scale={[0.2,0.65,0.2]} material={shadow}/>
       <Citizen position={[-1.6,0.1,-2.3]} scale={0.78}/>
+      <Furniture name="table" position={[-2.2,0.1,2.2]} scale={1.1}/>
+      <Furniture name="chair" position={[-1.5,0.1,2.8]} scale={1} rotation={145}/>
+      <Furniture name="pottedplant" position={[-3.6,0.08,-3.1]} scale={1.35}/>
     </>:venue==='hall'?<>
       <Block position={[0,0.78,-1.8]} scale={[4.2,0.3,1.5]} material={furniture}/>
       <Block position={[-1.6,0.38,-1.8]} scale={[0.28,0.65,0.3]} material={shadow}/>
       <Block position={[1.6,0.38,-1.8]} scale={[0.28,0.65,0.3]} material={shadow}/>
       <Block position={[0,1.65,-1.8]} scale={[1.2,0.14,0.85]} material={fabric}/>
       <Citizen position={[0.8,0,-2.5]} scale={0.75}/>
+      <Furniture name="table" position={[0,0.1,-1.8]} scale={1.5}/>
+      <Furniture name="chair" position={[0.8,0.1,-2.8]} scale={1.1} rotation={90}/>
     </>:<>
       <Block position={[0,0.55,0]} scale={[2.4,0.8,2.4]} material={green}/>
       <Block position={[0,1.0,0]} scale={[2.0,0.15,2.0]} material={fabric}/>
