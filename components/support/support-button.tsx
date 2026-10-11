@@ -8,6 +8,7 @@ import { ReplyBox, Thread, type ThreadReply, postReply } from '@/components/supp
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { SUPPORT_CATEGORIES, type SupportCategory, messageCategoryLabel } from '@/lib/support'
 import { ChevronLeft, MessageCircle } from 'lucide-react'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -44,6 +45,22 @@ export function SupportButton() {
   const [unread, setUnread] = useState(0)
   const [openId, setOpenId] = useState<string | null>(null)
   const enabled = !!user && user.role !== 'super_admin'
+  const isSuperAdmin = user?.role === 'super_admin'
+  const [inboxCount, setInboxCount] = useState(0)
+
+  // Le super_admin reçoit les messages : son bouton ouvre la messagerie, avec les messages en attente.
+  useEffect(() => {
+    if (!isSuperAdmin) return
+    const load = async () => {
+      const res = await fetch('/api/admin/messages?status=nouveau', { cache: 'no-store' }).catch(
+        () => null,
+      )
+      if (res?.ok) setInboxCount(((await res.json()) as { messages: unknown[] }).messages.length)
+    }
+    void load()
+    const timer = window.setInterval(() => void load(), 120_000)
+    return () => window.clearInterval(timer)
+  }, [isSuperAdmin])
 
   const loadThreads = useCallback(async () => {
     const res = await fetch('/api/support/threads', { cache: 'no-store' }).catch(() => null)
@@ -61,7 +78,24 @@ export function SupportButton() {
     return () => window.clearInterval(timer)
   }, [enabled, loadThreads])
 
-  // Le super_admin reçoit ces messages : pas de bouton pour s'écrire à lui-même.
+  if (isSuperAdmin && !pathname.startsWith('/admin')) {
+    return (
+      <Link
+        href="/admin/messages"
+        className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 print:hidden"
+      >
+        <MessageCircle aria-hidden="true" className="h-5 w-5" />
+        Messagerie
+        {inboxCount > 0 && (
+          <span className="ml-1 inline-flex min-w-6 items-center justify-center rounded-full bg-amber-400 px-1.5 text-xs font-bold text-amber-950">
+            {inboxCount}
+            <span className="sr-only"> message{inboxCount > 1 ? 's' : ''} à traiter</span>
+          </span>
+        )}
+      </Link>
+    )
+  }
+  // Le super_admin ne s'écrit pas à lui-même.
   if (!enabled) return null
 
   function openButton() {

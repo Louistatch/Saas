@@ -1,9 +1,12 @@
 'use client'
 
+import { ProtectedRoute } from '@/app/components/protected-route'
+import { useAuth } from '@/app/context/auth-context'
+import { useCooperative } from '@/app/context/cooperative-context'
+import { Logo } from '@/components/shared/logo'
+import { NotificationBell } from '@/components/shared/notification-bell'
+import { ServiceLauncher } from '@/components/shared/service-launcher'
 import { SupportButton } from '@/components/support/support-button'
-import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import {
   Select,
   SelectContent,
@@ -11,39 +14,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  BarChart3,
-  ShoppingCart,
-  ShoppingBag,
-  BookOpen,
-  Handshake,
-  Map as MapIcon,
-  GraduationCap,
-  Users,
-  Settings,
-  LogOut,
-  Menu,
-  Home,
-  Leaf,
-  FolderOpen,
-  Zap,
-  Shield,
-  Smartphone,
-  Banknote,
-  Code,
-  PhoneCall,
-  IdCard,
-  ChevronDown,
-} from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { Logo } from '@/components/shared/logo'
-import { useAuth } from '@/app/context/auth-context'
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { performLogout } from '@/lib/auth/logout'
-import { isHarooRole, hasOrgLayer } from '@/lib/utils/permissions'
-import { useCooperative } from '@/app/context/cooperative-context'
-import { ProtectedRoute } from '@/app/components/protected-route'
-import { NotificationBell } from '@/components/shared/notification-bell'
-import { ServiceLauncher } from '@/components/shared/service-launcher'
+import { hasOrgLayer, isHarooRole } from '@/lib/utils/permissions'
+import {
+  Banknote,
+  BarChart3,
+  BookOpen,
+  ChevronDown,
+  Code,
+  FolderOpen,
+  GraduationCap,
+  Handshake,
+  Home,
+  IdCard,
+  Leaf,
+  LogOut,
+  Map as MapIcon,
+  Menu,
+  PhoneCall,
+  Settings,
+  Shield,
+  ShoppingBag,
+  ShoppingCart,
+  Smartphone,
+  Users,
+  Zap,
+} from 'lucide-react'
+import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 
 interface NavItem {
   href: string
@@ -158,7 +158,7 @@ const NAV_SECTIONS: NavSection[] = [
         href: '/dashboard/templates',
         label: 'Modèles',
         icon: FolderOpen,
-        roles: ['super_admin', 'cooperative_admin'],
+        roles: ['super_admin'],
       },
       {
         href: '/dashboard/techniciens',
@@ -201,7 +201,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
   const { user } = useAuth()
-  const { currentCooperative, cooperatives, switchCooperative } = useCooperative()
+  const { currentCooperative, cooperatives, switchCooperative, refreshCooperatives } =
+    useCooperative()
   const [gestionOpen, setGestionOpen] = useState(false)
 
   // Un compte peut porter les deux couches : on ne renvoie vers /haroo que
@@ -264,7 +265,14 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         )}
         {/* Cooperative switcher for super_admin */}
         {user?.role === 'super_admin' && cooperatives.length > 1 && (
-          <Select value={currentCooperative?.id || ''} onValueChange={switchCooperative}>
+          <Select
+            value={currentCooperative?.id || ''}
+            onValueChange={switchCooperative}
+            onOpenChange={(open) => {
+              // Une organisation créée depuis l'admin apparaît sans recharger la page.
+              if (open) void refreshCooperatives()
+            }}
+          >
             <SelectTrigger className="mt-2 h-7 text-xs">
               <SelectValue placeholder="Choisir une coopérative" />
             </SelectTrigger>
@@ -377,7 +385,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { currentCooperative, cooperatives, switchCooperative } = useCooperative()
+  const { currentCooperative, cooperatives, switchCooperative, refreshCooperatives } =
+    useCooperative()
   const { user } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -427,7 +436,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* Right: cooperative switcher + notification bell */}
             <div className="flex items-center gap-2">
               {user?.role === 'super_admin' && cooperatives.length > 1 && (
-                <Select value={currentCooperative?.id || ''} onValueChange={switchCooperative}>
+                <Select
+                  value={currentCooperative?.id || ''}
+                  onValueChange={switchCooperative}
+                  onOpenChange={(open) => {
+                    // Une organisation créée depuis l'admin apparaît sans recharger la page.
+                    if (open) void refreshCooperatives()
+                  }}
+                >
                   <SelectTrigger className="hidden md:flex h-8 text-xs w-44">
                     <SelectValue placeholder="Coopérative" />
                   </SelectTrigger>

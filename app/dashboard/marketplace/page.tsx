@@ -1,24 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useAuth } from '@/app/context/auth-context'
+import { useCooperative } from '@/app/context/cooperative-context'
+import { useConfirm } from '@/components/shared/confirm-dialog'
+import { EmptyState } from '@/components/shared/empty-state'
+import { LoadingBlock, Spinner } from '@/components/shared/loading'
+import { PageHeader } from '@/components/shared/page-header'
+import { PaginationBar } from '@/components/shared/pagination'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Plus,
-  Upload,
-  Search,
-  FileText,
-  Download,
-  Trash2,
-  Eye,
-  EyeOff,
-  ChevronDown,
-  ChevronRight,
-  MapPin,
-  List,
-} from 'lucide-react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -27,24 +17,34 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { createClient } from '@/lib/supabase/client'
-import { useCooperative } from '@/app/context/cooperative-context'
-import { useAuth } from '@/app/context/auth-context'
-import { useToast } from '@/hooks/use-toast'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { useCascadingLocations } from '@/hooks/use-cascading-locations'
 import { useDebounced } from '@/hooks/use-debounced'
-import { LoadingBlock, Spinner } from '@/components/shared/loading'
-import { EmptyState } from '@/components/shared/empty-state'
-import { PageHeader } from '@/components/shared/page-header'
-import { PaginationBar } from '@/components/shared/pagination'
-import { useConfirm } from '@/components/shared/confirm-dialog'
+import { useResetPageOnChange } from '@/hooks/use-reset-page'
+import { useToast } from '@/hooks/use-toast'
 import {
-  TYPE_AGRICULTURE_KEYS,
   TYPES_AGRICULTURE as TYPES_AGRICULTURE_LABELS,
+  TYPE_AGRICULTURE_KEYS,
   labelTypeAgriculture,
 } from '@/lib/fiches/types'
+import { createClient } from '@/lib/supabase/client'
 import { errorMessage } from '@/lib/utils/errors'
-import { useCascadingLocations } from '@/hooks/use-cascading-locations'
-import { useResetPageOnChange } from '@/hooks/use-reset-page'
+import {
+  ChevronDown,
+  ChevronRight,
+  Download,
+  Eye,
+  EyeOff,
+  FileText,
+  List,
+  MapPin,
+  Plus,
+  Search,
+  Trash2,
+  Upload,
+} from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 interface FicheTechnique {
   id: string
@@ -365,10 +365,11 @@ export default function MarketplacePage() {
       })
       return
     }
-    if (user?.role !== 'super_admin' && currentCooperative.level !== 'faitiere') {
+    // Les comptes d'exploitation sont publiés par les opérateurs (et le super-administrateur).
+    if (user?.role !== 'super_admin') {
       toast({
         title: 'Accès refusé',
-        description: 'Seules les faîtières peuvent uploader des fiches',
+        description: 'Les comptes d’exploitation sont publiés par l’opérateur de votre zone.',
         variant: 'destructive',
       })
       return
@@ -502,7 +503,7 @@ export default function MarketplacePage() {
     if (viewMode === 'locality') fetchLocalityFiches()
   }
 
-  const isAdmin = user?.role === 'super_admin' || currentCooperative?.level === 'faitiere'
+  const isAdmin = user?.role === 'super_admin'
 
   return (
     <div className="space-y-8">
@@ -744,7 +745,8 @@ export default function MarketplacePage() {
                                                       )}
                                                     </div>
                                                     <p className="text-xs text-muted-foreground mt-0.5">
-                                                      {fiche.culture} · {labelTypeAgriculture(fiche.type_agriculture)}
+                                                      {fiche.culture} ·{' '}
+                                                      {labelTypeAgriculture(fiche.type_agriculture)}
                                                       {fiche.campaign
                                                         ? ` · Campagne ${fiche.campaign}`
                                                         : ''}
