@@ -1,8 +1,8 @@
-import type { Metadata } from 'next'
-import Link from 'next/link'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
 import { Button } from '@/components/ui/button'
-import { Building2, Headphones, Clock, Puzzle, GraduationCap, ArrowRight } from 'lucide-react'
+import { ArrowRight, Building2, Clock, GraduationCap, Headphones, Puzzle } from 'lucide-react'
+import type { Metadata } from 'next'
+import Link from 'next/link'
 
 export const metadata: Metadata = {
   title: 'Entreprise — FaîtiereHub | Solutions pour grandes faîtières et fédérations',
@@ -21,7 +21,7 @@ const enterpriseFeatures = [
     icon: Clock,
     title: 'SLA garanti',
     description:
-      'Accord de niveau de service avec garantie de disponibilité de 99,9%. Monitoring proactif, alertes en temps réel et résolution prioritaire des incidents.',
+      'Accord de niveau de service défini au contrat. Supervision des erreurs, alertes et traitement prioritaire des incidents.',
   },
   {
     icon: Building2,
@@ -54,8 +54,9 @@ export default function EntreprisePage() {
             Pour les grandes faîtières et fédérations
           </h1>
           <p className="mt-6 text-lg text-muted-foreground">
-            Vous gérez des milliers de membres répartis sur plusieurs régions ? FaîtiereHub Entreprise
-            vous offre la puissance, la flexibilité et l&apos;accompagnement dont vous avez besoin.
+            Vous gérez des milliers de membres répartis sur plusieurs régions ? FaîtiereHub
+            Entreprise vous offre la puissance, la flexibilité et l&apos;accompagnement dont vous
+            avez besoin.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-4">
             <Link href="/contact">
@@ -102,9 +103,9 @@ export default function EntreprisePage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-8 md:grid-cols-3 text-center">
             {[
-              { value: '10 000+', label: 'Membres gérés' },
-              { value: '99,9%', label: 'Disponibilité garantie' },
-              { value: '< 2h', label: 'Temps de réponse support' },
+              { value: '3 niveaux', label: 'Faîtière, union, coopérative' },
+              { value: 'QR', label: 'Cartes membres vérifiables sur le terrain' },
+              { value: 'Isolées', label: 'Données propres à chaque organisation' },
             ].map((stat) => (
               <div key={stat.label} className="space-y-2">
                 <p className="text-4xl font-bold text-primary">{stat.value}</p>
@@ -118,9 +119,7 @@ export default function EntreprisePage() {
       {/* CTA */}
       <section className="bg-primary/5 py-20">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-foreground">
-            Discutons de vos besoins
-          </h2>
+          <h2 className="text-3xl font-bold text-foreground">Discutons de vos besoins</h2>
           <p className="mt-4 text-lg text-muted-foreground">
             Notre équipe est prête à vous accompagner dans la digitalisation de votre faîtière.
             Contactez-nous pour une démonstration personnalisée.

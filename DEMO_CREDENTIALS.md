@@ -8,14 +8,14 @@ All demo accounts are configured in your Supabase project. Use these credentials
 
 ### Super Admin
 - **Email**: `admin@demo.local`
-- **Password**: `Demo123!SuperAdmin`
+- **Password**: `<secret retiré — voir gestionnaire de mots de passe>`
 - **Role**: super_admin
 - **Access**: Full platform access, manage all cooperatives
 - **Features**: Admin dashboard, user management, analytics, settings
 
 ### Cooperative Admin - Nord
 - **Email**: `coop-admin@demo.local`
-- **Password**: `Demo123!CoopAdmin`
+- **Password**: `<secret retiré — voir gestionnaire de mots de passe>`
 - **Role**: cooperative_admin
 - **Cooperative**: Coopérative du Nord
 - **Access**: Full access to Coopérative du Nord
@@ -23,7 +23,7 @@ All demo accounts are configured in your Supabase project. Use these credentials
 
 ### Cooperative Admin - Fermes
 - **Email**: `fermes-admin@demo.local`
-- **Password**: `Demo123!FarmesAdmin`
+- **Password**: `<secret retiré — voir gestionnaire de mots de passe>`
 - **Role**: cooperative_admin
 - **Cooperative**: Fermes Unies
 - **Access**: Full access to Fermes Unies
@@ -31,7 +31,7 @@ All demo accounts are configured in your Supabase project. Use these credentials
 
 ### Member - Nord
 - **Email**: `member1@demo.local`
-- **Password**: `Demo123!Member1`
+- **Password**: `<secret retiré — voir gestionnaire de mots de passe>`
 - **Role**: member
 - **Cooperative**: Coopérative du Nord
 - **Access**: Member features, marketplace, cards
@@ -39,7 +39,7 @@ All demo accounts are configured in your Supabase project. Use these credentials
 
 ### Member - Fermes
 - **Email**: `member2@demo.local`
-- **Password**: `Demo123!Member2`
+- **Password**: `<secret retiré — voir gestionnaire de mots de passe>`
 - **Role**: member
 - **Cooperative**: Fermes Unies
 - **Access**: Member features, marketplace, cards
@@ -47,7 +47,7 @@ All demo accounts are configured in your Supabase project. Use these credentials
 
 ### Guest
 - **Email**: `guest@demo.local`
-- **Password**: `Demo123!Guest`
+- **Password**: `<secret retiré — voir gestionnaire de mots de passe>`
 - **Role**: guest
 - **Cooperative**: None
 - **Access**: Public marketplace only
@@ -110,12 +110,12 @@ All demo accounts are configured in your Supabase project. Use these credentials
 All demo passwords follow this pattern:
 - Contains uppercase, lowercase, and numbers
 - 12+ characters for security
-- Format: `Demo123!{RoleDescription}`
+- Format: `<secret retiré — voir gestionnaire de mots de passe>{RoleDescription}`
 
 Examples:
-- `Demo123!SuperAdmin` (12 chars)
-- `Demo123!CoopAdmin` (12 chars)
-- `Demo123!Member1` (14 chars)
+- `<secret retiré — voir gestionnaire de mots de passe>` (12 chars)
+- `<secret retiré — voir gestionnaire de mots de passe>` (12 chars)
+- `<secret retiré — voir gestionnaire de mots de passe>` (14 chars)
 
 ## 📝 Creating Additional Test Accounts
 

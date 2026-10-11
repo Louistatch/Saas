@@ -50,6 +50,9 @@ jobs:
       - name: Isolation et reprise des traitements (PostgreSQL local)
         run: npm run test:hardening
 
+      - name: Tests unitaires (règles métier, dédoublonnage, HarooLife)
+        run: npm run test:unit
+
       - name: Contrôles de sécurité
         run: npm run security:check -- --static
 

@@ -79,11 +79,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   let userId = request_.existingUserId
   let created = false
   if (!userId) {
+    // Égalité exacte (ilike traitait « _ » et « % » comme des jokers) et e-mail confirmé :
+    // sinon un compte créé au nom du contact avant l'approbation recevrait l'organisation.
     const { data: existing } = await admin
       .from('profiles')
       .select('id')
-      .ilike('email', input.email)
+      .eq('email', input.email.trim().toLowerCase())
       .maybeSingle()
+    if (existing?.id) {
+      const { data: authUser } = await admin.auth.admin.getUserById(existing.id)
+      if (!authUser.user?.email_confirmed_at) {
+        return NextResponse.json(
+          {
+            error:
+              'Un compte existe déjà avec cet e-mail mais son adresse n’est pas confirmée : vérifiez son identité avant de lui confier l’organisation.',
+          },
+          { status: 409 },
+        )
+      }
+    }
     userId = existing?.id ?? null
   }
   if (userId) {

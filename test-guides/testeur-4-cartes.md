@@ -11,7 +11,7 @@
 | | |
 |---|---|
 | **Email** | `fenomat@demo.local` |
-| **Mot de passe** | `Demo123!CoopAdmin` |
+| **Mot de passe** | `<secret retiré — voir gestionnaire de mots de passe>` |
 | **Rôle** | Admin Faîtière FENOMAT |
 
 ---
