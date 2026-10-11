@@ -11,6 +11,8 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:3000',
     launchOptions: {
+      // Cloud sessions ship Chromium at this path; a local Playwright install may override it.
+      executablePath: process.env.PW_CHROMIUM_PATH || undefined,
       args: ['--enable-webgl','--use-angle=swiftshader','--enable-unsafe-swiftshader'],
     },
     screenshot: 'only-on-failure',
