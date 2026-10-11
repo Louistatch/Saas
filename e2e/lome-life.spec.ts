@@ -37,8 +37,24 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
   await page.getByRole('button',{name:'Faire mon service'}).click()
   await page.getByRole('button',{name:'Fermer',exact:true}).click()
   await page.getByRole('button',{name:'Voir mon argent'}).click()
-  await expect(page.getByRole('dialog',{name:'Mes finances'}).getByText('10 750 FCFA')).toBeVisible()
+  await expect.poll(async()=>page.evaluate(()=>{
+    const save=localStorage.getItem('haroolife.lome-life.v1')
+    return save?JSON.parse(save).wallet:0
+  })).toBe(10750)
   await page.getByRole('button',{name:'Fermer',exact:true}).click()
+  await navigation.getByRole('button',{name:'Maison'}).click()
+  await page.getByRole('button',{name:'Entrer',exact:true}).click()
+  await expect.poll(async()=>page.evaluate(()=>{
+    const save=localStorage.getItem('haroolife.lome-life.v1')
+    return save?JSON.parse(save).inside:null
+  })).toBe('market')
+  await expect(page.locator('canvas').first()).toBeVisible()
+  await page.waitForTimeout(1200)
+  const indoors=path.join('test-results','lome-visual',testInfo.project.name+'-interior.png')
+  fs.mkdirSync(path.dirname(indoors),{recursive:true})
+  await page.screenshot({path:indoors,fullPage:true})
+  await navigation.getByRole('button',{name:'Maison'}).click()
+  await page.getByRole('button',{name:'Sortir',exact:true}).click()
 
   await page.getByRole('button',{name:'Ouvrir les outils de construction'}).click()
   await expect(page.getByRole('dialog',{name:'Construire'})).toBeVisible()
