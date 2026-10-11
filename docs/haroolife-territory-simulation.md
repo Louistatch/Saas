@@ -37,3 +37,29 @@ Isoler un moteur d'entités/composants/systèmes (ECS) dans un Web Worker. Stock
 5. Sauvegardes séparées avec RLS, restauration fiable et multijoueur autoritaire.
 
 Ne pas lancer de migrations ou déploiement en production sans revue et recette du pilote.
+
+
+## Phase 2 — premier quartier PlayCanvas (prévisualisation)
+
+Le client affiche maintenant une scène 3D à l'entrée de `/haroolife/territoire`, avant la carte Leaflet :
+
+- Cinq **quartiers stylisés distincts** suivent la ville choisie via la carte ou les boutons. Les coordonnées des repères de ville sont géographiques, **pas** les positions, dimensions ou bâtiments de la scène 3D.
+- Une caméra orientable par boutons (contrôle tactile accessible), un chemin, des commerces et de petits personnages animés donnent une première vue d'un monde vivant. Ce n'est **pas** encore une simulation de déplacements routiers réels ni une économie multi-agent.
+- Les achats dans le moteur déterministe changent les visuels de Kpalimé : parcelles irriguées, usine, panneaux solaires et camion. Lomé affiche un signal de livraison après une vente simulée.
+- Un panneau de construction utilisable au clavier et au doigt évite de dépendre du raycast WebGL seul.
+- Le composant PlayCanvas est importé dynamiquement et uniquement côté navigateur. Sans WebGL2, le jeu économique et la carte restent utilisables. Économie de données / faible RAM : scène désactivée au départ mais activable manuellement ; bouton de mode léger pour libérer le rendu.
+- Les mises à jour visuelles sont limitées à ~10 par seconde et suspendues lorsque l'onglet est masqué ; `prefers-reduced-motion` coupe l'animation.
+
+**Aucune géométrie cadastrale, parcelle privée, donnée d'habitant ou topologie routière n'est exportée dans la scène.** Une zone 3D ne déclenche aucune opération Supabase. Toutes les dépenses de construction sont des chiffres fictifs du scénario local.
+
+### Vérifications 3D
+```sh
+node --import tsx --test tests/haroolife-territory-scene.test.ts
+npm run test:hardening
+npm run typecheck
+npm run build
+```
+
+Recette manuelle : sous Android, ouvrir Kpalimé, acheter l'usine, l'irrigation, le camion et les panneaux ; vérifier les changements graphiques, faire défiler les jours, choisir Lomé sur la carte et observer l'arrivée des produits. Puis vérifier un navigateur sans WebGL2 et le mode léger. Garder la PR en brouillon jusqu'à validation mobile.
+
+**Prochaine phase, non encore implémentée :** réseau routier OSM → graph de transport, PMTiles, assets 3D de qualité sous licence adaptée (Blender/GLB), vrais agents autonomes avec moteur ECS/Web Worker, sauvegardes versionnées, puis concurrence multijoueur côté serveur.
