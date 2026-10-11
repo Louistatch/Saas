@@ -64,3 +64,35 @@ self.addEventListener('fetch', (event) => {
     })
   )
 })
+
+// Alertes de la console de validation (Web Push). Le lien est toujours interne au site.
+self.addEventListener('push', (event) => {
+  let data = {}
+  try {
+    data = event.data ? event.data.json() : {}
+  } catch {
+    data = { body: event.data ? event.data.text() : '' }
+  }
+  const link = typeof data.link === 'string' && data.link.startsWith('/') ? data.link : '/operator/professionals'
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'FaîtiereHub', {
+      body: data.body || '',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      tag: data.tag,
+      data: { link },
+    })
+  )
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const target = new URL(event.notification.data?.link || '/operator/professionals', self.location.origin)
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+      const open = wins.find((w) => new URL(w.url).pathname === target.pathname)
+      if (open) return open.focus()
+      return self.clients.openWindow(target.href)
+    })
+  )
+})

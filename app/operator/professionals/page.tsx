@@ -14,6 +14,7 @@
  */
 
 import { ProtectedRoute } from '@/app/components/protected-route'
+import { ConsoleApp } from '@/components/operator/console-app'
 import { DossierDocuments } from '@/components/professionals/dossier-documents'
 import { RegisterProfessionalForm } from '@/components/professionals/register-form'
 import { Spinner } from '@/components/shared/loading'
@@ -234,7 +235,8 @@ function ProfessionalsContent() {
           </Link>
         </Button>
       </header>
-      <main className="mx-auto max-w-xl px-4 py-10 sm:px-6">
+      <main className="mx-auto max-w-xl px-4 py-6 sm:px-6 sm:py-10">
+        <ConsoleApp />
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-foreground">

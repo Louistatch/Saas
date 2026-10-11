@@ -1,0 +1,101 @@
+import 'server-only'
+import { createClient as createAdminClient } from '@/lib/supabase/admin'
+import webpush from 'web-push'
+
+interface AdminEvent {
+  id: number
+  kind: 'dossier.nouveau' | 'haroolife.groupe'
+  faitiere_id: string | null
+  title: string
+  body: string
+  link: string
+}
+
+interface Subscription {
+  id: string
+  user_id: string
+  endpoint: string
+  p256dh: string
+  auth: string
+  failures: number
+}
+
+export function pushConfigured(): boolean {
+  return Boolean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY)
+}
+
+let configured = false
+function configure() {
+  if (configured) return
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT || 'https://www.faitierehub.com',
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY as string,
+    process.env.VAPID_PRIVATE_KEY as string,
+  )
+  configured = true
+}
+
+/**
+ * Expédie, une seule fois, les événements admin en attente à leurs destinataires autorisés.
+ * Idempotent : les événements sont réservés (dispatched_at) avant l'envoi ; un second appel
+ * concurrent ne les revoit pas. Sans clés VAPID, ne réserve rien.
+ */
+export async function dispatchPendingEvents(): Promise<{ events: number; sent: number }> {
+  if (!pushConfigured()) return { events: 0, sent: 0 }
+  configure()
+  const admin = createAdminClient()
+  const { data: events } = await admin
+    .from('admin_events')
+    .update({ dispatched_at: new Date().toISOString() })
+    .is('dispatched_at', null)
+    .select('id, kind, faitiere_id, title, body, link')
+    .returns<AdminEvent[]>()
+  let sent = 0
+  for (const event of events ?? []) {
+    const { data: recipients } = await admin.rpc('admin_event_recipients', {
+      p_kind: event.kind,
+      p_faitiere: event.faitiere_id,
+    })
+    const userIds = ((recipients as string[] | null) ?? []).filter(Boolean)
+    if (userIds.length === 0) continue
+    const { data: subs } = await admin
+      .from('push_subscriptions')
+      .select('id, user_id, endpoint, p256dh, auth, failures')
+      .in('user_id', userIds)
+      .returns<Subscription[]>()
+    const payload = JSON.stringify({
+      title: event.title,
+      body: event.body,
+      link: event.link,
+      tag: `${event.kind}:${event.id}`,
+    })
+    await Promise.all(
+      (subs ?? []).map(async (sub) => {
+        try {
+          await webpush.sendNotification(
+            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+            payload,
+            { TTL: 86_400, timeout: 8_000 },
+          )
+          sent++
+          await admin
+            .from('push_subscriptions')
+            .update({ last_success_at: new Date().toISOString(), failures: 0 })
+            .eq('id', sub.id)
+        } catch (error) {
+          const status = (error as { statusCode?: number }).statusCode
+          // 404/410 : l'abonnement n'existe plus côté navigateur.
+          if (status === 404 || status === 410 || sub.failures >= 9) {
+            await admin.from('push_subscriptions').delete().eq('id', sub.id)
+          } else {
+            await admin
+              .from('push_subscriptions')
+              .update({ failures: sub.failures + 1 })
+              .eq('id', sub.id)
+          }
+        }
+      }),
+    )
+  }
+  return { events: events?.length ?? 0, sent }
+}

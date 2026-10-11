@@ -1,8 +1,9 @@
 import { commandSchema } from '@/lib/haroolife/core'
+import { dispatchPendingEvents } from '@/lib/push/server'
 import { getAccessContext } from '@/lib/security/assert-access'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
-import { type NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse, after } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store' }
@@ -63,7 +64,10 @@ export async function POST(request: NextRequest) {
       p_request_id: request_id,
       p_payload: payload,
     })
-    return error ? databaseError(error) : reply({ group_id: data })
+    if (error) return databaseError(error)
+    // Un groupe créé alerte les administrateurs abonnés, après la réponse.
+    if (action === 'create') after(() => dispatchPendingEvents().then(() => undefined))
+    return reply({ group_id: data })
   } catch {
     return unavailable()
   }

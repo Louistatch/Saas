@@ -18,12 +18,13 @@ import {
   isExistingFaitiere,
   listFaitieres,
 } from '@/lib/professionals/server'
+import { dispatchPendingEvents } from '@/lib/push/server'
 import { assertAuthenticated } from '@/lib/security/assert-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 import { flattenZodErrors } from '@/lib/validators/schemas'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
-import { type NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse, after } from 'next/server'
 
 const PROFILE_WAIT_ATTEMPTS = 8
 const PROFILE_WAIT_MS = 400
@@ -162,6 +163,8 @@ export async function POST(request: NextRequest) {
   if (verifyEmail) await sendConfirmationEmail(input.email)
   const passwordEmail = await sendPasswordSetupEmail(input.email, request.nextUrl.origin)
 
+  // Nouveau dossier : alerte les validateurs abonnés, après la réponse.
+  after(() => dispatchPendingEvents().then(() => undefined))
   return NextResponse.json({
     success: true,
     profile_id: pro.id,
