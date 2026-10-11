@@ -23,7 +23,7 @@ function Furniture({name,position,scale=1,rotation=0,action,onInteract}:{name:st
 function Block({position,scale,material,rotation}:{position:[number,number,number];scale:[number,number,number];material:ReturnType<typeof useMaterial>;rotation?:[number,number,number]}){
   return <Entity position={position} scale={scale} rotation={rotation}><Render type="box" material={material}/></Entity>
 }
-export default function LomeLifeRoom3D({venue,angle=45,onInteract}:{venue:Venue;angle?:number;onInteract?:(a:Action)=>void}){
+export default function LomeLifeRoom3D({venue,angle=45,distance=28,onInteract}:{venue:Venue;angle?:number;distance?:number;onInteract?:(a:Action)=>void}){
   const floor=useMaterial({diffuse:'#c7b399',gloss:0.08})
   const wall=useMaterial({diffuse:'#7293a1',gloss:0.04})
   const trim=useMaterial({diffuse:'#e8e5d8',gloss:0.1})
@@ -34,10 +34,10 @@ export default function LomeLifeRoom3D({venue,angle=45,onInteract}:{venue:Venue;
   const shadow=useMaterial({diffuse:'#304852',gloss:0.02})
   const roomLabel=venue==='house'?'Maison':venue==='market'?'Marché':venue==='bakery'?'Boulangerie':venue==='hall'?'Mairie':venue==='well'?'Puits':'Jardin'
   const radians=angle*Math.PI/180
-  const camera:[number,number,number]=[Math.sin(radians)*10,8,Math.cos(radians)*10]
+  const camera:[number,number,number]=[Math.sin(radians)*distance,distance*0.83,Math.cos(radians)*distance]
   return <>
     <Entity position={camera} rotation={[-35,angle,0]}>
-      <Camera fov={45} nearClip={0.1} farClip={80} clearColor="#b7d1ce"/>
+      <Camera fov={50} nearClip={0.1} farClip={110} clearColor="#b7d1ce"/>
     </Entity>
     <Entity rotation={[52,22,0]}><Light type="directional" intensity={1.8}/></Entity>
     <Entity rotation={[20,185,0]}><Light type="directional" intensity={0.8}/></Entity>
@@ -81,7 +81,7 @@ export default function LomeLifeRoom3D({venue,angle=45,onInteract}:{venue:Venue;
       </Entity>)}
       <Block position={[-2.2,0.75,2.1]} scale={[1.4,0.26,1.25]} material={furniture}/>
       <Block position={[-2.2,0.42,2.1]} scale={[0.2,0.65,0.2]} material={shadow}/>
-      <Citizen position={[-1.6,0.1,-2.3]} scale={0.78}/>
+      <Citizen position={[-1.6,0.1,-2.3]} scale={1.35}/>
       <Furniture name="table" position={[-2.2,0.1,2.2]} scale={1.1} action="buy-meal" onInteract={onInteract}/>
       <Furniture name="chair" position={[-1.5,0.1,2.8]} scale={1} rotation={145}/>
       <Furniture name="pottedplant" position={[-3.6,0.08,-3.1]} scale={1.35}/>
@@ -90,7 +90,7 @@ export default function LomeLifeRoom3D({venue,angle=45,onInteract}:{venue:Venue;
       <Block position={[-1.6,0.38,-1.8]} scale={[0.28,0.65,0.3]} material={shadow}/>
       <Block position={[1.6,0.38,-1.8]} scale={[0.28,0.65,0.3]} material={shadow}/>
       <Block position={[0,1.65,-1.8]} scale={[1.2,0.14,0.85]} material={fabric}/>
-      <Citizen position={[0.8,0,-2.5]} scale={0.75}/>
+      <Citizen position={[0.8,0,-2.5]} scale={1.3}/>
       <Furniture name="table" position={[0,0.1,-1.8]} scale={1.5} action="work" onInteract={onInteract}/>
       <Furniture name="chair" position={[0.8,0.1,-2.8]} scale={1.1} rotation={90}/>
     </>:<>
@@ -98,7 +98,7 @@ export default function LomeLifeRoom3D({venue,angle=45,onInteract}:{venue:Venue;
       <Block position={[0,1.0,0]} scale={[2.0,0.15,2.0]} material={fabric}/>
       <Block position={[2.5,0.5,1.5]} scale={[1.3,1.0,1.3]} material={furniture}/>
     </>}
-    <Citizen position={[-0.7,0.09,1.15]} scale={1}/>
+    <Citizen position={[-0.7,0.09,1.15]} scale={1.65}/>
     <Entity name={'Intérieur '+roomLabel} position={[0,3.9,0]} />
   </>
 }
