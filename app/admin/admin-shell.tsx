@@ -13,11 +13,13 @@ import {
   CreditCard,
   FileText,
   GraduationCap,
+  Landmark,
   LayoutDashboard,
   Leaf,
   LogOut,
   Mail,
   Menu,
+  Printer,
   Settings,
   TrendingUp,
   UserCheck,
@@ -61,6 +63,12 @@ const ADMIN_SECTIONS: { title: string; links: AdminLink[] }[] = [
     links: [
       { href: '/admin/haroo', label: 'Professionnels Haroo', icon: Briefcase },
       { href: '/admin/cartes', label: 'Cartes et PIN', icon: CreditCard },
+      {
+        href: '/admin/commandes-cartes',
+        label: 'Commandes de cartes',
+        icon: Printer,
+        badge: 'cards-print',
+      },
     ],
   },
   {
@@ -68,6 +76,7 @@ const ADMIN_SECTIONS: { title: string; links: AdminLink[] }[] = [
     links: [
       { href: '/admin/comptes-exploitation', label: "Comptes d'exploitation", icon: FileText },
       { href: '/admin/organization-earnings', label: 'Gains des organisations', icon: Coins },
+      { href: '/admin/credits', label: 'Demandes de crédit', icon: Landmark },
     ],
   },
   {

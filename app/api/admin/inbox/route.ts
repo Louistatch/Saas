@@ -142,7 +142,7 @@ export async function GET() {
     level: 'attention',
     title: 'Commandes de cartes payées à imprimer',
     detail: 'Payées, pas encore imprimées.',
-    href: '/admin/cartes',
+    href: '/admin/commandes-cartes',
   })
   push({
     key: 'cards-pay',
@@ -150,7 +150,7 @@ export async function GET() {
     level: 'info',
     title: 'Commandes de cartes en attente de paiement',
     detail: 'Demandées par les organisations, non payées.',
-    href: '/admin/cartes',
+    href: '/admin/commandes-cartes',
   })
   push({
     key: 'credits',
@@ -158,7 +158,7 @@ export async function GET() {
     level: 'info',
     title: 'Demandes de crédit en cours d’instruction',
     detail: 'Suivies par les coopératives.',
-    href: '/admin/cooperatives',
+    href: '/admin/credits',
   })
 
   const haroolife = hl.data as {
