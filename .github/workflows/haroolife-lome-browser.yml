@@ -1,0 +1,43 @@
+name: HarooLife Lomé Local Browser QA
+
+on:
+  pull_request:
+    paths:
+      - 'components/haroolife/**'
+      - 'lib/haroolife/**'
+      - 'app/haroolife/**'
+      - 'e2e/lome-life*'
+      - '.github/workflows/haroolife-lome-browser.yml'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  webgl-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install local Chromium with headless WebGL drivers
+        run: npx playwright install --with-deps chromium
+      - name: Verify desktop and Android-sized browser locally (NO deployment)
+        run: npx playwright test --config=e2e/lome-life-playwright.config.ts
+      - name: Keep desktop/mobile screenshots and failure traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: haroolife-lome-visual-qa
+          path: |
+            test-results/lome-visual
+            test-results/lome-report
+            test-results/**/*.zip
+          retention-days: 7
