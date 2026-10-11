@@ -2,33 +2,54 @@ import { test, expect } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
 
-test('Lomé Life renders and completes a market/needs cycle on desktop and Android viewport',async({page},testInfo)=>{
+test('immersive 3D Lomé life completes navigation, shopping, meals and work on desktop and Android',async({page},testInfo)=>{
   const errors:string[]=[]
-  page.on('pageerror',(error)=>errors.push(error.message))
+  page.on('pageerror',error=>errors.push(error.message))
   await page.goto('/haroolife/territoire/lome',{waitUntil:'domcontentloaded'})
-  await expect(page.getByRole('heading',{name:/LOMÉ LIFE/i})).toBeVisible()
-  await expect(page.getByText('Quartier de Lomé')).toBeVisible()
-  await expect(page.getByRole('button',{name:'Se déplacer'})).toBeVisible()
-  await expect(page.getByText('Mon argent')).toBeVisible()
-  await expect(page.getByRole('button',{name:/Marché de quartier/i})).toBeVisible()
-  await page.getByRole('button',{name:/Marché de quartier/i}).click()
-  await expect(page.getByText(/Trajet commencé/i).first()).toBeVisible()
-  await page.getByRole('button',{name:'+1 h'}).click()
-  await page.getByRole('button',{name:/Acheter un repas/i}).click()
-  await expect(page.getByText(/Un repas acheté/i).first()).toBeVisible()
-  await page.getByRole('button',{name:'Manger',exact:true}).click()
-  await expect(page.getByText(/Tu as mangé/i).first()).toBeVisible()
-  await page.getByRole('button',{name:/Faire mon service/i}).click()
-  await expect(page.getByText(/Service terminé/i).first()).toBeVisible()
-  // If WebGL2 works in this environment, verify actual PlayCanvas canvas (not a 2D placeholder).
-  const webgl2 = await page.evaluate(()=>{
-    try{return !!document.createElement('canvas').getContext('webgl2')}catch{return false}
-  })
-  expect(webgl2,'Software WebGL2 is required in Chromium QA').toBeTruthy()
+  const navigation=page.getByRole('navigation',{name:'Navigation du jeu'})
+  await expect(navigation).toBeVisible()
+  await expect(navigation.getByRole('button',{name:'Maison'})).toBeVisible()
+  await expect(navigation.getByRole('button',{name:'Acheter'})).toBeVisible()
+  await expect(navigation.getByRole('button',{name:'Carte'})).toBeVisible()
+  await expect(navigation.getByRole('button',{name:'Téléphone'})).toBeVisible()
+  const webgl2=await page.evaluate(()=>!!document.createElement('canvas').getContext('webgl2'))
+  expect(webgl2,'Chromium QA must provide a true WebGL2 device').toBe(true)
   await expect(page.locator('canvas').first()).toBeVisible({timeout:30000})
-  await page.waitForTimeout(1600)
-  const dest=path.join('test-results','lome-visual',testInfo.project.name+'.png')
-  fs.mkdirSync(path.dirname(dest),{recursive:true})
-  await page.screenshot({path:dest,fullPage:true})
-  expect(errors,'No uncaught errors during game loop').toEqual([])
+
+  await navigation.getByRole('button',{name:'Carte'}).click()
+  await expect(page.getByRole('dialog',{name:'Explorer Lomé'})).toBeVisible()
+  await page.getByRole('button',{name:/Marché de quartier/}).click()
+  // Automatic road movement must reach market without pressing +1 hour per tile.
+  await expect.poll(async()=>{
+    return page.evaluate(()=>{
+      const save=localStorage.getItem('haroolife.lome-life.v1')
+      return save?JSON.parse(save).route.length:99
+    })
+  },{timeout:15000}).toBe(0)
+  await navigation.getByRole('button',{name:'Acheter'}).click()
+  await expect(page.getByRole('dialog',{name:'Marché & commerces'})).toBeVisible()
+  await page.getByRole('button',{name:/Acheter un repas · 650 FCFA/}).click()
+  await page.getByRole('button',{name:/Manger ·/}).click()
+  await page.getByRole('button',{name:'Fermer',exact:true}).click()
+
+  await navigation.getByRole('button',{name:'Téléphone'}).click()
+  await page.getByRole('button',{name:'Métiers'}).click()
+  await page.getByRole('button',{name:'Faire mon service'}).click()
+  await page.getByRole('button',{name:'Fermer',exact:true}).click()
+  await page.getByRole('button',{name:'Voir mon argent'}).click()
+  await expect(page.getByRole('dialog',{name:'Mes finances'}).getByText('10 750 FCFA')).toBeVisible()
+  await page.getByRole('button',{name:'Fermer',exact:true}).click()
+
+  await page.getByRole('button',{name:'Ouvrir les outils de construction'}).click()
+  await expect(page.getByRole('dialog',{name:'Construire'})).toBeVisible()
+  await page.getByRole('button',{name:/Maison.*85 FCFA/}).click()
+  await expect(page.getByText(/Pose Maison en touchant un terrain/)).toBeVisible()
+  // Return to free travel; selection is still connected to the existing construction engine.
+  await page.getByRole('button',{name:'Terminer'}).click()
+
+  await expect(page.locator('canvas').first()).toBeVisible()
+  const screenshot=path.join('test-results','lome-visual',testInfo.project.name+'.png')
+  fs.mkdirSync(path.dirname(screenshot),{recursive:true})
+  await page.screenshot({path:screenshot,fullPage:true})
+  expect(errors,'No uncaught client runtime errors').toEqual([])
 })
