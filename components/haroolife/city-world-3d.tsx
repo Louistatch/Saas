@@ -13,7 +13,7 @@ import {
 } from '@/lib/haroolife/townsmen-engine'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { Compass, Maximize2, Minus, Plus, RotateCcw } from 'lucide-react'
-import { type LifeState, simulatedTraffic } from '@/lib/haroolife/lome-life-engine'
+import { type Action, type LifeState, simulatedTraffic } from '@/lib/haroolife/lome-life-engine'
 import LomeLifeRoom3D from './lome-life-room-3d'
 import { ZOOM_IN_FACTOR, ZOOM_OUT_FACTOR } from '@/lib/haroolife/vendor/house-builder-camera-zoom'
 
@@ -172,10 +172,11 @@ function Tile({
 }
 
 function SettlementScene({
-  city, tool, selected, pan, distance, angle, onTile, canTap, life,
+  city, tool, selected, pan, distance, angle, onTile, canTap, life, onInteriorAction,
 }: {
   city: City
   life?: LifeState
+  onInteriorAction?: (action: Action) => void
   tool: EditTool
   selected: Cell | null
   pan: { x: number; z: number }
@@ -212,7 +213,7 @@ function SettlementScene({
   const isBlocked = hover && tool !== 'inspect' && tool !== 'demolish'
     ? canBuild(city, hover.x, hover.y, tool) !== null : false
 
-  if (life?.inside) return <LomeLifeRoom3D venue={life.inside} angle={angle}/>
+  if (life?.inside) return <LomeLifeRoom3D venue={life.inside} angle={angle} onInteract={onInteriorAction}/>
 
   return (
     <>
@@ -281,10 +282,11 @@ function SettlementScene({
 }
 
 export default function CityWorld3D({
-  city, tool, inspect, onTile, life, immersive=false,
+  city, tool, inspect, onTile, life, immersive=false, onInteriorAction,
 }: {
   city: City
   life?: LifeState
+  onInteriorAction?: (action: Action) => void
   immersive?: boolean
   tool: EditTool
   inspect: Cell | null
@@ -332,7 +334,7 @@ export default function CityWorld3D({
             city={city} tool={tool} selected={inspect} life={life}
             pan={life ? {x:positionOf(life.pos.x,life.pos.y)[0]+pan.x,z:positionOf(life.pos.x,life.pos.y)[2]+pan.z} : pan}
             distance={life?.inside ? 11 : distance} angle={angle}
-            onTile={onTile} canTap={checkClick}
+            onTile={onTile} canTap={checkClick} onInteriorAction={onInteriorAction}
           />
         </Application>
       </div>
