@@ -30,6 +30,11 @@ jobs:
       - name: Install local Chromium with headless WebGL drivers
         run: npx playwright install --with-deps chromium
       - name: Verify desktop and Android-sized browser locally (NO deployment)
+        # Public, dummy values only. Needed because the parent app mounts its
+        # existing Supabase context for every page; no real backend is contacted.
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiJ9.placeholder
         run: npx playwright test --config=e2e/lome-life-playwright.config.ts
       - name: Keep desktop/mobile screenshots and failure traces
         if: always()
