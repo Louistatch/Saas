@@ -35,11 +35,15 @@ import {
   TYPE_ICONS,
   TYPE_LABELS,
   placeName as cityPlaceName,
+  landmarks,
   landmarksIn,
   lotAt as lotAtCell,
   lotById,
   toWorld,
 } from '@/lib/haroolife/city/world'
+import { type Actor, type OrgRef, primaryOrganization } from '@/lib/haroolife/domain/actor'
+import { HttpIdentityAdapter } from '@/lib/haroolife/domain/http'
+import { GameWorldAdapter } from '@/lib/haroolife/domain/services'
 import {
   CITIES,
   CITY_IDS,
@@ -97,6 +101,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CAMERA_HOME, type CameraState } from './city/city-world'
+import CooperativePanel from './city/cooperative-panel'
 import { sayOnPlace, usePresence } from './use-presence'
 
 const CityWorld = dynamic(() => import('./city/city-world'), {
@@ -140,6 +145,7 @@ type Sheet =
   | 'journal'
   | 'billboard'
   | 'lot'
+  | 'cooperative'
   | null
 type Mode = 'walk' | 'build' | 'demolish'
 const money = (n: number) => new Intl.NumberFormat('fr-FR').format(n) + ' FCFA'
@@ -244,6 +250,24 @@ export function LomeLifeImmersive() {
   const [camera, setCamera] = useState<CameraState>(() => CAMERA_HOME(cityLife.at.x, cityLife.at.y))
   const [follow, setFollow] = useState(true)
   const [selectedLot, setSelectedLot] = useState<Lot | null>(null)
+  // The real actor behind the player (null when signed out) and the organisation shown
+  // inside a house of cooperatives. Buildings are assigned to organisations by the adapter,
+  // never the other way round: the domain layer knows nothing about PlayCanvas.
+  const [actor, setActor] = useState<Actor | null>(null)
+  const [coopOrg, setCoopOrg] = useState<OrgRef | null>(null)
+  const worldAdapter = useMemo(
+    () => new GameWorldAdapter(landmarks().filter((l) => l.type === 'cooperative')),
+    [],
+  )
+  useEffect(() => {
+    let alive = true
+    new HttpIdentityAdapter().me().then((a) => alive && setActor(a))
+    return () => {
+      alive = false
+    }
+  }, [])
+  const myOrg = actor ? primaryOrganization(actor) : null
+  const myCoopLot = myOrg ? worldAdapter.lotForOrganization(myOrg) : null
   const [cityFilter, setCityFilter] = useState<Category | 'all'>('all')
   const [chunkStats, setChunkStats] = useState({
     chunks: 0,
@@ -312,7 +336,9 @@ export function LomeLifeImmersive() {
                           ? 'Panneau publicitaire'
                           : panel === 'lot'
                             ? 'Lieu'
-                            : ''
+                            : panel === 'cooperative'
+                              ? 'Coopérative'
+                              : ''
   const needs = life.needs
   const wellbeing = Math.round(NEED_KEYS.reduce((sum, k) => sum + needs[k], 0) / NEED_KEYS.length)
   const pending = eventById(life.pendingEvent)
@@ -423,8 +449,14 @@ export function LomeLifeImmersive() {
       fitness: cityLife.fitness,
       energy: life.needs.energy,
       hour: life.hour,
+      actor: actor ? { id: actor.id, organizations: actor.organizations.length } : null,
+      myCoopLot: myCoopLot?.id ?? null,
+      camera,
     }
   }, [
+    actor,
+    myCoopLot,
+    camera,
     chunkStats,
     quality,
     cityLife.at,
@@ -436,6 +468,15 @@ export function LomeLifeImmersive() {
     life.needs.energy,
     life.hour,
   ])
+  // Entering a house of cooperatives opens the dashboard of the organisation housed there
+  // (the player's own when it is the right building, otherwise the first one assigned).
+  useEffect(() => {
+    const lot = cityLife.insideLot ? lotById(cityLife.insideLot) : null
+    if (!lot || lot.type !== 'cooperative') return
+    const housed = actor ? worldAdapter.organizationsAt(lot, actor.organizations) : []
+    setCoopOrg(housed[0] ?? myOrg)
+    setPanel('cooperative')
+  }, [cityLife.insideLot, actor, myOrg, worldAdapter])
   // An activity animation lasts a few seconds, then the player stands idle again.
   useEffect(() => {
     if (!cityLife.activity) return
@@ -567,8 +608,32 @@ export function LomeLifeImmersive() {
     if (a === 'enter' || a === 'leave') setPanel(null)
   }
   function cityAction(a: CityAction) {
+    if (a === 'coop') {
+      setCoopOrg((cur) => cur ?? myOrg)
+      setPanel('cooperative')
+      return
+    }
     setCityLife((old) => cityInteract(old, a))
     if (a === 'enter' || a === 'leave') setPanel(null)
+  }
+  /** « Ma coopérative » : the camera flies to the building that houses the player's organisation. */
+  function goMyCooperative() {
+    if (!myCoopLot) {
+      setNotice(
+        actor
+          ? 'Votre compte n’est rattaché à aucune coopérative.'
+          : 'Connectez-vous pour retrouver votre coopérative.',
+      )
+      open('home')
+      return
+    }
+    setMode('walk')
+    setFollow(false)
+    setCoopOrg(myOrg)
+    setSelectedLot(myCoopLot)
+    setCamera(CAMERA_HOME(myCoopLot.door.x, myCoopLot.door.y))
+    setPanel('lot')
+    setNotice(null)
   }
   function useEquipment(p: Prop) {
     if (!p.action) return
@@ -842,6 +907,17 @@ export function LomeLifeImmersive() {
                     : 'Gagne ton premier salaire'}
             </span>
           </button>
+          {actor && (
+            <button
+              type="button"
+              aria-label="Ma coopérative"
+              title="Ma coopérative"
+              onClick={goMyCooperative}
+              className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-700 px-3 py-2 text-xs font-bold text-white shadow-md"
+            >
+              🤝 <span className="hidden sm:inline">Ma coopérative</span>
+            </button>
+          )}
           <button
             type="button"
             aria-label={playing ? 'Mettre en pause' : 'Faire avancer le temps'}
@@ -1725,6 +1801,14 @@ export function LomeLifeImmersive() {
                   <div className="grid grid-cols-2 gap-2">
                     <ActionButton title="Aller au marché" onClick={() => go(12, 11)} />
                     <ActionButton title="Voir les métiers" outline onClick={() => open('jobs')} />
+                    {actor && (
+                      <ActionButton
+                        title="Ma coopérative"
+                        outline
+                        onClick={goMyCooperative}
+                        icon={<Users size={17} />}
+                      />
+                    )}
                   </div>
                 </>
               )}
@@ -1819,8 +1903,24 @@ export function LomeLifeImmersive() {
                           ))}
                         </div>
                       )}
+                      {lot.type === 'cooperative' && actor && (
+                        <p className="text-xs text-slate-600">
+                          {worldAdapter.organizationsAt(lot, actor.organizations).length > 0
+                            ? 'Ici siège : ' +
+                              worldAdapter
+                                .organizationsAt(lot, actor.organizations)
+                                .map((o) => o.name)
+                                .join(', ')
+                            : 'Aucune de vos organisations ne siège ici.'}
+                        </p>
+                      )}
                       {here && !insideAny && room && (
-                        <ActionButton title="Entrer" onClick={() => cityAction('enter')} />
+                        <ActionButton
+                          title={
+                            lot.type === 'cooperative' ? 'Entrer dans la coopérative' : 'Entrer'
+                          }
+                          onClick={() => cityAction('enter')}
+                        />
                       )}
                       {insideHere && (
                         <ActionButton title="Sortir" outline onClick={() => cityAction('leave')} />
@@ -1877,6 +1977,22 @@ export function LomeLifeImmersive() {
                     </>
                   )
                 })()}
+              {panel === 'cooperative' &&
+                (coopOrg ? (
+                  <CooperativePanel org={coopOrg} actor={actor} onPickOrg={setCoopOrg} />
+                ) : actor ? (
+                  <p className="text-sm text-slate-600">
+                    Votre compte n’est rattaché à aucune coopérative. Rapprochez-vous de votre
+                    organisation pour être enregistré comme membre.
+                  </p>
+                ) : (
+                  <p className="text-sm text-slate-600">
+                    <Link href="/login" className="font-bold text-emerald-700 underline">
+                      Connectez-vous
+                    </Link>{' '}
+                    pour retrouver votre coopérative, ses membres et ses regroupements.
+                  </p>
+                ))}
               {panel === 'billboard' && board && (
                 <>
                   <div

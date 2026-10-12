@@ -188,3 +188,64 @@ Vérification : `tests/haroolife-city-catalogue.test.ts` (pack décodable, catal
 ajusté aux emprises, repères habillés selon leur nature, mobilier urbain, intérieurs meublés,
 tapis de course : énergie −15, forme +6, −500 FCFA) et `e2e/lome-world-life.spec.ts`
 (parcours complet en 11 étapes sur 1440×900 et 390×844, circulation autonome, nuit).
+
+## Jalon 2 : acteurs réels et coopératives (12/10/2026)
+
+HarooLife devient l'interface spatiale des comptes FaîtiereHub / Haroo. La couche métier
+(`lib/haroolife/domain/`) ne dépend pas du rendu : PlayCanvas ne connaît que l'adaptateur.
+
+### Couche domaine
+
+- `actor.ts` : `Actor` par composition (rôles `haroolife_world`, type Haroo, organisations,
+  arbre administré, compétences, disponibilité, cartes, parcelles) ; `capabilitiesOf()` dérive les
+  capacités (un agronome non validé n'organise pas d'équipe ; sans organisation, pas d'entrée en
+  coopérative) ; facettes `ProducerActor`, `WorkerActor`, `BuyerActor`, `AgronomistActor`,
+  `CooperativeActor`, `UnionActor`, `FederationActor`, `OperatorActor`, `ServiceProviderActor`.
+- `bus.ts` : `DomainCommandBus` (Command pattern, résultat `{ ok }` jamais d'exception) et
+  `DomainEventDispatcher` (`WorkerGroupCreated`, `WorkerJoined`, `WorkerLeft`, `WorkerGroupReady`,
+  `WorkerGroupExpired`, `LandPledged`, `CooperativeEntered`).
+- `worker-group.ts` : cycle `DRAFT → OPEN → READY → CONFIRMED → ACTIVE → COMPLETED` (+ `CANCELLED`,
+  `EXPIRED`), dérivé des lignes `haroolife_groups` existantes ; `canJoin` exige le rôle ouvrier,
+  la disponibilité et le consentement.
+- `land-aggregation.ts` : `validatePledge` reflète les gardes SQL de `haroolife_command`
+  (plafond du pilote, pas de double engagement d'une parcelle, même coopérative, unités en ha).
+- `cooperative.ts`, `services.ts` (`ActorRegistry` avec TTL, `GameWorldAdapter` qui affecte un
+  bâtiment à une organisation de façon stable, `AvatarRenderer`), `http.ts` (adaptateurs HTTP).
+
+### API (lecture seule, compte requis, `Cache-Control: private, no-store`)
+
+| Route | Accès | Contenu |
+|---|---|---|
+| `GET /api/haroolife/me` | connecté | l'acteur : rôles réels, organisations et lignée, cartes existantes (statut calculé par `computeCardStatus`), jamais de contact |
+| `GET /api/haroolife/cooperatives/[id]` | membre, admin de l'arbre, super_admin | effectif exact (`count: exact`), répartition par statut, superficie et cultures (`parcelles`), annonces, équipes et regroupements du pilote, présence réelle (résidents visibles membres) |
+| `GET /api/haroolife/cooperatives/[id]/members` | administrateurs seulement (403 sinon) | 20 par page côté serveur, recherche `ilike` sur prénom/nom, noms publics « Prénom I. » |
+
+### Dans la ville
+
+- Six « Maisons des coopératives » (type `cooperative`, catégorie Services, intérieur `hall`).
+- Bouton « Ma coopérative » (HUD et panneau Maison) : la caméra vole vers le bâtiment de
+  l'organisation, la fiche indique « Ici siège : … » ; « Entrer dans la coopérative » ouvre le
+  tableau de bord spatial ; les organisations liées (union, faîtière, coopératives filles) se
+  parcourent sans quitter le bâtiment, les frontières restant vérifiées par l'API.
+- 120 membres ne produisent pas 120 modèles : les avatars restent les résidents visibles et
+  consentants ; la liste nominative est paginée et réservée aux administrateurs.
+
+### Vérification
+
+- `tests/haroolife-domain.test.ts` (capacités, cycle de vie, gardes de promesse, pagination).
+- `e2e/lome-cooperative.spec.ts` (desktop 1440×900 et Pixel 7) : bouton → caméra déplacée →
+  taxi → entrée → tableau de bord (COOMARA-Kpalimé, lignée, 120 membres, cultures, équipe,
+  regroupement) → liste page 1/6 → page 2 → recherche « Abalo » (12) → union ; absence de
+  numéros de téléphone ; API 401 sans session, 400 sur identifiant invalide.
+  Captures : `test-results/lome-cooperative/*.png`.
+- Mock Supabase versionné dans `e2e/fixtures/mock-supabase.mjs` (120 membres, 40 parcelles,
+  groupes, résidents, `offset`/`limit` de postgrest-js honorés).
+
+### Non opérationnel à ce jalon
+
+- Aucune mesure sur appareil Android réel ; aucune préversion Vercel `haroolife-lome` depuis
+  cette session (projet non visible du compte connecté ici).
+- Le marché (préventes) et les formulaires « Recruter une équipe » / « Regrouper nos
+  superficies » ne sont pas encore branchés dans le panneau (Jalon 3).
+- Pas de carte de membre délivrée depuis le jeu : la fiche renvoie vers `/verify/<numéro>`
+  des cartes existantes uniquement.

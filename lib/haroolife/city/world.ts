@@ -116,6 +116,7 @@ export type LotType =
   | 'port'
   | 'townhall'
   | 'billboard'
+  | 'cooperative'
 export type Category =
   | 'homes'
   | 'shops'
@@ -138,6 +139,7 @@ export const CATEGORY_OF: Record<LotType, Category> = {
   hospital: 'health',
   station: 'transport',
   townhall: 'services',
+  cooperative: 'services',
   sport: 'leisure',
   stadium: 'leisure',
   park: 'leisure',
@@ -176,6 +178,7 @@ export const TYPE_LABELS: Record<LotType, string> = {
   port: 'Port de pêche',
   townhall: 'Hôtel de ville',
   billboard: 'Panneau',
+  cooperative: 'Maison des coopératives',
 }
 export const TYPE_ICONS: Record<LotType, string> = {
   house: '🏠',
@@ -196,6 +199,7 @@ export const TYPE_ICONS: Record<LotType, string> = {
   port: '⚓',
   townhall: '🏛️',
   billboard: '📢',
+  cooperative: '🤝',
 }
 
 export interface Lot {
@@ -296,6 +300,67 @@ export interface Landmark {
   floors?: number
 }
 export const LANDMARKS: Landmark[] = [
+  // Houses of cooperatives: the buildings real organisations are mapped onto (one per district).
+  {
+    type: 'cooperative',
+    name: 'Maison des coopératives de Tokoin',
+    district: 'tokoin',
+    x: 43,
+    y: 27,
+    w: 3,
+    h: 2,
+    floors: 2,
+  },
+  {
+    type: 'cooperative',
+    name: 'Maison des coopératives d’Adidogomé',
+    district: 'adidogome',
+    x: 20,
+    y: 40,
+    w: 3,
+    h: 2,
+    floors: 2,
+  },
+  {
+    type: 'cooperative',
+    name: 'Maison des coopératives d’Agoè',
+    district: 'agoe',
+    x: 50,
+    y: 8,
+    w: 3,
+    h: 2,
+    floors: 2,
+  },
+  {
+    type: 'cooperative',
+    name: 'Maison des coopératives du Centre',
+    district: 'centre',
+    x: 46,
+    y: 46,
+    w: 3,
+    h: 2,
+    floors: 3,
+  },
+  {
+    type: 'cooperative',
+    name: 'Maison des coopératives de Bè',
+    district: 'be',
+    x: 84,
+    y: 36,
+    w: 3,
+    h: 2,
+    floors: 2,
+  },
+  {
+    type: 'cooperative',
+    name: 'Maison des coopératives de Baguida',
+    district: 'baguida',
+    x: 106,
+    y: 46,
+    w: 3,
+    h: 2,
+    floors: 2,
+  },
   { type: 'market', name: 'Grand marché d’Assigamé', district: 'centre', x: 50, y: 52, w: 4, h: 3 },
   { type: 'townhall', name: 'Hôtel de ville de Lomé', district: 'centre', x: 62, y: 44, floors: 3 },
   { type: 'bank', name: 'Banque de Dékon', district: 'centre', x: 40, y: 44, floors: 5 },

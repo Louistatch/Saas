@@ -50,6 +50,7 @@ export type CityAction =
   | 'use-shower'
   | 'coach'
   | 'toilet'
+  | 'coop'
 
 export interface CityLife {
   v: 1
@@ -322,6 +323,7 @@ export const labelOf = (t: LotType) =>
       port: 'le port',
       townhall: 'l’hôtel de ville',
       billboard: 'le panneau',
+      cooperative: 'la maison des coopératives',
     }) as Record<LotType, string>
   )[t]
 
@@ -339,6 +341,7 @@ export function interiorFor(t: LotType): Interior | null {
     case 'school':
     case 'university':
     case 'station':
+    case 'cooperative':
       return 'hall'
     case 'sport':
     case 'stadium':
@@ -395,6 +398,14 @@ export function actionsFor(t: LotType): { id: CityAction; label: string; hint: s
       ]
     case 'bank':
       return [{ id: 'bank', label: 'Voir mon compte', hint: 'Solde et dépenses' }]
+    case 'cooperative':
+      return [
+        {
+          id: 'coop',
+          label: 'Tableau de bord de la coopérative',
+          hint: 'Membres, superficies, regroupements, besoins en ouvriers',
+        },
+      ]
     case 'park':
     case 'port':
       return [{ id: 'relax', label: 'Se détendre', hint: 'Loisir +25' }]
@@ -514,6 +525,8 @@ export function cityInteract(s: CityLife, action: CityAction): CityLife {
       )
     case 'relax':
       return note(bump(s, { fun: 25 }), 'Un moment au calme.')
+    case 'coop':
+      return note(s, 'Les données de la coopérative s’affichent dans la fiche.')
     case 'use-treadmill':
     case 'use-bike':
     case 'use-weights': {

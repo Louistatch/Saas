@@ -129,6 +129,7 @@ const FAR_BODY: Record<LotType, RGB> = {
   port: rgb('#7d9cb5'),
   townhall: rgb('#e4d8b8'),
   billboard: rgb('#333333'),
+  cooperative: rgb('#d9ead3'),
 }
 const ROOFS: RGB[] = [
   rgb('#b5541f'),
@@ -634,6 +635,32 @@ export function buildingFor(lot: Lot, sizes: SizeTable): BuildingSpec {
       palms(2, 95)
       props.push({ model: 'truck', cx: lot.x + 0.2, cy: lot.y + 0.1, rot: 90, scale: 0.4 })
       return { main: null, props, extras, far: far('flat', 0.4, FAR_BODY.port, FAR_BODY.port) }
+    }
+    case 'cooperative': {
+      const m = main('com-k', [0.86, 0.98, 0.86], 0.5, 2.6, 0.3)
+      const t = doorSide(lot, -0.2)
+      extras.push({ kind: 'flag', cx: t.cx - 0.7, cy: t.cy, color: rgb('#1f7a4d') })
+      extras.push({
+        kind: 'sign',
+        cx: t.cx,
+        cy: t.cy,
+        h: 1.0 * m.scale,
+        w: 0.7 * lot.w,
+        color: rgb('#1f7a4d'),
+      })
+      props.push({
+        model: 'oak',
+        cx: lot.x + lot.w - 0.5,
+        cy: lot.y + lot.h - 0.4,
+        rot: 0,
+        scale: 0.85,
+      })
+      return {
+        main: m,
+        props,
+        extras,
+        far: far('parapet', 1.5, FAR_BODY.cooperative, rgb('#1f7a4d')),
+      }
     }
     case 'townhall': {
       const m = main('com-n', [1, 0.97, 0.9], 0.5, 2.6, 0.3)
