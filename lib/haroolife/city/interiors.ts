@@ -53,7 +53,18 @@ export interface Prop {
   label?: string
   hint?: string
 }
-export type NpcAnim = 'idle' | 'walk' | 'run' | 'sit' | 'lift' | 'talk' | 'work' | 'pray' | 'rest'
+export type NpcAnim =
+  | 'idle'
+  | 'walk'
+  | 'run'
+  | 'sit'
+  | 'lift'
+  | 'talk'
+  | 'work'
+  | 'pray'
+  | 'rest'
+  | 'drive'
+  | 'enter'
 export interface Npc {
   id: string
   /** Kenney Mini Characters model name. */

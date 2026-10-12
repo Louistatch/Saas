@@ -29,6 +29,8 @@ export interface PlayerDebug {
   camera: CameraRig
   vehicle: { x: number; z: number; heading: number; speed: number } | null
   driving: boolean
+  model: string
+  anim: NpcAnim
 }
 
 const ANIM: Record<Mode, NpcAnim> = {
@@ -36,19 +38,24 @@ const ANIM: Record<Mode, NpcAnim> = {
   walk: 'walk',
   run: 'run',
   inside: 'idle',
-  drive: 'sit',
+  drive: 'drive',
   travel: 'idle',
 }
+/** How long the step-out clip plays when the avatar reappears at a door (ms). */
+const EXIT_CLIP_MS = 550
 
 export default function PlayerRig({
   controller,
   model,
+  pagne,
   vehicleEntity,
   onEvents,
   onCameraSync,
 }: {
   controller: PlayerController
   model: string
+  /** Hex colour of the pagne worn by the avatar. */
+  pagne?: string
   /** The player's vehicle entity, when one is in the scene (moved by the rig). */
   vehicleEntity: { current: pc.Entity | null }
   /** Receives the controller's events (cell changes, arrivals, vehicle) when any happened. */
@@ -60,7 +67,11 @@ export default function PlayerRig({
   const avatar = useRef<pc.Entity | null>(null)
   const cameraEntity = useRef<pc.Entity | null>(null)
   const [anim, setAnim] = useState<NpcAnim>('idle')
-  const lastMode = useRef<Mode>('idle')
+  const [clipSpeed, setClipSpeed] = useState(1)
+  const lastMode = useRef<Mode>(controller.mode)
+  /** While the step-out clip plays, locomotion clips wait. */
+  const exitUntil = useRef(0)
+  const lastSpeedSync = useRef(0)
   const lastSync = useRef({ at: 0, tx: Number.NaN, tz: Number.NaN, d: Number.NaN, a: Number.NaN })
   const lastDebug = useRef(0)
   const onAvatar = useCallback((e: pc.Entity | null) => {
@@ -95,10 +106,30 @@ export default function PlayerRig({
       v.setLocalPosition(vx, 0.02, vz)
       v.setLocalEulerAngles(0, controller.vehicle.heading + 180, 0)
     }
-    // Locomotion clip only when the mode changes.
+    // Locomotion clip only when the mode changes; stepping out of a building plays the
+    // interaction clip first; walk cycles follow the ground speed (no foot sliding).
     if (controller.mode !== lastMode.current) {
+      const from = lastMode.current
       lastMode.current = controller.mode
+      if (from === 'inside' && controller.mode !== 'inside') {
+        exitUntil.current = now + EXIT_CLIP_MS
+        setAnim('enter')
+      } else if (now >= exitUntil.current) setAnim(ANIM[controller.mode])
+    } else if (exitUntil.current && now >= exitUntil.current) {
+      exitUntil.current = 0
       setAnim(ANIM[controller.mode])
+    }
+    if (now - lastSpeedSync.current > 150) {
+      lastSpeedSync.current = now
+      const m = controller.mode
+      const rate =
+        m === 'walk'
+          ? Math.min(1.5, Math.max(0.6, controller.speed / controller.config.walkSpeed))
+          : m === 'run'
+            ? Math.min(1.4, Math.max(0.8, controller.speed / controller.config.runSpeed))
+            : 1
+      const rounded = Math.round(rate * 10) / 10
+      setClipSpeed((cur) => (cur === rounded ? cur : rounded))
     }
     // Camera: position and pitch from the rig every frame.
     if (!cameraEntity.current)
@@ -145,6 +176,8 @@ export default function PlayerRig({
         camera: { ...controller.camera },
         vehicle: controller.vehicle ? { ...controller.vehicle } : null,
         driving: controller.driving,
+        model,
+        anim,
       }
     }
   })
@@ -156,6 +189,8 @@ export default function PlayerRig({
       position={[sx, 0.05, sz]}
       rotation={controller.heading}
       anim={anim}
+      speed={clipSpeed}
+      pagne={pagne}
       scale={1.15}
       imperative
       onEntity={onAvatar}

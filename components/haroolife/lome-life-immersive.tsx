@@ -27,6 +27,14 @@ import {
 } from '@/lib/haroolife/city/life'
 import { LOCALITIES, LOCALITY_IDS, type LocalityId } from '@/lib/haroolife/city/locality'
 import { CITY_STORAGE, loadCityLife } from '@/lib/haroolife/city/migrate'
+import {
+  AVATAR_MODELS,
+  type Avatar,
+  DEFAULT_AVATAR,
+  loadAvatar,
+  pagneColor,
+  saveAvatar,
+} from '@/lib/haroolife/city/avatar'
 import { ESTATE_GATE } from '@/lib/haroolife/city/navigation'
 import { findPath } from '@/lib/haroolife/city/navigation'
 import { bump } from '@/lib/haroolife/city/perf'
@@ -124,6 +132,7 @@ import Joystick, { useKeyboardInput } from './city/joystick'
 import MarketPanel from './city/market-panel'
 import NationalMap from './city/national-map'
 import OnboardingSteps from './city/onboarding'
+import { PAGNES } from './pagnes'
 import { HomeDialog } from './residence-dialog'
 import { sayOnPlace, usePresence } from './use-presence'
 
@@ -152,6 +161,7 @@ type Sheet =
   | 'cooperative'
   | 'market'
   | 'residence'
+  | 'avatar'
   | null
 type Mode = 'walk' | 'build' | 'demolish'
 /** The module a HarooLife address opens inside the single 3D world. */
@@ -289,6 +299,15 @@ export function LomeLifeImmersive() {
   const reportedCell = useRef('')
   const [nearVehicle, setNearVehicle] = useState(false)
   const [driving, setDriving] = useState(false)
+  // The player's look: chosen on this device, shared by the street, the rooms and the taxi.
+  const [avatar, setAvatar] = useState<Avatar>(DEFAULT_AVATAR)
+  useEffect(() => setAvatar(loadAvatar(localStorage)), [])
+  const chooseAvatar = (next: Partial<Avatar>) =>
+    setAvatar((cur) => {
+      const a = { ...cur, ...next }
+      saveAvatar(localStorage, a)
+      return a
+    })
   const [selectedLot, setSelectedLot] = useState<Lot | null>(null)
   // The real actor behind the player (null when signed out) and the organisation shown
   // inside a house of cooperatives. Buildings are assigned to organisations by the adapter,
@@ -422,9 +441,11 @@ export function LomeLifeImmersive() {
                             ? 'Lieu'
                             : panel === 'cooperative'
                               ? 'Coopérative'
-                              : panel === 'market'
-                                ? 'Marché'
-                                : ''
+                              : panel === 'avatar'
+                                ? 'Mon apparence'
+                                : panel === 'market'
+                                  ? 'Marché'
+                                  : ''
   const needs = life.needs
   const wellbeing = Math.round(NEED_KEYS.reduce((sum, k) => sum + needs[k], 0) / NEED_KEYS.length)
   const pending = eventById(life.pendingEvent)
@@ -984,6 +1005,8 @@ export function LomeLifeImmersive() {
             onPlayerEvents={onPlayerEvents}
             onCameraSync={onCameraSync}
             hasVehicle={cityLife.locality === 'lome' && Boolean(cityLife.vehicle)}
+            avatarModel={avatar.model}
+            avatarPagne={pagneColor(avatar.pagne)}
             camera={camera}
             onCamera={setCamera}
             step={life.trafficStep}
@@ -2303,6 +2326,59 @@ export function LomeLifeImmersive() {
                   </Link>
                 </>
               )}
+              {panel === 'avatar' && (
+                <>
+                  <p className="text-sm text-slate-600">
+                    Le même personnage te suit dans la rue, dans les bâtiments et au volant.
+                    Personnages Kenney (CC0) ; ton choix reste sur cet appareil.
+                  </p>
+                  <div
+                    className="grid grid-cols-2 gap-2 sm:grid-cols-3"
+                    role="group"
+                    aria-label="Choisir mon personnage"
+                  >
+                    {AVATAR_MODELS.map((m) => (
+                      <button
+                        type="button"
+                        key={m.id}
+                        aria-pressed={avatar.model === m.id}
+                        onClick={() => chooseAvatar({ model: m.id })}
+                        className={
+                          'rounded-2xl border p-3 text-left ' +
+                          (avatar.model === m.id
+                            ? 'border-emerald-600 bg-emerald-50'
+                            : 'border-slate-200 bg-white')
+                        }
+                      >
+                        <span className="block text-sm font-black">{m.label}</span>
+                        <span className="block text-[11px] text-slate-500">{m.hint}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <fieldset className="space-y-2">
+                    <legend className="text-sm font-black">Mon pagne</legend>
+                    <div className="flex flex-wrap gap-2">
+                      {PAGNES.map((tone, i) => (
+                        <button
+                          key={tone}
+                          type="button"
+                          aria-label={`Pagne ${i + 1}`}
+                          aria-pressed={avatar.pagne === i + 1}
+                          onClick={() => chooseAvatar({ pagne: i + 1 })}
+                          style={{
+                            background: `repeating-linear-gradient(135deg, ${tone} 0 6px, ${tone}cc 6px 10px)`,
+                          }}
+                          className={`h-10 w-10 rounded-full ${avatar.pagne === i + 1 ? 'ring-4 ring-slate-900' : 'ring-2 ring-white'}`}
+                        />
+                      ))}
+                    </div>
+                  </fieldset>
+                  <p className="text-[11px] text-slate-500">
+                    Animations : marche, course, pas de porte et conduite. Faute de clip de
+                    demi-tour dans le pack, le personnage pivote sur place.
+                  </p>
+                </>
+              )}
               {panel === 'journal' && (
                 <>
                   <p className="text-sm text-slate-600">
@@ -2338,6 +2414,14 @@ export function LomeLifeImmersive() {
                   >
                     Ouvrir HarooVille
                   </Link>
+                  <button
+                    type="button"
+                    onClick={() => open('avatar')}
+                    className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-800"
+                  >
+                    Mon apparence : {AVATAR_MODELS.find((m) => m.id === avatar.model)?.label}, pagne{' '}
+                    {avatar.pagne}
+                  </button>
                   {presence.status === 'ready' && (
                     <button
                       type="button"

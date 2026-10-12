@@ -156,9 +156,10 @@ test('avatar, joystick, collisions, camera and taxi in the single 3D world', asy
   expect(driving.vehicle!.speed).toBeGreaterThan(2)
   await hold(90, 1200, 52) // brake
   await release()
-  await page.waitForTimeout(1200)
+  await expect
+    .poll(async () => Math.abs(((await player()) as Player).vehicle!.speed), { timeout: 6000 })
+    .toBeLessThan(0.6)
   const stoppedCar = (await player()) as Player
-  expect(Math.abs(stoppedCar.vehicle!.speed)).toBeLessThan(0.6)
   expect(
     Math.hypot(
       stoppedCar.vehicle!.x - before.vehicle!.x,

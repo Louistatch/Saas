@@ -1,6 +1,6 @@
 'use client'
 
-import { releaseEntity } from '@/lib/haroolife/city/gpu'
+import { deviceAlive, releaseEntity } from '@/lib/haroolife/city/gpu'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 /**
  * An animated Kenney Mini Character (CC0): a real skinned glTF with its own clips
@@ -23,6 +23,8 @@ const CLIP: Record<NpcAnim, string> = {
   work: 'interact-right',
   pray: 'crouch',
   rest: 'sit',
+  drive: 'drive',
+  enter: 'interact-right',
 }
 
 type Container = {
@@ -39,6 +41,8 @@ export function Character({
   name,
   active = true,
   imperative = false,
+  speed = 1,
+  pagne,
   onEntity,
 }: {
   model: string
@@ -51,6 +55,10 @@ export function Character({
   active?: boolean
   /** True when a rig moves the entity every frame: props place it once, never again. */
   imperative?: boolean
+  /** Playback rate of the current clip (walk cycles match the ground speed). */
+  speed?: number
+  /** Hex colour of a pagne worn as a wrap around the hips, or none. */
+  pagne?: string
   /** Receives the root entity, so a parent can move it imperatively between renders. */
   onEntity?: (e: pc.Entity | null) => void
 }) {
@@ -59,6 +67,7 @@ export function Character({
   const holder = useRef<pc.Entity | null>(null)
   const figure = useRef<pc.Entity | null>(null)
   const current = useRef<string | null>(null)
+  const band = useRef<pc.Entity | null>(null)
 
   // Create the skinned figure once the container is loaded (the first clip is read once).
   // biome-ignore lint/correctness/useExhaustiveDependencies: anim changes are handled below
@@ -71,6 +80,7 @@ export function Character({
     app.root.addChild(root)
     holder.current = root
     figure.current = fig
+    band.current = null
     onEntity?.(root)
     const clips = container.animations
       .map((a) => a.resource as pc.AnimTrack | null)
@@ -142,5 +152,35 @@ export function Character({
       /* clip missing in this model: keep the current one */
     }
   }, [anim])
+  // The pagne: a wrap around the hips in the chosen colour (a flat ring of boxes).
+  useEffect(() => {
+    const root = holder.current
+    if (!root || !app) return
+    if (band.current) {
+      releaseEntity(band.current)
+      band.current = null
+    }
+    if (!pagne) return
+    const e = new pc.Entity('pagne')
+    const mat = new pc.StandardMaterial()
+    mat.diffuse.fromString(pagne)
+    mat.gloss = 0.1
+    mat.update()
+    e.addComponent('render', { type: 'box', material: mat })
+    // Mini characters stand 0.66 units tall, hips at ~0.18: a wrap from the hips to mid-thigh.
+    e.setLocalPosition(0, 0.16, -0.02)
+    e.setLocalScale(0.3, 0.13, 0.22)
+    root.addChild(e)
+    band.current = e
+    return () => {
+      releaseEntity(e)
+      if (deviceAlive(app.graphicsDevice)) mat.destroy()
+      band.current = null
+    }
+  }, [pagne, app, asset])
+  useEffect(() => {
+    const fig = figure.current
+    if (fig?.anim) fig.anim.speed = speed
+  }, [speed])
   return null
 }

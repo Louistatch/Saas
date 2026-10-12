@@ -568,6 +568,8 @@ export default function CityWorld({
   onPlayerEvents,
   onCameraSync,
   hasVehicle,
+  avatarModel = PLAYER_MODEL,
+  avatarPagne,
   camera,
   onCamera,
   step,
@@ -599,6 +601,9 @@ export default function CityWorld({
   onCameraSync: (cam: CameraRig) => void
   /** Whether the player's taxi exists in this town. */
   hasVehicle: boolean
+  /** The player's chosen look: Kenney model and pagne colour (also used indoors). */
+  avatarModel?: string
+  avatarPagne?: string
   /** Low-rate camera state (chunk streaming, labels); the rig moves the real camera. */
   camera: CameraState
   onCamera: (c: CameraState) => void
@@ -752,6 +757,9 @@ export default function CityWorld({
           centerY={centerCell.y}
           onStats={onStats}
           rings={{ near: preset.nearRing, mid: preset.midRing, far: preset.farRing }}
+          detailCells={preset.detailCells}
+          lowCells={preset.lowCells}
+          triangleBudget={preset.triangleBudget}
           hidden={Boolean(scene)}
         />
         {ride ? (
@@ -763,7 +771,8 @@ export default function CityWorld({
             angle={camera.angle}
             distance={24}
             activity={activity}
-            playerModel={PLAYER_MODEL}
+            playerModel={avatarModel}
+            playerPagne={avatarPagne}
             onUse={onUseProp}
           />
         ) : (
@@ -807,7 +816,8 @@ export default function CityWorld({
             <Agents agents={agents} step={step} animated={animated} />
             <PlayerRig
               controller={controller}
-              model={PLAYER_MODEL}
+              model={avatarModel}
+              pagne={avatarPagne}
               vehicleEntity={vehicleEntity}
               onEvents={onPlayerEvents}
               onCameraSync={onCameraSync}

@@ -47,10 +47,78 @@ faite depuis cette session** : suivre le protocole de la baseline sur la Motorol
   déplacement continu ; après reconstruction, `lome-life` + `lome-travel` + `lome-player` + `lome-perf`
   8/8 verts, puis **suite complète 26/26** (desktop + mobile-android, 10,8 min) sur la build committée.
 
+## P0 — rendu PlayCanvas : audit et optimisation de la géométrie
+
+**Audit (hook `__LOME_CHUNKS`, triangles attribués par catégorie et par niveau de détail,
+caméra de suivi à 12 cases, Chromium SwiftShader).** Avant : 25 chunks chargés = 835 k
+triangles, dont les 9 chunks proches 811 k, et **719 k pour les seuls modèles de bâtiments**
+(89 %) ; props 59 k, trottoirs/rues 11 k, mobilier de rue 9 k, sol 3 k ; les 16 chunks lointains
+en volumes colorés ne coûtaient que 24 k. Les modèles Kenney pèsent 1 200 à 5 200 triangles
+chacun (`com-j` 5 246) alors qu'un lot occupe quelques dizaines de pixels à distance moyenne ; le
+frustum ne retirait que 336 k triangles sur 872 k soumis à la caméra proche, et 0 en vue de ville.
+Le coût est donc GPU (sommets, remplissage) et mémoire (≈ 1,5 M sommets × 40 octets en chunks
+fusionnés), pas les draw calls (26). Les squelettes (5 à 7 animés) et le CPU de construction des
+chunks (13 tâches longues au démarrage) viennent ensuite.
+
+**Ce qui a été fait.**
+
+- Sous-chunks de 8 × 8 cases (`SUB`), chacun un maillage fusionné : le culling par frustum
+  travaille sur 4 × plus d'unités ; les volumes lointains restent fusionnés par chunk de 16 × 16
+  pour limiter les draw calls en altitude.
+- Trois niveaux par sous-chunk selon la distance au centre de la caméra : **plein** (modèles
+  complets, props, détails), **simplifié** (`lib/haroolife/city/simplify.ts` : regroupement de
+  sommets sur une grille de 12 cellules par modèle, environ un cinquième des triangles,
+  silhouettes, toits et couleurs conservés, sans petits props), **lointain** (volumes colorés avec
+  toit). Rayons par preset : éco 9 / 22 cases, équilibré 13 / 30, élevé 18 / 40.
+- Budget de triangles visibles par preset (160 k / 320 k / 650 k) : au-delà, le rayon de détail
+  se réduit par paliers ; bien en dessous pendant 8 s, il remonte (hystérésis).
+- Cache GPU borné (72 maillages au-delà des vivants, éviction LRU) : un aller-retour ne
+  reconstruit rien ; changement de niveau = échange du maillage sur l'entité existante.
+- Streaming découpé dans le temps : ≤ 9 ms de construction par tick, les plus proches d'abord,
+  la suite à l'image suivante.
+
+**Mesures après (mêmes caméras, même machine, SwiftShader : tendances, pas des FPS Android).**
+
+| Caméra | Visible avant → après (triangles) | Chargé avant → après | FPS desktop avant → après | p50 / p95 desktop | FPS mobile avant → après | p50 / p95 mobile |
+|---|---|---|---|---|---|---|
+| Suivi à 12 cases (A) | 336 k → 149 k | 835 k → 216 k | 5,3 → 6,1 | 191 / 323 → 154 / 302 | 8,7 → 15,5 | 108 / 193 → 64 / 105 |
+| Recul ×3 (B) | 337 k → 161 k | 835 k → 216 k | 5,8 → 7,1 | 177 / 279 → 137 / 265 | 9,1 → 16,5 | 108 / 169 → 60 / 102 |
+| Vue de la ville (C) | 871 k → 164 k | 835 k → 127 k | 3,4 → 8,9 | 265 / 745 → 110 / 137 | — → 14,9 | — → 67 / 112 |
+
+Scénarios du spec de performance (`lome-perf`, mêmes caméras A–F qu'au D0) après P0 :
+desktop A 5,7 FPS (p50 167, p95 267 ms, 253 k triangles, 35 draw calls, 88 Mo) contre 3,2 FPS
+(299 / 688 ms, 990 k, 186 Mo) au D0 ; mobile A 12,5 FPS (77 / 141 ms) contre 6,5 (158 / 382 ms) ;
+ville détaillée visible en 1,8–2,6 s contre 5,8–6,6 s ; heap 88–112 Mo contre 108–219 Mo.
+Le scénario D (glissement en vue de ville) reste le plus coûteux sur SwiftShader (230 draw calls
+avec les sous-chunks avant la fusion des volumes lointains par chunk, livrée juste après).
+Fichiers : `docs/captures/jalon-d/p0-audit-*.txt`, `p0-perf-*.json` ; captures
+`p0-apres-proche-*.png`, `p0-apres-recul-*.png` (bâtiments proches inchangés, simplifiés au-delà
+du rayon de détail, volumes au loin).
+
+**Non vérifié sur Android réel** : les cibles (≥ 30 FPS) restent à confirmer sur le Motorola
+avec `scripts/haroolife-lan.sh` et le protocole de la baseline.
+
+## D2 — avatar configurable et animations
+
+| Critère | Réalisation | Preuve |
+|---|---|---|
+| Avatar configurable, humain, lisible | Feuille « Mon apparence » (journal) : six personnages Kenney Mini Characters (CC0, `public/haroolife/vendor/kenney-3d/mini-characters`), un pagne porté en pagne-wrap aux hanches dans une des huit couleurs ; choix gardé sur l'appareil (`haroolife.avatar.v1`, jamais écrit côté serveur). Le même modèle et le même pagne servent dans la rue, dans les pièces (`InteriorScene`) et au volant : un seul personnage. | `e2e/lome-avatar.spec.ts` (desktop + mobile) ; captures `d2-apparence-*.png`, `d2-marche-*.png` |
+| Animations | `idle`, `walk`, `sprint` (course), `drive` au volant, `interact-right` au pas de porte (joué 0,55 s quand l'avatar ressort d'un bâtiment) ; transitions 0,15 s ; cadence du cycle de marche asservie à la vitesse au sol (0,6–1,5 ×) pour limiter le glissement des pieds. **Demi-tour** : le pack ne contient pas de clip de pivot, le personnage tourne sur place à 600°/s avec le clip courant (fallback documenté, pas d'erreur). | spec : clip `walk`/`run` en marche, `idle` à l'arrêt, `enter`/`idle` à la sortie |
+| Contact au sol | Origine des modèles Kenney aux pieds ; avatar posé à 0,05 au-dessus du sol du monde ; hauteur du modèle 0,66 u (échelle 1,15). | captures |
+| Joystick et caméra persistants | Inchangés (D1). | `lome-player` vert |
+
+Inventaire des assets : seuls les personnages Kenney (CC0) sont utilisés ; aucun asset
+propriétaire. Limite : silhouettes « mini » stylisées, pas de visage ni de vêtements
+interchangeables — un pack riggé plus réaliste (licence compatible) reste à sourcer pour aller
+plus loin.
+
+Régression : suite Lomé complète **28/28** (desktop + Pixel 7, 10,4 min) sur la build P0 + D2,
+puis `lome-avatar` 2/2 après le réglage de la taille du pagne.
+
 ## Reste à faire (ordre de la mission)
 
-- D0/D2 performance : budget triangles, instancing, LOD personnages, Worker de génération si mesuré.
-- D2 avatars : apparence (tenue, couleurs), pipeline rig/animations étendu (`turn`, `work`, `carry`…), LOD.
+- Performance : LOD des personnages (squelettes), Worker de génération si mesuré, compression des GLB/textures.
+- D2 suite : pack de personnages plus réalistes sous licence compatible, clips `turn`/`work`/`carry`, LOD des squelettes.
 - D3 : zémidjan (chauffeur/passager) et car interurbain par chunks ; trafic PNJ avec collisions simplifiées.
 - D4 agriculture/construction/coopérative/ouvriers/acheteurs en parcours verticaux ; D5 présence temps réel
   (Presence + Broadcast privés) ; D6 déclinaison régionale ; D7 campagne Android réelle et vidéos.
