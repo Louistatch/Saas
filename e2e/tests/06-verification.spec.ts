@@ -1,9 +1,12 @@
-import { test, expect } from '../fixtures/base.fixture'
-import { VerifyPage } from '../pages/verify.page'
+import { expect, test } from '../fixtures/base.fixture'
 import { TEST_PREFIX } from '../helpers/constants'
+import { VerifyPage } from '../pages/verify.page'
 
 test.describe('Scenario 6: QR Verification & Mobile', () => {
-  test('valid card number shows "MEMBRE VÉRIFIÉ" with member details', async ({ page, testData }) => {
+  test('valid card number shows "MEMBRE VÉRIFIÉ" with member details', async ({
+    page,
+    testData,
+  }) => {
     const coopId = await testData.getCoopId('coop-admin@demo.local')
     if (!coopId) {
       test.skip(true, 'Could not determine cooperative ID')
@@ -53,7 +56,10 @@ test.describe('Scenario 6: QR Verification & Mobile', () => {
     await verifyPage.expectExpired()
   })
 
-  test('loading state shows spinner with "Vérification en cours..."', async ({ page, testData }) => {
+  test('loading state shows spinner with "Vérification en cours..."', async ({
+    page,
+    testData,
+  }) => {
     const coopId = await testData.getCoopId('coop-admin@demo.local')
     if (!coopId) {
       test.skip(true, 'Could not determine cooperative ID')
@@ -78,7 +84,10 @@ test.describe('Scenario 6: QR Verification & Mobile', () => {
     await verifyPage.waitForResult()
   })
 
-  test('verification page displays locality, phone, cooperative, and cotisation data', async ({ page, testData }) => {
+  test('verification page displays locality, phone, cooperative, and cotisation data', async ({
+    page,
+    testData,
+  }) => {
     const coopId = await testData.getCoopId('coop-admin@demo.local')
     if (!coopId) {
       test.skip(true, 'Could not determine cooperative ID')

@@ -1,4 +1,4 @@
-import { type Page, type Locator, expect } from '@playwright/test'
+import { type Locator, type Page, expect } from '@playwright/test'
 import { ROUTES } from '../helpers/constants'
 
 export class MarketplaceAdminPage {

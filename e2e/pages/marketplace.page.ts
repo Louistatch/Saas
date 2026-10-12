@@ -1,4 +1,4 @@
-import { type Page, type Locator, expect } from '@playwright/test'
+import { type Locator, type Page, expect } from '@playwright/test'
 import { ROUTES } from '../helpers/constants'
 
 export class MarketplacePage {
@@ -79,9 +79,11 @@ export class MarketplacePage {
 
   async expectFichesDisplayed() {
     // Wait for loading to complete
-    await expect(this.page.getByText(/Aucune fiche/i)).not.toBeVisible({ timeout: 5_000 }).catch(() => {
-      // It's ok if there are no fiches in staging
-    })
+    await expect(this.page.getByText(/Aucune fiche/i))
+      .not.toBeVisible({ timeout: 5_000 })
+      .catch(() => {
+        // It's ok if there are no fiches in staging
+      })
   }
 
   async getFicheCount(): Promise<number> {

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import { ROUTES } from '../helpers/constants'
 
 test.describe('Scenario 1: Navigation & UX', () => {
@@ -7,7 +7,7 @@ test.describe('Scenario 1: Navigation & UX', () => {
     expect(response?.status()).toBe(200)
 
     await expect(
-      page.getByRole('heading', { name: /Donnez du pouvoir à votre coopérative agricole/i })
+      page.getByRole('heading', { name: /Donnez du pouvoir à votre coopérative agricole/i }),
     ).toBeVisible()
 
     // CTA buttons — use .first() to avoid strict mode with multiple matches
@@ -35,7 +35,7 @@ test.describe('Scenario 1: Navigation & UX', () => {
   test('marketplace page loads with correct heading', async ({ page }) => {
     await page.goto(ROUTES.marketplace)
     await expect(
-      page.getByRole('heading', { name: /Comptes d'exploitation agricole/i })
+      page.getByRole('heading', { name: /Comptes d'exploitation agricole/i }),
     ).toBeVisible()
   })
 
@@ -78,16 +78,21 @@ test.describe('Scenario 1: Navigation & UX', () => {
       await page.goto(ROUTES.home)
 
       // Look for mobile menu button (hamburger)
-      const menuButton = page.locator('button[aria-label*="menu" i]').or(
-        page.locator('button[aria-label*="Ouvrir" i]')
-      )
+      const menuButton = page
+        .locator('button[aria-label*="menu" i]')
+        .or(page.locator('button[aria-label*="Ouvrir" i]'))
 
-      if (await menuButton.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+      if (
+        await menuButton
+          .first()
+          .isVisible({ timeout: 3000 })
+          .catch(() => false)
+      ) {
         await menuButton.first().click()
         // Use header-specific link to avoid footer duplicates
-        await expect(
-          page.getByRole('banner').getByRole('link', { name: /À propos/i })
-        ).toBeVisible({ timeout: 5000 })
+        await expect(page.getByRole('banner').getByRole('link', { name: /À propos/i })).toBeVisible(
+          { timeout: 5000 },
+        )
       }
     })
 
@@ -101,7 +106,9 @@ test.describe('Scenario 1: Navigation & UX', () => {
         const bodyWidth = await page.evaluate(() => document.body.scrollWidth)
         const viewportWidth = await page.evaluate(() => window.innerWidth)
         // Allow 30px tolerance (scrollbar + minor overflow)
-        expect(bodyWidth, `${route} should not have horizontal scroll`).toBeLessThanOrEqual(viewportWidth + 30)
+        expect(bodyWidth, `${route} should not have horizontal scroll`).toBeLessThanOrEqual(
+          viewportWidth + 30,
+        )
       }
     })
   })

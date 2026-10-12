@@ -1,6 +1,6 @@
-import { test, expect } from '../fixtures/base.fixture'
+import { expect, test } from '../fixtures/base.fixture'
+import { TEST_PREFIX } from '../helpers/constants'
 import { CardsPage } from '../pages/cards.page'
-import { TEST_PREFIX, } from '../helpers/constants'
 
 test.describe('Scenario 4: Card Generation', () => {
   test('cards page loads with generate button', async ({ coopAdminPage }) => {
@@ -87,7 +87,10 @@ test.describe('Scenario 4: Card Generation', () => {
     expect(card.qr_data).toContain(card.card_number)
   })
 
-  test('card renewal extends expiry without creating duplicate', async ({ coopAdminPage, testData }) => {
+  test('card renewal extends expiry without creating duplicate', async ({
+    coopAdminPage,
+    testData,
+  }) => {
     const coopId = await testData.getCoopId('coop-admin@demo.local')
     if (!coopId) {
       test.skip(true, 'Could not determine cooperative ID')
@@ -119,7 +122,10 @@ test.describe('Scenario 4: Card Generation', () => {
     expect(newCount).toBe(initialCount)
   })
 
-  test('bulk generation creates cards for multiple members', async ({ coopAdminPage, testData }) => {
+  test('bulk generation creates cards for multiple members', async ({
+    coopAdminPage,
+    testData,
+  }) => {
     const coopId = await testData.getCoopId('coop-admin@demo.local')
     if (!coopId) {
       test.skip(true, 'Could not determine cooperative ID')

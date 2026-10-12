@@ -6,7 +6,9 @@ on:
       - 'components/haroolife/**'
       - 'lib/haroolife/**'
       - 'app/haroolife/**'
-      - 'e2e/lome-life*'
+      - 'app/api/haroolife/**'
+      - 'e2e/lome-*'
+      - 'e2e/fixtures/**'
       - '.github/workflows/haroolife-lome-browser.yml'
       - 'package.json'
       - 'package-lock.json'
@@ -18,7 +20,8 @@ permissions:
 jobs:
   webgl-browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    # Build (~3 min) + 18 tests on two viewports in software WebGL (~21 min locally).
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,12 +32,21 @@ jobs:
         run: npm ci
       - name: Install local Chromium with headless WebGL drivers
         run: npx playwright install --with-deps chromium
+      - name: Start the local Supabase stand-in (fixtures only, no real backend)
+        run: |
+          node e2e/fixtures/mock-supabase.mjs > mock-supabase.log 2>&1 &
+          for i in $(seq 1 20); do
+            curl -sf -o /dev/null -X POST http://127.0.0.1:54329/__reset && break
+            sleep 1
+          done
       - name: Verify desktop and Android-sized browser locally (NO deployment)
-        # Public, dummy values only. Needed because the parent app mounts its
-        # existing Supabase context for every page; no real backend is contacted.
+        # Dummy values pointing at the stand-in above; nothing leaves the runner.
         env:
-          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiJ9.placeholder
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54329
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: e2e-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: e2e-service
+          HAROOLIFE_ENABLED: 'true'
+          NEXT_PUBLIC_HAROOLIFE_ENABLED: 'true'
         run: npx playwright test --config=e2e/lome-life-playwright.config.ts
       - name: Keep desktop/mobile screenshots and failure traces
         if: always()
@@ -44,5 +56,9 @@ jobs:
           path: |
             test-results/lome-visual
             test-results/lome-report
+            test-results/lome-cooperative
+            test-results/lome-city
+            test-results/lome-perf
             test-results/**/*.zip
+            mock-supabase.log
           retention-days: 7

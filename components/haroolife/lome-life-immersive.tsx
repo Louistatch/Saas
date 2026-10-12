@@ -1,5 +1,57 @@
 'use client'
 
+import { type Prop, animFor, layoutFor } from '@/lib/haroolife/city/interiors'
+import {
+  type CityAction,
+  type CityLife,
+  type Interior,
+  actionsFor,
+  arrive,
+  cityInteract,
+  decodeCityLife,
+  fromLegacy,
+  goToEstate,
+  goToLot,
+  goToPoint,
+  initialCityLife,
+  interiorFor,
+  lotAtDoor,
+  payRide,
+  roadsOf,
+  stepDir,
+  stopActivity,
+  useProp,
+  walkStep,
+} from '@/lib/haroolife/city/life'
+import { findPath } from '@/lib/haroolife/city/navigation'
+import { bump } from '@/lib/haroolife/city/perf'
+import {
+  PRESETS,
+  type Quality,
+  SLOW_FRAME_FPS,
+  detectQuality,
+  lowerQuality,
+  rememberQuality,
+} from '@/lib/haroolife/city/quality'
+import {
+  CATEGORY_LABELS,
+  CATEGORY_OF,
+  type Category,
+  DISTRICTS,
+  type Lot,
+  TYPE_ICONS,
+  TYPE_LABELS,
+  placeName as cityPlaceName,
+  landmarks,
+  landmarksIn,
+  lotAt as lotAtCell,
+  lotById,
+  toWorld,
+} from '@/lib/haroolife/city/world'
+import { type Actor, type OrgRef, primaryOrganization } from '@/lib/haroolife/domain/actor'
+import { createInteractionEngine } from '@/lib/haroolife/domain/engine'
+import { HttpAggregationService, HttpIdentityAdapter } from '@/lib/haroolife/domain/http'
+import { GameWorldAdapter } from '@/lib/haroolife/domain/services'
 import {
   CITIES,
   CITY_IDS,
@@ -21,18 +73,13 @@ import {
   type Transport,
   advanceLifeHour,
   buildInLome,
-  chooseTransport,
   decodeLomeLife,
   demolishInLome,
-  directTo,
   initialLomeLife,
   interact,
   jobVenue,
   selectCity,
   selectJob,
-  skipTravel,
-  stepPlayer,
-  walkLifeStep,
 } from '@/lib/haroolife/lome-life-engine'
 import { placeResidents, residentsAt } from '@/lib/haroolife/lome-presence'
 import { BILLBOARDS, PARTNER_APPS, billboardById } from '@/lib/haroolife/lome-sponsors'
@@ -60,10 +107,14 @@ import {
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { CAMERA_HOME, type CameraState } from './city/city-world'
+import CooperativePanel from './city/cooperative-panel'
+import MarketPanel from './city/market-panel'
+import OnboardingSteps from './city/onboarding'
 import { sayOnPlace, usePresence } from './use-presence'
 
-const World3D = dynamic(() => import('./city-world-3d'), {
+const CityWorld = dynamic(() => import('./city/city-world'), {
   ssr: false,
   loading: () => (
     <div className="flex h-full items-center justify-center bg-[#9bbd9d] text-sm font-bold text-white">
@@ -73,6 +124,7 @@ const World3D = dynamic(() => import('./city-world-3d'), {
 })
 const RideOverlay = dynamic(() => import('./travel-scene-3d'), { ssr: false })
 const STORAGE = 'haroolife.lome-life.v1'
+const CITY_STORAGE = 'haroolife.lome-city.v1'
 type Dir = [-1 | 0 | 1, -1 | 0 | 1]
 const KEYS: Record<string, Dir> = {
   arrowup: [0, -1],
@@ -102,6 +154,9 @@ type Sheet =
   | 'missions'
   | 'journal'
   | 'billboard'
+  | 'lot'
+  | 'cooperative'
+  | 'market'
   | null
 type Mode = 'walk' | 'build' | 'demolish'
 const money = (n: number) => new Intl.NumberFormat('fr-FR').format(n) + ' FCFA'
@@ -195,7 +250,93 @@ function DailyStatus({ life }: { life: LifeState }) {
 }
 
 export function LomeLifeImmersive() {
-  const [life, setLife] = useState<LifeState>(initialLomeLife)
+  bump('immersive')
+  const [cityLife, setCityLife] = useState<CityLife>(initialCityLife)
+  const life = cityLife.life
+  const setLife = useCallback(
+    (next: LifeState | ((old: LifeState) => LifeState)) =>
+      setCityLife((c) => ({ ...c, life: typeof next === 'function' ? next(c.life) : next })),
+    [],
+  )
+  const [camera, setCamera] = useState<CameraState>(() => CAMERA_HOME(cityLife.at.x, cityLife.at.y))
+  const [follow, setFollow] = useState(true)
+  const [selectedLot, setSelectedLot] = useState<Lot | null>(null)
+  // The real actor behind the player (null when signed out) and the organisation shown
+  // inside a house of cooperatives. Buildings are assigned to organisations by the adapter,
+  // never the other way round: the domain layer knows nothing about PlayCanvas.
+  const [actor, setActor] = useState<Actor | null>(null)
+  const [coopOrg, setCoopOrg] = useState<OrgRef | null>(null)
+  const worldAdapter = useMemo(
+    () => new GameWorldAdapter(landmarks().filter((l) => l.type === 'cooperative')),
+    [],
+  )
+  useEffect(() => {
+    let alive = true
+    new HttpIdentityAdapter().me().then((a) => alive && setActor(a))
+    return () => {
+      alive = false
+    }
+  }, [])
+  // One engine per world: commands go to the real services, events feed the HUD notice.
+  const engine = useMemo(() => {
+    const svc = new HttpAggregationService()
+    return createInteractionEngine({ teams: svc, land: svc, parcels: svc })
+  }, [])
+  useEffect(() => {
+    const labels: Record<string, string> = {
+      WorkerGroupCreated: 'Recrutement ouvert.',
+      WorkerJoined: 'Un ouvrier a rejoint l’équipe.',
+      WorkerLeft: 'Un ouvrier a quitté l’équipe.',
+      WorkerGroupReady: 'Effectif atteint : l’équipe est prête.',
+      WorkerGroupExpired: 'Délai de constitution dépassé.',
+      LandPledged: 'Surface engagée dans le regroupement.',
+    }
+    return engine.events.on('*', (e) => {
+      const text = labels[e.type]
+      if (text) setNotice(text)
+    })
+  }, [engine])
+  const myOrg = actor ? primaryOrganization(actor) : null
+  const myCoopLot = myOrg ? worldAdapter.lotForOrganization(myOrg) : null
+  const [cityFilter, setCityFilter] = useState<Category | 'all'>('all')
+  const [chunkStats, setChunkStats] = useState({
+    chunks: 0,
+    buildings: 0,
+    tris: 0,
+    detailed: false,
+  })
+  const frameRef = useRef({ drawCalls: 0, fps: 0 })
+  const [quality, setQuality] = useState<Quality>('balanced')
+  useEffect(() => setQuality(detectQuality()), [])
+  // Adaptive quality: when frames stay slow for two consecutive checks the preset steps down
+  // (the machine, not the player, decides), so the interface never freezes behind the renderer.
+  const slowChecks = useRef(0)
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const fps = frameRef.current.fps
+      if (!(fps > 0) || document.visibilityState !== 'visible') return
+      if (fps >= SLOW_FRAME_FPS) {
+        slowChecks.current = 0
+        return
+      }
+      slowChecks.current += 1
+      if (slowChecks.current < 2) return
+      slowChecks.current = 0
+      setQuality((q) => {
+        const lower = lowerQuality(q)
+        if (!lower) return q
+        setNotice(`Qualité graphique réduite (${PRESETS[lower].label}) pour rester fluide.`)
+        return lower
+      })
+    }, 3000)
+    return () => window.clearInterval(id)
+  }, [])
+  const heading = useRef(180)
+  const insideAny = Boolean(cityLife.insideLot || life.inside)
+  const interior = cityLife.insideLot
+    ? interiorFor(lotById(cityLife.insideLot)?.type ?? 'lot')
+    : (life.inside as Interior | null)
+  const doorLot = lotAtDoor(cityLife)
   const [loaded, setLoaded] = useState(false)
   const [webgl, setWebgl] = useState<boolean | null>(null)
   const [panel, setPanel] = useState<Sheet>(null)
@@ -209,7 +350,10 @@ export function LomeLifeImmersive() {
   const [billboard, setBillboard] = useState<string | null>(null)
   const board = billboardById(billboard)
   const cityDef = CITIES[life.cityId]
-  const whereAmI = placeNameAt(life.cityId, life.pos.x, life.pos.y)
+  const whereAmI =
+    life.cityId === 'lome'
+      ? cityPlaceName(cityLife.at.x, cityLife.at.y)
+      : placeNameAt(life.cityId, life.pos.x, life.pos.y)
   const [chatDraft, setChatDraft] = useState('')
   const [chat, setChat] = useState<{ by: 'me' | 'npc'; body: string }[]>([
     {
@@ -243,7 +387,13 @@ export function LomeLifeImmersive() {
                         ? 'Journal de vie'
                         : panel === 'billboard'
                           ? 'Panneau publicitaire'
-                          : ''
+                          : panel === 'lot'
+                            ? 'Lieu'
+                            : panel === 'cooperative'
+                              ? 'Coopérative'
+                              : panel === 'market'
+                                ? 'Marché'
+                                : ''
   const needs = life.needs
   const wellbeing = Math.round(NEED_KEYS.reduce((sum, k) => sum + needs[k], 0) / NEED_KEYS.length)
   const pending = eventById(life.pendingEvent)
@@ -255,10 +405,20 @@ export function LomeLifeImmersive() {
   )
   const hereNow = life.inside ? residentsAt(visitors, life.inside) : []
   const rain = (here?.sky[0]?.precipitation_probability ?? 0) >= 50
-  const destinationName = life.target
-    ? (LIFE_LOCATIONS.find((x) => x.x === life.target!.x && x.y === life.target!.y)?.name ??
-      'ta destination')
-    : 'ta destination'
+  const targetLot = cityLife.target ? lotById(cityLife.target) : null
+  const destinationName = targetLot
+    ? (targetLot.name ?? TYPE_LABELS[targetLot.type])
+    : life.target
+      ? (LIFE_LOCATIONS.find((x) => x.x === life.target!.x && x.y === life.target!.y)?.name ??
+        'ta destination')
+      : 'ta destination'
+  if (cityLife.route.length) {
+    const n = cityLife.route[0]
+    heading.current = Math.round(
+      (Math.atan2(n.x - cityLife.at.x, n.y - cityLife.at.y) * 180) / Math.PI,
+    )
+  }
+  const playerHeading = heading.current
   const [placeDraft, setPlaceDraft] = useState('')
   const [placeError, setPlaceError] = useState('')
   const [placeBusy, setPlaceBusy] = useState(false)
@@ -276,16 +436,15 @@ export function LomeLifeImmersive() {
     }
   }
   const mood = wellbeing >= 75 ? 'Heureux' : wellbeing >= 40 ? 'Bien' : 'Fatigué'
-  const status = life.route.length
-    ? 'En chemin vers ' +
-      (life.target
-        ? (LIFE_LOCATIONS.find((x) => x.x === life.target!.x && x.y === life.target!.y)?.name ??
-          'une destination')
-        : 'une destination') +
-      '…'
-    : life.inside
-      ? 'À l’intérieur : ' + (VENUE_LABELS[life.inside] ?? life.inside)
-      : life.lastEvent
+  const status = cityLife.route.length
+    ? 'En chemin vers ' + destinationName + '…'
+    : cityLife.insideLot
+      ? 'À l’intérieur : ' +
+        (lotById(cityLife.insideLot)?.name ??
+          TYPE_LABELS[lotById(cityLife.insideLot)?.type ?? 'lot'])
+      : life.inside
+        ? 'À l’intérieur : ' + (VENUE_LABELS[life.inside] ?? life.inside)
+        : life.lastEvent
   const missions = [
     { done: life.spent >= 650, text: 'Acheter un repas dans un commerce' },
     { done: life.earned > 0, text: 'Effectuer une journée de travail' },
@@ -299,33 +458,167 @@ export function LomeLifeImmersive() {
   useEffect(() => {
     try {
       setWebgl(Boolean(document.createElement('canvas').getContext('webgl2')))
-      const raw = localStorage.getItem(STORAGE)
-      if (raw) {
-        const save = decodeLomeLife(JSON.parse(raw))
-        if (save) setLife(save)
+      const rawCity = localStorage.getItem(CITY_STORAGE)
+      const city = rawCity ? decodeCityLife(JSON.parse(rawCity)) : null
+      if (city) {
+        setCityLife(city)
+        setCamera(CAMERA_HOME(city.at.x, city.at.y))
+      } else {
+        const raw = localStorage.getItem(STORAGE)
+        const save = raw ? decodeLomeLife(JSON.parse(raw)) : null
+        if (save) {
+          const migrated = fromLegacy(save)
+          setCityLife(migrated)
+          setCamera(CAMERA_HOME(migrated.at.x, migrated.at.y))
+        }
       }
     } catch {
       setWebgl(false)
     }
     setLoaded(true)
   }, [])
-  useEffect(() => {
-    if (!loaded) return
+  // Autosave is throttled: serialising the whole city on every walking step cost more than
+  // the step itself on slow machines. One pending timer writes the latest state (it is never
+  // cancelled by a newer change, so a busy main thread cannot starve it); the tab hiding
+  // flushes immediately.
+  const pendingSave = useRef<CityLife | null>(null)
+  const saveTimer = useRef<number | null>(null)
+  const flushSave = useCallback(() => {
+    saveTimer.current = null
+    if (!pendingSave.current) return
     try {
-      localStorage.setItem(STORAGE, JSON.stringify(life))
+      localStorage.setItem(CITY_STORAGE, JSON.stringify(pendingSave.current))
     } catch {
       /* Offline game supports blocked storage. */
     }
-  }, [life, loaded])
-  // Navigation advances automatically while the page is visible; no whole-hour penalty per road tile.
+    pendingSave.current = null
+  }, [])
   useEffect(() => {
-    if (!life.route.length || life.inside || riding) return
-    const ms = transport === 'walk' ? 670 : transport === 'moto' ? 360 : 250
-    const id = window.setInterval(() => {
-      if (document.visibilityState === 'visible') setLife((old) => walkLifeStep(old))
-    }, ms)
+    if (!loaded) return
+    pendingSave.current = cityLife
+    if (saveTimer.current === null) saveTimer.current = window.setTimeout(flushSave, 400)
+  }, [cityLife, loaded, flushSave])
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') flushSave()
+    }
+    window.addEventListener('pagehide', flushSave)
+    document.addEventListener('visibilitychange', onHide)
+    return () => {
+      window.removeEventListener('pagehide', flushSave)
+      document.removeEventListener('visibilitychange', onHide)
+      flushSave()
+    }
+  }, [flushSave])
+  // Live state for the end-to-end tests (chunks loaded, buildings, position, interior).
+  useEffect(() => {
+    const room = cityLife.insideLot
+      ? interiorFor(lotById(cityLife.insideLot)?.type ?? 'lot')
+      : (life.inside as Interior | null)
+    const layout = room ? layoutFor(room) : null
+    ;(window as unknown as { __LOME_CITY?: unknown }).__LOME_CITY = {
+      ...chunkStats,
+      ...frameRef.current,
+      quality,
+      at: cityLife.at,
+      route: cityLife.route.length,
+      inside: cityLife.insideLot ?? life.inside,
+      interiorProps: layout?.props.length ?? 0,
+      npcs: layout?.npcs.length ?? 0,
+      activity: cityLife.activity,
+      fitness: cityLife.fitness,
+      energy: life.needs.energy,
+      hour: life.hour,
+      actor: actor ? { id: actor.id, organizations: actor.organizations.length } : null,
+      myCoopLot: myCoopLot?.id ?? null,
+      camera,
+      riding,
+      transport,
+      panel,
+      wallet: life.wallet,
+      lastEvent: life.lastEvent,
+    }
+  }, [
+    riding,
+    transport,
+    panel,
+    life.wallet,
+    life.lastEvent,
+    actor,
+    myCoopLot,
+    camera,
+    chunkStats,
+    quality,
+    cityLife.at,
+    cityLife.route.length,
+    cityLife.insideLot,
+    cityLife.activity,
+    cityLife.fitness,
+    life.inside,
+    life.needs.energy,
+    life.hour,
+  ])
+  // Entering a house of cooperatives opens the dashboard of the organisation housed there
+  // (the player's own when it is the right building, otherwise the first one assigned).
+  useEffect(() => {
+    const lot = cityLife.insideLot ? lotById(cityLife.insideLot) : null
+    if (!lot || lot.type !== 'cooperative') return
+    const housed = actor ? worldAdapter.organizationsAt(lot, actor.organizations) : []
+    setCoopOrg(housed[0] ?? myOrg)
+    setPanel('cooperative')
+  }, [cityLife.insideLot, actor, myOrg, worldAdapter])
+  // An activity animation lasts a few seconds, then the player stands idle again.
+  useEffect(() => {
+    if (!cityLife.activity) return
+    const id = window.setTimeout(() => setCityLife((old) => stopActivity(old)), 3200)
+    return () => window.clearTimeout(id)
+  }, [cityLife.activity])
+  // The camera follows the player while walking, until the player pans by hand.
+  useEffect(() => {
+    if (!follow) return
+    setCamera((c) => {
+      const home = CAMERA_HOME(cityLife.at.x, cityLife.at.y)
+      return { ...c, tx: home.tx, tz: home.tz }
+    })
+  }, [cityLife.at.x, cityLife.at.y, follow])
+  // Navigation advances automatically while the page is visible; no whole-hour penalty per road tile.
+  // The pace is wall-clock based: when the main thread is busy (software WebGL, slow phone)
+  // a late timer advances the cells it owes, so a route takes the same time on any device.
+  // The clock lives in a ref: each step re-renders and re-creates the effect, and the time
+  // already elapsed towards the next cell must survive that.
+  const walkClock = useRef(0)
+  useEffect(() => {
+    if (!cityLife.route.length || insideAny || riding) {
+      walkClock.current = 0
+      return
+    }
+    const ms = transport === 'walk' ? 420 : transport === 'moto' ? 220 : 160
+    if (!walkClock.current) walkClock.current = performance.now()
+    const dbg = { ticks: 0, steps: 0, hidden: 0, created: Math.round(performance.now()) }
+    ;(window as unknown as { __LOME_WALK?: unknown }).__LOME_WALK = dbg
+    const id = window.setInterval(
+      () => {
+        dbg.ticks += 1
+        if (document.visibilityState !== 'visible') {
+          dbg.hidden += 1
+          walkClock.current = performance.now()
+          return
+        }
+        const now = performance.now()
+        const owed = Math.min(8, Math.floor((now - walkClock.current) / ms))
+        if (owed <= 0) return
+        dbg.steps += owed
+        walkClock.current += owed * ms
+        setCityLife((old) => {
+          let next = old
+          for (let i = 0; i < owed && next.route.length; i++) next = walkStep(next)
+          return next
+        })
+      },
+      Math.min(ms, 100),
+    )
     return () => window.clearInterval(id)
-  }, [life.route.length, life.inside, transport, riding])
+  }, [cityLife.route.length, insideAny, transport, riding])
   useEffect(() => {
     if (!playing) return
     const id = window.setInterval(() => {
@@ -351,33 +644,38 @@ export function LomeLifeImmersive() {
       if (!dir) return
       e.preventDefault()
       setPanel(null)
-      setLife((old) => stepPlayer(old, dir[0], dir[1]))
+      setFollow(true)
+      setCityLife((old) => stepDir(old, dir[0], dir[1]))
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
   useEffect(() => {
-    if (riding && (life.route.length === 0 || life.inside)) setRiding(false)
-  }, [riding, life.route.length, life.inside])
+    if (riding && (cityLife.route.length === 0 || insideAny)) setRiding(false)
+  }, [riding, cityLife.route.length, insideAny])
   // A ride lasts a few seconds on the boulevard (longer for a longer route), then lands.
   useEffect(() => {
     if (!riding) return
-    const ms = 4000 + 600 * life.route.length
+    const ms = 4000 + Math.min(6000, 120 * cityLife.route.length)
     const id = window.setTimeout(() => {
       setRiding(false)
-      setLife((old) => skipTravel(old))
+      setCityLife((old) => arrive(old))
     }, ms)
     return () => window.clearTimeout(id)
-  }, [riding, life.route.length])
+  }, [riding, cityLife.route.length])
   // Street traffic keeps moving while the player stands still (only when the tab is visible).
   useEffect(() => {
-    if (life.inside) return
+    if (insideAny) return
     const id = window.setInterval(() => {
       if (document.visibilityState === 'visible')
-        setLife((old) => (old.route.length ? old : { ...old, trafficStep: old.trafficStep + 1 }))
-    }, 900)
+        setCityLife((old) =>
+          old.route.length
+            ? old
+            : { ...old, life: { ...old.life, trafficStep: old.life.trafficStep + 1 } },
+        )
+    }, 700)
     return () => window.clearInterval(id)
-  }, [life.inside])
+  }, [insideAny])
 
   function open(id: Exclude<Sheet, null>) {
     setPanel((cur) => (cur === id ? null : id))
@@ -388,15 +686,103 @@ export function LomeLifeImmersive() {
     setPanel(null)
     setSelection({ x, y })
     setTransport('walk')
-    setLife((old) => directTo(old, { x, y }))
+    setFollow(true)
+    setCityLife((old) => goToEstate(old, x, y))
+  }
+  function goLot(lot: Lot) {
+    setMode('walk')
+    setPanel(null)
+    setTransport('walk')
+    setFollow(true)
+    setCityLife((old) => goToLot(old, lot))
+  }
+  function rideTo(lot: Lot, t: Transport) {
+    if (life.wallet < TRAVEL_COST[t]) {
+      setNotice('Solde insuffisant pour ce transport fictif.')
+      goLot(lot)
+      return
+    }
+    setMode('walk')
+    setPanel(null)
+    setFollow(true)
+    setTransport(t)
+    setCityLife((old) => {
+      const going = goToLot(old, lot)
+      return going.route.length ? payRide(going, t) : going
+    })
+    setRiding(true)
   }
   function action(a: Action) {
+    if (a === 'enter' && !insideAny && doorLot && !life.target) {
+      setCityLife((old) => cityInteract(old, 'enter'))
+      setPanel(null)
+      return
+    }
+    if (a === 'leave' && cityLife.insideLot) {
+      setCityLife((old) => cityInteract(old, 'leave'))
+      setPanel(null)
+      return
+    }
     setLife((old) => interact(old, a))
     if (a === 'enter' || a === 'leave') setPanel(null)
   }
+  function cityAction(a: CityAction) {
+    if (a === 'offers') {
+      setPanel('market')
+      return
+    }
+    if (a === 'coop') {
+      setCoopOrg((cur) => cur ?? myOrg)
+      setPanel('cooperative')
+      return
+    }
+    setCityLife((old) => cityInteract(old, a))
+    if (a === 'enter' || a === 'leave') setPanel(null)
+  }
+  /** « Ma coopérative » : the camera flies to the building that houses the player's organisation. */
+  function goMyCooperative() {
+    if (!myCoopLot) {
+      setNotice(
+        actor
+          ? 'Votre compte n’est rattaché à aucune coopérative.'
+          : 'Connectez-vous pour retrouver votre coopérative.',
+      )
+      open('home')
+      return
+    }
+    setMode('walk')
+    setFollow(false)
+    setCoopOrg(myOrg)
+    setSelectedLot(myCoopLot)
+    setCamera(CAMERA_HOME(myCoopLot.door.x, myCoopLot.door.y))
+    setPanel('lot')
+    setNotice(null)
+  }
+  function useEquipment(p: Prop) {
+    if (!p.action) return
+    setPanel(null)
+    if (cityLife.insideLot) {
+      setCityLife((old) => useProp(old, p.id))
+      return
+    }
+    // Estate interiors keep their original actions; the animation plays on the prop.
+    action(p.action as Action)
+    setCityLife((old) => ({ ...old, activity: { prop: p.id, anim: animFor(p.kind) } }))
+  }
+  /** Starts an activity from the sheet: the first prop in the room that offers it. */
+  function startActivity(a: CityAction) {
+    const room = cityLife.insideLot ? interiorFor(lotById(cityLife.insideLot)?.type ?? 'lot') : null
+    const prop = room ? layoutFor(room).props.find((p) => p.action === a) : null
+    if (prop) useEquipment(prop)
+    else cityAction(a)
+  }
   function tile(x: number, y: number) {
     setSelection({ x, y })
-    if (mode === 'walk') setLife((old) => directTo(old, { x, y }))
+    if (mode === 'walk') {
+      setFollow(true)
+      const built = life.city.buildings.some((b) => b.x === x && b.y === y && b.type !== 'road')
+      setCityLife((old) => (built ? goToEstate(old, x, y) : goToPoint(old, toWorld({ x, y }))))
+    }
     if (mode === 'build') setLife((old) => buildInLome(old, x, y, building))
     if (mode === 'demolish') setLife((old) => demolishInLome(old, x, y))
   }
@@ -405,12 +791,12 @@ export function LomeLifeImmersive() {
       setNotice('Solde insuffisant pour ce transport fictif.')
       return
     }
-    if (life.route.length === 0) {
+    if (cityLife.route.length === 0) {
       setNotice('Choisis d’abord une destination.')
       return
     }
     setTransport(t)
-    setLife((old) => chooseTransport(old, t))
+    setCityLife((old) => payRide(old, t))
     setRiding(t !== 'walk')
     setPanel(null)
   }
@@ -433,7 +819,8 @@ export function LomeLifeImmersive() {
   }
   function reset() {
     if (!window.confirm('Recommencer uniquement ta partie fictive de Lomé Life ?')) return
-    setLife(initialLomeLife())
+    setCityLife(initialCityLife())
+    setCamera(CAMERA_HOME(initialCityLife().at.x, initialCityLife().at.y))
     setPanel(null)
     setMode('walk')
     setTransport('walk')
@@ -453,25 +840,72 @@ export function LomeLifeImmersive() {
             </p>
           </div>
         ) : (
-          <World3D
-            immersive
+          <CityWorld
             city={life.city}
-            life={life}
-            inspect={selection}
+            tool={mode === 'walk' ? 'inspect' : mode === 'demolish' ? 'demolish' : building}
+            selected={selection}
             onTile={tile}
-            onInteriorAction={action}
+            player={cityLife.at}
+            playerRotation={playerHeading}
+            moving={cityLife.route.length > 0}
+            camera={camera}
+            onCamera={(c) => {
+              if (c.tx !== camera.tx || c.tz !== camera.tz) setFollow(false)
+              setCamera(c)
+            }}
+            step={life.trafficStep}
+            hour={life.hour}
+            interior={interior}
+            interiorTitle={
+              cityLife.insideLot
+                ? (lotById(cityLife.insideLot)?.name ??
+                  TYPE_LABELS[lotById(cityLife.insideLot)?.type ?? 'lot'])
+                : (VENUE_LABELS[life.inside ?? ''] ?? '')
+            }
+            activity={cityLife.activity}
+            onUseProp={useEquipment}
+            ride={riding && cityLife.route.length > 0 && !insideAny ? { transport, rain } : null}
+            visitors={visitors}
             onBillboard={(id) => {
               setBillboard(id)
               setPanel('billboard')
             }}
-            visitors={visitors}
-            ride={riding && life.route.length > 0 && !life.inside ? { transport, rain } : null}
-            tool={mode === 'walk' ? 'inspect' : mode === 'demolish' ? 'demolish' : building}
+            onCell={(cell) => {
+              const lot = lotAtCell(cell.x, cell.y)
+              if (lot) {
+                setSelectedLot(lot)
+                setPanel('lot')
+              } else {
+                setFollow(true)
+                setCityLife((old) => goToPoint(old, cell))
+              }
+            }}
+            onLotIcon={(lot) => {
+              setSelectedLot(lot)
+              setPanel('lot')
+            }}
+            filter={cityFilter}
+            selectedLot={selectedLot}
+            labelsHidden={panel !== null}
+            onStats={(s) =>
+              setChunkStats((old) =>
+                old.chunks === s.chunks &&
+                old.buildings === s.buildings &&
+                old.tris === s.tris &&
+                old.detailed === s.detailed
+                  ? old
+                  : s,
+              )
+            }
+            onFrame={(f) => {
+              frameRef.current = f
+            }}
+            quality={quality}
           />
         )}
       </div>
       <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-[#203d49]/40 via-[#203d49]/10 to-transparent" />
-      {riding && life.route.length > 0 && !life.inside && webgl !== false && (
+      {riding && cityLife.route.length > 0 && !insideAny && webgl !== false && (
         <RideOverlay
           transport={transport}
           rain={rain}
@@ -483,11 +917,63 @@ export function LomeLifeImmersive() {
           }}
           onSkip={() => {
             setRiding(false)
-            setLife((old) => skipTravel(old))
+            setCityLife((old) => arrive(old))
           }}
         />
       )}
 
+      {!insideAny && !riding && webgl !== false && (
+        <div
+          role="group"
+          aria-label="Catégories de lieux"
+          className="pointer-events-auto absolute left-3 right-16 top-[104px] z-10 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] sm:top-[114px]"
+        >
+          {(
+            [
+              'all',
+              'homes',
+              'shops',
+              'education',
+              'health',
+              'transport',
+              'services',
+              'leisure',
+              'worship',
+            ] as const
+          ).map((f) => (
+            <button
+              type="button"
+              key={f}
+              aria-pressed={cityFilter === f}
+              onClick={() => setCityFilter(f)}
+              className={
+                'shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold shadow ' +
+                (cityFilter === f
+                  ? 'border-emerald-700 bg-emerald-700 text-white'
+                  : 'border-white/70 bg-white/95 text-slate-800')
+              }
+            >
+              {f === 'all' ? 'Tous' : CATEGORY_LABELS[f]}
+            </button>
+          ))}
+        </div>
+      )}
+      {cityLife.insideLot && webgl !== false && (
+        <button
+          type="button"
+          aria-label="Activités du lieu"
+          onClick={() => {
+            const lot = lotById(cityLife.insideLot ?? '')
+            if (lot) {
+              setSelectedLot(lot)
+              open('lot')
+            }
+          }}
+          className="pointer-events-auto absolute left-3 top-[104px] z-10 rounded-full border border-emerald-700 bg-emerald-700 px-4 py-2 text-xs font-bold text-white shadow sm:top-[114px]"
+        >
+          Activités · {lotById(cityLife.insideLot)?.name ?? 'ce lieu'}
+        </button>
+      )}
       <header className="pointer-events-none absolute inset-x-0 top-0 z-20 px-3 pt-[max(12px,env(safe-area-inset-top))] sm:px-5">
         <div className="pointer-events-auto mx-auto flex max-w-[900px] items-center gap-2 rounded-[24px] border border-white/65 bg-white/95 p-2 shadow-lg shadow-slate-900/10 backdrop-blur-lg">
           <div className="flex shrink-0 items-center gap-1 rounded-2xl px-2 text-xs font-bold sm:text-sm">
@@ -544,6 +1030,17 @@ export function LomeLifeImmersive() {
                     : 'Gagne ton premier salaire'}
             </span>
           </button>
+          {actor && (
+            <button
+              type="button"
+              aria-label="Ma coopérative"
+              title="Ma coopérative"
+              onClick={goMyCooperative}
+              className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-700 px-3 py-2 text-xs font-bold text-white shadow-md"
+            >
+              🤝 <span className="hidden sm:inline">Ma coopérative</span>
+            </button>
+          )}
           <button
             type="button"
             aria-label={playing ? 'Mettre en pause' : 'Faire avancer le temps'}
@@ -608,7 +1105,10 @@ export function LomeLifeImmersive() {
                 type="button"
                 key={b.label}
                 aria-label={b.label}
-                onClick={() => setLife((old) => stepPlayer(old, b.dir[0], b.dir[1]))}
+                onClick={() => {
+                  setFollow(true)
+                  setCityLife((old) => stepDir(old, b.dir[0], b.dir[1]))
+                }}
                 className={
                   'flex h-10 w-10 items-center justify-center rounded-xl bg-white/90 text-base font-black text-emerald-900 shadow active:scale-95 ' +
                   b.cls
@@ -620,10 +1120,10 @@ export function LomeLifeImmersive() {
             <button
               type="button"
               aria-label="Entrer ou sortir"
-              onClick={() => action(life.inside ? 'leave' : 'enter')}
+              onClick={() => action(insideAny ? 'leave' : 'enter')}
               className="col-start-2 row-start-2 flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-700 text-[10px] font-black text-white shadow"
             >
-              {life.inside ? 'Sortir' : 'Entrer'}
+              {insideAny ? 'Sortir' : 'Entrer'}
             </button>
           </div>
           <div className="pointer-events-auto flex flex-col gap-2">
@@ -803,6 +1303,7 @@ export function LomeLifeImmersive() {
                     ))}
                   </div>
                   <DailyStatus life={life} />
+                  {actor && <OnboardingSteps actor={actor} />}
                   <div className="grid grid-cols-2 gap-2">
                     <ActionButton
                       title="Rentrer chez moi"
@@ -858,9 +1359,72 @@ export function LomeLifeImmersive() {
               {panel === 'map' && (
                 <>
                   <p className="text-sm text-slate-600">
-                    Explore les lieux en 3D. Sélectionne un endroit : ton personnage empruntera les
-                    routes du quartier.
+                    Toute la ville est là : touche un bâtiment dans la scène ou choisis un lieu. Ton
+                    personnage suit les rues, les ponts et les avenues.
                   </p>
+                  <div className="flex flex-wrap gap-1" role="group" aria-label="Filtrer la ville">
+                    {(
+                      [
+                        'all',
+                        'homes',
+                        'shops',
+                        'education',
+                        'health',
+                        'transport',
+                        'services',
+                        'leisure',
+                        'worship',
+                        'lots',
+                      ] as const
+                    ).map((f) => (
+                      <button
+                        type="button"
+                        key={f}
+                        aria-pressed={cityFilter === f}
+                        onClick={() => setCityFilter(f)}
+                        className={
+                          'rounded-full px-3 py-1.5 text-xs font-semibold ' +
+                          (cityFilter === f
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-slate-100 text-slate-700')
+                        }
+                      >
+                        {f === 'all' ? 'Tout' : CATEGORY_LABELS[f]}
+                      </button>
+                    ))}
+                  </div>
+                  {DISTRICTS.map((d) => {
+                    const places = landmarksIn(d.id).filter(
+                      (l) => cityFilter === 'all' || CATEGORY_OF[l.type] === cityFilter,
+                    )
+                    if (places.length === 0) return null
+                    return (
+                      <div key={d.id} className="rounded-2xl bg-slate-50 p-3">
+                        <p className="text-sm font-black">{d.name}</p>
+                        <p className="text-[11px] text-slate-500">{d.note}</p>
+                        <div className="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-2">
+                          {places.map((lot) => (
+                            <button
+                              type="button"
+                              key={lot.id}
+                              onClick={() => {
+                                setSelectedLot(lot)
+                                setPanel('lot')
+                              }}
+                              className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-left text-xs ring-1 ring-slate-200 hover:ring-emerald-400"
+                            >
+                              <span className="text-base">{TYPE_ICONS[lot.type]}</span>
+                              <span className="min-w-0 flex-1 truncate font-semibold">
+                                {lot.name}
+                              </span>
+                              <ArrowRight size={14} className="shrink-0 text-emerald-700" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <p className="text-sm font-black">Mon quartier</p>
                   <div className="flex flex-wrap gap-1" role="group" aria-label="Filtrer la carte">
                     {MAP_FILTERS.map((f) => (
                       <button
@@ -998,6 +1562,30 @@ export function LomeLifeImmersive() {
               )}
               {panel === 'phone' && (
                 <>
+                  <div className="rounded-2xl bg-slate-50 p-3">
+                    <p className="text-xs font-bold text-slate-700">Qualité graphique</p>
+                    <p className="text-[11px] text-slate-500">{PRESETS[quality].hint}</p>
+                    <div className="mt-2 flex gap-1" role="group" aria-label="Qualité graphique">
+                      {(['eco', 'balanced', 'high'] as const).map((q) => (
+                        <button
+                          type="button"
+                          key={q}
+                          aria-pressed={quality === q}
+                          onClick={() => {
+                            setQuality(q)
+                            rememberQuality(q)
+                          }}
+                          className={`flex-1 rounded-xl px-2 py-2 text-xs font-bold ${
+                            quality === q
+                              ? 'bg-slate-900 text-white'
+                              : 'bg-white text-slate-800 ring-1 ring-slate-200'
+                          }`}
+                        >
+                          {PRESETS[q].label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <div className="rounded-[24px] bg-gradient-to-br from-indigo-700 via-violet-700 to-orange-400 p-4 text-white">
                     <p className="text-3xl font-light">{String(life.hour).padStart(2, '0')}:00</p>
                     <p className="text-xs opacity-90">Jour {life.day} · Lomé</p>
@@ -1337,9 +1925,204 @@ export function LomeLifeImmersive() {
                   <div className="grid grid-cols-2 gap-2">
                     <ActionButton title="Aller au marché" onClick={() => go(12, 11)} />
                     <ActionButton title="Voir les métiers" outline onClick={() => open('jobs')} />
+                    {actor && (
+                      <ActionButton
+                        title="Ma coopérative"
+                        outline
+                        onClick={goMyCooperative}
+                        icon={<Users size={17} />}
+                      />
+                    )}
                   </div>
                 </>
               )}
+              {panel === 'lot' &&
+                selectedLot &&
+                (() => {
+                  const lot = selectedLot
+                  const here = cityLife.insideLot === lot.id || doorLot?.id === lot.id
+                  const insideHere = cityLife.insideLot === lot.id
+                  const room = interiorFor(lot.type)
+                  const layout = room ? layoutFor(room) : null
+                  const acts = actionsFor(lot.type)
+                  const path = here ? null : findPath(cityLife.at, lot.door, roadsOf(cityLife))
+                  const cells = path ? path.length - 1 : null
+                  const eta = (perCell: number) =>
+                    cells === null
+                      ? 'hors réseau'
+                      : `~ ${Math.max(1, Math.round(cells * perCell))} min`
+                  return (
+                    <>
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-100 text-3xl">
+                          {TYPE_ICONS[lot.type]}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-xl font-black">
+                            {lot.name ?? TYPE_LABELS[lot.type]}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            📍 {DISTRICTS.find((d) => d.id === lot.district)?.name}, {cityDef.name}{' '}
+                            · {TYPE_LABELS[lot.type]}
+                            {lot.floors > 1 ? ` · ${lot.floors} niveaux` : ''}
+                          </p>
+                        </div>
+                      </div>
+                      {acts.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5" aria-label="Activités proposées">
+                          {acts.map((a) => (
+                            <span
+                              key={a.id}
+                              className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-800"
+                            >
+                              {a.label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {layout && layout.npcs.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold text-slate-700">Personnages sur place</p>
+                          <div className="flex items-center gap-1">
+                            {layout.npcs.slice(0, 5).map((n, i) => (
+                              <span
+                                key={n.id}
+                                title={n.role}
+                                className={
+                                  'flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-[11px] font-black text-white ' +
+                                  [
+                                    'bg-emerald-600',
+                                    'bg-amber-500',
+                                    'bg-sky-600',
+                                    'bg-rose-500',
+                                    'bg-violet-600',
+                                  ][i % 5]
+                                }
+                              >
+                                {n.role
+                                  .replace(/^(Le |La |L’|Un |Une |Coach )/, '')
+                                  .slice(0, 2)
+                                  .toUpperCase()}
+                              </span>
+                            ))}
+                            <span className="ml-1 text-[11px] text-slate-500">
+                              {layout.npcs.length} personnages du jeu (pas de vrais joueurs)
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {insideHere && acts.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-xs font-bold text-slate-700">Choisir une activité</p>
+                          {acts.map((a) => (
+                            <button
+                              type="button"
+                              key={a.id}
+                              onClick={() => startActivity(a.id)}
+                              className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm"
+                            >
+                              <span className="font-bold">{a.label}</span>
+                              <span className="text-xs text-slate-500">{a.hint}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {lot.type === 'cooperative' && actor && (
+                        <p className="text-xs text-slate-600">
+                          {worldAdapter.organizationsAt(lot, actor.organizations).length > 0
+                            ? 'Ici siège : ' +
+                              worldAdapter
+                                .organizationsAt(lot, actor.organizations)
+                                .map((o) => o.name)
+                                .join(', ')
+                            : 'Aucune de vos organisations ne siège ici.'}
+                        </p>
+                      )}
+                      {here && !insideAny && room && (
+                        <ActionButton
+                          title={
+                            lot.type === 'cooperative' ? 'Entrer dans la coopérative' : 'Entrer'
+                          }
+                          onClick={() => cityAction('enter')}
+                        />
+                      )}
+                      {insideHere && (
+                        <ActionButton title="Sortir" outline onClick={() => cityAction('leave')} />
+                      )}
+                      {!here && (
+                        <div
+                          className="grid grid-cols-3 gap-2"
+                          role="group"
+                          aria-label="Comment y aller"
+                        >
+                          {(
+                            [
+                              {
+                                t: 'walk' as const,
+                                icon: '🚶',
+                                label: 'À pied',
+                                price: 'Gratuit',
+                                eta: eta(0.4),
+                              },
+                              {
+                                t: 'moto' as const,
+                                icon: '🛵',
+                                label: 'Zémidjan',
+                                price: money(TRAVEL_COST.moto),
+                                eta: eta(0.12),
+                              },
+                              {
+                                t: 'taxi' as const,
+                                icon: '🚕',
+                                label: 'Taxi',
+                                price: money(TRAVEL_COST.taxi),
+                                eta: eta(0.1),
+                              },
+                            ] as const
+                          ).map((o) => (
+                            <button
+                              type="button"
+                              key={o.t}
+                              onClick={() => (o.t === 'walk' ? goLot(lot) : rideTo(lot, o.t))}
+                              className="flex flex-col items-center gap-0.5 rounded-2xl border border-slate-200 bg-white px-2 py-3 text-center"
+                            >
+                              <span className="text-2xl">{o.icon}</span>
+                              <span className="text-sm font-bold">{o.label}</span>
+                              <span className="text-xs text-slate-600">{o.price}</span>
+                              <span className="text-[11px] text-slate-400">{o.eta}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-[11px] text-slate-500">
+                        {cityLife.visited.includes(lot.id) ? 'Déjà visité.' : 'Jamais visité.'}{' '}
+                        Condition physique : {cityLife.fitness}/100.
+                      </p>
+                    </>
+                  )
+                })()}
+              {panel === 'market' && <MarketPanel actor={actor} />}
+              {panel === 'cooperative' &&
+                (coopOrg ? (
+                  <CooperativePanel
+                    org={coopOrg}
+                    actor={actor}
+                    onPickOrg={setCoopOrg}
+                    engine={engine}
+                  />
+                ) : actor ? (
+                  <p className="text-sm text-slate-600">
+                    Votre compte n’est rattaché à aucune coopérative. Rapprochez-vous de votre
+                    organisation pour être enregistré comme membre.
+                  </p>
+                ) : (
+                  <p className="text-sm text-slate-600">
+                    <Link href="/login" className="font-bold text-emerald-700 underline">
+                      Connectez-vous
+                    </Link>{' '}
+                    pour retrouver votre coopérative, ses membres et ses regroupements.
+                  </p>
+                ))}
               {panel === 'billboard' && board && (
                 <>
                   <div

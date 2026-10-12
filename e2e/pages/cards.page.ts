@@ -1,4 +1,4 @@
-import { type Page, type Locator, expect } from '@playwright/test'
+import { type Locator, type Page, expect } from '@playwright/test'
 import { ROUTES } from '../helpers/constants'
 
 export class CardsPage {
@@ -16,7 +16,9 @@ export class CardsPage {
 
   constructor(page: Page) {
     this.page = page
-    this.generateButton = page.getByRole('button', { name: /Générer une carte|Générer la première carte/i })
+    this.generateButton = page.getByRole('button', {
+      name: /Générer une carte|Générer la première carte/i,
+    })
     this.bulkGenerateButton = page.getByRole('button', { name: /Génération en masse/i })
     this.downloadAllButton = page.getByRole('button', { name: /Tout télécharger/i })
     this.searchInput = page.getByLabel('Rechercher des cartes')
@@ -25,7 +27,9 @@ export class CardsPage {
     this.generateDialog = page.locator('[role="dialog"]')
     this.bulkDialog = page.locator('[role="dialog"]')
     this.memberSelect = page.locator('[role="dialog"] select').first()
-    this.confirmGenerateButton = page.locator('[role="dialog"]').getByRole('button', { name: /Générer/i })
+    this.confirmGenerateButton = page
+      .locator('[role="dialog"]')
+      .getByRole('button', { name: /Générer/i })
   }
 
   async goto() {
@@ -44,14 +48,14 @@ export class CardsPage {
     // Select a member from the dropdown
     if (memberName) {
       const options = await this.memberSelect.locator('option').allTextContents()
-      const matchingOption = options.find(o => o.includes(memberName))
+      const matchingOption = options.find((o) => o.includes(memberName))
       if (matchingOption) {
         await this.memberSelect.selectOption({ label: matchingOption })
       }
     } else {
       // Select first available member
       const options = await this.memberSelect.locator('option').allTextContents()
-      const validOption = options.find(o => o !== '— Choisir —' && o !== '')
+      const validOption = options.find((o) => o !== '— Choisir —' && o !== '')
       if (validOption) {
         await this.memberSelect.selectOption({ label: validOption })
       }
@@ -64,7 +68,7 @@ export class CardsPage {
   async downloadCard(cardNumber: string) {
     const row = this.page.locator('tr', { hasText: cardNumber })
     const downloadButton = row.getByLabel(/Download/i)
-    
+
     // Listen for download event
     const downloadPromise = this.page.waitForEvent('download', { timeout: 15_000 })
     await downloadButton.click()

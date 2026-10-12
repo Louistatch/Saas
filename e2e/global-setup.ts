@@ -3,9 +3,9 @@
  * Saves browser storage state to .auth/ directory for reuse.
  */
 
-import { chromium, type FullConfig } from '@playwright/test'
-import path from 'node:path'
 import fs from 'node:fs'
+import path from 'node:path'
+import { type FullConfig, chromium } from '@playwright/test'
 import { ACCOUNTS, ROUTES } from './helpers/constants'
 
 const AUTH_DIR = path.resolve(__dirname, '.auth')

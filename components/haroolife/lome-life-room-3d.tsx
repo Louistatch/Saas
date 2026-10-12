@@ -1,6 +1,7 @@
 'use client'
 
-import type { Action, Venue } from '@/lib/haroolife/lome-life-engine'
+import type { Interior } from '@/lib/haroolife/city/life'
+import type { Action } from '@/lib/haroolife/lome-life-engine'
 /** Lightweight original interior assembled from PlayCanvas geometry and CC0 Kenney models.
  * No proprietary interior scenes or textures from Lagos Life / The Sims.
  */
@@ -34,8 +35,8 @@ function Furniture({
   position: [number, number, number]
   scale?: number
   rotation?: number
-  action?: Action
-  onInteract?: (a: Action) => void
+  action?: Action | string
+  onInteract?: (a: Action | string) => void
 }) {
   const { asset } = useModel(BASE + 'furniture-kit/' + name + '.glb')
   if (!asset) return null
@@ -75,7 +76,12 @@ export default function LomeLifeRoom3D({
   angle = 45,
   distance = 28,
   onInteract,
-}: { venue: Venue; angle?: number; distance?: number; onInteract?: (a: Action) => void }) {
+}: {
+  venue: Interior
+  angle?: number
+  distance?: number
+  onInteract?: (a: Action | string) => void
+}) {
   const floor = useMaterial({ diffuse: '#c7b399', gloss: 0.08 })
   const wall = useMaterial({ diffuse: '#7293a1', gloss: 0.04 })
   const trim = useMaterial({ diffuse: '#e8e5d8', gloss: 0.1 })
@@ -95,7 +101,13 @@ export default function LomeLifeRoom3D({
             ? 'Mairie'
             : venue === 'well'
               ? 'Puits'
-              : 'Jardin'
+              : venue === 'gym'
+                ? 'Salle de sport'
+                : venue === 'chapel'
+                  ? 'Lieu de culte'
+                  : venue === 'clinic'
+                    ? 'Clinique'
+                    : 'Jardin'
   const radians = (angle * Math.PI) / 180
   const camera: [number, number, number] = [
     Math.sin(radians) * distance,
@@ -185,6 +197,81 @@ export default function LomeLifeRoom3D({
           />
           <Furniture name="chair" position={[-1.5, 0.1, 2.8]} scale={1} rotation={145} />
           <Furniture name="pottedplant" position={[-3.6, 0.08, -3.1]} scale={1.35} />
+        </>
+      ) : venue === 'gym' ? (
+        <>
+          {/* Weight racks, two treadmills, mats. */}
+          <Block position={[-2.6, 0.5, -2.6]} scale={[2.2, 0.9, 0.5]} material={furniture} />
+          {[-3.3, -2.6, -1.9].map((x) => (
+            <Block key={x} position={[x, 1.05, -2.6]} scale={[0.35, 0.2, 0.35]} material={shadow} />
+          ))}
+          {[0.6, 2.0].map((x) => (
+            <Entity key={x}>
+              <Block position={[x, 0.3, -2.4]} scale={[0.9, 0.18, 2.0]} material={shadow} />
+              <Block position={[x, 0.95, -3.2]} scale={[0.9, 1.1, 0.12]} material={trim} />
+            </Entity>
+          ))}
+          <Block position={[-1.5, 0.08, 1.6]} scale={[1.6, 0.06, 1.0]} material={seat} />
+          <Block position={[0.6, 0.08, 1.6]} scale={[1.6, 0.06, 1.0]} material={fabric} />
+          <Block position={[2.9, 0.4, 1.4]} scale={[0.5, 0.5, 0.5]} material={green} />
+          <Citizen position={[-1.5, 0.11, 1.4]} scale={1.3} />
+          <Citizen position={[2.0, 0.4, -2.2]} scale={1.3} />
+          <Furniture
+            name="chair"
+            position={[3.2, 0.1, -1.0]}
+            scale={1}
+            rotation={200}
+            action="train"
+            onInteract={onInteract}
+          />
+        </>
+      ) : venue === 'chapel' ? (
+        <>
+          {/* Pews, altar, pulpit. */}
+          {[-2.4, -1.2, 0.0, 1.2].map((z) => (
+            <Entity key={z}>
+              <Block position={[-1.3, 0.35, z]} scale={[2.2, 0.5, 0.35]} material={furniture} />
+              <Block position={[1.6, 0.35, z]} scale={[2.2, 0.5, 0.35]} material={furniture} />
+            </Entity>
+          ))}
+          <Block position={[0.2, 0.25, -3.3]} scale={[6.5, 0.5, 1.0]} material={trim} />
+          <Block position={[0.2, 0.9, -3.4]} scale={[1.6, 0.8, 0.6]} material={fabric} />
+          <Block position={[0.2, 2.2, -3.9]} scale={[0.14, 1.4, 0.1]} material={seat} />
+          <Block position={[0.2, 2.5, -3.9]} scale={[0.8, 0.14, 0.1]} material={seat} />
+          <Block position={[-2.6, 1.1, -3.3]} scale={[0.6, 1.2, 0.5]} material={furniture} />
+          <Citizen position={[0.2, 0.5, -3.0]} scale={1.3} />
+          <Citizen position={[-1.6, 0.1, 2.3]} scale={1.3} />
+          <Furniture
+            name="chair"
+            position={[2.0, 0.1, 2.4]}
+            scale={1}
+            rotation={0}
+            action="pray"
+            onInteract={onInteract}
+          />
+        </>
+      ) : venue === 'clinic' ? (
+        <>
+          {/* Beds with sheets, desk, cabinet. */}
+          {[-2.4, -0.4, 1.6].map((x) => (
+            <Entity key={x}>
+              <Block position={[x, 0.4, -2.2]} scale={[1.3, 0.5, 2.2]} material={trim} />
+              <Block position={[x, 0.7, -2.0]} scale={[1.2, 0.12, 1.8]} material={fabric} />
+              <Block position={[x, 0.75, -2.9]} scale={[0.9, 0.12, 0.4]} material={trim} />
+            </Entity>
+          ))}
+          <Block position={[2.6, 0.9, 1.6]} scale={[1.2, 1.8, 0.6]} material={trim} />
+          <Block position={[2.6, 1.3, 1.9]} scale={[0.5, 0.12, 0.08]} material={seat} />
+          <Block position={[2.6, 1.3, 1.9]} scale={[0.12, 0.5, 0.08]} material={seat} />
+          <Furniture
+            name="table"
+            position={[-1.6, 0.1, 1.8]}
+            scale={1.2}
+            action="care"
+            onInteract={onInteract}
+          />
+          <Furniture name="chair" position={[-0.7, 0.1, 2.4]} scale={1} rotation={160} />
+          <Citizen position={[-1.9, 0.1, 1.1]} scale={1.35} />
         </>
       ) : venue === 'hall' ? (
         <>

@@ -12,6 +12,11 @@
    - Avis de licence : `public/haroolife/vendor/LICENSE-cimulity.txt`.
    - Utilisation : classification de la forme des routes voisines pour afficher les tuiles correspondantes.
 
+3. **Kenney — kits 3D** (City Kit Commercial, City Kit Suburban, City Kit Roads, Car Kit, Mini Market, Mini Characters, Furniture Kit, Nature Kit), modèles glTF-binaire. Licence **CC0-1.0**. Source officielle : https://kenney.nl/assets ; copie via le miroir public https://github.com/shorepine/kenney (`3d/<kit>/<modèle>.glb` et `3d/<kit>/Textures/colormap.png`).
+   - Modèles utilisés tels quels (personnages animés, mobilier) : `public/haroolife/vendor/kenney-3d/`.
+   - Modèles « cuits » (72 bâtiments, véhicules, mobilier urbain) : `scripts/haroolife-bake-models.mjs` échantillonne la palette de chaque kit par sommet et produit `public/haroolife/city/kenney-pack.{bin,json}` (2,1 Mo, 755 Ko compressés) ; `lib/haroolife/city/pack.ts` les décode et les fusionne dans les maillages de chunk.
+   - Les modèles du dépôt `simcity-threejs-clone` (260 GLB sans attribution) n'ont **pas** été réutilisés : provenance et licence non établies.
+
 ## Bases étudiées, pas copiées
 
 - **IsoCity** — https://github.com/amilich/isometric-city : MIT, Next.js/TypeScript, rendu Canvas avancé, circulation et PNJ ; dépôt conséquent. Potentiel futur moteur à intégrer par module, après audit des dépendances et licences des médias.
