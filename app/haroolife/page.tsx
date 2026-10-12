@@ -18,6 +18,12 @@ export default function HarooLifePage() {
           <Link href="/dashboard">Mon tableau de bord</Link>
           <Link href="/haroo">Mon espace Haroo</Link>
           <Link href="/marche">Le marché</Link>
+          <Link href="/haroolife/territoire/lome" className="font-semibold text-emerald-800">
+            Lomé Life 3D
+          </Link>
+          <Link href="/haroolife/territoire" className="font-semibold text-emerald-800">
+            Simulateur du Togo
+          </Link>
         </nav>
       </header>
       {process.env.HAROOLIFE_ENABLED === 'true' ? (
@@ -31,6 +37,16 @@ export default function HarooLifePage() {
             espace est en préparation.
           </p>
           <p>Vos cartes, vos annonces et vos services FaîtiereHub restent accessibles.</p>
+          <p>
+            Vous pouvez déjà essayer le simulateur économique fictif du Togo, sans toucher aux
+            données réelles.
+          </p>
+          <Link
+            href="/haroolife/territoire"
+            className="inline-block rounded-xl border border-emerald-900 px-5 py-3 font-semibold text-emerald-900"
+          >
+            Explorer le Togo en simulation
+          </Link>
           <Link
             href="/haroo"
             className="inline-block rounded-xl bg-emerald-900 px-5 py-3 font-semibold text-white"

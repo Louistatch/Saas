@@ -1,0 +1,1025 @@
+'use client'
+
+import {
+  type Action,
+  type Career,
+  LIFE_LOCATIONS,
+  type LifeState,
+  SALARIES,
+  TRAVEL_COST,
+  type Transport,
+  advanceLifeHour,
+  buildInLome,
+  chooseTransport,
+  decodeLomeLife,
+  demolishInLome,
+  directTo,
+  initialLomeLife,
+  interact,
+  jobVenue,
+  selectJob,
+  stepPlayer,
+  walkLifeStep,
+} from '@/lib/haroolife/lome-life-engine'
+import { type BuildType, CATALOG } from '@/lib/haroolife/townsmen-engine'
+import {
+  ArrowRight,
+  Bell,
+  Check,
+  Clock3,
+  Hammer,
+  Home,
+  Map,
+  Pause,
+  Phone,
+  Play,
+  Plus,
+  Send,
+  ShoppingBag,
+  Sun,
+  UserRound,
+  Utensils,
+  X,
+} from 'lucide-react'
+import dynamic from 'next/dynamic'
+import Link from 'next/link'
+import { useEffect, useState } from 'react'
+
+const World3D = dynamic(() => import('./city-world-3d'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full items-center justify-center bg-[#9bbd9d] text-sm font-bold text-white">
+      Chargement du monde 3D de Lomé…
+    </div>
+  ),
+})
+const STORAGE = 'haroolife.lome-life.v1'
+type Dir = [-1 | 0 | 1, -1 | 0 | 1]
+const KEYS: Record<string, Dir> = {
+  arrowup: [0, -1],
+  w: [0, -1],
+  arrowdown: [0, 1],
+  s: [0, 1],
+  arrowleft: [-1, 0],
+  a: [-1, 0],
+  arrowright: [1, 0],
+  d: [1, 0],
+}
+const PAD: { label: string; dir: Dir; cls: string }[] = [
+  { label: 'Avancer', dir: [0, -1], cls: 'col-start-2 row-start-1' },
+  { label: 'Gauche', dir: [-1, 0], cls: 'col-start-1 row-start-2' },
+  { label: 'Droite', dir: [1, 0], cls: 'col-start-3 row-start-2' },
+  { label: 'Reculer', dir: [0, 1], cls: 'col-start-2 row-start-3' },
+]
+type Sheet =
+  | 'home'
+  | 'shop'
+  | 'map'
+  | 'phone'
+  | 'build'
+  | 'jobs'
+  | 'messages'
+  | 'wallet'
+  | 'missions'
+  | 'journal'
+  | null
+type Mode = 'walk' | 'build' | 'demolish'
+const money = (n: number) => new Intl.NumberFormat('fr-FR').format(n) + ' FCFA'
+const BUILDINGS: BuildType[] = [
+  'road',
+  'house',
+  'market',
+  'bakery',
+  'farm',
+  'mill',
+  'lumberyard',
+  'well',
+  'park',
+]
+const JOBS: Career[] = ['vendeur', 'boulanger', 'agent-communal']
+const VENUE_LABELS: Record<string, string> = {
+  house: 'Maison',
+  market: 'Marché',
+  bakery: 'Boulangerie',
+  hall: 'Mairie',
+  well: 'Puits',
+  park: 'Jardin',
+}
+const LOCATION_ICONS = ['🏠', '🛒', '🥖', '🏛️', '🚰', '🌳']
+const NAV_ITEMS = [
+  { id: 'home', label: 'Maison', icon: Home },
+  { id: 'shop', label: 'Acheter', icon: ShoppingBag },
+  { id: 'map', label: 'Carte', icon: Map },
+  { id: 'phone', label: 'Téléphone', icon: Phone },
+] as const
+const NEEDS = [
+  { key: 'hunger' as const, icon: '🍲', label: 'Faim', color: 'bg-orange-400' },
+  { key: 'energy' as const, icon: '⚡', label: 'Énergie', color: 'bg-amber-400' },
+  { key: 'hygiene' as const, icon: '💧', label: 'Hygiène', color: 'bg-sky-400' },
+  { key: 'social' as const, icon: '💬', label: 'Social', color: 'bg-emerald-400' },
+]
+function NeedBar({ value, color }: { value: number; color: string }) {
+  return (
+    <span className="block h-[7px] w-full overflow-hidden rounded-full bg-slate-200/80">
+      <span
+        className={'block h-full rounded-full transition-all duration-200 ' + color}
+        style={{ width: value + '%' }}
+      />
+    </span>
+  )
+}
+function ActionButton({
+  title,
+  onClick,
+  icon,
+  outline = false,
+}: {
+  title: string
+  onClick: () => void
+  icon?: React.ReactNode
+  outline?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        'flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold transition active:scale-[.98] ' +
+        (outline
+          ? 'border border-slate-200 bg-white text-slate-800'
+          : 'bg-emerald-600 text-white shadow-md shadow-emerald-600/15 hover:bg-emerald-700')
+      }
+    >
+      {icon}
+      {title}
+    </button>
+  )
+}
+function DailyStatus({ life }: { life: LifeState }) {
+  const completed = life.workToday ? 1 : 0
+  return (
+    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+      <div className="rounded-xl bg-slate-50 p-3">
+        <strong className="block text-lg">{life.meals}</strong>Repas
+      </div>
+      <div className="rounded-xl bg-slate-50 p-3">
+        <strong className="block text-lg">{completed}/1</strong>Service
+      </div>
+      <div className="rounded-xl bg-slate-50 p-3">
+        <strong className="block text-lg">{life.city.population}</strong>Habitants simulés
+      </div>
+    </div>
+  )
+}
+
+export function LomeLifeImmersive() {
+  const [life, setLife] = useState<LifeState>(initialLomeLife)
+  const [loaded, setLoaded] = useState(false)
+  const [webgl, setWebgl] = useState<boolean | null>(null)
+  const [panel, setPanel] = useState<Sheet>(null)
+  const [mode, setMode] = useState<Mode>('walk')
+  const [building, setBuilding] = useState<BuildType>('house')
+  const [selection, setSelection] = useState<{ x: number; y: number } | null>(null)
+  const [playing, setPlaying] = useState(false)
+  const [transport, setTransport] = useState<Transport>('walk')
+  const [chatDraft, setChatDraft] = useState('')
+  const [chat, setChat] = useState<{ by: 'me' | 'npc'; body: string }[]>([
+    {
+      by: 'npc',
+      body: 'Salut ! Bienvenue dans notre quartier fictif de Lomé. Passe au marché quand tu veux.',
+    },
+  ])
+  const [notice, setNotice] = useState<string | null>(null)
+  const nearTarget =
+    life.target && Math.abs(life.pos.x - life.target.x) + Math.abs(life.pos.y - life.target.y) === 1
+  const title =
+    panel === 'home'
+      ? 'Mon foyer'
+      : panel === 'shop'
+        ? 'Marché & commerces'
+        : panel === 'map'
+          ? 'Explorer Lomé'
+          : panel === 'phone'
+            ? 'Mon téléphone'
+            : panel === 'build'
+              ? 'Construire'
+              : panel === 'jobs'
+                ? 'Travailler & gagner'
+                : panel === 'messages'
+                  ? 'Messages du quartier'
+                  : panel === 'wallet'
+                    ? 'Mes finances'
+                    : panel === 'missions'
+                      ? 'Mes objectifs'
+                      : panel === 'journal'
+                        ? 'Journal de vie'
+                        : ''
+  const needs = life.needs
+  const wellbeing = Math.round((needs.hunger + needs.energy + needs.hygiene + needs.social) / 4)
+  const mood = wellbeing >= 75 ? 'Heureux' : wellbeing >= 40 ? 'Bien' : 'Fatigué'
+  const status = life.route.length
+    ? 'En chemin vers ' +
+      (life.target
+        ? (LIFE_LOCATIONS.find((x) => x.x === life.target!.x && x.y === life.target!.y)?.name ??
+          'une destination')
+        : 'une destination') +
+      '…'
+    : life.inside
+      ? 'À l’intérieur : ' + (VENUE_LABELS[life.inside] ?? life.inside)
+      : life.lastEvent
+  const missions = [
+    { done: life.spent >= 650, text: 'Acheter un repas dans un commerce' },
+    { done: life.earned > 0, text: 'Effectuer une journée de travail' },
+    {
+      done: life.city.buildings.length > initialLomeLife().city.buildings.length,
+      text: 'Construire un nouveau bâtiment',
+    },
+  ]
+  const completion = missions.filter((m) => m.done).length
+
+  useEffect(() => {
+    try {
+      setWebgl(Boolean(document.createElement('canvas').getContext('webgl2')))
+      const raw = localStorage.getItem(STORAGE)
+      if (raw) {
+        const save = decodeLomeLife(JSON.parse(raw))
+        if (save) setLife(save)
+      }
+    } catch {
+      setWebgl(false)
+    }
+    setLoaded(true)
+  }, [])
+  useEffect(() => {
+    if (!loaded) return
+    try {
+      localStorage.setItem(STORAGE, JSON.stringify(life))
+    } catch {
+      /* Offline game supports blocked storage. */
+    }
+  }, [life, loaded])
+  // Navigation advances automatically while the page is visible; no whole-hour penalty per road tile.
+  useEffect(() => {
+    if (!life.route.length || life.inside) return
+    const ms = transport === 'walk' ? 670 : transport === 'moto' ? 360 : 250
+    const id = window.setInterval(() => {
+      if (document.visibilityState === 'visible') setLife((old) => walkLifeStep(old))
+    }, ms)
+    return () => window.clearInterval(id)
+  }, [life.route.length, life.inside, transport])
+  useEffect(() => {
+    if (!playing) return
+    const id = window.setInterval(() => {
+      if (document.visibilityState === 'visible') setLife((old) => advanceLifeHour(old))
+    }, 11000)
+    return () => window.clearInterval(id)
+  }, [playing])
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') setPlaying(false)
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [])
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPanel(null)
+        return
+      }
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      const dir = KEYS[e.key.toLowerCase()]
+      if (!dir) return
+      e.preventDefault()
+      setPanel(null)
+      setLife((old) => stepPlayer(old, dir[0], dir[1]))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+  // Street traffic keeps moving while the player stands still (only when the tab is visible).
+  useEffect(() => {
+    if (life.inside) return
+    const id = window.setInterval(() => {
+      if (document.visibilityState === 'visible')
+        setLife((old) => (old.route.length ? old : { ...old, trafficStep: old.trafficStep + 1 }))
+    }, 900)
+    return () => window.clearInterval(id)
+  }, [life.inside])
+
+  function open(id: Exclude<Sheet, null>) {
+    setPanel((cur) => (cur === id ? null : id))
+    setNotice(null)
+  }
+  function go(x: number, y: number) {
+    setMode('walk')
+    setPanel(null)
+    setSelection({ x, y })
+    setTransport('walk')
+    setLife((old) => directTo(old, { x, y }))
+  }
+  function action(a: Action) {
+    setLife((old) => interact(old, a))
+    if (a === 'enter' || a === 'leave') setPanel(null)
+  }
+  function tile(x: number, y: number) {
+    setSelection({ x, y })
+    if (mode === 'walk') setLife((old) => directTo(old, { x, y }))
+    if (mode === 'build') setLife((old) => buildInLome(old, x, y, building))
+    if (mode === 'demolish') setLife((old) => demolishInLome(old, x, y))
+  }
+  function trip(t: Transport) {
+    if (t !== 'walk' && life.wallet < TRAVEL_COST[t]) {
+      setNotice('Solde insuffisant pour ce transport fictif.')
+      return
+    }
+    if (life.route.length === 0) {
+      setNotice('Choisis d’abord une destination.')
+      return
+    }
+    setTransport(t)
+    setLife((old) => chooseTransport(old, t))
+    setPanel(null)
+  }
+  function sendMessage() {
+    const body = chatDraft.trim().slice(0, 180)
+    if (!body) return
+    setChat((prev) => [
+      ...prev.slice(-20),
+      { by: 'me', body },
+      {
+        by: 'npc',
+        body: /travail|emploi/i.test(body)
+          ? 'Le marché embauche des vendeurs. Passe à la rubrique Métiers pour tenter ta chance !'
+          : /manger|faim|repas/i.test(body)
+            ? 'À la boulangerie, tu peux acheter un repas avec des FCFA fictifs.'
+            : 'Bienvenue ! On se croise bientôt au jardin ou au marché.',
+      },
+    ])
+    setChatDraft('')
+  }
+  function reset() {
+    if (!window.confirm('Recommencer uniquement ta partie fictive de Lomé Life ?')) return
+    setLife(initialLomeLife())
+    setPanel(null)
+    setMode('walk')
+    setTransport('walk')
+    setPlaying(false)
+  }
+
+  return (
+    <main className="fixed inset-0 z-[95] h-[100dvh] w-screen overflow-hidden bg-[#98b7a8] font-sans text-slate-900">
+      {/* The game world remains mounted under overlays. No map or dashboard replaces the canvas. */}
+      <div className="absolute inset-0" aria-label="Monde de jeu 3D de Lomé">
+        {webgl === false ? (
+          <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#123b33] p-8 text-center text-white">
+            <h1 className="text-2xl font-bold">Lomé Life 3D</h1>
+            <p>
+              Le rendu 3D exige WebGL2. Ouvre ce jeu dans Chrome avec l’accélération graphique
+              activée.
+            </p>
+          </div>
+        ) : (
+          <World3D
+            immersive
+            city={life.city}
+            life={life}
+            inspect={selection}
+            onTile={tile}
+            onInteriorAction={action}
+            tool={mode === 'walk' ? 'inspect' : mode === 'demolish' ? 'demolish' : building}
+          />
+        )}
+      </div>
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-[#203d49]/40 via-[#203d49]/10 to-transparent" />
+
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-20 px-3 pt-[max(12px,env(safe-area-inset-top))] sm:px-5">
+        <div className="pointer-events-auto mx-auto flex max-w-[900px] items-center gap-2 rounded-[24px] border border-white/65 bg-white/95 p-2 shadow-lg shadow-slate-900/10 backdrop-blur-lg">
+          <div className="flex shrink-0 items-center gap-1 rounded-2xl px-2 text-xs font-bold sm:text-sm">
+            <Sun size={17} className="text-amber-500" />{' '}
+            <span>
+              J{life.day} · {String(life.hour).padStart(2, '0')}h
+            </span>
+          </div>
+          <span className="h-6 w-px bg-slate-200" />
+          <button
+            type="button"
+            onClick={() => open('home')}
+            aria-label="Voir mes besoins"
+            className="flex min-w-0 flex-1 items-center justify-center gap-1 truncate rounded-xl py-2 text-xs font-semibold text-emerald-700"
+          >
+            {wellbeing >= 75 ? '🙂' : wellbeing >= 40 ? '😌' : '😟'} {mood}
+          </button>
+          <span className="h-6 w-px bg-slate-200" />
+          <button
+            type="button"
+            onClick={() => open('wallet')}
+            aria-label="Voir mon argent"
+            className="flex shrink-0 items-center gap-1 rounded-2xl bg-slate-100 px-3 py-2 text-[11px] font-black sm:text-sm"
+          >
+            {new Intl.NumberFormat('fr-FR').format(life.wallet)}{' '}
+            <span className="hidden sm:inline">FCFA</span>
+            <Plus size={15} className="rounded-full bg-emerald-600 text-white" />
+          </button>
+        </div>
+        <div className="pointer-events-auto mx-auto mt-2 flex max-w-[900px] items-start justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => open('missions')}
+            className="flex max-w-[79%] items-center gap-2 rounded-full border border-white/40 bg-white/85 px-3 py-2 text-left text-xs font-semibold shadow-md backdrop-blur"
+          >
+            <span>🎯</span>
+            <span className="truncate">
+              {life.route.length
+                ? 'Destination en cours…'
+                : needs.hunger < 35
+                  ? 'Mange quelque chose'
+                  : life.workToday
+                    ? 'Développe ton quartier'
+                    : 'Gagne ton premier salaire'}
+            </span>
+          </button>
+          <button
+            type="button"
+            aria-label={playing ? 'Mettre en pause' : 'Faire avancer le temps'}
+            onClick={() => setPlaying((p) => !p)}
+            className="rounded-full bg-white/90 p-2.5 shadow-md"
+          >
+            {playing ? <Pause size={17} /> : <Play size={17} />}
+          </button>
+        </div>
+        {mode !== 'walk' && (
+          <div className="pointer-events-auto mx-auto mt-2 flex max-w-[900px] items-center justify-between gap-2 rounded-2xl border border-emerald-200 bg-emerald-950/90 px-3 py-2 text-xs font-semibold text-white shadow">
+            <span>
+              {mode === 'build'
+                ? '🏗️ Pose ' + CATALOG[building].label + ' en touchant un terrain'
+                : '🗑️ Choisis un bâtiment à démolir'}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setMode('walk')
+                setPanel(null)
+              }}
+              className="rounded-lg bg-white px-3 py-1.5 text-emerald-950"
+            >
+              Terminer
+            </button>
+          </div>
+        )}
+      </header>
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-[calc(100px+env(safe-area-inset-bottom))] z-20 px-3 sm:px-5">
+        <div className="mx-auto flex max-w-[900px] items-end justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => open('home')}
+            aria-label="Afficher les besoins du personnage"
+            className="pointer-events-auto flex min-w-0 max-w-[75%] items-center gap-2 rounded-full border border-white/70 bg-white/90 py-2 pl-2 pr-3 shadow-lg backdrop-blur"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-800 text-white">
+              <UserRound size={21} />
+            </span>
+            <span className="grid w-[146px] grid-cols-2 gap-x-2 gap-y-1 sm:w-[200px]">
+              {NEEDS.map((n) => (
+                <span
+                  key={n.key}
+                  className="flex items-center gap-1"
+                  title={n.label + ' ' + needs[n.key] + '%'}
+                >
+                  <span className="text-xs">{n.icon}</span>
+                  <NeedBar value={needs[n.key]} color={n.color} />
+                </span>
+              ))}
+            </span>
+          </button>
+          <div
+            className="pointer-events-auto grid grid-cols-3 grid-rows-3 gap-1"
+            role="group"
+            aria-label="Déplacer le personnage"
+          >
+            {PAD.map((b) => (
+              <button
+                type="button"
+                key={b.label}
+                aria-label={b.label}
+                onClick={() => setLife((old) => stepPlayer(old, b.dir[0], b.dir[1]))}
+                className={
+                  'flex h-10 w-10 items-center justify-center rounded-xl bg-white/90 text-base font-black text-emerald-900 shadow active:scale-95 ' +
+                  b.cls
+                }
+              >
+                {b.dir[1] === -1 ? '▲' : b.dir[1] === 1 ? '▼' : b.dir[0] === -1 ? '◀' : '▶'}
+              </button>
+            ))}
+            <button
+              type="button"
+              aria-label="Entrer ou sortir"
+              onClick={() => action(life.inside ? 'leave' : 'enter')}
+              className="col-start-2 row-start-2 flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-700 text-[10px] font-black text-white shadow"
+            >
+              {life.inside ? 'Sortir' : 'Entrer'}
+            </button>
+          </div>
+          <div className="pointer-events-auto flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => open('build')}
+              aria-label="Ouvrir les outils de construction"
+              className="rounded-full bg-emerald-700 p-3 text-white shadow-lg"
+            >
+              <Hammer size={21} />
+            </button>
+            <button
+              type="button"
+              onClick={() => open('missions')}
+              aria-label="Ouvrir les objectifs"
+              className="rounded-full bg-white/90 p-3 text-slate-900 shadow"
+            >
+              <Bell size={20} />
+            </button>
+          </div>
+        </div>
+        <div className="pointer-events-auto mx-auto mt-2 max-w-[900px]">
+          <button
+            type="button"
+            onClick={() => open('journal')}
+            role="status"
+            className="max-w-[94%] rounded-2xl bg-slate-950/65 px-3 py-2 text-left text-[11px] font-medium text-white shadow backdrop-blur sm:text-xs"
+          >
+            {status.length > 95 ? status.slice(0, 92) + '…' : status}
+          </button>
+        </div>
+      </div>
+
+      <nav
+        aria-label="Navigation du jeu"
+        className="absolute inset-x-0 bottom-0 z-30 px-3 pb-[max(10px,env(safe-area-inset-bottom))]"
+      >
+        <div className="mx-auto grid max-w-[520px] grid-cols-4 gap-1 rounded-[26px] border border-white/75 bg-white/95 p-2 shadow-2xl backdrop-blur-lg">
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon
+            return (
+              <button
+                type="button"
+                key={item.id}
+                aria-pressed={panel === item.id}
+                onClick={() => open(item.id)}
+                className={
+                  'flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-[18px] text-[11px] font-semibold transition ' +
+                  (panel === item.id
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-600 hover:bg-slate-100')
+                }
+              >
+                <Icon size={21} />
+                <span>{item.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </nav>
+
+      {panel && (
+        <div className="absolute inset-0 z-40" aria-label={title}>
+          <button
+            type="button"
+            aria-label="Fermer le panneau"
+            className="absolute inset-0 bg-slate-950/40"
+            onClick={() => setPanel(null)}
+          />
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
+            className="absolute inset-x-0 bottom-[calc(85px+env(safe-area-inset-bottom))] mx-auto flex max-h-[min(68dvh,680px)] w-[calc(100%-16px)] max-w-[620px] flex-col overflow-hidden rounded-[30px] border border-white/80 bg-white shadow-2xl sm:max-h-[70dvh]"
+          >
+            <div className="mx-auto mt-2 h-1.5 w-11 shrink-0 rounded-full bg-slate-200" />
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 px-5 pb-3 pt-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                  Lomé Life · Quartier fictif
+                </p>
+                <h2 className="text-xl font-black">{title}</h2>
+              </div>
+              <button
+                type="button"
+                aria-label="Fermer"
+                onClick={() => setPanel(null)}
+                className="rounded-full bg-slate-100 p-2"
+              >
+                <X size={21} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 pb-5 pt-4 sm:px-5">
+              {notice && (
+                <div
+                  role="alert"
+                  className="rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-900"
+                >
+                  {notice}
+                </div>
+              )}
+              {panel === 'home' && (
+                <>
+                  <p className="text-sm text-slate-600">
+                    Prends soin de ton personnage. Ses besoins influencent sa journée.
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {NEEDS.map((n) => (
+                      <div key={n.key} className="rounded-2xl bg-slate-50 p-3">
+                        <div className="mb-2 flex items-center justify-between text-xs">
+                          <span>
+                            {n.icon} {n.label}
+                          </span>
+                          <strong>{needs[n.key]}%</strong>
+                        </div>
+                        <NeedBar value={needs[n.key]} color={n.color} />
+                      </div>
+                    ))}
+                  </div>
+                  <DailyStatus life={life} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <ActionButton
+                      title="Rentrer chez moi"
+                      onClick={() => go(9, 9)}
+                      icon={<Home size={17} />}
+                    />
+                    <ActionButton title="Entrer" outline onClick={() => action('enter')} />
+                    <ActionButton title="Dormir" outline onClick={() => action('sleep')} />
+                    <ActionButton title="Se laver" outline onClick={() => action('wash')} />
+                    <ActionButton title="Manger" outline onClick={() => action('eat')} />
+                    <ActionButton title="Sortir" outline onClick={() => action('leave')} />
+                  </div>
+                </>
+              )}
+              {panel === 'shop' && (
+                <>
+                  <p className="text-sm text-slate-600">
+                    Les achats modifient ton argent et le stock réel du moteur de simulation
+                    fictive.
+                  </p>
+                  <div className="flex items-center justify-between rounded-2xl bg-emerald-50 p-4">
+                    <div>
+                      <strong className="block">🍲 Repas du quartier</strong>
+                      <span className="text-xs text-slate-600">
+                        Stock municipal : {life.city.food} · À consommer ensuite
+                      </span>
+                    </div>
+                    <strong className="text-sm">650 FCFA</strong>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <ActionButton title="Aller au marché" onClick={() => go(12, 11)} />
+                    <ActionButton
+                      title="Aller à la boulangerie"
+                      outline
+                      onClick={() => go(13, 11)}
+                    />
+                  </div>
+                  <ActionButton
+                    title="Acheter un repas · 650 FCFA"
+                    icon={<ShoppingBag size={17} />}
+                    onClick={() => action('buy-meal')}
+                  />
+                  <ActionButton
+                    title={'Manger · ' + life.meals + ' repas disponible(s)'}
+                    outline
+                    icon={<Utensils size={17} />}
+                    onClick={() => action('eat')}
+                  />
+                </>
+              )}
+              {panel === 'map' && (
+                <>
+                  <p className="text-sm text-slate-600">
+                    Explore les lieux en 3D. Sélectionne un endroit : ton personnage empruntera les
+                    routes du quartier.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {LIFE_LOCATIONS.map((place, i) => (
+                      <button
+                        type="button"
+                        key={place.name}
+                        onClick={() => go(place.x, place.y)}
+                        className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left hover:border-emerald-400"
+                      >
+                        <span className="text-xl">{LOCATION_ICONS[i]}</span>
+                        <span className="min-w-0 text-xs font-bold">{place.name}</span>
+                        <ArrowRight size={14} className="ml-auto shrink-0 text-emerald-700" />
+                      </button>
+                    ))}
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 p-3 text-sm">
+                    <strong>Déplacement</strong>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {life.route.length} tronçon(s) restant(s) · {money(life.wallet)} disponibles
+                    </p>
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {(['walk', 'moto', 'taxi'] as const).map((t) => (
+                        <button
+                          type="button"
+                          key={t}
+                          onClick={() => trip(t)}
+                          className="rounded-xl border border-emerald-200 bg-white px-2 py-3 text-xs font-semibold"
+                        >
+                          {t === 'walk' ? '🚶 Marche' : t === 'moto' ? '🏍️ Moto' : '🚕 Taxi'}
+                          <span className="mt-1 block text-[10px] text-slate-500">
+                            {t === 'walk' ? 'Gratuit' : money(TRAVEL_COST[t])}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-[11px] text-slate-500">
+                      Les déplacements motorisés accélèrent le trajet simulé, sans véhicules
+                      physiques pilotables pour le moment.
+                    </p>
+                  </div>
+                </>
+              )}
+              {panel === 'phone' && (
+                <>
+                  <div className="rounded-[24px] bg-gradient-to-br from-indigo-700 via-violet-700 to-orange-400 p-4 text-white">
+                    <p className="text-3xl font-light">{String(life.hour).padStart(2, '0')}:00</p>
+                    <p className="text-xs opacity-90">Jour {life.day} · Lomé</p>
+                    <div className="mt-5 grid grid-cols-3 gap-3 text-center">
+                      {(
+                        [
+                          { id: 'jobs', icon: '💼', name: 'Métiers' },
+                          { id: 'messages', icon: '💬', name: 'Messages' },
+                          { id: 'wallet', icon: '💵', name: 'Argent' },
+                          { id: 'missions', icon: '🎯', name: 'Missions' },
+                          { id: 'journal', icon: '📰', name: 'Journal' },
+                          { id: 'build', icon: '🏗️', name: 'Construire' },
+                        ] as const
+                      ).map((app) => (
+                        <button
+                          key={app.id}
+                          type="button"
+                          onClick={() => open(app.id)}
+                          className="rounded-xl bg-white/20 p-3 backdrop-blur-sm hover:bg-white/30"
+                        >
+                          <span className="block text-2xl">{app.icon}</span>
+                          <span className="mt-1 block text-[11px]">{app.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Les services et conversations de ce téléphone sont simulés localement. Aucun
+                    message réel n’est envoyé.
+                  </p>
+                </>
+              )}
+              {panel === 'jobs' && (
+                <>
+                  <p className="text-sm text-slate-600">
+                    Choisis un métier et rends-toi sur place entre 7h et 19h. Un seul salaire par
+                    journée.
+                  </p>
+                  {JOBS.map((job) => (
+                    <button
+                      type="button"
+                      key={job}
+                      onClick={() => setLife((old) => selectJob(old, job))}
+                      className={
+                        'flex w-full items-center justify-between rounded-2xl border p-4 text-left text-sm ' +
+                        (life.job === job
+                          ? 'border-emerald-600 bg-emerald-50'
+                          : 'border-slate-200 bg-white')
+                      }
+                    >
+                      <span>
+                        <strong className="block capitalize">{job}</strong>
+                        <span className="text-xs text-slate-500">
+                          Lieu : {VENUE_LABELS[jobVenue(job)]}
+                        </span>
+                      </span>
+                      <span className="text-right">
+                        <strong className="block">{money(SALARIES[job])}</strong>
+                        <span className="text-xs">
+                          {life.job === job ? '✓ Sélectionné' : 'Choisir'}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                  <div className="grid grid-cols-2 gap-2">
+                    <ActionButton
+                      title="Aller travailler"
+                      onClick={() => {
+                        const target = LIFE_LOCATIONS.find(
+                          (loc) => loc.venue === jobVenue(life.job),
+                        )
+                        if (target) go(target.x, target.y)
+                      }}
+                    />
+                    <ActionButton
+                      title="Faire mon service"
+                      outline
+                      onClick={() => action('work')}
+                    />
+                  </div>
+                  <DailyStatus life={life} />
+                </>
+              )}
+              {panel === 'wallet' && (
+                <>
+                  <div className="rounded-2xl bg-emerald-900 p-5 text-white">
+                    <p className="text-xs">Mon solde fictif</p>
+                    <p className="mt-2 text-3xl font-black">{money(life.wallet)}</p>
+                    <p className="mt-1 text-xs text-emerald-200">
+                      Aucun paiement réel et aucune connexion Mobile Money.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="rounded-xl bg-emerald-50 p-4 text-sm">
+                      <p>Revenus personnels</p>
+                      <strong>{money(life.earned)}</strong>
+                    </div>
+                    <div className="rounded-xl bg-amber-50 p-4 text-sm">
+                      <p>Dépenses</p>
+                      <strong>{money(life.spent)}</strong>
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-slate-100 p-4 text-sm">
+                    Budget municipal distinct : <strong>{money(life.city.coins)}</strong> · bois
+                    disponible : {life.city.wood}
+                  </div>
+                  <ActionButton title="Trouver un travail" onClick={() => open('jobs')} />
+                </>
+              )}
+              {panel === 'messages' && (
+                <>
+                  <p className="text-xs text-slate-500">
+                    Discussion avec Afi, personnage fictif. Réponses scénarisées, sans joueurs en
+                    ligne.
+                  </p>
+                  <div className="space-y-3 rounded-2xl bg-slate-50 p-3">
+                    {chat.map((item, i) => (
+                      <div
+                        key={i}
+                        className={'flex ' + (item.by === 'me' ? 'justify-end' : 'justify-start')}
+                      >
+                        <span
+                          className={
+                            'max-w-[85%] rounded-2xl px-3 py-2 text-sm ' +
+                            (item.by === 'me'
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-white text-slate-800 shadow-sm')
+                          }
+                        >
+                          {item.body}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      sendMessage()
+                    }}
+                    className="flex gap-2"
+                  >
+                    <input
+                      aria-label="Écrire à Afi"
+                      value={chatDraft}
+                      maxLength={180}
+                      onChange={(e) => setChatDraft(e.target.value)}
+                      className="min-w-0 flex-1 rounded-2xl border border-slate-200 px-3 py-3 text-sm"
+                      placeholder="Écrire à Afi…"
+                    />
+                    <button
+                      type="submit"
+                      aria-label="Envoyer le message simulé"
+                      className="rounded-2xl bg-emerald-600 px-4 text-white"
+                    >
+                      <Send size={18} />
+                    </button>
+                  </form>
+                </>
+              )}
+              {panel === 'build' && (
+                <>
+                  <p className="text-sm text-slate-600">
+                    Sélectionne une construction puis touche une parcelle libre dans la scène 3D.
+                    Les ressources sont déduites du budget municipal fictif.
+                  </p>
+                  <div className="flex items-center justify-between rounded-xl bg-slate-100 p-3 text-xs font-semibold">
+                    <span>🏛️ {money(life.city.coins)}</span>
+                    <span>🪵 {life.city.wood} bois</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {BUILDINGS.map((b) => (
+                      <button
+                        type="button"
+                        key={b}
+                        onClick={() => {
+                          setBuilding(b)
+                          setMode('build')
+                          setPanel(null)
+                        }}
+                        className={
+                          'rounded-2xl border p-3 text-left text-xs ' +
+                          (building === b
+                            ? 'border-emerald-600 bg-emerald-50'
+                            : 'border-slate-200 bg-white')
+                        }
+                      >
+                        <span className="text-2xl">{CATALOG[b].icon}</span>
+                        <strong className="mt-1 block">{CATALOG[b].label}</strong>
+                        <span className="block text-slate-500">
+                          {CATALOG[b].coins} FCFA · {CATALOG[b].wood} bois
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <ActionButton
+                    title="Passer en mode démolition"
+                    outline
+                    onClick={() => {
+                      setMode('demolish')
+                      setPanel(null)
+                    }}
+                    icon={<Hammer size={17} />}
+                  />
+                </>
+              )}
+              {panel === 'missions' && (
+                <>
+                  <p className="text-sm text-slate-600">
+                    Développe ta vie et ta ville : objectifs liés à de vraies actions de jeu.
+                  </p>
+                  <div className="flex items-center justify-between rounded-2xl bg-emerald-50 p-4">
+                    <strong>Progression</strong>
+                    <strong>
+                      {completion} / {missions.length}
+                    </strong>
+                  </div>
+                  {missions.map((m, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 rounded-xl border border-slate-100 p-3 text-sm"
+                    >
+                      <span
+                        className={
+                          'flex h-7 w-7 shrink-0 items-center justify-center rounded-full ' +
+                          (m.done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100')
+                        }
+                      >
+                        {m.done ? <Check size={16} /> : i + 1}
+                      </span>
+                      <span>{m.text}</span>
+                    </div>
+                  ))}
+                  <div className="grid grid-cols-2 gap-2">
+                    <ActionButton title="Aller au marché" onClick={() => go(12, 11)} />
+                    <ActionButton title="Voir les métiers" outline onClick={() => open('jobs')} />
+                  </div>
+                </>
+              )}
+              {panel === 'journal' && (
+                <>
+                  <p className="text-sm text-slate-600">
+                    Événements enregistrés de ta partie. Pas de véritables nouvelles ou
+                    utilisateurs.
+                  </p>
+                  {life.events.map((ev, i) => (
+                    <div
+                      key={i}
+                      className="rounded-xl border-l-4 border-emerald-400 bg-slate-50 p-3 text-sm"
+                    >
+                      {ev}
+                    </div>
+                  ))}
+                  <DailyStatus life={life} />
+                  <button
+                    type="button"
+                    onClick={() => setLife((old) => advanceLifeHour(old))}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 p-3 text-sm font-semibold"
+                  >
+                    <Clock3 size={17} /> Avancer d’une heure
+                  </button>
+                  <button
+                    type="button"
+                    onClick={reset}
+                    className="w-full rounded-xl border border-rose-200 p-3 text-sm font-semibold text-rose-700"
+                  >
+                    Recommencer ma partie fictive
+                  </button>
+                  <Link
+                    href="/haroolife/territoire"
+                    className="block p-2 text-center text-sm font-semibold text-emerald-700 underline"
+                  >
+                    Ouvrir HarooVille
+                  </Link>
+                </>
+              )}
+              <p className="pt-1 text-center text-[10px] text-slate-500">
+                HarooLife · Mode fictif, hors paiements et comptes réels
+              </p>
+            </div>
+          </section>
+        </div>
+      )}
+    </main>
+  )
+}
