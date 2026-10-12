@@ -48,7 +48,7 @@ test('signed-in players see real residents of their canton and can speak on the 
     .poll(
       () =>
         page.evaluate(
-          () => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? '{}').route?.length,
+          () => (window as unknown as { __LOME_CITY?: { route?: number } }).__LOME_CITY?.route,
         ),
       { timeout: 15000 },
     )

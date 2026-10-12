@@ -38,15 +38,24 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
     )
     .toEqual(before)
 
-  // Paid ride: the travel scene opens on the boulevard; "Passer" lands at destination.
-  // A distant place chosen from the map, then a zémidjan from its sheet: the ride starts
-  // at once whatever the pace of the walk, instead of relying on a route still in progress.
+  // Paid rides: the travel scene opens on the boulevard; "Passer" lands at destination.
+  // First a taxi to a distant place from its sheet (the ride starts at once), then "Chez
+  // moi" from there: the way home is long enough for the map's zémidjan button to find a
+  // route still in progress whatever the pace of the machine.
   await navigation.getByRole('button', { name: 'Carte' }).click()
   await page.getByRole('button', { name: /Grand marché d’Assigamé/ }).click()
+  await page.getByRole('dialog', { name: 'Lieu' }).getByRole('button', { name: /Taxi/ }).click()
+  await expect(page.getByLabel('Trajet en cours')).toBeVisible()
   await page
-    .getByRole('dialog', { name: 'Lieu' })
-    .getByRole('button', { name: /Zémidjan/ })
-    .click()
+    .getByLabel('Trajet en cours')
+    .getByRole('button', { name: /Passer/ })
+    .click({ timeout: 15000, force: true })
+    .catch(() => undefined)
+  await expect(page.getByLabel('Trajet en cours')).toBeHidden()
+  await navigation.getByRole('button', { name: 'Carte' }).click()
+  await page.getByRole('button', { name: /Chez moi/ }).click()
+  await navigation.getByRole('button', { name: 'Carte' }).click()
+  await page.getByRole('button', { name: /Moto/ }).click()
   const ride = page.getByLabel('Trajet en cours')
   await expect(ride).toBeVisible()
   await expect(ride.getByText('Boulevard du Mono')).toBeVisible()
@@ -107,15 +116,45 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
       async () => {
         return page.evaluate(() => {
           const save = localStorage.getItem('haroolife.lome-city.v1')
-          return save ? JSON.parse(save).route.length : 99
+          const c = (window as unknown as { __LOME_CITY?: Record<string, unknown> }).__LOME_CITY
+          // One string so a failure prints the whole state (riding, transport, inside…).
+          // The route comes from the live state: the autosave is throttled, so the save may
+          // still hold the previous (empty) route when the walk has just started.
+          return JSON.stringify({
+            route: c?.route ?? 99,
+            saved: save ? JSON.parse(save).route.length : 99,
+            riding: c?.riding,
+            transport: c?.transport,
+            inside: c?.inside,
+            panel: c?.panel,
+            at: c?.at,
+            walk: (window as unknown as { __LOME_WALK?: unknown }).__LOME_WALK,
+            visible: document.visibilityState,
+          })
         })
       },
       { timeout: 15000 },
     )
-    .toBe(0)
+    .toContain('"route":0,')
   await navigation.getByRole('button', { name: 'Acheter' }).click()
   await expect(page.getByRole('dialog', { name: 'Marché & commerces' })).toBeVisible()
   await page.getByRole('button', { name: /Acheter un repas · 650 FCFA/ }).click()
+  // The engine answers every action with a message; the purchase must be the last one.
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const v = JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? 'null')
+        const c = (window as unknown as { __LOME_CITY?: Record<string, unknown> }).__LOME_CITY
+        return JSON.stringify({
+          last: v?.life.lastEvent,
+          pos: v?.life.pos,
+          inside: v?.life.inside,
+          memWallet: c?.wallet,
+          memLast: c?.lastEvent,
+        })
+      }),
+    )
+    .toContain('repas acheté')
   await page.getByRole('button', { name: /Manger ·/ }).click()
   await page.getByRole('button', { name: 'Fermer', exact: true }).click()
 
@@ -128,10 +167,22 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
     .poll(async () =>
       page.evaluate(() => {
         const save = localStorage.getItem('haroolife.lome-city.v1')
-        return save ? JSON.parse(save).life.wallet : 0
+        const v = save ? JSON.parse(save) : null
+        const c = (window as unknown as { __LOME_CITY?: Record<string, unknown> }).__LOME_CITY
+        return JSON.stringify({
+          wallet: v?.life.wallet,
+          pos: v?.life.pos,
+          at: c?.at,
+          food: v?.life.city.food,
+          earned: v?.life.earned,
+          spent: v?.life.spent,
+          meals: v?.life.meals,
+          lastEvent: v?.life.lastEvent,
+          inside: c?.inside,
+        })
       }),
     )
-    .toBe(10400)
+    .toContain('"wallet":9500,')
   await page.getByRole('button', { name: 'Fermer', exact: true }).click()
   await navigation.getByRole('button', { name: 'Maison' }).click()
   await page.getByRole('button', { name: 'Entrer', exact: true }).click()

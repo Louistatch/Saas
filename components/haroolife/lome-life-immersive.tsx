@@ -477,14 +477,39 @@ export function LomeLifeImmersive() {
     }
     setLoaded(true)
   }, [])
-  useEffect(() => {
-    if (!loaded) return
+  // Autosave is throttled: serialising the whole city on every walking step cost more than
+  // the step itself on slow machines. One pending timer writes the latest state (it is never
+  // cancelled by a newer change, so a busy main thread cannot starve it); the tab hiding
+  // flushes immediately.
+  const pendingSave = useRef<CityLife | null>(null)
+  const saveTimer = useRef<number | null>(null)
+  const flushSave = useCallback(() => {
+    saveTimer.current = null
+    if (!pendingSave.current) return
     try {
-      localStorage.setItem(CITY_STORAGE, JSON.stringify(cityLife))
+      localStorage.setItem(CITY_STORAGE, JSON.stringify(pendingSave.current))
     } catch {
       /* Offline game supports blocked storage. */
     }
-  }, [cityLife, loaded])
+    pendingSave.current = null
+  }, [])
+  useEffect(() => {
+    if (!loaded) return
+    pendingSave.current = cityLife
+    if (saveTimer.current === null) saveTimer.current = window.setTimeout(flushSave, 400)
+  }, [cityLife, loaded, flushSave])
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') flushSave()
+    }
+    window.addEventListener('pagehide', flushSave)
+    document.addEventListener('visibilitychange', onHide)
+    return () => {
+      window.removeEventListener('pagehide', flushSave)
+      document.removeEventListener('visibilitychange', onHide)
+      flushSave()
+    }
+  }, [flushSave])
   // Live state for the end-to-end tests (chunks loaded, buildings, position, interior).
   useEffect(() => {
     const room = cityLife.insideLot
@@ -507,8 +532,18 @@ export function LomeLifeImmersive() {
       actor: actor ? { id: actor.id, organizations: actor.organizations.length } : null,
       myCoopLot: myCoopLot?.id ?? null,
       camera,
+      riding,
+      transport,
+      panel,
+      wallet: life.wallet,
+      lastEvent: life.lastEvent,
     }
   }, [
+    riding,
+    transport,
+    panel,
+    life.wallet,
+    life.lastEvent,
     actor,
     myCoopLot,
     camera,
@@ -549,20 +584,31 @@ export function LomeLifeImmersive() {
   // Navigation advances automatically while the page is visible; no whole-hour penalty per road tile.
   // The pace is wall-clock based: when the main thread is busy (software WebGL, slow phone)
   // a late timer advances the cells it owes, so a route takes the same time on any device.
+  // The clock lives in a ref: each step re-renders and re-creates the effect, and the time
+  // already elapsed towards the next cell must survive that.
+  const walkClock = useRef(0)
   useEffect(() => {
-    if (!cityLife.route.length || insideAny || riding) return
+    if (!cityLife.route.length || insideAny || riding) {
+      walkClock.current = 0
+      return
+    }
     const ms = transport === 'walk' ? 420 : transport === 'moto' ? 220 : 160
-    let last = performance.now()
+    if (!walkClock.current) walkClock.current = performance.now()
+    const dbg = { ticks: 0, steps: 0, hidden: 0, created: Math.round(performance.now()) }
+    ;(window as unknown as { __LOME_WALK?: unknown }).__LOME_WALK = dbg
     const id = window.setInterval(
       () => {
+        dbg.ticks += 1
         if (document.visibilityState !== 'visible') {
-          last = performance.now()
+          dbg.hidden += 1
+          walkClock.current = performance.now()
           return
         }
         const now = performance.now()
-        const owed = Math.min(8, Math.floor((now - last) / ms))
+        const owed = Math.min(8, Math.floor((now - walkClock.current) / ms))
         if (owed <= 0) return
-        last += owed * ms
+        dbg.steps += owed
+        walkClock.current += owed * ms
         setCityLife((old) => {
           let next = old
           for (let i = 0; i < owed && next.route.length; i++) next = walkStep(next)
