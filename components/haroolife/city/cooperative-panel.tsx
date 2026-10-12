@@ -1,9 +1,11 @@
 'use client'
 
-import type { Actor, OrgRef } from '@/lib/haroolife/domain/actor'
+import { type Actor, type OrgRef, can } from '@/lib/haroolife/domain/actor'
 import type { CooperativeDashboard, MembersPage } from '@/lib/haroolife/domain/cooperative'
+import type { InteractionEngine } from '@/lib/haroolife/domain/engine'
 import { HttpOrganizationService } from '@/lib/haroolife/domain/http'
-import { STATE_LABELS } from '@/lib/haroolife/domain/worker-group'
+import type { LandAggregation } from '@/lib/haroolife/domain/land-aggregation'
+import { STATE_LABELS, canJoin, canRecruit } from '@/lib/haroolife/domain/worker-group'
 /**
  * Inside a house of cooperatives: the spatial dashboard of one real organisation. Every
  * figure comes from the API (true counts), the member list is paginated server-side and
@@ -11,6 +13,7 @@ import { STATE_LABELS } from '@/lib/haroolife/domain/worker-group'
  * are members, never a fake crowd.
  */
 import { useCallback, useEffect, useState } from 'react'
+import { OpenPoolForm, PledgeForm, RecruitForm } from './aggregation'
 
 const service = new HttpOrganizationService()
 const LEVEL: Record<string, string> = {
@@ -31,15 +34,14 @@ export default function CooperativePanel({
   org,
   actor,
   onPickOrg,
-  onRecruit,
-  onPool,
+  engine,
 }: {
   org: OrgRef
   actor: Actor | null
   /** Navigate the hierarchy (unions, cooperatives) without leaving the building. */
   onPickOrg: (o: OrgRef) => void
-  onRecruit?: () => void
-  onPool?: () => void
+  /** The interaction engine (commands + events); null when signed out. */
+  engine?: InteractionEngine | null
 }) {
   const [dash, setDash] = useState<CooperativeDashboard | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -47,6 +49,21 @@ export default function CooperativePanel({
   const [page, setPage] = useState(1)
   const [q, setQ] = useState('')
   const [listOpen, setListOpen] = useState(false)
+  const [form, setForm] = useState<
+    { kind: 'recruit' } | { kind: 'pool' } | { kind: 'pledge'; pool: LandAggregation } | null
+  >(null)
+  const [done, setDone] = useState<string | null>(null)
+  const [version, setVersion] = useState(0)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  // Business actions are only offered inside the actor's own organisation; the server
+  // re-checks membership and every rule on each command.
+  const member = Boolean(actor?.organizations.some((o) => o.id === org.id))
+  const canAct = Boolean(engine && actor && member)
+  const refresh = (message: string) => {
+    setForm(null)
+    setDone(message)
+    setVersion((v) => v + 1)
+  }
 
   useEffect(() => {
     let alive = true
@@ -62,7 +79,7 @@ export default function CooperativePanel({
     return () => {
       alive = false
     }
-  }, [org.id])
+  }, [org.id, version])
   const loadMembers = useCallback(
     async (p: number, query: string) => {
       try {
@@ -88,6 +105,14 @@ export default function CooperativePanel({
   const pages = members ? Math.max(1, Math.ceil(members.total / members.pageSize)) : 1
   return (
     <div className="space-y-3" data-testid="cooperative-dashboard">
+      {done && (
+        <p
+          role="status"
+          className="rounded-2xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-900"
+        >
+          {done}
+        </p>
+      )}
       <div className="flex items-center gap-3">
         {dash.logoUrl ? (
           <img src={dash.logoUrl} alt="" className="h-14 w-14 rounded-2xl object-cover" />
@@ -154,25 +179,65 @@ export default function CooperativePanel({
         {dash.workerNeeds.length === 0 && (
           <p className="text-xs text-slate-500">Aucune équipe en constitution.</p>
         )}
-        {dash.workerNeeds.map((g) => (
-          <div
-            key={g.id}
-            className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-slate-200"
-          >
-            <span className="truncate font-semibold">{g.title}</span>
-            <span className="text-xs text-slate-500">
-              {g.engaged}/{g.target} · {STATE_LABELS[g.state]}
-            </span>
-          </div>
-        ))}
-        {onRecruit && (
+        {dash.workerNeeds.map((g) => {
+          const join = actor ? canJoin(g, actor) : { ok: false as const }
+          return (
+            <div key={g.id} className="rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-slate-200">
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate font-semibold">{g.title}</span>
+                <span className="shrink-0 text-xs text-slate-500">
+                  {g.engaged}/{g.target} · {STATE_LABELS[g.state]}
+                </span>
+              </div>
+              {canAct && engine && actor && (g.joined || join.ok) && (
+                <button
+                  type="button"
+                  disabled={busyId === g.id}
+                  onClick={async () => {
+                    setBusyId(g.id)
+                    const r = await engine.bus.dispatch(
+                      { type: g.joined ? 'LeaveTeam' : 'JoinTeam', payload: { groupId: g.id } },
+                      actor,
+                    )
+                    setBusyId(null)
+                    if (r.ok)
+                      refresh(
+                        g.joined ? 'Vous avez quitté l’équipe.' : 'Vous avez rejoint l’équipe.',
+                      )
+                    else setError(r.error)
+                  }}
+                  className="mt-1 rounded-lg bg-slate-900 px-3 py-1 text-xs font-bold text-white disabled:opacity-50"
+                >
+                  {g.joined ? 'Quitter l’équipe' : 'Rejoindre l’équipe'}
+                </button>
+              )}
+              {canAct &&
+                actor &&
+                !g.joined &&
+                !join.ok &&
+                'reason' in join &&
+                can(actor, 'view-open-groups') && (
+                  <p className="mt-1 text-[11px] text-slate-500">{join.reason}</p>
+                )}
+            </div>
+          )
+        })}
+        {canAct && actor && canRecruit(actor) && form?.kind !== 'recruit' && (
           <button
             type="button"
-            onClick={onRecruit}
+            onClick={() => setForm({ kind: 'recruit' })}
             className="w-full rounded-xl bg-emerald-700 px-3 py-2 text-sm font-bold text-white"
           >
             Recruter une équipe
           </button>
+        )}
+        {form?.kind === 'recruit' && engine && actor && (
+          <RecruitForm
+            engine={engine}
+            actor={actor}
+            onDone={refresh}
+            onCancel={() => setForm(null)}
+          />
         )}
       </div>
       <div className="space-y-1">
@@ -182,9 +247,9 @@ export default function CooperativePanel({
         )}
         {dash.landGroups.map((g) => (
           <div key={g.id} className="rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-slate-200">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <span className="truncate font-semibold">{g.title}</span>
-              <span className="text-xs text-slate-500">
+              <span className="shrink-0 text-xs text-slate-500">
                 {ha(g.committedHa)} / {ha(g.targetHa)} · {STATE_LABELS[g.state]}
               </span>
             </div>
@@ -196,16 +261,53 @@ export default function CooperativePanel({
                 }}
               />
             </span>
+            <p className="mt-1 text-[11px] text-slate-500">
+              {g.participants} participant(s) · du {g.startsOn} au {g.endsOn}
+              {g.joined ? ' · vous participez' : ''}
+            </p>
+            {canAct &&
+              actor &&
+              can(actor, 'join-land-group') &&
+              g.state === 'OPEN' &&
+              !g.joined &&
+              !(form?.kind === 'pledge' && form.pool.id === g.id) && (
+                <button
+                  type="button"
+                  onClick={() => setForm({ kind: 'pledge', pool: g })}
+                  className="mt-1 rounded-lg bg-amber-600 px-3 py-1 text-xs font-bold text-white"
+                >
+                  Engager une parcelle
+                </button>
+              )}
+            {form?.kind === 'pledge' && form.pool.id === g.id && engine && actor && (
+              <div className="mt-2">
+                <PledgeForm
+                  engine={engine}
+                  actor={actor}
+                  pool={g}
+                  onDone={refresh}
+                  onCancel={() => setForm(null)}
+                />
+              </div>
+            )}
           </div>
         ))}
-        {onPool && (
+        {canAct && actor && can(actor, 'join-land-group') && form?.kind !== 'pool' && (
           <button
             type="button"
-            onClick={onPool}
+            onClick={() => setForm({ kind: 'pool' })}
             className="w-full rounded-xl border border-emerald-700 px-3 py-2 text-sm font-bold text-emerald-800"
           >
             Regrouper nos superficies
           </button>
+        )}
+        {form?.kind === 'pool' && engine && actor && (
+          <OpenPoolForm
+            engine={engine}
+            actor={actor}
+            onDone={refresh}
+            onCancel={() => setForm(null)}
+          />
         )}
       </div>
       <p className="text-xs text-slate-500">

@@ -42,7 +42,8 @@ import {
   toWorld,
 } from '@/lib/haroolife/city/world'
 import { type Actor, type OrgRef, primaryOrganization } from '@/lib/haroolife/domain/actor'
-import { HttpIdentityAdapter } from '@/lib/haroolife/domain/http'
+import { createInteractionEngine } from '@/lib/haroolife/domain/engine'
+import { HttpAggregationService, HttpIdentityAdapter } from '@/lib/haroolife/domain/http'
 import { GameWorldAdapter } from '@/lib/haroolife/domain/services'
 import {
   CITIES,
@@ -102,6 +103,8 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CAMERA_HOME, type CameraState } from './city/city-world'
 import CooperativePanel from './city/cooperative-panel'
+import MarketPanel from './city/market-panel'
+import OnboardingSteps from './city/onboarding'
 import { sayOnPlace, usePresence } from './use-presence'
 
 const CityWorld = dynamic(() => import('./city/city-world'), {
@@ -146,6 +149,7 @@ type Sheet =
   | 'billboard'
   | 'lot'
   | 'cooperative'
+  | 'market'
   | null
 type Mode = 'walk' | 'build' | 'demolish'
 const money = (n: number) => new Intl.NumberFormat('fr-FR').format(n) + ' FCFA'
@@ -266,6 +270,25 @@ export function LomeLifeImmersive() {
       alive = false
     }
   }, [])
+  // One engine per world: commands go to the real services, events feed the HUD notice.
+  const engine = useMemo(() => {
+    const svc = new HttpAggregationService()
+    return createInteractionEngine({ teams: svc, land: svc, parcels: svc })
+  }, [])
+  useEffect(() => {
+    const labels: Record<string, string> = {
+      WorkerGroupCreated: 'Recrutement ouvert.',
+      WorkerJoined: 'Un ouvrier a rejoint l’équipe.',
+      WorkerLeft: 'Un ouvrier a quitté l’équipe.',
+      WorkerGroupReady: 'Effectif atteint : l’équipe est prête.',
+      WorkerGroupExpired: 'Délai de constitution dépassé.',
+      LandPledged: 'Surface engagée dans le regroupement.',
+    }
+    return engine.events.on('*', (e) => {
+      const text = labels[e.type]
+      if (text) setNotice(text)
+    })
+  }, [engine])
   const myOrg = actor ? primaryOrganization(actor) : null
   const myCoopLot = myOrg ? worldAdapter.lotForOrganization(myOrg) : null
   const [cityFilter, setCityFilter] = useState<Category | 'all'>('all')
@@ -338,7 +361,9 @@ export function LomeLifeImmersive() {
                             ? 'Lieu'
                             : panel === 'cooperative'
                               ? 'Coopérative'
-                              : ''
+                              : panel === 'market'
+                                ? 'Marché'
+                                : ''
   const needs = life.needs
   const wellbeing = Math.round(NEED_KEYS.reduce((sum, k) => sum + needs[k], 0) / NEED_KEYS.length)
   const pending = eventById(life.pendingEvent)
@@ -608,6 +633,10 @@ export function LomeLifeImmersive() {
     if (a === 'enter' || a === 'leave') setPanel(null)
   }
   function cityAction(a: CityAction) {
+    if (a === 'offers') {
+      setPanel('market')
+      return
+    }
     if (a === 'coop') {
       setCoopOrg((cur) => cur ?? myOrg)
       setPanel('cooperative')
@@ -1180,6 +1209,7 @@ export function LomeLifeImmersive() {
                     ))}
                   </div>
                   <DailyStatus life={life} />
+                  {actor && <OnboardingSteps actor={actor} />}
                   <div className="grid grid-cols-2 gap-2">
                     <ActionButton
                       title="Rentrer chez moi"
@@ -1977,9 +2007,15 @@ export function LomeLifeImmersive() {
                     </>
                   )
                 })()}
+              {panel === 'market' && <MarketPanel actor={actor} />}
               {panel === 'cooperative' &&
                 (coopOrg ? (
-                  <CooperativePanel org={coopOrg} actor={actor} onPickOrg={setCoopOrg} />
+                  <CooperativePanel
+                    org={coopOrg}
+                    actor={actor}
+                    onPickOrg={setCoopOrg}
+                    engine={engine}
+                  />
                 ) : actor ? (
                   <p className="text-sm text-slate-600">
                     Votre compte n’est rattaché à aucune coopérative. Rapprochez-vous de votre

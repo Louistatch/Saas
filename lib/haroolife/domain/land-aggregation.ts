@@ -106,7 +106,10 @@ export function validatePledge(args: {
   if (Math.round(amountHa * 10000) / 10000 !== amountHa)
     return { ok: false, reason: 'Quatre décimales au plus (unité : hectare).' }
   if (amountHa > parcel.areaHa)
-    return { ok: false, reason: `La parcelle ne fait que ${parcel.areaHa} ha.` }
+    return {
+      ok: false,
+      reason: `La parcelle ne fait que ${parcel.areaHa.toLocaleString('fr-FR')} ha.`,
+    }
   if (g.committedHa + amountHa > g.maxHa)
     return { ok: false, reason: `Au-delà du maximum du regroupement (${g.maxHa} ha).` }
   if (g.joined) return { ok: false, reason: 'Vous participez déjà à ce regroupement.' }

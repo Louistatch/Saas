@@ -43,6 +43,15 @@ export interface WorkerAggregationService {
 export interface LandAggregationService {
   openPools(): Promise<LandAggregation[]>
   pledge(groupId: string, parcelId: string, amountHa: number): Promise<LandAggregation>
+  /** Opens a pool with the organiser's own first pledge (the pilot requires one). */
+  createPool(input: {
+    title: string
+    crop: string
+    startsOn: string
+    endsOn: string
+    parcelId: string
+    amountHa: number
+  }): Promise<LandAggregation>
 }
 export interface Offer {
   id: string

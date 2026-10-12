@@ -36,9 +36,20 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   if (process.env.HAROOLIFE_ENABLED !== 'true') return unavailable()
-  // Browser commands are same-origin and use the existing HttpOnly session.
+  // Browser commands are same-origin and use the existing HttpOnly session. The origin is
+  // compared with the host the browser actually used (nextUrl.origin normalises to localhost
+  // behind `next start --hostname`, which would reject legitimate same-origin calls).
   const origin = request.headers.get('origin')
-  if (!origin || origin !== request.nextUrl.origin) return reply({ error: 'Origine invalide' }, 403)
+  const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? ''
+  const originHost = (() => {
+    try {
+      return origin ? new URL(origin).host : ''
+    } catch {
+      return ''
+    }
+  })()
+  if (!origin || (origin !== request.nextUrl.origin && (!host || originHost !== host)))
+    return reply({ error: 'Origine invalide' }, 403)
   try {
     const blocked = await applyRateLimit(request, 'haroolife')
     if (blocked) return blocked

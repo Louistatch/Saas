@@ -43,6 +43,8 @@ test('« Ma coopérative » : camera, entrance and the spatial dashboard of a re
   ])
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
+  // The mock board starts from the fixture for every run (desktop, then mobile).
+  await page.request.post('http://127.0.0.1:54329/__reset')
   const dir = path.join('test-results', 'lome-cooperative')
   fs.mkdirSync(dir, { recursive: true })
   await page.goto('/haroolife/territoire/lome', { waitUntil: 'domcontentloaded' })
@@ -84,13 +86,50 @@ test('« Ma coopérative » : camera, entrance and the spatial dashboard of a re
   await expect(dash).toBeVisible({ timeout: 15000 })
   await expect(page.getByRole('dialog', { name: 'Coopérative' })).toBeVisible()
   await expect(dash.getByText('COOMARA-Kpalimé')).toBeVisible()
-  await expect(dash.getByText(/Coopérative · Union des coopératives de Kloto · FENOMAT/)).toBeVisible()
+  await expect(
+    dash.getByText(/Coopérative · Union des coopératives de Kloto · FENOMAT/),
+  ).toBeVisible()
   await expect(dash.getByText('120', { exact: true })).toBeVisible()
   await expect(dash.getByText('Principales cultures')).toBeVisible()
   await expect(dash.getByText(/Équipe récolte/)).toBeVisible()
   await expect(dash.getByText('Regroupement maïs 15 ha')).toBeVisible()
   await page.waitForTimeout(600)
   await page.screenshot({ path: path.join(dir, `${testInfo.project.name}-dashboard.png`) })
+
+  // Scenario A: the producer opens a recruitment; the group lands on the board (real command).
+  await dash.getByRole('button', { name: 'Recruter une équipe' }).click()
+  const recruit = dash.getByRole('form', { name: 'Recruter une équipe' })
+  await recruit.getByLabel('Titre').fill('Désherbage parcelles Sud')
+  await recruit.getByLabel('Activité').selectOption('desherbage')
+  await recruit.getByRole('button', { name: 'Ouvrir le recrutement' }).click()
+  await expect(dash.getByRole('status')).toContainText('Désherbage parcelles Sud', {
+    timeout: 15000,
+  })
+  await expect(dash.getByText('Désherbage parcelles Sud', { exact: true })).toHaveCount(1)
+  await expect(dash.getByText(/0\/8 · En constitution/)).toBeVisible()
+  // The account is not a worker: joining is explained, not offered.
+  await expect(dash.getByText('Profil ouvrier requis.').first()).toBeVisible()
+
+  // Scenario B: 2 ha pledged on the 15 ha pool (12,5 → 14,5), then the same pool refuses a second one.
+  await dash.getByRole('button', { name: 'Engager une parcelle' }).click()
+  const pledge = dash.getByRole('form', {
+    name: /Engager une parcelle dans Regroupement maïs 15 ha/,
+  })
+  await pledge.getByLabel('Parcelle').selectOption({ index: 1 })
+  await pledge.getByLabel('Surface engagée').fill('200')
+  await pledge.getByLabel('Unité').selectOption('are')
+  await expect(pledge.getByText(/Soit 2 ha sur une parcelle de 0,5 ha/)).toBeVisible()
+  // Client-side mirror of the database rule: the 0,5 ha parcel cannot pledge 2 ha.
+  await pledge.getByRole('button', { name: 'Engager cette surface' }).click()
+  await expect(pledge.getByRole('alert')).toContainText('La parcelle ne fait que 0,5 ha.')
+  await pledge.getByLabel('Parcelle').selectOption({ index: 4 })
+  await expect(pledge.getByText(/Soit 2 ha sur une parcelle de 2 ha/)).toBeVisible()
+  await pledge.getByRole('button', { name: 'Engager cette surface' }).click()
+  await expect(dash.getByRole('status')).toContainText('14,5 ha sur 15 ha', { timeout: 15000 })
+  await expect(dash.getByText(/14,5 ha \/ 15 ha/)).toBeVisible()
+  await expect(dash.getByText(/3 participant\(s\).*vous participez/)).toBeVisible()
+  await expect(dash.getByRole('button', { name: 'Engager une parcelle' })).toHaveCount(0)
+  await page.screenshot({ path: path.join(dir, `${testInfo.project.name}-aggregation.png`) })
 
   // Paginated member list (server-side, 20 per page) with search.
   await dash.getByRole('button', { name: /Voir les membres \(120\)/ }).click()
@@ -127,4 +166,49 @@ test('the API refuses the member list to an account outside the organisation', a
   expect(members.status()).toBe(401)
   const bad = await request.get('/api/haroolife/cooperatives/not-a-uuid')
   expect(bad.status()).toBe(400)
+})
+
+test('the market shows real presales and announcements, never a phone number', async ({
+  page,
+  context,
+}, testInfo) => {
+  test.setTimeout(150_000)
+  await context.addCookies([
+    { name: 'sb-127-auth-token', value: 'base64-' + b64(session), domain: '127.0.0.1', path: '/' },
+  ])
+  await page.goto('/haroolife/territoire/lome', { waitUntil: 'domcontentloaded' })
+  await expect(page.locator('canvas').first()).toBeVisible({ timeout: 30000 })
+  const navigation = page.getByRole('navigation', { name: 'Navigation du jeu' })
+  await navigation.getByRole('button', { name: 'Carte' }).click()
+  await page.getByRole('button', { name: /Grand marché d’Assigamé/ }).click()
+  const lotSheet = page.getByRole('dialog', { name: 'Lieu' })
+  await lotSheet.getByRole('button', { name: /Taxi/ }).click()
+  await page
+    .getByLabel('Trajet en cours')
+    .getByRole('button', { name: /Passer/ })
+    .click({ timeout: 15000, force: true })
+    .catch(() => undefined)
+  await expect.poll(() => stats(page).then((s) => s?.route ?? 99), { timeout: 20000 }).toBe(0)
+  await page.getByRole('button', { name: 'Entrer ou sortir' }).click()
+  await expect
+    .poll(() => stats(page).then((s) => s?.inside ?? null), { timeout: 10000 })
+    .not.toBeNull()
+  await page.getByRole('button', { name: 'Activités du lieu' }).click()
+  await page.getByRole('button', { name: /Voir les offres de producteurs/ }).click()
+  const market = page.getByTestId('market-offers')
+  await expect(page.getByRole('dialog', { name: 'Marché' })).toBeVisible()
+  const offers = market.getByRole('list', { name: 'Offres' })
+  await expect(offers.getByRole('listitem')).toHaveCount(3, { timeout: 15000 })
+  await expect(offers).toContainText('Maïs blanc, récolte de novembre')
+  await expect(offers).toContainText('12 000 kg')
+  await expect(offers).toContainText('180 FCFA/kg')
+  await expect(offers).toContainText('Soja de Kpalimé, 800 kg')
+  await expect(offers).not.toContainText('Déjà vendu')
+  await expect(offers).not.toContainText(/\+228|90 11 22 33/)
+  await market.getByRole('button', { name: 'Soja' }).click()
+  await expect(offers.getByRole('listitem')).toHaveCount(2)
+  await expect(offers).not.toContainText('Maïs blanc')
+  const dir = path.join('test-results', 'lome-cooperative')
+  fs.mkdirSync(dir, { recursive: true })
+  await page.screenshot({ path: path.join(dir, `${testInfo.project.name}-market.png`) })
 })

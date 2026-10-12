@@ -127,7 +127,7 @@ const CARDS = MEMBERS.filter((_, i) => i % 2 === 0).map((m, i) => ({
 }))
 const CROPS = ['Maïs', 'Soja', 'Manioc', 'Riz']
 const PARCELS = Array.from({ length: 40 }, (_, i) => ({
-  id: `p${String(i).padStart(7, '0')}-0000-4000-8000-000000000000`,
+  id: `b${String(i).padStart(7, '0')}-0000-4000-8000-000000000000`,
   cooperative_id: C1,
   member_id: MEMBERS[i % 30].id,
   culture_principale: CROPS[i % CROPS.length],
@@ -173,6 +173,9 @@ const GROUPS = [
     created_at: '2026-10-11T00:00:00Z',
   },
 ]
+// Snapshots so a test run can put the board back (POST /__reset): Playwright projects share
+// this process and the commands of one run must not leak into the next.
+const GROUPS_INITIAL = GROUPS.map((g) => ({ ...g }))
 let PARTS = [
   { group_id: G1, user_id: 'u5', parcel_id: null, amount: 1, left_at: null },
   { group_id: G1, user_id: 'u6', parcel_id: null, amount: 1, left_at: null },
@@ -180,11 +183,19 @@ let PARTS = [
   { group_id: G2, user_id: 'u3', parcel_id: PARCELS[3].id, amount: 6, left_at: null },
   { group_id: G2, user_id: 'u8', parcel_id: PARCELS[5].id, amount: 6.5, left_at: null },
 ]
+const PARTS_INITIAL = PARTS.map((p) => ({ ...p }))
 const ANNOUNCEMENTS = [1, 2, 3].map((i) => ({
   id: `n${i}`,
   cooperative_id: C1,
   status: 'active',
-  title: `Annonce ${i}`,
+  type: i === 1 ? 'prevente' : i === 2 ? 'job' : 'autre',
+  title: i === 1 ? 'Soja de Kpalimé, 800 kg' : `Annonce ${i}`,
+  culture: i === 1 ? 'Soja' : null,
+  quantity_kg: i === 1 ? 800 : null,
+  price_per_kg_fcfa: i === 1 ? 450 : null,
+  location_canton: 'Kpalimé',
+  contact_phone: '+228 90 11 22 33',
+  created_at: '2026-10-01T00:00:00Z',
 }))
 const RESIDENTS = [
   { user_id: 'u-m0', visible: true },
@@ -198,7 +209,7 @@ const PROFILES = [
   { id: 'u-x', email: 'x@test.local' },
 ]
 // Mes parcelles (compte membre m0 par e-mail ? non : l'admin n'a pas de parcelle ; le pilote en prête 3 pour le jeu)
-const MY_PARCELS = PARCELS.slice(0, 3).map((p) => ({
+const MY_PARCELS = [...PARCELS.slice(0, 3), PARCELS[7]].map((p) => ({
   id: p.id,
   culture: p.culture_principale,
   area: p.superficie_ha,
@@ -397,7 +408,9 @@ const PRESALES = [
     quantite_estimee: 12,
     prix_par_tonne: 180000,
     canton_id: CANTON(5).id,
-    statut: 'ouverte',
+    statut: 'DISPONIBLE',
+    cantons: { name: 'Kpalimé' },
+    created_at: '2026-10-02T00:00:00Z',
     description: 'Maïs blanc, récolte de novembre',
     created_by: 'u3',
     date_recolte_prevue: '2026-11-20',
@@ -408,7 +421,9 @@ const PRESALES = [
     quantite_estimee: 5,
     prix_par_tonne: 420000,
     canton_id: CANTON(1).id,
-    statut: 'ouverte',
+    statut: 'DISPONIBLE',
+    cantons: { name: 'Lama-Kara' },
+    created_at: '2026-10-03T00:00:00Z',
     description: 'Soja bio',
     created_by: 'u4',
     date_recolte_prevue: '2026-12-05',
@@ -419,7 +434,9 @@ const PRESALES = [
     quantite_estimee: 2,
     prix_par_tonne: 170000,
     canton_id: CANTON(1).id,
-    statut: 'close',
+    statut: 'VENDUE',
+    cantons: { name: 'Lama-Kara' },
+    created_at: '2026-10-04T00:00:00Z',
     description: 'Déjà vendu',
     created_by: 'u4',
     date_recolte_prevue: '2026-10-01',
@@ -499,6 +516,12 @@ http
     })
     req.on('end', () => {
       const url = new URL(req.url, `http://127.0.0.1:${PORT}`)
+      if (url.pathname === '/__reset' && req.method === 'POST') {
+        GROUPS.splice(0, GROUPS.length, ...GROUPS_INITIAL.map((g) => ({ ...g })))
+        PARTS = PARTS_INITIAL.map((p) => ({ ...p }))
+        res.writeHead(204)
+        return res.end()
+      }
       const send = (status, data, headers = {}) => {
         res.writeHead(status, {
           'Content-Type': 'application/json',
@@ -556,6 +579,11 @@ http
                 code: '22023',
                 message: 'Cette surface dépasserait le maximum du regroupement (16 ha)',
               })
+            if (PARTS.some((x) => x.parcel_id === parcel.id && !x.left_at))
+              return send(409, {
+                code: '22023',
+                message: 'Cette parcelle participe déjà sur cette période',
+              })
             PARTS.push({
               group_id: g.id,
               user_id: UID,
@@ -597,6 +625,15 @@ http
             owner_id: UID,
             created_at: new Date().toISOString(),
           })
+          // Like the database: the organiser of a pool brings the first pledge.
+          if (p_payload.kind === 'work' && p_payload.parcel_id)
+            PARTS.push({
+              group_id: id,
+              user_id: UID,
+              parcel_id: p_payload.parcel_id,
+              amount: Number(p_payload.amount),
+              left_at: null,
+            })
           return send(200, id)
         }
         return send(409, { code: '22023', message: 'Commande invalide' })
@@ -613,7 +650,9 @@ http
         if (range) rows = rows.slice(Number(range[1]), Number(range[2]) + 1)
         // postgrest-js .range() and .limit() travel as query parameters.
         const offset = Number(url.searchParams.get('offset') ?? 0)
-        const limit = url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : rows.length
+        const limit = url.searchParams.has('limit')
+          ? Number(url.searchParams.get('limit'))
+          : rows.length
         if (offset || limit < rows.length) rows = rows.slice(offset, offset + limit)
         const wantCount = String(req.headers.prefer ?? '').includes('count=')
         const headers = {

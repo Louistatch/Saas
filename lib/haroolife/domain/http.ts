@@ -124,6 +124,26 @@ export class HttpAggregationService
     })
     return fromBoardWork(b.groups.find((x) => x.id === groupId) as Group, b)
   }
+  async createPool(input: {
+    title: string
+    crop: string
+    startsOn: string
+    endsOn: string
+    parcelId: string
+    amountHa: number
+  }) {
+    const b = await this.command('create', {
+      kind: 'work',
+      title: input.title,
+      activity: input.crop,
+      starts_on: input.startsOn,
+      ends_on: input.endsOn,
+      parcel_id: input.parcelId,
+      amount: input.amountHa,
+    })
+    const g = b.groups.find((x) => x.title === input.title && x.kind === 'work') as Group
+    return fromBoardWork(g, b)
+  }
   async mine(): Promise<Parcel[]> {
     const b = await this.board()
     return b.parcels.map((p) => ({

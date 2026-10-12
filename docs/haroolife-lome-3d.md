@@ -249,3 +249,75 @@ HarooLife devient l'interface spatiale des comptes FaîtiereHub / Haroo. La couc
   superficies » ne sont pas encore branchés dans le panneau (Jalon 3).
 - Pas de carte de membre délivrée depuis le jeu : la fiche renvoie vers `/verify/<numéro>`
   des cartes existantes uniquement.
+
+## Jalon 3 : agrégation et interactions (12/10/2026)
+
+### Moteur d'interaction (`lib/haroolife/domain/engine.ts`)
+
+`createInteractionEngine({ teams, land, parcels })` enregistre les commandes sur le
+`DomainCommandBus` ; chaque bâtiment est un point d'interaction qui envoie une commande, jamais
+une écriture directe :
+
+| Commande | Capacité exigée | Vérifications côté client (miroir) | Service réel |
+|---|---|---|---|
+| `RecruitTeam` | producteur, admin de coopérative ou agronome validé (`canRecruit`) | titre ≥ 3, fin ≥ début | `haroolife_command` `create` (`team`) |
+| `JoinTeam` | `join-team` | `canJoin` : profil ouvrier, disponible, équipe ouverte, pas déjà membre, places restantes | `join` |
+| `LeaveTeam` | — | — | `leave` |
+| `PledgeLand` | `join-land-group` | `validatePledge` : regroupement ouvert, parcelle à soi, surface > 0 à 4 décimales, ≤ parcelle, ≤ plafond, pas déjà participant | `join` avec `parcel_id` et `amount` (ha) |
+| `OpenLandPool` | `join-land-group` | parcelle à soi, 0 < surface ≤ parcelle, titre, dates | `create` (`work`) avec première promesse |
+| `EnterCooperative` | `enter-cooperative` | rattachement ou `browse-hierarchy` | événement seulement |
+
+Les unités (`ha`, `are`, `m²`) sont converties en hectares à 4 décimales comme la base ; aucune
+somme n'est faite côté client, seul `total` renvoyé par `haroolife_board` compte. Les événements
+`WorkerGroupCreated`, `WorkerJoined`, `WorkerLeft`, `WorkerGroupReady`, `WorkerGroupExpired`,
+`LandPledged`, `CooperativeEntered` alimentent la notice du HUD.
+
+### Dans la maison des coopératives
+
+- « Recruter une équipe » (formulaire : titre, activité, dates, bénéficiaire) → le groupe apparaît
+  avec son effectif réel 0/8 ; « Rejoindre / Quitter l'équipe » pour un ouvrier disponible, sinon
+  la raison est affichée (« Profil ouvrier requis. »), jamais un bouton qui échouerait.
+- « Engager une parcelle » sur un regroupement ouvert (parcelle, surface, unité) et « Regrouper nos
+  superficies » (nouveau regroupement avec première promesse). Scénario validé : regroupement
+  de 15 ha à 12,5 ha, promesse de 2 ha refusée sur une parcelle de 0,5 ha, acceptée sur une
+  parcelle de 2 ha → 14,5 / 15 ha, 3 participants, plus de bouton pour le même compte.
+- Les actions ne sont proposées que dans sa propre organisation ; le serveur revérifie tout.
+
+### Marché
+
+`GET /api/haroolife/market` (compte requis, filtres `culture` / `canton`) assemble les préventes
+Haroo `DISPONIBLE` et les annonces de producteurs de type `prevente` actives, en FCFA/kg et kg,
+sans aucun numéro de téléphone (la mise en relation renvoie vers `/haroo` ou `/marketplace`).
+Dans un marché de la ville : « Voir les offres de producteurs » ouvre la fiche « Marché » avec
+filtres par culture.
+
+### Parcours d'accueil et cartes
+
+Le panneau Maison affiche le parcours d'accueil du compte réel : compte, organisation, canton,
+profil Haroo, carte (statut calculé par la règle commune, lien `/verify/<numéro>`), chacun
+renvoyant vers l'écran existant qui le complète. Le jeu ne crée ni compte, ni adhésion, ni carte.
+
+### Correctif trouvé en route
+
+`POST /api/haroolife` comparait l'en-tête `Origin` à `request.nextUrl.origin`, qui vaut
+`http://localhost:3000` derrière `next start --hostname 127.0.0.1` : toute commande depuis le
+navigateur était refusée (« Origine invalide ») dans ce banc. La comparaison se fait maintenant
+avec l'hôte réellement utilisé (`Host` / `X-Forwarded-Host`), toujours en même origine.
+
+### Vérification
+
+- `tests/haroolife-engine.test.ts` : scénarios A (recrutement, 8 adhésions, prêt, refus du
+  non-ouvrier, de l'indisponible, du doublon, du 9ᵉ), B (15 ha, 2 ha acceptés, ares et m²,
+  dépassement de parcelle et de plafond, double engagement, double participation, capacité
+  manquante), C (frontières d'organisation), D (ouverture d'un regroupement avec première
+  promesse).
+- `e2e/lome-cooperative.spec.ts` (desktop et Pixel 7) : scénarios A et B dans le bâtiment avec
+  le mock Supabase (commandes réelles via `/api/haroolife`, réinitialisées par `POST /__reset`),
+  marché (3 offres, filtre Soja → 2, « Déjà vendu » absent, aucun numéro).
+
+### Non opérationnel à ce jalon
+
+- Les états `CONFIRMED`, `ACTIVE`, `COMPLETED` restent dérivés des dates : aucune table de
+  production n'est modifiée (pas de migration).
+- Pas de création de prévente depuis le jeu ; pas de mesure sur Android réel ; préversion Vercel
+  non vérifiable depuis cette session.

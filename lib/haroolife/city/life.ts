@@ -51,6 +51,7 @@ export type CityAction =
   | 'coach'
   | 'toilet'
   | 'coop'
+  | 'offers'
 
 export interface CityLife {
   v: 1
@@ -361,8 +362,16 @@ export function interiorFor(t: LotType): Interior | null {
 export function actionsFor(t: LotType): { id: CityAction; label: string; hint: string }[] {
   switch (t) {
     case 'shop':
-    case 'market':
       return [{ id: 'buy-meal', label: 'Acheter un repas', hint: '650 FCFA' }]
+    case 'market':
+      return [
+        { id: 'buy-meal', label: 'Acheter un repas', hint: '650 FCFA' },
+        {
+          id: 'offers',
+          label: 'Voir les offres de producteurs',
+          hint: 'Préventes réelles (Haroo)',
+        },
+      ]
     case 'sport':
     case 'stadium':
       return [
@@ -527,6 +536,8 @@ export function cityInteract(s: CityLife, action: CityAction): CityLife {
       return note(bump(s, { fun: 25 }), 'Un moment au calme.')
     case 'coop':
       return note(s, 'Les données de la coopérative s’affichent dans la fiche.')
+    case 'offers':
+      return note(s, 'Les offres réelles s’affichent dans la fiche.')
     case 'use-treadmill':
     case 'use-bike':
     case 'use-weights': {
