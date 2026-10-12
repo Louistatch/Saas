@@ -10,6 +10,8 @@
  * District names are real; the layout is a game simplification, not a survey.
  */
 import { SIZE } from '../townsmen-engine'
+import { type LocalityId, current } from './locality'
+import { hash } from './seed'
 
 export const WORLD_W = 120
 export const WORLD_H = 80
@@ -19,8 +21,9 @@ export const ESTATE = { x0: 49, y0: 22, size: SIZE }
 /** The estate's western driveway joins avenue x=48 at local row 12 ((9,12) is an estate road). */
 export const DRIVEWAY_Y = ESTATE.y0 + 12
 
-export type Terrain = 'land' | 'sand' | 'lagoon' | 'ocean'
-export type DistrictId = 'agoe' | 'adidogome' | 'tokoin' | 'centre' | 'be' | 'baguida'
+export type Terrain = 'land' | 'sand' | 'lagoon' | 'ocean' | 'hill'
+/** District ids are locality-specific strings (Lomé: agoe, adidogome, tokoin, centre, be, baguida). */
+export type DistrictId = string
 export interface DistrictDef {
   id: DistrictId
   name: string
@@ -33,69 +36,10 @@ export interface DistrictDef {
   y0: number
   y1: number
 }
-export const DISTRICTS: DistrictDef[] = [
-  {
-    id: 'agoe',
-    name: 'Agoè',
-    note: 'Le nord qui grandit : gare routière, stade et lotissements.',
-    density: 1,
-    x0: 0,
-    x1: 120,
-    y0: 0,
-    y1: 14,
-  },
-  {
-    id: 'adidogome',
-    name: 'Adidogomé',
-    note: 'Résidentiel à l’ouest, écoles et petits commerces.',
-    density: 1,
-    x0: 0,
-    x1: 36,
-    y0: 14,
-    y1: 68,
-  },
-  {
-    id: 'tokoin',
-    name: 'Tokoin',
-    note: 'Université, CHU et les quartiers de la classe moyenne.',
-    density: 2,
-    x0: 36,
-    x1: 70,
-    y0: 14,
-    y1: 40,
-  },
-  {
-    id: 'centre',
-    name: 'Centre-ville · Dékon',
-    note: 'Le grand marché d’Assigamé, les banques et l’hôtel de ville.',
-    density: 3,
-    x0: 36,
-    x1: 70,
-    y0: 40,
-    y1: 68,
-  },
-  {
-    id: 'be',
-    name: 'Bè',
-    note: 'Le vieux Lomé entre lagune et océan, port de pêche et cultes.',
-    density: 2,
-    x0: 70,
-    x1: 100,
-    y0: 14,
-    y1: 68,
-  },
-  {
-    id: 'baguida',
-    name: 'Baguida',
-    note: 'La côte vers l’est : cocotiers, plage et hôtels.',
-    density: 1,
-    x0: 100,
-    x1: 120,
-    y0: 14,
-    y1: 68,
-  },
-]
-export const WATER_NAMES = { lagoon: 'Lagune de Bè', ocean: 'Océan Atlantique', sand: 'Plage' }
+/** Districts of the active locality. */
+export const districts = (): DistrictDef[] => current().districts
+/** Water names of the active locality (lagoon = inland water, ocean = open water, sand = shore). */
+export const waterNames = () => current().waterNames
 
 export type LotType =
   | 'house'
@@ -220,31 +164,21 @@ export interface Lot {
 
 export const key = (x: number, y: number) => `${x}:${y}`
 export const within = (x: number, y: number) => x >= 0 && y >= 0 && x < WORLD_W && y < WORLD_H
+/** Inside the player's estate: only the locality that hosts it (Lomé) has one. */
 export const inEstate = (x: number, y: number) =>
-  x >= ESTATE.x0 && y >= ESTATE.y0 && x < ESTATE.x0 + ESTATE.size && y < ESTATE.y0 + ESTATE.size
+  current().estate !== null &&
+  x >= ESTATE.x0 &&
+  y >= ESTATE.y0 &&
+  x < ESTATE.x0 + ESTATE.size &&
+  y < ESTATE.y0 + ESTATE.size
 export const toLocal = (p: { x: number; y: number }) => ({ x: p.x - ESTATE.x0, y: p.y - ESTATE.y0 })
 export const toWorld = (p: { x: number; y: number }) => ({ x: p.x + ESTATE.x0, y: p.y + ESTATE.y0 })
 
-/** Deterministic 32-bit hash → [0, 1). */
-export function hash(x: number, y: number, salt = 0): number {
-  let h = (x * 374761393 + y * 668265263 + salt * 2246822519) | 0
-  h = Math.imul(h ^ (h >>> 13), 1274126177)
-  h ^= h >>> 16
-  return (h >>> 0) / 4294967296
-}
+export { hash }
 
 export function terrainAt(x: number, y: number): Terrain {
   if (!within(x, y)) return 'ocean'
-  if (y >= 72) return 'ocean'
-  if (y >= 68) return 'sand'
-  // Lagoon: a band north of Bè and Baguida with a wavy bank, plus an arm towards Tokoin.
-  if (x >= 66) {
-    const bank = 16 + Math.round(Math.sin(x / 5) * 1.5)
-    const south = 26 + Math.round(Math.cos(x / 7) * 1.5)
-    if (y >= bank && y <= south) return 'lagoon'
-  }
-  if (x >= 60 && x < 66 && y >= 19 && y <= 23) return 'lagoon'
-  return 'land'
+  return current().terrain(x, y)
 }
 export const isWater = (x: number, y: number) => {
   const t = terrainAt(x, y)
@@ -252,40 +186,29 @@ export const isWater = (x: number, y: number) => {
 }
 
 export function districtAt(x: number, y: number): DistrictDef {
-  for (const d of DISTRICTS) if (x >= d.x0 && x < d.x1 && y >= d.y0 && y < d.y1) return d
-  return DISTRICTS[0]
+  const ds = current().districts
+  for (const d of ds) if (x >= d.x0 && x < d.x1 && y >= d.y0 && y < d.y1) return d
+  return ds[0]
 }
 export function placeName(x: number, y: number): string {
   const t = terrainAt(x, y)
-  if (t === 'lagoon') return WATER_NAMES.lagoon
-  if (t === 'ocean') return WATER_NAMES.ocean
-  if (t === 'sand') return `${WATER_NAMES.sand} · ${districtAt(x, y).name}`
+  const names = current().waterNames
+  if (t === 'lagoon') return names.lagoon
+  if (t === 'ocean') return names.ocean
+  if (t === 'sand') return `${names.sand} · ${districtAt(x, y).name}`
+  if (t === 'hill') return `Collines · ${districtAt(x, y).name}`
   return districtAt(x, y).name
 }
 
-const BRIDGES = new Set([84, 108])
-/** Avenues every 12 columns and 10 rows, the beach boulevard, two bridges over the lagoon,
- * and district streets that split the blocks. Water is never road except on a bridge. */
+/** The road network of the active locality (avenues, streets, bridges, shore road). */
 export function isCityRoad(x: number, y: number): boolean {
   if (!within(x, y)) return false
   if (inEstate(x, y)) return false
-  const t = terrainAt(x, y)
-  if (t === 'ocean') return false
-  if (t === 'sand') return y === 68 // beach boulevard
-  if (t === 'lagoon') return BRIDGES.has(x) // bridges only
-  if (x % 12 === 0 || y % 10 === 0) return true
-  if (y === 68) return true
-  const d = districtAt(x, y)
-  // Streets inside blocks: downtown gets both, dense gets one, loose gets a few.
-  if (d.density === 3 && (x % 12 === 6 || y % 10 === 5)) return true
-  if (d.density === 2 && x % 12 === 6) return true
-  if (d.density === 1 && y % 10 === 5 && hash(Math.floor(x / 12), Math.floor(y / 10), 7) > 0.3)
-    return true
-  return false
+  return current().road(x, y)
 }
 /** The estate's driveway: world cells west of the estate on the driveway row, up to the avenue. */
 export function isDriveway(x: number, y: number): boolean {
-  return y === DRIVEWAY_Y && x >= ESTATE.x0 - 1 && x < ESTATE.x0
+  return current().estate !== null && y === DRIVEWAY_Y && x >= ESTATE.x0 - 1 && x < ESTATE.x0
 }
 
 export interface Landmark {
@@ -299,166 +222,12 @@ export interface Landmark {
   h?: number
   floors?: number
 }
-export const LANDMARKS: Landmark[] = [
-  // Houses of cooperatives: the buildings real organisations are mapped onto (one per district).
-  {
-    type: 'cooperative',
-    name: 'Maison des coopératives de Tokoin',
-    district: 'tokoin',
-    x: 43,
-    y: 27,
-    w: 3,
-    h: 2,
-    floors: 2,
-  },
-  {
-    type: 'cooperative',
-    name: 'Maison des coopératives d’Adidogomé',
-    district: 'adidogome',
-    x: 20,
-    y: 40,
-    w: 3,
-    h: 2,
-    floors: 2,
-  },
-  {
-    type: 'cooperative',
-    name: 'Maison des coopératives d’Agoè',
-    district: 'agoe',
-    x: 50,
-    y: 8,
-    w: 3,
-    h: 2,
-    floors: 2,
-  },
-  {
-    type: 'cooperative',
-    name: 'Maison des coopératives du Centre',
-    district: 'centre',
-    x: 46,
-    y: 46,
-    w: 3,
-    h: 2,
-    floors: 3,
-  },
-  {
-    type: 'cooperative',
-    name: 'Maison des coopératives de Bè',
-    district: 'be',
-    x: 84,
-    y: 36,
-    w: 3,
-    h: 2,
-    floors: 2,
-  },
-  {
-    type: 'cooperative',
-    name: 'Maison des coopératives de Baguida',
-    district: 'baguida',
-    x: 106,
-    y: 46,
-    w: 3,
-    h: 2,
-    floors: 2,
-  },
-  { type: 'market', name: 'Grand marché d’Assigamé', district: 'centre', x: 50, y: 52, w: 4, h: 3 },
-  { type: 'townhall', name: 'Hôtel de ville de Lomé', district: 'centre', x: 62, y: 44, floors: 3 },
-  { type: 'bank', name: 'Banque de Dékon', district: 'centre', x: 40, y: 44, floors: 5 },
-  {
-    type: 'university',
-    name: 'Université de Lomé',
-    district: 'tokoin',
-    x: 40,
-    y: 32,
-    w: 4,
-    h: 3,
-    floors: 2,
-  },
-  {
-    type: 'hospital',
-    name: 'CHU de Tokoin',
-    district: 'tokoin',
-    x: 40,
-    y: 18,
-    w: 3,
-    h: 3,
-    floors: 3,
-  },
-  { type: 'port', name: 'Port de pêche de Bè', district: 'be', x: 74, y: 64, w: 3, h: 2 },
-  { type: 'market', name: 'Marché de Bè', district: 'be', x: 88, y: 46, w: 3, h: 2 },
-  {
-    type: 'worship',
-    name: 'Cathédrale du Sacré-Cœur',
-    district: 'centre',
-    x: 56,
-    y: 60,
-    floors: 2,
-  },
-  { type: 'worship', name: 'Grande mosquée de Lomé', district: 'tokoin', x: 52, y: 16, floors: 2 },
-  { type: 'station', name: 'Gare routière d’Agoè', district: 'agoe', x: 38, y: 4, w: 4, h: 2 },
-  { type: 'stadium', name: 'Stade de Kégué', district: 'agoe', x: 86, y: 4, w: 5, h: 4 },
-  { type: 'school', name: 'Lycée d’Adidogomé', district: 'adidogome', x: 14, y: 32, w: 3, h: 2 },
-  {
-    type: 'hospital',
-    name: 'Clinique d’Adidogomé',
-    district: 'adidogome',
-    x: 26,
-    y: 54,
-    floors: 2,
-  },
-  { type: 'market', name: 'Marché d’Adidogomé', district: 'adidogome', x: 8, y: 44, w: 3, h: 2 },
-  { type: 'sport', name: 'Salle Fitness Tokoin', district: 'tokoin', x: 44, y: 24, floors: 2 },
-  { type: 'sport', name: 'Terrain de Bè', district: 'be', x: 92, y: 34, w: 3, h: 3 },
-  {
-    type: 'hotel',
-    name: 'Hôtel de la plage de Baguida',
-    district: 'baguida',
-    x: 110,
-    y: 62,
-    w: 3,
-    h: 2,
-    floors: 3,
-  },
-  { type: 'park', name: 'Plage de Baguida', district: 'baguida', x: 104, y: 56, w: 4, h: 3 },
-  { type: 'school', name: 'École de Baguida', district: 'baguida', x: 112, y: 36, w: 3, h: 2 },
-  { type: 'bank', name: 'Caisse d’épargne d’Agoè', district: 'agoe', x: 62, y: 4, floors: 3 },
-  { type: 'worship', name: 'Temple de Bè', district: 'be', x: 80, y: 56, floors: 2 },
-  { type: 'market', name: 'Marché d’Agoè-Assiyéyé', district: 'agoe', x: 14, y: 4, w: 3, h: 2 },
-  { type: 'bank', name: 'Banque de Bè', district: 'be', x: 94, y: 62, floors: 4 },
-  { type: 'school', name: 'École de Tokoin', district: 'tokoin', x: 44, y: 38, w: 2, h: 2 },
-  { type: 'hospital', name: 'Centre de santé d’Agoè', district: 'agoe', x: 26, y: 8, floors: 2 },
-  { type: 'worship', name: 'Église d’Agoè', district: 'agoe', x: 74, y: 8, floors: 2 },
-  { type: 'sport', name: 'Gymnase de Dékon', district: 'centre', x: 38, y: 50, w: 3, h: 2 },
-  { type: 'bank', name: 'Banque de Baguida', district: 'baguida', x: 110, y: 50, floors: 3 },
-  { type: 'hospital', name: 'Dispensaire de Bè', district: 'be', x: 98, y: 28, floors: 2 },
-  { type: 'park', name: 'Jardin de Dékon', district: 'centre', x: 46, y: 64, w: 3, h: 2 },
-  { type: 'sport', name: 'Gym d’Agoè', district: 'agoe', x: 110, y: 10, floors: 2 },
-  { type: 'worship', name: 'Mosquée d’Adidogomé', district: 'adidogome', x: 30, y: 20, floors: 2 },
-  { type: 'bank', name: 'Microfinance d’Adidogomé', district: 'adidogome', x: 4, y: 60, floors: 2 },
-  {
-    type: 'hospital',
-    name: 'Centre de santé de Baguida',
-    district: 'baguida',
-    x: 116,
-    y: 48,
-    floors: 2,
-  },
-  { type: 'school', name: 'École d’Agoè', district: 'agoe', x: 100, y: 8, w: 3, h: 2 },
-  { type: 'worship', name: 'Église de Baguida', district: 'baguida', x: 104, y: 42, floors: 2 },
-  { type: 'sport', name: 'Stade d’Adidogomé', district: 'adidogome', x: 20, y: 62, w: 4, h: 3 },
-  { type: 'bank', name: 'Banque de Tokoin', district: 'tokoin', x: 68, y: 26, floors: 4 },
-  { type: 'market', name: 'Marché de Tokoin', district: 'tokoin', x: 38, y: 36, w: 3, h: 2 },
-  { type: 'school', name: 'École du centre', district: 'centre', x: 66, y: 56, w: 2, h: 2 },
-  { type: 'market', name: 'Marché de Baguida', district: 'baguida', x: 108, y: 30, w: 3, h: 2 },
-  { type: 'hospital', name: 'Clinique du centre', district: 'centre', x: 44, y: 58, floors: 3 },
-  { type: 'school', name: 'Collège de Bè', district: 'be', x: 76, y: 40, w: 3, h: 2 },
-  { type: 'sport', name: 'Piscine de Baguida', district: 'baguida', x: 114, y: 20, w: 3, h: 2 },
-  { type: 'hotel', name: 'Hôtel du centre', district: 'centre', x: 60, y: 50, floors: 6 },
-  { type: 'station', name: 'Gare de Baguida', district: 'baguida', x: 102, y: 66, w: 3, h: 2 },
-]
+/** Landmark anchors of the active locality. */
+export const landmarkAnchors = (): Landmark[] => current().landmarks
 
-/** Every generated lot of the world (memoised: the world is immutable). */
-let cache: { lots: Lot[]; byCell: Map<string, Lot>; byId: Map<string, Lot> } | null = null
+/** Every generated lot of a locality (memoised per locality: each world is immutable). */
+type WorldIndex = { lots: Lot[]; byCell: Map<string, Lot>; byId: Map<string, Lot> }
+const caches = new Map<LocalityId, WorldIndex>()
 
 function freeFootprint(taken: Set<string>, x: number, y: number, w: number, h: number): boolean {
   for (let i = 0; i < w; i++)
@@ -475,6 +244,7 @@ function freeFootprint(taken: Set<string>, x: number, y: number, w: number, h: n
       if (inEstate(cx, cy) || taken.has(key(cx, cy))) return false
       // Keep one cell away from the estate so its fence reads.
       if (
+        current().estate !== null &&
         cx >= ESTATE.x0 - 1 &&
         cy >= ESTATE.y0 - 1 &&
         cx <= ESTATE.x0 + ESTATE.size &&
@@ -506,8 +276,13 @@ function fillerType(d: DistrictDef, x: number, y: number, onAvenue: boolean): Lo
 export function worldLots(): Lot[] {
   return worldIndex().lots
 }
-export function worldIndex() {
-  if (cache) return cache
+export function worldIndex(): WorldIndex {
+  const loc = current()
+  const cached = caches.get(loc.id)
+  if (cached) return cached
+  // Lot ids of the reference world stay as they were (saves point to them); other
+  // localities prefix theirs so a save can never confuse two towns.
+  const prefix = loc.id === 'lome' ? '' : `${loc.id}:`
   const taken = new Set<string>()
   const lots: Lot[] = []
   const occupy = (lot: Lot) => {
@@ -516,7 +291,7 @@ export function worldIndex() {
     lots.push(lot)
   }
   // 1. Landmarks: nearest free footprint to the anchor, spiralling out.
-  for (const lm of LANDMARKS) {
+  for (const lm of loc.landmarks) {
     const w = lm.w ?? 2
     const h = lm.h ?? 2
     let placed = false
@@ -529,7 +304,7 @@ export function worldIndex() {
           const door = freeFootprint(taken, x, y, w, h) ? doorOf(x, y, w, h) : null
           if (door && districtAt(x, y).id === lm.district) {
             occupy({
-              id: `lm-${lots.length}`,
+              id: `${prefix}lm-${lots.length}`,
               type: lm.type,
               district: lm.district,
               x,
@@ -571,7 +346,7 @@ export function worldIndex() {
           x % 12 === 1 || y % 10 === 1 || (x + 2) % 12 === 0 || (y + 2) % 10 === 0,
         )
         occupy({
-          id: `l-${x}-${y}`,
+          id: `${prefix}l-${x}-${y}`,
           type: t1,
           district: d.id,
           x,
@@ -597,7 +372,18 @@ export function worldIndex() {
           : type === 'shop'
             ? 1 + Math.floor(hash(x, y, 5) * 2)
             : 1
-      occupy({ id: `l-${x}-${y}`, type, district: d.id, x, y, w, h, floors, name: null, door })
+      occupy({
+        id: `${prefix}l-${x}-${y}`,
+        type,
+        district: d.id,
+        x,
+        y,
+        w,
+        h,
+        floors,
+        name: null,
+        door,
+      })
     }
   const byCell = new Map<string, Lot>()
   const byId = new Map<string, Lot>()
@@ -606,8 +392,9 @@ export function worldIndex() {
     for (let i = 0; i < lot.w; i++)
       for (let j = 0; j < lot.h; j++) byCell.set(key(lot.x + i, lot.y + j), lot)
   }
-  cache = { lots, byCell, byId }
-  return cache
+  const index = { lots, byCell, byId }
+  caches.set(loc.id, index)
+  return index
 }
 export const lotAt = (x: number, y: number): Lot | null =>
   worldIndex().byCell.get(key(x, y)) ?? null

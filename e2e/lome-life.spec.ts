@@ -73,7 +73,7 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
   await expect(ride).toBeHidden()
   await navigation.getByRole('button', { name: 'Carte' }).click()
   await expect(page.getByRole('dialog', { name: 'Explorer Lomé' })).toBeVisible()
-  // Named city: filters narrow the destinations, districts are listed, the city can change.
+  // Named city: filters narrow the destinations, districts are listed.
   await page
     .getByRole('group', { name: 'Filtrer la carte' })
     .getByRole('button', { name: 'Commerces' })
@@ -85,15 +85,9 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
     .click()
   await expect(page.getByText(/Les quartiers de Lomé/)).toBeVisible()
   await expect(page.getByRole('dialog').getByText('Tokoin').first()).toBeVisible()
-  await page
-    .getByRole('group', { name: 'Changer de ville' })
-    .getByRole('button', { name: 'Kara' })
-    .click()
-  await expect(page.getByText(/Les quartiers de Kara/)).toBeVisible()
-  await page
-    .getByRole('group', { name: 'Changer de ville' })
-    .getByRole('button', { name: 'Lomé' })
-    .click()
+  // The other towns are reached by travelling on the Togo map (lome-travel.spec.ts), not renamed.
+  await expect(page.getByTestId('national-map').getByText(/OpenStreetMap/)).toBeVisible()
+  await expect(page.getByRole('button', { name: /Voyager vers Kara/ }).first()).toBeVisible()
   // Monetisation surfaces: a billboard sheet from the map, partner slots in the phone.
   await page.getByRole('button', { name: /Adidogomé · Disponible/ }).click()
   await expect(page.getByRole('dialog', { name: 'Panneau publicitaire' })).toBeVisible()

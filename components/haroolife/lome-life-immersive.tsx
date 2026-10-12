@@ -8,6 +8,7 @@ import {
   actionsFor,
   arrive,
   cityInteract,
+  ensureLocality,
   goToEstate,
   goToLot,
   goToPoint,
@@ -18,9 +19,12 @@ import {
   roadsOf,
   stepDir,
   stopActivity,
+  travelTo,
+  tripTo,
   useProp,
   walkStep,
 } from '@/lib/haroolife/city/life'
+import { LOCALITIES, LOCALITY_IDS, type LocalityId } from '@/lib/haroolife/city/locality'
 import { CITY_STORAGE, loadCityLife } from '@/lib/haroolife/city/migrate'
 import { findPath } from '@/lib/haroolife/city/navigation'
 import { bump } from '@/lib/haroolife/city/perf'
@@ -36,11 +40,12 @@ import {
   CATEGORY_LABELS,
   CATEGORY_OF,
   type Category,
-  DISTRICTS,
   type Lot,
   TYPE_ICONS,
   TYPE_LABELS,
   placeName as cityPlaceName,
+  districts,
+  inEstate,
   landmarks,
   landmarksIn,
   lotAt as lotAtCell,
@@ -53,7 +58,6 @@ import { HttpAggregationService, HttpIdentityAdapter } from '@/lib/haroolife/dom
 import { GameWorldAdapter } from '@/lib/haroolife/domain/services'
 import {
   CITIES,
-  CITY_IDS,
   MAP_FILTERS,
   type MapFilter,
   districtAt,
@@ -110,6 +114,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CAMERA_HOME, type CameraState } from './city/city-world'
 import CooperativePanel from './city/cooperative-panel'
 import MarketPanel from './city/market-panel'
+import NationalMap from './city/national-map'
 import OnboardingSteps from './city/onboarding'
 import { HomeDialog } from './residence-dialog'
 import { sayOnPlace, usePresence } from './use-presence'
@@ -258,6 +263,8 @@ function DailyStatus({ life }: { life: LifeState }) {
 export function LomeLifeImmersive() {
   bump('immersive')
   const [cityLife, setCityLife] = useState<CityLife>(initialCityLife)
+  // The generators read one locality at a time: the save's town, applied before any lookup.
+  ensureLocality(cityLife)
   const life = cityLife.life
   const setLife = useCallback(
     (next: LifeState | ((old: LifeState) => LifeState)) =>
@@ -357,9 +364,9 @@ export function LomeLifeImmersive() {
   const board = billboardById(billboard)
   const cityDef = CITIES[life.cityId]
   const whereAmI =
-    life.cityId === 'lome'
-      ? cityPlaceName(cityLife.at.x, cityLife.at.y)
-      : placeNameAt(life.cityId, life.pos.x, life.pos.y)
+    life.cityId !== 'lome' && inEstate(cityLife.at.x, cityLife.at.y)
+      ? placeNameAt(life.cityId, life.pos.x, life.pos.y)
+      : cityPlaceName(cityLife.at.x, cityLife.at.y)
   const [chatDraft, setChatDraft] = useState('')
   const [chat, setChat] = useState<{ by: 'me' | 'npc'; body: string }[]>([
     {
@@ -376,7 +383,7 @@ export function LomeLifeImmersive() {
       : panel === 'shop'
         ? 'Marché & commerces'
         : panel === 'map'
-          ? 'Explorer Lomé'
+          ? `Explorer ${LOCALITIES[cityLife.locality].name}`
           : panel === 'phone'
             ? 'Mon téléphone'
             : panel === 'build'
@@ -536,8 +543,10 @@ export function LomeLifeImmersive() {
       wallet: life.wallet,
       lastEvent: life.lastEvent,
       estateBuildings: life.city.buildings.length,
+      locality: cityLife.locality,
     }
   }, [
+    cityLife.locality,
     life.city.buildings.length,
     riding,
     transport,
@@ -845,6 +854,36 @@ export function LomeLifeImmersive() {
     }
   }, [presence.status, presence.world, residencePrompted])
 
+  /** The bush taxi to another town: fare, hours on the road, arrival at its station. */
+  function travel(to: LocalityId) {
+    const trip = tripTo(cityLife, to)
+    if (!trip || to === cityLife.locality) return
+    if (life.wallet < trip.fare) {
+      setNotice(`Il te faut ${money(trip.fare)} pour le car vers ${LOCALITIES[to].name}.`)
+      return
+    }
+    setCityLife((old) => {
+      let next: CityLife = {
+        ...old,
+        life: {
+          ...old.life,
+          wallet: old.life.wallet - trip.fare,
+          spent: old.life.spent + trip.fare,
+        },
+      }
+      for (let h = 0; h < trip.hours; h++) next = { ...next, life: advanceLifeHour(next.life) }
+      if (to in CITIES) next = { ...next, life: selectCity(next.life, to) }
+      return travelTo(next, to)
+    })
+    const gate = LOCALITIES[to].gate
+    setCamera(CAMERA_HOME(gate.x, gate.y))
+    setFollow(true)
+    setSelectedLot(null)
+    setPanel(null)
+    setMode('walk')
+    setTransport('walk')
+  }
+
   function reset() {
     if (!window.confirm('Recommencer uniquement ta partie fictive de Lomé Life ?')) return
     setCityLife(initialCityLife())
@@ -929,6 +968,7 @@ export function LomeLifeImmersive() {
               frameRef.current = f
             }}
             quality={quality}
+            locality={cityLife.locality}
           />
         )}
       </div>
@@ -1386,6 +1426,41 @@ export function LomeLifeImmersive() {
               )}
               {panel === 'map' && (
                 <>
+                  <div className="rounded-2xl bg-slate-50 p-3" data-testid="national-map">
+                    <p className="text-sm font-black">Le Togo</p>
+                    <p className="text-[11px] text-slate-500">
+                      Tu es à {LOCALITIES[cityLife.locality].name} (
+                      {LOCALITIES[cityLife.locality].region}). Choisis une destination : le car
+                      interurbain t’y dépose à la gare routière, la ville se charge au fur et à
+                      mesure autour de toi.
+                    </p>
+                    <NationalMap current={cityLife.locality} onPick={travel} />
+                    <div className="mt-2 grid gap-1">
+                      {LOCALITY_IDS.filter((id) => id !== cityLife.locality).map((id) => {
+                        const trip = tripTo(cityLife, id)
+                        return (
+                          <button
+                            type="button"
+                            key={id}
+                            onClick={() => travel(id)}
+                            className="flex items-center gap-3 rounded-xl bg-white px-3 py-2 text-left text-xs ring-1 ring-slate-200 hover:ring-emerald-400"
+                          >
+                            <span className="text-base">🚌</span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block font-bold">
+                                Voyager vers {LOCALITIES[id].name}
+                              </span>
+                              <span className="block text-slate-500">
+                                {LOCALITIES[id].note} Car interurbain : {trip.hours} h,{' '}
+                                {money(trip.fare)} (tarif fictif).
+                              </span>
+                            </span>
+                            <ArrowRight size={14} className="shrink-0 text-emerald-700" />
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
                   <p className="text-sm text-slate-600">
                     Toute la ville est là : touche un bâtiment dans la scène ou choisis un lieu. Ton
                     personnage suit les rues, les ponts et les avenues.
@@ -1421,7 +1496,7 @@ export function LomeLifeImmersive() {
                       </button>
                     ))}
                   </div>
-                  {DISTRICTS.map((d) => {
+                  {districts().map((d) => {
                     const places = landmarksIn(d.id).filter(
                       (l) => cityFilter === 'all' || CATEGORY_OF[l.type] === cityFilter,
                     )
@@ -1509,27 +1584,9 @@ export function LomeLifeImmersive() {
                         sud-ouest.
                       </li>
                     </ul>
-                    <div className="mt-3 flex gap-1" role="group" aria-label="Changer de ville">
-                      {CITY_IDS.map((id) => (
-                        <button
-                          type="button"
-                          key={id}
-                          aria-pressed={life.cityId === id}
-                          onClick={() => setLife((old) => selectCity(old, id))}
-                          className={
-                            'rounded-full px-3 py-1.5 text-xs font-semibold ' +
-                            (life.cityId === id
-                              ? 'bg-emerald-700 text-white'
-                              : 'bg-white text-slate-700 ring-1 ring-slate-200')
-                          }
-                        >
-                          {CITIES[id].name}
-                        </button>
-                      ))}
-                    </div>
                     <p className="mt-1 text-[11px] text-slate-500">
-                      Même quartier de jeu, noms et lieux de la ville choisie. Relevé géographique à
-                      venir.
+                      Les noms du domaine suivent la ville où tu habites. Pour changer de ville,
+                      voyage depuis la carte du Togo ci-dessus.
                     </p>
                   </div>
                   <div className="rounded-2xl bg-slate-50 p-3 text-sm">
@@ -1991,8 +2048,8 @@ export function LomeLifeImmersive() {
                             {lot.name ?? TYPE_LABELS[lot.type]}
                           </p>
                           <p className="text-xs text-slate-500">
-                            📍 {DISTRICTS.find((d) => d.id === lot.district)?.name}, {cityDef.name}{' '}
-                            · {TYPE_LABELS[lot.type]}
+                            📍 {districts().find((d) => d.id === lot.district)?.name},{' '}
+                            {cityDef.name} · {TYPE_LABELS[lot.type]}
                             {lot.floors > 1 ? ` · ${lot.floors} niveaux` : ''}
                           </p>
                         </div>

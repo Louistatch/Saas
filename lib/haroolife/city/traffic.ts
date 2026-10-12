@@ -1,3 +1,4 @@
+import { type LocalityId, current } from './locality'
 /**
  * Life on the streets: vehicles on a deterministic closed walk over the road network, and
  * pedestrians who walk real routes between the doors of real places (home → market,
@@ -32,8 +33,9 @@ export interface Agent {
   activity?: 'walk' | 'run'
 }
 
-let loopCache: { x: number; y: number }[] | null = null
+const loops = new Map<LocalityId, { x: number; y: number }[]>()
 export function cityLoop(): { x: number; y: number }[] {
+  const loopCache = loops.get(current().id)
   if (loopCache) return loopCache
   const road = (x: number, y: number) => isCityRoad(x, y) || isDriveway(x, y)
   // Start on the first avenue crossing found.
@@ -41,8 +43,8 @@ export function cityLoop(): { x: number; y: number }[] {
   for (let y = 0; y < WORLD_H && !start; y++)
     for (let x = 0; x < WORLD_W && !start; x++) if (road(x, y)) start = { x, y }
   if (!start) {
-    loopCache = []
-    return loopCache
+    loops.set(current().id, [])
+    return []
   }
   const seen = new Set<string>()
   const walk: { x: number; y: number }[] = []
@@ -72,8 +74,8 @@ export function cityLoop(): { x: number; y: number }[] {
     stack.push({ p: n, i: 0 })
   }
   if (walk.length > 1) walk.pop()
-  loopCache = walk
-  return loopCache
+  loops.set(current().id, walk)
+  return walk
 }
 
 const FLEET: VehicleKind[] = [
@@ -152,10 +154,11 @@ interface Route {
   minY: number
   maxY: number
 }
-const routes = new Map<number, Route | null>()
+const routes = new Map<string, Route | null>()
 /** The i-th pedestrian's route: between the doors of two real places, deterministic. */
 function routeOf(i: number): Route | null {
-  const cached = routes.get(i)
+  const routeKey = `${current().id}:${i}`
+  const cached = routes.get(routeKey)
   if (cached !== undefined) return cached
   const lm = landmarks()
   const lots = worldLots().filter((l) => l.type === 'house' || l.type === 'apartment')
@@ -176,7 +179,7 @@ function routeOf(i: number): Route | null {
     }
     route = { path, minX, maxX, minY, maxY }
   }
-  routes.set(i, route)
+  routes.set(routeKey, route)
   return route
 }
 /** Pedestrians within `radius` cells of a centre: each walks its route there and back. */

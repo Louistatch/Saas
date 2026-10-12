@@ -10,6 +10,7 @@ export default defineConfig({
     'lome-perf.spec.ts',
     'lome-cooperative.spec.ts',
     'lome-gpu-lifecycle.spec.ts',
+    'lome-travel.spec.ts',
   ],
   reporter: [['list'], ['html', { outputFolder: 'test-results/lome-report', open: 'never' }]],
   fullyParallel: false,

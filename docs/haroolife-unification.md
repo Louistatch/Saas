@@ -124,14 +124,56 @@ L'ancienne clé n'est jamais supprimée ; `haroolife.citybuilder.imported` empê
 Captures : `docs/captures/unification/b-entree-*.png` (`/haroolife`), `b-construire-*.png`
 (`/haroolife/territoire`). Suite Lomé complète après le Jalon B : 22 tests, 22 réussis (desktop + mobile-android, 9,3 min).
 
+## Jalon C — carte nationale sourcée et deux pôles pilotes
+
+**Géographie sourcée.** `scripts/haroolife-geo.mjs` est le pipeline hors ligne : il lit des GeoJSON
+déjà téléchargés (ici geoBoundaries gbOpen TGO ADM0–ADM2, construits à partir d'OpenStreetMap,
+licence ODbL 1.0 ; un export Geofabrik `togo-latest.osm.pbf` converti en GeoJSON est accepté de la
+même façon), simplifie les anneaux (Douglas-Peucker, 0,012°), calcule les centroïdes et écrit
+`lib/haroolife/togo/boundaries.json` (26 ko : pays, 5 régions, 37 préfectures). Aucune coordonnée
+n'est saisie à la main : un pôle est dessiné au centroïde de sa préfecture (`Lome Commune`, `Kozah`).
+L'attribution « © les contributeurs OpenStreetMap, geoBoundaries · ODbL » est affichée sous la
+carte. Note : le téléchargement direct depuis download.geofabrik.de est refusé par le réseau de
+cette session (403 proxy) ; les fichiers geoBoundaries ont été obtenus via leur dépôt public.
+
+**Localités dans le même moteur.** `lib/haroolife/city/locality.ts` décrit une localité : terrain,
+règle des routes, quartiers, lieux nommés, décor (palette du sol, arbres de rue et de berge,
+quartiers « côtiers », rangée du littoral, ciel). `world.ts`, `chunks.ts`, `traffic.ts`,
+`catalogue.ts` et le rendu des chunks lisent la localité active ; les caches (lots, chunks,
+boucles de circulation, trajets des piétons) sont indexés par localité, les identifiants de lots
+des autres villes sont préfixés. **Lomé est inchangée** : l'empreinte SHA-256 du monde généré
+(terrain, routes, quartiers, noms, 2 532 lots, 52 lieux) est identique avant et après la
+refonte (`f8bf0223…`). Kara (préfecture de la Kozah, région de la Kara) : rivière Kara qui
+traverse la grille avec trois ponts et ses berges, collines de la Lama au nord-est, retenue au
+sud-ouest, cinq quartiers (Tchré, Kpéwa, Centre-ville, Awandjélo, Dongoyo), 41 lieux nommés
+(université, CHU, grand marché, préfecture, gare routière, mosquée centrale, cathédrale, stade,
+cinq maisons des coopératives…), 2 353 lots générés avec le même catalogue de bâtiments détaillés.
+Le domaine du joueur et sa maison restent à Lomé ; à Kara on visite.
+
+**Voyage.** Feuille « Explorer » : carte du Togo (SVG, aucune seconde application WebGL), pôles
+cliquables, car interurbain Lomé ↔ Kara (7 h, 4 000 FCFA fictifs, refus si le portefeuille ne
+suffit pas). L'arrivée place le joueur au carrefour de la gare routière, les chunks de l'ancienne
+ville sont évincés par leur clé, ceux de la nouvelle se chargent autour de lui par anneaux
+(près / moyen / loin) comme à Lomé. La sauvegarde porte la localité (`CityLife.locality`,
+anciennes sauvegardes = Lomé).
+
+**Vérification** (`e2e/lome-travel.spec.ts`, desktop et mobile-android) : carte sourcée visible
+avec attribution, voyage vers Kara, portefeuille débité, lieux de Kara dans l'explorateur (aucun
+lieu de Lomé), marche dans ses rues, 0 erreur de page ou WebGL, un seul canvas, rechargement à
+Kara (localité conservée), retour à Lomé avec le domaine intact. Suite Lomé complète sur cette
+base : 24 tests, 22 réussis au premier passage, les 2 échecs venant d'une assertion obsolète du
+test de vie (anciens boutons « Changer de ville », remplacés par le voyage) ; test corrigé,
+reconstruction, `lome-life` + `lome-travel` 4/4 verts sur desktop et mobile-android. Captures :
+`docs/captures/unification/c-carte-togo-*.png`, `c-kara-*.png`.
+
 ## Ordre des jalons
 
 A. Audit + crash GPU (fait).
 B. Entrée unique `/haroolife` dans le moteur Lomé Life ; `/haroolife/territoire`, `/lome`, `/carte`
    sont des modules du même monde ; migration des sauvegardes ; une seule application PlayCanvas
    (fait).
-C. Carte nationale sourcée + deux pôles pilotes (Grand Lomé, Lama-Kara) avec décor régional et
-   chargement progressif par chunks.
+C. Carte nationale sourcée + deux pôles pilotes (Grand Lomé, Kara) avec décor régional et
+   chargement progressif par chunks (fait ; identité visuelle régionale à approfondir au D).
 D. Intégration complète des mécaniques (Construire, Économie, village, maison, acteurs).
 E. Performance Android mesurée (p50/p95, appels de rendu, démarrage, mémoire, pertes de contexte),
    neuf scénarios d'acceptation, captures réelles avant/après mobile et PC.
