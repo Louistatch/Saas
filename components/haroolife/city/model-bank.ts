@@ -3,14 +3,19 @@
 import type { SizeTable } from '@/lib/haroolife/city/catalogue'
 import { type Model, type PackManifest, decodeModel } from '@/lib/haroolife/city/pack'
 import * as pc from 'playcanvas'
+import { simplifyModel } from '@/lib/haroolife/city/simplify'
 
 /** Where the baked Kenney pack is served from (see scripts/haroolife-bake-models.mjs). */
 export const PACK_BASE = '/haroolife/city/'
+/** Grid cells across a model's bounding box for the low level of detail. */
+export const LOW_DETAIL_CELLS = 12
 
 export interface Bank {
   manifest: PackManifest
   sizes: SizeTable
   model: (key: string) => Model
+  /** The same model simplified for the middle distance (about a fifth of the triangles). */
+  lowModel: (key: string) => Model
 }
 
 let loading: Promise<Bank> | null = null
@@ -26,6 +31,13 @@ export function loadBank(): Promise<Bank> {
     for (const [k, m] of Object.entries(manifest.models))
       sizes[k] = [m.max[0] - m.min[0], m.max[1] - m.min[1], m.max[2] - m.min[2]]
     const cache = new Map<string, Model>()
+    const lowCache = new Map<string, Model>()
+    // Audit hook: triangles per model of the pack (from the manifest, nothing decoded).
+    if (typeof window !== 'undefined') {
+      const tris: Record<string, number> = {}
+      for (const [k, m] of Object.entries(manifest.models)) tris[k] = m.tris
+      ;(window as unknown as { __LOME_BANK?: unknown }).__LOME_BANK = tris
+    }
     return {
       manifest,
       sizes,
@@ -34,6 +46,16 @@ export function loadBank(): Promise<Bank> {
         if (!m) {
           m = decodeModel(manifest, bin, key)
           cache.set(key, m)
+        }
+        return m
+      },
+      lowModel: (key: string) => {
+        let m = lowCache.get(key)
+        if (!m) {
+          const full = cache.get(key) ?? decodeModel(manifest, bin, key)
+          cache.set(key, full)
+          m = simplifyModel(full, LOW_DETAIL_CELLS)
+          lowCache.set(key, m)
         }
         return m
       },

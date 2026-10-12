@@ -81,3 +81,15 @@ sera documenté avec sa cause dans `docs/haroolife-jalon-d-final.md`.
 5. Onglet Performance de DevTools pour le thread principal ; onglet Network pour le poids.
 6. Consigner les résultats dans `docs/haroolife-jalon-d-final.md` avec le modèle de téléphone,
    la version de Chrome et le réseau.
+
+## Accès depuis le téléphone sur le réseau local (sans déploiement)
+
+```
+bash scripts/haroolife-lan.sh
+```
+
+Le script construit la version de production et la sert sur toutes les interfaces
+(`next start --hostname 0.0.0.0`), puis affiche l'URL à ouvrir sur le Motorola relié au même
+Wi-Fi (`http://<ip-du-pc>:3000/haroolife`). Le pare-feu du PC doit laisser passer le port 3000.
+Les variables `NEXT_PUBLIC_SUPABASE_*` doivent être celles du projet réel (`.env.local`) pour que
+les services Haroo/FaîtiereHub répondent ; la ville 3D fonctionne aussi hors connexion.

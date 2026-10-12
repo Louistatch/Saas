@@ -23,6 +23,12 @@ export interface QualityPreset {
   vehicleRadius: number
   /** Second fill light on or off. */
   fillLight: boolean
+  /** Cells from the camera target with full-detail buildings and props. */
+  detailCells: number
+  /** Cells up to which buildings keep a simplified model (beyond: coloured volumes). */
+  lowCells: number
+  /** Triangles visible per frame the renderer aims to stay under (dynamic detail radius). */
+  triangleBudget: number
 }
 export const PRESETS: Record<Quality, QualityPreset> = {
   eco: {
@@ -38,6 +44,9 @@ export const PRESETS: Record<Quality, QualityPreset> = {
     maxWalkers: 8,
     vehicleRadius: 16,
     fillLight: false,
+    detailCells: 9,
+    lowCells: 22,
+    triangleBudget: 160_000,
   },
   balanced: {
     id: 'balanced',
@@ -52,6 +61,9 @@ export const PRESETS: Record<Quality, QualityPreset> = {
     maxWalkers: 14,
     vehicleRadius: 22,
     fillLight: false,
+    detailCells: 13,
+    lowCells: 30,
+    triangleBudget: 320_000,
   },
   high: {
     id: 'high',
@@ -66,6 +78,9 @@ export const PRESETS: Record<Quality, QualityPreset> = {
     maxWalkers: 20,
     vehicleRadius: 26,
     fillLight: true,
+    detailCells: 18,
+    lowCells: 40,
+    triangleBudget: 650_000,
   },
 }
 export const STORAGE_KEY = 'haroolife.quality'
