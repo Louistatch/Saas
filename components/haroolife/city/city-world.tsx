@@ -247,7 +247,13 @@ function QualityController({ quality }: { quality: Quality }) {
   useEffect(() => {
     if (!app) return
     app.graphicsDevice.maxPixelRatio = PRESETS[quality].maxPixelRatio
-    app.resizeCanvas()
+    // Never app.resizeCanvas() here: this child effect runs before the wrapper sets the fill
+    // mode, and the engine's default (keep aspect of the 300×150 canvas) would pin the inline
+    // style to a 2:1 strip. The CSS size stays 100 %, only the backbuffer follows the preset.
+    const canvas = app.graphicsDevice.canvas
+    canvas.style.width = '100%'
+    canvas.style.height = '100%'
+    app.updateCanvasSize()
   }, [app, quality])
   return null
 }
