@@ -55,6 +55,27 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
   await expect(ride).toBeHidden()
   await navigation.getByRole('button', { name: 'Carte' }).click()
   await expect(page.getByRole('dialog', { name: 'Explorer Lomé' })).toBeVisible()
+  // Named city: filters narrow the destinations, districts are listed, the city can change.
+  await page
+    .getByRole('group', { name: 'Filtrer la carte' })
+    .getByRole('button', { name: 'Commerces' })
+    .click()
+  await expect(page.getByRole('button', { name: /Chez moi/ })).toBeHidden()
+  await page
+    .getByRole('group', { name: 'Filtrer la carte' })
+    .getByRole('button', { name: 'Tout' })
+    .click()
+  await expect(page.getByText(/Les quartiers de Lomé/)).toBeVisible()
+  await expect(page.getByRole('dialog').getByText('Tokoin').first()).toBeVisible()
+  await page
+    .getByRole('group', { name: 'Changer de ville' })
+    .getByRole('button', { name: 'Kara' })
+    .click()
+  await expect(page.getByText(/Les quartiers de Kara/)).toBeVisible()
+  await page
+    .getByRole('group', { name: 'Changer de ville' })
+    .getByRole('button', { name: 'Lomé' })
+    .click()
   await page.getByRole('button', { name: /Marché de quartier/ }).click()
   // Automatic road movement must reach market without pressing +1 hour per tile.
   await expect

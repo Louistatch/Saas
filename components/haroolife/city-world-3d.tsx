@@ -1,5 +1,6 @@
 'use client'
 
+import { districtIndexAt, isShore } from '@/lib/haroolife/lome-districts'
 import { type Action, type LifeState, trafficVehicles } from '@/lib/haroolife/lome-life-engine'
 import type { Transport } from '@/lib/haroolife/lome-life-engine'
 import type { PlacedResident } from '@/lib/haroolife/lome-presence'
@@ -121,6 +122,8 @@ function BuildingModel({ building }: { building: Building }) {
 type MaterialSet = {
   grass: ReturnType<typeof useMaterial>
   dryGrass: ReturnType<typeof useMaterial>
+  sand: ReturnType<typeof useMaterial>
+  districts: ReturnType<typeof useMaterial>[]
   forest: ReturnType<typeof useMaterial>
   water: ReturnType<typeof useMaterial>
   road: ReturnType<typeof useMaterial>
@@ -168,9 +171,11 @@ function Tile({
             ? mats.water
             : type === 'forest'
               ? mats.forest
-              : (x * 13 + y * 7) % 7 === 0
-                ? mats.dryGrass
-                : mats.grass
+              : isShore(x, y)
+                ? mats.sand
+                : (x * 13 + y * 7) % 7 === 0
+                  ? mats.dryGrass
+                  : mats.districts[districtIndexAt(x, y)]
   return (
     <Entity
       name={'Plot ' + (x + 1) + '-' + (y + 1)}
@@ -243,6 +248,12 @@ function SettlementScene({
   const hoveredMaterial = useMaterial({ diffuse: '#b8e9a0', emissive: '#385b29', gloss: 0.1 })
   const blocked = useMaterial({ diffuse: '#dc886b', gloss: 0.1 })
   const highlighted = useMaterial({ diffuse: '#e7d07e', gloss: 0.1 })
+  const sand = useMaterial({ diffuse: '#e2cf9a', gloss: 0.04 })
+  const d0 = useMaterial({ diffuse: '#86b35e', gloss: 0.08 })
+  const d1 = useMaterial({ diffuse: '#7cab5b', gloss: 0.08 })
+  const d2 = useMaterial({ diffuse: '#79aa59', gloss: 0.08 })
+  const d3 = useMaterial({ diffuse: '#8fb366', gloss: 0.08 })
+  const d4 = useMaterial({ diffuse: '#a3b96a', gloss: 0.08 })
   const pagne0 = useMaterial({ diffuse: PAGNES[0], gloss: 0.1 })
   const pagne1 = useMaterial({ diffuse: PAGNES[1], gloss: 0.1 })
   const pagne2 = useMaterial({ diffuse: PAGNES[2], gloss: 0.1 })
@@ -263,8 +274,26 @@ function SettlementScene({
       hover: hoveredMaterial,
       blocked,
       selected: highlighted,
+      sand,
+      districts: [d0, d1, d2, d3, d4],
     }),
-    [grass, dryGrass, forest, water, road, farm, hoveredMaterial, blocked, highlighted],
+    [
+      grass,
+      dryGrass,
+      forest,
+      water,
+      road,
+      farm,
+      hoveredMaterial,
+      blocked,
+      highlighted,
+      sand,
+      d0,
+      d1,
+      d2,
+      d3,
+      d4,
+    ],
   )
   const objects = useMemo(
     () => new Map(city.buildings.map((b) => [b.x + ':' + b.y, b])),

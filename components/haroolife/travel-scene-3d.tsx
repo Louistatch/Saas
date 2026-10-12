@@ -155,12 +155,14 @@ export default function RideOverlay({
   transport,
   rain,
   destination,
+  boulevard = 'Boulevard du Mono',
   onSkip,
   onMap,
 }: {
   transport: Transport
   rain: boolean
   destination: string
+  boulevard?: string
   onSkip: () => void
   onMap: () => void
 }) {
@@ -185,7 +187,7 @@ export default function RideOverlay({
       </style>
       <div className="absolute inset-x-0 top-[calc(70px+env(safe-area-inset-top))] flex flex-col items-center gap-2 px-3">
         <div className="rounded-2xl border-4 border-white bg-emerald-700 px-5 py-2 text-center text-lg font-black uppercase tracking-wide text-white shadow-lg">
-          Boulevard du Mono
+          {boulevard}
         </div>
         <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-white/95 px-3 py-2 text-xs font-bold shadow">
           <span>

@@ -114,3 +114,15 @@ service payé, entrée dans un intérieur 3D, mode construction. Captures dans
   la météo Open-Meteo du canton (probabilité ≥ 50 %) ; ciel et bitume changent avec.
 - Durée : quelques secondes, proportionnelle au trajet ; « Passer » pose le personnage à
   destination (`skipTravel`), « Carte » revient au quartier. Pas de second contexte WebGL.
+
+## Tranche 5 : ville nommée
+
+- `lib/haroolife/lome-districts.ts` : la grille 22×22 est découpée en cinq quartiers nommés
+  (nord, ouest, centre, est, sud) et deux plans d'eau. Lomé : Agoè, Adidogomé, Tokoin, Bè,
+  Baguida ; lagune de Bè au nord-est, océan Atlantique au sud-ouest ; les berges sont en sable.
+  Kara et Sokodé ont leurs propres quartiers, rivières et artère principale.
+- Le HUD affiche le quartier où se trouve le personnage ; la carte propose des filtres
+  (Tout, Commerces, Services, Maisons), la liste des quartiers avec une phrase chacun, et le
+  choix de la ville. Changer de ville garde la grille, l'argent et la partie : seuls les noms
+  changent (relevé géographique réel : tranche ultérieure). Les tuiles 3D prennent une teinte
+  par quartier.
