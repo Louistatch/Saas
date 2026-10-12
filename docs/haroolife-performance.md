@@ -100,6 +100,46 @@ figeait le style en ligne à un bandeau 2:1. Détecté par le test anti-plateau 
 `e2e/lome-city.spec.ts` (93 % de ciel), corrigé par `updateCanvasSize()` sans toucher au
 style, rejoué vert sur desktop et Pixel 7.
 
+## Rendu logiciel et qualité adaptative (12/10/2026, après la CI rouge)
+
+Sur un runner sans GPU (SwiftShader), une image coûtait 1 s sur desktop et plusieurs secondes
+sous charge : le fil principal bloqué rendait l'interface inerte (Playwright attendait des
+images stables pendant 160 s) et le job CI échouait ou expirait à chaque push. Corrections
+réelles, pas de délais rallongés :
+
+- rendu logiciel détecté une fois (`WEBGL_debug_renderer_info`) : préréglage Économie et
+  ratio de pixels plafonné à 0,5 (desktop 720×450, Pixel 7 206×457 pixels rendus) ;
+- qualité adaptative : sous 6 images/s sur deux contrôles consécutifs (3 s), le préréglage
+  descend d'un cran avec un message au joueur ;
+- marche cadencée par l'horloge réelle (un minuteur en retard rattrape les cellules dues,
+  horloge conservée entre deux rendus) ; sauvegarde locale regroupée (400 ms, jamais
+  affamée) au lieu d'une sérialisation complète à chaque pas ;
+- le scénario D de la mesure (glisser) envoie 16 événements de pointeur au lieu de 100.
+
+Même banc, après ces corrections (canvas plein écran, ratio 0,5) :
+
+| Scénario | desktop fps / p50 ms | Draw calls | Entités | Animés | Re-renders | mobile fps / p50 ms | Draw calls | Re-renders |
+|---|---|---|---|---|---|---|---|---|
+| A_cold_open | 2,7 / 317 | 35 | 117 | 5 | 24 | 6,2 / 148 | 12 | 26 |
+| B_tokoin_aerial | 2,7 / 407 | 38 | 119 | 5 | 36 | 5,9 / 170 | 18 | 38 |
+| C_zoom_max | 4,8 / 198 | 10 | 119 | 6 | 70 | 10,4 / 95 | 5 | 68 |
+| D_camera_move | 2,0 / 555 | 70 | 119 | 5 | 114 | 3,9 / 243 | 29 | 96 |
+| E_gym | 10,2 / 84 | 292 | 154 | 7 | 146 | 18,7 / 53 | 292 | 123 |
+| F_back_to_city | 2,4 / 434 | 57 | 118 | 6 | 156 | 4,0 / 258 | 34 | 131 |
+
+Ouverture à froid : canvas visible 1104 ms (desktop) / 1377 ms (mobile) ; ville détaillée
+3148 ms / 2663 ms (contre 10 519 / 7597 ms avant) ; transfert 7326 Ko. Entrée en salle 2654 /
+2892 ms ; retour en ville 272 / 158 ms. Temps de frame en ville : p50 317 ms (desktop, contre
+1013 ms) et 148 ms (mobile, contre 435 ms) ; en salle 84 / 53 ms.
+
+Suite Playwright complète (18 tests, deux projets) : 7,2 min au lieu de 20,8 min sur ce banc,
+8,6 min sur le runner GitHub ; elle passe aussi sous bridage CPU ×4 (`PW_CPU_THROTTLE=4`),
+qui reproduit le runner localement.
+
+Ces chiffres restent ceux d'un rendu logiciel : sur un GPU réel le ratio de pixels remonte
+à 1 (Économie), 1,5 (Équilibré) ou 2 (Élevé) et la qualité adaptative n'intervient que si
+les images restent lentes. Aucune mesure sur Android réel n'a encore été faite.
+
 ## Ce qui n'est pas fait
 
 - Pas d'instancing matériel : les bâtiments sont fusionnés par chunk (batching statique), ce
