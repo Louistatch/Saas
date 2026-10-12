@@ -55,33 +55,50 @@ navigation.
 
 ## Avant → après (même build, mêmes scénarios, même banc)
 
+Les colonnes « après » datent du 12/10/2026, après la correction du canvas (voir plus bas) : les
+premières mesures « après » du jalon 1 avaient été prises avec un canvas figé en bandeau 2:1
+(412×206 px sur Pixel 7, 1440×720 sur desktop), donc avec un champ horizontal trop large et
+plus de chunks visibles qu'en réalité. Elles sont remplacées ici par les valeurs mesurées
+sur le canvas plein écran.
+
 ### desktop
 
 | Scénario | Draw calls avant → après | Entités rendues | Instances de maillage | Figures animées | Re-renders React (immersive) | Heap Mo |
 |---|---|---|---|---|---|---|
-| A_cold_open | 298 → 136 | 674 → 137 | 739 → 174 | 21 → 9 | 364 → 30 | 144 → 214 |
-| B_tokoin_aerial | 294 → 138 | 671 → 137 | 736 → 174 | 20 → 10 | 854 → 44 | 176 → 226 |
-| C_zoom_max | 14 → 12 | 667 → 137 | 732 → 174 | 17 → 9 | 2450 → 92 | 135 → 190 |
-| D_camera_move | 606 → 283 | 673 → 136 | 738 → 173 | 19 → 9 | 20537 → 462 | 151 → 193 |
-| E_gym | 292 → 292 | 134 → 164 | 146 → 176 | 7 → 7 | 22309 → 524 | 268 → 183 |
-| F_back_to_city | 190 → 73 | 672 → 140 | 737 → 177 | 19 → 9 | 22612 → 532 | 175 → 199 |
+| A_cold_open | 298 → 42 | 674 → 137 | 739 → 174 | 21 → 9 | 364 → 28 | 144 → 219 |
+| B_tokoin_aerial | 294 → 43 | 671 → 135 | 736 → 172 | 20 → 9 | 854 → 40 | 176 → 224 |
+| C_zoom_max | 14 → 10 | 667 → 138 | 732 → 175 | 17 → 9 | 2450 → 88 | 135 → 190 |
+| D_camera_move | 606 → 92 | 673 → 138 | 738 → 175 | 19 → 9 | 20537 → 454 | 151 → 194 |
+| E_gym | 292 → 292 | 134 → 164 | 146 → 176 | 7 → 7 | 22309 → 511 | 268 → 183 |
+| F_back_to_city | 190 → 72 | 672 → 140 | 737 → 177 | 19 → 9 | 22612 → 519 | 175 → 185 |
 
-Ouverture à froid : canvas visible 2527 → 1008 ms ; ville détaillée 6231 → 10116 ms ; transfert 7968 → 7778 Ko. Entrée en salle 4848 → 5587 ms ; retour en ville 1247 → 239 ms. Temps de frame après optimisation (horloge réelle, rendu logiciel) : ville p50 902.5 ms, salle p50 89.7 ms.
+Ouverture à froid : canvas visible 2527 → 1878 ms ; ville détaillée 6231 → 10519 ms ; transfert 7968 → 7801 Ko. Entrée en salle 4848 → 5546 ms ; retour en ville 1247 → 306 ms. Temps de frame après optimisation (horloge réelle, rendu logiciel) : ville p50 1013 ms, salle p50 99 ms.
 
 ### mobile-android
 
-Les appels de rendu « avant » sur mobile (40, 82…) sont sous-estimés : la sonde les lisait avant que le canvas ne soit à sa taille finale. Comparer plutôt les entités, les instances et les re-renders.
-
 | Scénario | Draw calls avant → après | Entités rendues | Instances de maillage | Figures animées | Re-renders React (immersive) | Heap Mo |
 |---|---|---|---|---|---|---|
-| A_cold_open | 40 → 137 | 674 → 137 | 739 → 174 | 21 → 9 | 444 → 32 | 169 → 292 |
-| B_tokoin_aerial | 40 → 141 | 672 → 135 | 737 → 172 | 20 → 9 | 762 → 44 | 185 → 296 |
-| C_zoom_max | 4 → 12 | 668 → 138 | 733 → 175 | 18 → 9 | 1898 → 86 | 157 → 203 |
-| D_camera_move | 82 → 294 | 680 → 140 | 745 → 177 | 23 → 9 | 9725 → 188 | 168 → 192 |
-| E_gym | 292 → 292 | 134 → 164 | 146 → 176 | 7 → 7 | 10445 → 234 | 205 → 193 |
-| F_back_to_city | 32 → 86 | 660 → 142 | 725 → 179 | 15 → 10 | 10624 → 242 | 125 → 185 |
+| A_cold_open | 40 → 16 | 674 → 137 | 739 → 174 | 21 → 9 | 444 → 30 | 169 → 311 |
+| B_tokoin_aerial | 40 → 14 | 672 → 135 | 737 → 172 | 20 → 9 | 762 → 44 | 185 → 317 |
+| C_zoom_max | 4 → 5 | 668 → 139 | 733 → 176 | 18 → 10 | 1898 → 82 | 157 → 203 |
+| D_camera_move | 82 → 30 | 680 → 138 | 745 → 175 | 23 → 10 | 9725 → 282 | 168 → 195 |
+| E_gym | 292 → 292 | 134 → 164 | 146 → 176 | 7 → 7 | 10445 → 319 | 205 → 209 |
+| F_back_to_city | 32 → 34 | 660 → 136 | 725 → 173 | 15 → 9 | 10624 → 327 | 125 → 185 |
 
-Ouverture à froid : canvas visible 1892 → 949 ms ; ville détaillée 3783 → 8825 ms ; transfert 7797 → 7778 Ko. Entrée en salle 3202 → 4398 ms ; retour en ville 879 → 161 ms. Temps de frame après optimisation (horloge réelle, rendu logiciel) : ville p50 684.6 ms, salle p50 49 ms.
+Ouverture à froid : canvas visible 1892 → 999 ms ; ville détaillée 3783 → 7597 ms ; transfert 7797 → 7801 Ko. Entrée en salle 3202 → 5188 ms ; retour en ville 879 → 282 ms. Temps de frame après optimisation (horloge réelle, rendu logiciel) : ville p50 435 ms, salle p50 96 ms.
+
+En portrait, le champ visible couvre peu de chunks : les appels de rendu en ville sont
+faibles (5 à 34) et c'est l'intérieur de la salle (292 appels : équipements, personnages,
+mobilier non fusionnés) qui devient le poste le plus lourd. Le tas mémoire à l'ouverture
+(≈ 310 Mo) reste au-dessus de ce que l'on souhaite sur un téléphone d'entrée de gamme.
+
+### Correction du canvas (12/10/2026)
+
+Le contrôleur de qualité appelait `app.resizeCanvas()` avant que le wrapper React fixe le
+mode de remplissage ; le mode par défaut du moteur (conserver le ratio du canvas 300×150)
+figeait le style en ligne à un bandeau 2:1. Détecté par le test anti-plateau mobile de
+`e2e/lome-city.spec.ts` (93 % de ciel), corrigé par `updateCanvasSize()` sans toucher au
+style, rejoué vert sur desktop et Pixel 7.
 
 ## Ce qui n'est pas fait
 
