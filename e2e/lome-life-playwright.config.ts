@@ -11,6 +11,7 @@ export default defineConfig({
     'lome-cooperative.spec.ts',
     'lome-gpu-lifecycle.spec.ts',
     'lome-travel.spec.ts',
+    'lome-player.spec.ts',
   ],
   reporter: [['list'], ['html', { outputFolder: 'test-results/lome-report', open: 'never' }]],
   fullyParallel: false,

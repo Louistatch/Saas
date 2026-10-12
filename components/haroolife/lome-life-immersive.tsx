@@ -9,15 +9,16 @@ import {
   arrive,
   cityInteract,
   ensureLocality,
+  freelyWalkable,
   goToEstate,
   goToLot,
   goToPoint,
   initialCityLife,
   interiorFor,
   lotAtDoor,
+  moveTo,
   payRide,
   roadsOf,
-  stepDir,
   stopActivity,
   travelTo,
   tripTo,
@@ -26,15 +27,18 @@ import {
 } from '@/lib/haroolife/city/life'
 import { LOCALITIES, LOCALITY_IDS, type LocalityId } from '@/lib/haroolife/city/locality'
 import { CITY_STORAGE, loadCityLife } from '@/lib/haroolife/city/migrate'
+import { ESTATE_GATE } from '@/lib/haroolife/city/navigation'
 import { findPath } from '@/lib/haroolife/city/navigation'
 import { bump } from '@/lib/haroolife/city/perf'
+import { type CameraRig, type InputState, PlayerController } from '@/lib/haroolife/city/player'
 import {
   PRESETS,
   type Quality,
-  SLOW_FRAME_FPS,
+  QualityGovernor,
   detectQuality,
   lowerQuality,
   rememberQuality,
+  softwareRenderer,
 } from '@/lib/haroolife/city/quality'
 import {
   CATEGORY_LABELS,
@@ -46,6 +50,8 @@ import {
   placeName as cityPlaceName,
   districts,
   inEstate,
+  isCityRoad,
+  isDriveway,
   landmarks,
   landmarksIn,
   lotAt as lotAtCell,
@@ -111,8 +117,10 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { worldPos } from './city/city-chunks'
 import { CAMERA_HOME, type CameraState } from './city/city-world'
 import CooperativePanel from './city/cooperative-panel'
+import Joystick, { useKeyboardInput } from './city/joystick'
 import MarketPanel from './city/market-panel'
 import NationalMap from './city/national-map'
 import OnboardingSteps from './city/onboarding'
@@ -128,23 +136,6 @@ const CityWorld = dynamic(() => import('./city/city-world'), {
   ),
 })
 const RideOverlay = dynamic(() => import('./travel-scene-3d'), { ssr: false })
-type Dir = [-1 | 0 | 1, -1 | 0 | 1]
-const KEYS: Record<string, Dir> = {
-  arrowup: [0, -1],
-  w: [0, -1],
-  arrowdown: [0, 1],
-  s: [0, 1],
-  arrowleft: [-1, 0],
-  a: [-1, 0],
-  arrowright: [1, 0],
-  d: [1, 0],
-}
-const PAD: { label: string; dir: Dir; cls: string }[] = [
-  { label: 'Avancer', dir: [0, -1], cls: 'col-start-2 row-start-1' },
-  { label: 'Gauche', dir: [-1, 0], cls: 'col-start-1 row-start-2' },
-  { label: 'Droite', dir: [1, 0], cls: 'col-start-3 row-start-2' },
-  { label: 'Reculer', dir: [0, 1], cls: 'col-start-2 row-start-3' },
-]
 type Sheet =
   | 'home'
   | 'shop'
@@ -272,7 +263,32 @@ export function LomeLifeImmersive() {
     [],
   )
   const [camera, setCamera] = useState<CameraState>(() => CAMERA_HOME(cityLife.at.x, cityLife.at.y))
-  const [follow, setFollow] = useState(true)
+  // The continuous player: one controller for the whole session, stepped by the renderer.
+  // World queries read the latest state through a ref so buildings on the estate count.
+  const cityLifeRef = useRef(cityLife)
+  cityLifeRef.current = cityLife
+  const estateRoads = useMemo(() => roadsOf(cityLife), [cityLife.life.city.buildings])
+  const estateRoadsRef = useRef(estateRoads)
+  estateRoadsRef.current = estateRoads
+  const input = useRef<InputState>({ x: 0, y: 0, run: false }).current
+  const controller = useMemo(() => {
+    const c = new PlayerController(
+      {
+        walkable: (x, y) =>
+          freelyWalkable(x, y, estateRoadsRef.current, cityLifeRef.current.life.city.buildings),
+        drivable: (x, y) => isCityRoad(x, y) || isDriveway(x, y),
+      },
+      cityLifeRef.current.at,
+      { angle: 35, distance: 12 },
+    )
+    c.input = input
+    return c
+    // biome-ignore lint/correctness/useExhaustiveDependencies: created once; state flows through refs
+  }, [])
+  /** Cell last reported by the controller: a React `at` that differs is a jump (door, travel, load). */
+  const reportedCell = useRef('')
+  const [nearVehicle, setNearVehicle] = useState(false)
+  const [driving, setDriving] = useState(false)
   const [selectedLot, setSelectedLot] = useState<Lot | null>(null)
   // The real actor behind the player (null when signed out) and the organisation shown
   // inside a house of cooperatives. Buildings are assigned to organisations by the adapter,
@@ -323,28 +339,30 @@ export function LomeLifeImmersive() {
   useEffect(() => setQuality(detectQuality()), [])
   // Adaptive quality: when frames stay slow for two consecutive checks the preset steps down
   // (the machine, not the player, decides), so the interface never freezes behind the renderer.
-  const slowChecks = useRef(0)
+  // With hysteresis: three slow checks step down, a fast minute steps back up (never above
+  // the level the device or the player chose), and never while a sheet covers the scene.
+  const governor = useRef<QualityGovernor | null>(null)
+  const qualityRef = useRef<Quality>('balanced')
+  qualityRef.current = quality
+  useEffect(() => {
+    governor.current = new QualityGovernor(detectQuality(), softwareRenderer())
+  }, [])
   useEffect(() => {
     const id = window.setInterval(() => {
       const fps = frameRef.current.fps
-      if (!(fps > 0) || document.visibilityState !== 'visible') return
-      if (fps >= SLOW_FRAME_FPS) {
-        slowChecks.current = 0
-        return
-      }
-      slowChecks.current += 1
-      if (slowChecks.current < 2) return
-      slowChecks.current = 0
-      setQuality((q) => {
-        const lower = lowerQuality(q)
-        if (!lower) return q
-        setNotice(`Qualité graphique réduite (${PRESETS[lower].label}) pour rester fluide.`)
-        return lower
-      })
+      if (!(fps > 0) || document.visibilityState !== 'visible' || !governor.current) return
+      const next = governor.current.sample(fps, qualityRef.current)
+      if (!next) return
+      const down = next === lowerQuality(qualityRef.current)
+      setQuality(next)
+      setNotice(
+        down
+          ? `Qualité graphique réduite (${PRESETS[next].label}) pour rester fluide.`
+          : `Qualité graphique relevée (${PRESETS[next].label}).`,
+      )
     }, 3000)
     return () => window.clearInterval(id)
   }, [])
-  const heading = useRef(180)
   const insideAny = Boolean(cityLife.insideLot || life.inside)
   const interior = cityLife.insideLot
     ? interiorFor(lotById(cityLife.insideLot)?.type ?? 'lot')
@@ -425,13 +443,6 @@ export function LomeLifeImmersive() {
       ? (LIFE_LOCATIONS.find((x) => x.x === life.target!.x && x.y === life.target!.y)?.name ??
         'ta destination')
       : 'ta destination'
-  if (cityLife.route.length) {
-    const n = cityLife.route[0]
-    heading.current = Math.round(
-      (Math.atan2(n.x - cityLife.at.x, n.y - cityLife.at.y) * 180) / Math.PI,
-    )
-  }
-  const playerHeading = heading.current
   const [placeDraft, setPlaceDraft] = useState('')
   const [placeError, setPlaceError] = useState('')
   const [placeBusy, setPlaceBusy] = useState(false)
@@ -582,52 +593,116 @@ export function LomeLifeImmersive() {
     const id = window.setTimeout(() => setCityLife((old) => stopActivity(old)), 3200)
     return () => window.clearTimeout(id)
   }, [cityLife.activity])
-  // The camera follows the player while walking, until the player pans by hand.
+  // Controller ↔ React bridge. React owns the game state (saves, HUD, interactions); the
+  // controller owns the continuous pose. A React `at` that the controller did not report is a
+  // jump (leaving a building, travelling, loading a save): the avatar is placed there.
   useEffect(() => {
-    if (!follow) return
-    setCamera((c) => {
-      const home = CAMERA_HOME(cityLife.at.x, cityLife.at.y)
-      return { ...c, tx: home.tx, tz: home.tz }
-    })
-  }, [cityLife.at.x, cityLife.at.y, follow])
-  // Navigation advances automatically while the page is visible; no whole-hour penalty per road tile.
-  // The pace is wall-clock based: when the main thread is busy (software WebGL, slow phone)
-  // a late timer advances the cells it owes, so a route takes the same time on any device.
-  // The clock lives in a ref: each step re-renders and re-creates the effect, and the time
-  // already elapsed towards the next cell must survive that.
-  const walkClock = useRef(0)
+    const key = `${cityLife.locality}:${cityLife.at.x}:${cityLife.at.y}`
+    if (reportedCell.current === key) return
+    reportedCell.current = key
+    const pose = cityLife.pose
+    controller.teleport(cityLife.at, pose?.heading)
+    if (pose && Math.abs(pose.x - cityLife.at.x) <= 1 && Math.abs(pose.z - cityLife.at.y) <= 1)
+      controller.pos = { x: pose.x, z: pose.z }
+    controller.camera.follow = true
+  }, [cityLife.at.x, cityLife.at.y, cityLife.locality, controller, cityLife.at, cityLife.pose])
   useEffect(() => {
-    if (!cityLife.route.length || insideAny || riding) {
-      walkClock.current = 0
-      return
+    controller.route = cityLife.route.map((c) => ({ x: c.x, z: c.y }))
+  }, [cityLife.route, controller])
+  useEffect(() => {
+    controller.setInside(insideAny)
+  }, [insideAny, controller])
+  useEffect(() => {
+    controller.setTravelling(riding)
+  }, [riding, controller])
+  useEffect(() => {
+    const v = cityLife.locality === 'lome' ? cityLife.vehicle : null
+    if (v) {
+      if (!controller.vehicle) controller.vehicle = { x: v.x, z: v.z, heading: v.heading, speed: 0 }
+      else if (!controller.driving)
+        Object.assign(controller.vehicle, { x: v.x, z: v.z, heading: v.heading, speed: 0 })
+    } else {
+      controller.vehicle = null
+      controller.driving = false
     }
-    const ms = transport === 'walk' ? 420 : transport === 'moto' ? 220 : 160
-    if (!walkClock.current) walkClock.current = performance.now()
-    const dbg = { ticks: 0, steps: 0, hidden: 0, created: Math.round(performance.now()) }
-    ;(window as unknown as { __LOME_WALK?: unknown }).__LOME_WALK = dbg
-    const id = window.setInterval(
-      () => {
-        dbg.ticks += 1
-        if (document.visibilityState !== 'visible') {
-          dbg.hidden += 1
-          walkClock.current = performance.now()
-          return
+  }, [cityLife.vehicle, cityLife.locality, controller])
+  // A first visit to Lomé parks the player's taxi on the avenue by the estate gate.
+  useEffect(() => {
+    if (!loaded || cityLife.vehicle !== undefined) return
+    setCityLife((old) => ({
+      ...old,
+      vehicle: { x: ESTATE_GATE.x, z: ESTATE_GATE.y + 3, heading: 0 },
+    }))
+  }, [loaded, cityLife.vehicle])
+  const onPlayerEvents = useCallback(
+    (events: ReturnType<PlayerController['drain']>, c: PlayerController) => {
+      for (const ev of events) {
+        if (ev.type === 'cell') {
+          const key = `${cityLifeRef.current.locality}:${ev.x}:${ev.y}`
+          reportedCell.current = key
+          const pose = { x: c.pos.x, z: c.pos.z, heading: c.heading }
+          setCityLife((old) => {
+            const head = old.route[0]
+            if (head && head.x === ev.x && head.y === ev.y) return { ...walkStep(old), pose }
+            return moveTo(old, { x: ev.x, y: ev.y }, pose)
+          })
+          setNearVehicle(c.canEnterVehicle())
+        } else if (ev.type === 'vehicle') {
+          const v = c.vehicle
+          setDriving(ev.state === 'entered')
+          setNearVehicle(ev.state === 'left' ? c.canEnterVehicle() : false)
+          setCityLife((old) => ({
+            ...old,
+            vehicle: v ? { x: v.x, z: v.z, heading: v.heading } : old.vehicle,
+            pose: { x: c.pos.x, z: c.pos.z, heading: c.heading },
+          }))
+          setNotice(
+            ev.state === 'entered'
+              ? 'Tu conduis le taxi : joystick pour accélérer, freiner et tourner.'
+              : 'Tu es descendu du taxi.',
+          )
         }
-        const now = performance.now()
-        const owed = Math.min(8, Math.floor((now - walkClock.current) / ms))
-        if (owed <= 0) return
-        dbg.steps += owed
-        walkClock.current += owed * ms
-        setCityLife((old) => {
-          let next = old
-          for (let i = 0; i < owed && next.route.length; i++) next = walkStep(next)
-          return next
-        })
-      },
-      Math.min(ms, 100),
+      }
+    },
+    [],
+  )
+  const onCameraSync = useCallback((cam: CameraRig) => {
+    const [tx, , tz] = worldPos(cam.tx, cam.tz)
+    setCamera((c) =>
+      c.tx === tx && c.tz === tz && c.distance === cam.distance && c.angle === cam.angle
+        ? c
+        : { tx, tz, distance: cam.distance, angle: cam.angle },
     )
-    return () => window.clearInterval(id)
-  }, [cityLife.route.length, insideAny, transport, riding])
+  }, [])
+  const onJoystickActive = useCallback(() => {
+    controller.camera.follow = true
+    if (cityLifeRef.current.route.length)
+      setCityLife((old) => ({ ...old, route: [], target: null }))
+  }, [controller])
+  useKeyboardInput(input, panel === null && !insideAny && !riding)
+  // Test hooks: walkability of a cell and an automatic walk to the player's taxi.
+  useEffect(() => {
+    const w = window as unknown as {
+      __LOME_WALKABLE?: (x: number, y: number) => boolean
+      __LOME_GOTO_TAXI?: () => void
+    }
+    w.__LOME_WALKABLE = (x, y) =>
+      freelyWalkable(x, y, estateRoadsRef.current, cityLifeRef.current.life.city.buildings)
+    w.__LOME_GOTO_TAXI = () => {
+      const v = controller.vehicle
+      if (!v) return
+      setCityLife((old) => goToPoint(old, { x: Math.round(v.x), y: Math.round(v.z) }))
+    }
+    return () => {
+      w.__LOME_WALKABLE = undefined
+      w.__LOME_GOTO_TAXI = undefined
+    }
+  }, [controller])
+  function toggleVehicle() {
+    if (controller.driving) {
+      if (!controller.exitVehicle()) setNotice('Freine avant de descendre du taxi.')
+    } else if (!controller.enterVehicle()) setNotice('Approche-toi du taxi pour monter.')
+  }
   useEffect(() => {
     if (!playing) return
     const id = window.setInterval(() => {
@@ -648,13 +723,6 @@ export function LomeLifeImmersive() {
         setPanel(null)
         return
       }
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-      const dir = KEYS[e.key.toLowerCase()]
-      if (!dir) return
-      e.preventDefault()
-      setPanel(null)
-      setFollow(true)
-      setCityLife((old) => stepDir(old, dir[0], dir[1]))
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -695,14 +763,14 @@ export function LomeLifeImmersive() {
     setPanel(null)
     setSelection({ x, y })
     setTransport('walk')
-    setFollow(true)
+    controller.camera.follow = true
     setCityLife((old) => goToEstate(old, x, y))
   }
   function goLot(lot: Lot) {
     setMode('walk')
     setPanel(null)
     setTransport('walk')
-    setFollow(true)
+    controller.camera.follow = true
     setCityLife((old) => goToLot(old, lot))
   }
   function rideTo(lot: Lot, t: Transport) {
@@ -713,7 +781,7 @@ export function LomeLifeImmersive() {
     }
     setMode('walk')
     setPanel(null)
-    setFollow(true)
+    controller.camera.follow = true
     setTransport(t)
     setCityLife((old) => {
       const going = goToLot(old, lot)
@@ -760,7 +828,7 @@ export function LomeLifeImmersive() {
       return
     }
     setMode('walk')
-    setFollow(false)
+    controller.camera.follow = false
     setCoopOrg(myOrg)
     setSelectedLot(myCoopLot)
     setCamera(CAMERA_HOME(myCoopLot.door.x, myCoopLot.door.y))
@@ -788,7 +856,7 @@ export function LomeLifeImmersive() {
   function tile(x: number, y: number) {
     setSelection({ x, y })
     if (mode === 'walk') {
-      setFollow(true)
+      controller.camera.follow = true
       const built = life.city.buildings.some((b) => b.x === x && b.y === y && b.type !== 'road')
       setCityLife((old) => (built ? goToEstate(old, x, y) : goToPoint(old, toWorld({ x, y }))))
     }
@@ -877,7 +945,7 @@ export function LomeLifeImmersive() {
     })
     const gate = LOCALITIES[to].gate
     setCamera(CAMERA_HOME(gate.x, gate.y))
-    setFollow(true)
+    controller.camera.follow = true
     setSelectedLot(null)
     setPanel(null)
     setMode('walk')
@@ -912,14 +980,12 @@ export function LomeLifeImmersive() {
             tool={mode === 'walk' ? 'inspect' : mode === 'demolish' ? 'demolish' : building}
             selected={selection}
             onTile={tile}
-            player={cityLife.at}
-            playerRotation={playerHeading}
-            moving={cityLife.route.length > 0}
+            controller={controller}
+            onPlayerEvents={onPlayerEvents}
+            onCameraSync={onCameraSync}
+            hasVehicle={cityLife.locality === 'lome' && Boolean(cityLife.vehicle)}
             camera={camera}
-            onCamera={(c) => {
-              if (c.tx !== camera.tx || c.tz !== camera.tz) setFollow(false)
-              setCamera(c)
-            }}
+            onCamera={setCamera}
             step={life.trafficStep}
             hour={life.hour}
             interior={interior}
@@ -943,7 +1009,7 @@ export function LomeLifeImmersive() {
                 setSelectedLot(lot)
                 setPanel('lot')
               } else {
-                setFollow(true)
+                controller.camera.follow = true
                 setCityLife((old) => goToPoint(old, cell))
               }
             }}
@@ -1141,60 +1207,54 @@ export function LomeLifeImmersive() {
 
       <div className="pointer-events-none absolute inset-x-0 bottom-[calc(100px+env(safe-area-inset-bottom))] z-20 px-3 sm:px-5">
         <div className="mx-auto flex max-w-[900px] items-end justify-between gap-2">
-          <button
-            type="button"
-            onClick={() => open('home')}
-            aria-label="Afficher les besoins du personnage"
-            className="pointer-events-auto flex min-w-0 max-w-[75%] items-center gap-2 rounded-full border border-white/70 bg-white/90 py-2 pl-2 pr-3 shadow-lg backdrop-blur"
-          >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-800 text-white">
-              <UserRound size={21} />
-            </span>
-            <span className="grid w-[150px] grid-cols-2 gap-x-2 gap-y-0.5 sm:w-[200px]">
-              {NEEDS.map((n) => (
-                <span
-                  key={n.key}
-                  className="flex items-center gap-1"
-                  title={n.label + ' ' + needs[n.key] + '%'}
-                >
-                  <span className="text-xs">{n.icon}</span>
-                  <NeedBar value={needs[n.key]} color={n.color} />
-                </span>
-              ))}
-            </span>
-          </button>
-          <div
-            className="pointer-events-auto grid grid-cols-3 grid-rows-3 gap-1"
-            role="group"
-            aria-label="Déplacer le personnage"
-          >
-            {PAD.map((b) => (
+          <div className="flex min-w-0 flex-col items-start gap-2">
+            <button
+              type="button"
+              onClick={() => open('home')}
+              aria-label="Afficher les besoins du personnage"
+              className="pointer-events-auto flex min-w-0 max-w-[75%] items-center gap-2 rounded-full border border-white/70 bg-white/90 py-2 pl-2 pr-3 shadow-lg backdrop-blur"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-800 text-white">
+                <UserRound size={21} />
+              </span>
+              <span className="grid w-[150px] grid-cols-2 gap-x-2 gap-y-0.5 sm:w-[200px]">
+                {NEEDS.map((n) => (
+                  <span
+                    key={n.key}
+                    className="flex items-center gap-1"
+                    title={n.label + ' ' + needs[n.key] + '%'}
+                  >
+                    <span className="text-xs">{n.icon}</span>
+                    <NeedBar value={needs[n.key]} color={n.color} />
+                  </span>
+                ))}
+              </span>
+            </button>
+            <Joystick
+              input={input}
+              disabled={panel !== null || riding}
+              onActive={onJoystickActive}
+            />
+          </div>
+          <div className="pointer-events-auto flex flex-col gap-2">
+            {(nearVehicle || driving) && (
               <button
                 type="button"
-                key={b.label}
-                aria-label={b.label}
-                onClick={() => {
-                  setFollow(true)
-                  setCityLife((old) => stepDir(old, b.dir[0], b.dir[1]))
-                }}
-                className={
-                  'flex h-10 w-10 items-center justify-center rounded-xl bg-white/90 text-base font-black text-emerald-900 shadow active:scale-95 ' +
-                  b.cls
-                }
+                aria-label={driving ? 'Descendre du taxi' : 'Monter dans le taxi'}
+                onClick={toggleVehicle}
+                className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-400 text-[10px] font-black text-slate-900 shadow"
               >
-                {b.dir[1] === -1 ? '▲' : b.dir[1] === 1 ? '▼' : b.dir[0] === -1 ? '◀' : '▶'}
+                {driving ? 'Descendre' : '🚕 Monter'}
               </button>
-            ))}
+            )}
             <button
               type="button"
               aria-label="Entrer ou sortir"
               onClick={() => action(insideAny ? 'leave' : 'enter')}
-              className="col-start-2 row-start-2 flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-700 text-[10px] font-black text-white shadow"
+              className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-700 text-[10px] font-black text-white shadow"
             >
               {insideAny ? 'Sortir' : 'Entrer'}
             </button>
-          </div>
-          <div className="pointer-events-auto flex flex-col gap-2">
             <button
               type="button"
               onClick={() => open('build')}
@@ -1659,6 +1719,7 @@ export function LomeLifeImmersive() {
                           onClick={() => {
                             setQuality(q)
                             rememberQuality(q)
+                            if (governor.current) governor.current.ceiling = q
                           }}
                           className={`flex-1 rounded-xl px-2 py-2 text-xs font-bold ${
                             quality === q

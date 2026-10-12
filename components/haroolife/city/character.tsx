@@ -38,6 +38,7 @@ export function Character({
   scale = 1,
   name,
   active = true,
+  imperative = false,
   onEntity,
 }: {
   model: string
@@ -48,6 +49,8 @@ export function Character({
   name?: string
   /** False freezes the skeleton (off-screen or far characters cost no animation time). */
   active?: boolean
+  /** True when a rig moves the entity every frame: props place it once, never again. */
+  imperative?: boolean
   /** Receives the root entity, so a parent can move it imperatively between renders. */
   onEntity?: (e: pc.Entity | null) => void
 }) {
@@ -108,9 +111,12 @@ export function Character({
   }, [active])
 
   // Follow position, rotation and scale from props without re-instantiating.
+  const placed = useRef(false)
   useEffect(() => {
     const root = holder.current
     if (!root) return
+    if (imperative && placed.current) return
+    placed.current = true
     root.setLocalPosition(position[0], position[1], position[2])
     root.setLocalEulerAngles(0, rotation, 0)
     root.setLocalScale(scale, scale, scale)
