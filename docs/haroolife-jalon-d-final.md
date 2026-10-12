@@ -45,7 +45,7 @@ faite depuis cette session** : suivre le protocole de la baseline sur la Motorol
 - Suite Lomé complète sur la première build D1 : 26 tests, 22 verts, 4 échecs = les deux anciens
   specs qui cliquaient le pavé 4 directions (`lome-life`, `lome-travel`), réécrits pour le
   déplacement continu ; après reconstruction, `lome-life` + `lome-travel` + `lome-player` + `lome-perf`
-  8/8 verts (desktop + mobile-android).
+  8/8 verts, puis **suite complète 26/26** (desktop + mobile-android, 10,8 min) sur la build committée.
 
 ## Reste à faire (ordre de la mission)
 
