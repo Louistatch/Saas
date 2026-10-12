@@ -23,7 +23,9 @@ import {
   stepPlayer,
   walkLifeStep,
 } from '@/lib/haroolife/lome-life-engine'
+import { placeResidents, residentsAt } from '@/lib/haroolife/lome-presence'
 import { type BuildType, CATALOG } from '@/lib/haroolife/townsmen-engine'
+import { ROLE_LABELS } from '@/lib/haroolife/world'
 import {
   ArrowRight,
   Bell,
@@ -40,12 +42,14 @@ import {
   ShoppingBag,
   Sun,
   UserRound,
+  Users,
   Utensils,
   X,
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { sayOnPlace, usePresence } from './use-presence'
 
 const World3D = dynamic(() => import('./city-world-3d'), {
   ssr: false,
@@ -221,6 +225,29 @@ export function LomeLifeImmersive() {
   const needs = life.needs
   const wellbeing = Math.round(NEED_KEYS.reduce((sum, k) => sum + needs[k], 0) / NEED_KEYS.length)
   const pending = eventById(life.pendingEvent)
+  const presence = usePresence()
+  const here = presence.status === 'ready' ? (presence.world?.here ?? null) : null
+  const visitors = useMemo(
+    () => (here ? placeResidents(here.residents, life.city.buildings) : []),
+    [here, life.city.buildings],
+  )
+  const hereNow = life.inside ? residentsAt(visitors, life.inside) : []
+  const [placeDraft, setPlaceDraft] = useState('')
+  const [placeError, setPlaceError] = useState('')
+  const [placeBusy, setPlaceBusy] = useState(false)
+  async function sayOnThePlace() {
+    const body = placeDraft.trim().slice(0, 200)
+    if (!body || !here) return
+    setPlaceBusy(true)
+    setPlaceError('')
+    const err = await sayOnPlace(here.canton.canton_id, body)
+    setPlaceBusy(false)
+    if (err) setPlaceError(err)
+    else {
+      setPlaceDraft('')
+      void presence.reload()
+    }
+  }
   const mood = wellbeing >= 75 ? 'Heureux' : wellbeing >= 40 ? 'Bien' : 'Fatigué'
   const status = life.route.length
     ? 'En chemin vers ' +
@@ -392,6 +419,7 @@ export function LomeLifeImmersive() {
             inspect={selection}
             onTile={tile}
             onInteriorAction={action}
+            visitors={visitors}
             tool={mode === 'walk' ? 'inspect' : mode === 'demolish' ? 'demolish' : building}
           />
         )}
@@ -415,6 +443,15 @@ export function LomeLifeImmersive() {
           >
             {wellbeing >= 75 ? '🙂' : wellbeing >= 40 ? '😌' : '😟'} {mood}
           </button>
+          {here && (
+            <span
+              className="flex shrink-0 items-center gap-1 rounded-xl bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-800"
+              title={'Habitants de ' + here.canton.canton + ' présents dans le quartier'}
+            >
+              <Users size={14} /> {here.residents.length}
+              <span className="hidden sm:inline"> · {here.canton.canton}</span>
+            </span>
+          )}
           <span className="h-6 w-px bg-slate-200" />
           <button
             type="button"
@@ -545,6 +582,25 @@ export function LomeLifeImmersive() {
             </button>
           </div>
         </div>
+        {life.inside && hereNow.length > 0 && (
+          <div className="pointer-events-auto mx-auto mt-2 flex max-w-[900px] flex-wrap items-center gap-1 text-[11px]">
+            <span className="rounded-full bg-white/90 px-2 py-1 font-bold text-emerald-900 shadow">
+              Ici maintenant
+            </span>
+            {hereNow.slice(0, 6).map((r) => (
+              <span
+                key={r.display_name}
+                className="rounded-full bg-emerald-900/85 px-2 py-1 font-semibold text-white shadow"
+              >
+                {r.display_name}
+                <span className="ml-1 font-normal text-emerald-200">
+                  {ROLE_LABELS[r.roles[0]] ?? ''}
+                </span>
+              </span>
+            ))}
+            {hereNow.length > 6 && <span className="text-white">+{hereNow.length - 6}</span>}
+          </div>
+        )}
         <div className="pointer-events-auto mx-auto mt-2 max-w-[900px]">
           <button
             type="button"
@@ -894,9 +950,84 @@ export function LomeLifeImmersive() {
                   <ActionButton title="Trouver un travail" onClick={() => open('jobs')} />
                 </>
               )}
-              {panel === 'messages' && (
+              {panel === 'messages' && here && (
                 <>
                   <p className="text-xs text-slate-500">
+                    La place de {here.canton.canton} : messages des habitants connectés à HarooLife,
+                    200 caractères, visibles par tous les habitants du canton.
+                  </p>
+                  {presence.world?.me.home === null && (
+                    <Link
+                      href="/haroolife"
+                      className="block rounded-xl bg-amber-50 p-3 text-xs font-semibold text-amber-900"
+                    >
+                      Choisissez d’abord votre maison dans HarooLife pour parler sur la place.
+                    </Link>
+                  )}
+                  <div className="space-y-2 rounded-2xl bg-slate-50 p-3">
+                    {here.messages.length === 0 && (
+                      <p className="text-center text-xs text-slate-500">
+                        Personne n’a encore parlé ici aujourd’hui.
+                      </p>
+                    )}
+                    {here.messages.map((m) => (
+                      <div
+                        key={m.id}
+                        className={'flex ' + (m.is_me ? 'justify-end' : 'justify-start')}
+                      >
+                        <span
+                          className={
+                            'max-w-[85%] rounded-2xl px-3 py-2 text-sm ' +
+                            (m.is_me
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-white text-slate-800 shadow-sm')
+                          }
+                        >
+                          {!m.is_me && (
+                            <strong className="block text-[11px]">{m.display_name}</strong>
+                          )}
+                          {m.body}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  {placeError && (
+                    <p role="alert" className="text-xs font-semibold text-rose-700">
+                      {placeError}
+                    </p>
+                  )}
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      void sayOnThePlace()
+                    }}
+                    className="flex gap-2"
+                  >
+                    <input
+                      aria-label="Parler sur la place"
+                      value={placeDraft}
+                      maxLength={200}
+                      onChange={(e) => setPlaceDraft(e.target.value)}
+                      className="min-w-0 flex-1 rounded-2xl border border-slate-200 px-3 py-3 text-sm"
+                      placeholder={'Dire quelque chose à ' + here.canton.canton + '…'}
+                    />
+                    <button
+                      type="submit"
+                      disabled={placeBusy}
+                      aria-label="Envoyer sur la place"
+                      className="rounded-2xl bg-emerald-600 px-4 text-white disabled:opacity-50"
+                    >
+                      <Send size={18} />
+                    </button>
+                  </form>
+                </>
+              )}
+              {panel === 'messages' && !here && (
+                <>
+                  <p className="text-xs text-slate-500">
+                    {presence.status === 'offline'
+                      ? 'Connectez-vous à FaîtiereHub pour retrouver les habitants de votre canton. En attendant : '
+                      : ''}
                     Discussion avec Afi, personnage fictif. Réponses scénarisées, sans joueurs en
                     ligne.
                   </p>
