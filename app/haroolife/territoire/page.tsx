@@ -1,10 +1,9 @@
-import { CityBuilder } from '@/components/haroolife/city-builder'
 import type { Metadata } from 'next'
 export const metadata: Metadata = {
-  title: 'HarooVille — Jeu de construction de ville',
-  description:
-    'Construisez et gérez une ville togolaise isométrique, ses habitants, routes et chaînes de production.',
+  title: 'HarooLife — Construire',
+  description: 'Construisez votre domaine dans le monde 3D du Togo : routes, maisons, commerces.',
 }
+/** Module « Construire » of the single 3D world (mounted by the HarooLife layout). */
 export default function HarooVillePage() {
-  return <CityBuilder />
+  return null
 }

@@ -8,8 +8,6 @@ import {
   actionsFor,
   arrive,
   cityInteract,
-  decodeCityLife,
-  fromLegacy,
   goToEstate,
   goToLot,
   goToPoint,
@@ -23,6 +21,7 @@ import {
   useProp,
   walkStep,
 } from '@/lib/haroolife/city/life'
+import { CITY_STORAGE, loadCityLife } from '@/lib/haroolife/city/migrate'
 import { findPath } from '@/lib/haroolife/city/navigation'
 import { bump } from '@/lib/haroolife/city/perf'
 import {
@@ -73,7 +72,6 @@ import {
   type Transport,
   advanceLifeHour,
   buildInLome,
-  decodeLomeLife,
   demolishInLome,
   initialLomeLife,
   interact,
@@ -107,11 +105,13 @@ import {
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CAMERA_HOME, type CameraState } from './city/city-world'
 import CooperativePanel from './city/cooperative-panel'
 import MarketPanel from './city/market-panel'
 import OnboardingSteps from './city/onboarding'
+import { HomeDialog } from './residence-dialog'
 import { sayOnPlace, usePresence } from './use-presence'
 
 const CityWorld = dynamic(() => import('./city/city-world'), {
@@ -123,8 +123,6 @@ const CityWorld = dynamic(() => import('./city/city-world'), {
   ),
 })
 const RideOverlay = dynamic(() => import('./travel-scene-3d'), { ssr: false })
-const STORAGE = 'haroolife.lome-life.v1'
-const CITY_STORAGE = 'haroolife.lome-city.v1'
 type Dir = [-1 | 0 | 1, -1 | 0 | 1]
 const KEYS: Record<string, Dir> = {
   arrowup: [0, -1],
@@ -157,8 +155,16 @@ type Sheet =
   | 'lot'
   | 'cooperative'
   | 'market'
+  | 'residence'
   | null
 type Mode = 'walk' | 'build' | 'demolish'
+/** The module a HarooLife address opens inside the single 3D world. */
+export function routeModule(pathname: string | null): 'walk' | 'build' | 'map' {
+  const path = (pathname ?? '').replace(/\/+$/, '')
+  if (path === '/haroolife/territoire') return 'build'
+  if (path === '/haroolife/territoire/carte') return 'map'
+  return 'walk'
+}
 const money = (n: number) => new Intl.NumberFormat('fr-FR').format(n) + ' FCFA'
 const BUILDINGS: BuildType[] = [
   'road',
@@ -458,20 +464,12 @@ export function LomeLifeImmersive() {
   useEffect(() => {
     try {
       setWebgl(Boolean(document.createElement('canvas').getContext('webgl2')))
-      const rawCity = localStorage.getItem(CITY_STORAGE)
-      const city = rawCity ? decodeCityLife(JSON.parse(rawCity)) : null
-      if (city) {
-        setCityLife(city)
-        setCamera(CAMERA_HOME(city.at.x, city.at.y))
-      } else {
-        const raw = localStorage.getItem(STORAGE)
-        const save = raw ? decodeLomeLife(JSON.parse(raw)) : null
-        if (save) {
-          const migrated = fromLegacy(save)
-          setCityLife(migrated)
-          setCamera(CAMERA_HOME(migrated.at.x, migrated.at.y))
-        }
+      const loaded = loadCityLife(localStorage)
+      if (loaded.source !== 'fresh' || loaded.importedBuilder) {
+        setCityLife(loaded.world)
+        setCamera(CAMERA_HOME(loaded.world.at.x, loaded.world.at.y))
       }
+      if (loaded.importedBuilder) setNotice('Vos constructions HarooVille sont sur le domaine.')
     } catch {
       setWebgl(false)
     }
@@ -537,8 +535,10 @@ export function LomeLifeImmersive() {
       panel,
       wallet: life.wallet,
       lastEvent: life.lastEvent,
+      estateBuildings: life.city.buildings.length,
     }
   }, [
+    life.city.buildings.length,
     riding,
     transport,
     panel,
@@ -817,6 +817,34 @@ export function LomeLifeImmersive() {
     ])
     setChatDraft('')
   }
+  // One world, several addresses. The engine is mounted by the /haroolife layout, so these
+  // routes change the module on screen without unmounting the PlayCanvas application:
+  // /haroolife/territoire opens « Construire », /haroolife/territoire/carte « Explorer »,
+  // /haroolife and /haroolife/territoire/lome the walk around Lomé.
+  const pathname = usePathname()
+  useEffect(() => {
+    const module = routeModule(pathname)
+    if (module === 'build') {
+      setPanel('build')
+      setMode('build')
+    } else if (module === 'map') {
+      setPanel('map')
+      setMode('walk')
+    } else {
+      setPanel((cur) => (cur === 'build' || cur === 'map' ? null : cur))
+      setMode('walk')
+    }
+  }, [pathname])
+  // A signed-in account without a home is invited once to settle in its canton.
+  const [residencePrompted, setResidencePrompted] = useState(false)
+  useEffect(() => {
+    if (residencePrompted || presence.status !== 'ready' || !presence.world) return
+    if (presence.world.me.home === null) {
+      setResidencePrompted(true)
+      setPanel('residence')
+    }
+  }, [presence.status, presence.world, residencePrompted])
+
   function reset() {
     if (!window.confirm('Recommencer uniquement ta partie fictive de Lomé Life ?')) return
     setCityLife(initialCityLife())
@@ -1244,7 +1272,7 @@ export function LomeLifeImmersive() {
           </section>
         </div>
       )}
-      {panel && (
+      {panel && panel !== 'residence' && (
         <div className="absolute inset-0 z-40" aria-label={title}>
           <button
             type="button"
@@ -1731,12 +1759,13 @@ export function LomeLifeImmersive() {
                     200 caractères, visibles par tous les habitants du canton.
                   </p>
                   {presence.world?.me.home === null && (
-                    <Link
-                      href="/haroolife"
-                      className="block rounded-xl bg-amber-50 p-3 text-xs font-semibold text-amber-900"
+                    <button
+                      type="button"
+                      onClick={() => open('residence')}
+                      className="block w-full rounded-xl bg-amber-50 p-3 text-left text-xs font-semibold text-amber-900"
                     >
                       Choisissez d’abord votre maison dans HarooLife pour parler sur la place.
-                    </Link>
+                    </button>
                   )}
                   <div className="space-y-2 rounded-2xl bg-slate-50 p-3">
                     {here.messages.length === 0 && (
@@ -2191,6 +2220,25 @@ export function LomeLifeImmersive() {
                   >
                     Ouvrir HarooVille
                   </Link>
+                  {presence.status === 'ready' && (
+                    <button
+                      type="button"
+                      onClick={() => open('residence')}
+                      className="w-full rounded-xl border border-emerald-200 p-3 text-sm font-semibold text-emerald-800"
+                    >
+                      {presence.world?.me.home
+                        ? `Ma résidence : ${presence.world.me.home.canton}`
+                        : 'Choisir ma résidence au Togo'}
+                    </button>
+                  )}
+                  <nav
+                    aria-label="Mes services FaîtiereHub"
+                    className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs font-semibold text-slate-600"
+                  >
+                    <Link href="/dashboard">Mon tableau de bord</Link>
+                    <Link href="/haroo">Mon espace Haroo</Link>
+                    <Link href="/marche">Le marché</Link>
+                  </nav>
                 </>
               )}
               <p className="pt-1 text-center text-[10px] text-slate-500">
@@ -2199,6 +2247,18 @@ export function LomeLifeImmersive() {
             </div>
           </section>
         </div>
+      )}
+      {panel === 'residence' && presence.world && (
+        <HomeDialog
+          world={presence.world}
+          defaultName={actor?.displayName || 'Habitant'}
+          onDone={() => {
+            setPanel(null)
+            setNotice('Votre maison est installée dans votre canton.')
+            void presence.reload()
+          }}
+          onClose={() => setPanel(null)}
+        />
       )}
     </main>
   )

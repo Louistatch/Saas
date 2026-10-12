@@ -91,12 +91,45 @@ même monde (feuille, panneau ou bâtiment), jamais une page ni une seconde appl
 | Qualité et performance | `lib/haroolife/city/quality.ts`, `perf.ts` | Inchangé, budgets par région, streaming des chunks à la demande | `haroolife.quality` | `lome-perf`, p50/p95 Android |
 | Cycle de vie GPU | 4 `<Application>` distincts | Une seule `<Application>` montée par `/haroolife` ; les modules changent de scène sans démonter le moteur | — | `lome-gpu-lifecycle` (20 transitions mobile sans erreur) |
 
+## Jalon B — entrée unique et un seul moteur
+
+**Architecture.** `app/haroolife/layout.tsx` monte `LomeLifeImmersive` une seule fois ; les pages
+`/haroolife`, `/haroolife/territoire`, `/haroolife/territoire/lome` et `/haroolife/territoire/carte`
+ne portent plus que leurs métadonnées. Une navigation entre ces adresses change le module affiché
+(`routeModule()` : « Construire » pour `/territoire`, « Explorer » pour `/territoire/carte`, la
+marche dans Lomé sinon) sans démonter l'application PlayCanvas : aucune redirection, donc aucune
+boucle possible, et l'historique du navigateur fonctionne (retour = fermeture du module).
+
+**Ce qui a quitté les routes** (le code reste pour le Jalon D) : TogoLife (village SVG, onglets),
+HarooVille `CityBuilder` (plateau 2D/3D), `TerritorySandbox` (Leaflet + panneau 3D) — soit trois
+applications WebGL de moins. Le choix de résidence (`HomeDialog`, désormais
+`components/haroolife/residence-dialog.tsx`) est devenu la feuille « Ma résidence » du monde 3D,
+proposée une fois à un compte connecté sans maison, et accessible depuis le journal et les messages.
+Les liens « Mon tableau de bord / Mon espace Haroo / Le marché » de l'ancien en-tête vivent dans le
+journal.
+
+**Sauvegardes.** `lib/haroolife/city/migrate.ts` charge `haroolife.lome-city.v1`, sinon l'ancien
+`haroolife.lome-life.v1`, puis importe une seule fois les constructions de `haroolife.citybuilder.v1`
+sur les cellules libres du domaine (budget et ressources au plus haut des deux, journal annoté).
+L'ancienne clé n'est jamais supprimée ; `haroolife.citybuilder.imported` empêche un second import.
+
+**Vérification** (bundle de production reconstruit, `e2e/lome-gpu-lifecycle.spec.ts`) :
+
+| Scénario | desktop 1440×900 | mobile-android Pixel 7 |
+|---|---|---|
+| Transitions Lomé → Construire → retour par l'historique (10 desktop / 20 mobile), arrière-plan simulé, rechargement complet sur l'ancienne adresse `/territoire/lome` | même canvas conservé, 0 erreur | même canvas conservé, 0 erreur |
+| Perte puis restauration du contexte WebGL | restauré | restauré |
+| Import d'une sauvegarde HarooVille (3 constructions sur cellules libres), idempotent au second chargement | vert | vert |
+
+Captures : `docs/captures/unification/b-entree-*.png` (`/haroolife`), `b-construire-*.png`
+(`/haroolife/territoire`). Suite Lomé complète après le Jalon B : 22 tests, 22 réussis (desktop + mobile-android, 9,3 min).
+
 ## Ordre des jalons
 
-A. Audit + crash GPU (fait, voir ci-dessus).
+A. Audit + crash GPU (fait).
 B. Entrée unique `/haroolife` dans le moteur Lomé Life ; `/haroolife/territoire`, `/lome`, `/carte`
-   redirigent vers des modules du même monde ; migration des sauvegardes ; une seule application
-   PlayCanvas.
+   sont des modules du même monde ; migration des sauvegardes ; une seule application PlayCanvas
+   (fait).
 C. Carte nationale sourcée + deux pôles pilotes (Grand Lomé, Lama-Kara) avec décor régional et
    chargement progressif par chunks.
 D. Intégration complète des mécaniques (Construire, Économie, village, maison, acteurs).
