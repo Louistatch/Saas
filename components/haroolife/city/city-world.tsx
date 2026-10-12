@@ -9,7 +9,7 @@ import {
   renders,
   watchLongTasks,
 } from '@/lib/haroolife/city/perf'
-import { PRESETS, type Quality } from '@/lib/haroolife/city/quality'
+import { PRESETS, type Quality, renderPixelRatio } from '@/lib/haroolife/city/quality'
 import { type Agent, agentsNear } from '@/lib/haroolife/city/traffic'
 import {
   CATEGORY_OF,
@@ -246,7 +246,7 @@ function QualityController({ quality }: { quality: Quality }) {
   const app = useApp()
   useEffect(() => {
     if (!app) return
-    app.graphicsDevice.maxPixelRatio = PRESETS[quality].maxPixelRatio
+    app.graphicsDevice.maxPixelRatio = renderPixelRatio(quality)
     // Never app.resizeCanvas() here: this child effect runs before the wrapper sets the fill
     // mode, and the engine's default (keep aspect of the 300×150 canvas) would pin the inline
     // style to a 2:1 strip. The CSS size stays 100 %, only the backbuffer follows the preset.

@@ -101,6 +101,7 @@ export function detectQuality(): Quality {
   } catch {
     /* storage blocked */
   }
+  if (softwareRenderer()) return 'eco'
   const nav = navigator as Navigator & {
     deviceMemory?: number
     connection?: { saveData?: boolean }
@@ -114,6 +115,52 @@ export function detectQuality(): Quality {
     reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
   })
 }
+let software: boolean | null = null
+/**
+ * Whether WebGL runs on a software rasterizer (SwiftShader, llvmpipe…): no GPU at all, as on
+ * headless runners and some low-end or virtualised machines. Detected once, cached.
+ */
+export function softwareRenderer(): boolean {
+  if (software !== null) return software
+  if (typeof document === 'undefined') return false
+  try {
+    const canvas = document.createElement('canvas')
+    const gl = (canvas.getContext('webgl2') ??
+      canvas.getContext('webgl')) as WebGLRenderingContext | null
+    if (!gl) {
+      software = true
+      return software
+    }
+    const info = gl.getExtension('WEBGL_debug_renderer_info')
+    const renderer = String(
+      info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
+    )
+    gl.getExtension('WEBGL_lose_context')?.loseContext()
+    software = /swiftshader|llvmpipe|softpipe|software|mesa offscreen/i.test(renderer)
+  } catch {
+    software = false
+  }
+  return software
+}
+/** For tests and diagnostics. */
+export function setSoftwareRendererForTests(value: boolean | null) {
+  software = value
+}
+/**
+ * Pixel ratio actually used for the canvas: on a software rasterizer the cost is the number
+ * of pixels, so every preset renders at half resolution there and the UI stays responsive.
+ */
+export function renderPixelRatio(q: Quality, isSoftware = softwareRenderer()): number {
+  const cap = PRESETS[q].maxPixelRatio
+  return isSoftware ? Math.min(cap, 0.5) : cap
+}
+/** One step down (high → balanced → eco), or null when already at the floor. */
+export function lowerQuality(q: Quality): Quality | null {
+  return q === 'high' ? 'balanced' : q === 'balanced' ? 'eco' : null
+}
+/** Frames slower than this, sustained, trigger an automatic step down. */
+export const SLOW_FRAME_FPS = 6
+
 export function rememberQuality(q: Quality) {
   try {
     window.localStorage.setItem(STORAGE_KEY, q)

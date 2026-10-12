@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { FrameRing, percentile } from '../lib/haroolife/city/perf'
-import { PRESETS, autoQuality, isQuality } from '../lib/haroolife/city/quality'
+import {
+  PRESETS,
+  autoQuality,
+  isQuality,
+  lowerQuality,
+  renderPixelRatio,
+} from '../lib/haroolife/city/quality'
 
 test('frame ring reports percentiles of the last frames only', () => {
   const ring = new FrameRing(4)
@@ -31,4 +37,14 @@ test('quality presets are ordered and chosen from the device', () => {
   assert.equal(autoQuality({ mobile: false, deviceMemory: 4, hardwareConcurrency: 4 }), 'balanced')
   assert.equal(isQuality('high'), true)
   assert.equal(isQuality('ultra'), false)
+})
+
+test('software rasterizers render at half resolution and quality steps down one level at a time', () => {
+  assert.equal(renderPixelRatio('high', false), PRESETS.high.maxPixelRatio)
+  assert.equal(renderPixelRatio('high', true), 0.5)
+  assert.equal(renderPixelRatio('eco', true), 0.5)
+  assert.equal(renderPixelRatio('eco', false), 1)
+  assert.equal(lowerQuality('high'), 'balanced')
+  assert.equal(lowerQuality('balanced'), 'eco')
+  assert.equal(lowerQuality('eco'), null)
 })

@@ -25,7 +25,14 @@ import {
 } from '@/lib/haroolife/city/life'
 import { findPath } from '@/lib/haroolife/city/navigation'
 import { bump } from '@/lib/haroolife/city/perf'
-import { PRESETS, type Quality, detectQuality, rememberQuality } from '@/lib/haroolife/city/quality'
+import {
+  PRESETS,
+  type Quality,
+  SLOW_FRAME_FPS,
+  detectQuality,
+  lowerQuality,
+  rememberQuality,
+} from '@/lib/haroolife/city/quality'
 import {
   CATEGORY_LABELS,
   CATEGORY_OF,
@@ -301,6 +308,29 @@ export function LomeLifeImmersive() {
   const frameRef = useRef({ drawCalls: 0, fps: 0 })
   const [quality, setQuality] = useState<Quality>('balanced')
   useEffect(() => setQuality(detectQuality()), [])
+  // Adaptive quality: when frames stay slow for two consecutive checks the preset steps down
+  // (the machine, not the player, decides), so the interface never freezes behind the renderer.
+  const slowChecks = useRef(0)
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const fps = frameRef.current.fps
+      if (!(fps > 0) || document.visibilityState !== 'visible') return
+      if (fps >= SLOW_FRAME_FPS) {
+        slowChecks.current = 0
+        return
+      }
+      slowChecks.current += 1
+      if (slowChecks.current < 2) return
+      slowChecks.current = 0
+      setQuality((q) => {
+        const lower = lowerQuality(q)
+        if (!lower) return q
+        setNotice(`Qualité graphique réduite (${PRESETS[lower].label}) pour rester fluide.`)
+        return lower
+      })
+    }, 3000)
+    return () => window.clearInterval(id)
+  }, [])
   const heading = useRef(180)
   const insideAny = Boolean(cityLife.insideLot || life.inside)
   const interior = cityLife.insideLot
