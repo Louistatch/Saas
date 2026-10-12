@@ -18,25 +18,19 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
   expect(webgl2, 'Chromium QA must provide a true WebGL2 device').toBe(true)
   await expect(page.locator('canvas').first()).toBeVisible({ timeout: 30000 })
 
-  // Direct control: one step on the on-screen pad moves the character to a neighbouring road tile.
-  const before = await page.evaluate(
-    () => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? '{}').at,
-  )
-  await page
-    .getByRole('group', { name: 'Déplacer le personnage' })
-    .getByRole('button', { name: 'Reculer' })
-    .click()
-  await expect
-    .poll(() =>
-      page.evaluate(() => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? '{}').at),
-    )
-    .toEqual({ x: before.x, y: before.y + 1 })
-  await page.keyboard.press('ArrowUp')
-  await expect
-    .poll(() =>
-      page.evaluate(() => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? '{}').at),
-    )
-    .toEqual(before)
+  // Direct control: holding a direction walks the character continuously along the road
+  // (the joystick on screen, the arrow keys here); the save follows the cell it reaches.
+  const savedAt = () =>
+    page.evaluate(() => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? '{}').at)
+  const before = await savedAt()
+  await page.keyboard.down('ArrowDown')
+  await expect.poll(savedAt).not.toEqual(before)
+  await page.keyboard.up('ArrowDown')
+  const south = await savedAt()
+  expect(south.y).toBeGreaterThan(before.y)
+  await page.keyboard.down('ArrowUp')
+  await expect.poll(async () => (await savedAt()).y).toBeLessThan(south.y)
+  await page.keyboard.up('ArrowUp')
 
   // Paid rides: the travel scene opens on the boulevard; "Passer" lands at destination.
   // First a taxi to a distant place from its sheet (the ride starts at once), then "Chez

@@ -23,6 +23,12 @@ export interface QualityPreset {
   vehicleRadius: number
   /** Second fill light on or off. */
   fillLight: boolean
+  /** Cells from the camera target with full-detail buildings and props. */
+  detailCells: number
+  /** Cells up to which buildings keep a simplified model (beyond: coloured volumes). */
+  lowCells: number
+  /** Triangles visible per frame the renderer aims to stay under (dynamic detail radius). */
+  triangleBudget: number
 }
 export const PRESETS: Record<Quality, QualityPreset> = {
   eco: {
@@ -38,6 +44,9 @@ export const PRESETS: Record<Quality, QualityPreset> = {
     maxWalkers: 8,
     vehicleRadius: 16,
     fillLight: false,
+    detailCells: 9,
+    lowCells: 22,
+    triangleBudget: 160_000,
   },
   balanced: {
     id: 'balanced',
@@ -52,6 +61,9 @@ export const PRESETS: Record<Quality, QualityPreset> = {
     maxWalkers: 14,
     vehicleRadius: 22,
     fillLight: false,
+    detailCells: 13,
+    lowCells: 30,
+    triangleBudget: 320_000,
   },
   high: {
     id: 'high',
@@ -66,6 +78,9 @@ export const PRESETS: Record<Quality, QualityPreset> = {
     maxWalkers: 20,
     vehicleRadius: 26,
     fillLight: true,
+    detailCells: 18,
+    lowCells: 40,
+    triangleBudget: 650_000,
   },
 }
 export const STORAGE_KEY = 'haroolife.quality'
@@ -158,8 +173,56 @@ export function renderPixelRatio(q: Quality, isSoftware = softwareRenderer()): n
 export function lowerQuality(q: Quality): Quality | null {
   return q === 'high' ? 'balanced' : q === 'balanced' ? 'eco' : null
 }
-/** Frames slower than this, sustained, trigger an automatic step down. */
-export const SLOW_FRAME_FPS = 6
+/** Frames slower than this, sustained, trigger an automatic step down (software renderers excepted). */
+export const SLOW_FRAME_FPS = 24
+/** Above this, sustained for a minute, the preset may climb back towards the device's level. */
+export const FAST_FRAME_FPS = 50
+export function raiseQuality(q: Quality): Quality | null {
+  return q === 'eco' ? 'balanced' : q === 'balanced' ? 'high' : null
+}
+/**
+ * Adaptive quality with hysteresis. Fed one FPS reading per check (every 3 s): three slow
+ * checks in a row step the preset down; twenty fast checks in a row (one minute) step it
+ * back up, never above the ceiling the device or the player chose, and never within a
+ * minute of a step down. A software rasterizer keeps the old 6 FPS floor: it cannot reach
+ * 24 FPS whatever the preset, and dropping it further only blurs the picture.
+ */
+export class QualityGovernor {
+  private slow = 0
+  private fast = 0
+  private sinceDown = Number.POSITIVE_INFINITY
+  constructor(
+    public ceiling: Quality,
+    private software = false,
+    private slowChecks = 3,
+    private fastChecks = 20,
+  ) {}
+  /** Returns the preset to switch to, or null to keep the current one. */
+  sample(fps: number, current: Quality): Quality | null {
+    if (!(fps > 0)) return null
+    this.sinceDown += 1
+    const floor = this.software ? 6 : SLOW_FRAME_FPS
+    if (fps < floor) {
+      this.fast = 0
+      this.slow += 1
+      if (this.slow < this.slowChecks) return null
+      this.slow = 0
+      this.sinceDown = 0
+      return lowerQuality(current)
+    }
+    this.slow = 0
+    if (fps >= FAST_FRAME_FPS && this.sinceDown >= this.fastChecks) {
+      this.fast += 1
+      if (this.fast < this.fastChecks) return null
+      this.fast = 0
+      const up = raiseQuality(current)
+      return up && order(up) <= order(this.ceiling) ? up : null
+    }
+    this.fast = 0
+    return null
+  }
+}
+const order = (q: Quality) => (q === 'eco' ? 0 : q === 'balanced' ? 1 : 2)
 
 export function rememberQuality(q: Quality) {
   try {

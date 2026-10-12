@@ -11,6 +11,7 @@ import {
   renders,
   watchLongTasks,
 } from '@/lib/haroolife/city/perf'
+import type { CameraRig, PlayerController } from '@/lib/haroolife/city/player'
 import { PRESETS, type Quality, renderPixelRatio } from '@/lib/haroolife/city/quality'
 import { type Agent, agentsNear } from '@/lib/haroolife/city/traffic'
 import {
@@ -21,6 +22,8 @@ import {
   type Lot,
   SIZE_HINT,
   TYPE_ICONS,
+  WORLD_H,
+  WORLD_W,
   inEstate,
   landmarks,
 } from '@/lib/haroolife/city/world'
@@ -47,10 +50,14 @@ import { Character } from './character'
 import CityChunks, { type ChunkStats, cellOf, worldPos } from './city-chunks'
 import InteriorScene from './interior-scene'
 import { type Bank, bakedMaterial, loadBank, meshFor } from './model-bank'
+import PlayerRig from './player-rig'
 import { useMaterial } from './use-material'
 
 export type CameraState = { tx: number; tz: number; distance: number; angle: number }
 /** Frame the player with the dense city around: the target sits a little south-east of them. */
+/** The camera entity's initial transform; the player rig moves it every frame afterwards. */
+const CAMERA_START: [number, number, number] = [0, 20, 20]
+const CAMERA_START_ROT: [number, number, number] = [-45, 0, 0]
 export const CAMERA_HOME = (x: number, y: number): CameraState => {
   const [px, , pz] = worldPos(x - 4, y + 3)
   return { tx: px, tz: pz, distance: 28, angle: 35 }
@@ -264,28 +271,6 @@ function QualityController({ quality }: { quality: Quality }) {
 
 const EstateTilesMemo = memo(EstateTiles)
 
-function PlayerFigure({
-  position,
-  rotation,
-  moving,
-}: { position: [number, number, number]; rotation: number; moving: boolean }) {
-  const highlighted = useMaterial({ diffuse: '#e7d07e', emissive: '#6b5a1a', gloss: 0.2 })
-  return (
-    <Entity name="Joueur" position={position}>
-      <Character
-        model={PLAYER_MODEL}
-        position={[position[0], 0.05, position[2]]}
-        rotation={rotation}
-        anim={moving ? 'walk' : 'idle'}
-        scale={1.15}
-      />
-      <Entity position={[0, 0.02, 0]} scale={[0.9, 0.025, 0.9]}>
-        <Render type="cylinder" material={highlighted} />
-      </Entity>
-    </Entity>
-  )
-}
-
 /** A glowing plate under the selected place. */
 function SelectionRing({
   position,
@@ -350,11 +335,14 @@ function Ambient({ color }: { color: string }) {
 function Picker({
   camera,
   onPan,
+  onOrbit,
   onZoom,
   onTap,
 }: {
   camera: CameraState
   onPan: (dx: number, dz: number) => void
+  /** Single-finger drag while following the player: rotates the camera, vertical zooms. Returns false to pan instead. */
+  onOrbit: (dxPixels: number, dyPixels: number) => boolean
   onZoom: (factor: number) => void
   onTap: (cell: { x: number; y: number }) => void
 }) {
@@ -373,17 +361,7 @@ function Picker({
   useAppEvent('update', () => {
     const p = pending.current
     if (!app || (p.dx === 0 && p.dz === 0)) return
-    const camEntity = app.root.findByName('CityCamera') as pc.Entity | null
-    if (camEntity) {
-      const c = cam.current
-      const az = (c.angle * Math.PI) / 180
-      camEntity.setLocalPosition(
-        c.tx + p.dx + Math.sin(az) * c.distance * 0.72,
-        c.distance * 0.9,
-        c.tz + p.dz + Math.cos(az) * c.distance * 0.72,
-      )
-    }
-    if (performance.now() - p.since > 120) flush()
+    if (performance.now() - p.since > 60) flush()
   })
   useEffect(() => {
     if (!app) return
@@ -421,6 +399,7 @@ function Picker({
       if (!moved && Math.hypot(dx, dy) < 7) return
       moved = true
       last = { x: e.clientX, y: e.clientY }
+      if (onOrbit(dx, dy)) return
       // Screen drag → ground drag, rotated by the camera azimuth and scaled with distance.
       const k = cam.current.distance / 520
       const a = (cam.current.angle * Math.PI) / 180
@@ -465,7 +444,7 @@ function Picker({
       window.removeEventListener('pointerup', up)
       window.removeEventListener('pointercancel', up)
     }
-  }, [app, onZoom, onTap, flush])
+  }, [app, onZoom, onTap, flush, onOrbit])
   return null
 }
 
@@ -585,9 +564,12 @@ export default function CityWorld({
   tool,
   selected,
   onTile,
-  player,
-  playerRotation,
-  moving,
+  controller,
+  onPlayerEvents,
+  onCameraSync,
+  hasVehicle,
+  avatarModel = PLAYER_MODEL,
+  avatarPagne,
   camera,
   onCamera,
   step,
@@ -613,10 +595,16 @@ export default function CityWorld({
   tool: EditTool
   selected: { x: number; y: number } | null
   onTile: (x: number, y: number) => void
-  /** Player world cell. */
-  player: { x: number; y: number }
-  playerRotation: number
-  moving: boolean
+  /** The continuous player controller: avatar, camera rig and vehicle are driven from it. */
+  controller: PlayerController
+  onPlayerEvents: (events: ReturnType<PlayerController['drain']>, c: PlayerController) => void
+  onCameraSync: (cam: CameraRig) => void
+  /** Whether the player's taxi exists in this town. */
+  hasVehicle: boolean
+  /** The player's chosen look: Kenney model and pagne colour (also used indoors). */
+  avatarModel?: string
+  avatarPagne?: string
+  /** Low-rate camera state (chunk streaming, labels); the rig moves the real camera. */
   camera: CameraState
   onCamera: (c: CameraState) => void
   step: number
@@ -677,21 +665,36 @@ export default function CityWorld({
   }, [centerCell.x, centerCell.y, filter, camera.distance, locality])
   const light = useMemo(() => daylight(hour), [hour])
 
+  // Free camera (not following): drag pans the rig's target in ground units.
   const onPan = useCallback(
     (dx: number, dz: number) => {
       dragging.current = true
-      onCamera({
-        ...camera,
-        tx: Math.max(-90, Math.min(90, camera.tx + dx)),
-        tz: Math.max(-60, Math.min(60, camera.tz + dz)),
-      })
+      const rig = controller.camera
+      rig.follow = false
+      rig.tx = Math.max(-5, Math.min(WORLD_W + 5, rig.tx + dx / CELL))
+      rig.tz = Math.max(-5, Math.min(WORLD_H + 5, rig.tz + dz / CELL))
+      onCamera({ ...camera, tx: rig.tx, tz: rig.tz })
     },
-    [camera, onCamera],
+    [camera, onCamera, controller],
+  )
+  // Following the player: horizontal drag orbits, vertical drag zooms.
+  const onOrbit = useCallback(
+    (dx: number, dy: number) => {
+      const rig = controller.camera
+      if (!rig.follow) return false
+      rig.angle = (rig.angle - dx * 0.35 + 360) % 360
+      rig.distance = Math.max(7, Math.min(110, rig.distance * (1 + dy * 0.004)))
+      return true
+    },
+    [controller],
   )
   const onZoom = useCallback(
-    (f: number) =>
-      onCamera({ ...camera, distance: Math.max(9, Math.min(110, camera.distance * f)) }),
-    [camera, onCamera],
+    (f: number) => {
+      const rig = controller.camera
+      rig.distance = Math.max(7, Math.min(110, rig.distance * f))
+      onCamera({ ...camera, distance: rig.distance })
+    },
+    [camera, onCamera, controller],
   )
   const onTap = useCallback(
     (cell: { x: number; y: number }) => {
@@ -710,22 +713,25 @@ export default function CityWorld({
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       const k = e.key.toLowerCase()
-      if (k === 'q') onCamera({ ...camera, angle: (camera.angle + 315) % 360 })
-      else if (k === 'e') onCamera({ ...camera, angle: (camera.angle + 45) % 360 })
+      if (k === 'q') controller.camera.angle = (controller.camera.angle + 315) % 360
+      else if (k === 'e') controller.camera.angle = (controller.camera.angle + 45) % 360
       else if (k === '+' || k === '=') onZoom(0.8)
       else if (k === '-') onZoom(1.25)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [camera, onCamera, onZoom])
+  }, [controller, onZoom])
 
-  const az = (camera.angle * Math.PI) / 180
-  const camPos: [number, number, number] = [
-    camera.tx + Math.sin(az) * camera.distance * 0.72,
-    camera.distance * 0.9,
-    camera.tz + Math.cos(az) * camera.distance * 0.72,
-  ]
-  const playerPos = worldPos(player.x, player.y)
+  const vehicleEntity = useRef<pc.Entity | null>(null)
+  const registerVehicle = useCallback((e: pc.Entity | null) => {
+    vehicleEntity.current = e
+  }, [])
+  const vehicleStart = useMemo<[number, number, number]>(() => {
+    const v = controller.vehicle
+    const [x, , z] = v ? worldPos(v.x, v.z) : [0, 0, 0]
+    return [x, 0.02, z]
+    // biome-ignore lint/correctness/useExhaustiveDependencies: the rig moves the car afterwards
+  }, [hasVehicle])
   const estateCenter = worldPos(ESTATE.x0 + (SIZE_HINT - 1) / 2, ESTATE.y0 + (SIZE_HINT - 1) / 2)
   const scene = interior || ride
   const selPos = selectedLot
@@ -751,6 +757,9 @@ export default function CityWorld({
           centerY={centerCell.y}
           onStats={onStats}
           rings={{ near: preset.nearRing, mid: preset.midRing, far: preset.farRing }}
+          detailCells={preset.detailCells}
+          lowCells={preset.lowCells}
+          triangleBudget={preset.triangleBudget}
           hidden={Boolean(scene)}
         />
         {ride ? (
@@ -762,12 +771,13 @@ export default function CityWorld({
             angle={camera.angle}
             distance={24}
             activity={activity}
-            playerModel={PLAYER_MODEL}
+            playerModel={avatarModel}
+            playerPagne={avatarPagne}
             onUse={onUseProp}
           />
         ) : (
           <>
-            <Entity name="CityCamera" position={camPos} rotation={[-52, camera.angle, 0]}>
+            <Entity name="CityCamera" position={CAMERA_START} rotation={CAMERA_START_ROT}>
               <Camera fov={46} nearClip={0.5} farClip={420} clearColor={light.sky} />
             </Entity>
             <Ambient color={light.ambient} />
@@ -804,8 +814,25 @@ export default function CityWorld({
               />
             )}
             <Agents agents={agents} step={step} animated={animated} />
-            <PlayerFigure position={playerPos} rotation={playerRotation} moving={moving} />
-            <Picker camera={camera} onPan={onPan} onZoom={onZoom} onTap={onTap} />
+            <PlayerRig
+              controller={controller}
+              model={avatarModel}
+              pagne={avatarPagne}
+              vehicleEntity={vehicleEntity}
+              onEvents={onPlayerEvents}
+              onCameraSync={onCameraSync}
+            />
+            {hasVehicle && (
+              <Baked
+                name="Taxi du joueur"
+                model="taxi"
+                position={vehicleStart}
+                rotation={0}
+                scale={0.36}
+                onEntity={registerVehicle}
+              />
+            )}
+            <Picker camera={camera} onPan={onPan} onOrbit={onOrbit} onZoom={onZoom} onTap={onTap} />
             <LabelProjector overlay={overlay} lots={labels} />
           </>
         )}
@@ -857,7 +884,9 @@ export default function CityWorld({
         <button
           type="button"
           aria-label="Tourner la caméra"
-          onClick={() => onCamera({ ...camera, angle: (camera.angle + 45) % 360 })}
+          onClick={() => {
+            controller.camera.angle = (controller.camera.angle + 45) % 360
+          }}
           className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
         >
           <RotateCcw className="h-5 w-5" />
@@ -865,7 +894,10 @@ export default function CityWorld({
         <button
           type="button"
           aria-label="Recentrer sur moi"
-          onClick={() => onCamera(CAMERA_HOME(player.x, player.y))}
+          onClick={() => {
+            controller.camera.follow = true
+            controller.camera.distance = Math.min(controller.camera.distance, 12)
+          }}
           className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
         >
           <Maximize2 className="h-5 w-5" />
@@ -873,7 +905,14 @@ export default function CityWorld({
         <button
           type="button"
           aria-label="Vue de la ville"
-          onClick={() => onCamera({ ...CAMERA_HOME(60, 40), distance: 100 })}
+          onClick={() => {
+            const rig = controller.camera
+            rig.follow = false
+            rig.tx = 60
+            rig.tz = 40
+            rig.distance = 100
+            onCamera({ ...camera, tx: 60, tz: 40, distance: 100 })
+          }}
           className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
         >
           <Compass className="h-5 w-5" />

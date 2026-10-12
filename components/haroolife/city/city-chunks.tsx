@@ -1,13 +1,7 @@
 'use client'
 
 import { type Extra, buildingFor, streetFor } from '@/lib/haroolife/city/catalogue'
-import {
-  CHUNK,
-  type ChunkRef,
-  chunkOfCell,
-  chunksAround,
-  lotsInChunk,
-} from '@/lib/haroolife/city/chunks'
+import { CHUNK, chunkOfCell, lotsInChunk } from '@/lib/haroolife/city/chunks'
 import { releaseEntity, releaseMesh } from '@/lib/haroolife/city/gpu'
 import { current } from '@/lib/haroolife/city/locality'
 import { type Geometry, appendModel } from '@/lib/haroolife/city/pack'
@@ -489,16 +483,118 @@ function drawExtra(b: MeshBuilder, e: Extra) {
 
 const SMALL_EXTRAS = new Set(['sign', 'bench', 'flag', 'wall', 'cross'])
 
-function buildChunk(
+/** Where a chunk's triangles go, for the audit hook and the geometry budgets. */
+export type TriBreakdown = Record<
+  'ground' | 'street' | 'streetProps' | 'buildings' | 'props' | 'extras' | 'far',
+  number
+>
+const emptyBreakdown = (): TriBreakdown => ({
+  ground: 0,
+  street: 0,
+  streetProps: 0,
+  buildings: 0,
+  props: 0,
+  extras: 0,
+  far: 0,
+})
+
+/** Side of a sub-chunk in cells: the unit of streaming, culling and level of detail. */
+export const SUB = 8
+export type Level = 'full' | 'low' | 'far'
+export interface SubRef {
+  key: string
+  x0: number
+  y0: number
+  /** Side in cells: SUB for detailed levels, a whole chunk for the far volumes. */
+  size: number
+  /** Chebyshev distance (cells) from the camera target to the sub-chunk's centre. */
+  dist: number
+  level: Level
+}
+/**
+ * Sub-chunks to keep around a camera cell: full detail up to `detail` cells, simplified
+ * models up to `low`, coloured volumes up to `far`. Nearest first.
+ */
+export function subsAround(
+  cx: number,
+  cy: number,
+  detail: number,
+  low: number,
+  far: number,
+): SubRef[] {
+  const out: SubRef[] = []
+  const loc = current().id
+  const s0 = Math.max(0, Math.floor((cx - far) / SUB))
+  const s1 = Math.min(Math.ceil(WORLD_W / SUB) - 1, Math.floor((cx + far) / SUB))
+  const t0 = Math.max(0, Math.floor((cy - far) / SUB))
+  const t1 = Math.min(Math.ceil(WORLD_H / SUB) - 1, Math.floor((cy + far) / SUB))
+  // Far volumes are cheap: one mesh per whole chunk keeps the draw calls low at altitude.
+  const farChunks = new Map<string, SubRef>()
+  for (let sy = t0; sy <= t1; sy++)
+    for (let sx = s0; sx <= s1; sx++) {
+      const x0 = sx * SUB
+      const y0 = sy * SUB
+      const dist = Math.max(Math.abs(x0 + SUB / 2 - 0.5 - cx), Math.abs(y0 + SUB / 2 - 0.5 - cy))
+      if (dist > far) continue
+      const level: Level = dist <= detail ? 'full' : dist <= low ? 'low' : 'far'
+      if (level === 'far') {
+        const cxk = Math.floor(x0 / CHUNK)
+        const cyk = Math.floor(y0 / CHUNK)
+        const key = `${loc}:c${cxk}:${cyk}`
+        const have = farChunks.get(key)
+        if (!have || dist < have.dist)
+          farChunks.set(key, { key, x0: cxk * CHUNK, y0: cyk * CHUNK, size: CHUNK, dist, level })
+        continue
+      }
+      out.push({ key: `${loc}:${sx}:${sy}`, x0, y0, size: SUB, dist, level })
+    }
+  // A chunk whose quadrants are all far is one far mesh; mixed chunks keep their detailed
+  // quadrants and the far ones become a far mesh of the whole chunk underneath them is
+  // avoided by only emitting the far chunk when none of its quadrants is detailed.
+  const detailedChunks = new Set(
+    out.map((c) => `${loc}:c${Math.floor(c.x0 / CHUNK)}:${Math.floor(c.y0 / CHUNK)}`),
+  )
+  for (const [key, ref] of farChunks) {
+    if (detailedChunks.has(key)) {
+      // Mixed chunk: emit the far quadrants individually.
+      for (let sy = 0; sy < CHUNK / SUB; sy++)
+        for (let sx = 0; sx < CHUNK / SUB; sx++) {
+          const x0 = ref.x0 + sx * SUB
+          const y0 = ref.y0 + sy * SUB
+          const skey = `${loc}:${x0 / SUB}:${y0 / SUB}`
+          if (out.some((c) => c.key === skey)) continue
+          const dist = Math.max(
+            Math.abs(x0 + SUB / 2 - 0.5 - cx),
+            Math.abs(y0 + SUB / 2 - 0.5 - cy),
+          )
+          if (dist > far) continue
+          out.push({ key: skey, x0, y0, size: SUB, dist, level: 'far' })
+        }
+    } else out.push(ref)
+  }
+  return out.sort((a, b) => a.dist - b.dist)
+}
+
+function buildSub(
   device: pc.GraphicsDevice,
-  c: ChunkRef,
+  c: SubRef,
   bank: Bank | null,
-): { mesh: pc.Mesh | null; tris: number } {
+): { mesh: pc.Mesh | null; tris: number; breakdown: TriBreakdown } {
   const b = new MeshBuilder()
-  const x0 = c.cx * CHUNK
-  const y0 = c.cy * CHUNK
-  const near = c.lod === 'near' && bank !== null
-  const mid = c.lod === 'mid' && bank !== null
+  const x0 = c.x0
+  const y0 = c.y0
+  const near = c.level === 'full' && bank !== null
+  const mid = c.level === 'low' && bank !== null
+  const breakdown = emptyBreakdown()
+  let section: keyof TriBreakdown = 'ground'
+  let mark = 0
+  /** Attributes the triangles added since the last mark to the current section. */
+  const settle = (next: keyof TriBreakdown) => {
+    const n = b.idx.length / 3
+    breakdown[section] += n - mark
+    mark = n
+    section = next
+  }
   const place = (
     key: string,
     cx: number,
@@ -509,11 +605,21 @@ function buildChunk(
     tint?: RGB,
   ) => {
     if (!bank) return
-    appendModel(b, bank.model(key), { x: sx(cx), y: lift, z: sz(cy), rot, scale, tint })
+    const was = section
+    settle(section === 'ground' || section === 'street' ? 'streetProps' : section)
+    appendModel(b, mid ? bank.lowModel(key) : bank.model(key), {
+      x: sx(cx),
+      y: lift,
+      z: sz(cy),
+      rot,
+      scale,
+      tint,
+    })
+    settle(was)
   }
   const ground = palette()
-  for (let y = y0; y < Math.min(y0 + CHUNK, WORLD_H); y++)
-    for (let x = x0; x < Math.min(x0 + CHUNK, WORLD_W); x++) {
+  for (let y = y0; y < Math.min(y0 + c.size, WORLD_H); y++)
+    for (let x = x0; x < Math.min(x0 + c.size, WORLD_W); x++) {
       const [px, , pz] = worldPos(x, y)
       const t = terrainAt(x, y)
       if (t === 'ocean') {
@@ -554,6 +660,7 @@ function buildChunk(
       }
       const road = isCityRoad(x, y) || isDriveway(x, y)
       if (road) {
+        settle('street')
         const st = streetFor(x, y)
         b.flat(px - E, pz - E, px + E, pz + E, 0, st.avenue ? COLORS.road : COLORS.street)
         if (near) {
@@ -591,15 +698,17 @@ function buildChunk(
           else if (y % 10 === 0 || y === ground.shoreRow)
             b.flat(px - 0.35, pz - 0.05, px + 0.35, pz + 0.05, 0.011, COLORS.lane)
         }
+        settle('ground')
         continue
       }
       b.flat(px - E, pz - E, px + E, pz + E, 0, ground.grass[districtAt(x, y).id] ?? ground.earth)
     }
+  settle('buildings')
   // Buildings owned by this chunk (top-left cell inside it).
   let tris = 0
-  for (const lot of lotsInChunk(c.cx, c.cy)) {
-    const own = chunkOfCell(lot.x, lot.y)
-    if (own.cx !== c.cx || own.cy !== c.cy) continue
+  const parent = chunkOfCell(x0, y0)
+  for (const lot of lotsInChunk(parent.cx, parent.cy)) {
+    if (lot.x < x0 || lot.y < y0 || lot.x >= x0 + c.size || lot.y >= y0 + c.size) continue
     const spec = buildingFor(lot, bank?.sizes ?? {})
     const [ax, , az] = worldPos(lot.x, lot.y)
     const [bx, , bz] = worldPos(lot.x + lot.w - 1, lot.y + lot.h - 1)
@@ -614,7 +723,9 @@ function buildChunk(
       continue
     }
     if (near || mid) {
+      settle('extras')
       for (const e of spec.extras) if (e.kind === 'ground') drawExtra(b, e)
+      settle('buildings')
       if (spec.main)
         place(
           spec.main.model,
@@ -626,13 +737,17 @@ function buildChunk(
           spec.main.tint,
         )
       // Middle ring: the building and its silhouette features, without small props.
+      settle('props')
       if (near)
         for (const p of spec.props) place(p.model, p.cx, p.cy, p.rot, p.scale, p.lift ?? 0, p.tint)
+      settle('extras')
       for (const e of spec.extras)
         if (e.kind !== 'ground' && (near || !SMALL_EXTRAS.has(e.kind))) drawExtra(b, e)
+      settle('buildings')
       continue
     }
     // Far level of detail: a coloured volume with the right roof silhouette.
+    settle('far')
     const f = spec.far
     if (f.height < 0.05) {
       b.flat(fx0, fz0, fx1, fz1, 0.01, f.body)
@@ -675,15 +790,20 @@ function buildChunk(
         b.flat(fx0 + 0.06, fz0 + 0.06, fx1 - 0.06, fz1 - 0.06, f.height + 0.01, f.roof)
     }
   }
+  settle('far')
   tris = b.idx.length / 3
-  return { mesh: b.build(device), tris }
+  return { mesh: b.build(device), tris, breakdown }
 }
 
 export interface ChunkStats {
   chunks: number
   buildings: number
-  /** Triangles currently in chunk meshes. */
+  /** Triangles currently in loaded sub-chunk meshes. */
   tris: number
+  /** Triangles of the sub-chunks inside the camera frustum on the last frame. */
+  visibleTris: number
+  /** Current full-detail radius in cells, after the dynamic budget. */
+  detailCells: number
   /** True once the baked model pack is in use (real buildings, not volumes). */
   detailed: boolean
 }
@@ -695,26 +815,43 @@ export interface Rings {
 }
 export const DEFAULT_RINGS: Rings = { near: 1, mid: 2, far: 3 }
 
+/** Built meshes kept beyond the live set (walking back and forth costs no rebuild). */
+const CACHE_MAX = 72
+/** Milliseconds of building per tick before the rest is deferred to the next frame. */
+const BUILD_SLICE_MS = 9
+
+type Built = { mesh: pc.Mesh | null; tris: number; breakdown: TriBreakdown; used: number }
+type Live = { entity: pc.Entity; level: Level; meshKey: string }
+
 export default function CityChunks({
   centerX,
   centerY,
   onStats,
   rings = DEFAULT_RINGS,
+  detailCells = 13,
+  lowCells = 30,
+  triangleBudget = 320_000,
   hidden = false,
 }: {
   centerX: number
   centerY: number
   onStats?: (s: ChunkStats) => void
-  /** Chunk rings per level of detail (from the quality preset). */
+  /** Far ring in chunks (from the quality preset): how far coloured volumes reach. */
   rings?: Rings
+  /** Full-detail and simplified radii in cells, and the visible-triangle budget. */
+  detailCells?: number
+  lowCells?: number
+  triangleBudget?: number
   /** Keep the chunks alive but invisible (interiors, rides): no rebuild on return. */
   hidden?: boolean
 }) {
   bump('chunks')
   const app = useApp()
-  const live = useRef(
-    new Map<string, { entity: pc.Entity; mesh: pc.Mesh | null; lod: string; tris: number }>(),
-  )
+  const live = useRef(new Map<string, Live>())
+  const cache = useRef(new Map<string, Built>())
+  const uses = useRef(0)
+  /** Dynamic scale of the detail radius (1 = preset), lowered when the visible budget is exceeded. */
+  const scale = useRef({ value: 1, changedAt: 0 })
   const [bank, setBank] = useState<Bank | null>(null)
   const [, setTick] = useState(0)
   useEffect(() => {
@@ -729,66 +866,140 @@ export default function CityChunks({
 
   useEffect(() => {
     if (!app) return
-    for (const v of live.current) v[1].entity.enabled = !hidden
+    for (const v of live.current.values()) v.entity.enabled = !hidden
     if (hidden) return
-    const wanted = chunksAround(centerX, centerY, rings.near, rings.far, rings.mid)
+    const device = app.graphicsDevice
+    const far = (rings.far + 0.5) * CHUNK
+    const detail = Math.max(5, Math.round(detailCells * scale.current.value))
+    const low = Math.max(detail + 4, Math.round(lowCells * Math.max(0.6, scale.current.value)))
+    const wanted = subsAround(centerX, centerY, detail, low, far)
     const keep = new Set(wanted.map((c) => c.key))
     for (const [k, v] of live.current) {
       if (!keep.has(k)) {
         releaseEntity(v.entity)
-        releaseMesh(v.mesh)
         live.current.delete(k)
       }
     }
-    let buildings = 0
-    let budget = bank ? 4 : 6 // chunks built per effect run; the rest come on the next frames
+    const meshKeyOf = (c: SubRef) =>
+      `${c.key}|${c.level === 'far' ? 'far' : bank ? c.level : `${c.level}-plain`}`
+    const material = bakedMaterial()
+    const started = performance.now()
+    let built = 0
+    let pending = false
     for (const c of wanted) {
-      const lodKey = c.lod === 'far' ? 'far' : bank ? c.lod : `${c.lod}-plain`
+      const mk = meshKeyOf(c)
       const have = live.current.get(c.key)
-      if (have && have.lod === lodKey) continue
-      if (budget-- <= 0) break
-      if (have) {
-        releaseEntity(have.entity)
-        releaseMesh(have.mesh)
-        live.current.delete(c.key)
+      if (have && have.meshKey === mk) continue
+      let b = cache.current.get(mk)
+      if (!b) {
+        // Time-sliced: a few sub-chunks per tick, the nearest first; the rest next frame.
+        if (built > 0 && performance.now() - started > BUILD_SLICE_MS) {
+          pending = true
+          break
+        }
+        const r = buildSub(device, c, bank)
+        // The cache owns the mesh: a reference of its own, so destroying a mesh instance
+        // (entity released, level swapped) never frees a mesh another entity may reuse.
+        r.mesh?.incRefCount()
+        b = { ...r, used: 0 }
+        cache.current.set(mk, b)
+        built++
       }
-      const { mesh, tris } = buildChunk(app.graphicsDevice, c, bank)
-      const entity = new pc.Entity(`chunk ${c.key}`)
-      if (mesh)
-        entity.addComponent('render', {
-          meshInstances: [new pc.MeshInstance(mesh, bakedMaterial())],
-        })
-      app.root.addChild(entity)
-      live.current.set(c.key, { entity, mesh, lod: lodKey, tris })
+      b.used = ++uses.current
+      const instances = b.mesh ? [new pc.MeshInstance(b.mesh, material)] : []
+      if (have) {
+        // Level change: swap the mesh on the existing entity, the old mesh stays cached.
+        if (have.entity.render) have.entity.render.meshInstances = instances
+        have.level = c.level
+        have.meshKey = mk
+      } else {
+        const entity = new pc.Entity(`chunk ${c.key}`)
+        entity.addComponent('render', { meshInstances: instances })
+        app.root.addChild(entity)
+        live.current.set(c.key, { entity, level: c.level, meshKey: mk })
+      }
     }
+    // Bounded GPU cache: drop the least recently used meshes nobody displays.
+    if (cache.current.size > CACHE_MAX) {
+      const inUse = new Set([...live.current.values()].map((v) => v.meshKey))
+      const victims = [...cache.current]
+        .filter(([k]) => !inUse.has(k))
+        .sort((a, b) => a[1].used - b[1].used)
+        .slice(0, cache.current.size - CACHE_MAX)
+      for (const [k, v] of victims) {
+        v.mesh?.decRefCount()
+        releaseMesh(v.mesh)
+        cache.current.delete(k)
+      }
+    }
+    // Statistics: loaded, visible on the last frame, and the buildings in detailed range.
     let tris = 0
+    let visibleTris = 0
+    let buildings = 0
+    const audit: unknown[] = []
+    for (const [key, v] of live.current) {
+      const b = cache.current.get(v.meshKey)
+      if (!b) continue
+      tris += b.tris
+      const mi = v.entity.render?.meshInstances[0]
+      if (mi?.visibleThisFrame) visibleTris += b.tris
+      audit.push({ key, lod: v.level, tris: b.tris, ...b.breakdown })
+    }
     for (const c of wanted) {
-      const have = live.current.get(c.key)
-      if (!have) continue
-      tris += have.tris
-      buildings += lotsInChunk(c.cx, c.cy).filter(
-        (l) => l.type !== 'lot' && l.type !== 'park',
+      if (c.level === 'far') continue
+      const parent = chunkOfCell(c.x0, c.y0)
+      buildings += lotsInChunk(parent.cx, parent.cy).filter(
+        (l) =>
+          l.type !== 'lot' &&
+          l.type !== 'park' &&
+          l.x >= c.x0 &&
+          l.y >= c.y0 &&
+          l.x < c.x0 + c.size &&
+          l.y < c.y0 + c.size,
       ).length
     }
-    onStats?.({ chunks: live.current.size, buildings, tris, detailed: bank !== null })
-    // Finish the remaining chunks shortly after, so the first frame is not blocked.
-    const pending = wanted.some((c) => {
-      const lodKey = c.lod === 'far' ? 'far' : bank ? c.lod : `${c.lod}-plain`
-      return live.current.get(c.key)?.lod !== lodKey
+    onStats?.({
+      chunks: live.current.size,
+      buildings,
+      tris,
+      visibleTris,
+      detailCells: detail,
+      detailed: bank !== null,
     })
+    ;(window as unknown as { __LOME_CHUNKS?: unknown }).__LOME_CHUNKS = audit
+    // Dynamic detail: over budget → shrink the detail radius now; well under it for a
+    // while → grow it back towards the preset (hysteresis against flapping).
+    const now = performance.now()
+    const sc = scale.current
+    if (!pending && visibleTris > triangleBudget && sc.value > 0.4) {
+      sc.value = Math.max(0.4, sc.value - 0.15)
+      sc.changedAt = now
+      pending = true
+    } else if (
+      !pending &&
+      visibleTris < triangleBudget * 0.55 &&
+      sc.value < 1 &&
+      now - sc.changedAt > 8000
+    ) {
+      sc.value = Math.min(1, sc.value + 0.1)
+      sc.changedAt = now
+      pending = true
+    }
     if (!pending) return
-    const id = window.setTimeout(() => setTick((t) => t + 1), 30)
+    const id = window.setTimeout(() => setTick((t) => t + 1), 16)
     return () => window.clearTimeout(id)
   })
 
   useEffect(
     () => () => {
       // The application may already be destroyed (route change): release is a no-op then.
-      for (const v of live.current.values()) {
-        releaseEntity(v.entity)
-        releaseMesh(v.mesh)
+      for (const v of live.current.values()) releaseEntity(v.entity)
+      for (const b of cache.current.values()) {
+        b.mesh?.decRefCount()
+        releaseMesh(b.mesh)
       }
       live.current.clear()
+      cache.current.clear()
     },
     [],
   )

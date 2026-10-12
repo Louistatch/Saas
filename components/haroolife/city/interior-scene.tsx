@@ -386,6 +386,7 @@ export default function InteriorScene({
   distance = 24,
   activity,
   playerModel = 'character-female-a',
+  playerPagne,
   onUse,
 }: {
   layout: Layout
@@ -395,6 +396,7 @@ export default function InteriorScene({
   /** The equipment the player is using and the animation to play. */
   activity: { prop: string; anim: NpcAnim } | null
   playerModel?: string
+  playerPagne?: string
   onUse?: (p: Prop) => void
 }) {
   const floor = useMaterial({ diffuse: layout.floor, gloss: 0.1 })
@@ -481,6 +483,7 @@ export default function InteriorScene({
         position={[player.x, 0, player.z]}
         rotation={player.rot}
         anim={player.anim}
+        pagne={playerPagne}
         scale={1.35}
       />
       <Entity name={`Intérieur ${title}`} position={[0, 3.9, 0]} />

@@ -49,7 +49,16 @@ export function findPath(
   estateRoads: ReadonlySet<string>,
   limit = 20000,
 ): WorldPoint[] | null {
-  if (!walkable(from.x, from.y, estateRoads) || !walkable(to.x, to.y, estateRoads)) return null
+  return findPathWhere(from, to, (x, y) => walkable(x, y, estateRoads), limit)
+}
+/** Breadth-first shortest path over any cell predicate (roads, or roads plus open ground). */
+export function findPathWhere(
+  from: WorldPoint,
+  to: WorldPoint,
+  allowed: (x: number, y: number) => boolean,
+  limit = 20000,
+): WorldPoint[] | null {
+  if (!allowed(from.x, from.y) || !allowed(to.x, to.y)) return null
   const start = key(from.x, from.y)
   const goal = key(to.x, to.y)
   if (start === goal) return [from]
@@ -60,7 +69,7 @@ export function findPath(
     for (const [dx, dy] of N4) {
       const n = { x: p.x + dx, y: p.y + dy }
       const k = key(n.x, n.y)
-      if (parent.has(k) || !walkable(n.x, n.y, estateRoads)) continue
+      if (parent.has(k) || !allowed(n.x, n.y)) continue
       parent.set(k, key(p.x, p.y))
       if (k === goal) {
         const out: WorldPoint[] = []

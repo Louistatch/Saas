@@ -1,8 +1,3 @@
-/**
- * Life in the city: the player's world position and routes, visits to city lots and their
- * interiors, and the actions each kind of place offers. Wraps the estate engine state
- * (`LifeState`, local coordinates, construction rules, saves) without changing it.
- */
 import {
   type LifeState,
   TRAVEL_COST,
@@ -10,17 +5,33 @@ import {
   decodeLomeLife,
   initialLomeLife,
 } from '../lome-life-engine'
+/**
+ * Life in the city: the player's world position and routes, visits to city lots and their
+ * interiors, and the actions each kind of place offers. Wraps the estate engine state
+ * (`LifeState`, local coordinates, construction rules, saves) without changing it.
+ */
+import type { Building } from '../townsmen-engine'
 import { type NpcAnim, animFor, layoutFor } from './interiors'
 import { LOCALITIES, type LocalityId, current, isLocalityId, setLocality } from './locality'
 import {
   ESTATE_GATE,
   type WorldPoint,
   estateRoadsOf,
-  findPath,
+  findPathWhere,
   nearestWalkable,
   walkable,
 } from './navigation'
-import { type Lot, type LotType, inEstate, lotAt, lotById, toLocal, toWorld } from './world'
+import {
+  type Lot,
+  type LotType,
+  inEstate,
+  lotAt,
+  lotById,
+  terrainAt,
+  toLocal,
+  toWorld,
+  within,
+} from './world'
 
 export type Interior =
   | 'house'
@@ -70,6 +81,10 @@ export interface CityLife {
   fitness: number
   /** Equipment in use right now (drives the player's animation inside a room). */
   activity: { prop: string; anim: NpcAnim } | null
+  /** Continuous position (cell units) and heading of the avatar, when known. */
+  pose?: { x: number; z: number; heading: number }
+  /** The player's taxi, parked somewhere in the town (Lomé), or absent. */
+  vehicle?: { x: number; z: number; heading: number } | null
 }
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)))
@@ -167,6 +182,23 @@ export function decodeCityLife(value: unknown): CityLife | null {
     visited: v.visited,
     fitness: Number.isInteger(v.fitness) && v.fitness! >= 0 && v.fitness! <= 100 ? v.fitness! : 0,
     activity: null,
+    pose:
+      v.pose &&
+      Number.isFinite(v.pose.x) &&
+      Number.isFinite(v.pose.z) &&
+      Number.isFinite(v.pose.heading) &&
+      Math.abs(v.pose.x - at.x) <= 1 &&
+      Math.abs(v.pose.z - at.y) <= 1
+        ? { x: v.pose.x, z: v.pose.z, heading: v.pose.heading }
+        : undefined,
+    vehicle:
+      v.vehicle && Number.isFinite(v.vehicle.x) && Number.isFinite(v.vehicle.z)
+        ? {
+            x: v.vehicle.x,
+            z: v.vehicle.z,
+            heading: Number.isFinite(v.vehicle.heading) ? v.vehicle.heading : 0,
+          }
+        : (v.vehicle ?? undefined),
   }
 }
 
@@ -184,9 +216,15 @@ function syncEstate(life: LifeState, at: WorldPoint): LifeState {
 export const roadsOf = (s: CityLife) => estateRoadsOf(s.life.city.buildings)
 
 /** Walk to a city lot: the route ends on its door cell. */
+/** Cells the avatar may cross on a route: roads plus open ground (see `freelyWalkable`). */
+const openCell = (s: CityLife) => {
+  const roads = roadsOf(s)
+  const buildings = s.life.city.buildings
+  return (x: number, y: number) => freelyWalkable(x, y, roads, buildings)
+}
 export function goToLot(s: CityLife, lot: Lot): CityLife {
   if (s.insideLot || s.life.inside) return note(s, 'Sors du bâtiment avant de partir.')
-  const path = findPath(s.at, lot.door, roadsOf(s))
+  const path = findPathWhere(s.at, lot.door, openCell(s))
   if (!path) return note(s, 'Aucune route ne mène là-bas pour le moment.')
   return note(
     { ...s, route: path.slice(1), target: lot.id, life: { ...s.life, target: null } },
@@ -207,7 +245,7 @@ export function goToEstate(s: CityLife, bx: number, by: number): CityLife {
     [0, -1],
   ] as const) {
     const door = toWorld({ x: bx + dx, y: by + dy })
-    const path = findPath(s.at, door, roads)
+    const path = findPathWhere(s.at, door, (x, y) => walkable(x, y, roads))
     if (path && (!best || path.length < best.length)) best = path
   }
   if (!best) return note(s, 'Lieu inaccessible : il faut le relier aux routes de la mairie.')
@@ -228,16 +266,18 @@ export function goToPoint(s: CityLife, p: WorldPoint): CityLife {
   const roads = roadsOf(s)
   const dest = nearestWalkable(p, roads, 4)
   if (!dest) return note(s, 'Pas de route par ici.')
-  const path = findPath(s.at, dest, roads)
+  // Parks, empty plots and the estate lawn are open ground: the path may cross them.
+  const path = findPathWhere(s.at, dest, openCell(s))
   if (!path) return note(s, 'Aucune route ne mène là-bas pour le moment.')
-  return note({ ...s, route: path.slice(1), target: null }, `En route : ${path.length - 1} cases.`)
+  const route = path.slice(1)
+  return note({ ...s, route, target: null }, `En route : ${route.length} cases.`)
 }
 
 /** One cell along the route. Never advances the clock; call during visible play only. */
 export function walkStep(s: CityLife): CityLife {
   if (s.insideLot || s.life.inside || s.route.length === 0) return s
   const next = s.route[0]
-  if (!walkable(next.x, next.y, roadsOf(s)))
+  if (!openCell(s)(next.x, next.y))
     return note({ ...s, route: [], target: null }, 'Le trajet a été interrompu.')
   const at = next
   const life = syncEstate(
@@ -649,6 +689,7 @@ export function travelTo(s: CityLife, to: LocalityId): CityLife {
       target: null,
       insideLot: null,
       activity: null,
+      pose: undefined,
       life: { ...s.life, inside: null, route: [], target: null },
     },
     `Arrivée à ${loc.name} (${LOCALITIES[to].region}).`,
@@ -657,4 +698,39 @@ export function travelTo(s: CityLife, to: LocalityId): CityLife {
 /** The locality a save is in, applied to the generators before anything reads them. */
 export const ensureLocality = (s: CityLife) => {
   if (current().id !== s.locality) setLocality(s.locality)
+}
+
+/**
+ * Where the continuous avatar may stand: the walkable network (city roads, driveway, estate
+ * roads), open lots (parks, empty plots) and the free cells of the estate. Buildings, water
+ * and hills block.
+ */
+export function freelyWalkable(
+  x: number,
+  y: number,
+  estateRoads: ReadonlySet<string>,
+  buildings: Building[],
+): boolean {
+  if (walkable(x, y, estateRoads)) return true
+  if (!within(x, y) || terrainAt(x, y) !== 'land') return false
+  if (inEstate(x, y)) {
+    const l = toLocal({ x, y })
+    return !buildings.some((b) => b.x === l.x && b.y === l.y && b.type !== 'road')
+  }
+  const lot = lotAt(x, y)
+  return lot !== null && (lot.type === 'park' || lot.type === 'lot')
+}
+
+/** The avatar reached another cell on its own (joystick or vehicle): record it, no path check. */
+export function moveTo(s: CityLife, cell: WorldPoint, pose?: CityLife['pose']): CityLife {
+  if (s.at.x === cell.x && s.at.y === cell.y) return pose ? { ...s, pose } : s
+  const life = syncEstate(
+    {
+      ...s.life,
+      trafficStep: s.life.trafficStep + 1,
+      needs: { ...s.life.needs, energy: clamp(s.life.needs.energy - 1) },
+    },
+    cell,
+  )
+  return { ...s, at: { ...cell }, life, route: [], target: null, pose }
 }

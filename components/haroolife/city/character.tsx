@@ -1,6 +1,6 @@
 'use client'
 
-import { releaseEntity } from '@/lib/haroolife/city/gpu'
+import { deviceAlive, releaseEntity } from '@/lib/haroolife/city/gpu'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 /**
  * An animated Kenney Mini Character (CC0): a real skinned glTF with its own clips
@@ -23,6 +23,8 @@ const CLIP: Record<NpcAnim, string> = {
   work: 'interact-right',
   pray: 'crouch',
   rest: 'sit',
+  drive: 'drive',
+  enter: 'interact-right',
 }
 
 type Container = {
@@ -38,6 +40,9 @@ export function Character({
   scale = 1,
   name,
   active = true,
+  imperative = false,
+  speed = 1,
+  pagne,
   onEntity,
 }: {
   model: string
@@ -48,6 +53,12 @@ export function Character({
   name?: string
   /** False freezes the skeleton (off-screen or far characters cost no animation time). */
   active?: boolean
+  /** True when a rig moves the entity every frame: props place it once, never again. */
+  imperative?: boolean
+  /** Playback rate of the current clip (walk cycles match the ground speed). */
+  speed?: number
+  /** Hex colour of a pagne worn as a wrap around the hips, or none. */
+  pagne?: string
   /** Receives the root entity, so a parent can move it imperatively between renders. */
   onEntity?: (e: pc.Entity | null) => void
 }) {
@@ -56,6 +67,7 @@ export function Character({
   const holder = useRef<pc.Entity | null>(null)
   const figure = useRef<pc.Entity | null>(null)
   const current = useRef<string | null>(null)
+  const band = useRef<pc.Entity | null>(null)
 
   // Create the skinned figure once the container is loaded (the first clip is read once).
   // biome-ignore lint/correctness/useExhaustiveDependencies: anim changes are handled below
@@ -68,6 +80,7 @@ export function Character({
     app.root.addChild(root)
     holder.current = root
     figure.current = fig
+    band.current = null
     onEntity?.(root)
     const clips = container.animations
       .map((a) => a.resource as pc.AnimTrack | null)
@@ -108,9 +121,12 @@ export function Character({
   }, [active])
 
   // Follow position, rotation and scale from props without re-instantiating.
+  const placed = useRef(false)
   useEffect(() => {
     const root = holder.current
     if (!root) return
+    if (imperative && placed.current) return
+    placed.current = true
     root.setLocalPosition(position[0], position[1], position[2])
     root.setLocalEulerAngles(0, rotation, 0)
     root.setLocalScale(scale, scale, scale)
@@ -136,5 +152,35 @@ export function Character({
       /* clip missing in this model: keep the current one */
     }
   }, [anim])
+  // The pagne: a wrap around the hips in the chosen colour (a flat ring of boxes).
+  useEffect(() => {
+    const root = holder.current
+    if (!root || !app) return
+    if (band.current) {
+      releaseEntity(band.current)
+      band.current = null
+    }
+    if (!pagne) return
+    const e = new pc.Entity('pagne')
+    const mat = new pc.StandardMaterial()
+    mat.diffuse.fromString(pagne)
+    mat.gloss = 0.1
+    mat.update()
+    e.addComponent('render', { type: 'box', material: mat })
+    // Mini characters stand 0.66 units tall, hips at ~0.18: a wrap from the hips to mid-thigh.
+    e.setLocalPosition(0, 0.16, -0.02)
+    e.setLocalScale(0.3, 0.13, 0.22)
+    root.addChild(e)
+    band.current = e
+    return () => {
+      releaseEntity(e)
+      if (deviceAlive(app.graphicsDevice)) mat.destroy()
+      band.current = null
+    }
+  }, [pagne, app, asset])
+  useEffect(() => {
+    const fig = figure.current
+    if (fig?.anim) fig.anim.speed = speed
+  }, [speed])
   return null
 }

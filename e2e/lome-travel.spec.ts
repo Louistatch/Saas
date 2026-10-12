@@ -79,12 +79,14 @@ test('travel Lomé → Kara → Lomé inside the single 3D world', async ({ page
 
   // A few steps in Kara's streets.
   const before = (await live())?.at
-  for (let i = 0; i < 3; i++) {
-    await page.getByRole('button', { name: 'Gauche' }).click()
-    await page.waitForTimeout(250)
-  }
-  const after = (await live())?.at
-  expect(`${after?.x},${after?.y}`).not.toBe(`${before?.x},${before?.y}`)
+  await page.keyboard.down('ArrowLeft')
+  await expect
+    .poll(async () => {
+      const after = (await live())?.at
+      return `${after?.x},${after?.y}` !== `${before?.x},${before?.y}`
+    })
+    .toBe(true)
+  await page.keyboard.up('ArrowLeft')
   await page.waitForTimeout(1500)
   expect(errors, 'no GPU or page error while in Kara').toEqual([])
 
