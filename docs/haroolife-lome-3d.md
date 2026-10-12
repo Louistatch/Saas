@@ -83,3 +83,13 @@ Le scénario Playwright construit l'application, puis joue sur ordinateur
 directionnel et clavier, trajet automatique vers le marché, achat et repas,
 service payé, entrée dans un intérieur 3D, mode construction. Captures dans
 `test-results/lome-visual/`.
+
+## Tranche 2 : événements à choix et six besoins
+
+- Six jauges : faim, énergie, hygiène, social, loisir, toilettes. Nouvelles actions « Se détendre »
+  (maison ou jardin) et « Toilettes » (maison, mairie, marché). Les anciennes sauvegardes se chargent
+  avec des valeurs par défaut.
+- Événements du quartier (`lib/haroolife/lome-events.ts`) : rue inondée à Bè, coupure CEET, grand
+  marché fermé, grève des zémidjans, fête de quartier. Tirage déterministe par (jour, heure), de jour
+  seulement, jamais en déplacement ; chaque événement propose deux choix aux conséquences affichées,
+  et les dépenses passent par le portefeuille fictif vers la caisse municipale.

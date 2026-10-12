@@ -1,10 +1,12 @@
 'use client'
 
+import { eventById, resolveEvent } from '@/lib/haroolife/lome-events'
 import {
   type Action,
   type Career,
   LIFE_LOCATIONS,
   type LifeState,
+  NEED_KEYS,
   SALARIES,
   TRAVEL_COST,
   type Transport,
@@ -117,6 +119,8 @@ const NEEDS = [
   { key: 'energy' as const, icon: '⚡', label: 'Énergie', color: 'bg-amber-400' },
   { key: 'hygiene' as const, icon: '💧', label: 'Hygiène', color: 'bg-sky-400' },
   { key: 'social' as const, icon: '💬', label: 'Social', color: 'bg-emerald-400' },
+  { key: 'fun' as const, icon: '🎉', label: 'Loisir', color: 'bg-fuchsia-400' },
+  { key: 'bladder' as const, icon: '🚽', label: 'Toilettes', color: 'bg-teal-400' },
 ]
 function NeedBar({ value, color }: { value: number; color: string }) {
   return (
@@ -215,7 +219,8 @@ export function LomeLifeImmersive() {
                         ? 'Journal de vie'
                         : ''
   const needs = life.needs
-  const wellbeing = Math.round((needs.hunger + needs.energy + needs.hygiene + needs.social) / 4)
+  const wellbeing = Math.round(NEED_KEYS.reduce((sum, k) => sum + needs[k], 0) / NEED_KEYS.length)
+  const pending = eventById(life.pendingEvent)
   const mood = wellbeing >= 75 ? 'Heureux' : wellbeing >= 40 ? 'Bien' : 'Fatigué'
   const status = life.route.length
     ? 'En chemin vers ' +
@@ -480,7 +485,7 @@ export function LomeLifeImmersive() {
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-800 text-white">
               <UserRound size={21} />
             </span>
-            <span className="grid w-[146px] grid-cols-2 gap-x-2 gap-y-1 sm:w-[200px]">
+            <span className="grid w-[150px] grid-cols-2 gap-x-2 gap-y-0.5 sm:w-[200px]">
               {NEEDS.map((n) => (
                 <span
                   key={n.key}
@@ -580,6 +585,46 @@ export function LomeLifeImmersive() {
         </div>
       </nav>
 
+      {pending && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="event-title"
+            className="w-full max-w-md rounded-[28px] bg-white p-6 text-center shadow-2xl"
+          >
+            <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-sky-50 text-3xl">
+              {pending.icon}
+            </span>
+            <h2 id="event-title" className="mt-4 text-2xl font-black">
+              {pending.title}
+            </h2>
+            <p className="mt-2 text-sm text-slate-600">{pending.body}</p>
+            <div className="mt-5 space-y-2">
+              {pending.choices.map((choice, i) => (
+                <button
+                  type="button"
+                  key={choice.label}
+                  onClick={() => setLife((old) => resolveEvent(old, i))}
+                  className={
+                    'w-full rounded-2xl px-4 py-3 text-left ' +
+                    (i === 0
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                      : 'border border-slate-200 bg-white text-slate-900')
+                  }
+                >
+                  <span className="block text-base font-bold">{choice.label}</span>
+                  <span
+                    className={'block text-xs ' + (i === 0 ? 'text-emerald-100' : 'text-slate-500')}
+                  >
+                    {choice.hint}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
       {panel && (
         <div className="absolute inset-0 z-40" aria-label={title}>
           <button
@@ -649,6 +694,8 @@ export function LomeLifeImmersive() {
                     <ActionButton title="Dormir" outline onClick={() => action('sleep')} />
                     <ActionButton title="Se laver" outline onClick={() => action('wash')} />
                     <ActionButton title="Manger" outline onClick={() => action('eat')} />
+                    <ActionButton title="Se détendre" outline onClick={() => action('relax')} />
+                    <ActionButton title="Toilettes" outline onClick={() => action('toilet')} />
                     <ActionButton title="Sortir" outline onClick={() => action('leave')} />
                   </div>
                 </>
