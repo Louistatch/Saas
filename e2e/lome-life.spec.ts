@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './lome-test'
 
 test('immersive 3D Lomé life completes navigation, shopping, meals and work on desktop and Android', async ({
   page,
@@ -39,10 +39,14 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
     .toEqual(before)
 
   // Paid ride: the travel scene opens on the boulevard; "Passer" lands at destination.
+  // A distant place chosen from the map, then a zémidjan from its sheet: the ride starts
+  // at once whatever the pace of the walk, instead of relying on a route still in progress.
   await navigation.getByRole('button', { name: 'Carte' }).click()
-  await page.getByRole('button', { name: /Chez moi/ }).click()
-  await navigation.getByRole('button', { name: 'Carte' }).click()
-  await page.getByRole('button', { name: /Moto/ }).click()
+  await page.getByRole('button', { name: /Grand marché d’Assigamé/ }).click()
+  await page
+    .getByRole('dialog', { name: 'Lieu' })
+    .getByRole('button', { name: /Zémidjan/ })
+    .click()
   const ride = page.getByLabel('Trajet en cours')
   await expect(ride).toBeVisible()
   await expect(ride.getByText('Boulevard du Mono')).toBeVisible()

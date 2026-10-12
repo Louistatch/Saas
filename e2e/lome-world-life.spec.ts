@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './lome-test'
 
 /**
  * Phase 2 — the living world. One complete outing, end to end, on desktop and Android:

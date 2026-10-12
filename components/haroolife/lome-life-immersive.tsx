@@ -517,12 +517,30 @@ export function LomeLifeImmersive() {
     })
   }, [cityLife.at.x, cityLife.at.y, follow])
   // Navigation advances automatically while the page is visible; no whole-hour penalty per road tile.
+  // The pace is wall-clock based: when the main thread is busy (software WebGL, slow phone)
+  // a late timer advances the cells it owes, so a route takes the same time on any device.
   useEffect(() => {
     if (!cityLife.route.length || insideAny || riding) return
     const ms = transport === 'walk' ? 420 : transport === 'moto' ? 220 : 160
-    const id = window.setInterval(() => {
-      if (document.visibilityState === 'visible') setCityLife((old) => walkStep(old))
-    }, ms)
+    let last = performance.now()
+    const id = window.setInterval(
+      () => {
+        if (document.visibilityState !== 'visible') {
+          last = performance.now()
+          return
+        }
+        const now = performance.now()
+        const owed = Math.min(8, Math.floor((now - last) / ms))
+        if (owed <= 0) return
+        last += owed * ms
+        setCityLife((old) => {
+          let next = old
+          for (let i = 0; i < owed && next.route.length; i++) next = walkStep(next)
+          return next
+        })
+      },
+      Math.min(ms, 100),
+    )
     return () => window.clearInterval(id)
   }, [cityLife.route.length, insideAny, transport, riding])
   useEffect(() => {

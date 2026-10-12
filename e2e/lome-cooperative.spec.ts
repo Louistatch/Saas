@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './lome-test'
 
 // Signed-in administrator against the mock Supabase (e2e/fixtures/mock-supabase.mjs): the
 // account is member of COOMARA-Kpalimé (120 members, 40 parcelles) and administers its tree.

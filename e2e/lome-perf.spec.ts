@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './lome-test'
 
 /**
  * Performance scenarios A–F on the 3D city, measured in the real browser build. Figures come
@@ -129,13 +129,15 @@ test('performance scenarios A–F', async ({ page, browserName }, testInfo) => {
   await page.evaluate(() =>
     (window as unknown as { __LOME_PERF_RESET?: () => void }).__LOME_PERF_RESET?.(),
   )
-  for (let k = 0; k < 4; k++) {
+  // Two drags of 8 steps: each pointer event waits for the busy main thread, so 100 events
+  // at one frame per second would cost the whole scenario budget on a software renderer.
+  for (let k = 0; k < 2; k++) {
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
     await page.mouse.down()
     await page.mouse.move(
       box.x + box.width / 2 + (k % 2 ? 220 : -220),
       box.y + box.height / 2 + 120,
-      { steps: 25 },
+      { steps: 8 },
     )
     await page.mouse.up()
   }

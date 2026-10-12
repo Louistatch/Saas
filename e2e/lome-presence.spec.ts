@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './lome-test'
 
 // Signed-in session against the mock Supabase used by the HarooLife SVG village tests.
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url')
