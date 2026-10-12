@@ -10,9 +10,10 @@ import type { Layout, Npc, NpcAnim, Prop, PropKind } from '@/lib/haroolife/city/
  */
 import { Entity, Gltf } from '@playcanvas/react'
 import { Camera, Light, Render } from '@playcanvas/react/components'
-import { useAppEvent, useMaterial, useModel } from '@playcanvas/react/hooks'
+import { useAppEvent, useModel } from '@playcanvas/react/hooks'
 import { useState } from 'react'
 import { Character } from './character'
+import { useMaterial } from './use-material'
 
 const BASE = '/haroolife/vendor/kenney-3d/furniture-kit/'
 type Mat = ReturnType<typeof useMaterial>

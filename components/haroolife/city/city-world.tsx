@@ -1,5 +1,6 @@
 'use client'
 
+import { releaseEntity } from '@/lib/haroolife/city/gpu'
 import { type NpcAnim, type Prop, layoutFor } from '@/lib/haroolife/city/interiors'
 import type { Interior } from '@/lib/haroolife/city/life'
 import {
@@ -34,7 +35,7 @@ import type { BuildType, City } from '@/lib/haroolife/townsmen-engine'
  */
 import { Application, Entity, Gltf } from '@playcanvas/react'
 import { Camera, Light, Render } from '@playcanvas/react/components'
-import { useApp, useAppEvent, useMaterial, useModel } from '@playcanvas/react/hooks'
+import { useApp, useAppEvent, useModel } from '@playcanvas/react/hooks'
 import { Compass, Maximize2, Minus, Plus, RotateCcw } from 'lucide-react'
 import * as pc from 'playcanvas'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -44,6 +45,7 @@ import { Character } from './character'
 import CityChunks, { type ChunkStats, cellOf, worldPos } from './city-chunks'
 import InteriorScene from './interior-scene'
 import { type Bank, bakedMaterial, loadBank, meshFor } from './model-bank'
+import { useMaterial } from './use-material'
 
 export type CameraState = { tx: number; tz: number; distance: number; angle: number }
 /** Frame the player with the dense city around: the target sits a little south-east of them. */
@@ -121,7 +123,7 @@ function Baked({
     onEntity?.(e)
     return () => {
       onEntity?.(null)
-      e.destroy()
+      releaseEntity(e)
       ref.current = null
     }
   }, [app, bank, model, name, onEntity])

@@ -8,6 +8,7 @@ import {
   chunksAround,
   lotsInChunk,
 } from '@/lib/haroolife/city/chunks'
+import { releaseEntity, releaseMesh } from '@/lib/haroolife/city/gpu'
 import { type Geometry, appendModel } from '@/lib/haroolife/city/pack'
 import { bump } from '@/lib/haroolife/city/perf'
 import {
@@ -703,8 +704,8 @@ export default function CityChunks({
     const keep = new Set(wanted.map((c) => c.key))
     for (const [k, v] of live.current) {
       if (!keep.has(k)) {
-        v.entity.destroy()
-        v.mesh?.destroy()
+        releaseEntity(v.entity)
+        releaseMesh(v.mesh)
         live.current.delete(k)
       }
     }
@@ -716,8 +717,8 @@ export default function CityChunks({
       if (have && have.lod === lodKey) continue
       if (budget-- <= 0) break
       if (have) {
-        have.entity.destroy()
-        have.mesh?.destroy()
+        releaseEntity(have.entity)
+        releaseMesh(have.mesh)
         live.current.delete(c.key)
       }
       const { mesh, tris } = buildChunk(app.graphicsDevice, c, bank)
@@ -751,9 +752,10 @@ export default function CityChunks({
 
   useEffect(
     () => () => {
+      // The application may already be destroyed (route change): release is a no-op then.
       for (const v of live.current.values()) {
-        v.entity.destroy()
-        v.mesh?.destroy()
+        releaseEntity(v.entity)
+        releaseMesh(v.mesh)
       }
       live.current.clear()
     },

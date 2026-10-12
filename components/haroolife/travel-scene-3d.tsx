@@ -9,8 +9,9 @@ import type { Transport } from '@/lib/haroolife/lome-life-engine'
 import { Entity } from '@playcanvas/react'
 import { Gltf } from '@playcanvas/react'
 import { Camera, Light, Render } from '@playcanvas/react/components'
-import { useAppEvent, useMaterial, useModel } from '@playcanvas/react/hooks'
+import { useAppEvent, useModel } from '@playcanvas/react/hooks'
 import { useState } from 'react'
+import { useMaterial } from './city/use-material'
 
 const BASE = '/haroolife/vendor/kenney-3d/'
 const LANES = [-2.1, 2.1]

@@ -1,5 +1,6 @@
 'use client'
 
+import { releaseEntity } from '@/lib/haroolife/city/gpu'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 /**
  * An animated Kenney Mini Character (CC0): a real skinned glTF with its own clips
@@ -94,7 +95,7 @@ export function Character({
     }
     return () => {
       onEntity?.(null)
-      root.destroy()
+      releaseEntity(root)
       holder.current = null
       figure.current = null
       current.current = null
