@@ -35,6 +35,7 @@ import {
   walkLifeStep,
 } from '@/lib/haroolife/lome-life-engine'
 import { placeResidents, residentsAt } from '@/lib/haroolife/lome-presence'
+import { BILLBOARDS, PARTNER_APPS, billboardById } from '@/lib/haroolife/lome-sponsors'
 import { type BuildType, CATALOG } from '@/lib/haroolife/townsmen-engine'
 import { ROLE_LABELS } from '@/lib/haroolife/world'
 import {
@@ -100,6 +101,7 @@ type Sheet =
   | 'wallet'
   | 'missions'
   | 'journal'
+  | 'billboard'
   | null
 type Mode = 'walk' | 'build' | 'demolish'
 const money = (n: number) => new Intl.NumberFormat('fr-FR').format(n) + ' FCFA'
@@ -204,6 +206,8 @@ export function LomeLifeImmersive() {
   const [transport, setTransport] = useState<Transport>('walk')
   const [riding, setRiding] = useState(false)
   const [mapFilter, setMapFilter] = useState<MapFilter>('all')
+  const [billboard, setBillboard] = useState<string | null>(null)
+  const board = billboardById(billboard)
   const cityDef = CITIES[life.cityId]
   const whereAmI = placeNameAt(life.cityId, life.pos.x, life.pos.y)
   const [chatDraft, setChatDraft] = useState('')
@@ -237,7 +241,9 @@ export function LomeLifeImmersive() {
                       ? 'Mes objectifs'
                       : panel === 'journal'
                         ? 'Journal de vie'
-                        : ''
+                        : panel === 'billboard'
+                          ? 'Panneau publicitaire'
+                          : ''
   const needs = life.needs
   const wellbeing = Math.round(NEED_KEYS.reduce((sum, k) => sum + needs[k], 0) / NEED_KEYS.length)
   const pending = eventById(life.pendingEvent)
@@ -454,6 +460,10 @@ export function LomeLifeImmersive() {
             inspect={selection}
             onTile={tile}
             onInteriorAction={action}
+            onBillboard={(id) => {
+              setBillboard(id)
+              setPanel('billboard')
+            }}
             visitors={visitors}
             ride={riding && life.route.length > 0 && !life.inside ? { transport, rain } : null}
             tool={mode === 'walk' ? 'inspect' : mode === 'demolish' ? 'demolish' : building}
@@ -931,6 +941,35 @@ export function LomeLifeImmersive() {
                     </p>
                   </div>
                   <div className="rounded-2xl bg-slate-50 p-3 text-sm">
+                    <strong>Panneaux publicitaires</strong>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Un panneau par quartier, visible par tous les habitants. Tarif affiché par
+                      semaine ; aucune réservation n’est encore facturée.
+                    </p>
+                    <ul className="mt-2 space-y-1">
+                      {BILLBOARDS.map((bb) => (
+                        <li key={bb.id}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBillboard(bb.id)
+                              setPanel('billboard')
+                            }}
+                            className="flex w-full items-center justify-between rounded-xl bg-white px-3 py-2 text-left text-xs ring-1 ring-slate-200"
+                          >
+                            <span>
+                              <strong>{cityDef.districts[bb.district].name}</strong> ·{' '}
+                              {bb.status === 'house' ? bb.headline : 'Disponible'}
+                            </span>
+                            <span className="font-bold text-emerald-800">
+                              {money(bb.priceWeek)}/sem.
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 p-3 text-sm">
                     <strong>Déplacement</strong>
                     <p className="mt-1 text-xs text-slate-500">
                       {life.route.length} tronçon(s) restant(s) · {money(life.wallet)} disponibles
@@ -984,6 +1023,35 @@ export function LomeLifeImmersive() {
                         </button>
                       ))}
                     </div>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 p-3">
+                    <p className="text-xs font-bold text-slate-700">Services et partenaires</p>
+                    <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+                      {PARTNER_APPS.map((app) => (
+                        <Link
+                          key={app.id}
+                          href={app.href}
+                          className={
+                            'rounded-xl p-3 text-[11px] font-semibold ' +
+                            (app.status === 'house'
+                              ? 'bg-white text-slate-800 ring-1 ring-slate-200'
+                              : 'border border-dashed border-emerald-400 bg-emerald-50 text-emerald-800')
+                          }
+                        >
+                          <span className="block text-2xl">{app.icon}</span>
+                          {app.name}
+                          {app.status === 'available' && (
+                            <span className="block font-normal text-emerald-700">
+                              {money(app.priceMonth)}/mois
+                            </span>
+                          )}
+                        </Link>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-[11px] text-slate-500">
+                      Trois emplacements partenaires ouverts (banque, assurance, intrants…). Tarif
+                      affiché ; aucun partenaire n’est encore facturé.
+                    </p>
                   </div>
                   <p className="text-xs text-slate-500">
                     Les services et conversations de ce téléphone sont simulés localement. Aucun
@@ -1270,6 +1338,39 @@ export function LomeLifeImmersive() {
                     <ActionButton title="Aller au marché" onClick={() => go(12, 11)} />
                     <ActionButton title="Voir les métiers" outline onClick={() => open('jobs')} />
                   </div>
+                </>
+              )}
+              {panel === 'billboard' && board && (
+                <>
+                  <div
+                    className={
+                      'rounded-2xl p-5 text-center ' +
+                      (board.status === 'house'
+                        ? 'bg-emerald-800 text-white'
+                        : 'border-2 border-dashed border-emerald-400 bg-emerald-50 text-emerald-900')
+                    }
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">
+                      {cityDef.districts[board.district].name} · {cityDef.name}
+                    </p>
+                    <p className="mt-2 text-xl font-black">{board.headline}</p>
+                  </div>
+                  <div className="flex items-center justify-between rounded-xl bg-slate-50 p-3 text-sm">
+                    <span>
+                      {board.status === 'house' ? 'Occupé par FaîtiereHub' : 'Disponible'}
+                    </span>
+                    <strong>{money(board.priceWeek)} / 7 jours</strong>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Vu par les habitants du quartier à chaque passage. Tarif indicatif : la
+                    réservation se fait avec l’équipe, aucune facturation automatique.
+                  </p>
+                  <Link
+                    href={board.href}
+                    className="flex min-h-12 items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white"
+                  >
+                    {board.status === 'house' ? 'Ouvrir le service' : 'Réserver ce panneau'}
+                  </Link>
                 </>
               )}
               {panel === 'journal' && (

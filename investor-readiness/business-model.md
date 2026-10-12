@@ -20,6 +20,23 @@
 | Abonnement « Professionnel » | 99 000 XOF par mois **affiché**, aucune facturation dans le code | FAIT (affiché seulement) | 0 |
 | Offre gratuite | 10 cartes numériques par coopérative, appliquée en base | FAIT | — |
 
+## Surfaces de monétisation dans HarooLife Lomé 3D (HYPOTHÈSE, 0 encaissé)
+
+Le quartier 3D (`/haroolife/territoire/lome`, PR #23 à #28) expose deux inventaires
+publicitaires, codés dans `lib/haroolife/lome-sponsors.ts`. Ce sont des tarifs affichés et des
+emplacements, pas des ventes : **aucun annonceur, aucune facture, 0 FCFA encaissé**.
+
+| Surface | Inventaire | Tarif affiché | Occupé aujourd'hui | Étiquette |
+|---|---|---|---|---|
+| Panneaux publicitaires 3D (un par quartier, vus à chaque passage) | 5 | 15 000 à 25 000 FCFA / 7 jours selon le quartier | 2 par les services FaîtiereHub (marché, carte Haroo), 3 libres | HYPOTHÈSE |
+| Applis partenaires dans le téléphone du jeu | 3 libres (+ 3 services maison gratuits) | 50 000 FCFA / mois | 0 | HYPOTHÈSE |
+
+Plafond si tout était réservé au tarif affiché : 50 000 FCFA par semaine de panneaux et
+150 000 FCFA par mois d'applis, soit environ **600 USD par mois pour une ville**. PROJECTION,
+conditionnée à une audience que le jeu n'a pas encore (voir `traction-evidence-register.md`).
+Cibles plausibles : banques et microfinance, assureurs agricoles, vendeurs d'intrants,
+opérateurs télécom. Toute réservation passe par la page contact ; rien n'est automatisé.
+
 ## Ce que le modèle doit prouver (dans l'ordre)
 
 1. **Usage récurrent** : des administrateurs qui reviennent chaque semaine. Aujourd'hui : non

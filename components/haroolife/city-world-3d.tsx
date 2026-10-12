@@ -4,6 +4,7 @@ import { districtIndexAt, isShore } from '@/lib/haroolife/lome-districts'
 import { type Action, type LifeState, trafficVehicles } from '@/lib/haroolife/lome-life-engine'
 import type { Transport } from '@/lib/haroolife/lome-life-engine'
 import type { PlacedResident } from '@/lib/haroolife/lome-presence'
+import { BILLBOARDS } from '@/lib/haroolife/lome-sponsors'
 import {
   type BuildType,
   type Building,
@@ -224,7 +225,9 @@ function SettlementScene({
   onInteriorAction,
   visitors = [],
   ride,
+  onBillboard,
 }: {
+  onBillboard?: (id: string) => void
   visitors?: PlacedResident[]
   ride?: { transport: Transport; rain: boolean } | null
   city: City
@@ -249,6 +252,9 @@ function SettlementScene({
   const blocked = useMaterial({ diffuse: '#dc886b', gloss: 0.1 })
   const highlighted = useMaterial({ diffuse: '#e7d07e', gloss: 0.1 })
   const sand = useMaterial({ diffuse: '#e2cf9a', gloss: 0.04 })
+  const panelHouse = useMaterial({ diffuse: '#0f766e', emissive: '#0b3d38', gloss: 0.3 })
+  const panelFree = useMaterial({ diffuse: '#f5f1e6', emissive: '#4b4a44', gloss: 0.3 })
+  const panelFrame = useMaterial({ diffuse: '#2d2d2d', gloss: 0.4 })
   const d0 = useMaterial({ diffuse: '#86b35e', gloss: 0.08 })
   const d1 = useMaterial({ diffuse: '#7cab5b', gloss: 0.08 })
   const d2 = useMaterial({ diffuse: '#79aa59', gloss: 0.08 })
@@ -410,6 +416,30 @@ function SettlementScene({
               </Entity>
             )
           })}
+          {BILLBOARDS.filter((bb) => !objects.has(bb.x + ':' + bb.y)).map((bb) => (
+            <Entity
+              key={bb.id}
+              name={'Panneau ' + bb.id}
+              position={positionOf(bb.x, bb.y)}
+              rotation={[0, bb.rotation, 0]}
+              onClick={() => {
+                if (canTap()) onBillboard?.(bb.id)
+              }}
+            >
+              <Entity position={[-0.3, 0.7, 0]} scale={[0.08, 1.4, 0.08]}>
+                <Render type="cylinder" material={panelFrame} />
+              </Entity>
+              <Entity position={[0.3, 0.7, 0]} scale={[0.08, 1.4, 0.08]}>
+                <Render type="cylinder" material={panelFrame} />
+              </Entity>
+              <Entity position={[0, 1.85, 0]} scale={[1.3, 0.8, 0.08]}>
+                <Render type="box" material={panelFrame} />
+              </Entity>
+              <Entity position={[0, 1.85, 0.05]} scale={[1.18, 0.68, 0.02]}>
+                <Render type="box" material={bb.status === 'house' ? panelHouse : panelFree} />
+              </Entity>
+            </Entity>
+          ))}
           {life.city.buildings
             .filter((b) => b.type === 'road')
             .slice(0, 2)
@@ -473,7 +503,9 @@ export default function CityWorld3D({
   onInteriorAction,
   visitors,
   ride,
+  onBillboard,
 }: {
+  onBillboard?: (id: string) => void
   visitors?: PlacedResident[]
   ride?: { transport: Transport; rain: boolean } | null
   city: City
@@ -555,6 +587,7 @@ export default function CityWorld3D({
             life={life}
             visitors={visitors}
             ride={ride}
+            onBillboard={onBillboard}
             pan={
               life
                 ? {
