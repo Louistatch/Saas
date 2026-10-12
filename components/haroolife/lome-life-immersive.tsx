@@ -20,6 +20,7 @@ import {
   interact,
   jobVenue,
   selectJob,
+  skipTravel,
   stepPlayer,
   walkLifeStep,
 } from '@/lib/haroolife/lome-life-engine'
@@ -59,6 +60,7 @@ const World3D = dynamic(() => import('./city-world-3d'), {
     </div>
   ),
 })
+const RideOverlay = dynamic(() => import('./travel-scene-3d'), { ssr: false })
 const STORAGE = 'haroolife.lome-life.v1'
 type Dir = [-1 | 0 | 1, -1 | 0 | 1]
 const KEYS: Record<string, Dir> = {
@@ -190,6 +192,7 @@ export function LomeLifeImmersive() {
   const [selection, setSelection] = useState<{ x: number; y: number } | null>(null)
   const [playing, setPlaying] = useState(false)
   const [transport, setTransport] = useState<Transport>('walk')
+  const [riding, setRiding] = useState(false)
   const [chatDraft, setChatDraft] = useState('')
   const [chat, setChat] = useState<{ by: 'me' | 'npc'; body: string }[]>([
     {
@@ -232,6 +235,11 @@ export function LomeLifeImmersive() {
     [here, life.city.buildings],
   )
   const hereNow = life.inside ? residentsAt(visitors, life.inside) : []
+  const rain = (here?.sky[0]?.precipitation_probability ?? 0) >= 50
+  const destinationName = life.target
+    ? (LIFE_LOCATIONS.find((x) => x.x === life.target!.x && x.y === life.target!.y)?.name ??
+      'ta destination')
+    : 'ta destination'
   const [placeDraft, setPlaceDraft] = useState('')
   const [placeError, setPlaceError] = useState('')
   const [placeBusy, setPlaceBusy] = useState(false)
@@ -292,13 +300,13 @@ export function LomeLifeImmersive() {
   }, [life, loaded])
   // Navigation advances automatically while the page is visible; no whole-hour penalty per road tile.
   useEffect(() => {
-    if (!life.route.length || life.inside) return
+    if (!life.route.length || life.inside || riding) return
     const ms = transport === 'walk' ? 670 : transport === 'moto' ? 360 : 250
     const id = window.setInterval(() => {
       if (document.visibilityState === 'visible') setLife((old) => walkLifeStep(old))
     }, ms)
     return () => window.clearInterval(id)
-  }, [life.route.length, life.inside, transport])
+  }, [life.route.length, life.inside, transport, riding])
   useEffect(() => {
     if (!playing) return
     const id = window.setInterval(() => {
@@ -329,6 +337,19 @@ export function LomeLifeImmersive() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+  useEffect(() => {
+    if (riding && (life.route.length === 0 || life.inside)) setRiding(false)
+  }, [riding, life.route.length, life.inside])
+  // A ride lasts a few seconds on the boulevard (longer for a longer route), then lands.
+  useEffect(() => {
+    if (!riding) return
+    const ms = 4000 + 600 * life.route.length
+    const id = window.setTimeout(() => {
+      setRiding(false)
+      setLife((old) => skipTravel(old))
+    }, ms)
+    return () => window.clearTimeout(id)
+  }, [riding, life.route.length])
   // Street traffic keeps moving while the player stands still (only when the tab is visible).
   useEffect(() => {
     if (life.inside) return
@@ -371,6 +392,7 @@ export function LomeLifeImmersive() {
     }
     setTransport(t)
     setLife((old) => chooseTransport(old, t))
+    setRiding(t !== 'walk')
     setPanel(null)
   }
   function sendMessage() {
@@ -420,11 +442,27 @@ export function LomeLifeImmersive() {
             onTile={tile}
             onInteriorAction={action}
             visitors={visitors}
+            ride={riding && life.route.length > 0 && !life.inside ? { transport, rain } : null}
             tool={mode === 'walk' ? 'inspect' : mode === 'demolish' ? 'demolish' : building}
           />
         )}
       </div>
       <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-[#203d49]/40 via-[#203d49]/10 to-transparent" />
+      {riding && life.route.length > 0 && !life.inside && webgl !== false && (
+        <RideOverlay
+          transport={transport}
+          rain={rain}
+          destination={destinationName}
+          onMap={() => {
+            setRiding(false)
+            open('map')
+          }}
+          onSkip={() => {
+            setRiding(false)
+            setLife((old) => skipTravel(old))
+          }}
+        />
+      )}
 
       <header className="pointer-events-none absolute inset-x-0 top-0 z-20 px-3 pt-[max(12px,env(safe-area-inset-top))] sm:px-5">
         <div className="pointer-events-auto mx-auto flex max-w-[900px] items-center gap-2 rounded-[24px] border border-white/65 bg-white/95 p-2 shadow-lg shadow-slate-900/10 backdrop-blur-lg">

@@ -105,3 +105,12 @@ service payé, entrée dans un intérieur 3D, mode construction. Captures dans
 - L'appli Messages du téléphone devient la place du canton : messages réels des habitants,
   envoi via `/api/haroolife/say` (200 caractères, cadence en base). Sans compte ou si HarooLife
   est désactivé, le jeu reste jouable seul avec le personnage scénarisé.
+
+## Tranche 4 : scène de trajet
+
+- Un transport payant (zémidjan ou taxi) ouvre une scène de trajet dans la même application
+  PlayCanvas (`components/haroolife/travel-scene-3d.tsx`) : boulevard du Mono vu de derrière le
+  véhicule, circulation dépassée, lampadaires et concessions qui défilent. Pluie réelle d'après
+  la météo Open-Meteo du canton (probabilité ≥ 50 %) ; ciel et bitume changent avec.
+- Durée : quelques secondes, proportionnelle au trajet ; « Passer » pose le personnage à
+  destination (`skipTravel`), « Carte » revient au quartier. Pas de second contexte WebGL.
