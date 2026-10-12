@@ -7,7 +7,8 @@ import type { Action } from '@/lib/haroolife/lome-life-engine'
  */
 import { Entity, Gltf } from '@playcanvas/react'
 import { Camera, Light, Render } from '@playcanvas/react/components'
-import { useMaterial, useModel } from '@playcanvas/react/hooks'
+import { useModel } from '@playcanvas/react/hooks'
+import { useMaterial } from './city/use-material'
 
 const BASE = '/haroolife/vendor/kenney-3d/'
 function Citizen({

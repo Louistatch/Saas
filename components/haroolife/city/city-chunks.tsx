@@ -8,6 +8,8 @@ import {
   chunksAround,
   lotsInChunk,
 } from '@/lib/haroolife/city/chunks'
+import { releaseEntity, releaseMesh } from '@/lib/haroolife/city/gpu'
+import { current } from '@/lib/haroolife/city/locality'
 import { type Geometry, appendModel } from '@/lib/haroolife/city/pack'
 import { bump } from '@/lib/haroolife/city/perf'
 import {
@@ -55,18 +57,6 @@ const shade = (c: RGB, k: number): RGB => [
   Math.min(1, c[2] * k),
 ]
 const COLORS = {
-  grass: {
-    agoe: rgb('#9cbf6a'),
-    adidogome: rgb('#95ba62'),
-    tokoin: rgb('#8db35e'),
-    centre: rgb('#9aae66'),
-    be: rgb('#9fbd6f'),
-    baguida: rgb('#b3c67a'),
-  },
-  earth: rgb('#c9ad7d'),
-  sand: rgb('#e6d3a3'),
-  lagoon: rgb('#58b0c8'),
-  ocean: rgb('#3f93b8'),
   road: rgb('#4a4f55'),
   street: rgb('#676b70'),
   lane: rgb('#e9e2c6'),
@@ -79,6 +69,38 @@ const COLORS = {
   tree: rgb('#3f7f3f'),
   seat: rgb('#1f7a4d'),
   concrete: rgb('#9a9a94'),
+}
+/** Ground palette of the active locality (memoised per locality). */
+const palettes = new Map<string, Palette>()
+interface Palette {
+  grass: Record<string, RGB>
+  earth: RGB
+  sand: RGB
+  lagoon: RGB
+  ocean: RGB
+  hill: RGB
+  shoreRow: number | null
+  shoreTree: string
+}
+function palette(): Palette {
+  const loc = current()
+  const cached = palettes.get(loc.id)
+  if (cached) return cached
+  const d = loc.decor
+  const grass: Record<string, RGB> = {}
+  for (const [id, hex] of Object.entries(d.grass)) grass[id] = rgb(hex)
+  const p: Palette = {
+    grass,
+    earth: rgb(d.earth),
+    sand: rgb(d.sand),
+    lagoon: rgb(d.lagoon),
+    ocean: rgb(d.ocean),
+    hill: rgb(d.hill),
+    shoreRow: d.shoreRow,
+    shoreTree: d.shoreTree,
+  }
+  palettes.set(loc.id, p)
+  return p
 }
 
 export class MeshBuilder implements Geometry {
@@ -489,16 +511,26 @@ function buildChunk(
     if (!bank) return
     appendModel(b, bank.model(key), { x: sx(cx), y: lift, z: sz(cy), rot, scale, tint })
   }
+  const ground = palette()
   for (let y = y0; y < Math.min(y0 + CHUNK, WORLD_H); y++)
     for (let x = x0; x < Math.min(x0 + CHUNK, WORLD_W); x++) {
       const [px, , pz] = worldPos(x, y)
       const t = terrainAt(x, y)
       if (t === 'ocean') {
-        b.flat(px - E, pz - E, px + E, pz + E, -0.08, COLORS.ocean)
+        b.flat(px - E, pz - E, px + E, pz + E, -0.08, ground.ocean)
+        continue
+      }
+      if (t === 'hill') {
+        // Savanna hills: a mound per cell, taller towards the grid's edge, with sparse trees.
+        const rise = 0.5 + hash(x, y, 26) * 0.9 + (y < 3 ? 0.6 : 0)
+        b.flat(px - E, pz - E, px + E, pz + E, 0, ground.hill)
+        b.dome(px, -0.2, pz, E * 1.25, shade(ground.hill, 0.9 + hash(x, y, 27) * 0.2), 4, 8)
+        if (near && hash(x, y, 28) < 0.12)
+          place('tree', x, y, Math.floor(hash(x, y, 29) * 360), 0.8, rise * 0.4)
         continue
       }
       if (t === 'lagoon') {
-        b.flat(px - E, pz - E, px + E, pz + E, -0.08, COLORS.lagoon)
+        b.flat(px - E, pz - E, px + E, pz + E, -0.08, ground.lagoon)
         if (isCityRoad(x, y)) {
           b.box(px - E * 0.8, 0.1, pz - E, px + E * 0.8, 0.22, pz + E, COLORS.road)
           b.box(px - E * 0.8, 0.22, pz - E, px - E * 0.7, 0.34, pz + E, COLORS.kerb)
@@ -508,11 +540,11 @@ function buildChunk(
       }
       if (inEstate(x, y)) continue // the estate draws itself
       if (t === 'sand') {
-        b.flat(px - E, pz - E, px + E, pz + E, 0, COLORS.sand)
+        b.flat(px - E, pz - E, px + E, pz + E, 0, ground.sand)
         if (isCityRoad(x, y)) b.flat(px - E, pz - E * 0.7, px + E, pz + E * 0.7, 0.01, COLORS.road)
         else if (near && hash(x, y, 21) < 0.1)
           place(
-            'palm',
+            ground.shoreTree,
             x + hash(x, y, 22) * 0.6 - 0.3,
             y + hash(x, y, 23) * 0.6 - 0.3,
             Math.floor(hash(x, y, 24) * 360),
@@ -546,7 +578,7 @@ function buildChunk(
           } else if (st.avenue) {
             if (x % 12 === 0 && !(y % 10 === 0))
               b.flat(px - 0.05, pz - 0.35, px + 0.05, pz + 0.35, 0.011, COLORS.lane)
-            else if (y % 10 === 0 || y === 68)
+            else if (y % 10 === 0 || y === ground.shoreRow)
               b.flat(px - 0.35, pz - 0.05, px + 0.35, pz + 0.05, 0.011, COLORS.lane)
           }
           if (st.lamp)
@@ -556,12 +588,12 @@ function buildChunk(
         } else if (st.avenue) {
           if (x % 12 === 0 && !(y % 10 === 0))
             b.flat(px - 0.05, pz - 0.35, px + 0.05, pz + 0.35, 0.011, COLORS.lane)
-          else if (y % 10 === 0 || y === 68)
+          else if (y % 10 === 0 || y === ground.shoreRow)
             b.flat(px - 0.35, pz - 0.05, px + 0.35, pz + 0.05, 0.011, COLORS.lane)
         }
         continue
       }
-      b.flat(px - E, pz - E, px + E, pz + E, 0, COLORS.grass[districtAt(x, y).id])
+      b.flat(px - E, pz - E, px + E, pz + E, 0, ground.grass[districtAt(x, y).id] ?? ground.earth)
     }
   // Buildings owned by this chunk (top-left cell inside it).
   let tris = 0
@@ -703,8 +735,8 @@ export default function CityChunks({
     const keep = new Set(wanted.map((c) => c.key))
     for (const [k, v] of live.current) {
       if (!keep.has(k)) {
-        v.entity.destroy()
-        v.mesh?.destroy()
+        releaseEntity(v.entity)
+        releaseMesh(v.mesh)
         live.current.delete(k)
       }
     }
@@ -716,8 +748,8 @@ export default function CityChunks({
       if (have && have.lod === lodKey) continue
       if (budget-- <= 0) break
       if (have) {
-        have.entity.destroy()
-        have.mesh?.destroy()
+        releaseEntity(have.entity)
+        releaseMesh(have.mesh)
         live.current.delete(c.key)
       }
       const { mesh, tris } = buildChunk(app.graphicsDevice, c, bank)
@@ -751,9 +783,10 @@ export default function CityChunks({
 
   useEffect(
     () => () => {
+      // The application may already be destroyed (route change): release is a no-op then.
       for (const v of live.current.values()) {
-        v.entity.destroy()
-        v.mesh?.destroy()
+        releaseEntity(v.entity)
+        releaseMesh(v.mesh)
       }
       live.current.clear()
     },

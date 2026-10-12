@@ -1,7 +1,6 @@
-import { TerritorySandbox } from '@/components/haroolife/territory-sandbox'
 import type { Metadata } from 'next'
-import 'leaflet/dist/leaflet.css'
-export const metadata: Metadata = { title: 'HarooLife — Carte économique du Togo' }
+export const metadata: Metadata = { title: 'HarooLife — Explorer' }
+/** Module « Explorer » of the single 3D world (mounted by the HarooLife layout). */
 export default function HarooLifeMapPage() {
-  return <TerritorySandbox />
+  return null
 }

@@ -11,15 +11,15 @@ import {
 import { agentsNear, cityLoop } from '../lib/haroolife/city/traffic'
 import {
   CATEGORY_OF,
-  DISTRICTS,
   ESTATE,
-  LANDMARKS,
   WORLD_H,
   WORLD_W,
   districtAt,
+  districts,
   inEstate,
   isCityRoad,
   isDriveway,
+  landmarkAnchors,
   landmarks,
   landmarksIn,
   lotAt,
@@ -34,7 +34,7 @@ test('the world is a real city: hundreds of buildings across six districts, wate
   const buildings = lots.filter((l) => l.type !== 'lot' && l.type !== 'park')
   assert.ok(buildings.length >= 250, `${buildings.length} buildings`)
   assert.ok(lots.length >= 400, `${lots.length} lots`)
-  for (const d of DISTRICTS) {
+  for (const d of districts()) {
     const inD = buildings.filter((l) => l.district === d.id)
     assert.ok(inD.length >= 25, `${d.name}: ${inD.length} buildings`)
     // Every district has the everyday services: market, school, bank, hospital, sport, worship.
@@ -80,7 +80,7 @@ test('lots never overlap roads, water or the estate, and each has a reachable do
     assert.equal(districtAt(lot.x, lot.y).id, lot.district)
   }
   // Every named landmark was placed, in its own district.
-  assert.equal(landmarks().length, LANDMARKS.length)
+  assert.equal(landmarks().length, landmarkAnchors().length)
   for (const lm of landmarks()) assert.ok(CATEGORY_OF[lm.type])
 })
 

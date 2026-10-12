@@ -1,5 +1,6 @@
 'use client'
 
+import { releaseEntity, releaseMesh } from '@/lib/haroolife/city/gpu'
 import { appendModel } from '@/lib/haroolife/city/pack'
 import { districtIndexAt, isShore } from '@/lib/haroolife/lome-districts'
 import { type Action, type LifeState, trafficVehicles } from '@/lib/haroolife/lome-life-engine'
@@ -22,12 +23,13 @@ import { ZOOM_IN_FACTOR, ZOOM_OUT_FACTOR } from '@/lib/haroolife/vendor/house-bu
  */
 import { Application, Entity, Gltf } from '@playcanvas/react'
 import { Camera, Light, Render } from '@playcanvas/react/components'
-import { useApp, useMaterial, useModel, useParent } from '@playcanvas/react/hooks'
+import { useApp, useModel, useParent } from '@playcanvas/react/hooks'
 import { Compass, Maximize2, Minus, Plus, RotateCcw } from 'lucide-react'
 import * as pc from 'playcanvas'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MeshBuilder } from './city/city-chunks'
 import { type Bank, bakedMaterial, loadBank } from './city/model-bank'
+import { useMaterial } from './city/use-material'
 import LomeLifeRoom3D from './lome-life-room-3d'
 import { PAGNES } from './pagnes'
 import { Ride } from './travel-scene-3d'
@@ -816,8 +818,8 @@ function EstateGround({ city }: { city: City }) {
     entity.addComponent('render', { meshInstances: [new pc.MeshInstance(mesh, bakedMaterial())] })
     parent.addChild(entity)
     return () => {
-      entity.destroy()
-      mesh.destroy()
+      releaseEntity(entity)
+      releaseMesh(mesh)
     }
   }, [app, parent, bank, city.buildings])
   return null

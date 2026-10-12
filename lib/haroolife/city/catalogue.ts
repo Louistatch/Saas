@@ -4,6 +4,7 @@
  * (fences, awnings, trees, stalls, lamps). Everything is a pure function of the lot and
  * the deterministic world hash, so a building never changes identity between loads.
  */
+import { current } from './locality'
 import { CELL, type Lot, type LotType, hash, isCityRoad } from './world'
 
 /** Cell-space placement: cx/cy are world cell coordinates (fractional = inside a cell). */
@@ -261,7 +262,8 @@ export function buildingFor(lot: Lot, sizes: SizeTable): BuildingSpec {
       })
     }
   }
-  const coastal = lot.district === 'baguida' || lot.district === 'be'
+  const decor = current().decor
+  const coastal = decor.coastalDistricts.includes(lot.district)
   const far = (
     style: RoofStyle,
     height: number,
@@ -296,7 +298,7 @@ export function buildingFor(lot: Lot, sizes: SizeTable): BuildingSpec {
       if (lot.w >= 2) {
         const t = doorSide(lot, -0.35)
         props.push({
-          model: coastal ? 'palm' : r2 > 0.5 ? 'oak' : 'tree',
+          model: coastal ? 'palm' : r2 > 0.5 ? decor.concessionTree : 'tree',
           cx: t.cx + (rot === 0 || rot === 180 ? 0.62 : 0),
           cy: t.cy + (rot === 90 || rot === 270 ? 0.62 : 0),
           rot: 0,
@@ -682,8 +684,10 @@ export interface StreetSpec {
   tree: Placement | null
 }
 export function streetFor(x: number, y: number): StreetSpec {
+  const { shoreRow, shoreTree, streetTree } = current().decor
+  const shore = shoreRow !== null && y === shoreRow
   const avenueX = x % 12 === 0
-  const avenueY = y % 10 === 0 || y === 68
+  const avenueY = y % 10 === 0 || shore
   const avenue = avenueX || avenueY
   const road = (ax: number, ay: number) => isCityRoad(ax, ay)
   // Crosswalks where a street meets an avenue.
@@ -716,19 +720,19 @@ export function streetFor(x: number, y: number): StreetSpec {
     }
   if (avenueX && !avenueY && y % 6 === 3)
     tree = {
-      model: y === 68 ? 'palm' : 'tree-small',
+      model: shore ? shoreTree : streetTree,
       cx: x + 0.42,
       cy: y,
       rot: 0,
-      scale: y === 68 ? 1 : 1.5,
+      scale: shore ? 1 : 1.5,
     }
   else if (avenueY && !avenueX && x % 6 === 4)
     tree = {
-      model: y === 68 ? 'palm' : 'tree-small',
+      model: shore ? shoreTree : streetTree,
       cx: x,
       cy: y + 0.42,
       rot: 0,
-      scale: y === 68 ? 1.1 : 1.5,
+      scale: shore ? 1.1 : 1.5,
     }
   return { avenue, crosswalk, lamp, tree }
 }

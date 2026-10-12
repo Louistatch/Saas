@@ -3,6 +3,7 @@
  * keeps the chunks around the camera target, builds one merged mesh per chunk, and drops
  * chunks that drift out of range. Everything here is pure and memoised.
  */
+import { type LocalityId, current } from './locality'
 import { type Lot, WORLD_H, WORLD_W, worldLots } from './world'
 
 export const CHUNK = 16
@@ -16,17 +17,20 @@ export interface ChunkRef {
   lod: Lod
 }
 
-export const chunkKey = (cx: number, cy: number) => `${cx}:${cy}`
+/** Keys carry the locality so a trip evicts the previous town's chunks naturally. */
+export const chunkKey = (cx: number, cy: number) => `${current().id}:${cx}:${cy}`
 export const chunkOfCell = (x: number, y: number) => ({
   cx: Math.floor(x / CHUNK),
   cy: Math.floor(y / CHUNK),
 })
 
-let lotsByChunk: Map<string, Lot[]> | null = null
+const byLocality = new Map<LocalityId, Map<string, Lot[]>>()
 /** Lots whose footprint touches the chunk (a 2×2 lot across a border is listed in both). */
 export function lotsInChunk(cx: number, cy: number): Lot[] {
+  let lotsByChunk = byLocality.get(current().id)
   if (!lotsByChunk) {
     lotsByChunk = new Map()
+    byLocality.set(current().id, lotsByChunk)
     for (const lot of worldLots()) {
       const seen = new Set<string>()
       for (let i = 0; i < lot.w; i++)

@@ -1,7 +1,9 @@
 'use client'
 
+import { releaseEntity } from '@/lib/haroolife/city/gpu'
 import { type NpcAnim, type Prop, layoutFor } from '@/lib/haroolife/city/interiors'
 import type { Interior } from '@/lib/haroolife/city/life'
+import { LOCALITIES, type LocalityId } from '@/lib/haroolife/city/locality'
 import {
   FrameRing,
   type PerfSnapshot,
@@ -19,6 +21,7 @@ import {
   type Lot,
   SIZE_HINT,
   TYPE_ICONS,
+  inEstate,
   landmarks,
 } from '@/lib/haroolife/city/world'
 import type { Transport } from '@/lib/haroolife/lome-life-engine'
@@ -34,7 +37,7 @@ import type { BuildType, City } from '@/lib/haroolife/townsmen-engine'
  */
 import { Application, Entity, Gltf } from '@playcanvas/react'
 import { Camera, Light, Render } from '@playcanvas/react/components'
-import { useApp, useAppEvent, useMaterial, useModel } from '@playcanvas/react/hooks'
+import { useApp, useAppEvent, useModel } from '@playcanvas/react/hooks'
 import { Compass, Maximize2, Minus, Plus, RotateCcw } from 'lucide-react'
 import * as pc from 'playcanvas'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -44,6 +47,7 @@ import { Character } from './character'
 import CityChunks, { type ChunkStats, cellOf, worldPos } from './city-chunks'
 import InteriorScene from './interior-scene'
 import { type Bank, bakedMaterial, loadBank, meshFor } from './model-bank'
+import { useMaterial } from './use-material'
 
 export type CameraState = { tx: number; tz: number; distance: number; angle: number }
 /** Frame the player with the dense city around: the target sits a little south-east of them. */
@@ -121,7 +125,7 @@ function Baked({
     onEntity?.(e)
     return () => {
       onEntity?.(null)
-      e.destroy()
+      releaseEntity(e)
       ref.current = null
     }
   }, [app, bank, model, name, onEntity])
@@ -603,6 +607,7 @@ export default function CityWorld({
   onStats,
   onFrame,
   quality = 'balanced',
+  locality = 'lome',
 }: {
   city: City
   tool: EditTool
@@ -631,8 +636,11 @@ export default function CityWorld({
   onStats?: (s: ChunkStats) => void
   onFrame?: (s: { drawCalls: number; fps: number }) => void
   quality?: Quality
+  /** Town on screen; the estate is drawn only where it exists (Lomé). */
+  locality?: LocalityId
 }) {
   bump('world')
+  const hasEstate = LOCALITIES[locality].estate !== null
   const preset = PRESETS[quality]
   const overlay = useRef<HTMLDivElement | null>(null)
   const dragging = useRef(false)
@@ -665,7 +673,8 @@ export default function CityWorld({
         (l) => Math.abs(l.x - centerCell.x) < radius && Math.abs(l.y - centerCell.y) < radius * 0.8,
       )
       .slice(0, 28)
-  }, [centerCell.x, centerCell.y, filter, camera.distance])
+    // biome-ignore lint/correctness/useExhaustiveDependencies: landmarks() reads the active locality
+  }, [centerCell.x, centerCell.y, filter, camera.distance, locality])
   const light = useMemo(() => daylight(hour), [hour])
 
   const onPan = useCallback(
@@ -688,12 +697,7 @@ export default function CityWorld({
     (cell: { x: number; y: number }) => {
       if (interior || ride) return
       // The estate ground is one mesh: route its taps to the estate handler (local cells).
-      if (
-        cell.x >= ESTATE.x0 &&
-        cell.y >= ESTATE.y0 &&
-        cell.x < ESTATE.x0 + ESTATE.size &&
-        cell.y < ESTATE.y0 + ESTATE.size
-      ) {
+      if (inEstate(cell.x, cell.y)) {
         onTileRef.current(cell.x - ESTATE.x0, cell.y - ESTATE.y0)
         return
       }
@@ -779,17 +783,19 @@ export default function CityWorld({
                 />
               </Entity>
             )}
-            <Entity position={estateCenter}>
-              <EstateTilesMemo
-                city={city}
-                tool={tool}
-                selected={selected}
-                onTile={stableOnTile}
-                canTap={canTap}
-                visitors={visitors}
-                onBillboard={stableOnBillboard}
-              />
-            </Entity>
+            {hasEstate && (
+              <Entity position={estateCenter}>
+                <EstateTilesMemo
+                  city={city}
+                  tool={tool}
+                  selected={selected}
+                  onTile={stableOnTile}
+                  canTap={canTap}
+                  visitors={visitors}
+                  onBillboard={stableOnBillboard}
+                />
+              </Entity>
+            )}
             {selPos && selectedLot && (
               <SelectionRing
                 position={[selPos[0], 0.03, selPos[2]]}

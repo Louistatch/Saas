@@ -11,6 +11,7 @@ import {
   initialLomeLife,
 } from '../lome-life-engine'
 import { type NpcAnim, animFor, layoutFor } from './interiors'
+import { LOCALITIES, type LocalityId, current, isLocalityId, setLocality } from './locality'
 import {
   ESTATE_GATE,
   type WorldPoint,
@@ -56,6 +57,8 @@ export type CityAction =
 export interface CityLife {
   v: 1
   life: LifeState
+  /** The town the player is in (the estate and home stay in Lomé). */
+  locality: LocalityId
   at: WorldPoint
   route: WorldPoint[]
   /** Lot the player is heading to or standing at the door of. */
@@ -102,6 +105,7 @@ export function initialCityLife(): CityLife {
   return {
     v: 1,
     life,
+    locality: 'lome',
     at: { ...ESTATE_GATE },
     route: [],
     target: null,
@@ -117,6 +121,7 @@ export function fromLegacy(life: LifeState): CityLife {
   return {
     v: 1,
     life: { ...life, route: [], target: null },
+    locality: 'lome',
     at: toWorld(life.pos),
     route: [],
     target: null,
@@ -133,6 +138,9 @@ export function decodeCityLife(value: unknown): CityLife | null {
   if (v.v !== 1) return null
   const life = decodeLomeLife(v.life)
   if (!life) return null
+  // Saves from before the national world have no locality: they are in Lomé.
+  const locality: LocalityId = isLocalityId(v.locality) ? v.locality : 'lome'
+  setLocality(locality)
   const roads = estateRoadsOf(life.city.buildings)
   if (!v.at || !Number.isInteger(v.at.x) || !Number.isInteger(v.at.y)) return null
   const at = nearestWalkable(v.at, roads) ?? toWorld(life.pos)
@@ -148,6 +156,7 @@ export function decodeCityLife(value: unknown): CityLife | null {
   return {
     v: 1,
     life: syncEstate(life, at),
+    locality,
     at,
     route: Array.isArray(v.route)
       ? v.route.filter((p) => p && walkable(p.x, p.y, roads)).slice(0, 400)
@@ -613,3 +622,39 @@ export function useProp(s: CityLife, propId: string): CityLife {
   return refused ? next : { ...next, activity: { prop: prop.id, anim: animFor(prop.kind) } }
 }
 export const stopActivity = (s: CityLife): CityLife => (s.activity ? { ...s, activity: null } : s)
+
+/** Inter-city travel: cost and duration of the bush taxi, indicative and fictional. */
+export const TRIPS: Record<`${LocalityId}>${LocalityId}`, { hours: number; fare: number }> = {
+  'lome>lome': { hours: 0, fare: 0 },
+  'kara>kara': { hours: 0, fare: 0 },
+  'lome>kara': { hours: 7, fare: 4000 },
+  'kara>lome': { hours: 7, fare: 4000 },
+}
+export const tripTo = (s: CityLife, to: LocalityId) => TRIPS[`${s.locality}>${to}`]
+
+/**
+ * Arrive in another town: the player steps out at its bus station gate, the estate and
+ * the home stay where they are (Lomé). Paying and the hours on the road are the caller's,
+ * so the HUD can show the ride first. Switches the active locality synchronously.
+ */
+export function travelTo(s: CityLife, to: LocalityId): CityLife {
+  if (to === s.locality) return s
+  const loc = setLocality(to)
+  return note(
+    {
+      ...s,
+      locality: to,
+      at: { ...loc.gate },
+      route: [],
+      target: null,
+      insideLot: null,
+      activity: null,
+      life: { ...s.life, inside: null, route: [], target: null },
+    },
+    `Arrivée à ${loc.name} (${LOCALITIES[to].region}).`,
+  )
+}
+/** The locality a save is in, applied to the generators before anything reads them. */
+export const ensureLocality = (s: CityLife) => {
+  if (current().id !== s.locality) setLocality(s.locality)
+}
