@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createPublicClient } from '@/lib/supabase/public'
 import { createLogger } from '@/lib/utils/logger'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 import { z } from 'zod'
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   const pageSize = Math.min(Number.parseInt(searchParams.get('limit') ?? '20'), 50)
 
   try {
-    const supabase = await createClient()
+    const supabase = createPublicClient()
 
     let query = supabase
       .from('marketplace_products')

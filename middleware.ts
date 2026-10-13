@@ -151,6 +151,9 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+    // Static files never need the session: skipping them saves an invocation (and, for a signed-in
+    // person, a Supabase Auth round trip) per 3D model, pack, font or manifest; /monitoring is the
+    // Sentry tunnel.
+    '/((?!_next/static|_next/image|favicon.ico|monitoring|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|avif|glb|gltf|bin|ktx2|json|webmanifest|woff2?|ttf|mp3|wav|js|txt|xml|map)$).*)',
   ],
 }

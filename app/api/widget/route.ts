@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createPublicClient } from '@/lib/supabase/public'
 import { clientKeyFromHeaders, isUuid, rateLimit } from '@/lib/utils/rate-limit'
 import { createLogger } from '@/lib/utils/logger'
 
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const supabase = await createClient()
+    const supabase = createPublicClient()
 
     const [coopRes, fichesRes] = await Promise.all([
       supabase

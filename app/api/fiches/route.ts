@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { createPublicClient } from '@/lib/supabase/public'
 import { createClient } from '@/lib/supabase/server'
 import { assertRole } from '@/lib/security/assert-access'
 import { TYPE_AGRICULTURE_KEYS } from '@/lib/fiches/types'
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
   const pageSize = Math.min(Number.parseInt(searchParams.get('limit') ?? '20'), 50)
 
   try {
-    const supabase = await createClient()
+    const supabase = createPublicClient()
 
     let query = supabase
       .from('fiches_techniques')
