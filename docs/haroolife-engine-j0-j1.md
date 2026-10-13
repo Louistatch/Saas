@@ -89,7 +89,30 @@ de Rapier ferait 569 Ko, mais `@react-three/rapier` impose la version « compat 
 
 ## Mesures comparées (salle de sport)
 
-(Mesure A/B répétée en cours : résultats dans le commit suivant.)
+Salle Fitness Tokoin, même parcours (carte → taxi → entrée), 4 s de stabilisation puis
+8 s mesurées, **3 exécutions par cas, médiane**. Ratio de pixels identique (0,5, plafond du
+rendu logiciel) pour les deux moteurs.
+
+| Profil | Moteur | Images/s (3 essais) | Médiane | p50 / p95 (ms) | Appels de rendu | Triangles | Entrée prête |
+|---|---|---|---|---|---|---|---|
+| Bureau 1440×900 | PlayCanvas | 13,9 · 14,5 · 14,4 | 14,4 | 68 / 94 | 147 | 15 038 | 0,45 s |
+| Bureau 1440×900 | R3F + Rapier | 10,2 · 13,2 · 13,6 | 13,2 | 74 / 100 | 52 | 10 150 | 2,3 s |
+| Android (Pixel 7 émulé) | PlayCanvas | 23,5 · 24,1 · 22,4 | 23,5 | 40 / 66 | 147 | 15 038 | 1,0 s |
+| Android (Pixel 7 émulé) | R3F + Rapier | 26,0 · 25,7 · 26,0 | 26,0 | 37 / 53 | 29 | 5 913 | 1,5 s |
+
+Lecture :
+
+- **Appels de rendu divisés par 3 à 5** (147 → 52 / 29) : effet direct de la fusion par
+  matériau. C'est le gain qui compte le plus sur un vrai GPU mobile.
+- **Images/s : à égalité au bureau, R3F devant sur le profil Android** (+11 % en médiane,
+  p95 66 → 53 ms). Réserve : la caméra R3F suit le joueur de plus près ; sur l'écran étroit
+  elle cadre moins d'objets (5 913 triangles contre 15 038). Les deux scènes ne montrent donc
+  pas exactement la même chose.
+- **Entrée plus lente avec R3F** (0,45 → 2,3 s au bureau) : premier téléchargement de three,
+  R3F et Rapier (≈ 1,1 Mo gzip), création d'un second contexte WebGL. Mis en cache ensuite.
+- Le premier essai R3F au bureau (10,2) est nettement plus bas que les deux suivants :
+  variabilité de l'environnement, d'où les trois essais.
+- Mémoire JS : 79–83 Mo (PlayCanvas) contre 97–98 Mo (R3F, la ville PlayCanvas restant chargée).
 
 Toutes ces mesures sont faites **sans GPU** (Chromium + SwiftShader, rendu logiciel). Le profil
 CPU de l'intérieur R3F montre le fil principal inactif 87 % du temps : la limite est la
