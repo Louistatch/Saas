@@ -79,7 +79,10 @@ export async function middleware(request: NextRequest) {
   const isProtected =
     pathname.startsWith('/dashboard') ||
     pathname.startsWith('/admin') ||
-    pathname.startsWith('/operator')
+    pathname.startsWith('/operator') ||
+    // Attestations et rapports : documents nominatifs, jamais sans session (la RLS filtre les
+    // lignes, mais l'en-tête d'un « rapport officiel » s'affichait pour n'importe qui).
+    pathname.startsWith('/reports')
   const isAuthPage = pathname.startsWith('/auth/')
 
   // Protected routes: redirect unauthenticated users
