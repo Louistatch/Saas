@@ -44,7 +44,9 @@ const securityHeaders = [
       "frame-src 'self' https://*.vercel.app https://*.fedapay.com",
       "base-uri 'self'",
       "form-action 'self'",
-      "upgrade-insecure-requests",
+      // Local LAN test builds (scripts/haroolife-lan.sh) are served over plain http from the PC's
+      // IP: upgrading would turn every asset into an https URL that does not exist. Never on Vercel.
+      ...(process.env.HAROOLIFE_LAN_HTTP === '1' && !process.env.VERCEL ? [] : ['upgrade-insecure-requests']),
     ].join('; '),
   },
 ]

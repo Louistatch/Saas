@@ -52,6 +52,17 @@ type Snap = { key: string; pose: Pose; t: number }
 type IOSocket = Socket<ServerToClient, ClientToServer>
 const KEEP = 200
 
+/** RFC 4122 v4 id. crypto.randomUUID needs a secure context, which a phone on the LAN over
+ * plain http is not; getRandomValues works everywhere. */
+export function uuid(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const b = crypto.getRandomValues(new Uint8Array(16))
+  b[6] = (b[6] & 0x0f) | 0x40
+  b[8] = (b[8] & 0x3f) | 0x80
+  const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('')
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
+}
+
 export class RealtimeClient {
   private socket: IOSocket | null = null
   private state: RealtimeSnapshot = {
@@ -130,7 +141,10 @@ export class RealtimeClient {
       this.set({ me, status: 'online' })
       void this.afterConnect()
     })
-    socket.on('disconnect', () => {
+    socket.on('disconnect', (reason) => {
+      // A disconnect decided by the relay is not retried by Socket.IO on its own.
+      if (reason === 'io server disconnect' && !this.stopped)
+        window.setTimeout(() => socket.connect(), 2000)
       this.presentMap.clear()
       this.set({ status: this.stopped ? 'idle' : 'offline', present: [], typing: {} })
     })
@@ -261,7 +275,7 @@ export class RealtimeClient {
     if (this.state.outbox.length >= LIMITS.outbox)
       return 'Trop de messages en attente : reconnecte-toi.'
     const item: Outgoing = {
-      clientId: crypto.randomUUID(),
+      clientId: uuid(),
       room,
       body: text.slice(0, LIMITS.body),
       state: this.socket?.connected ? 'sending' : 'queued',
@@ -305,12 +319,29 @@ export class RealtimeClient {
         clientId: item.clientId,
       })
       if (r.ok) this.receive([{ ...r.message, client_id: item.clientId }], false)
-      else if (r.code === 'auth_expired' || r.code === 'unavailable') update({ state: 'queued' })
+      else if (r.code === 'auth_expired') {
+        // The relay holds the token from the handshake: reconnect so a refreshed one is sent;
+        // the queued message goes out again (same clientId) once connected.
+        update({ state: 'queued' })
+        this.reauth()
+      } else if (r.code === 'unavailable') update({ state: 'queued' })
       else update({ state: 'error', error: r.error })
     } catch {
       // No ack in time: maybe stored, maybe not. The resend (same clientId) settles it.
       update({ state: 'queued' })
     }
+  }
+
+  private reauthing = false
+  private reauth() {
+    const s = this.socket
+    if (!s || this.reauthing) return
+    this.reauthing = true
+    s.disconnect()
+    window.setTimeout(() => {
+      this.reauthing = false
+      if (!this.stopped) s.connect()
+    }, 500)
   }
 
   async olderThan(room: RoomId) {

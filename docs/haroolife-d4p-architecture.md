@@ -73,3 +73,51 @@ super_admin : lecture, écriture et effacement partout (modération).
 | Relais | `HAROOLIFE_REALTIME_ORIGINS` | Origines autorisées |
 | Relais | `HAROOLIFE_REALTIME_DISABLED` | Coupe-circuit |
 | Relais (local) | `HAROOLIFE_REALTIME_REPO=pglite` | Vraie migration dans PGlite ; refusé en production |
+
+## Panneaux publicitaires 3D (M2)
+
+```
+lib/haroolife/ads/campaigns.ts   supports (PLACEMENTS), campagnes internes, règles pures :
+                                 runsOn, campaignFor (rotation 20 s), safeHref/safeImage,
+                                 TRANSITIONS, exposed (approximation d'exposition)
+lib/haroolife/ads/poster.ts      affiche dessinée sur canvas 512 × 288 (image facultative, hôtes permis)
+lib/haroolife/ads/exposure.ts    ExposureTracker : ≥ 1 s de vue, une fois / 30 s, clics plafonnés
+components/haroolife/city/billboards-3d.tsx
+                                 2 poteaux + cadre + affiche éclairée, construits à < 26 cases,
+                                 libérés au-delà de 34, 4 Hz hors boucle de rendu
+GET  /api/haroolife/ads?locality=   annonces internes + campagnes approuvées (cache CDN 60 s)
+POST /api/haroolife/ads/events      compteurs agrégés (≤ 8 lignes, plafonds, débit par adresse)
+/admin/haroolife-panneaux           console super_admin : brouillon, aperçu, revue, statuts, stats
+```
+
+### Supports pilotes
+
+| Id | Ville | Cellule | Face | Emplacement |
+|---|---|---|---|---|
+| lome-avenue | Lomé | (47, 37) | Est | Avenue, près du domaine |
+| lome-jardin | Lomé | (43, 32) | Ouest | Jardin de quartier |
+| kara-gare | Kara | (69, 41) | Nord | Arrêt de la gare routière |
+| kara-marche | Kara | (75, 49) | Sud | Abords du marché |
+
+Tous sur un terrain ouvert (parc ou parcelle libre) au bord d'une route, hors porte et hors domaine (test unitaire). Le panneau du domaine `bb-centre`, collé à la maison et masquant sa porte, a été déplacé en (13, 7).
+
+### Circuit d'une campagne (migration `20261013_130000_haroolife_ads.sql`, non appliquée en production)
+
+```
+brouillon → en revue → approuvée → en cours ⇄ en pause → expirée
+              ↑   └─ approbation refusée sans droits confirmés,
+              └──── et sans référence de contrat pour un partenaire
+```
+
+Une campagne en cours ne se modifie pas : il faut la mettre en pause. Chaque changement crée une version. Revenir à une version remet la campagne en brouillon pour une nouvelle revue. Une campagne n'est diffusée que si elle est approuvée ou en cours, dans sa fenêtre, droits confirmés et contrat présent. Le client masque aussi toute campagne hors fenêtre, même servie par le cache.
+
+### Statistiques
+
+`haroolife_ad_stats(day, campaign, placement, impressions, clicks)` : rien d'autre. Exposition approchée (devant la caméra, ≤ 16 cases, vue de face, champ de 70°, ≥ 1 s, sans test d'occlusion). Clic : seulement « En savoir plus ». Les campagnes inconnues ou en pause et les supports invalides sont ignorés.
+
+### Coupures
+
+| Variable | Effet |
+|---|---|
+| `HAROOLIFE_ADS_DISABLED=true` (serveur) | l'API renvoie `enabled: false` : aucun panneau n'est construit |
+| `NEXT_PUBLIC_HAROOLIFE_ADS=off` (build) | module désactivé côté client |

@@ -217,6 +217,19 @@ describe('HarooLife Socket.IO relay', () => {
     kofi.disconnect()
   })
 
+  it('a token that expires during the session gets auth_expired (the client then reconnects)', async () => {
+    const exp = Math.floor(Date.now() / 1000) + 2
+    const token = `${b64({ alg: 'none' })}.${b64({ sub: LOCAL_ACCOUNTS.ama.id, exp })}.x`
+    const c = connect(null, token)
+    await ready(c)
+    assert.equal((await send(c, 'locality:lome', 'avant expiration')).ok, true)
+    await new Promise((r) => setTimeout(r, 2600))
+    const late = await send(c, 'locality:lome', 'après expiration')
+    assert.equal(late.ok, false)
+    if (!late.ok) assert.equal(late.code, 'auth_expired')
+    c.disconnect()
+  })
+
   it('rejects invalid payloads and honours the kill switch', async () => {
     const ama = connect('ama')
     await ready(ama)

@@ -44,6 +44,8 @@ export const LOCAL_COOPS = {
 const subOf = (token: string): string | null => {
   try {
     const payload = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8'))
+    // Like PostgREST: an expired token is refused.
+    if (typeof payload.exp === 'number' && payload.exp * 1000 < Date.now()) return null
     return typeof payload.sub === 'string' && /^[0-9a-f-]{36}$/.test(payload.sub)
       ? payload.sub
       : null
