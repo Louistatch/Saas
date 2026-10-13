@@ -29,6 +29,7 @@ import {
 } from '@/lib/haroolife/city/world'
 import type { Transport } from '@/lib/haroolife/lome-life-engine'
 import type { PlacedResident } from '@/lib/haroolife/lome-presence'
+import type { PresenceEntry } from '@/lib/haroolife/realtime/protocol'
 import type { BuildType, City } from '@/lib/haroolife/townsmen-engine'
 /**
  * The city of Lomé in 3D: streamed chunks of real buildings, the player's estate embedded
@@ -51,6 +52,7 @@ import CityChunks, { type ChunkStats, cellOf, worldPos } from './city-chunks'
 import InteriorScene from './interior-scene'
 import { type Bank, bakedMaterial, loadBank, meshFor } from './model-bank'
 import PlayerRig from './player-rig'
+import RemotePlayers, { type PoseFeed } from './remote-players'
 import { useMaterial } from './use-material'
 
 export type CameraState = { tx: number; tz: number; distance: number; angle: number }
@@ -590,6 +592,8 @@ export default function CityWorld({
   onFrame,
   quality = 'balanced',
   locality = 'lome',
+  remoteFeed,
+  remotePresent,
 }: {
   city: City
   tool: EditTool
@@ -604,6 +608,9 @@ export default function CityWorld({
   /** The player's chosen look: Kenney model and pagne colour (also used indoors). */
   avatarModel?: string
   avatarPagne?: string
+  /** Other players in this locality (realtime relay), interpolated between snapshots. */
+  remoteFeed?: PoseFeed
+  remotePresent?: PresenceEntry[]
   /** Low-rate camera state (chunk streaming, labels); the rig moves the real camera. */
   camera: CameraState
   onCamera: (c: CameraState) => void
@@ -822,6 +829,9 @@ export default function CityWorld({
               onEvents={onPlayerEvents}
               onCameraSync={onCameraSync}
             />
+            {remoteFeed && remotePresent && remotePresent.length > 0 && (
+              <RemotePlayers feed={remoteFeed} present={remotePresent} />
+            )}
             {hasVehicle && (
               <Baked
                 name="Taxi du joueur"

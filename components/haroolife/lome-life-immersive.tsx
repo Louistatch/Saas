@@ -142,7 +142,9 @@ import NationalMap from './city/national-map'
 import OnboardingSteps from './city/onboarding'
 import { PAGNES } from './pagnes'
 import { HomeDialog } from './residence-dialog'
+import LiveChat from './live-chat'
 import { sayOnPlace, usePresence } from './use-presence'
+import { useRealtime } from './use-realtime'
 
 const CityWorld = dynamic(() => import('./city/city-world'), {
   ssr: false,
@@ -470,6 +472,53 @@ export function LomeLifeImmersive() {
   const wellbeing = Math.round(NEED_KEYS.reduce((sum, k) => sum + needs[k], 0) / NEED_KEYS.length)
   const pending = eventById(life.pendingEvent)
   const presence = usePresence()
+  // Live discussions and other players (Socket.IO relay), when configured; see use-realtime.
+  const realtime = useRealtime()
+  const unreadTotal = Object.values(realtime.state.unread).reduce((a, b) => a + b, 0)
+  const online = realtime.state.status === 'online'
+  // Slow presence: which locality the player is in (re-sent by the client after reconnection).
+  useEffect(() => {
+    if (online && realtime.client)
+      void realtime.client.join(cityLife.locality === 'kara' ? 'kara' : 'lome')
+  }, [online, realtime.client, cityLife.locality])
+  // Movement snapshots at 5 Hz, only when the avatar moved (or every 2 s to stay visible).
+  useEffect(() => {
+    const client = realtime.client
+    if (!online || !client || insideAny) return
+    let n = 0
+    let last = { x: Number.NaN, z: Number.NaN, at: 0 }
+    const id = window.setInterval(() => {
+      const p = controller.driving && controller.vehicle ? controller.vehicle : controller.pos
+      const now = performance.now()
+      if (Math.hypot(p.x - last.x, p.z - last.z) < 0.03 && now - last.at < 2000) return
+      last = { x: p.x, z: p.z, at: now }
+      n++
+      client.pose({
+        x: Math.round(p.x * 100) / 100,
+        z: Math.round(p.z * 100) / 100,
+        heading: Math.round(
+          controller.driving && controller.vehicle
+            ? controller.vehicle.heading
+            : controller.heading,
+        ),
+        mode: controller.driving ? 'drive' : controller.mode,
+        n,
+      })
+    }, 200)
+    return () => window.clearInterval(id)
+  }, [online, realtime.client, insideAny, controller])
+  // Test hook: relay state without reading the UI.
+  useEffect(() => {
+    ;(window as unknown as { __LOME_REALTIME?: unknown }).__LOME_REALTIME = {
+      status: realtime.state.status,
+      me: realtime.state.me?.name ?? null,
+      rooms: realtime.state.me?.rooms.length ?? 0,
+      present: realtime.state.present.map((p) => p.name),
+      unread: unreadTotal,
+      outbox: realtime.state.outbox.map((o) => o.state),
+      drop: () => realtime.client?.drop(),
+    }
+  }, [realtime.state, realtime.client, unreadTotal])
   const here = presence.status === 'ready' ? (presence.world?.here ?? null) : null
   const visitors = useMemo(
     () => (here ? placeResidents(here.residents, life.city.buildings) : []),
@@ -1100,6 +1149,8 @@ export function LomeLifeImmersive() {
             onTile={tile}
             controller={controller}
             onPlayerEvents={onPlayerEvents}
+            remoteFeed={realtime.client ?? undefined}
+            remotePresent={realtime.state.present}
             onCameraSync={onCameraSync}
             hasVehicle={cityLife.locality === 'lome' && Boolean(cityLife.vehicle)}
             avatarModel={avatar.model}
@@ -1457,7 +1508,7 @@ export function LomeLifeImmersive() {
                 aria-pressed={panel === item.id}
                 onClick={() => open(item.id)}
                 className={
-                  'flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-[18px] text-[11px] font-semibold transition ' +
+                  'relative flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-[18px] text-[11px] font-semibold transition ' +
                   (panel === item.id
                     ? 'bg-slate-900 text-white'
                     : 'text-slate-600 hover:bg-slate-100')
@@ -1465,6 +1516,14 @@ export function LomeLifeImmersive() {
               >
                 <Icon size={21} />
                 <span>{item.label}</span>
+                {item.id === 'phone' && unreadTotal > 0 && (
+                  <span
+                    data-testid="unread-badge"
+                    className="absolute right-3 top-1 min-w-5 rounded-full bg-rose-500 px-1 text-[10px] font-black text-white"
+                  >
+                    {unreadTotal > 99 ? '99+' : unreadTotal}
+                  </span>
+                )}
               </button>
             )
           })}
@@ -1529,7 +1588,9 @@ export function LomeLifeImmersive() {
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 px-5 pb-3 pt-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
-                  Lomé Life · Quartier fictif
+                  {panel === 'messages' && realtime.state.status === 'online'
+                    ? 'Lomé Life · En direct'
+                    : 'Lomé Life · Quartier fictif'}
                 </p>
                 <h2 className="text-xl font-black">{title}</h2>
               </div>
@@ -2009,6 +2070,14 @@ export function LomeLifeImmersive() {
                   <ActionButton title="Trouver un travail" onClick={() => open('jobs')} />
                 </>
               )}
+              {panel === 'messages' && realtime.state.status !== 'disabled' && (
+                <LiveChat
+                  client={realtime.client}
+                  state={realtime.state}
+                  locality={cityLife.locality === 'kara' ? 'kara' : 'lome'}
+                  onChooseHome={() => open('residence')}
+                />
+              )}
               {panel === 'messages' && here && (
                 <>
                   <p className="text-xs text-slate-500">
@@ -2082,7 +2151,7 @@ export function LomeLifeImmersive() {
                   </form>
                 </>
               )}
-              {panel === 'messages' && !here && (
+              {panel === 'messages' && !here && realtime.state.status !== 'online' && (
                 <>
                   <p className="text-xs text-slate-500">
                     {presence.status === 'offline'
@@ -2561,7 +2630,9 @@ export function LomeLifeImmersive() {
                 </>
               )}
               <p className="pt-1 text-center text-[10px] text-slate-500">
-                HarooLife · Mode fictif, hors paiements et comptes réels
+                {panel === 'messages' && realtime.state.status === 'online'
+                  ? 'Discussion entre vrais comptes HarooLife : messages enregistrés, signalables et modérés'
+                  : 'HarooLife · Mode fictif, hors paiements et comptes réels'}
               </p>
             </div>
           </section>

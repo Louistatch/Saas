@@ -26,6 +26,11 @@ const session = () => ({
   expires_at: Math.floor(Date.now() / 1000) + 120,
   user,
 })
+const REALTIME_ACCOUNTS = new Set([
+  'a1a1a1a1-0000-4000-8000-000000000001',
+  'b2b2b2b2-0000-4000-8000-000000000002',
+  'c3c3c3c3-0000-4000-8000-000000000003',
+])
 const C1 = 'c1000000-0000-4000-8000-000000000001'
 const C2 = 'c2000000-0000-4000-8000-000000000002'
 const C3 = 'c3000000-0000-4000-8000-000000000003'
@@ -535,7 +540,23 @@ http
       }
       if (req.method === 'OPTIONS') return send(204)
       const p = url.pathname
-      if (p === '/auth/v1/user') return send(200, user)
+      if (p === '/auth/v1/user') {
+        // Realtime chat accounts (fictional, see realtime/pglite.ts): answer with the token's
+        // subject, so two browsers are two different people for the Socket.IO relay.
+        const bearer = (req.headers.authorization ?? '').replace(/^Bearer /, '')
+        let sub = null
+        try {
+          sub = JSON.parse(Buffer.from(bearer.split('.')[1] ?? '', 'base64url').toString()).sub
+        } catch {}
+        if (typeof sub === 'string' && REALTIME_ACCOUNTS.has(sub))
+          return send(200, {
+            ...user,
+            id: sub,
+            email: `${sub.slice(0, 8)}@test.local`,
+            app_metadata: {},
+          })
+        return send(200, user)
+      }
       if (p === '/auth/v1/token') {
         refreshCount++
         log.push('token-refresh')
