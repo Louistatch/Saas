@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { safeInternalPath } from '@/lib/auth/safe-redirect'
 import { errorMessage } from '@/lib/utils/errors'
 import { hasOrgLayer, isHarooRole } from '@/lib/utils/permissions'
 import { flattenZodErrors, loginSchema } from '@/lib/validators/schemas'
@@ -81,17 +82,7 @@ function LoginInner() {
 
         // Chemin interne uniquement : « /\evil.com » passait l'ancien contrôle et le navigateur
         // le lit comme « //evil.com ». On résout l'adresse et on exige la même origine.
-        const safeRedirect = (() => {
-          if (!redirectTo || !redirectTo.startsWith('/') || redirectTo.includes('\\')) return null
-          try {
-            const url = new URL(redirectTo, window.location.origin)
-            return url.origin === window.location.origin
-              ? `${url.pathname}${url.search}${url.hash}`
-              : null
-          } catch {
-            return null
-          }
-        })()
+        const safeRedirect = safeInternalPath(redirectTo, window.location.origin)
         // Un professionnel Haroo ne doit jamais être renvoyé vers le dashboard
         // coopérative, même si ?redirect=/dashboard a été posé par le middleware
         // lors d'une visite déconnectée — son espace est /haroo.

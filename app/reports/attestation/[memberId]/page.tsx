@@ -1,3 +1,4 @@
+import { PrintButton } from '@/app/reports/_components/print-button'
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 
@@ -89,9 +90,7 @@ export default async function AttestationPage({
 
       {/* Print button */}
       <div className="no-print" style={{ position: 'fixed', top: 16, right: 16, zIndex: 999 }}>
-        <button
-          type="button"
-          onClick={() => window.print()}
+        <PrintButton
           style={{
             background: GREEN,
             color: 'white',
@@ -105,9 +104,7 @@ export default async function AttestationPage({
             alignItems: 'center',
             gap: 8,
           }}
-        >
-          ⬇ Télécharger / Imprimer
-        </button>
+        />
       </div>
 
       {/* A4 Page */}

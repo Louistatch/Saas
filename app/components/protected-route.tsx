@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect } from 'react'
+import { type UserRole, useAuth } from '@/app/context/auth-context'
+import { STALE_SESSION_PARAM } from '@/lib/auth/safe-redirect'
 import { useRouter } from 'next/navigation'
-import { useAuth, type UserRole } from '@/app/context/auth-context'
+import { useEffect } from 'react'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -32,10 +33,11 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
 
     if (!isAuthenticated) {
       const current =
-        typeof window !== 'undefined'
-          ? window.location.pathname + window.location.search
-          : ''
-      router.replace(`/auth/login?redirect=${encodeURIComponent(current)}`)
+        typeof window !== 'undefined' ? window.location.pathname + window.location.search : ''
+      // Le middleware ne laisse passer ici que des personnes qu'il voit connectées : si le navigateur
+      // n'a pas de session, elle est périmée de son côté. Le drapeau évite la boucle infinie
+      // /auth/login → page demandée → /auth/login.
+      router.replace(`/auth/login?redirect=${encodeURIComponent(current)}&${STALE_SESSION_PARAM}=1`)
       return
     }
 

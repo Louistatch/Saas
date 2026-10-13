@@ -1,10 +1,11 @@
 'use client'
 
-import { useCallback, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { QrScanner } from '@/components/shared/qr-scanner'
+import { extractCardNumber } from '@/lib/verify/card-number'
 import { ArrowLeft, ScanLine } from 'lucide-react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useCallback, useState } from 'react'
 
 /**
  * Public scan page (WhatsApp-Web style).
@@ -16,25 +17,6 @@ import { ArrowLeft, ScanLine } from 'lucide-react'
  *   - https://<host>/verify/<CARD>     (our cards)
  *   - bare card number e.g. HAR-481923
  */
-/**
- * Accepte aussi bien l'URL complète encodée dans le QR que le numéro de carte
- * saisi à la main. Fonction pure : hors du composant, elle garde une identité
- * stable et n'a pas à figurer dans les dépendances des hooks.
- */
-function extractCardNumber(raw: string): string | null {
-  const value = raw.trim()
-  // URL complète pointant vers notre route de vérification
-  try {
-    const url = new URL(value)
-    const m = url.pathname.match(/\/verify\/([^/?#]+)/i)
-    if (m) return decodeURIComponent(m[1])
-  } catch {
-    /* pas une URL — on continue */
-  }
-  // Numéro de carte nu (PREFIXE-CHIFFRES)
-  if (/^[A-Z]{2,5}-\d{4,6}$/i.test(value)) return value.toUpperCase()
-  return null
-}
 
 export default function ScanPage() {
   const router = useRouter()
@@ -70,8 +52,8 @@ export default function ScanPage() {
       <section className="scan-body">
         <h1 className="scan-title">Vérification instantanée</h1>
         <p className="scan-sub">
-          Comme un scan WhatsApp Web : placez le QR code de la carte de membre
-          dans le cadre, la vérification démarre toute seule.
+          Comme un scan WhatsApp Web : placez le QR code de la carte de membre dans le cadre, la
+          vérification démarre toute seule.
         </p>
 
         <QrScanner onResult={handleResult} className="scan-cam" />

@@ -2616,7 +2616,10 @@ export function LomeLifeImmersive() {
                   </p>
                 ) : (
                   <p className="text-sm text-slate-600">
-                    <Link href="/login" className="font-bold text-emerald-700 underline">
+                    <Link
+                      href="/auth/login?redirect=%2Fharoolife"
+                      className="font-bold text-emerald-700 underline"
+                    >
                       Connectez-vous
                     </Link>{' '}
                     pour retrouver votre coopérative, ses membres et ses regroupements.

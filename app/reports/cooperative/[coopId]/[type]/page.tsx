@@ -1,3 +1,4 @@
+import { PrintButton } from '@/app/reports/_components/print-button'
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 
@@ -231,9 +232,7 @@ export default async function CooperativeReportPage({
 
       {/* Print button */}
       <div className="no-print" style={{ position: 'fixed', top: 16, right: 16, zIndex: 999 }}>
-        <button
-          type="button"
-          onClick={() => window.print()}
+        <PrintButton
           style={{
             background: GREEN,
             color: 'white',
@@ -244,9 +243,7 @@ export default async function CooperativeReportPage({
             fontFamily: 'sans-serif',
             cursor: 'pointer',
           }}
-        >
-          ⬇ Télécharger / Imprimer
-        </button>
+        />
       </div>
 
       <div

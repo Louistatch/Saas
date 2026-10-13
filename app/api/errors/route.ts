@@ -11,8 +11,24 @@ const schema = z.object({
   route: z.string().startsWith('/').max(300),
 })
 
+/**
+ * The browser's Origin must name the host that received the request. Compared on the Host header
+ * rather than nextUrl.origin, which a self-hosted `next start` can report under another name
+ * (localhost vs 127.0.0.1), silently dropping every error report.
+ */
+function sameOrigin(request: NextRequest): boolean {
+  const origin = request.headers.get('origin')
+  const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host')
+  if (!origin || !host) return false
+  try {
+    return new URL(origin).host === host
+  } catch {
+    return false
+  }
+}
+
 export async function POST(request: NextRequest) {
-  if (request.headers.get('origin') !== request.nextUrl.origin) {
+  if (!sameOrigin(request)) {
     return NextResponse.json({ error: 'Origine invalide' }, { status: 403 })
   }
   if (!rateLimit(`client-error:${clientKeyFromHeaders(request.headers)}`, 5, 60_000).ok) {

@@ -93,6 +93,10 @@ const nextConfig = {
       './public/logo.png',
     ],
   },
+  // Anciennes adresses : /login n'a jamais existé mais a été lié depuis HarooLife.
+  async redirects() {
+    return [{ source: '/login', destination: '/auth/login', permanent: false }]
+  },
   async headers() {
     return [
       { source: '/api/verify/:path*', headers: [

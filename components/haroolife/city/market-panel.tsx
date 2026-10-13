@@ -34,7 +34,10 @@ export default function MarketPanel({ actor }: { actor: Actor | null }) {
   if (!actor)
     return (
       <p className="text-sm text-slate-600">
-        <Link href="/login" className="font-bold text-emerald-700 underline">
+        <Link
+          href="/auth/login?redirect=%2Fharoolife"
+          className="font-bold text-emerald-700 underline"
+        >
           Connectez-vous
         </Link>{' '}
         pour voir les préventes réelles des producteurs.
