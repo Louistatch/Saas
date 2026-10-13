@@ -13,6 +13,7 @@ export default defineConfig({
     'lome-travel.spec.ts',
     'lome-player.spec.ts',
     'lome-avatar.spec.ts',
+    'lome-door.spec.ts',
   ],
   reporter: [['list'], ['html', { outputFolder: 'test-results/lome-report', open: 'never' }]],
   fullyParallel: false,

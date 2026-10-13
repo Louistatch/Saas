@@ -8,6 +8,7 @@ import {
   actionsFor,
   arrive,
   cityInteract,
+  enterLot,
   ensureLocality,
   freelyWalkable,
   goToEstate,
@@ -26,6 +27,12 @@ import {
   walkStep,
 } from '@/lib/haroolife/city/life'
 import { LOCALITIES, LOCALITY_IDS, type LocalityId } from '@/lib/haroolife/city/locality'
+import {
+  type InteractionTarget,
+  estateRef,
+  lotRef,
+  resolveInteraction,
+} from '@/lib/haroolife/city/interaction'
 import { CITY_STORAGE, loadCityLife } from '@/lib/haroolife/city/migrate'
 import {
   AVATAR_MODELS,
@@ -89,6 +96,7 @@ import {
   TRAVEL_COST,
   type Transport,
   advanceLifeHour,
+  enterBuilding,
   buildInLome,
   demolishInLome,
   initialLomeLife,
@@ -412,8 +420,20 @@ export function LomeLifeImmersive() {
     },
   ])
   const [notice, setNotice] = useState<string | null>(null)
-  const nearTarget =
-    life.target && Math.abs(life.pos.x - life.target.x) + Math.abs(life.pos.y - life.target.y) === 1
+  // The door in reach of the avatar (single resolver, continuous position, hysteresis).
+  const [door, setDoor] = useState<InteractionTarget | null>(null)
+  const doorRef = useRef<InteractionTarget | null>(null)
+  const insideName = cityLife.insideLot
+    ? (lotById(cityLife.insideLot)?.name ?? TYPE_LABELS[lotById(cityLife.insideLot)?.type ?? 'lot'])
+    : life.inside
+      ? (VENUE_LABELS[life.inside] ?? life.inside)
+      : ''
+  const doorName = insideAny ? insideName : (door?.label ?? '')
+  const doorTitle = insideAny
+    ? `Sortir — ${insideName}`
+    : door
+      ? `${door.isAccessible ? 'Entrer' : 'Fermé'} — ${door.label}`
+      : 'Entrer'
   const title =
     panel === 'home'
       ? 'Mon foyer'
@@ -633,6 +653,33 @@ export function LomeLifeImmersive() {
   useEffect(() => {
     controller.setInside(insideAny)
   }, [insideAny, controller])
+  // Door in reach: checked ~7 times a second from the controller's continuous pose (never a
+  // React update per frame: state changes only when the door itself changes).
+  useEffect(() => {
+    if (insideAny || webgl === false) {
+      doorRef.current = null
+      setDoor(null)
+      return
+    }
+    const check = () => {
+      const t = controller.driving
+        ? null
+        : resolveInteraction(
+            cityLifeRef.current,
+            controller.pos,
+            doorRef.current?.id ?? null,
+            undefined,
+            controller.heading,
+          )
+      const prev = doorRef.current
+      if (prev?.id === t?.id && prev?.isAccessible === t?.isAccessible) return
+      doorRef.current = t
+      setDoor(t)
+    }
+    check()
+    const id = window.setInterval(check, 140)
+    return () => window.clearInterval(id)
+  }, [insideAny, webgl, controller])
   useEffect(() => {
     controller.setTravelling(riding)
   }, [riding, controller])
@@ -738,11 +785,23 @@ export function LomeLifeImmersive() {
     document.addEventListener('visibilitychange', onVisibility)
     return () => document.removeEventListener('visibilitychange', onVisibility)
   }, [])
+  // Key E on a PC: the same action as the door button (never while typing in a field).
+  const doorKey = useRef<() => void>(() => {})
+  doorKey.current = () => {
+    if (panel !== null || riding) return
+    if (insideAny) action('leave')
+    else if (doorRef.current) action('enter')
+  }
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setPanel(null)
         return
+      }
+      const el = e.target as HTMLElement | null
+      const typing = el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))
+      if ((e.key === 'e' || e.key === 'E') && !typing && !e.repeat && !e.ctrlKey && !e.metaKey) {
+        doorKey.current()
       }
     }
     window.addEventListener('keydown', onKey)
@@ -810,10 +869,44 @@ export function LomeLifeImmersive() {
     })
     setRiding(true)
   }
+  /** Resolve the door from where the avatar stands now, at the moment of the tap. */
+  function resolveDoor(): InteractionTarget | null {
+    if (controller.driving) return null
+    return resolveInteraction(
+      cityLifeRef.current,
+      controller.pos,
+      doorRef.current?.id ?? null,
+      undefined,
+      controller.heading,
+    )
+  }
+  /** « Entrer » (button, sheet or key E): one tap, the building in reach, explicit feedback. */
+  function enterDoor() {
+    if (controller.driving) {
+      setNotice('Descends du taxi pour entrer dans un bâtiment.')
+      return
+    }
+    const t = resolveDoor()
+    if (!t) {
+      setNotice('Approche-toi d’une porte : le bouton « Entrer » apparaît devant une entrée.')
+      return
+    }
+    if (!t.isAccessible) {
+      setNotice(`${t.label} : ${t.reason ?? 'fermé.'}`)
+      return
+    }
+    // Where to come back out: the exact spot in front of this door.
+    const pose = { x: controller.pos.x, z: controller.pos.z, heading: controller.heading }
+    const b = estateRef(t)
+    const lot = lotRef(t)
+    if (b) setCityLife((old) => ({ ...old, pose, route: [], life: enterBuilding(old.life, b) }))
+    else if (lot) setCityLife((old) => enterLot(old, lot, pose))
+    setNotice(null)
+    setPanel(null)
+  }
   function action(a: Action) {
-    if (a === 'enter' && !insideAny && doorLot && !life.target) {
-      setCityLife((old) => cityInteract(old, 'enter'))
-      setPanel(null)
+    if (a === 'enter' && !insideAny) {
+      enterDoor()
       return
     }
     if (a === 'leave' && cityLife.insideLot) {
@@ -834,8 +927,12 @@ export function LomeLifeImmersive() {
       setPanel('cooperative')
       return
     }
+    if (a === 'enter') {
+      enterDoor()
+      return
+    }
     setCityLife((old) => cityInteract(old, a))
-    if (a === 'enter' || a === 'leave') setPanel(null)
+    if (a === 'leave') setPanel(null)
   }
   /** « Ma coopérative » : the camera flies to the building that houses the player's organisation. */
   function goMyCooperative() {
@@ -1259,7 +1356,7 @@ export function LomeLifeImmersive() {
               onActive={onJoystickActive}
             />
           </div>
-          <div className="pointer-events-auto flex flex-col gap-2">
+          <div className="pointer-events-auto flex flex-col items-end gap-2">
             {(nearVehicle || driving) && (
               <button
                 type="button"
@@ -1270,14 +1367,33 @@ export function LomeLifeImmersive() {
                 {driving ? 'Descendre' : '🚕 Monter'}
               </button>
             )}
-            <button
-              type="button"
-              aria-label="Entrer ou sortir"
-              onClick={() => action(insideAny ? 'leave' : 'enter')}
-              className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-700 text-[10px] font-black text-white shadow"
-            >
-              {insideAny ? 'Sortir' : 'Entrer'}
-            </button>
+            {(insideAny || door) && (
+              <button
+                type="button"
+                aria-label="Entrer ou sortir"
+                title={doorTitle}
+                data-testid="door-action"
+                data-door={insideAny ? 'inside' : (door?.id ?? '')}
+                onClick={() => action(insideAny ? 'leave' : 'enter')}
+                className={`flex min-h-14 max-w-[11rem] items-center gap-2 self-end rounded-2xl px-4 py-2 text-left text-sm font-black shadow-lg ${
+                  insideAny || door?.isAccessible
+                    ? 'bg-emerald-700 text-white'
+                    : 'bg-slate-200 text-slate-600'
+                }`}
+              >
+                <span aria-hidden className="text-lg leading-none">
+                  {insideAny ? '🚪' : door?.isAccessible ? '🏠' : '🔒'}
+                </span>
+                <span className="min-w-0 leading-tight">
+                  <span className="block">
+                    {insideAny ? 'Sortir' : door?.isAccessible ? 'Entrer' : 'Fermé'}
+                  </span>
+                  <span className="block truncate text-[11px] font-semibold opacity-90">
+                    {doorName}
+                  </span>
+                </span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => open('build')}
@@ -2110,7 +2226,8 @@ export function LomeLifeImmersive() {
                 selectedLot &&
                 (() => {
                   const lot = selectedLot
-                  const here = cityLife.insideLot === lot.id || doorLot?.id === lot.id
+                  const here =
+                    cityLife.insideLot === lot.id || doorLot?.id === lot.id || door?.id === lot.id
                   const insideHere = cityLife.insideLot === lot.id
                   const room = interiorFor(lot.type)
                   const layout = room ? layoutFor(room) : null

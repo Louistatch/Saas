@@ -203,14 +203,15 @@ export function decodeCityLife(value: unknown): CityLife | null {
 }
 
 /** Keep the estate engine's local position in step with the world position while inside the fence. */
-function syncEstate(life: LifeState, at: WorldPoint): LifeState {
+function syncEstate(life: LifeState, at: WorldPoint, keepTarget = false): LifeState {
   if (!inEstate(at.x, at.y)) return life
   const l = toLocal(at)
   const roads = estateRoadsOf(life.city.buildings)
   if (!roads.has(`${l.x}:${l.y}`)) return life
+  // Walking a route to a chosen building keeps that choice: the door resolver prefers it.
   return life.pos.x === l.x && life.pos.y === l.y
     ? life
-    : { ...life, pos: l, route: [], target: null }
+    : { ...life, pos: l, route: [], target: keepTarget ? life.target : null }
 }
 
 export const roadsOf = (s: CityLife) => estateRoadsOf(s.life.city.buildings)
@@ -237,7 +238,11 @@ export function goToLot(s: CityLife, lot: Lot): CityLife {
 export function goToEstate(s: CityLife, bx: number, by: number): CityLife {
   if (s.insideLot || s.life.inside) return note(s, 'Sors du bâtiment avant de partir.')
   const roads = roadsOf(s)
+  // The avatar may stand on the lawn (joystick): the path crosses open ground like city routes,
+  // and ends preferably on the road side of the building (its door), else beside it.
+  const open = openCell(s)
   let best: WorldPoint[] | null = null
+  let bestCost = Number.POSITIVE_INFINITY
   for (const [dx, dy] of [
     [0, 1],
     [1, 0],
@@ -245,8 +250,13 @@ export function goToEstate(s: CityLife, bx: number, by: number): CityLife {
     [0, -1],
   ] as const) {
     const door = toWorld({ x: bx + dx, y: by + dy })
-    const path = findPathWhere(s.at, door, (x, y) => walkable(x, y, roads))
-    if (path && (!best || path.length < best.length)) best = path
+    const path = findPathWhere(s.at, door, open)
+    if (!path) continue
+    const cost = path.length + (walkable(door.x, door.y, roads) ? 0 : 4)
+    if (cost < bestCost) {
+      best = path
+      bestCost = cost
+    }
   }
   if (!best) return note(s, 'Lieu inaccessible : il faut le relier aux routes de la mairie.')
   return note(
@@ -287,6 +297,7 @@ export function walkStep(s: CityLife): CityLife {
       needs: { ...s.life.needs, energy: clamp(s.life.needs.energy - 1) },
     },
     at,
+    true,
   )
   const out: CityLife = { ...s, at, life, route: s.route.slice(1) }
   if (out.route.length === 0) {
@@ -304,7 +315,11 @@ export function walkStep(s: CityLife): CityLife {
 export function arrive(s: CityLife): CityLife {
   if (s.route.length === 0) return s
   const last = s.route[s.route.length - 1]
-  const life = syncEstate({ ...s.life, trafficStep: s.life.trafficStep + s.route.length }, last)
+  const life = syncEstate(
+    { ...s.life, trafficStep: s.life.trafficStep + s.route.length },
+    last,
+    true,
+  )
   const out: CityLife = { ...s, at: last, life, route: [] }
   const lot = out.target ? lotById(out.target) : null
   return note(out, lot ? `Arrivé : ${lot.name ?? labelOf(lot.type)}.` : 'Arrivé à destination.')
@@ -504,6 +519,16 @@ export function lotAtDoor(s: CityLife): Lot | null {
   return null
 }
 
+/** Enter a city lot the interaction resolver picked from the continuous avatar position. */
+export function enterLot(s: CityLife, lot: Lot, pose?: CityLife['pose']): CityLife {
+  if (s.insideLot || s.life.inside) return note(s, 'Sors avant de changer de bâtiment.')
+  if (!interiorFor(lot.type)) return note(s, 'Rien à visiter ici.')
+  const visited = s.visited.includes(lot.id) ? s.visited : [...s.visited, lot.id].slice(-50)
+  return note(
+    { ...s, insideLot: lot.id, route: [], target: lot.id, visited, pose: pose ?? s.pose },
+    `Tu entres : ${lot.name ?? labelOf(lot.type)}.`,
+  )
+}
 export function cityInteract(s: CityLife, action: CityAction): CityLife {
   if (action === 'leave') {
     if (!s.insideLot) return note(s, 'Tu es déjà dehors.')
@@ -513,12 +538,7 @@ export function cityInteract(s: CityLife, action: CityAction): CityLife {
     if (s.insideLot || s.life.inside) return note(s, 'Sors avant de changer de bâtiment.')
     const lot = lotAtDoor(s)
     if (!lot) return note(s, 'Approche-toi de la porte d’un bâtiment.')
-    if (!interiorFor(lot.type)) return note(s, 'Rien à visiter ici.')
-    const visited = s.visited.includes(lot.id) ? s.visited : [...s.visited, lot.id].slice(-50)
-    return note(
-      { ...s, insideLot: lot.id, route: [], target: lot.id, visited },
-      `Tu entres : ${lot.name ?? labelOf(lot.type)}.`,
-    )
+    return enterLot(s, lot)
   }
   const lot = s.insideLot ? lotById(s.insideLot) : lotAtDoor(s)
   if (!lot) return note(s, 'Entre d’abord dans un lieu.')
