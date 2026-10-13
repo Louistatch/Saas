@@ -38,7 +38,13 @@ export default function Joystick({
       if (knob.current) knob.current.style.transform = 'translate(0px, 0px)'
     }
     const down = (e: PointerEvent) => {
-      if (disabled || state.current) return
+      if (disabled) return
+      // A finger already holds the stick: ignore a second one, unless the first was lost
+      // without an up/cancel event (Android can drop it on a system gesture or a dialog).
+      if (state.current) {
+        if (el.hasPointerCapture(state.current.id)) return
+        release()
+      }
       e.preventDefault()
       el.setPointerCapture(e.pointerId)
       const r = el.getBoundingClientRect()
@@ -79,7 +85,15 @@ export default function Joystick({
     el.addEventListener('pointerup', up)
     el.addEventListener('pointercancel', up)
     el.addEventListener('lostpointercapture', up)
+    // Switching app, a notification shade or a phone call must not leave the player walking.
+    const hidden = () => {
+      if (document.visibilityState === 'hidden') release()
+    }
+    window.addEventListener('blur', release)
+    document.addEventListener('visibilitychange', hidden)
     return () => {
+      window.removeEventListener('blur', release)
+      document.removeEventListener('visibilitychange', hidden)
       el.removeEventListener('pointerdown', down)
       el.removeEventListener('pointermove', move)
       el.removeEventListener('pointerup', up)

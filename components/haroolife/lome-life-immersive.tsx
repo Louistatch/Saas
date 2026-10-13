@@ -144,6 +144,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { worldPos } from './city/city-chunks'
 import { CAMERA_HOME, type CameraState } from './city/city-world'
 import CooperativePanel from './city/cooperative-panel'
+import DiagOverlay, { initialDiag, rememberDiag } from './city/diag-overlay'
 import Joystick, { useKeyboardInput } from './city/joystick'
 import MarketPanel from './city/market-panel'
 import NationalMap from './city/national-map'
@@ -498,6 +499,9 @@ export function LomeLifeImmersive() {
   const presence = usePresence()
   // Live discussions and other players (Socket.IO relay), when configured; see use-realtime.
   const realtime = useRealtime()
+  // Diagnostic panel for real-phone testing (?diag=1 or the phone settings).
+  const [diag, setDiag] = useState(false)
+  useEffect(() => setDiag(initialDiag()), [])
   const unreadTotal = Object.values(realtime.state.unread).reduce((a, b) => a + b, 0)
   const online = realtime.state.status === 'online'
   // Slow presence: which locality the player is in (re-sent by the client after reconnection).
@@ -1610,6 +1614,17 @@ export function LomeLifeImmersive() {
         </div>
       </div>
 
+      {diag && (
+        <DiagOverlay
+          client={realtime.client}
+          state={realtime.state}
+          onClose={() => {
+            setDiag(false)
+            rememberDiag(false)
+          }}
+        />
+      )}
+
       <nav
         aria-label="Navigation du jeu"
         className="absolute inset-x-0 bottom-0 z-30 px-3 pb-[max(10px,env(safe-area-inset-bottom))]"
@@ -2023,6 +2038,18 @@ export function LomeLifeImmersive() {
               )}
               {panel === 'phone' && (
                 <>
+                  <label className="flex items-center justify-between rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-700">
+                    Diagnostic images/s et réseau
+                    <input
+                      type="checkbox"
+                      checked={diag}
+                      onChange={(e) => {
+                        setDiag(e.target.checked)
+                        rememberDiag(e.target.checked)
+                      }}
+                      className="h-4 w-4"
+                    />
+                  </label>
                   <div className="rounded-2xl bg-slate-50 p-3">
                     <p className="text-xs font-bold text-slate-700">Qualité graphique</p>
                     <p className="text-[11px] text-slate-500">{PRESETS[quality].hint}</p>

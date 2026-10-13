@@ -133,6 +133,46 @@ describe('HarooLife Socket.IO relay', () => {
     for (const c of [ama, yawa, kofi]) c.disconnect()
   })
 
+  it('message permissions: only the author edits or deletes, nobody reads outside their rooms', async () => {
+    const ama = connect('ama')
+    const yawa = connect('yawa')
+    const kofi = connect('kofi')
+    await Promise.all([ready(ama), ready(yawa), ready(kofi)])
+    const run = crypto.randomUUID().slice(0, 8)
+    const mine = await send(ama, BE, `message d'Ama ${run}`)
+    assert.ok(mine.ok)
+    if (!mine.ok) return
+    const id = mine.message.id
+    // Yawa shares the room but is not the author: no edit, no delete, the text is unchanged.
+    const e1 = await yawa.timeout(3000).emitWithAck('chat:edit', { id, body: 'falsifié' })
+    assert.equal(e1.ok, false, 'a room-mate cannot edit')
+    const d1 = await yawa.timeout(3000).emitWithAck('chat:delete', { id })
+    assert.equal(d1.ok, false, 'a room-mate cannot delete')
+    // Kofi is outside the room: no edit, no delete, no report, no history, no typing relay.
+    assert.equal((await kofi.timeout(3000).emitWithAck('chat:edit', { id, body: 'x' })).ok, false)
+    assert.equal((await kofi.timeout(3000).emitWithAck('chat:delete', { id })).ok, false)
+    assert.equal(
+      (await kofi.timeout(3000).emitWithAck('chat:report', { id, reason: 'spam' })).ok,
+      false,
+    )
+    assert.equal((await kofi.timeout(3000).emitWithAck('chat:history', { room: BE })).ok, false)
+    const quiet = silent(ama, 'chat:typing')
+    kofi.emit('chat:typing', { room: BE })
+    assert.equal(await quiet, true, 'typing into a foreign room is not relayed')
+    const h = await yawa.timeout(3000).emitWithAck('chat:history', { room: BE })
+    assert.ok(h.ok)
+    if (h.ok) {
+      const kept = h.messages.find((m: ChatMessage) => m.id === id)
+      assert.equal(kept?.body, `message d'Ama ${run}`, 'unchanged after the refused attempts')
+    }
+    // The author can.
+    const e2 = await ama.timeout(3000).emitWithAck('chat:edit', { id, body: `corrigé ${run}` })
+    assert.equal(e2.ok, true)
+    const d2 = await ama.timeout(3000).emitWithAck('chat:delete', { id })
+    assert.equal(d2.ok, true)
+    for (const c of [ama, yawa, kofi]) c.disconnect()
+  })
+
   it('a resend with the same clientId is the same message, never broadcast twice', async () => {
     const ama = connect('ama')
     const yawa = connect('yawa')

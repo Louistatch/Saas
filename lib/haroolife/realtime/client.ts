@@ -78,6 +78,8 @@ export class RealtimeClient {
   private listeners = new Set<() => void>()
   private poseListeners = new Set<(s: Snap) => void>()
   private presentMap = new Map<string, PresenceEntry>()
+  /** Connection health for the in-game diagnostic panel (read on demand, never rendered from). */
+  private health = { attempts: 0, reconnects: 0, onlineSince: 0, lastDropAt: 0, lastDrop: '' }
   private typingTimers = new Map<string, number>()
   private lastTyping = 0
   private locality: Locality | null = null
@@ -137,11 +139,20 @@ export class RealtimeClient {
       timeout: 10_000,
     })
     this.socket = socket
+    socket.io.on('reconnect_attempt', (n) => {
+      this.health.attempts = n
+    })
     socket.on('system:hello', ({ me }) => {
+      if (this.health.onlineSince || this.health.lastDropAt) this.health.reconnects++
+      this.health.attempts = 0
+      this.health.onlineSince = Date.now()
       this.set({ me, status: 'online' })
       void this.afterConnect()
     })
     socket.on('disconnect', (reason) => {
+      this.health.onlineSince = 0
+      this.health.lastDropAt = Date.now()
+      this.health.lastDrop = reason
       // A disconnect decided by the relay is not retried by Socket.IO on its own.
       if (reason === 'io server disconnect' && !this.stopped)
         window.setTimeout(() => socket.connect(), 2000)
@@ -197,6 +208,11 @@ export class RealtimeClient {
       console.warn('[realtime]', error)
     })
     window.addEventListener('online', this.onOnline)
+  }
+
+  /** Reconnection attempts in progress, reconnections since start, and the last drop. */
+  diagnostics() {
+    return { ...this.health, connected: this.socket?.connected ?? false }
   }
 
   private onOnline = () => {
