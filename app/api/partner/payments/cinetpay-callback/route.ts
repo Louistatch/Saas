@@ -51,6 +51,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Payment intent not found' }, { status: 404 })
   }
 
+  // Un paiement accepté doit porter exactement le montant et la devise enregistrés : on ne crédite
+  // jamais sur la foi d'une référence seule (même contrôle que le callback des cotisations).
+  if (
+    check.status === 'ACCEPTED' &&
+    (check.amount !== Number(intent.amount_fcfa) || check.currency !== 'XOF')
+  ) {
+    return NextResponse.json({ error: 'Amount or currency mismatch' }, { status: 409 })
+  }
+
   const now = new Date().toISOString()
   const isSuccess = check.status === 'ACCEPTED'
   const isTerminal =

@@ -25,6 +25,7 @@ import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 import { parseQuery } from '@/lib/agritogo/nlp-router'
 import { tryDirectAction } from '@/lib/agritogo/direct-actions'
 import { buildProducerContext } from '@/lib/agritogo/producer-context'
+import { requirePrivateCard } from '@/lib/security/card-access'
 import {
   getDeepSeekKey,
   rotateDeepSeekKey,
@@ -70,6 +71,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Message trop long (1000 caractères max).' }, { status: 400 })
   }
 
+  // Le contexte personnel, l'historique et l'enregistrement de l'échange sont réservés au
+  // titulaire de la carte (session carte ou compte qui y a droit). Un numéro de carte est public
+  // (imprimé, dans le QR) : sans ce contrôle, n'importe qui lisait l'historique d'un membre ou
+  // écrivait dans le sien. Les autres reçoivent une réponse générique, sans donnée du membre.
+  const owner = (await requirePrivateCard(cardNumber)).ok
+  const ownCard = owner ? cardNumber : ''
+
   // ─── NIVEAU 1 : NLP Parse ────────────────────────────────────
   const parsed = parseQuery(userMessage)
 
@@ -78,11 +86,13 @@ export async function POST(request: NextRequest) {
     try {
       const directResult = await tryDirectAction(parsed)
       if (directResult) {
-        const supabase = await createClient()
-        await supabase.from('ai_conversations').insert([
-          { card_number: cardNumber, role: 'user', content: userMessage },
-          { card_number: cardNumber, role: 'assistant', content: directResult.response },
-        ])
+        if (owner) {
+          const supabase = await createClient()
+          await supabase.from('ai_conversations').insert([
+            { card_number: cardNumber, role: 'user', content: userMessage },
+            { card_number: cardNumber, role: 'assistant', content: directResult.response },
+          ])
+        }
 
         return NextResponse.json({
           response: directResult.response,
@@ -110,7 +120,8 @@ export async function POST(request: NextRequest) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             message: userMessage,
-            card_number: cardNumber,
+            // AgriTogo construit lui aussi un contexte à partir du numéro : jamais pour un tiers.
+            card_number: ownCard || null,
             audience: 'farmer',
           }),
           signal: AbortSignal.timeout(30000),
@@ -128,11 +139,13 @@ export async function POST(request: NextRequest) {
       if (agriRes.ok) {
         const data = await agriRes.json()
         if (data.response) {
-          const supabase = await createClient()
-          await supabase.from('ai_conversations').insert([
-            { card_number: cardNumber, role: 'user', content: userMessage },
-            { card_number: cardNumber, role: 'assistant', content: data.response },
-          ])
+          if (owner) {
+            const supabase = await createClient()
+            await supabase.from('ai_conversations').insert([
+              { card_number: cardNumber, role: 'user', content: userMessage },
+              { card_number: cardNumber, role: 'assistant', content: data.response },
+            ])
+          }
 
           return NextResponse.json({
             response: data.response,
@@ -166,15 +179,17 @@ export async function POST(request: NextRequest) {
   let lastError = ''
 
   // Construit le contexte riche du producteur (parcelles, météo, prix, cotisations…)
-  const { systemPrompt } = await buildProducerContext(cardNumber, supabase, supabaseAdmin)
+  const { systemPrompt } = await buildProducerContext(ownCard, supabase, supabaseAdmin)
 
   // Historique de conversation (format OpenAI)
-  const { data: history } = await supabaseAdmin
-    .from('ai_conversations')
-    .select('role, content')
-    .eq('card_number', cardNumber)
-    .order('created_at', { ascending: false })
-    .limit(MAX_HISTORY)
+  const { data: history } = owner
+    ? await supabaseAdmin
+        .from('ai_conversations')
+        .select('role, content')
+        .eq('card_number', cardNumber)
+        .order('created_at', { ascending: false })
+        .limit(MAX_HISTORY)
+    : { data: [] as { role: string; content: string }[] }
 
   // Fetched newest-first so we keep the most recent N; restore chronological order.
   const historyMessages: OpenAI.Chat.ChatCompletionMessageParam[] = (history ?? []).reverse().map((h) => ({
@@ -220,10 +235,12 @@ export async function POST(request: NextRequest) {
         const aiResponse = completion.choices[0]?.message?.content ?? ''
         if (!aiResponse) throw new Error('Réponse DeepSeek vide')
 
-        await supabase.from('ai_conversations').insert([
-          { card_number: cardNumber, role: 'user', content: userMessage },
-          { card_number: cardNumber, role: 'assistant', content: aiResponse },
-        ])
+        if (owner) {
+          await supabase.from('ai_conversations').insert([
+            { card_number: cardNumber, role: 'user', content: userMessage },
+            { card_number: cardNumber, role: 'assistant', content: aiResponse },
+          ])
+        }
 
         return NextResponse.json({
           response: aiResponse,
