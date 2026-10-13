@@ -6,6 +6,8 @@ export function HarooLifeEntry() {
   return (
     <Link
       href="/haroolife"
+      // Le monde 3D est lourd : on ne le précharge pas depuis le tableau de bord, il se charge au clic.
+      prefetch={false}
       className="flex items-center gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950 hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-offset-4"
     >
       <Sprout aria-hidden="true" className="h-8 w-8 shrink-0" />

@@ -220,6 +220,7 @@ export default function AdminHome() {
           )}
           <Link
             href="/haroolife"
+            prefetch={false}
             className="inline-block text-sm font-medium text-primary hover:underline"
           >
             Ouvrir HarooLife

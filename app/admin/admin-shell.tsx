@@ -167,6 +167,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                   <Link
                     key={link.href}
                     href={link.href}
+                    // HarooLife est un monde 3D : pas de préchargement depuis le menu admin.
+                    prefetch={link.href.startsWith('/haroolife') ? false : undefined}
                     aria-current={isActive ? 'page' : undefined}
                     onClick={() => setSidebarOpen(false)}
                     className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 transition-colors ${
