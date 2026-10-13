@@ -1,5 +1,18 @@
 import { withSentryConfig } from '@sentry/nextjs'
 
+// HarooLife realtime relay (Socket.IO, WebSocket only): allowed in connect-src only when configured.
+const realtimeSources = (() => {
+  const raw = process.env.NEXT_PUBLIC_HAROOLIFE_REALTIME_URL
+  if (!raw) return ''
+  try {
+    const u = new URL(raw)
+    const ws = u.protocol === 'https:' ? 'wss:' : 'ws:'
+    return ` ${u.origin} ${ws}//${u.host}`
+  } catch {
+    return ''
+  }
+})()
+
 /** @type {import('next').NextConfig} */
 const securityHeaders = [
   { key: 'X-Frame-Options', value: 'DENY' },
@@ -24,14 +37,16 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://*.supabase.co https:",
       "font-src 'self'",
-      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.vercel-analytics.com https://*.vercel.app https://*.i.posthog.com https://*.posthog.com`,
+      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.vercel-analytics.com https://*.vercel.app https://*.i.posthog.com https://*.posthog.com${realtimeSources}`,
       "worker-src 'self'",
       "manifest-src 'self'",
       "frame-ancestors 'none'",
       "frame-src 'self' https://*.vercel.app https://*.fedapay.com",
       "base-uri 'self'",
       "form-action 'self'",
-      "upgrade-insecure-requests",
+      // Local LAN test builds (scripts/haroolife-lan.sh) are served over plain http from the PC's
+      // IP: upgrading would turn every asset into an https URL that does not exist. Never on Vercel.
+      ...(process.env.HAROOLIFE_LAN_HTTP === '1' && !process.env.VERCEL ? [] : ['upgrade-insecure-requests']),
     ].join('; '),
   },
 ]

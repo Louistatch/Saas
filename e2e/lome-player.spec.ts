@@ -105,7 +105,29 @@ test('avatar, joystick, collisions, camera and taxi in the single 3D world', asy
     topSpeed = Math.max(topSpeed, ((await player()) as Player).speed)
   }
   await release()
-  expect(topSpeed, 'runs with a full deflection').toBeGreaterThan(3)
+  // On failure, say what was under the finger (an overlay above the stick, a modal…).
+  const underFinger = await page.evaluate(
+    ([x, y]) => {
+      const el = document.elementFromPoint(x, y)
+      return el ? `${el.tagName}[${el.getAttribute('data-testid') ?? el.className}]` : 'none'
+    },
+    [cx, cy],
+  )
+  expect(
+    topSpeed,
+    `runs with a full deflection (under the finger: ${underFinger})`,
+  ).toBeGreaterThan(3)
+
+  // 2b. Leaving the app (window blur) with the stick held: the avatar stops, no ghost walk.
+  await hold(0, 600, 52)
+  expect(((await player()) as Player).speed).toBeGreaterThan(0.5)
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')))
+  await expect.poll(async () => ((await player()) as Player).speed).toBe(0)
+  await release()
+  // And the stick answers again right after (no stuck state).
+  await hold(180, 600, 46)
+  expect(((await player()) as Player).speed, 'stick usable after a blur').toBeGreaterThan(0.5)
+  await release()
 
   // 3. Collision: push north for 6 s; the avatar never ends up on a building or water cell.
   await hold(270, 6000, 52)

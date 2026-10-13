@@ -1,5 +1,27 @@
 'use client'
 
+import {
+  type AdCampaign,
+  type AdPlacement,
+  INTERNAL_CAMPAIGNS,
+  isSponsored,
+  safeHref,
+} from '@/lib/haroolife/ads/campaigns'
+import { ExposureTracker } from '@/lib/haroolife/ads/exposure'
+import {
+  AVATAR_MODELS,
+  type Avatar,
+  DEFAULT_AVATAR,
+  loadAvatar,
+  pagneColor,
+  saveAvatar,
+} from '@/lib/haroolife/city/avatar'
+import {
+  type InteractionTarget,
+  estateRef,
+  lotRef,
+  resolveInteraction,
+} from '@/lib/haroolife/city/interaction'
 import { type Prop, animFor, layoutFor } from '@/lib/haroolife/city/interiors'
 import {
   type CityAction,
@@ -9,6 +31,7 @@ import {
   arrive,
   cityInteract,
   ensureLocality,
+  enterLot,
   freelyWalkable,
   goToEstate,
   goToLot,
@@ -27,14 +50,6 @@ import {
 } from '@/lib/haroolife/city/life'
 import { LOCALITIES, LOCALITY_IDS, type LocalityId } from '@/lib/haroolife/city/locality'
 import { CITY_STORAGE, loadCityLife } from '@/lib/haroolife/city/migrate'
-import {
-  AVATAR_MODELS,
-  type Avatar,
-  DEFAULT_AVATAR,
-  loadAvatar,
-  pagneColor,
-  saveAvatar,
-} from '@/lib/haroolife/city/avatar'
 import { ESTATE_GATE } from '@/lib/haroolife/city/navigation'
 import { findPath } from '@/lib/haroolife/city/navigation'
 import { bump } from '@/lib/haroolife/city/perf'
@@ -91,6 +106,7 @@ import {
   advanceLifeHour,
   buildInLome,
   demolishInLome,
+  enterBuilding,
   initialLomeLife,
   interact,
   jobVenue,
@@ -128,13 +144,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { worldPos } from './city/city-chunks'
 import { CAMERA_HOME, type CameraState } from './city/city-world'
 import CooperativePanel from './city/cooperative-panel'
+import DiagOverlay, { initialDiag, rememberDiag } from './city/diag-overlay'
 import Joystick, { useKeyboardInput } from './city/joystick'
 import MarketPanel from './city/market-panel'
 import NationalMap from './city/national-map'
 import OnboardingSteps from './city/onboarding'
+import LiveChat from './live-chat'
 import { PAGNES } from './pagnes'
 import { HomeDialog } from './residence-dialog'
 import { sayOnPlace, usePresence } from './use-presence'
+import { useRealtime } from './use-realtime'
 
 const CityWorld = dynamic(() => import('./city/city-world'), {
   ssr: false,
@@ -157,6 +176,7 @@ type Sheet =
   | 'missions'
   | 'journal'
   | 'billboard'
+  | 'ad'
   | 'lot'
   | 'cooperative'
   | 'market'
@@ -412,8 +432,31 @@ export function LomeLifeImmersive() {
     },
   ])
   const [notice, setNotice] = useState<string | null>(null)
-  const nearTarget =
-    life.target && Math.abs(life.pos.x - life.target.x) + Math.abs(life.pos.y - life.target.y) === 1
+  // The door in reach of the avatar (single resolver, continuous position, hysteresis).
+  const [door, setDoor] = useState<InteractionTarget | null>(null)
+  const doorRef = useRef<InteractionTarget | null>(null)
+  // Street billboards (M2): internal notices at once (offline too), live campaigns when reachable.
+  const [adCampaigns, setAdCampaigns] = useState<AdCampaign[]>(INTERNAL_CAMPAIGNS)
+  const [nearAd, setNearAd] = useState<{ placement: AdPlacement; campaign: AdCampaign } | null>(
+    null,
+  )
+  const [adFocus, setAdFocus] = useState<{ placement: AdPlacement; campaign: AdCampaign } | null>(
+    null,
+  )
+  const adTracker = useRef<ExposureTracker | null>(null)
+  if (!adTracker.current) adTracker.current = new ExposureTracker()
+  const adsEnabled = process.env.NEXT_PUBLIC_HAROOLIFE_ADS !== 'off'
+  const insideName = cityLife.insideLot
+    ? (lotById(cityLife.insideLot)?.name ?? TYPE_LABELS[lotById(cityLife.insideLot)?.type ?? 'lot'])
+    : life.inside
+      ? (VENUE_LABELS[life.inside] ?? life.inside)
+      : ''
+  const doorName = insideAny ? insideName : (door?.label ?? '')
+  const doorTitle = insideAny
+    ? `Sortir — ${insideName}`
+    : door
+      ? `${door.isAccessible ? 'Entrer' : 'Fermé'} — ${door.label}`
+      : 'Entrer'
   const title =
     panel === 'home'
       ? 'Mon foyer'
@@ -437,19 +480,146 @@ export function LomeLifeImmersive() {
                         ? 'Journal de vie'
                         : panel === 'billboard'
                           ? 'Panneau publicitaire'
-                          : panel === 'lot'
-                            ? 'Lieu'
-                            : panel === 'cooperative'
-                              ? 'Coopérative'
-                              : panel === 'avatar'
-                                ? 'Mon apparence'
-                                : panel === 'market'
-                                  ? 'Marché'
-                                  : ''
+                          : panel === 'ad'
+                            ? adFocus && isSponsored(adFocus.campaign)
+                              ? 'Promotion'
+                              : 'Information FaîtiereHub'
+                            : panel === 'lot'
+                              ? 'Lieu'
+                              : panel === 'cooperative'
+                                ? 'Coopérative'
+                                : panel === 'avatar'
+                                  ? 'Mon apparence'
+                                  : panel === 'market'
+                                    ? 'Marché'
+                                    : ''
   const needs = life.needs
   const wellbeing = Math.round(NEED_KEYS.reduce((sum, k) => sum + needs[k], 0) / NEED_KEYS.length)
   const pending = eventById(life.pendingEvent)
   const presence = usePresence()
+  // Live discussions and other players (Socket.IO relay), when configured; see use-realtime.
+  const realtime = useRealtime()
+  // Diagnostic panel for real-phone testing (?diag=1 or the phone settings).
+  const [diag, setDiag] = useState(false)
+  useEffect(() => setDiag(initialDiag()), [])
+  const unreadTotal = Object.values(realtime.state.unread).reduce((a, b) => a + b, 0)
+  const online = realtime.state.status === 'online'
+  // Slow presence: which locality the player is in (re-sent by the client after reconnection).
+  useEffect(() => {
+    if (online && realtime.client)
+      void realtime.client.join(cityLife.locality === 'kara' ? 'kara' : 'lome')
+  }, [online, realtime.client, cityLife.locality])
+  // Movement snapshots at 5 Hz, only when the avatar moved (or every 2 s to stay visible).
+  useEffect(() => {
+    const client = realtime.client
+    if (!online || !client || insideAny) return
+    let n = 0
+    let last = { x: Number.NaN, z: Number.NaN, at: 0 }
+    const id = window.setInterval(() => {
+      const p = controller.driving && controller.vehicle ? controller.vehicle : controller.pos
+      const now = performance.now()
+      if (Math.hypot(p.x - last.x, p.z - last.z) < 0.03 && now - last.at < 2000) return
+      last = { x: p.x, z: p.z, at: now }
+      n++
+      client.pose({
+        x: Math.round(p.x * 100) / 100,
+        z: Math.round(p.z * 100) / 100,
+        heading: Math.round(
+          controller.driving && controller.vehicle
+            ? controller.vehicle.heading
+            : controller.heading,
+        ),
+        mode: controller.driving ? 'drive' : controller.mode,
+        n,
+      })
+    }, 200)
+    return () => window.clearInterval(id)
+  }, [online, realtime.client, insideAny, controller])
+  // Test hook: relay state without reading the UI.
+  useEffect(() => {
+    ;(window as unknown as { __LOME_REALTIME?: unknown }).__LOME_REALTIME = {
+      status: realtime.state.status,
+      me: realtime.state.me?.name ?? null,
+      rooms: realtime.state.me?.rooms.length ?? 0,
+      present: realtime.state.present.map((p) => p.name),
+      unread: unreadTotal,
+      outbox: realtime.state.outbox.map((o) => o.state),
+      drop: () => realtime.client?.drop(),
+    }
+  }, [realtime.state, realtime.client, unreadTotal])
+  // Campaigns of this town (CDN-cached API); on failure the internal notices stay.
+  useEffect(() => {
+    if (!adsEnabled) return
+    let stop = false
+    const locality = cityLife.locality === 'kara' ? 'kara' : 'lome'
+    void fetch(`/api/haroolife/ads?locality=${locality}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { enabled: boolean; campaigns: AdCampaign[] } | null) => {
+        if (stop || !d) return
+        setAdCampaigns(d.enabled ? d.campaigns : [])
+      })
+      .catch(() => {})
+    return () => {
+      stop = true
+    }
+  }, [adsEnabled, cityLife.locality])
+  // Aggregated statistics leave every minute and when the page is hidden (counts only).
+  useEffect(() => {
+    if (!adsEnabled) return
+    const send = (beacon: boolean) => {
+      const items = adTracker.current?.flush() ?? []
+      if (!items.length) return
+      const body = JSON.stringify({ items: items.slice(0, 8) })
+      if (beacon && navigator.sendBeacon)
+        navigator.sendBeacon(
+          '/api/haroolife/ads/events',
+          new Blob([body], { type: 'application/json' }),
+        )
+      else
+        void fetch('/api/haroolife/ads/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body,
+          keepalive: true,
+        }).catch(() => {})
+    }
+    const id = window.setInterval(() => send(false), 60_000)
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') send(true)
+    }
+    document.addEventListener('visibilitychange', onHide)
+    window.addEventListener('pagehide', onHide)
+    ;(window as unknown as { __LOME_ADS_FLUSH?: () => void }).__LOME_ADS_FLUSH = () => send(false)
+    return () => {
+      window.clearInterval(id)
+      document.removeEventListener('visibilitychange', onHide)
+      window.removeEventListener('pagehide', onHide)
+      send(true)
+    }
+  }, [adsEnabled])
+  const onNearAd = useCallback(
+    (p: { placement: AdPlacement; campaign: AdCampaign } | null) => setNearAd(p),
+    [],
+  )
+  const adsProp = useMemo(
+    () =>
+      adsEnabled && adTracker.current
+        ? { campaigns: adCampaigns, tracker: adTracker.current, onNear: onNearAd }
+        : undefined,
+    [adsEnabled, adCampaigns, onNearAd],
+  )
+  function readAd() {
+    if (!nearAd) return
+    setAdFocus(nearAd)
+    setPanel('ad')
+  }
+  function learnMore() {
+    if (!adFocus) return
+    const href = safeHref(adFocus.campaign.creative.href)
+    if (!href) return
+    adTracker.current?.click(adFocus.campaign.id, adFocus.placement.id)
+    window.open(href, '_blank', 'noopener,noreferrer')
+  }
   const here = presence.status === 'ready' ? (presence.world?.here ?? null) : null
   const visitors = useMemo(
     () => (here ? placeResidents(here.residents, life.city.buildings) : []),
@@ -633,6 +803,33 @@ export function LomeLifeImmersive() {
   useEffect(() => {
     controller.setInside(insideAny)
   }, [insideAny, controller])
+  // Door in reach: checked ~7 times a second from the controller's continuous pose (never a
+  // React update per frame: state changes only when the door itself changes).
+  useEffect(() => {
+    if (insideAny || webgl === false) {
+      doorRef.current = null
+      setDoor(null)
+      return
+    }
+    const check = () => {
+      const t = controller.driving
+        ? null
+        : resolveInteraction(
+            cityLifeRef.current,
+            controller.pos,
+            doorRef.current?.id ?? null,
+            undefined,
+            controller.heading,
+          )
+      const prev = doorRef.current
+      if (prev?.id === t?.id && prev?.isAccessible === t?.isAccessible) return
+      doorRef.current = t
+      setDoor(t)
+    }
+    check()
+    const id = window.setInterval(check, 140)
+    return () => window.clearInterval(id)
+  }, [insideAny, webgl, controller])
   useEffect(() => {
     controller.setTravelling(riding)
   }, [riding, controller])
@@ -738,11 +935,23 @@ export function LomeLifeImmersive() {
     document.addEventListener('visibilitychange', onVisibility)
     return () => document.removeEventListener('visibilitychange', onVisibility)
   }, [])
+  // Key E on a PC: the same action as the door button (never while typing in a field).
+  const doorKey = useRef<() => void>(() => {})
+  doorKey.current = () => {
+    if (panel !== null || riding) return
+    if (insideAny) action('leave')
+    else if (doorRef.current) action('enter')
+  }
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setPanel(null)
         return
+      }
+      const el = e.target as HTMLElement | null
+      const typing = el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))
+      if ((e.key === 'e' || e.key === 'E') && !typing && !e.repeat && !e.ctrlKey && !e.metaKey) {
+        doorKey.current()
       }
     }
     window.addEventListener('keydown', onKey)
@@ -810,10 +1019,44 @@ export function LomeLifeImmersive() {
     })
     setRiding(true)
   }
+  /** Resolve the door from where the avatar stands now, at the moment of the tap. */
+  function resolveDoor(): InteractionTarget | null {
+    if (controller.driving) return null
+    return resolveInteraction(
+      cityLifeRef.current,
+      controller.pos,
+      doorRef.current?.id ?? null,
+      undefined,
+      controller.heading,
+    )
+  }
+  /** « Entrer » (button, sheet or key E): one tap, the building in reach, explicit feedback. */
+  function enterDoor() {
+    if (controller.driving) {
+      setNotice('Descends du taxi pour entrer dans un bâtiment.')
+      return
+    }
+    const t = resolveDoor()
+    if (!t) {
+      setNotice('Approche-toi d’une porte : le bouton « Entrer » apparaît devant une entrée.')
+      return
+    }
+    if (!t.isAccessible) {
+      setNotice(`${t.label} : ${t.reason ?? 'fermé.'}`)
+      return
+    }
+    // Where to come back out: the exact spot in front of this door.
+    const pose = { x: controller.pos.x, z: controller.pos.z, heading: controller.heading }
+    const b = estateRef(t)
+    const lot = lotRef(t)
+    if (b) setCityLife((old) => ({ ...old, pose, route: [], life: enterBuilding(old.life, b) }))
+    else if (lot) setCityLife((old) => enterLot(old, lot, pose))
+    setNotice(null)
+    setPanel(null)
+  }
   function action(a: Action) {
-    if (a === 'enter' && !insideAny && doorLot && !life.target) {
-      setCityLife((old) => cityInteract(old, 'enter'))
-      setPanel(null)
+    if (a === 'enter' && !insideAny) {
+      enterDoor()
       return
     }
     if (a === 'leave' && cityLife.insideLot) {
@@ -834,8 +1077,12 @@ export function LomeLifeImmersive() {
       setPanel('cooperative')
       return
     }
+    if (a === 'enter') {
+      enterDoor()
+      return
+    }
     setCityLife((old) => cityInteract(old, a))
-    if (a === 'enter' || a === 'leave') setPanel(null)
+    if (a === 'leave') setPanel(null)
   }
   /** « Ma coopérative » : the camera flies to the building that houses the player's organisation. */
   function goMyCooperative() {
@@ -1003,6 +1250,9 @@ export function LomeLifeImmersive() {
             onTile={tile}
             controller={controller}
             onPlayerEvents={onPlayerEvents}
+            remoteFeed={realtime.client ?? undefined}
+            remotePresent={realtime.state.present}
+            ads={adsProp}
             onCameraSync={onCameraSync}
             hasVehicle={cityLife.locality === 'lome' && Boolean(cityLife.vehicle)}
             avatarModel={avatar.model}
@@ -1259,7 +1509,7 @@ export function LomeLifeImmersive() {
               onActive={onJoystickActive}
             />
           </div>
-          <div className="pointer-events-auto flex flex-col gap-2">
+          <div className="pointer-events-auto flex flex-col items-end gap-2">
             {(nearVehicle || driving) && (
               <button
                 type="button"
@@ -1270,14 +1520,51 @@ export function LomeLifeImmersive() {
                 {driving ? 'Descendre' : '🚕 Monter'}
               </button>
             )}
-            <button
-              type="button"
-              aria-label="Entrer ou sortir"
-              onClick={() => action(insideAny ? 'leave' : 'enter')}
-              className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-700 text-[10px] font-black text-white shadow"
-            >
-              {insideAny ? 'Sortir' : 'Entrer'}
-            </button>
+            {nearAd && !insideAny && !driving && panel === null && (
+              <button
+                type="button"
+                data-testid="ad-read"
+                onClick={readAd}
+                className="flex min-h-11 max-w-[11rem] items-center gap-2 self-end rounded-2xl bg-white/95 px-3 py-2 text-left text-xs font-black text-slate-800 shadow-lg ring-1 ring-slate-200"
+              >
+                <span aria-hidden className="text-base leading-none">
+                  📣
+                </span>
+                <span className="min-w-0 leading-tight">
+                  <span className="block">Lire l’annonce</span>
+                  <span className="block truncate text-[11px] font-semibold text-slate-500">
+                    {isSponsored(nearAd.campaign) ? 'Promotion' : nearAd.campaign.advertiser.name}
+                  </span>
+                </span>
+              </button>
+            )}
+            {(insideAny || door) && (
+              <button
+                type="button"
+                aria-label="Entrer ou sortir"
+                title={doorTitle}
+                data-testid="door-action"
+                data-door={insideAny ? 'inside' : (door?.id ?? '')}
+                onClick={() => action(insideAny ? 'leave' : 'enter')}
+                className={`flex min-h-14 max-w-[11rem] items-center gap-2 self-end rounded-2xl px-4 py-2 text-left text-sm font-black shadow-lg ${
+                  insideAny || door?.isAccessible
+                    ? 'bg-emerald-700 text-white'
+                    : 'bg-slate-200 text-slate-600'
+                }`}
+              >
+                <span aria-hidden className="text-lg leading-none">
+                  {insideAny ? '🚪' : door?.isAccessible ? '🏠' : '🔒'}
+                </span>
+                <span className="min-w-0 leading-tight">
+                  <span className="block">
+                    {insideAny ? 'Sortir' : door?.isAccessible ? 'Entrer' : 'Fermé'}
+                  </span>
+                  <span className="block truncate text-[11px] font-semibold opacity-90">
+                    {doorName}
+                  </span>
+                </span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => open('build')}
@@ -1327,6 +1614,17 @@ export function LomeLifeImmersive() {
         </div>
       </div>
 
+      {diag && (
+        <DiagOverlay
+          client={realtime.client}
+          state={realtime.state}
+          onClose={() => {
+            setDiag(false)
+            rememberDiag(false)
+          }}
+        />
+      )}
+
       <nav
         aria-label="Navigation du jeu"
         className="absolute inset-x-0 bottom-0 z-30 px-3 pb-[max(10px,env(safe-area-inset-bottom))]"
@@ -1341,7 +1639,7 @@ export function LomeLifeImmersive() {
                 aria-pressed={panel === item.id}
                 onClick={() => open(item.id)}
                 className={
-                  'flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-[18px] text-[11px] font-semibold transition ' +
+                  'relative flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-[18px] text-[11px] font-semibold transition ' +
                   (panel === item.id
                     ? 'bg-slate-900 text-white'
                     : 'text-slate-600 hover:bg-slate-100')
@@ -1349,6 +1647,14 @@ export function LomeLifeImmersive() {
               >
                 <Icon size={21} />
                 <span>{item.label}</span>
+                {item.id === 'phone' && unreadTotal > 0 && (
+                  <span
+                    data-testid="unread-badge"
+                    className="absolute right-3 top-1 min-w-5 rounded-full bg-rose-500 px-1 text-[10px] font-black text-white"
+                  >
+                    {unreadTotal > 99 ? '99+' : unreadTotal}
+                  </span>
+                )}
               </button>
             )
           })}
@@ -1413,7 +1719,9 @@ export function LomeLifeImmersive() {
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 px-5 pb-3 pt-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
-                  Lomé Life · Quartier fictif
+                  {panel === 'messages' && realtime.state.status === 'online'
+                    ? 'Lomé Life · En direct'
+                    : 'Lomé Life · Quartier fictif'}
                 </p>
                 <h2 className="text-xl font-black">{title}</h2>
               </div>
@@ -1730,6 +2038,18 @@ export function LomeLifeImmersive() {
               )}
               {panel === 'phone' && (
                 <>
+                  <label className="flex items-center justify-between rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-700">
+                    Diagnostic images/s et réseau
+                    <input
+                      type="checkbox"
+                      checked={diag}
+                      onChange={(e) => {
+                        setDiag(e.target.checked)
+                        rememberDiag(e.target.checked)
+                      }}
+                      className="h-4 w-4"
+                    />
+                  </label>
                   <div className="rounded-2xl bg-slate-50 p-3">
                     <p className="text-xs font-bold text-slate-700">Qualité graphique</p>
                     <p className="text-[11px] text-slate-500">{PRESETS[quality].hint}</p>
@@ -1893,6 +2213,14 @@ export function LomeLifeImmersive() {
                   <ActionButton title="Trouver un travail" onClick={() => open('jobs')} />
                 </>
               )}
+              {panel === 'messages' && realtime.state.status !== 'disabled' && (
+                <LiveChat
+                  client={realtime.client}
+                  state={realtime.state}
+                  locality={cityLife.locality === 'kara' ? 'kara' : 'lome'}
+                  onChooseHome={() => open('residence')}
+                />
+              )}
               {panel === 'messages' && here && (
                 <>
                   <p className="text-xs text-slate-500">
@@ -1966,7 +2294,7 @@ export function LomeLifeImmersive() {
                   </form>
                 </>
               )}
-              {panel === 'messages' && !here && (
+              {panel === 'messages' && !here && realtime.state.status !== 'online' && (
                 <>
                   <p className="text-xs text-slate-500">
                     {presence.status === 'offline'
@@ -2110,7 +2438,8 @@ export function LomeLifeImmersive() {
                 selectedLot &&
                 (() => {
                   const lot = selectedLot
-                  const here = cityLife.insideLot === lot.id || doorLot?.id === lot.id
+                  const here =
+                    cityLife.insideLot === lot.id || doorLot?.id === lot.id || door?.id === lot.id
                   const insideHere = cityLife.insideLot === lot.id
                   const room = interiorFor(lot.type)
                   const layout = room ? layoutFor(room) : null
@@ -2293,6 +2622,54 @@ export function LomeLifeImmersive() {
                     pour retrouver votre coopérative, ses membres et ses regroupements.
                   </p>
                 ))}
+              {panel === 'ad' && adFocus && (
+                <>
+                  <div
+                    data-testid="ad-focus"
+                    className="relative overflow-hidden rounded-2xl p-5"
+                    style={{
+                      background: adFocus.campaign.creative.palette[0],
+                      color: adFocus.campaign.creative.palette[1],
+                    }}
+                  >
+                    <span
+                      aria-hidden
+                      className="absolute inset-y-0 left-0 w-2"
+                      style={{ background: adFocus.campaign.creative.palette[2] }}
+                    />
+                    <p className="text-[11px] font-bold uppercase tracking-wide opacity-80">
+                      {adFocus.campaign.advertiser.name}
+                      {isSponsored(adFocus.campaign) ? ' · Promotion' : ''}
+                    </p>
+                    <p className="mt-2 text-xl font-black">{adFocus.campaign.creative.title}</p>
+                    <p className="mt-1 text-sm opacity-90">{adFocus.campaign.creative.body}</p>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {adFocus.placement.label}.{' '}
+                    {isSponsored(adFocus.campaign)
+                      ? 'Contenu sponsorisé, validé par l’équipe FaîtiereHub.'
+                      : 'Information sur un service FaîtiereHub (pas une publicité payée).'}{' '}
+                    Le lien s’ouvre dans un nouvel onglet ; ta partie reste ouverte.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      data-testid="ad-learn-more"
+                      onClick={learnMore}
+                      className="min-h-12 rounded-2xl bg-emerald-600 px-4 text-sm font-bold text-white"
+                    >
+                      {adFocus.campaign.creative.cta}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPanel(null)}
+                      className="min-h-12 rounded-2xl bg-slate-100 px-4 text-sm font-bold text-slate-800"
+                    >
+                      Retour au jeu
+                    </button>
+                  </div>
+                </>
+              )}
               {panel === 'billboard' && board && (
                 <>
                   <div
@@ -2444,7 +2821,9 @@ export function LomeLifeImmersive() {
                 </>
               )}
               <p className="pt-1 text-center text-[10px] text-slate-500">
-                HarooLife · Mode fictif, hors paiements et comptes réels
+                {panel === 'messages' && realtime.state.status === 'online'
+                  ? 'Discussion entre vrais comptes HarooLife : messages enregistrés, signalables et modérés'
+                  : 'HarooLife · Mode fictif, hors paiements et comptes réels'}
               </p>
             </div>
           </section>

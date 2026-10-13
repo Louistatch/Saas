@@ -13,6 +13,10 @@ export default defineConfig({
     'lome-travel.spec.ts',
     'lome-player.spec.ts',
     'lome-avatar.spec.ts',
+    'lome-door.spec.ts',
+    'lome-realtime.spec.ts',
+    'lome-billboard.spec.ts',
+    'lome-endurance.spec.ts',
   ],
   reporter: [['list'], ['html', { outputFolder: 'test-results/lome-report', open: 'never' }]],
   fullyParallel: false,
@@ -24,7 +28,16 @@ export default defineConfig({
     launchOptions: {
       // Cloud sessions ship Chromium at this path; a local Playwright install may override it.
       executablePath: process.env.PW_CHROMIUM_PATH || undefined,
-      args: ['--enable-webgl', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+      args: [
+        '--enable-webgl',
+        '--use-angle=swiftshader',
+        '--enable-unsafe-swiftshader',
+        // Two players = two pages; each stands for a phone in the foreground, so neither may be
+        // throttled as a background tab (the realtime spec animates both at once).
+        '--disable-background-timer-throttling',
+        '--disable-renderer-backgrounding',
+        '--disable-backgrounding-occluded-windows',
+      ],
     },
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',

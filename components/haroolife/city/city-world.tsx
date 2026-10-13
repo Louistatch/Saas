@@ -1,5 +1,7 @@
 'use client'
 
+import type { AdCampaign, AdPlacement } from '@/lib/haroolife/ads/campaigns'
+import type { ExposureTracker } from '@/lib/haroolife/ads/exposure'
 import { releaseEntity } from '@/lib/haroolife/city/gpu'
 import { type NpcAnim, type Prop, layoutFor } from '@/lib/haroolife/city/interiors'
 import type { Interior } from '@/lib/haroolife/city/life'
@@ -29,6 +31,7 @@ import {
 } from '@/lib/haroolife/city/world'
 import type { Transport } from '@/lib/haroolife/lome-life-engine'
 import type { PlacedResident } from '@/lib/haroolife/lome-presence'
+import type { PresenceEntry } from '@/lib/haroolife/realtime/protocol'
 import type { BuildType, City } from '@/lib/haroolife/townsmen-engine'
 /**
  * The city of Lomé in 3D: streamed chunks of real buildings, the player's estate embedded
@@ -46,11 +49,13 @@ import * as pc from 'playcanvas'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ESTATE_ASSETS, EstateTiles } from '../city-world-3d'
 import { Ride } from '../travel-scene-3d'
+import Billboards from './billboards-3d'
 import { Character } from './character'
 import CityChunks, { type ChunkStats, cellOf, worldPos } from './city-chunks'
 import InteriorScene from './interior-scene'
 import { type Bank, bakedMaterial, loadBank, meshFor } from './model-bank'
 import PlayerRig from './player-rig'
+import RemotePlayers, { type PoseFeed } from './remote-players'
 import { useMaterial } from './use-material'
 
 export type CameraState = { tx: number; tz: number; distance: number; angle: number }
@@ -590,6 +595,9 @@ export default function CityWorld({
   onFrame,
   quality = 'balanced',
   locality = 'lome',
+  remoteFeed,
+  remotePresent,
+  ads,
 }: {
   city: City
   tool: EditTool
@@ -604,6 +612,15 @@ export default function CityWorld({
   /** The player's chosen look: Kenney model and pagne colour (also used indoors). */
   avatarModel?: string
   avatarPagne?: string
+  /** Other players in this locality (realtime relay), interpolated between snapshots. */
+  remoteFeed?: PoseFeed
+  remotePresent?: PresenceEntry[]
+  /** Street billboards (M2): campaigns, exposure statistics, the support the player stands by. */
+  ads?: {
+    campaigns: AdCampaign[]
+    tracker: ExposureTracker
+    onNear: (p: { placement: AdPlacement; campaign: AdCampaign } | null) => void
+  }
   /** Low-rate camera state (chunk streaming, labels); the rig moves the real camera. */
   camera: CameraState
   onCamera: (c: CameraState) => void
@@ -822,6 +839,18 @@ export default function CityWorld({
               onEvents={onPlayerEvents}
               onCameraSync={onCameraSync}
             />
+            {ads && ads.campaigns.length > 0 && (
+              <Billboards
+                locality={locality}
+                campaigns={ads.campaigns}
+                controller={controller}
+                tracker={ads.tracker}
+                onNear={ads.onNear}
+              />
+            )}
+            {remoteFeed && remotePresent && remotePresent.length > 0 && (
+              <RemotePlayers feed={remoteFeed} present={remotePresent} />
+            )}
             {hasVehicle && (
               <Baked
                 name="Taxi du joueur"

@@ -228,6 +228,21 @@ function nearVenue(state: LifeState, venue: Venue): boolean {
   if (state.inside === venue) return true
   return state.city.buildings.some((b) => b.type === venue && manhattan(b, state.pos) === 1)
 }
+export const isVenue = (t: string): t is Venue => venues.has(t as Venue)
+/**
+ * Enter an estate building chosen by the interaction resolver (which measured the continuous
+ * avatar position against the footprint). `state.pos` is a road cell and may lag behind the
+ * avatar standing on the lawn, so it is not consulted here.
+ */
+export function enterBuilding(state: LifeState, building: RoadPoint): LifeState {
+  if (state.inside) return events(state, 'Sors avant de changer de bâtiment.')
+  const b = state.city.buildings.find((q) => q.x === building.x && q.y === building.y)
+  if (!b || !isVenue(b.type)) return events(state, 'Ce bâtiment ne se visite pas.')
+  return events(
+    { ...state, inside: b.type, route: [], target: { x: b.x, y: b.y } },
+    'Tu entres : ' + CATALOG[b.type as BuildType]?.label + '.',
+  )
+}
 export function interact(state: LifeState, action: Action): LifeState {
   if (action === 'leave') {
     if (!state.inside) return events(state, 'Tu es déjà à l’extérieur.')

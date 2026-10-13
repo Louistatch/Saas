@@ -39,6 +39,17 @@ jobs:
             curl -sf -o /dev/null -X POST http://127.0.0.1:54329/__reset && break
             sleep 1
           done
+      - name: Start the local Socket.IO relay (real chat migration in PGlite, fixtures only)
+        env:
+          SUPABASE_URL: http://127.0.0.1:54329
+          SUPABASE_ANON_KEY: e2e-anon-key
+          HAROOLIFE_REALTIME_REPO: pglite
+        run: |
+          npm run realtime > realtime.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf -o /dev/null http://127.0.0.1:3001/health && break
+            sleep 1
+          done
       - name: Verify desktop and Android-sized browser locally (NO deployment)
         # Dummy values pointing at the stand-in above; nothing leaves the runner.
         env:
@@ -47,6 +58,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: e2e-service
           HAROOLIFE_ENABLED: 'true'
           NEXT_PUBLIC_HAROOLIFE_ENABLED: 'true'
+          NEXT_PUBLIC_HAROOLIFE_REALTIME_URL: http://127.0.0.1:3001
         run: npx playwright test --config=e2e/lome-life-playwright.config.ts
       - name: Keep desktop/mobile screenshots and failure traces
         if: always()
@@ -61,4 +73,5 @@ jobs:
             test-results/lome-perf
             test-results/**/*.zip
             mock-supabase.log
+            realtime.log
           retention-days: 7
