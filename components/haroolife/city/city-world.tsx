@@ -1,5 +1,7 @@
 'use client'
 
+import type { AdCampaign, AdPlacement } from '@/lib/haroolife/ads/campaigns'
+import type { ExposureTracker } from '@/lib/haroolife/ads/exposure'
 import { releaseEntity } from '@/lib/haroolife/city/gpu'
 import { type NpcAnim, type Prop, layoutFor } from '@/lib/haroolife/city/interiors'
 import type { Interior } from '@/lib/haroolife/city/life'
@@ -47,6 +49,7 @@ import * as pc from 'playcanvas'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ESTATE_ASSETS, EstateTiles } from '../city-world-3d'
 import { Ride } from '../travel-scene-3d'
+import Billboards from './billboards-3d'
 import { Character } from './character'
 import CityChunks, { type ChunkStats, cellOf, worldPos } from './city-chunks'
 import InteriorScene from './interior-scene'
@@ -594,6 +597,7 @@ export default function CityWorld({
   locality = 'lome',
   remoteFeed,
   remotePresent,
+  ads,
 }: {
   city: City
   tool: EditTool
@@ -611,6 +615,12 @@ export default function CityWorld({
   /** Other players in this locality (realtime relay), interpolated between snapshots. */
   remoteFeed?: PoseFeed
   remotePresent?: PresenceEntry[]
+  /** Street billboards (M2): campaigns, exposure statistics, the support the player stands by. */
+  ads?: {
+    campaigns: AdCampaign[]
+    tracker: ExposureTracker
+    onNear: (p: { placement: AdPlacement; campaign: AdCampaign } | null) => void
+  }
   /** Low-rate camera state (chunk streaming, labels); the rig moves the real camera. */
   camera: CameraState
   onCamera: (c: CameraState) => void
@@ -829,6 +839,15 @@ export default function CityWorld({
               onEvents={onPlayerEvents}
               onCameraSync={onCameraSync}
             />
+            {ads && ads.campaigns.length > 0 && (
+              <Billboards
+                locality={locality}
+                campaigns={ads.campaigns}
+                controller={controller}
+                tracker={ads.tracker}
+                onNear={ads.onNear}
+              />
+            )}
             {remoteFeed && remotePresent && remotePresent.length > 0 && (
               <RemotePlayers feed={remoteFeed} present={remotePresent} />
             )}

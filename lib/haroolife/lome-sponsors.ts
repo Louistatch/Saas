@@ -69,9 +69,10 @@ export const BILLBOARDS: Billboard[] = [
   {
     id: 'bb-centre',
     district: 2,
-    x: 8,
-    y: 8,
-    rotation: 45,
+    // Moved from (8, 8), which stood right against the player's house and hid its door (D4+).
+    x: 13,
+    y: 7,
+    rotation: 180,
     status: 'house',
     headline: 'Carte Haroo : votre identité professionnelle',
     href: '/haroo',

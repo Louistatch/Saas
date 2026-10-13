@@ -26,6 +26,7 @@ const session = () => ({
   expires_at: Math.floor(Date.now() / 1000) + 120,
   user,
 })
+const AD_CAMPAIGNS = []
 const REALTIME_ACCOUNTS = new Set([
   'a1a1a1a1-0000-4000-8000-000000000001',
   'b2b2b2b2-0000-4000-8000-000000000002',
@@ -524,6 +525,7 @@ http
       if (url.pathname === '/__reset' && req.method === 'POST') {
         GROUPS.splice(0, GROUPS.length, ...GROUPS_INITIAL.map((g) => ({ ...g })))
         PARTS = PARTS_INITIAL.map((p) => ({ ...p }))
+        AD_CAMPAIGNS.splice(0)
         res.writeHead(204)
         return res.end()
       }
@@ -566,6 +568,50 @@ http
       if (p === '/rest/v1/rpc/haroolife_world') return send(200, WORLD)
       if (p === '/rest/v1/rpc/haroolife_set_home') return send(200, null)
       if (p === '/rest/v1/rpc/haroolife_say') return send(200, 'm3')
+      // Billboard admin console (UI only; the real rules are tested on the SQL in PGlite).
+      if (p === '/rest/v1/rpc/haroolife_ad_admin_list')
+        return send(200, {
+          campaigns: AD_CAMPAIGNS,
+          stats: [
+            { campaign: 'internal-marche', placement: 'lome-avenue', impressions: 12, clicks: 2 },
+          ],
+        })
+      if (p === '/rest/v1/rpc/haroolife_ad_admin_save') {
+        const { p: c } = JSON.parse(body || '{}')
+        const row = {
+          id: `ad${AD_CAMPAIGNS.length + 1}0000-0000-4000-8000-000000000000`.slice(0, 36),
+          advertiser: { name: c.advertiser, kind: c.kind },
+          creative: c.creative,
+          status: 'draft',
+          locality: c.locality,
+          placements: c.placements,
+          startsAt: c.startsAt,
+          endsAt: c.endsAt,
+          weight: c.weight,
+          version: 1,
+          rightsConfirmed: c.rightsConfirmed,
+          contractRef: c.contractRef || null,
+          versions: 1,
+        }
+        AD_CAMPAIGNS.unshift(row)
+        return send(200, row)
+      }
+      if (p === '/rest/v1/rpc/haroolife_ad_admin_move') {
+        const { p_id, p_status } = JSON.parse(body || '{}')
+        const row = AD_CAMPAIGNS.find((c) => c.id === p_id)
+        if (row && p_status === 'approved' && !row.rightsConfirmed)
+          return send(400, {
+            code: '22023',
+            message: 'Confirmez d’abord les droits sur les images et textes',
+          })
+        if (row)
+          Object.assign(row, {
+            status: p_status,
+            version: row.version + 1,
+            versions: row.versions + 1,
+          })
+        return send(200, row ?? null)
+      }
       if (p === '/rest/v1/rpc/get_accessible_cooperative_ids') return send(200, [C1, U1, C2])
       if (p === '/rest/v1/rpc/haroolife_board') return send(200, BOARD())
       if (p === '/rest/v1/rpc/haroolife_command') {

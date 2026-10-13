@@ -1,5 +1,27 @@
 'use client'
 
+import {
+  type AdCampaign,
+  type AdPlacement,
+  INTERNAL_CAMPAIGNS,
+  isSponsored,
+  safeHref,
+} from '@/lib/haroolife/ads/campaigns'
+import { ExposureTracker } from '@/lib/haroolife/ads/exposure'
+import {
+  AVATAR_MODELS,
+  type Avatar,
+  DEFAULT_AVATAR,
+  loadAvatar,
+  pagneColor,
+  saveAvatar,
+} from '@/lib/haroolife/city/avatar'
+import {
+  type InteractionTarget,
+  estateRef,
+  lotRef,
+  resolveInteraction,
+} from '@/lib/haroolife/city/interaction'
 import { type Prop, animFor, layoutFor } from '@/lib/haroolife/city/interiors'
 import {
   type CityAction,
@@ -8,8 +30,8 @@ import {
   actionsFor,
   arrive,
   cityInteract,
-  enterLot,
   ensureLocality,
+  enterLot,
   freelyWalkable,
   goToEstate,
   goToLot,
@@ -27,21 +49,7 @@ import {
   walkStep,
 } from '@/lib/haroolife/city/life'
 import { LOCALITIES, LOCALITY_IDS, type LocalityId } from '@/lib/haroolife/city/locality'
-import {
-  type InteractionTarget,
-  estateRef,
-  lotRef,
-  resolveInteraction,
-} from '@/lib/haroolife/city/interaction'
 import { CITY_STORAGE, loadCityLife } from '@/lib/haroolife/city/migrate'
-import {
-  AVATAR_MODELS,
-  type Avatar,
-  DEFAULT_AVATAR,
-  loadAvatar,
-  pagneColor,
-  saveAvatar,
-} from '@/lib/haroolife/city/avatar'
 import { ESTATE_GATE } from '@/lib/haroolife/city/navigation'
 import { findPath } from '@/lib/haroolife/city/navigation'
 import { bump } from '@/lib/haroolife/city/perf'
@@ -96,9 +104,9 @@ import {
   TRAVEL_COST,
   type Transport,
   advanceLifeHour,
-  enterBuilding,
   buildInLome,
   demolishInLome,
+  enterBuilding,
   initialLomeLife,
   interact,
   jobVenue,
@@ -140,9 +148,9 @@ import Joystick, { useKeyboardInput } from './city/joystick'
 import MarketPanel from './city/market-panel'
 import NationalMap from './city/national-map'
 import OnboardingSteps from './city/onboarding'
+import LiveChat from './live-chat'
 import { PAGNES } from './pagnes'
 import { HomeDialog } from './residence-dialog'
-import LiveChat from './live-chat'
 import { sayOnPlace, usePresence } from './use-presence'
 import { useRealtime } from './use-realtime'
 
@@ -167,6 +175,7 @@ type Sheet =
   | 'missions'
   | 'journal'
   | 'billboard'
+  | 'ad'
   | 'lot'
   | 'cooperative'
   | 'market'
@@ -425,6 +434,17 @@ export function LomeLifeImmersive() {
   // The door in reach of the avatar (single resolver, continuous position, hysteresis).
   const [door, setDoor] = useState<InteractionTarget | null>(null)
   const doorRef = useRef<InteractionTarget | null>(null)
+  // Street billboards (M2): internal notices at once (offline too), live campaigns when reachable.
+  const [adCampaigns, setAdCampaigns] = useState<AdCampaign[]>(INTERNAL_CAMPAIGNS)
+  const [nearAd, setNearAd] = useState<{ placement: AdPlacement; campaign: AdCampaign } | null>(
+    null,
+  )
+  const [adFocus, setAdFocus] = useState<{ placement: AdPlacement; campaign: AdCampaign } | null>(
+    null,
+  )
+  const adTracker = useRef<ExposureTracker | null>(null)
+  if (!adTracker.current) adTracker.current = new ExposureTracker()
+  const adsEnabled = process.env.NEXT_PUBLIC_HAROOLIFE_ADS !== 'off'
   const insideName = cityLife.insideLot
     ? (lotById(cityLife.insideLot)?.name ?? TYPE_LABELS[lotById(cityLife.insideLot)?.type ?? 'lot'])
     : life.inside
@@ -459,15 +479,19 @@ export function LomeLifeImmersive() {
                         ? 'Journal de vie'
                         : panel === 'billboard'
                           ? 'Panneau publicitaire'
-                          : panel === 'lot'
-                            ? 'Lieu'
-                            : panel === 'cooperative'
-                              ? 'Coopérative'
-                              : panel === 'avatar'
-                                ? 'Mon apparence'
-                                : panel === 'market'
-                                  ? 'Marché'
-                                  : ''
+                          : panel === 'ad'
+                            ? adFocus && isSponsored(adFocus.campaign)
+                              ? 'Promotion'
+                              : 'Information FaîtiereHub'
+                            : panel === 'lot'
+                              ? 'Lieu'
+                              : panel === 'cooperative'
+                                ? 'Coopérative'
+                                : panel === 'avatar'
+                                  ? 'Mon apparence'
+                                  : panel === 'market'
+                                    ? 'Marché'
+                                    : ''
   const needs = life.needs
   const wellbeing = Math.round(NEED_KEYS.reduce((sum, k) => sum + needs[k], 0) / NEED_KEYS.length)
   const pending = eventById(life.pendingEvent)
@@ -519,6 +543,79 @@ export function LomeLifeImmersive() {
       drop: () => realtime.client?.drop(),
     }
   }, [realtime.state, realtime.client, unreadTotal])
+  // Campaigns of this town (CDN-cached API); on failure the internal notices stay.
+  useEffect(() => {
+    if (!adsEnabled) return
+    let stop = false
+    const locality = cityLife.locality === 'kara' ? 'kara' : 'lome'
+    void fetch(`/api/haroolife/ads?locality=${locality}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { enabled: boolean; campaigns: AdCampaign[] } | null) => {
+        if (stop || !d) return
+        setAdCampaigns(d.enabled ? d.campaigns : [])
+      })
+      .catch(() => {})
+    return () => {
+      stop = true
+    }
+  }, [adsEnabled, cityLife.locality])
+  // Aggregated statistics leave every minute and when the page is hidden (counts only).
+  useEffect(() => {
+    if (!adsEnabled) return
+    const send = (beacon: boolean) => {
+      const items = adTracker.current?.flush() ?? []
+      if (!items.length) return
+      const body = JSON.stringify({ items: items.slice(0, 8) })
+      if (beacon && navigator.sendBeacon)
+        navigator.sendBeacon(
+          '/api/haroolife/ads/events',
+          new Blob([body], { type: 'application/json' }),
+        )
+      else
+        void fetch('/api/haroolife/ads/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body,
+          keepalive: true,
+        }).catch(() => {})
+    }
+    const id = window.setInterval(() => send(false), 60_000)
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') send(true)
+    }
+    document.addEventListener('visibilitychange', onHide)
+    window.addEventListener('pagehide', onHide)
+    ;(window as unknown as { __LOME_ADS_FLUSH?: () => void }).__LOME_ADS_FLUSH = () => send(false)
+    return () => {
+      window.clearInterval(id)
+      document.removeEventListener('visibilitychange', onHide)
+      window.removeEventListener('pagehide', onHide)
+      send(true)
+    }
+  }, [adsEnabled])
+  const onNearAd = useCallback(
+    (p: { placement: AdPlacement; campaign: AdCampaign } | null) => setNearAd(p),
+    [],
+  )
+  const adsProp = useMemo(
+    () =>
+      adsEnabled && adTracker.current
+        ? { campaigns: adCampaigns, tracker: adTracker.current, onNear: onNearAd }
+        : undefined,
+    [adsEnabled, adCampaigns, onNearAd],
+  )
+  function readAd() {
+    if (!nearAd) return
+    setAdFocus(nearAd)
+    setPanel('ad')
+  }
+  function learnMore() {
+    if (!adFocus) return
+    const href = safeHref(adFocus.campaign.creative.href)
+    if (!href) return
+    adTracker.current?.click(adFocus.campaign.id, adFocus.placement.id)
+    window.open(href, '_blank', 'noopener,noreferrer')
+  }
   const here = presence.status === 'ready' ? (presence.world?.here ?? null) : null
   const visitors = useMemo(
     () => (here ? placeResidents(here.residents, life.city.buildings) : []),
@@ -1151,6 +1248,7 @@ export function LomeLifeImmersive() {
             onPlayerEvents={onPlayerEvents}
             remoteFeed={realtime.client ?? undefined}
             remotePresent={realtime.state.present}
+            ads={adsProp}
             onCameraSync={onCameraSync}
             hasVehicle={cityLife.locality === 'lome' && Boolean(cityLife.vehicle)}
             avatarModel={avatar.model}
@@ -1416,6 +1514,24 @@ export function LomeLifeImmersive() {
                 className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-400 text-[10px] font-black text-slate-900 shadow"
               >
                 {driving ? 'Descendre' : '🚕 Monter'}
+              </button>
+            )}
+            {nearAd && !insideAny && !driving && panel === null && (
+              <button
+                type="button"
+                data-testid="ad-read"
+                onClick={readAd}
+                className="flex min-h-11 max-w-[11rem] items-center gap-2 self-end rounded-2xl bg-white/95 px-3 py-2 text-left text-xs font-black text-slate-800 shadow-lg ring-1 ring-slate-200"
+              >
+                <span aria-hidden className="text-base leading-none">
+                  📣
+                </span>
+                <span className="min-w-0 leading-tight">
+                  <span className="block">Lire l’annonce</span>
+                  <span className="block truncate text-[11px] font-semibold text-slate-500">
+                    {isSponsored(nearAd.campaign) ? 'Promotion' : nearAd.campaign.advertiser.name}
+                  </span>
+                </span>
               </button>
             )}
             {(insideAny || door) && (
@@ -2479,6 +2595,54 @@ export function LomeLifeImmersive() {
                     pour retrouver votre coopérative, ses membres et ses regroupements.
                   </p>
                 ))}
+              {panel === 'ad' && adFocus && (
+                <>
+                  <div
+                    data-testid="ad-focus"
+                    className="relative overflow-hidden rounded-2xl p-5"
+                    style={{
+                      background: adFocus.campaign.creative.palette[0],
+                      color: adFocus.campaign.creative.palette[1],
+                    }}
+                  >
+                    <span
+                      aria-hidden
+                      className="absolute inset-y-0 left-0 w-2"
+                      style={{ background: adFocus.campaign.creative.palette[2] }}
+                    />
+                    <p className="text-[11px] font-bold uppercase tracking-wide opacity-80">
+                      {adFocus.campaign.advertiser.name}
+                      {isSponsored(adFocus.campaign) ? ' · Promotion' : ''}
+                    </p>
+                    <p className="mt-2 text-xl font-black">{adFocus.campaign.creative.title}</p>
+                    <p className="mt-1 text-sm opacity-90">{adFocus.campaign.creative.body}</p>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {adFocus.placement.label}.{' '}
+                    {isSponsored(adFocus.campaign)
+                      ? 'Contenu sponsorisé, validé par l’équipe FaîtiereHub.'
+                      : 'Information sur un service FaîtiereHub (pas une publicité payée).'}{' '}
+                    Le lien s’ouvre dans un nouvel onglet ; ta partie reste ouverte.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      data-testid="ad-learn-more"
+                      onClick={learnMore}
+                      className="min-h-12 rounded-2xl bg-emerald-600 px-4 text-sm font-bold text-white"
+                    >
+                      {adFocus.campaign.creative.cta}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPanel(null)}
+                      className="min-h-12 rounded-2xl bg-slate-100 px-4 text-sm font-bold text-slate-800"
+                    >
+                      Retour au jeu
+                    </button>
+                  </div>
+                </>
+              )}
               {panel === 'billboard' && board && (
                 <>
                   <div

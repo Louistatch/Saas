@@ -15,6 +15,7 @@ export default defineConfig({
     'lome-avatar.spec.ts',
     'lome-door.spec.ts',
     'lome-realtime.spec.ts',
+    'lome-billboard.spec.ts',
   ],
   reporter: [['list'], ['html', { outputFolder: 'test-results/lome-report', open: 'never' }]],
   fullyParallel: false,
