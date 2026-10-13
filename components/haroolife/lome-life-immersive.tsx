@@ -140,9 +140,8 @@ import {
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { CAMERA_HOME, type CameraState, worldPos } from '@/lib/haroolife/city/geometry'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { worldPos } from './city/city-chunks'
-import { CAMERA_HOME, type CameraState } from './city/city-world'
 import CooperativePanel from './city/cooperative-panel'
 import DiagOverlay, { initialDiag, rememberDiag } from './city/diag-overlay'
 import Joystick, { useKeyboardInput } from './city/joystick'
@@ -2616,7 +2615,10 @@ export function LomeLifeImmersive() {
                   </p>
                 ) : (
                   <p className="text-sm text-slate-600">
-                    <Link href="/login" className="font-bold text-emerald-700 underline">
+                    <Link
+                      href="/auth/login?redirect=%2Fharoolife"
+                      className="font-bold text-emerald-700 underline"
+                    >
                       Connectez-vous
                     </Link>{' '}
                     pour retrouver votre coopérative, ses membres et ses regroupements.

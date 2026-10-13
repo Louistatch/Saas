@@ -6,6 +6,7 @@
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 import { type NextRequest, NextResponse } from 'next/server'
+import { rateLimit } from './rate-limit'
 
 // Vérifier si Upstash est configuré
 const isUpstashConfigured = !!(
@@ -96,20 +97,55 @@ export const rateLimiters = redis
 /**
  * Apply persistent rate limiting via Upstash Redis.
  * Returns a 429 response if the limit is exceeded, or null if the request is allowed.
- * Falls back to in-memory rate limiting if Upstash is not configured.
+ * Falls back to the in-memory limiter (same budgets, per instance) if Upstash is not configured.
  */
+type LimiterName =
+  | 'haroolife'
+  | 'verify'
+  | 'marketplace'
+  | 'embed'
+  | 'auth'
+  | 'webhook'
+  | 'ai-chat'
+  | 'ai-vision'
+  | 'ai-voice'
+  | 'kobo-sync'
+
+/** Same budgets as the Upstash limiters, per minute and per IP, for the in-memory fallback. */
+const PER_MINUTE: Record<LimiterName, number> = {
+  verify: 10,
+  marketplace: 60,
+  embed: 30,
+  haroolife: 20,
+  auth: 5,
+  webhook: 100,
+  'ai-chat': 20,
+  'ai-vision': 10,
+  'ai-voice': 15,
+  'kobo-sync': 5,
+}
+
 export async function applyRateLimit(
   request: NextRequest,
-  limiter: 'haroolife' | 'verify' | 'marketplace' | 'embed' | 'auth' | 'webhook' | 'ai-chat' | 'ai-vision' | 'ai-voice' | 'kobo-sync'
+  limiter: LimiterName
 ): Promise<NextResponse | null> {
-  if (!rateLimiters) {
-    // Upstash not configured — fall through to in-memory rate limiter in route handlers
-    return null
-  }
-
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
     ?? request.headers.get('x-real-ip')
     ?? 'unknown'
+
+  if (!rateLimiters) {
+    // Upstash not configured: an in-memory budget per instance instead of no limit at all
+    // (several routes relied on this function alone and were left unprotected).
+    const mem = rateLimit(`rl:${limiter}:${ip}`, PER_MINUTE[limiter], 60_000)
+    if (mem.ok) return null
+    return NextResponse.json(
+      { error: 'Trop de requêtes. Réessayez dans quelques instants.' },
+      {
+        status: 429,
+        headers: { 'Retry-After': String(Math.max(1, Math.ceil((mem.resetAt - Date.now()) / 1000))) },
+      },
+    )
+  }
 
   const { success, limit, reset } = await rateLimiters[limiter].limit(ip)
 

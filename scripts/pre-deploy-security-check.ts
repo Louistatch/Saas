@@ -172,6 +172,17 @@ if (!process.argv.includes('--static')) {
     koboSecret.length >= 32,
     'Ajouter KOBO_WEBHOOK_SECRET (≥32 chars) dans .env.local et Vercel Dashboard',
   )
+  // Sans Upstash, la limitation de débit n'est qu'en mémoire, propre à chaque instance serverless.
+  check(
+    '[RATE-1] Upstash Redis configuré (limitation de débit partagée)',
+    !!process.env.UPSTASH_REDIS_REST_URL && !!process.env.UPSTASH_REDIS_REST_TOKEN,
+    'Ajouter UPSTASH_REDIS_REST_URL et UPSTASH_REDIS_REST_TOKEN dans Vercel',
+  )
+  check(
+    '[CARD-1] CARD_AUTH_SECRET configuré (≥32 chars)',
+    (process.env.CARD_AUTH_SECRET ?? '').length >= 32,
+    'Ajouter CARD_AUTH_SECRET (≥32 chars) : sessions et PIN des cartes',
+  )
 } else {
   console.log('Configuration des secrets : contrôle réservé à l’environnement de déploiement.')
 }

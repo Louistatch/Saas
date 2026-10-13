@@ -20,6 +20,7 @@ import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 import { buildProducerContext } from '@/lib/agritogo/producer-context'
+import { requirePrivateCard } from '@/lib/security/card-access'
 import {
   getGeminiKey,
   markKeyExhausted as markGeminiKeyExhausted,
@@ -68,15 +69,22 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const supabaseAdmin = createAdminClient()
 
+  // Contexte personnel, historique et enregistrement : titulaire de la carte seulement (voir
+  // /api/ai/chat). Un numéro de carte est public ; un tiers reçoit une réponse générique.
+  const owner = card_number ? (await requirePrivateCard(card_number)).ok : false
+  const ownCard = owner ? card_number : ''
+
   // Contexte producteur + historique (en parallèle)
   const [contextResult, historyResult] = await Promise.all([
-    buildProducerContext(card_number, supabase, supabaseAdmin),
-    supabaseAdmin
-      .from('ai_conversations')
-      .select('role, content')
-      .eq('card_number', card_number)
-      .order('created_at', { ascending: false })
-      .limit(MAX_HISTORY),
+    buildProducerContext(ownCard, supabase, supabaseAdmin),
+    owner
+      ? supabaseAdmin
+          .from('ai_conversations')
+          .select('role, content')
+          .eq('card_number', card_number)
+          .order('created_at', { ascending: false })
+          .limit(MAX_HISTORY)
+      : Promise.resolve({ data: [] as { role: string; content: string }[] }),
   ])
   const { systemPrompt, memberName } = contextResult
   // Fetched newest-first to keep the most recent N; restore chronological order.
@@ -160,7 +168,7 @@ export async function POST(request: NextRequest) {
     if (!response) throw new Error('Réponse DeepSeek vide')
 
     // Sauvegarde dans l'historique
-    if (card_number) {
+    if (owner) {
       await supabase.from('ai_conversations').insert([
         { card_number, role: 'user', content: `🎤 ${transcript}` },
         { card_number, role: 'assistant', content: response },

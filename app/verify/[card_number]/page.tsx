@@ -1,26 +1,12 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { CardLoginPanel } from '@/components/verify/card-login-panel'
 import { AtsBadge, type AtsBreakdown } from '@/components/shared/ats-badge'
 import { Logo } from '@/components/shared/logo'
-import { AcheteurView } from '@/components/verify/acheteur-view'
-import { AgriSmartWater } from '@/components/verify/agrismart-water'
 import { vfpStyles } from '@/components/verify/vfp-styles'
-import { AgriSmartReport } from '@/components/agrismart/agrismart-report'
-import {
-  type AgronomeCardStatus,
-  type AgronomePublicProfile,
-  AgronomeView,
-} from '@/components/verify/agronome-view'
-import { MarketAdvisor } from '@/components/verify/market-advisor'
+import type { AgronomeCardStatus, AgronomePublicProfile } from '@/components/verify/agronome-view'
 import { Card3D } from '@/components/verify/card-3d'
-import { CotisationView } from '@/components/verify/cotisation-view'
-import { ExploitationInlineView } from '@/components/verify/exploitation-inline-view'
-import { IntrantsInlineView } from '@/components/verify/intrants-inline-view'
-import { MarketPricesDashboard } from '@/components/verify/market-prices-dashboard'
-import { MeteoInlineView } from '@/components/verify/meteo-inline-view'
-import { OuvrierView } from '@/components/verify/ouvrier-view'
-import { ParcellesInlineView } from '@/components/verify/parcelles-inline-view'
 import { PrivateCardSection } from '@/components/verify/private-card-section'
 import { memberFullName, waNumber } from '@/components/verify/types'
 import {
@@ -49,6 +35,60 @@ import {
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
+
+// Chaque vue n'apparaît que pour un type de carte ou après un choix dans le menu : chargées à la
+// demande, elles (et recharts, jsPDF…) sortent du premier chargement de la page la plus scannée.
+// Le cadre réservé évite que la page saute pendant leur arrivée.
+const viewSlot = () => <div aria-busy="true" className="min-h-[60vh]" />
+const AcheteurView = dynamic(
+  () => import('@/components/verify/acheteur-view').then((m) => m.AcheteurView),
+  { loading: viewSlot },
+)
+const AgriSmartWater = dynamic(
+  () => import('@/components/verify/agrismart-water').then((m) => m.AgriSmartWater),
+  { loading: viewSlot },
+)
+const AgriSmartReport = dynamic(
+  () => import('@/components/agrismart/agrismart-report').then((m) => m.AgriSmartReport),
+  { loading: viewSlot },
+)
+const MarketAdvisor = dynamic(
+  () => import('@/components/verify/market-advisor').then((m) => m.MarketAdvisor),
+  { loading: viewSlot },
+)
+const CotisationView = dynamic(
+  () => import('@/components/verify/cotisation-view').then((m) => m.CotisationView),
+  { loading: viewSlot },
+)
+const ExploitationInlineView = dynamic(
+  () =>
+    import('@/components/verify/exploitation-inline-view').then((m) => m.ExploitationInlineView),
+  { loading: viewSlot },
+)
+const IntrantsInlineView = dynamic(
+  () => import('@/components/verify/intrants-inline-view').then((m) => m.IntrantsInlineView),
+  { loading: viewSlot },
+)
+const MarketPricesDashboard = dynamic(
+  () => import('@/components/verify/market-prices-dashboard').then((m) => m.MarketPricesDashboard),
+  { loading: viewSlot },
+)
+const MeteoInlineView = dynamic(
+  () => import('@/components/verify/meteo-inline-view').then((m) => m.MeteoInlineView),
+  { loading: viewSlot },
+)
+const OuvrierView = dynamic(
+  () => import('@/components/verify/ouvrier-view').then((m) => m.OuvrierView),
+  { loading: viewSlot },
+)
+const ParcellesInlineView = dynamic(
+  () => import('@/components/verify/parcelles-inline-view').then((m) => m.ParcellesInlineView),
+  { loading: viewSlot },
+)
+const AgronomeView = dynamic(
+  () => import('@/components/verify/agronome-view').then((m) => m.AgronomeView),
+  { loading: viewSlot },
+)
 
 interface VerifyResult {
   valid: boolean
@@ -300,7 +340,10 @@ export default function VerifyCardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen vfp-bg flex items-center justify-center">
+      // Clé propre : sans elle, React réutilisait le bloc du spinner (68 px, centré) comme calque
+      // de fond plein écran de la page chargée, et le navigateur comptait ce changement de taille
+      // comme un décalage de mise en page (CLS 0,46 sur mobile, 0,80 sur ordinateur).
+      <div key="verify-loading" className="min-h-screen vfp-bg flex items-center justify-center">
         <style>{vfpStyles}</style>
         <div className="text-center">
           <div className="vfp-loader mx-auto mb-4" />
@@ -652,11 +695,7 @@ export default function VerifyCardPage() {
               </div>
             </div>
           </header>
-          <AgronomeView
-            cardNumber={cardNumber}
-            agronome={result.agronome}
-            card={result.card}
-          />
+          <AgronomeView cardNumber={cardNumber} agronome={result.agronome} card={result.card} />
           <div
             className={`vfp-card rounded-2xl p-3 transition-all duration-700 ${showContent ? 'opacity-100' : 'opacity-0'}`}
             style={{ transitionDelay: '600ms' }}
@@ -1092,7 +1131,9 @@ export default function VerifyCardPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    document.getElementById('card-login')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                    document
+                      .getElementById('card-login')
+                      ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
                   }
                   className="vfp-card rounded-2xl py-3 px-1.5 min-h-[78px] flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform"
                 >
@@ -1608,10 +1649,7 @@ export default function VerifyCardPage() {
         {/* ─── Exploitation View ─── */}
         {isValid && activeView === 'exploitation' && (
           <PrivateCardSection cardNumber={cardNumber}>
-            <ExploitationInlineView
-              cardNumber={cardNumber}
-              onBack={() => setActiveView('menu')}
-            />
+            <ExploitationInlineView cardNumber={cardNumber} onBack={() => setActiveView('menu')} />
           </PrivateCardSection>
         )}
 

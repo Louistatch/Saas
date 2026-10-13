@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createPublicClient } from '@/lib/supabase/public'
 import { createLogger } from '@/lib/utils/logger'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const supabase = await createClient()
+    const supabase = createPublicClient()
 
     // Get embed config
     const { data: config } = await supabase

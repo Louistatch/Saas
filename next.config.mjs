@@ -93,6 +93,10 @@ const nextConfig = {
       './public/logo.png',
     ],
   },
+  // Anciennes adresses : /login n'a jamais existé mais a été lié depuis HarooLife.
+  async redirects() {
+    return [{ source: '/login', destination: '/auth/login', permanent: false }]
+  },
   async headers() {
     return [
       { source: '/api/verify/:path*', headers: [
@@ -126,6 +130,16 @@ const nextConfig = {
           // Embed: allow framing from any origin (widget use case)
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'no-referrer' },
+        ],
+      },
+      {
+        // HarooLife 3D models and packs (≈ 6 MB): served with max-age=0, each visit revalidated
+        // ~42 files before the world could start. A day of freshness, then a background
+        // revalidation: a changed model reaches players at the latest the next day. Immutable,
+        // versioned URLs are the next step (they need every loader to carry the version).
+        source: '/haroolife/:dir(city|vendor|models)/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=604800' },
         ],
       },
       {

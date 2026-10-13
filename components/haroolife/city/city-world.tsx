@@ -58,15 +58,11 @@ import PlayerRig from './player-rig'
 import RemotePlayers, { type PoseFeed } from './remote-players'
 import { useMaterial } from './use-material'
 
-export type CameraState = { tx: number; tz: number; distance: number; angle: number }
-/** Frame the player with the dense city around: the target sits a little south-east of them. */
+export { CAMERA_HOME, type CameraState } from '@/lib/haroolife/city/geometry'
+import type { CameraState } from '@/lib/haroolife/city/geometry'
 /** The camera entity's initial transform; the player rig moves it every frame afterwards. */
 const CAMERA_START: [number, number, number] = [0, 20, 20]
 const CAMERA_START_ROT: [number, number, number] = [-45, 0, 0]
-export const CAMERA_HOME = (x: number, y: number): CameraState => {
-  const [px, , pz] = worldPos(x - 4, y + 3)
-  return { tx: px, tz: pz, distance: 28, angle: 35 }
-}
 type EditTool = BuildType | 'inspect' | 'demolish'
 /** The player's own look (a Kenney Mini Character). */
 export const PLAYER_MODEL = 'character-female-a'
@@ -460,15 +456,33 @@ function LabelProjector({
 }: { overlay: React.RefObject<HTMLDivElement | null>; lots: Lot[] }) {
   const app = useApp()
   const tmp = useRef(new pc.Vec3())
+  const at = useRef(new pc.Vec3())
+  // Per-frame work stays cheap: the camera is looked up once (again only if it left the scene) and
+  // the canvas rectangle is re-read on resize, not with a forced layout every frame.
+  const cam = useRef<pc.Entity | null>(null)
+  const rect = useRef<DOMRect | null>(null)
+  useEffect(() => {
+    const drop = () => {
+      rect.current = null
+    }
+    window.addEventListener('resize', drop)
+    window.addEventListener('orientationchange', drop)
+    return () => {
+      window.removeEventListener('resize', drop)
+      window.removeEventListener('orientationchange', drop)
+    }
+  }, [])
   useAppEvent('update', () => {
     if (!app || !overlay.current) return
-    const camEntity = app.root.findByName('CityCamera') as pc.Entity | null
-    const cc = camEntity?.camera
+    if (!cam.current?.camera || !cam.current.parent)
+      cam.current = app.root.findByName('CityCamera') as pc.Entity | null
+    const cc = cam.current?.camera
     if (!cc) return
     const canvas = app.graphicsDevice.canvas as HTMLCanvasElement
-    const rect = canvas.getBoundingClientRect()
-    const kx = rect.width / canvas.width
-    const ky = rect.height / canvas.height
+    if (!rect.current || rect.current.width === 0) rect.current = canvas.getBoundingClientRect()
+    const r = rect.current
+    const kx = r.width / canvas.width
+    const ky = r.height / canvas.height
     const children = overlay.current.children
     for (let i = 0; i < children.length; i++) {
       const el = children[i] as HTMLElement
@@ -476,13 +490,13 @@ function LabelProjector({
       if (!lot) continue
       const [px, , pz] = worldPos(lot.x + (lot.w - 1) / 2, lot.y + (lot.h - 1) / 2)
       const h = 0.6 + lot.floors * 0.5 + 0.9
-      const p = cc.worldToScreen(new pc.Vec3(px, h, pz), tmp.current)
+      const p = cc.worldToScreen(at.current.set(px, h, pz), tmp.current)
       const visible =
         p.z > 0 &&
         p.x >= -60 &&
         p.y >= -40 &&
-        p.x * kx <= rect.width + 60 &&
-        p.y * ky <= rect.height + 40
+        p.x * kx <= r.width + 60 &&
+        p.y * ky <= r.height + 40
       el.style.display = visible ? '' : 'none'
       if (visible)
         el.style.transform = `translate(${Math.round(p.x * kx)}px, ${Math.round(p.y * ky)}px) translate(-50%, -100%)`
@@ -496,7 +510,17 @@ function StatsProbe({ onFrame }: { onFrame: (s: { drawCalls: number; fps: number
   const app = useApp()
   const last = useRef(0)
   const ring = useRef(new FrameRing(600))
-  const tasks = useRef(watchLongTasks())
+  // One observer for the probe's lifetime. `useRef(watchLongTasks())` evaluated its argument on
+  // every render and leaked a new, never-disconnected PerformanceObserver each time.
+  const tasks = useRef<ReturnType<typeof watchLongTasks> | null>(null)
+  useEffect(() => {
+    const t = watchLongTasks()
+    tasks.current = t
+    return () => {
+      t.stop()
+      tasks.current = null
+    }
+  }, [])
   useEffect(() => {
     const w = window as unknown as { __LOME_PERF_RESET?: () => void; __LOME_APP?: unknown }
     w.__LOME_PERF_RESET = () => ring.current.reset()
@@ -551,8 +575,8 @@ function StatsProbe({ onFrame }: { onFrame: (s: { drawCalls: number; fps: number
       animated,
       animating,
       heapMB: mem ? Math.round(mem.usedJSHeapSize / 1048576) : null,
-      longTasks: tasks.current.count(),
-      longTaskMs: tasks.current.totalMs(),
+      longTasks: tasks.current?.count() ?? 0,
+      longTaskMs: tasks.current?.totalMs() ?? 0,
       renders: { ...renders },
       assets: app.assets.list().filter((a) => a.loaded).length,
       pixelRatio: app.graphicsDevice.maxPixelRatio,
@@ -647,6 +671,10 @@ export default function CityWorld({
   bump('world')
   const hasEstate = LOCALITIES[locality].estate !== null
   const preset = PRESETS[quality]
+  // Antialiasing is fixed when the WebGL context is created. Keying the Application on it rebuilt
+  // the whole context (chunks, models, shaders) exactly when the quality governor stepped down
+  // on a struggling phone; the governor now only changes resolution and detail.
+  const [antialias] = useState(preset.antialias)
   const overlay = useRef<HTMLDivElement | null>(null)
   const dragging = useRef(false)
   const centerCell = useMemo(() => cellOf(camera.tx, camera.tz), [camera.tx, camera.tz])
@@ -762,8 +790,7 @@ export default function CityWorld({
       data-testid="city-world"
     >
       <Application
-        key={preset.antialias ? 'aa' : 'noaa'}
-        graphicsDeviceOptions={{ antialias: preset.antialias }}
+        graphicsDeviceOptions={{ antialias }}
         className="h-full w-full"
         style={{ width: '100%', height: '100%' }}
       >

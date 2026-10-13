@@ -87,11 +87,16 @@ export interface PerfSnapshot {
 }
 
 /** Long tasks (> 50 ms) observed since the page loaded; counts are cumulative. */
-export function watchLongTasks(): { count: () => number; totalMs: () => number } {
+export function watchLongTasks(): {
+  count: () => number
+  totalMs: () => number
+  stop: () => void
+} {
   let count = 0
   let total = 0
+  let obs: PerformanceObserver | null = null
   try {
-    const obs = new PerformanceObserver((list) => {
+    obs = new PerformanceObserver((list) => {
       for (const e of list.getEntries()) {
         count++
         total += e.duration
@@ -101,5 +106,5 @@ export function watchLongTasks(): { count: () => number; totalMs: () => number }
   } catch {
     /* not supported */
   }
-  return { count: () => count, totalMs: () => Math.round(total) }
+  return { count: () => count, totalMs: () => Math.round(total), stop: () => obs?.disconnect() }
 }

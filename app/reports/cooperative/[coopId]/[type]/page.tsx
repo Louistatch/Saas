@@ -1,3 +1,5 @@
+import { PrintButton } from '@/app/reports/_components/print-button'
+import { assertTenantAccess } from '@/lib/security/assert-access'
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 
@@ -30,6 +32,11 @@ export default async function CooperativeReportPage({
   if (!['membres', 'cotisations', 'productions'].includes(type)) {
     notFound()
   }
+
+  // Rapport d'organisation : réservé aux administrateurs de cette coopérative (ou de son réseau)
+  // et aux super_admins. Un refus ne dit pas si la coopérative existe.
+  const access = await assertTenantAccess(coopId)
+  if (!access.ok) notFound()
 
   const reportType = type as ReportType
   const supabase = await createClient()
@@ -231,9 +238,7 @@ export default async function CooperativeReportPage({
 
       {/* Print button */}
       <div className="no-print" style={{ position: 'fixed', top: 16, right: 16, zIndex: 999 }}>
-        <button
-          type="button"
-          onClick={() => window.print()}
+        <PrintButton
           style={{
             background: GREEN,
             color: 'white',
@@ -244,9 +249,7 @@ export default async function CooperativeReportPage({
             fontFamily: 'sans-serif',
             cursor: 'pointer',
           }}
-        >
-          ⬇ Télécharger / Imprimer
-        </button>
+        />
       </div>
 
       <div

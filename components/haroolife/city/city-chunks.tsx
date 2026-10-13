@@ -30,14 +30,8 @@ import * as pc from 'playcanvas'
 import { useEffect, useRef, useState } from 'react'
 import { type Bank, bakedMaterial, loadBank } from './model-bank'
 
-/** World cell → scene position (cell centre). The whole city is centred on the origin. */
-export function worldPos(x: number, y: number, h = 0): [number, number, number] {
-  return [(x - WORLD_W / 2 + 0.5) * CELL, h, (y - WORLD_H / 2 + 0.5) * CELL]
-}
-/** Scene position → world cell. */
-export function cellOf(px: number, pz: number): { x: number; y: number } {
-  return { x: Math.floor(px / CELL + WORLD_W / 2), y: Math.floor(pz / CELL + WORLD_H / 2) }
-}
+export { cellOf, worldPos } from '@/lib/haroolife/city/geometry'
+import { worldPos } from '@/lib/haroolife/city/geometry'
 
 type RGB = [number, number, number]
 const rgb = (hex: string): RGB => [
