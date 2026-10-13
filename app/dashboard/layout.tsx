@@ -2,7 +2,7 @@
 
 import { ProtectedRoute } from '@/app/components/protected-route'
 import { useAuth } from '@/app/context/auth-context'
-import { useCooperative } from '@/app/context/cooperative-context'
+import { CooperativeProvider, useCooperative } from '@/app/context/cooperative-context'
 import { Logo } from '@/components/shared/logo'
 import { NotificationBell } from '@/components/shared/notification-bell'
 import { ServiceLauncher } from '@/components/shared/service-launcher'
@@ -401,7 +401,17 @@ function ViewAsBanner() {
   )
 }
 
+// The cooperative scope lives here rather than in the root layout: public pages (landing,
+// /verify, /marche, HarooLife) no longer fetch the account's cooperatives on every visit.
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <CooperativeProvider>
+      <DashboardShell>{children}</DashboardShell>
+    </CooperativeProvider>
+  )
+}
+
+function DashboardShell({ children }: { children: React.ReactNode }) {
   const { currentCooperative, cooperatives } = useCooperative()
   const { user } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)

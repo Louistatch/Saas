@@ -1,5 +1,6 @@
 'use client'
 
+import { HAROOLIFE_ASSETS } from '@/lib/haroolife/assets'
 import type { Transport } from '@/lib/haroolife/lome-life-engine'
 /**
  * Travel scene: a ride along a Lomé boulevard between two places, seen from behind the
@@ -13,7 +14,7 @@ import { useAppEvent, useModel } from '@playcanvas/react/hooks'
 import { useState } from 'react'
 import { useMaterial } from './city/use-material'
 
-const BASE = '/haroolife/vendor/kenney-3d/'
+const BASE = `${HAROOLIFE_ASSETS}/vendor/kenney-3d/`
 const LANES = [-2.1, 2.1]
 const TRAFFIC = [
   { kind: 'sedan', lane: 0, z: -14, s: 0.83 },

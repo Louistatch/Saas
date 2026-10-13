@@ -1,5 +1,6 @@
 'use client'
 
+import { HAROOLIFE_ASSETS } from '@/lib/haroolife/assets'
 import { deviceAlive, releaseEntity } from '@/lib/haroolife/city/gpu'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 /**
@@ -11,7 +12,7 @@ import { useApp, useModel } from '@playcanvas/react/hooks'
 import * as pc from 'playcanvas'
 import { useEffect, useRef } from 'react'
 
-export const CHARACTER_BASE = '/haroolife/vendor/kenney-3d/mini-characters/'
+export const CHARACTER_BASE = `${HAROOLIFE_ASSETS}/vendor/kenney-3d/mini-characters/`
 /** Kenney clip names for each activity. */
 const CLIP: Record<NpcAnim, string> = {
   idle: 'idle',

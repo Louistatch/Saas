@@ -1,5 +1,6 @@
 'use client'
 
+import { HAROOLIFE_ASSETS } from '@/lib/haroolife/assets'
 import type { Interior } from '@/lib/haroolife/city/life'
 import type { Action } from '@/lib/haroolife/lome-life-engine'
 /** Lightweight original interior assembled from PlayCanvas geometry and CC0 Kenney models.
@@ -10,7 +11,7 @@ import { Camera, Light, Render } from '@playcanvas/react/components'
 import { useModel } from '@playcanvas/react/hooks'
 import { useMaterial } from './city/use-material'
 
-const BASE = '/haroolife/vendor/kenney-3d/'
+const BASE = `${HAROOLIFE_ASSETS}/vendor/kenney-3d/`
 function Citizen({
   position,
   scale = 0.85,

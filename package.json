@@ -85,7 +85,7 @@
     "react-is": "^19.2.7",
     "react-resizable-panels": "^2.1.7",
     "recharts": "^3.8.1",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.5",
     "socket.io": "4.8.4",
     "socket.io-client": "4.8.4",
     "sonner": "^1.7.1",

@@ -1,12 +1,13 @@
 'use client'
 
+import { HAROOLIFE_ASSETS } from '@/lib/haroolife/assets'
 import type { SizeTable } from '@/lib/haroolife/city/catalogue'
 import { type Model, type PackManifest, decodeModel } from '@/lib/haroolife/city/pack'
-import * as pc from 'playcanvas'
 import { simplifyModel } from '@/lib/haroolife/city/simplify'
+import * as pc from 'playcanvas'
 
 /** Where the baked Kenney pack is served from (see scripts/haroolife-bake-models.mjs). */
-export const PACK_BASE = '/haroolife/city/'
+export const PACK_BASE = `${HAROOLIFE_ASSETS}/city/`
 /** Grid cells across a model's bounding box for the low level of detail. */
 export const LOW_DETAIL_CELLS = 12
 

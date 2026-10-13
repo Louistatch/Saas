@@ -1,5 +1,4 @@
 import { AuthProvider } from '@/app/context/auth-context'
-import { CooperativeProvider } from '@/app/context/cooperative-context'
 import { PostHogProvider } from '@/app/providers/posthog-provider'
 import { SiteVisitTracker } from '@/components/shared/site-visit-tracker'
 import { ThemeProvider } from '@/components/theme-provider'
@@ -52,16 +51,14 @@ export default function RootLayout({
         >
           <PostHogProvider>
             <AuthProvider>
-              <CooperativeProvider>
-                {children}
-                <Toaster />
-                {process.env.NODE_ENV === 'production' && (
-                  <>
-                    <Analytics />
-                    <SiteVisitTracker />
-                  </>
-                )}
-              </CooperativeProvider>
+              {children}
+              <Toaster />
+              {process.env.NODE_ENV === 'production' && (
+                <>
+                  <Analytics />
+                  <SiteVisitTracker />
+                </>
+              )}
             </AuthProvider>
           </PostHogProvider>
         </ThemeProvider>

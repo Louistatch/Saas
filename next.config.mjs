@@ -1,4 +1,27 @@
 import { withSentryConfig } from '@sentry/nextjs'
+import { createHash } from 'node:crypto'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+
+// Content hash of the HarooLife 3D assets (public/haroolife/{city,vendor,models}). Loaders put it
+// in the URL (/haroolife/v/<hash>/…, see lib/haroolife/assets.ts), so those URLs can be cached as
+// immutable: a changed model changes the hash, hence the URL, on the next deploy.
+const harooAssetsVersion = (() => {
+  const hash = createHash('sha256')
+  const walk = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const p = join(dir, e.name)
+      if (e.isDirectory()) walk(p)
+      else hash.update(p).update(readFileSync(p))
+    }
+  }
+  try {
+    for (const d of ['city', 'vendor', 'models']) walk(join('public', 'haroolife', d))
+    return hash.digest('hex').slice(0, 12)
+  } catch {
+    return ''
+  }
+})()
 
 // HarooLife realtime relay (Socket.IO, WebSocket only): allowed in connect-src only when configured.
 const realtimeSources = (() => {
@@ -52,6 +75,9 @@ const securityHeaders = [
 ]
 
 const nextConfig = {
+  env: {
+    NEXT_PUBLIC_HAROOLIFE_ASSETS_V: harooAssetsVersion,
+  },
   typescript: {
     ignoreBuildErrors: false,
   },
@@ -97,6 +123,16 @@ const nextConfig = {
   async redirects() {
     return [{ source: '/login', destination: '/auth/login', permanent: false }]
   },
+  // Versioned HarooLife asset URLs map back onto the files in public/: the version only exists
+  // to give each content its own URL.
+  async rewrites() {
+    return [
+      {
+        source: '/haroolife/v/:v/:dir(city|vendor|models)/:path*',
+        destination: '/haroolife/:dir/:path*',
+      },
+    ]
+  },
   async headers() {
     return [
       { source: '/api/verify/:path*', headers: [
@@ -135,12 +171,17 @@ const nextConfig = {
       {
         // HarooLife 3D models and packs (≈ 6 MB): served with max-age=0, each visit revalidated
         // ~42 files before the world could start. A day of freshness, then a background
-        // revalidation: a changed model reaches players at the latest the next day. Immutable,
-        // versioned URLs are the next step (they need every loader to carry the version).
+        // revalidation: a changed model reaches players at the latest the next day. This stays for
+        // unversioned URLs (old clients, external links); the game itself uses the versioned ones.
         source: '/haroolife/:dir(city|vendor|models)/:path*',
         headers: [
           { key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=604800' },
         ],
+      },
+      {
+        // Versioned URLs (content hash): never revalidated, a new content gets a new URL.
+        source: '/haroolife/v/:v/:dir(city|vendor|models)/:path*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
       },
       {
         // Service worker must be served as JS with no caching so updates propagate immediately

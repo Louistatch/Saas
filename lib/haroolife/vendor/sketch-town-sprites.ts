@@ -4,7 +4,9 @@
  * Source of this copy: https://github.com/shorepine/kenney/tree/main/2d/Sketch%20Town/Tiles
  * Only a selected set of source sprites is included for performance.
  */
-export const SKETCH_TOWN_SOURCE = '/haroolife/vendor/kenney-sketch-town/'
+import { HAROOLIFE_ASSETS } from '@/lib/haroolife/assets'
+
+export const SKETCH_TOWN_SOURCE = `${HAROOLIFE_ASSETS}/vendor/kenney-sketch-town/`
 export const SKETCH_TOWN_ASSETS = [
   'grass_center_S.png',
   'dirt_center_S.png',

@@ -1,5 +1,6 @@
 'use client'
 // Chargé avec dynamic(() => import('./village-3d'), { ssr: false }) : WebGL n'existe pas côté serveur.
+import { HAROOLIFE_ASSETS } from '@/lib/haroolife/assets'
 import { Application, Entity } from '@playcanvas/react'
 import { Camera, Light, Render } from '@playcanvas/react/components'
 import { useAsset } from '@playcanvas/react/hooks'
@@ -15,9 +16,9 @@ const LABELS: Record<Place, string> = {
 
 // Modèles GLB optionnels (voir public/haroolife/models/README.md). Un fichier absent = formes simples.
 const MODELS = {
-  hut: { src: '/haroolife/models/hut.glb', scale: 1.6 },
-  tree: { src: '/haroolife/models/tree.glb', scale: 1.8 },
-  villager: { src: '/haroolife/models/villager.glb', scale: 1 },
+  hut: { src: `${HAROOLIFE_ASSETS}/models/hut.glb`, scale: 1.6 },
+  tree: { src: `${HAROOLIFE_ASSETS}/models/tree.glb`, scale: 1.8 },
+  villager: { src: `${HAROOLIFE_ASSETS}/models/villager.glb`, scale: 1 },
 } as const
 type ModelKey = keyof typeof MODELS
 const Available = createContext<Partial<Record<ModelKey, boolean>>>({})

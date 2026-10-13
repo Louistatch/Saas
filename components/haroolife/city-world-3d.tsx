@@ -1,5 +1,6 @@
 'use client'
 
+import { HAROOLIFE_ASSETS } from '@/lib/haroolife/assets'
 import { releaseEntity, releaseMesh } from '@/lib/haroolife/city/gpu'
 import { appendModel } from '@/lib/haroolife/city/pack'
 import { districtIndexAt, isShore } from '@/lib/haroolife/lome-districts'
@@ -39,7 +40,7 @@ type Cell = { x: number; y: number }
 type Vec3 = [number, number, number]
 const CELL = 1.35
 const ORIGIN = (SIZE - 1) / 2
-const BASE = '/haroolife/vendor/kenney-3d/'
+const BASE = `${HAROOLIFE_ASSETS}/vendor/kenney-3d/`
 const ASSETS = {
   hall: BASE + 'commercial/building-a.glb',
   house: BASE + 'suburban/building-type-a.glb',

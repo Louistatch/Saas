@@ -1,5 +1,6 @@
 import { STALE_SESSION_PARAM, isOrgOnlyPath, safeInternalPath } from '@/lib/auth/safe-redirect'
 import { redirectProductionVercelHost } from '@/lib/routing/vercel-canonical-host'
+import { createNonce, cspReportOnlyEnabled, reportOnlyPolicy } from '@/lib/security/csp-report-only'
 import { createServerClient } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
 
@@ -36,8 +37,24 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url.toString(), { status: 301 })
   }
 
+  // Report-Only CSP trial (pages only): the policy is also passed to the render as a request
+  // header, from which Next reads the nonce and puts it on its own scripts.
+  const trialPolicy =
+    cspReportOnlyEnabled() && !pathname.startsWith('/api/') ? reportOnlyPolicy(createNonce()) : null
+  const forward = () => {
+    if (!trialPolicy) return NextResponse.next({ request })
+    // Built on each call: the session refresh below rewrites the request cookies first.
+    const headers = new Headers(request.headers)
+    headers.set('content-security-policy-report-only', trialPolicy)
+    return NextResponse.next({ request: { headers } })
+  }
+  const withTrial = (response: NextResponse) => {
+    if (trialPolicy) response.headers.set('Content-Security-Policy-Report-Only', trialPolicy)
+    return response
+  }
+
   // ─── ALWAYS refresh session (keeps cookies alive on every navigation) ───
-  let supabaseResponse = NextResponse.next({ request })
+  let supabaseResponse = forward()
 
   // Ce code s'exécute sur chaque requête. Sans ces variables, `createServerClient`
   // lève, et le site entier répond 500 sur une erreur illisible. On laisse
@@ -51,7 +68,7 @@ export async function middleware(request: NextRequest) {
     console.error(
       '[middleware] NEXT_PUBLIC_SUPABASE_URL ou NEXT_PUBLIC_SUPABASE_ANON_KEY manquante — session non rafraîchie',
     )
-    return supabaseResponse
+    return withTrial(supabaseResponse)
   }
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -61,7 +78,7 @@ export async function middleware(request: NextRequest) {
       },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-        supabaseResponse = NextResponse.next({ request })
+        supabaseResponse = forward()
         cookiesToSet.forEach(({ name, value, options }) =>
           supabaseResponse.cookies.set(name, value, options),
         )
@@ -146,7 +163,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(destination, request.url))
   }
 
-  return supabaseResponse
+  return withTrial(supabaseResponse)
 }
 
 export const config = {

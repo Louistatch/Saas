@@ -218,15 +218,26 @@ export function CooperativeProvider({ children }: { children: React.ReactNode })
     [supabase],
   )
 
-  const value: CooperativeContextType = {
-    cooperatives,
-    currentCooperative,
-    isLoading,
-    switchCooperative,
-    updateCooperative,
-    addCooperative,
-    refreshCooperatives: fetchCooperatives,
-  }
+  const value = useMemo<CooperativeContextType>(
+    () => ({
+      cooperatives,
+      currentCooperative,
+      isLoading,
+      switchCooperative,
+      updateCooperative,
+      addCooperative,
+      refreshCooperatives: fetchCooperatives,
+    }),
+    [
+      cooperatives,
+      currentCooperative,
+      isLoading,
+      switchCooperative,
+      updateCooperative,
+      addCooperative,
+      fetchCooperatives,
+    ],
+  )
 
   return <CooperativeContext.Provider value={value}>{children}</CooperativeContext.Provider>
 }

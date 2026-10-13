@@ -8,7 +8,7 @@ import type { AuthUser, HarooType, UserRole } from '@/types/domain'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import type React from 'react'
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 
 const log = createLogger('auth')
 
@@ -264,14 +264,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await performLogout()
   }, [])
 
-  const value: AuthContextType = {
-    user,
-    isLoading,
-    isAuthenticated: !!user,
-    login,
-    logout,
-    refreshProfile,
-  }
+  // Stable identity: every consumer re-renders only when one of these actually changes.
+  const value = useMemo<AuthContextType>(
+    () => ({ user, isLoading, isAuthenticated: !!user, login, logout, refreshProfile }),
+    [user, isLoading, login, logout, refreshProfile],
+  )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

@@ -1,3 +1,4 @@
+import { CooperativeProvider } from '@/app/context/cooperative-context'
 import { requireRole } from '@/lib/security/assert-access'
 import { AdminShell } from './admin-shell'
 
@@ -19,5 +20,9 @@ export default async function AdminLayout({
 }) {
   await requireRole('super_admin')
 
-  return <AdminShell>{children}</AdminShell>
+  return (
+    <CooperativeProvider>
+      <AdminShell>{children}</AdminShell>
+    </CooperativeProvider>
+  )
 }

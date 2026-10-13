@@ -1,5 +1,6 @@
 'use client'
 
+import { HAROOLIFE_ASSETS } from '@/lib/haroolife/assets'
 import type { Layout, Npc, NpcAnim, Prop, PropKind } from '@/lib/haroolife/city/interiors'
 /**
  * A furnished interior built from a layout: original low-poly equipment (treadmills,
@@ -15,7 +16,7 @@ import { useState } from 'react'
 import { Character } from './character'
 import { useMaterial } from './use-material'
 
-const BASE = '/haroolife/vendor/kenney-3d/furniture-kit/'
+const BASE = `${HAROOLIFE_ASSETS}/vendor/kenney-3d/furniture-kit/`
 type Mat = ReturnType<typeof useMaterial>
 type Mats = Record<
   | 'dark'
