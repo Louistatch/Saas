@@ -1,11 +1,12 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import type { LucideIcon } from 'lucide-react'
 
 interface ChartCardProps {
   title: string
   description?: string
-  icon?: React.ElementType
+  icon?: LucideIcon
   isLoading: boolean
   children: React.ReactNode
 }

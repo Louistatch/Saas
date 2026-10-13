@@ -25,14 +25,10 @@ test('one configurable avatar across street, room and taxi', async ({ page }) =>
   await page.getByRole('button', { name: 'Fermer', exact: true }).click()
   await expect.poll(async () => (await player())?.model).toBe('character-male-b')
   const pagne = await page.evaluate(() => {
-    const app = (
-      window as unknown as {
-        __LOME_APP?: {
-          root: { findByName: (n: string) => { findByName: (n: string) => unknown } | null }
-        }
-      }
-    ).__LOME_APP
-    return Boolean(app?.root.findByName('Joueur')?.findByName('pagne'))
+    const scene = (
+      window as unknown as { __LOME_SCENE?: import('../lib/haroolife/engine/types').SceneProbe }
+    ).__LOME_SCENE
+    return Boolean(scene?.childNames('Joueur')?.includes('pagne'))
   })
   expect(pagne, 'the pagne wrap is on the avatar').toBe(true)
   expect(await page.evaluate(() => localStorage.getItem('haroolife.avatar.v1'))).toContain(
@@ -76,15 +72,10 @@ test('one configurable avatar across street, room and taxi', async ({ page }) =>
     )
     .not.toBeNull()
   const indoorModel = await page.evaluate(() => {
-    const app = (
-      window as unknown as {
-        __LOME_APP?: {
-          root: { findByName: (n: string) => { name: string; children: { name: string }[] } | null }
-        }
-      }
-    ).__LOME_APP
-    const e = app?.root.findByName('Joueur')
-    return e ? e.children.map((c) => c.name).join(',') : null
+    const scene = (
+      window as unknown as { __LOME_SCENE?: import('../lib/haroolife/engine/types').SceneProbe }
+    ).__LOME_SCENE
+    return scene?.childNames('Joueur')?.join(',') ?? null
   })
   expect(indoorModel, 'the indoor figure carries the pagne too').toContain('pagne')
   // Stepping out plays the door clip before idling.

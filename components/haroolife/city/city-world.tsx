@@ -13,7 +13,7 @@ import {
   renders,
   watchLongTasks,
 } from '@/lib/haroolife/city/perf'
-import type { CameraRig, PlayerController } from '@/lib/haroolife/city/player'
+import type { CameraRig, InputState, PlayerController } from '@/lib/haroolife/city/player'
 import { PRESETS, type Quality, renderPixelRatio } from '@/lib/haroolife/city/quality'
 import { type Agent, agentsNear } from '@/lib/haroolife/city/traffic'
 import {
@@ -29,6 +29,7 @@ import {
   inEstate,
   landmarks,
 } from '@/lib/haroolife/city/world'
+import type { RendererId } from '@/lib/haroolife/engine/types'
 import type { Transport } from '@/lib/haroolife/lome-life-engine'
 import type { PlacedResident } from '@/lib/haroolife/lome-presence'
 import type { PresenceEntry } from '@/lib/haroolife/realtime/protocol'
@@ -45,6 +46,7 @@ import { Application, Entity, Gltf } from '@playcanvas/react'
 import { Camera, Light, Render } from '@playcanvas/react/components'
 import { useApp, useAppEvent, useModel } from '@playcanvas/react/hooks'
 import { Compass, Maximize2, Minus, Plus, RotateCcw } from 'lucide-react'
+import dynamic from 'next/dynamic'
 import * as pc from 'playcanvas'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ESTATE_ASSETS, EstateTiles } from '../city-world-3d'
@@ -56,6 +58,7 @@ import InteriorScene from './interior-scene'
 import { type Bank, bakedMaterial, loadBank, meshFor } from './model-bank'
 import PlayerRig from './player-rig'
 import RemotePlayers, { type PoseFeed } from './remote-players'
+import { playCanvasProbe } from './scene-probe'
 import { useMaterial } from './use-material'
 
 export { CAMERA_HOME, type CameraState } from '@/lib/haroolife/city/geometry'
@@ -65,6 +68,9 @@ const CAMERA_START: [number, number, number] = [0, 20, 20]
 const CAMERA_START_ROT: [number, number, number] = [-45, 0, 0]
 type EditTool = BuildType | 'inspect' | 'demolish'
 /** The player's own look (a Kenney Mini Character). */
+// React Three Fiber interior (behind ?engine=three): its own chunk, never downloaded otherwise.
+const InteriorThree = dynamic(() => import('../engine-three/interior-three'), { ssr: false })
+
 export const PLAYER_MODEL = 'character-female-a'
 
 function Model({
@@ -492,11 +498,7 @@ function LabelProjector({
       const h = 0.6 + lot.floors * 0.5 + 0.9
       const p = cc.worldToScreen(at.current.set(px, h, pz), tmp.current)
       const visible =
-        p.z > 0 &&
-        p.x >= -60 &&
-        p.y >= -40 &&
-        p.x * kx <= r.width + 60 &&
-        p.y * ky <= r.height + 40
+        p.z > 0 && p.x >= -60 && p.y >= -40 && p.x * kx <= r.width + 60 && p.y * ky <= r.height + 40
       el.style.display = visible ? '' : 'none'
       if (visible)
         el.style.transform = `translate(${Math.round(p.x * kx)}px, ${Math.round(p.y * ky)}px) translate(-50%, -100%)`
@@ -506,7 +508,14 @@ function LabelProjector({
 }
 
 /** Frame statistics for the debug hook, the statistics overlay and the e2e performance scenarios. */
-function StatsProbe({ onFrame }: { onFrame: (s: { drawCalls: number; fps: number }) => void }) {
+function StatsProbe({
+  onFrame,
+  paused,
+}: {
+  onFrame: (s: { drawCalls: number; fps: number }) => void
+  /** Another renderer is on screen: it publishes the stats and the scene probe meanwhile. */
+  paused: boolean
+}) {
   const app = useApp()
   const last = useRef(0)
   const ring = useRef(new FrameRing(600))
@@ -522,17 +531,28 @@ function StatsProbe({ onFrame }: { onFrame: (s: { drawCalls: number; fps: number
     }
   }, [])
   useEffect(() => {
-    const w = window as unknown as { __LOME_PERF_RESET?: () => void; __LOME_APP?: unknown }
+    if (!app || paused) return
+    const w = window as unknown as {
+      __LOME_PERF_RESET?: () => void
+      __LOME_APP?: unknown
+      __LOME_SCENE?: unknown
+    }
     w.__LOME_PERF_RESET = () => ring.current.reset()
+    // Debugging only: tests read the engine-neutral __LOME_SCENE.
     w.__LOME_APP = app
+    w.__LOME_SCENE = playCanvasProbe(app)
     return () => {
       w.__LOME_PERF_RESET = undefined
       w.__LOME_APP = undefined
+      w.__LOME_SCENE = undefined
     }
-  }, [app])
+  }, [app, paused])
   const prev = useRef(0)
   useAppEvent('update', () => {
-    if (!app) return
+    if (!app || paused) {
+      prev.current = 0
+      return
+    }
     const now = performance.now()
     if (prev.current) ring.current.push(now - prev.current)
     prev.current = now
@@ -588,6 +608,30 @@ function StatsProbe({ onFrame }: { onFrame: (s: { drawCalls: number; fps: number
   return null
 }
 
+/**
+ * While another renderer draws the scene, PlayCanvas stops rendering frames (its context and
+ * loaded city stay, so coming back is instant).
+ */
+function PauseRendering({ paused }: { paused: boolean }) {
+  const app = useApp()
+  useEffect(() => {
+    if (!app || !paused) return
+    const before = app.autoRender
+    app.autoRender = false
+    app.renderNextFrame = false
+    // Hidden too: the browser would otherwise composite two full-screen canvases every frame
+    // (measured: about a quarter of the frame time on a software renderer).
+    const canvas = app.graphicsDevice.canvas as HTMLCanvasElement
+    canvas.style.visibility = 'hidden'
+    return () => {
+      app.autoRender = before
+      app.renderNextFrame = true
+      canvas.style.visibility = ''
+    }
+  }, [app, paused])
+  return null
+}
+
 export default function CityWorld({
   city,
   tool,
@@ -622,6 +666,9 @@ export default function CityWorld({
   remoteFeed,
   remotePresent,
   ads,
+  renderer = 'playcanvas',
+  input,
+  onLeave,
 }: {
   city: City
   tool: EditTool
@@ -667,6 +714,12 @@ export default function CityWorld({
   quality?: Quality
   /** Town on screen; the estate is drawn only where it exists (Lomé). */
   locality?: LocalityId
+  /** Renderer for the scenes it supports (interiors for 'three'); PlayCanvas draws the rest. */
+  renderer?: RendererId
+  /** Joystick and keyboard input, read by renderers that let the player walk indoors. */
+  input?: InputState
+  /** Leave the current building (walking out of the door in the 'three' interior). */
+  onLeave?: () => void
 }) {
   bump('world')
   const hasEstate = LOCALITIES[locality].estate !== null
@@ -779,6 +832,8 @@ export default function CityWorld({
   }, [hasVehicle])
   const estateCenter = worldPos(ESTATE.x0 + (SIZE_HINT - 1) / 2, ESTATE.y0 + (SIZE_HINT - 1) / 2)
   const scene = interior || ride
+  // Interiors drawn by React Three Fiber: PlayCanvas pauses and draws nothing underneath.
+  const threeInterior = renderer === 'three' && Boolean(interior) && !ride && Boolean(input)
   const selPos = selectedLot
     ? worldPos(selectedLot.x + (selectedLot.w - 1) / 2, selectedLot.y + (selectedLot.h - 1) / 2)
     : null
@@ -794,7 +849,8 @@ export default function CityWorld({
         className="h-full w-full"
         style={{ width: '100%', height: '100%' }}
       >
-        {onFrame && <StatsProbe onFrame={onFrame} />}
+        {onFrame && <StatsProbe onFrame={onFrame} paused={threeInterior} />}
+        <PauseRendering paused={threeInterior} />
         <QualityController quality={quality} />
         <CityChunks
           centerX={centerCell.x}
@@ -808,7 +864,7 @@ export default function CityWorld({
         />
         {ride ? (
           <Ride transport={ride.transport} rain={ride.rain} />
-        ) : interior ? (
+        ) : threeInterior ? null : interior ? (
           <InteriorScene
             layout={layoutFor(interior)}
             title={interiorTitle}
@@ -893,6 +949,23 @@ export default function CityWorld({
           </>
         )}
       </Application>
+      {threeInterior && interior && input && (
+        <div className="absolute inset-0" data-renderer="three">
+          <InteriorThree
+            layout={layoutFor(interior)}
+            title={interiorTitle}
+            angle={camera.angle}
+            activity={activity}
+            playerModel={avatarModel}
+            playerPagne={avatarPagne}
+            onUse={onUseProp}
+            input={input}
+            onLeave={onLeave ?? (() => {})}
+            onFrame={onFrame}
+            pixelRatio={renderPixelRatio(quality)}
+          />
+        </div>
+      )}
       {!scene && (
         <div
           ref={overlay}

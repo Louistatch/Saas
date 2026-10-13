@@ -31,12 +31,20 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { Building2, CheckCircle2, Network, Sprout, TrendingUp, BookOpen } from 'lucide-react'
+import {
+  BookOpen,
+  Building2,
+  CheckCircle2,
+  type LucideIcon,
+  Network,
+  Sprout,
+  TrendingUp,
+} from 'lucide-react'
 import { useAuth } from '@/app/context/auth-context'
 import { hasOrgLayer, isHarooRole } from '@/lib/utils/permissions'
 import { HAROO_TYPE_LABELS, type HarooType } from '@/types/domain'
 
-const HAROO_CHOICES: { value: HarooType; icon: React.ElementType; blurb: string }[] = [
+const HAROO_CHOICES: { value: HarooType; icon: LucideIcon; blurb: string }[] = [
   { value: 'ouvrier', icon: Sprout, blurb: "Offres d'emploi saisonnier près de chez vous" },
   { value: 'acheteur', icon: TrendingUp, blurb: 'Préventes de production filtrées sur vos produits' },
   { value: 'agronome', icon: BookOpen, blurb: 'Demandes de mission de conseil' },

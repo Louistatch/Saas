@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useAuth } from '@/app/context/auth-context'
 import { useCooperative } from '@/app/context/cooperative-context'
-import { BookOpen, Play, HelpCircle, CheckSquare, Plus, Clock } from 'lucide-react'
+import { BookOpen, Play, HelpCircle, CheckSquare, Plus, Clock, type LucideIcon } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
 
 interface AcademyModule {
@@ -49,7 +49,7 @@ const LEVEL_BADGE: Record<string, string> = {
   intermediaire: 'bg-yellow-100 text-yellow-800',
   avance: 'bg-red-100 text-red-800',
 }
-const CONTENT_ICON: Record<string, React.ElementType> = {
+const CONTENT_ICON: Record<string, LucideIcon> = {
   text: BookOpen, video: Play, quiz: HelpCircle, checklist: CheckSquare,
 }
 const CATEGORIES = ['tous','agronomie','phytosanitaire','gestion','commerce','numerique','autre']

@@ -81,6 +81,8 @@ import {
   lotById,
   toWorld,
 } from '@/lib/haroolife/city/world'
+import { currentRenderer } from '@/lib/haroolife/engine/select'
+import type { RendererId } from '@/lib/haroolife/engine/types'
 import { type Actor, type OrgRef, primaryOrganization } from '@/lib/haroolife/domain/actor'
 import { createInteractionEngine } from '@/lib/haroolife/domain/engine'
 import { HttpAggregationService, HttpIdentityAdapter } from '@/lib/haroolife/domain/http'
@@ -300,6 +302,9 @@ export function LomeLifeImmersive() {
   const estateRoadsRef = useRef(estateRoads)
   estateRoadsRef.current = estateRoads
   const input = useRef<InputState>({ x: 0, y: 0, run: false }).current
+  // Renderer for the scenes it supports (?engine=three), read once on the client.
+  const [renderer, setRenderer] = useState<RendererId>('playcanvas')
+  useEffect(() => setRenderer(currentRenderer()), [])
   const controller = useMemo(() => {
     const c = new PlayerController(
       {
@@ -896,7 +901,8 @@ export function LomeLifeImmersive() {
     if (cityLifeRef.current.route.length)
       setCityLife((old) => ({ ...old, route: [], target: null }))
   }, [controller])
-  useKeyboardInput(input, panel === null && !insideAny && !riding)
+  // Indoors the keyboard walks the player only where the renderer lets them walk (R3F interiors).
+  useKeyboardInput(input, panel === null && (!insideAny || renderer === 'three') && !riding)
   // Test hooks: walkability of a cell and an automatic walk to the player's taxi.
   useEffect(() => {
     const w = window as unknown as {
@@ -1307,6 +1313,9 @@ export function LomeLifeImmersive() {
             }}
             quality={quality}
             locality={cityLife.locality}
+            renderer={renderer}
+            input={input}
+            onLeave={() => action('leave')}
           />
         )}
       </div>
