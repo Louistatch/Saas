@@ -22,6 +22,9 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
   // (the joystick on screen, the arrow keys here); the save follows the cell it reaches.
   const savedAt = () =>
     page.evaluate(() => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? '{}').at)
+  // The first autosave lands 400 ms after the game state initialises: on a slow runner the
+  // canvas is visible before it exists, and a missing `before` made the walk below meaningless.
+  await expect.poll(savedAt, { timeout: 30000 }).toBeTruthy()
   const before = await savedAt()
   await page.keyboard.down('ArrowDown')
   await expect.poll(savedAt).not.toEqual(before)
