@@ -307,7 +307,9 @@ export function daylight(hour: number) {
     a[1] + (b[1] - a[1]) * k,
     a[2] + (b[2] - a[2]) * k,
   ]
-  const night: [number, number, number] = [0.1, 0.16, 0.3]
+  // Night floor: dark enough to read as night, bright enough that the city stays legible on a
+  // phone screen outdoors (measured on a Motorola at 21h: buildings were nearly black).
+  const night: [number, number, number] = [0.14, 0.21, 0.37]
   const day: [number, number, number] = [0.62, 0.82, 0.91]
   const gold: [number, number, double] = [0.96, 0.68, 0.45] as unknown as [number, number, number]
   let sky = mix(night, day, Math.min(1, t * 1.6))
@@ -320,11 +322,11 @@ export function daylight(hour: number) {
           .padStart(2, '0'),
       )
       .join('')}`
-  const sun = 0.25 + t * 1.3
+  const sun = 0.5 + t * 1.05
   const sunColor = hex(
     mix([0.8, 0.85, 1], mix([1, 1, 0.96], [1, 0.78, 0.55], warm), Math.min(1, t * 2)),
   )
-  const ambient = hex(mix([0.12, 0.16, 0.28], [0.72, 0.8, 0.86], Math.min(1, t * 1.8)))
+  const ambient = hex(mix([0.27, 0.31, 0.42], [0.72, 0.8, 0.86], Math.min(1, t * 1.8)))
   return { sky: hex(sky), sun, sunColor, ambient, night: t < 0.08 }
 }
 type double = number
@@ -888,7 +890,7 @@ export default function CityWorld({
               <Entity rotation={[22, 200, 0]}>
                 <Light
                   type="directional"
-                  intensity={light.night ? 0.2 : 0.55}
+                  intensity={light.night ? 0.35 : 0.55}
                   color={light.night ? '#8fa8ff' : '#ffffff'}
                 />
               </Entity>
