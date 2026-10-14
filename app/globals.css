@@ -162,3 +162,43 @@
     animation: none;
   }
 }
+
+/* AgriAcademy (J3) : jetons de l'école, limités à l'espace de formation. L'or signifie
+   « validé » ou « l'action à faire maintenant », jamais une décoration. */
+.academy {
+  --ac-ground: #f6f7f1;
+  --ac-ink: #10261a;
+  --ac-emerald: #0d3d22;
+  --ac-green: #1b7a46;
+  --ac-gold: #c9a227;
+  --ac-line: #dce3db;
+  --ac-muted: #6b7a70;
+  --ac-mist: #e6efe8;
+  --ac-sand: #fbf3da;
+  --ac-pale: #b9cbbf;
+  font-family: var(--font-academy-body), system-ui, sans-serif;
+  color: var(--ac-ink);
+  background: var(--ac-ground);
+}
+.academy-display {
+  font-family: var(--font-academy-display), Georgia, serif;
+  letter-spacing: -0.015em;
+}
+/* Segments du parcours : chaque segment validé se révèle à son tour (route-draw, horizontal). */
+@keyframes segment-draw {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.academy-segment {
+  transform-origin: left;
+  animation: segment-draw 260ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .academy-segment {
+    animation: none;
+  }
+}
