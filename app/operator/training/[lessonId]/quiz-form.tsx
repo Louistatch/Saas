@@ -19,6 +19,8 @@ interface AttemptResult {
   score?: number
   passed?: boolean
   error?: string
+  lessonCompleted?: boolean
+  training?: { lessonsCompleted: number; lessonsTotal: number; trainingCompleted: boolean } | null
 }
 
 export function QuizForm({ quiz }: { quiz: AcademyQuizPublic }) {
@@ -39,7 +41,21 @@ export function QuizForm({ quiz }: { quiz: AcademyQuizPublic }) {
     })
   }
 
+  const unanswered = quiz.questions.filter(
+    (q) => q.question_type !== 'case' && (answers[q.id] ?? []).length === 0,
+  ).length
+
   const submit = async () => {
+    if (unanswered > 0) {
+      setResult({
+        ok: false,
+        error:
+          unanswered === 1
+            ? 'Une question est sans réponse.'
+            : `${unanswered} questions sont sans réponse.`,
+      })
+      return
+    }
     setSubmitting(true)
     try {
       const res = await fetch(`/api/academy/operator/quizzes/${quiz.id}/attempts`, {
@@ -122,6 +138,22 @@ export function QuizForm({ quiz }: { quiz: AcademyQuizPublic }) {
             {result.passed ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
             Score : {result.score}% — {result.passed ? 'Réussi' : 'Non atteint'}
           </div>
+        )}
+        {result?.ok && result.lessonCompleted && (
+          <p className="text-sm font-medium text-primary" aria-live="polite">
+            Leçon validée.
+            {result.training && !result.training.trainingCompleted
+              ? ` ${result.training.lessonsCompleted} leçon(s) sur ${result.training.lessonsTotal} validée(s).`
+              : ''}
+            {result.training?.trainingCompleted
+              ? ' Formation terminée : votre dossier passe à l’évaluation pratique.'
+              : ''}
+          </p>
+        )}
+        {result?.ok && result.passed && !result.lessonCompleted && (
+          <p className="text-sm text-muted-foreground">
+            Quiz réussi. Déposez le cas pratique ci-dessous pour valider la leçon.
+          </p>
         )}
         {result && !result.ok && <p className="text-sm text-destructive">{result.error}</p>}
 

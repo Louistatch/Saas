@@ -63,6 +63,13 @@ export default async function OperatorTrainingPage() {
 
   const summary = await getProfileProgressSummary(admin, ctx.userId, OPERATOR_MODULE_ID)
   const statusByLesson = new Map(summary.lessons.map((l) => [l.lesson_id, l.status]))
+  const scoreByLesson = new Map(
+    summary.latest_quiz_attempts
+      .filter((a) => a.lesson_id && a.score != null)
+      .map((a) => [a.lesson_id as string, a.score as number]),
+  )
+  const completedCount = summary.lessons.filter((l) => l.status === 'completed').length
+  const total = module_.lessons.length
 
   return (
     <div className="min-h-screen bg-background">
@@ -81,7 +88,16 @@ export default async function OperatorTrainingPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-foreground">Leçons</CardTitle>
+            <CardTitle className="flex items-center justify-between text-foreground">
+              <span>Leçons</span>
+              <span className="text-sm font-medium text-muted-foreground" aria-live="polite">
+                {completedCount} / {total} validées
+              </span>
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Une leçon est validée quand son quiz est réussi et son cas pratique déposé. Quand les{' '}
+              {total} le sont, votre dossier passe à l’évaluation pratique.
+            </p>
           </CardHeader>
           <CardContent className="p-0">
             <ul className="divide-y divide-border">
@@ -97,7 +113,14 @@ export default async function OperatorTrainingPage() {
                         {lesson.order_index != null ? `${lesson.order_index}. ` : ''}
                         {lesson.title}
                       </span>
-                      <StatusBadge status={status} />
+                      <span className="flex items-center gap-2">
+                        {scoreByLesson.has(lesson.id) && (
+                          <span className="text-xs text-muted-foreground">
+                            Quiz {scoreByLesson.get(lesson.id)} %
+                          </span>
+                        )}
+                        <StatusBadge status={status} />
+                      </span>
                     </Link>
                   </li>
                 )
