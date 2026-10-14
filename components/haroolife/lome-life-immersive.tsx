@@ -9,13 +9,16 @@ import {
 } from '@/lib/haroolife/ads/campaigns'
 import { ExposureTracker } from '@/lib/haroolife/ads/exposure'
 import {
+  AVATAR_CHOSEN_STORAGE,
   AVATAR_MODELS,
+  AVATAR_STORAGE,
   type Avatar,
   DEFAULT_AVATAR,
   loadAvatar,
   pagneColor,
   saveAvatar,
 } from '@/lib/haroolife/city/avatar'
+import { CAMERA_HOME, type CameraState, worldPos } from '@/lib/haroolife/city/geometry'
 import {
   type InteractionTarget,
   estateRef,
@@ -53,7 +56,12 @@ import { CITY_STORAGE, loadCityLife } from '@/lib/haroolife/city/migrate'
 import { ESTATE_GATE } from '@/lib/haroolife/city/navigation'
 import { findPath } from '@/lib/haroolife/city/navigation'
 import { bump } from '@/lib/haroolife/city/perf'
-import { type CameraRig, type InputState, PlayerController } from '@/lib/haroolife/city/player'
+import {
+  type CameraRig,
+  FOLLOW_DISTANCE,
+  type InputState,
+  PlayerController,
+} from '@/lib/haroolife/city/player'
 import {
   PRESETS,
   type Quality,
@@ -81,12 +89,12 @@ import {
   lotById,
   toWorld,
 } from '@/lib/haroolife/city/world'
-import { currentRenderer } from '@/lib/haroolife/engine/select'
-import type { RendererId } from '@/lib/haroolife/engine/types'
 import { type Actor, type OrgRef, primaryOrganization } from '@/lib/haroolife/domain/actor'
 import { createInteractionEngine } from '@/lib/haroolife/domain/engine'
 import { HttpAggregationService, HttpIdentityAdapter } from '@/lib/haroolife/domain/http'
 import { GameWorldAdapter } from '@/lib/haroolife/domain/services'
+import { currentRenderer } from '@/lib/haroolife/engine/select'
+import type { RendererId } from '@/lib/haroolife/engine/types'
 import {
   CITIES,
   MAP_FILTERS,
@@ -142,7 +150,6 @@ import {
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { CAMERA_HOME, type CameraState, worldPos } from '@/lib/haroolife/city/geometry'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import CooperativePanel from './city/cooperative-panel'
 import DiagOverlay, { initialDiag, rememberDiag } from './city/diag-overlay'
@@ -165,6 +172,8 @@ const CityWorld = dynamic(() => import('./city/city-world'), {
   ),
 })
 const RideOverlay = dynamic(() => import('./travel-scene-3d'), { ssr: false })
+// Animated preview of the chosen character (three.js), loaded only when the sheet opens.
+const AvatarPreview = dynamic(() => import('./avatar-preview'), { ssr: false })
 type Sheet =
   | 'home'
   | 'shop'
@@ -216,7 +225,7 @@ const VENUE_LABELS: Record<string, string> = {
 const LOCATION_ICONS = ['🏠', '🛒', '🥖', '🏛️', '🚰', '🌳']
 const NAV_ITEMS = [
   { id: 'home', label: 'Maison', icon: Home },
-  { id: 'shop', label: 'Acheter', icon: ShoppingBag },
+  { id: 'shop', label: 'Aménager', icon: ShoppingBag },
   { id: 'map', label: 'Carte', icon: Map },
   { id: 'phone', label: 'Téléphone', icon: Phone },
 ] as const
@@ -313,7 +322,7 @@ export function LomeLifeImmersive() {
         drivable: (x, y) => isCityRoad(x, y) || isDriveway(x, y),
       },
       cityLifeRef.current.at,
-      { angle: 35, distance: 12 },
+      { angle: 35, distance: FOLLOW_DISTANCE },
     )
     c.input = input
     return c
@@ -325,7 +334,30 @@ export function LomeLifeImmersive() {
   const [driving, setDriving] = useState(false)
   // The player's look: chosen on this device, shared by the street, the rooms and the taxi.
   const [avatar, setAvatar] = useState<Avatar>(DEFAULT_AVATAR)
-  useEffect(() => setAvatar(loadAvatar(localStorage)), [])
+  // New game: no look chosen yet on this device → the appearance sheet opens first, with a
+  // « Commencer » button. Closing it (any way) counts as a choice; progress is never touched.
+  const [firstRun, setFirstRun] = useState(false)
+  useEffect(() => {
+    setAvatar(loadAvatar(localStorage))
+    try {
+      if (!localStorage.getItem(AVATAR_STORAGE) && !localStorage.getItem(AVATAR_CHOSEN_STORAGE)) {
+        setFirstRun(true)
+        setPanel('avatar')
+      }
+    } catch {
+      /* storage blocked: no first-run prompt */
+    }
+  }, [])
+  const confirmAvatar = () => {
+    saveAvatar(localStorage, avatar)
+    try {
+      localStorage.setItem(AVATAR_CHOSEN_STORAGE, '1')
+    } catch {
+      /* blocked storage */
+    }
+    setFirstRun(false)
+    setPanel(null)
+  }
   const chooseAvatar = (next: Partial<Avatar>) =>
     setAvatar((cur) => {
       const a = { ...cur, ...next }
@@ -1736,7 +1768,7 @@ export function LomeLifeImmersive() {
               <button
                 type="button"
                 aria-label="Fermer"
-                onClick={() => setPanel(null)}
+                onClick={() => (firstRun && panel === 'avatar' ? confirmAvatar() : setPanel(null))}
                 className="rounded-full bg-slate-100 p-2"
               >
                 <X size={21} />
@@ -2717,15 +2749,17 @@ export function LomeLifeImmersive() {
               {panel === 'avatar' && (
                 <>
                   <p className="text-sm text-slate-600">
-                    Le même personnage te suit dans la rue, dans les bâtiments et au volant.
-                    Personnages Kenney (CC0) ; ton choix reste sur cet appareil.
+                    {firstRun
+                      ? 'Choisis qui tu es dans Lomé : le même personnage te suit dans la rue, dans les bâtiments et au volant. Tu pourras changer depuis le téléphone.'
+                      : 'Le même personnage te suit dans la rue, dans les bâtiments et au volant. Personnages Quaternius et Kenney (CC0) ; ton choix reste sur cet appareil.'}
                   </p>
+                  <AvatarPreview model={avatar.model} pagne={pagneColor(avatar.pagne)} />
                   <div
-                    className="grid grid-cols-2 gap-2 sm:grid-cols-3"
+                    className="grid grid-cols-2 gap-2 sm:grid-cols-4"
                     role="group"
                     aria-label="Choisir mon personnage"
                   >
-                    {AVATAR_MODELS.map((m) => (
+                    {AVATAR_MODELS.filter((m) => m.family === 'quaternius').map((m) => (
                       <button
                         type="button"
                         key={m.id}
@@ -2743,6 +2777,34 @@ export function LomeLifeImmersive() {
                       </button>
                     ))}
                   </div>
+                  <details className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                    <summary className="cursor-pointer text-sm font-semibold text-slate-700">
+                      Personnages classiques (mini)
+                    </summary>
+                    <div
+                      className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3"
+                      role="group"
+                      aria-label="Choisir un personnage classique"
+                    >
+                      {AVATAR_MODELS.filter((m) => m.family === 'kenney-mini').map((m) => (
+                        <button
+                          type="button"
+                          key={m.id}
+                          aria-pressed={avatar.model === m.id}
+                          onClick={() => chooseAvatar({ model: m.id })}
+                          className={
+                            'rounded-2xl border p-3 text-left ' +
+                            (avatar.model === m.id
+                              ? 'border-emerald-600 bg-emerald-50'
+                              : 'border-slate-200 bg-white')
+                          }
+                        >
+                          <span className="block text-sm font-black">{m.label}</span>
+                          <span className="block text-[11px] text-slate-500">{m.hint}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </details>
                   <fieldset className="space-y-2">
                     <legend className="text-sm font-black">Mon pagne</legend>
                     <div className="flex flex-wrap gap-2">
@@ -2762,9 +2824,19 @@ export function LomeLifeImmersive() {
                     </div>
                   </fieldset>
                   <p className="text-[11px] text-slate-500">
-                    Animations : marche, course, pas de porte et conduite. Faute de clip de
-                    demi-tour dans le pack, le personnage pivote sur place.
+                    Animations : marche, course, geste d’interaction et salut. Les personnages
+                    adultes n’ont pas encore de clip assis ni de conduite : ils gardent une pose
+                    debout à côté du meuble ou du véhicule.
                   </p>
+                  {firstRun && (
+                    <button
+                      type="button"
+                      onClick={confirmAvatar}
+                      className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#218b70] text-base font-black text-white"
+                    >
+                      Commencer
+                    </button>
+                  )}
                 </>
               )}
               {panel === 'journal' && (

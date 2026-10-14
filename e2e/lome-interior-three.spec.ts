@@ -6,8 +6,8 @@ import { expect, test } from './lome-test'
  * Jalon J1: the gym drawn by React Three Fiber (`?engine=three`) with Rapier collisions.
  * The player walks inside under the joystick, cannot cross walls or equipment, uses a
  * treadmill, walks out of the open front, and the PlayCanvas street comes back. A second run
- * checks that repeated visits do not accumulate GPU resources, and the default engine stays
- * PlayCanvas.
+ * checks that repeated visits do not accumulate GPU resources, and that `?engine=playcanvas`
+ * remains the way back to the PlayCanvas interiors (the default is now Three).
  */
 type Interior = { x: number; z: number; anim: string; using: string | null; left: boolean }
 type Live = {
@@ -79,7 +79,7 @@ test('R3F gym: walk, collide, use a treadmill, walk out', async ({ page }, testI
   await enterGym(page)
 
   const s = await scene(page)
-  expect(s?.joueur, 'the player wears the pagne indoors').toContain('pagne')
+  expect(s?.joueur, 'the chosen figure is drawn indoors').toContain('figure')
   await page.screenshot({ path: testInfo.outputPath('three-gym.png') })
 
   // Joystick: the player really walks, with the walk or run clip.
@@ -115,7 +115,7 @@ test('R3F gym: walk, collide, use a treadmill, walk out', async ({ page }, testI
   expect(errors).toEqual([])
 })
 
-test('R3F interior: repeated visits keep GPU resources flat; default engine unchanged', async ({
+test('R3F interior: repeated visits keep GPU resources flat; ?engine=playcanvas is the way back', async ({
   page,
 }) => {
   test.setTimeout(300_000)

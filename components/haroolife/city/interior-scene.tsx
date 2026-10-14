@@ -1,5 +1,6 @@
 'use client'
 
+import { adultFor } from '@/lib/haroolife/city/avatar-catalogue'
 import type { Layout, Npc, NpcAnim, Prop, PropKind } from '@/lib/haroolife/city/interiors'
 import { SHAPE_MATERIALS, type ShapeMaterial, shapeOf } from '@/lib/haroolife/city/prop-shapes'
 /**
@@ -163,7 +164,7 @@ function Mover({ npc }: { npc: Npc }) {
   return (
     <Character
       name={`npc:${npc.id}`}
-      model={npc.model}
+      model={adultFor(npc.model)}
       position={[x, 0, z]}
       rotation={rot}
       anim={npc.anim}
@@ -262,7 +263,11 @@ export default function InteriorScene({
           <Character
             key={n.id}
             name={`npc:${n.id}`}
-            model={n.model}
+            model={
+              n.anim === 'sit' || n.anim === 'rest' || n.anim === 'drive'
+                ? n.model
+                : adultFor(n.model)
+            }
             position={[n.x, 0, n.z]}
             rotation={n.rot ?? 0}
             anim={n.anim}
