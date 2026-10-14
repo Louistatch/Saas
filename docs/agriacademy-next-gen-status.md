@@ -12,8 +12,8 @@ chaque jalon livré ; rien n'est fusionné ni déployé sans accord explicite.
 | C2 pas de fin de formation automatique | **Corrigé** (PR #37) | `lib/academy/operator-completion.ts` : `settleOperatorTraining` → `markPartnerTrainingCompleted`, e-mails une seule fois ; `candidate` → `training` à la première leçon |
 | E1 devoirs non corrigeables | **Corrigé** (J2) | `lib/academy/assignment-review.ts`, `/admin/partners/training/corrections`, retour et reprise côté candidat |
 | E2 seuil 70 % = sans-faute | **Corrigé** (J2, migration à appliquer) | crédit partiel documenté (`assessment-policy.ts`), 5 questions par quiz (`20261014_150000_academy_quiz_v2_questions.sql`), 3 tentatives par 24 h |
-| E3 12 captures manquantes | Ouvert | `academy_media_assets` tous `pending_capture` (J4) |
-| E4 texte long non affiché | Ouvert | `content_body` jamais rendu (J3/J4) |
+| E3 12 captures manquantes | Ouvert, encadré (J3) : cadre « capture d'écran réelle à produire » dans le lecteur | `academy_media_assets` tous `pending_capture` (J4) |
+| E4 texte long non affiché | **Corrigé** (J3) : section « Lire la leçon complète » | `components/academy/lesson-player.tsx` |
 | M1 quiz vide | **Corrigé** (J2) : une question à la fois, confirmation, explications et bonnes réponses après correction | `quiz-form.tsx` |
 | M2 espace opérateur trompeur | **Corrigé** : compteur « x / 12 », statuts réels (PR #37) | `components/operator/journey.tsx` |
 | M3 limites par IP | Ouvert (J1 sécurité, à faire) | `register/route.ts:31`, `attempts/route.ts:16` |
@@ -39,7 +39,7 @@ Vérification restante de J1 : parcours complet contre une base (ouvrir → quiz
 | J2 | Moteur d'évaluation : quiz, tentatives, seuils, explications, devoirs, correction | Fait (branche `feat/academy-j2-evaluation`) ; migration de contenu à appliquer après fusion |
 | J3 | Interface premium : tableau de bord, lecteur de cours, navigation, mobile, mouvement | À faire, spécification d'écrans à soumettre avant code |
 | J4 | Contenu : texte long, captures authentiques, schémas, objectifs | À faire |
-| J5 | Laboratoire 3D pilote (inscription d'un producteur ou carte membre) | À faire, après J1 à J4 |
+| J5 | Laboratoire 3D pilote (inscription d'un producteur ou carte membre) | À faire ; le cadre (scène, missions, vue 2D) existe depuis J3 |
 | J6 | Gestion de la formation côté admin | Entamé : file de correction ; fiche candidat et alertes à faire |
 | J7 | Validation : tests unitaires, intégration, navigateur, sécurité, mobile, accessibilité | Continu |
 | J8 | Préparation de mise en production | À faire |
@@ -61,3 +61,20 @@ Vérification restante de J1 : parcours complet contre une base (ouvrir → quiz
    que la PR n'est pas fusionnée et son application autorisée.
 3. **Ordre : J2 avant J3**, comme le prompt le demande. J3 commencera par une spécification
    d'écrans à soumettre avant le code.
+
+## J3 livré (14 octobre 2026)
+
+Design validé par l'utilisateur (accès libre aux 12 leçons, courriel à l'équipe, scène
+« bureau de coopérative »). Écarts par rapport à la spécification, assumés :
+
+- Position de diapositive mémorisée sur l'appareil (`localStorage`), pas en base : aucune
+  migration ; la leçon à reprendre, elle, vient du serveur (`last_viewed_at`).
+- Les trois étapes sont dans une seule PR (commits séparés 1/3, 2/3, 3/3) plutôt que trois PR
+  à fusionner l'une après l'autre.
+- La vue 3D du laboratoire est annoncée « bientôt » (J5) ; rien n'est chargé.
+
+Vérifié sur la pile locale (mock Supabase alimenté par le contenu réel de la formation,
+`e2e/fixtures/academy-content.json`) : aucune erreur de page, aucun chunk Three.js chargé sur
+l'accueil, le lecteur et le laboratoire ; position de diapositive conservée au rechargement ;
+cas pratique indisponible avant le quiz ; mouvement réduit respecté. Captures PC 1440×900 et
+Android 390×844. Non mesuré : Motorola réel, poids exact des chunks (à lire dans le build Vercel).
