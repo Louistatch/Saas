@@ -63,7 +63,13 @@ test('Lecteur : cours lisible sans quiz sur la page, texte long mis en forme, m�
   await page.goto(`/operator/training/${lesson4}`)
   await expect(page.getByRole('heading', { level: 2, name: 'Leçon complète' })).toBeVisible()
   await expect(page.getByRole('heading', { level: 2, name: /Déduplication/ })).toBeVisible()
-  await expect(page.getByText('Média à fournir.')).toBeVisible()
+  await expect(
+    page.getByText('Capture du produit, données d’exemple', { exact: false }),
+  ).toBeVisible()
+  await expect(page.getByRole('img', { name: /Page Membres/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Exemple de terrain' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Vérifiez-vous avant le quiz' })).toBeVisible()
+  await expect(page.getByText('Média à fournir.')).toHaveCount(0)
   await expect(page.getByRole('radio')).toHaveCount(0)
   await expect(page.getByRole('textbox')).toHaveCount(0)
   await expect(page.getByText('Objectif', { exact: true })).toHaveCount(0)
