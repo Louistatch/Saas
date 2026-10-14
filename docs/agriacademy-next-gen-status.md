@@ -11,7 +11,7 @@ chaque jalon livré ; rien n'est fusionné ni déployé sans accord explicite.
 | C1 progression jamais écrite | **Corrigé** (PR #37, `main` 5d42466) | `lib/academy/operator-training.ts` : `recordLessonOpened`, `evaluateLessonCompletion` ; politique dans `lib/academy/completion-policy.ts` (4 tests) |
 | C2 pas de fin de formation automatique | **Corrigé** (PR #37) | `lib/academy/operator-completion.ts` : `settleOperatorTraining` → `markPartnerTrainingCompleted`, e-mails une seule fois ; `candidate` → `training` à la première leçon |
 | E1 devoirs non corrigeables | **Corrigé** (J2) | `lib/academy/assignment-review.ts`, `/admin/partners/training/corrections`, retour et reprise côté candidat |
-| E2 seuil 70 % = sans-faute | **Corrigé** (J2, migration à appliquer) | crédit partiel documenté (`assessment-policy.ts`), 5 questions par quiz (`20261014_150000_academy_quiz_v2_questions.sql`), 3 tentatives par 24 h |
+| E2 seuil 70 % = sans-faute | **Corrigé et appliqué en production le 14 octobre 2026** | crédit partiel documenté (`assessment-policy.ts`), 5 questions par quiz (`20261014_150000_academy_quiz_v2_questions.sql`), 3 tentatives par 24 h |
 | E3 12 captures manquantes | Ouvert | `academy_media_assets` tous `pending_capture` (J4) |
 | E4 texte long non affiché | Ouvert | `content_body` jamais rendu (J3/J4) |
 | M1 quiz vide | **Corrigé** (J2) : une question à la fois, confirmation, explications et bonnes réponses après correction | `quiz-form.tsx` |
@@ -36,7 +36,7 @@ Vérification restante de J1 : parcours complet contre une base (ouvrir → quiz
 |---|---|---|
 | J0 | Lire l'audit, vérifier `main`, documenter l'état | Fait (ce document) |
 | J1 | Progression, règles de validation serveur, transitions, notification admin, sécurité | Fait sauf M3 et M5 |
-| J2 | Moteur d'évaluation : quiz, tentatives, seuils, explications, devoirs, correction | Fait (branche `feat/academy-j2-evaluation`) ; migration de contenu à appliquer après fusion |
+| J2 | Moteur d'évaluation : quiz, tentatives, seuils, explications, devoirs, correction | Fait : PR #38 fusionnée, migration de contenu appliquée en production (60 questions, 211 options, 5 par quiz, 3 tentatives par jour, vérifié par requête) |
 | J3 | Interface premium : tableau de bord, lecteur de cours, navigation, mobile, mouvement | À faire, spécification d'écrans à soumettre avant code |
 | J4 | Contenu : texte long, captures authentiques, schémas, objectifs | À faire |
 | J5 | Laboratoire 3D pilote (inscription d'un producteur ou carte membre) | À faire, après J1 à J4 |
@@ -57,7 +57,9 @@ Vérification restante de J1 : parcours complet contre une base (ouvrir → quiz
    tentatives par 24 h, explications après chaque tentative, ordre stable par personne.** Plus
    exigeant que 3 questions à 60 %, sans être un sans-faute ; les 24 questions nouvelles sont
    tirées du texte long des leçons, avec de vrais distracteurs. La migration est additive et
-   idempotente (vérifiée deux fois sur PGlite) ; **elle n'est pas appliquée en production** tant
-   que la PR n'est pas fusionnée et son application autorisée.
+   idempotente (vérifiée deux fois sur PGlite), **appliquée en production le 14 octobre 2026**
+   sur accord explicite, après fusion de la PR #38. Relevé après application : 60 questions,
+   211 options, 5 questions par quiz, aucune question sans bonne réponse, aucun choix multiple
+   sans distracteur, 12 quiz limités à 3 tentatives par jour.
 3. **Ordre : J2 avant J3**, comme le prompt le demande. J3 commencera par une spécification
    d'écrans à soumettre avant le code.
