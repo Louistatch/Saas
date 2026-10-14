@@ -101,8 +101,20 @@ export default function RemotePlayers({
 
   const register = useCallback(
     (key: string) => (e: pc.Entity | null) => {
-      if (e) entities.current.set(key, e)
-      else entities.current.delete(key)
+      if (!e) {
+        entities.current.delete(key)
+        return
+      }
+      entities.current.set(key, e)
+      // The figure may have loaded seconds after its first pose (the adult models are larger):
+      // place it where the player is now, not at the sample the element was rendered with.
+      const list = buffers.current.get(key)
+      const s = list ? sampleAt(list, performance.now() - INTERP_DELAY_MS) : null
+      if (s) {
+        const [px, , pz] = worldPos(s.x, s.z)
+        e.setLocalPosition(px, 0.05, pz)
+        e.setLocalEulerAngles(0, s.heading, 0)
+      }
     },
     [],
   )

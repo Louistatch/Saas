@@ -57,6 +57,8 @@ async function player(browser: Browser, who: 'ama' | 'yawa', device: object) {
   await context.addCookies([
     { name: 'sb-127-auth-token', value: `base64-${b64(session)}`, domain: '127.0.0.1', path: '/' },
   ])
+  // A returning player: the first-run appearance sheet would otherwise take the keyboard.
+  await context.addInitScript(() => localStorage.setItem('haroolife.avatar.chosen', '1'))
   const page = await context.newPage()
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(e.message))
@@ -165,9 +167,17 @@ test('two people chat in real time, survive a network cut and a reload, and see 
   const moved = frames
     .slice(1)
     .filter((p, i) => Math.hypot(p.x - frames[i].x, p.z - frames[i].z) > 1e-4).length
-  const steps = frames
-    .slice(1)
-    .map((p, i) => Math.hypot(p.x - frames[i].x, p.z - frames[i].z) / ((p.t - frames[i].t) / 1000))
+  // Speed over windows of at least one interpolation delay (remote-players INTERP_DELAY_MS): two animation-frame callbacks a
+  // few ms apart can straddle a single engine update after a long frame (software rendering),
+  // which would read as a huge per-frame speed although the figure moved one normal step.
+  const SPEED_WINDOW_MS = 220
+  const steps: number[] = []
+  for (let i = 0; i < frames.length; i++) {
+    const j = frames.findIndex((p, k) => k > i && p.t - frames[i].t >= SPEED_WINDOW_MS)
+    if (j < 0) break
+    const d = Math.hypot(frames[j].x - frames[i].x, frames[j].z - frames[i].z)
+    steps.push(d / ((frames[j].t - frames[i].t) / 1000))
+  }
   testInfo.annotations.push({
     type: 'remote avatar (SwiftShader, 2 pages)',
     description: JSON.stringify({

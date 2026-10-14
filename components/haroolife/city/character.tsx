@@ -65,6 +65,7 @@ export function Character({
   const current = useRef<string | null>(null)
   const band = useRef<pc.Entity | null>(null)
   const tinted = useRef<pc.Material[]>([])
+  const placed = useRef(false)
 
   // Create the skinned figure once the container is loaded (the first clip is read once).
   // biome-ignore lint/correctness/useExhaustiveDependencies: anim changes are handled below
@@ -79,6 +80,12 @@ export function Character({
     fig.setLocalEulerAngles(0, spec.yaw, 0)
     root.addChild(fig)
     app.root.addChild(root)
+    // Placed before the parent learns of it: an imperative parent (remote players) may then
+    // move it to where it really is, and no frame shows it at the props' stale position.
+    root.setLocalPosition(position[0], position[1], position[2])
+    root.setLocalEulerAngles(0, rotation, 0)
+    root.setLocalScale(scale, scale, scale)
+    placed.current = true
     holder.current = root
     figure.current = fig
     band.current = null
@@ -152,7 +159,6 @@ export function Character({
   }, [active])
 
   // Follow position, rotation and scale from props without re-instantiating.
-  const placed = useRef(false)
   useEffect(() => {
     const root = holder.current
     if (!root) return

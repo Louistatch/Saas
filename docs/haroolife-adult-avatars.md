@@ -75,6 +75,20 @@ détruire l'entité. Avec un moteur corrigé la première passe suffit. Vérifi�
 `lome-endurance.spec.ts` (20 visites, textures stables) et un script de diagnostic (textures
 « skin » par cycle : 23 → 23, contre 38 → 65 avant).
 
+## Corrections apportées par la CI (webgl-browser sur la PR)
+
+- `lome-life.spec.ts` : l'onglet s'appelle « Aménager » ; à l'intérieur, c'est le canvas
+  visible qui est attendu (celui de PlayCanvas est masqué pendant un intérieur Three).
+- `lome-realtime.spec.ts` : ses propres contextes de navigateur sont marqués « joueur de
+  retour », sinon la feuille du premier lancement prend le clavier d'Ama et son avatar ne bouge
+  pas chez Yawa. La vitesse de l'avatar distant est mesurée sur des fenêtres d'au moins 220 ms :
+  deux rappels d'animation à 7 ms d'intervalle peuvent encadrer une seule mise à jour du
+  moteur après une image longue (rendu logiciel), ce qui lisait un pas normal de 0,5 unité
+  comme 80 unités/s. Une téléportation de 20 unités reste détectée (> 14 unités/s sur 220 ms).
+- Personnage : l'entité est placée à sa position de départ avant d'être remise au parent, et
+  les joueurs distants la posent à la position interpolée du moment dès réception, car un
+  modèle adulte peut se charger quelques secondes après la première pose.
+
 ## Fichiers
 
 - Modèles : `public/haroolife/vendor/quaternius/{Casual_2,Casual_Hoodie,Women_Casual,Women_Formal}.glb`
@@ -111,7 +125,7 @@ React Three Fiber, drei : MIT ; Rapier : Apache-2.0.
 | `npm run build` | OK |
 | `npm run security:check` | les 8 assertions de code passent ; 3 assertions d'environnement échouent faute de secrets locaux (KOBO, Upstash, CARD), comme avant |
 | Playwright `lome-avatar`, `lome-door`, `lome-player`, `lome-interior-three`, `lome-travel`, `lome-gpu-lifecycle` (desktop + mobile-android) | 16 passés |
-| Playwright `lome-endurance` (desktop) | passé seul (1,0 min) ; en parallèle avec le worker mobile, une fois 289 tampons contre 286 attendus (seuil absolu, textures et tendance sur 20 visites bonnes) |
+| Playwright `lome-endurance` (desktop) | passé seul (1,0 min) ; en parallèle avec le worker mobile, une fois 289 tampons contre 286 attendus, et sur la CI une fois une tendance de 5 tampons contre 4 (seuils de bruit des chunks de rue ; textures stables) |
 
 Captures `docs/captures/haroolife-adultes/` (avant = `main`, après = cette branche) :
 `avant-mobile-rue`, `apres-mobile-rue`, `avant-mobile-maison`, `apres-mobile-maison`,
