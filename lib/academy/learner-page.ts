@@ -20,14 +20,21 @@ export interface LearnerPageData {
   lessons: LearnerLesson[]
   resume: LearnerLesson | null
   firstName: string | null
+  /** Autres modules publiés (hors parcours opérateur) : affichés sans lien tant qu'ils n'ont pas de parcours. */
+  otherPublishedModules: number
 }
 
 export async function loadLearnerPage(userId: string): Promise<LearnerPageData | null> {
   const admin = createAdminClient()
-  const [module_, summary, profile] = await Promise.all([
+  const [module_, summary, profile, others] = await Promise.all([
     getModuleWithLessons(admin, OPERATOR_MODULE_ID, userId),
     getProfileProgressSummary(admin, userId, OPERATOR_MODULE_ID),
     admin.from('profiles').select('first_name').eq('id', userId).maybeSingle(),
+    admin
+      .from('academy_modules')
+      .select('id')
+      .eq('is_published', true)
+      .neq('id', OPERATOR_MODULE_ID),
   ])
   if (!module_) return null
   const lessons = learnerLessons(
@@ -47,5 +54,6 @@ export async function loadLearnerPage(userId: string): Promise<LearnerPageData |
     lessons,
     resume: resumeLesson(lessons),
     firstName: profile.data?.first_name ?? null,
+    otherPublishedModules: others.data?.length ?? 0,
   }
 }

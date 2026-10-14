@@ -525,8 +525,28 @@ const TABLES = {
   academy_lesson_slides: ACADEMY.slides,
   academy_media_assets: ACADEMY.assets ?? [],
   academy_quizzes: ACADEMY.quizzes,
-  academy_quiz_questions: [],
-  academy_quiz_options: [],
+  academy_quiz_questions: ACADEMY.quizzes.flatMap((q) =>
+    [1, 2, 3, 4, 5].map((n) => ({
+      id: `${q.id}-q${n}`,
+      quiz_id: q.id,
+      question_type: n === 5 ? 'multiple_choice' : 'single_choice',
+      prompt: `Question ${n} du quiz (données d’exercice)`,
+      points: 1,
+      order_index: n,
+      explanation: 'Explication d’exercice.',
+    })),
+  ),
+  academy_quiz_options: ACADEMY.quizzes.flatMap((q) =>
+    [1, 2, 3, 4, 5].flatMap((n) =>
+      ['A', 'B', 'C', 'D'].map((l, i) => ({
+        id: `${q.id}-q${n}-${l}`,
+        question_id: `${q.id}-q${n}`,
+        label: `Réponse ${l}`,
+        is_correct: i === 0 || (n === 5 && i === 1),
+        order_index: i + 1,
+      })),
+    ),
+  ),
   academy_assignments: ACADEMY.assignments,
   academy_profile_progress: ACADEMY_PROGRESS,
   academy_quiz_attempts: ACADEMY_ATTEMPTS,

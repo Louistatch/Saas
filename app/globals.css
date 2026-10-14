@@ -202,6 +202,10 @@
     animation: none;
   }
 }
+/* En salle d'évaluation, aucune bulle ne recouvre les réponses. */
+body:has(.academy-focus) [data-support-button] {
+  display: none;
+}
 /* Sur téléphone, le bouton de messagerie flotte au-dessus de la barre d'onglets d'AgriAcademy. */
 @media (max-width: 767px) {
   body:has(.academy) [data-support-button] {

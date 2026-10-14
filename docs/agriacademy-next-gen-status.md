@@ -38,7 +38,7 @@ Vérification restante de J1 : parcours complet contre une base (ouvrir → quiz
 | J1 | Progression, règles de validation serveur, transitions, notification admin, sécurité | Fait sauf M3 et M5 |
 | J2 | Moteur d'évaluation : quiz, tentatives, seuils, explications, devoirs, correction | Fait (branche `feat/academy-j2-evaluation`) ; migration de contenu à appliquer après fusion |
 | J3 | Interface premium : tableau de bord, lecteur de cours, navigation, mobile, mouvement | À faire, spécification d'écrans à soumettre avant code |
-| J4 | Contenu : texte long, captures authentiques, schémas, objectifs | À faire |
+| J4 | Contenu : texte long, captures authentiques, schémas, objectifs | Entamé : texte long rendu en sections (J3) ; captures authentiques, mapping par leçon et exemples à faire |
 | J5 | Laboratoire 3D pilote (inscription d'un producteur ou carte membre) | À faire ; le cadre (scène, missions, vue 2D) existe depuis J3 |
 | J6 | Gestion de la formation côté admin | Entamé : file de correction ; fiche candidat et alertes à faire |
 | J7 | Validation : tests unitaires, intégration, navigateur, sécurité, mobile, accessibilité | Continu |
@@ -78,3 +78,28 @@ Vérifié sur la pile locale (mock Supabase alimenté par le contenu réel de la
 l'accueil, le lecteur et le laboratoire ; position de diapositive conservée au rechargement ;
 cas pratique indisponible avant le quiz ; mouvement réduit respecté. Captures PC 1440×900 et
 Android 390×844. Non mesuré : Motorola réel, poids exact des chunks (à lire dans le build Vercel).
+
+## J3 mis à jour (cadrage `AGRIACADEMY_J3_J4_PROMPT_CLAUDE.md`, 14 octobre 2026)
+
+Spécification : `docs/agriacademy-j3-experience-spec.md` (six écrans, correspondance ancien →
+nouveau, auto-critique). Réalisé sur la même PR #39 :
+
+- Écran 1 « Mes formations » : une action « Reprendre », prochains devoirs (cas pratiques à
+  déposer, reprises), scores connus, lien vers la vue d'ensemble, autres formations publiées
+  comptées sans lien.
+- Écran 2 « Vue d'ensemble » (`/operator/training/cursus`) : objectif, débouché, prérequis,
+  durée étiquetée « estimée », programme avec état réel, évaluations requises, critères.
+- Écrans 3 et 4 : lecture continue (objectif une seule fois, points clés, démonstration ou
+  « Média à fournir », `content_body` rendu en h2 / p / listes / cases sans HTML injecté,
+  « À retenir ») ; plus de pile de cartes ni de badges de type ; sommaire en tiroir sur
+  téléphone ; fil d'Ariane ; trois espaces Cours / Exercice / Évaluation sur une barre basse.
+- Écran 5 « Salle d'évaluation » : page dédiée, bulle de support masquée, règles affichées
+  depuis les données, quiz J2 inchangé, cas pratique dans sa section, fermé avant le quiz.
+- Écran 6 : pages admin existantes, raffinements J6.
+
+Vérifié localement (mock alimenté par le contenu réel) : 24 tests unitaires AgriAcademy,
+7 tests Playwright (`e2e/academy.spec.ts`, workflow `academy-browser.yml`) : reprise en deux
+actions, états réels, texte long, média à fournir, quiz une question à la fois, cas pratique
+fermé, retour sans perte, tiroir Android, aucun défilement horizontal à 390 et 320 px, aucun
+chunk Three.js. Captures avant/après PC 1440 et Android 390 jointes à la PR. Non mesuré :
+LCP/INP sur appareil réel, Motorola.

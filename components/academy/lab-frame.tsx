@@ -6,7 +6,7 @@
 import type { LabMission, LabObject } from '@/lib/academy/lab-missions'
 import { Archive, Check, FileText, Monitor, Smartphone } from 'lucide-react'
 import Link from 'next/link'
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 
 const ICON: Record<LabObject['key'], typeof Monitor> = {
   computer: Monitor,
@@ -20,11 +20,15 @@ export function LabFrame({
   objects,
   mission,
   lesson,
+  tabs,
+  bottomTabs,
 }: {
   sceneTitle: string
   objects: LabObject[]
   mission: LabMission
   lesson: { id: string; title: string; order_index: number | null }
+  tabs?: ReactNode
+  bottomTabs?: ReactNode
 }) {
   const [active, setActive] = useState<LabObject['key']>(mission.focus)
   const [done, setDone] = useState<number>(0)
@@ -33,7 +37,7 @@ export function LabFrame({
   const focusIndex = objects.findIndex((o) => o.key === mission.focus)
 
   return (
-    <div className="flex min-h-screen flex-col bg-(--ac-ink) text-(--ac-ground)">
+    <div className="flex min-h-screen flex-col bg-(--ac-ink) pb-20 text-(--ac-ground) lg:pb-0">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-(--ac-ground)/14 px-4 py-4 sm:px-7">
         <div className="flex min-w-0 items-center gap-4">
           <Link
@@ -43,9 +47,10 @@ export function LabFrame({
             ‹ Leçon {lesson.order_index ?? ''}
           </Link>
           <h1 className="academy-display truncate text-lg font-medium sm:text-[22px]">
-            Laboratoire : {sceneTitle}
+            Exercice : {sceneTitle}
           </h1>
         </div>
+        {tabs}
         <div className="flex flex-wrap items-center gap-2.5 text-[13px] font-semibold">
           <span className="inline-flex items-center gap-2 rounded-full bg-(--ac-gold)/18 px-3 py-1.5 text-(--ac-gold)">
             <span aria-hidden="true" className="h-2 w-2 rounded-full bg-(--ac-gold)" />
@@ -198,6 +203,7 @@ export function LabFrame({
           </div>
         </aside>
       </div>
+      {bottomTabs}
     </div>
   )
 }

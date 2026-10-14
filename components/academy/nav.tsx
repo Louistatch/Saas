@@ -3,12 +3,22 @@
 // Navigation d'AgriAcademy : six entrées sur ordinateur (barre latérale), quatre sur téléphone
 // (barre d'onglets, 48 px de touche). « Leçons » et « Laboratoire » passent par des routes de
 // reprise qui choisissent la leçon à ouvrir côté serveur ; « Certificat » renvoie au dossier.
-import { BookOpen, FlaskConical, GraduationCap, Home, ScrollText, Trophy, User } from 'lucide-react'
+import {
+  BookOpen,
+  FlaskConical,
+  GraduationCap,
+  Home,
+  Map as MapIcon,
+  ScrollText,
+  Trophy,
+  User,
+} from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const DESKTOP = [
-  { href: '/operator/training', label: 'Accueil', icon: Home, exact: true },
+  { href: '/operator/training', label: 'Mes formations', icon: Home, exact: true },
+  { href: '/operator/training/cursus', label: 'Vue d’ensemble', icon: MapIcon, exact: true },
   {
     href: '/operator/training/resume',
     label: 'Mes cours',
@@ -42,6 +52,9 @@ function isCurrent(entry: Entry, pathname: string): boolean {
   }
   return false
 }
+
+/** Dans une leçon (cours, exercice, évaluation), la barre du bas est celle de la leçon. */
+const inLesson = (pathname: string) => /^\/operator\/training\/[0-9a-f-]{36}(\/|$)/.test(pathname)
 
 export function AcademyNav() {
   const pathname = usePathname()
@@ -79,27 +92,29 @@ export function AcademyNav() {
         </p>
       </nav>
 
-      <nav
-        aria-label="AgriAcademy"
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-(--ac-line) bg-white px-1.5 pt-1.5 pb-[max(10px,env(safe-area-inset-bottom))] md:hidden"
-      >
-        {MOBILE.map((entry) => {
-          const current = isCurrent(entry, pathname)
-          return (
-            <Link
-              key={entry.label}
-              href={entry.href}
-              aria-current={current ? 'page' : undefined}
-              className={`flex min-h-12 flex-col items-center gap-1 pt-1.5 text-[11px] font-semibold ${
-                current ? 'text-(--ac-emerald)' : 'text-(--ac-muted)'
-              }`}
-            >
-              <entry.icon aria-hidden="true" className="h-[22px] w-[22px]" />
-              {entry.label}
-            </Link>
-          )
-        })}
-      </nav>
+      {!inLesson(pathname) && (
+        <nav
+          aria-label="AgriAcademy"
+          className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-(--ac-line) bg-white px-1.5 pt-1.5 pb-[max(10px,env(safe-area-inset-bottom))] md:hidden"
+        >
+          {MOBILE.map((entry) => {
+            const current = isCurrent(entry, pathname)
+            return (
+              <Link
+                key={entry.label}
+                href={entry.href}
+                aria-current={current ? 'page' : undefined}
+                className={`flex min-h-12 flex-col items-center gap-1 pt-1.5 text-[11px] font-semibold ${
+                  current ? 'text-(--ac-emerald)' : 'text-(--ac-muted)'
+                }`}
+              >
+                <entry.icon aria-hidden="true" className="h-[22px] w-[22px]" />
+                {entry.label}
+              </Link>
+            )
+          })}
+        </nav>
+      )}
     </>
   )
 }

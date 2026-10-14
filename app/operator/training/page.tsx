@@ -69,6 +69,8 @@ export default async function OperatorTrainingPage() {
   const { module: module_, lessons, resume, firstName } = data
   const counts = remainingCounts(lessons)
   const toRead = lessons.filter((l) => l.review)
+  const toSubmit = lessons.filter((l) => l.state === 'quiz_passed')
+  const otherModules = data.otherPublishedModules
   const acquired = lessons
     .filter((l) => l.state === 'completed')
     .map((l) => ({
@@ -84,7 +86,7 @@ export default async function OperatorTrainingPage() {
             {firstName ? `Bonjour ${firstName}` : 'Bonjour'}
           </p>
           <h1 className="academy-display text-[28px] font-medium leading-tight sm:text-[34px]">
-            Votre parcours d’opérateur certifié
+            Mes formations
           </h1>
         </div>
         <div className="flex gap-2">
@@ -105,8 +107,16 @@ export default async function OperatorTrainingPage() {
       </header>
 
       <div className="grid gap-6 lg:grid-cols-12">
-        <div className={`lg:col-span-8 ${enter(1)}`}>
+        <div className={`flex flex-col gap-3 lg:col-span-8 ${enter(1)}`}>
           <RouteCard lessons={lessons} resume={resume} moduleTitle={module_.title} />
+          <p className="m-0 text-sm text-(--ac-muted)">
+            <Link href="/operator/training/cursus" className="font-semibold no-underline">
+              Vue d’ensemble du cursus
+            </Link>
+            {' : '}objectif, programme, évaluations requises et critères de passage.
+            {otherModules > 0 &&
+              ` ${otherModules} autre${otherModules > 1 ? 's' : ''} formation${otherModules > 1 ? 's' : ''} publiée${otherModules > 1 ? 's' : ''} : accès sur demande à l’équipe.`}
+          </p>
         </div>
         <section
           aria-labelledby="remaining-title"
@@ -174,10 +184,20 @@ export default async function OperatorTrainingPage() {
               detail="Laboratoire, bureau de coopérative fictif. Rien n’est enregistré en production."
             />
           )}
+          {toSubmit.slice(0, 2).map((l) => (
+            <ActivityRow
+              key={`submit-${l.id}`}
+              href={`/operator/training/${l.id}/evaluation#cas-pratique`}
+              lead={l.order_index ?? '•'}
+              title={`Cas pratique ${l.order_index ?? ''} à déposer`}
+              detail={`Quiz réussi${l.quizScore != null ? ` (${l.quizScore} %)` : ''}. Le dépôt valide la leçon.`}
+              tag="À déposer"
+            />
+          ))}
           {toRead.slice(0, 2).map((l) => (
             <ActivityRow
               key={l.id}
-              href={`/operator/training/${l.id}#cas-pratique`}
+              href={`/operator/training/${l.id}/evaluation#cas-pratique`}
               lead={l.review?.score != null ? l.review.score : '✓'}
               title={`Cas pratique ${l.order_index ?? ''} corrigé`}
               detail={

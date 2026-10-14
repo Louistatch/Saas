@@ -1,4 +1,5 @@
 import { LabFrame } from '@/components/academy/lab-frame'
+import { LessonTabs } from '@/components/academy/lesson-tabs'
 import { LAB_SCENE, missionForLesson } from '@/lib/academy/lab-missions'
 import { loadLearnerPage } from '@/lib/academy/learner-page'
 import { assertOperatorCandidate } from '@/lib/security/assert-partner-access'
@@ -23,6 +24,8 @@ export default async function LessonLabPage({
       objects={LAB_SCENE.objects}
       mission={missionForLesson(lesson.title)}
       lesson={{ id: lesson.id, title: lesson.title, order_index: lesson.order_index }}
+      tabs={<LessonTabs lesson={lesson} current="exercice" variant="top" />}
+      bottomTabs={<LessonTabs lesson={lesson} current="exercice" variant="bottom" />}
     />
   )
 }

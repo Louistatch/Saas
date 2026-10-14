@@ -70,12 +70,6 @@ export function RouteCard({
         >
           {label}
         </Link>
-        <Link
-          href="/operator/training/lab"
-          className="inline-flex min-h-12 items-center rounded-full border border-(--ac-ground)/40 px-5 font-semibold text-(--ac-ground)"
-        >
-          Ouvrir le laboratoire
-        </Link>
       </div>
     </section>
   )
