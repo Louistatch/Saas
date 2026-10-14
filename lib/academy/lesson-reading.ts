@@ -6,6 +6,7 @@
  * Fonctions pures, testées dans tests/academy-lesson-reading.test.ts.
  */
 import { type LessonBlock, parseLessonText } from './lesson-text'
+import { CAPTURE_LABEL, captureFor } from './media-catalogue'
 
 export interface ReadingSlide {
   id: string
@@ -28,7 +29,11 @@ export interface Demo {
   note: string
   /** Image prête à afficher, sinon null : le média est à fournir. */
   src: string | null
+  /** Variante téléphone de la capture du catalogue, quand elle existe. */
+  srcMobile: string | null
   alt: string
+  /** Origine de l'image : capture de production (base) ou capture du produit avec données d'exemple. */
+  source: 'production' | 'catalogue' | null
 }
 
 export interface LessonReading {
@@ -45,28 +50,53 @@ export function isAuthorNote(body: string): boolean {
   return /^\s*utiliser (une|la|des) captures?\b/i.test(body)
 }
 
-export function demoFromSlide(slide: ReadingSlide): Demo {
+export function demoFromSlide(slide: ReadingSlide, orderIndex: number | null = null): Demo {
   const asset = slide.media_asset
   const path = asset?.storage_path ?? ''
   const ready = asset?.status === 'ready' && (path.startsWith('http') || path.startsWith('/'))
   const routeInBody =
     /\/(?:dashboard|operator|admin|verify)[\w/\-[\]]*/.exec(slide.body)?.[0] ?? null
-  const route = asset?.source_route ?? routeInBody
-  const note = isAuthorNote(slide.body)
-    ? `Capture authentique de l’écran${route ? ` ${route}` : ''} à fournir par l’équipe pédagogique. En attendant, ouvrez cet écran dans votre espace pour le repérer.`
-    : slide.body
+  const catalogue = captureFor(orderIndex)
+  const route = asset?.source_route ?? catalogue?.route ?? routeInBody
+  if (ready) {
+    return {
+      title: slide.title,
+      route,
+      note: isAuthorNote(slide.body) ? '' : slide.body,
+      src: path,
+      srcMobile: null,
+      alt: asset?.alt_text ?? slide.title,
+      source: 'production',
+    }
+  }
+  if (catalogue) {
+    return {
+      title: slide.title,
+      route: catalogue.route,
+      note: CAPTURE_LABEL,
+      src: catalogue.desktop,
+      srcMobile: catalogue.mobile,
+      alt: catalogue.alt,
+      source: 'catalogue',
+    }
+  }
   return {
     title: slide.title,
     route,
-    note,
-    src: ready ? path : null,
+    note: isAuthorNote(slide.body)
+      ? `Capture authentique de l’écran${route ? ` ${route}` : ''} à fournir par l’équipe pédagogique. En attendant, ouvrez cet écran dans votre espace pour le repérer.`
+      : slide.body,
+    src: null,
+    srcMobile: null,
     alt: asset?.alt_text ?? slide.title,
+    source: null,
   }
 }
 
 export function lessonReading(input: {
   slides: ReadingSlide[]
   content_body: string | null
+  order_index?: number | null
 }): LessonReading {
   const slides = input.slides
   const objectiveSlide = slides.find((s) => s.slide_type === 'objective')
@@ -95,7 +125,7 @@ export function lessonReading(input: {
           s.slide_type === 'concept' || s.slide_type === 'procedure' || s.slide_type === 'warning',
       )
       .map((s) => ({ id: s.id, title: s.title, body: s.body })),
-    demo: screenshot ? demoFromSlide(screenshot) : null,
+    demo: screenshot ? demoFromSlide(screenshot, input.order_index ?? null) : null,
     blocks,
     summary: summary ? { title: summary.title, body: summary.body } : null,
     caseBrief: caseSlide ? { title: caseSlide.title, body: caseSlide.body } : null,

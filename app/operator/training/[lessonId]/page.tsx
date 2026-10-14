@@ -2,6 +2,7 @@ import { LessonList } from '@/components/academy/lesson-list'
 import { LessonReadingView } from '@/components/academy/lesson-reading'
 import { LessonCrumbs, LessonTabs } from '@/components/academy/lesson-tabs'
 import { loadLearnerPage } from '@/lib/academy/learner-page'
+import { enrichmentFor } from '@/lib/academy/lesson-enrichment'
 import { lessonReading } from '@/lib/academy/lesson-reading'
 import { OPERATOR_MODULE_ID } from '@/lib/academy/operator-training'
 import { assertOperatorCandidate } from '@/lib/security/assert-partner-access'
@@ -34,7 +35,12 @@ export default async function OperatorLessonPage({
   const position = lessons.findIndex((l) => l.id === lessonId)
   const prev = position > 0 ? lessons[position - 1] : null
   const next = position < lessons.length - 1 ? lessons[position + 1] : null
-  const reading = lessonReading({ slides: lesson.slides, content_body: lesson.content_body })
+  const reading = lessonReading({
+    slides: lesson.slides,
+    content_body: lesson.content_body,
+    order_index: lesson.order_index,
+  })
+  const enrichment = enrichmentFor(lesson.order_index)
   const mailto = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
     `Question sur la leçon ${view.order_index ?? ''} : ${view.title}`,
   )}`
@@ -60,7 +66,13 @@ export default async function OperatorLessonPage({
             <LessonTabs lesson={view} current="cours" variant="top" />
           </div>
         </header>
-        <LessonReadingView lesson={view} reading={reading} prev={prev} next={next} />
+        <LessonReadingView
+          lesson={view}
+          reading={reading}
+          enrichment={enrichment}
+          prev={prev}
+          next={next}
+        />
       </main>
 
       <aside

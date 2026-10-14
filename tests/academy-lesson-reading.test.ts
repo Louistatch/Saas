@@ -81,5 +81,22 @@ describe('lecture d’une leçon (J3/J4)', () => {
     )
     assert.equal(ready.src, '/media/cards.png')
     assert.equal(ready.note, 'Observer la page des cartes.')
+    assert.equal(ready.source, 'production')
+  })
+
+  it('prend la capture du produit (données d’exemple) quand la base n’a pas encore de capture', () => {
+    const d = demoFromSlide(
+      slide('screenshot', 'Page Membres', 'Utiliser une capture exacte de /dashboard/members', {
+        status: 'pending_capture',
+        storage_path: null,
+        alt_text: null,
+        source_route: '/dashboard/members',
+      }),
+      4,
+    )
+    assert.equal(d.source, 'catalogue')
+    assert.equal(d.src, '/academy/captures/lesson-04-desktop.webp')
+    assert.equal(d.srcMobile, '/academy/captures/lesson-04-mobile.webp')
+    assert.equal(d.route, '/dashboard/members')
   })
 })

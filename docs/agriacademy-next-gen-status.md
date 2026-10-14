@@ -12,7 +12,7 @@ chaque jalon livré ; rien n'est fusionné ni déployé sans accord explicite.
 | C2 pas de fin de formation automatique | **Corrigé** (PR #37) | `lib/academy/operator-completion.ts` : `settleOperatorTraining` → `markPartnerTrainingCompleted`, e-mails une seule fois ; `candidate` → `training` à la première leçon |
 | E1 devoirs non corrigeables | **Corrigé** (J2) | `lib/academy/assignment-review.ts`, `/admin/partners/training/corrections`, retour et reprise côté candidat |
 | E2 seuil 70 % = sans-faute | **Corrigé** (J2, migration à appliquer) | crédit partiel documenté (`assessment-policy.ts`), 5 questions par quiz (`20261014_150000_academy_quiz_v2_questions.sql`), 3 tentatives par 24 h |
-| E3 12 captures manquantes | Ouvert, encadré (J3) : cadre « capture d'écran réelle à produire » dans le lecteur | `academy_media_assets` tous `pending_capture` (J4) |
+| E3 12 captures manquantes | **Partiel** (J4) : 12 captures du produit avec données d'exemple, étiquetées ; captures de production à fournir | `public/academy/captures`, `lib/academy/media-catalogue.ts` |
 | E4 texte long non affiché | **Corrigé** (J3) : section « Lire la leçon complète » | `components/academy/lesson-player.tsx` |
 | M1 quiz vide | **Corrigé** (J2) : une question à la fois, confirmation, explications et bonnes réponses après correction | `quiz-form.tsx` |
 | M2 espace opérateur trompeur | **Corrigé** : compteur « x / 12 », statuts réels (PR #37) | `components/operator/journey.tsx` |
@@ -38,7 +38,7 @@ Vérification restante de J1 : parcours complet contre une base (ouvrir → quiz
 | J1 | Progression, règles de validation serveur, transitions, notification admin, sécurité | Fait sauf M3 et M5 |
 | J2 | Moteur d'évaluation : quiz, tentatives, seuils, explications, devoirs, correction | Fait (branche `feat/academy-j2-evaluation`) ; migration de contenu à appliquer après fusion |
 | J3 | Interface premium : tableau de bord, lecteur de cours, navigation, mobile, mouvement | À faire, spécification d'écrans à soumettre avant code |
-| J4 | Contenu : texte long, captures authentiques, schémas, objectifs | Entamé : texte long rendu en sections (J3) ; captures authentiques, mapping par leçon et exemples à faire |
+| J4 | Contenu : texte long, captures authentiques, schémas, objectifs | Fait (branche `feat/academy-j4-content`) : captures du produit (données d'exemple) pour 12 leçons, carte pédagogique, exemples de terrain, auto-vérifications ; captures de production à fournir (`docs/agriacademy-j4-captures.md`) ; schémas interactifs non faits |
 | J5 | Laboratoire 3D pilote (inscription d'un producteur ou carte membre) | À faire ; le cadre (scène, missions, vue 2D) existe depuis J3 |
 | J6 | Gestion de la formation côté admin | Entamé : file de correction ; fiche candidat et alertes à faire |
 | J7 | Validation : tests unitaires, intégration, navigateur, sécurité, mobile, accessibilité | Continu |
@@ -103,3 +103,17 @@ actions, états réels, texte long, média à fournir, quiz une question à la f
 fermé, retour sans perte, tiroir Android, aucun défilement horizontal à 390 et 320 px, aucun
 chunk Three.js. Captures avant/après PC 1440 et Android 390 jointes à la PR. Non mesuré :
 LCP/INP sur appareil réel, Motorola.
+
+## J4 livré (14 octobre 2026)
+
+- 24 captures du produit (12 écrans × bureau et Android), prises par Playwright sur le produit
+  construit depuis le dépôt contre le mock : vrais écrans, données d'exemple, étiquetées ainsi
+  sous l'image. Une capture de production (`academy_media_assets.storage_path`) prime dès
+  qu'elle existe ; demandes détaillées dans `docs/agriacademy-j4-captures.md`.
+- Carte pédagogique objectif → explication → démonstration → exercice → quiz → devoir pour les
+  12 leçons (`docs/agriacademy-j4-content-map.md`), leçons 4 et 8 comme référence éditoriale.
+- Par leçon, dans le code (`lib/academy/lesson-enrichment.ts`, relu en PR, sans écriture en
+  base) : résultat attendu, « À observer » sur la capture, exemple de terrain togolais fictif,
+  trois questions d'auto-vérification non notées. Quiz et cas pratiques inchangés.
+- Vérifié : 29 tests unitaires AgriAcademy, 7 tests Playwright, captures PC et Android du cours.
+- Non fait : schémas interactifs, prise de notes, captures de production.

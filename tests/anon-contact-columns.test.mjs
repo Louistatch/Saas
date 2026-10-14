@@ -24,7 +24,9 @@ test('anon ne lit plus les téléphones ; les colonnes publiques et les comptes 
   await db.exec(sql('supabase/migrations/20261014_090000_anon_contact_columns.sql'))
 
   await db.exec('SET ROLE anon')
-  const pub = await db.query('SELECT id, name, level, parent_id, logo_url, faitiere_name FROM cooperatives')
+  const pub = await db.query(
+    'SELECT id, name, level, parent_id, logo_url, faitiere_name FROM cooperatives',
+  )
   assert.equal(pub.rows.length, 1, 'public columns still readable')
   await assert.rejects(db.query('SELECT coordo_phone FROM cooperatives'), /permission denied/)
   await assert.rejects(db.query('SELECT coordo_name FROM cooperatives'), /permission denied/)
@@ -33,12 +35,19 @@ test('anon ne lit plus les téléphones ; les colonnes publiques et les comptes 
   await assert.rejects(db.query('SELECT phone FROM techniciens'), /permission denied/)
 
   await db.exec('RESET ROLE; SET ROLE authenticated')
-  assert.equal((await db.query('SELECT coordo_phone FROM cooperatives')).rows[0].coordo_phone, '+22890000000')
+  assert.equal(
+    (await db.query('SELECT coordo_phone FROM cooperatives')).rows[0].coordo_phone,
+    '+22890000000',
+  )
   assert.equal((await db.query('SELECT phone FROM techniciens')).rows[0].phone, '+22891111111')
 
   await db.exec('RESET ROLE')
   await db.exec(sql('supabase/rollbacks/20261014_090000_anon_contact_columns.rollback.sql'))
   await db.exec('SET ROLE anon')
-  assert.equal((await db.query('SELECT coordo_phone FROM cooperatives')).rows.length, 1, 'rollback restores')
+  assert.equal(
+    (await db.query('SELECT coordo_phone FROM cooperatives')).rows.length,
+    1,
+    'rollback restores',
+  )
   await db.close()
 })

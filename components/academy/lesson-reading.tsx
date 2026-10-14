@@ -1,6 +1,7 @@
 import type { LearnerLesson } from '@/lib/academy/learner-view'
+import type { LessonEnrichment } from '@/lib/academy/lesson-enrichment'
 import type { LessonReading } from '@/lib/academy/lesson-reading'
-import { ChevronLeft, ChevronRight, ImageOff, Lightbulb } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Eye, ImageOff, Lightbulb, MapPin } from 'lucide-react'
 // Espace « Cours » : un seul écran de lecture, du plus court au plus long : objectif, points
 // clés, démonstration, texte complet, à retenir. Aucune pile de cartes identiques ; aucun
 // badge de type ; le média manquant est dit manquant, jamais simulé.
@@ -10,11 +11,13 @@ import { LessonText } from './lesson-text'
 export function LessonReadingView({
   lesson,
   reading,
+  enrichment,
   prev,
   next,
 }: {
   lesson: LearnerLesson
   reading: LessonReading
+  enrichment: LessonEnrichment | null
   prev: LearnerLesson | null
   next: LearnerLesson | null
 }) {
@@ -57,12 +60,32 @@ export function LessonReadingView({
             )}
           </figcaption>
           {reading.demo.src ? (
-            <img
-              src={reading.demo.src}
-              alt={reading.demo.alt}
-              loading="lazy"
-              className="w-full rounded-xl border border-(--ac-line)"
-            />
+            <>
+              <picture>
+                {reading.demo.srcMobile && (
+                  <source media="(max-width: 640px)" srcSet={reading.demo.srcMobile} />
+                )}
+                <img
+                  src={reading.demo.src}
+                  alt={reading.demo.alt}
+                  loading="lazy"
+                  className="w-full rounded-xl border border-(--ac-line)"
+                />
+              </picture>
+              {reading.demo.source === 'catalogue' && (
+                <p className="m-0 text-xs text-(--ac-muted)">
+                  {reading.demo.note} : l’écran réel de FaîtiereHub, avec une coopérative fictive.
+                </p>
+              )}
+              {enrichment && (
+                <p className="m-0 flex items-start gap-2 text-sm leading-relaxed">
+                  <Eye aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-(--ac-green)" />
+                  <span>
+                    <strong>À observer.</strong> {enrichment.demoFocus}
+                  </span>
+                </p>
+              )}
+            </>
           ) : (
             <div
               role="note"
@@ -86,6 +109,62 @@ export function LessonReadingView({
             Leçon complète
           </h2>
           <LessonText blocks={reading.blocks} />
+        </section>
+      )}
+
+      {enrichment && (
+        <section
+          aria-labelledby="example-title"
+          className="flex flex-col gap-3 rounded-[20px] border border-(--ac-line) bg-(--ac-sand) px-5 py-5 sm:px-7"
+        >
+          <h2
+            id="example-title"
+            className="flex items-center gap-2 text-[13px] font-bold text-(--ac-green)"
+          >
+            <MapPin aria-hidden="true" className="h-4 w-4" /> Exemple de terrain
+          </h2>
+          <p className="academy-display m-0 text-lg font-medium leading-tight">
+            {enrichment.example.title}
+          </p>
+          <p className="m-0 max-w-[68ch] text-[15px] leading-relaxed">{enrichment.example.body}</p>
+          <p className="m-0 text-xs text-(--ac-muted)">
+            Coopérative et chiffres fictifs, à titre d’exercice.
+          </p>
+        </section>
+      )}
+
+      {enrichment && (
+        <section aria-labelledby="selfcheck-title" className="flex flex-col gap-2">
+          <h2 id="selfcheck-title" className="text-[13px] font-bold text-(--ac-green)">
+            Vérifiez-vous avant le quiz
+          </h2>
+          <p className="m-0 text-sm text-(--ac-muted)">
+            Trois questions sans note. Répondez de tête, puis comparez.
+          </p>
+          <ol className="m-0 flex list-none flex-col gap-2 p-0">
+            {enrichment.selfCheck.map((s, i) => (
+              <li key={s.question}>
+                <details className="group rounded-2xl border border-(--ac-line) bg-white">
+                  <summary className="flex min-h-12 cursor-pointer list-none items-start gap-3 px-4 py-3 text-[15px] font-semibold [&::-webkit-details-marker]:hidden">
+                    <span
+                      aria-hidden="true"
+                      className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-(--ac-gold) text-[11px] font-bold"
+                    >
+                      {i + 1}
+                    </span>
+                    <span className="flex-1">{s.question}</span>
+                    <ChevronRight
+                      aria-hidden="true"
+                      className="mt-1 h-4 w-4 shrink-0 transition-transform group-open:rotate-90"
+                    />
+                  </summary>
+                  <p className="m-0 border-t border-(--ac-line) px-4 py-3 pl-[52px] text-[15px] leading-relaxed">
+                    {s.answer}
+                  </p>
+                </details>
+              </li>
+            ))}
+          </ol>
         </section>
       )}
 
