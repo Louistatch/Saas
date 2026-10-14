@@ -202,20 +202,43 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   // les profils Haroo SANS couche organisationnelle. Sinon un membre de
   // coopérative qui active Haroo serait expulsé de son propre dashboard.
   const harooOnly = !!user && !hasOrgLayer(user.role) && isHarooRole(user.role, user.harooType)
+  // Ni organisation ni Haroo : peut-être un candidat Opérateur arrivé ici par un ancien lien
+  // ou un favori. Son dossier (partner_memberships) n'est pas dans le profil : on le demande.
+  const layerless = !!user && !hasOrgLayer(user.role) && !isHarooRole(user.role, user.harooType)
+  const [operatorOnly, setOperatorOnly] = useState(false)
 
   useEffect(() => {
     if (harooOnly) router.replace('/haroo')
   }, [harooOnly, router])
+  useEffect(() => {
+    if (!layerless) return
+    let cancelled = false
+    fetch('/api/account/partner-status')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((status: { has_applied?: boolean } | null) => {
+        if (cancelled || status?.has_applied !== true) return
+        setOperatorOnly(true)
+        router.replace('/operator')
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [layerless, router])
 
   const isActive = (href: string) =>
     href === '/dashboard' ? pathname === href : pathname.startsWith(href)
 
-  if (harooOnly) {
+  if (harooOnly || operatorOnly) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="space-y-4 text-center">
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground text-sm">Redirection vers votre espace Haroo…</p>
+          <p className="text-muted-foreground text-sm">
+            {harooOnly
+              ? 'Redirection vers votre espace Haroo…'
+              : 'Redirection vers votre espace Opérateur…'}
+          </p>
         </div>
       </div>
     )
