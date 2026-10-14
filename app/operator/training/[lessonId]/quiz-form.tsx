@@ -13,6 +13,7 @@ import { ArrowLeft, ArrowRight, CheckCircle2, Clock, XCircle } from 'lucide-reac
  * qu'avec le résultat d'une tentative corrigée côté serveur (lib/academy/operator-training.ts).
  * Un quiz réussi ne se rejoue pas ; la limite de tentatives par 24 h vient du serveur.
  */
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 interface QuestionFeedback {
@@ -55,6 +56,7 @@ export function QuizForm({ quiz, history }: { quiz: AcademyQuizPublic; history: 
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<AttemptResult | null>(null)
   const [closed, setClosed] = useState(history.anyPassed)
+  const router = useRouter()
 
   const questions = quiz.questions
   const total = questions.length
@@ -86,7 +88,11 @@ export function QuizForm({ quiz, history }: { quiz: AcademyQuizPublic; history: 
       if (!res.ok) setResult({ ...body, ok: false, error: body.error ?? 'Soumission impossible' })
       else {
         setResult(body)
-        if (body.passed) setClosed(true)
+        if (body.passed) {
+          setClosed(true)
+          // Le serveur décide de l'état de la leçon : on relit la page (cas pratique déverrouillé).
+          router.refresh()
+        }
       }
     } catch {
       setResult({ ok: false, error: 'Erreur de connexion. Vérifiez votre internet.' })

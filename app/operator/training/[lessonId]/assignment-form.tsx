@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import type { AcademyAssignment } from '@/types/domain'
 import { CheckCircle2, ClipboardList, MessageSquareText, RotateCcw } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 export interface SubmissionState {
@@ -42,6 +43,7 @@ export function AssignmentForm({
   }>(null)
   const [error, setError] = useState('')
   const [resubmitting, setResubmitting] = useState(false)
+  const router = useRouter()
   const criteria = (
     (assignment.rubric as { criteria?: Criterion[] } | null)?.criteria ?? []
   ).filter((c) => typeof c?.name === 'string')
@@ -67,6 +69,7 @@ export function AssignmentForm({
         return
       }
       setDone(body)
+      router.refresh()
     } catch {
       setError('Erreur de connexion. Vérifiez votre internet.')
       setSubmitting(false)
