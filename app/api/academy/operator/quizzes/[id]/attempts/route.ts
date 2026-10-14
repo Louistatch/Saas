@@ -47,7 +47,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     answers: parsed.data.answers,
   })
   if (!result.ok) {
-    return NextResponse.json({ error: result.error ?? 'Soumission impossible' }, { status: 422 })
+    return NextResponse.json(
+      {
+        error: result.error ?? 'Soumission impossible',
+        reason: result.reason,
+        retryAt: result.retryAt,
+      },
+      { status: result.reason ? 409 : 422 },
+    )
   }
   // C1/C2 : la leçon est validée d'après les preuves en base, jamais d'après le client ; si
   // c'était la dernière, la fin de formation est enregistrée sur le dossier et signalée.
