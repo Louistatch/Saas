@@ -6,7 +6,7 @@
  * jamais vers une URL venue de la requête (pas de redirection ouverte).
  */
 
-import { accountHomeUrl } from '@/lib/account/journey'
+import { confirmedHomePath } from '@/lib/account/confirmed-home'
 import { createClient } from '@/lib/supabase/server'
 import type { EmailOtpType } from '@supabase/supabase-js'
 import { type NextRequest, NextResponse } from 'next/server'
@@ -31,13 +31,7 @@ export async function GET(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.redirect(`${base}/auth/login?confirmed=1`)
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, haroo_type')
-    .eq('id', user.id)
-    .maybeSingle()
-  const home = profile
-    ? accountHomeUrl({ role: profile.role, harooType: profile.haroo_type })
-    : '/compte'
+  // Organisation, Haroo ou dossier Opérateur : la personne arrive dans SON espace.
+  const home = await confirmedHomePath(supabase, user.id)
   return NextResponse.redirect(`${base}${home}?confirmed=1`)
 }

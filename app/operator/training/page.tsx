@@ -1,3 +1,4 @@
+import { ShareTraining } from '@/components/operator/share-training'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -104,6 +105,7 @@ export default async function OperatorTrainingPage() {
             </ul>
           </CardContent>
         </Card>
+        <ShareTraining className="mt-10 border-t border-border pt-6" />
       </main>
     </div>
   )

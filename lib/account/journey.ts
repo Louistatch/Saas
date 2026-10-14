@@ -47,10 +47,24 @@ export function isProfileComplete(user: Pick<AuthUser, 'firstName' | 'lastName'>
   return Boolean(user.firstName?.trim() && user.lastName?.trim())
 }
 
-export function accountHomeUrl(user: Pick<AuthUser, 'role' | 'harooType'>): string {
+/** Espace des opérateurs certifiés (parcours de certification, puis console de validation). */
+export const OPERATOR_SPACE_URL = '/operator'
+
+/**
+ * Page d'accueil du compte. La couche organisationnelle prime (son dashboard porte la bascule
+ * vers Haroo), puis l'espace Haroo, puis l'espace Opérateur pour un compte qui n'a ni l'une ni
+ * l'autre mais un dossier Opérateur (`operator`, lu dans partner_memberships par l'appelant :
+ * ce n'est pas une colonne de `profiles`). Même règle que le middleware et la page de connexion.
+ */
+export function accountHomeUrl(
+  user: Pick<AuthUser, 'role' | 'harooType'>,
+  options: { operator?: boolean } = {},
+): string {
   if (user.role === 'super_admin') return '/admin'
+  if (hasOrgLayer(user.role)) return '/dashboard'
   const haroo = effectiveHarooType(user.role, user.harooType)
-  return !hasOrgLayer(user.role) && haroo ? HAROO_SPACE_URL : '/dashboard'
+  if (haroo) return HAROO_SPACE_URL
+  return options.operator ? OPERATOR_SPACE_URL : '/dashboard'
 }
 
 export function accountJourney(user: AuthUser | null): AccountJourney {

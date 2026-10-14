@@ -1,5 +1,5 @@
-@import 'tailwindcss';
-@import 'tw-animate-css';
+@import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -75,8 +75,8 @@
 }
 
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-sans: "Geist", "Geist Fallback";
+  --font-mono: "Geist Mono", "Geist Mono Fallback";
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -121,5 +121,44 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Parcours en étapes (skill ui-motion) : la ligne se trace jusqu'à l'étape en cours, le point
+   de l'étape en cours respire. Sans mouvement, tout est dessiné d'emblée. */
+@keyframes route-draw {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+@keyframes pulse-soft {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+.route-line {
+  transform-origin: top;
+  animation: route-draw 800ms ease-out 200ms both;
+}
+.route-now::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 9999px;
+  border: 2px solid var(--primary);
+  animation: pulse-soft 2.4s ease-out 1s infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .route-line,
+  .route-now::after {
+    animation: none;
   }
 }
