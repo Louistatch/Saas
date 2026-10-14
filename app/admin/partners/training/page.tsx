@@ -11,7 +11,8 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { LoadingBlock } from '@/components/shared/loading'
 import { PageHeader } from '@/components/shared/page-header'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { GraduationCap } from 'lucide-react'
+import { ClipboardCheck, GraduationCap } from 'lucide-react'
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
 interface CandidateRow {
@@ -29,20 +30,37 @@ interface CandidateRow {
 export default function OperatorTrainingAdminPage() {
   const [candidates, setCandidates] = useState<CandidateRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [pending, setPending] = useState<number | null>(null)
 
   useEffect(() => {
     fetch('/api/admin/academy/operator/candidates')
       .then((res) => res.json())
       .then((data) => setCandidates(data.candidates ?? []))
       .finally(() => setIsLoading(false))
+    fetch('/api/admin/academy/operator/submissions?status=submitted')
+      .then((res) => res.json())
+      .then((data) => setPending((data.submissions ?? []).length))
+      .catch(() => setPending(null))
   }, [])
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Formation Opérateurs"
-        description="Avancement des candidats sur le parcours « Opérateur certifié FaîtiereHub » — leçons, quiz, devoirs. Lecture seule ; la validation de certification se fait depuis Opérateurs."
+        description="Avancement des candidats sur le parcours « Opérateur certifié FaîtiereHub » : leçons validées (quiz réussi et cas pratique déposé), quiz, dépôts. La fin de formation est automatique ; l'évaluation pratique se décide depuis Opérateurs."
       />
+      <Link
+        href="/admin/partners/training/corrections"
+        className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground hover:bg-muted"
+      >
+        <ClipboardCheck className="h-4 w-4 text-primary" aria-hidden />
+        Corriger les cas pratiques
+        {pending != null && pending > 0 && (
+          <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground">
+            {pending}
+          </span>
+        )}
+      </Link>
 
       <Card>
         <CardHeader>

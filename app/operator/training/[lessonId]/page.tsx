@@ -1,6 +1,10 @@
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { OPERATOR_MODULE_ID, getModuleWithLessons } from '@/lib/academy/operator-training'
+import {
+  OPERATOR_MODULE_ID,
+  getModuleWithLessons,
+  getProfileProgressSummary,
+} from '@/lib/academy/operator-training'
 import { assertOperatorCandidate } from '@/lib/security/assert-partner-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { ArrowLeft, ImageIcon } from 'lucide-react'
@@ -36,9 +40,16 @@ export default async function OperatorLessonPage({
 
   const { lessonId } = await params
   const admin = createAdminClient()
-  const module_ = await getModuleWithLessons(admin, OPERATOR_MODULE_ID)
+  const [module_, summary] = await Promise.all([
+    getModuleWithLessons(admin, OPERATOR_MODULE_ID, guard.ctx.userId),
+    getProfileProgressSummary(admin, guard.ctx.userId, OPERATOR_MODULE_ID),
+  ])
   const lesson = module_?.lessons.find((l) => l.id === lessonId)
   if (!module_ || !lesson) notFound()
+  const quizHistory = summary.latest_quiz_attempts.find((a) => a.quiz_id === lesson.quiz?.id)
+  const latestSubmission = summary.submissions.find(
+    (sub) => sub.assignment_id === lesson.assignment?.id,
+  )
 
   return (
     <div className="min-h-screen bg-background">
@@ -78,13 +89,36 @@ export default async function OperatorLessonPage({
 
         {lesson.quiz && (
           <div className="mt-6">
-            <QuizForm quiz={lesson.quiz} />
+            <QuizForm
+              quiz={lesson.quiz}
+              history={{
+                attempts: quizHistory?.attempts ?? 0,
+                anyPassed: quizHistory?.any_passed ?? false,
+                lastScore: quizHistory?.score ?? null,
+              }}
+            />
           </div>
         )}
 
         {lesson.assignment && (
           <div className="mt-6">
-            <AssignmentForm assignment={lesson.assignment} />
+            <AssignmentForm
+              assignment={lesson.assignment}
+              latest={
+                latestSubmission
+                  ? {
+                      status: latestSubmission.status as
+                        | 'submitted'
+                        | 'reviewed'
+                        | 'revision_required'
+                        | 'draft',
+                      score: latestSubmission.score,
+                      feedback: latestSubmission.feedback,
+                      reviewed_at: latestSubmission.reviewed_at,
+                    }
+                  : null
+              }
+            />
           </div>
         )}
       </main>

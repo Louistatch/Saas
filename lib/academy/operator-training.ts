@@ -20,7 +20,8 @@ import type {
 } from '@/types/domain'
 import type { Database } from '@/types/supabase'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { isLessonCompleted, missingForLesson, percentScore } from './completion-policy'
+import { attemptGate, gradeQuiz, stableShuffle } from './assessment-policy'
+import { isLessonCompleted, missingForLesson } from './completion-policy'
 
 type AdminClient = SupabaseClient<Database>
 
@@ -32,14 +33,31 @@ export interface ProgressResult {
   error?: string
 }
 
+export interface QuestionFeedback {
+  questionId: string
+  earned: number
+  points: number
+  correct: boolean
+  pending: boolean
+  correctOptionIds: string[]
+  selectedOptionIds: string[]
+  explanation: string | null
+}
+
 export interface QuizAttemptResult {
   ok: boolean
   error?: string
+  /** Quand la tentative est refusée : pourquoi, et à partir de quand réessayer. */
+  reason?: 'already_passed' | 'limit_reached'
+  retryAt?: string
   score?: number
   passed?: boolean
   attemptId?: string
   lessonId?: string | null
   moduleId?: string
+  attemptsLeft?: number | null
+  /** Retour détaillé (`show_feedback`) : bonne réponse et explication par question. */
+  feedback?: QuestionFeedback[]
 }
 
 export interface AssignmentSubmissionResult {
@@ -71,12 +89,17 @@ export interface ProfileProgressSummary {
     score: number | null
     passed: boolean | null
     submitted_at: string | null
+    /** Nombre total de tentatives, et vrai si l'une a réussi. */
+    attempts: number
+    any_passed: boolean
   }[]
   submissions: {
     assignment_id: string
     lesson_id: string
     status: string
     score: number | null
+    feedback: string | null
+    reviewed_at: string | null
   }[]
 }
 
@@ -89,6 +112,8 @@ export interface ProfileProgressSummary {
 export async function getModuleWithLessons(
   admin: AdminClient,
   moduleId: string,
+  /** Graine de l'ordre des questions (`randomize_questions`) : la même personne voit le même ordre. */
+  orderSeed?: string,
 ): Promise<AcademyModuleWithLessons | null> {
   const { data: module_ } = await admin
     .from('academy_modules')
@@ -184,7 +209,10 @@ export async function getModuleWithLessons(
             passing_score: quiz.passing_score,
             max_attempts: quiz.max_attempts,
             is_required: quiz.is_required,
-            questions: (questionsByQuiz.get(quiz.id) ?? []).map((question) => ({
+            questions: (quiz.randomize_questions && orderSeed
+              ? stableShuffle(questionsByQuiz.get(quiz.id) ?? [], `${orderSeed}:${quiz.id}`)
+              : (questionsByQuiz.get(quiz.id) ?? [])
+            ).map((question) => ({
               id: question.id,
               question_type: question.question_type as AcademyQuestionType,
               prompt: question.prompt,
@@ -388,14 +416,38 @@ export async function submitQuizAttempt(
 ): Promise<QuizAttemptResult> {
   const { data: quiz } = await admin
     .from('academy_quizzes')
-    .select('id, passing_score, lesson_id, module_id')
+    .select('id, passing_score, lesson_id, module_id, max_attempts, show_feedback')
     .eq('id', params.quizId)
     .maybeSingle()
   if (!quiz) return { ok: false, error: 'Quiz introuvable' }
 
+  // Tentatives passées de la personne : un quiz réussi ne se rejoue pas, la limite par 24 h
+  // s'applique (assessment-policy.ts).
+  const { data: previous } = await admin
+    .from('academy_quiz_attempts')
+    .select('created_at, passed')
+    .eq('quiz_id', params.quizId)
+    .eq('profile_id', params.profileId)
+  const gate = attemptGate(
+    (previous ?? []).map((a) => ({ createdAt: a.created_at, passed: a.passed })),
+    quiz.max_attempts,
+  )
+  if (!gate.allowed) {
+    return {
+      ok: false,
+      reason: gate.reason,
+      retryAt: gate.retryAt,
+      attemptsLeft: gate.attemptsLeft,
+      error:
+        gate.reason === 'already_passed'
+          ? 'Ce quiz est déjà réussi.'
+          : 'Nombre de tentatives atteint pour aujourd’hui. Relisez la leçon et réessayez demain.',
+    }
+  }
+
   const { data: questions } = await admin
     .from('academy_quiz_questions')
-    .select('id, question_type, points')
+    .select('id, question_type, points, explanation')
     .eq('quiz_id', params.quizId)
   const questionRows = questions ?? []
   if (questionRows.length === 0) return { ok: false, error: 'Quiz sans questions' }
@@ -407,30 +459,24 @@ export async function submitQuizAttempt(
       'question_id',
       questionRows.map((q) => q.id),
     )
-  const optionsByQuestion = new Map<string, { id: string; is_correct: boolean }[]>()
+  const correctByQuestion = new Map<string, string[]>()
   for (const option of options ?? []) {
-    const list = optionsByQuestion.get(option.question_id) ?? []
-    list.push({ id: option.id, is_correct: option.is_correct })
-    optionsByQuestion.set(option.question_id, list)
+    if (!option.is_correct) continue
+    const list = correctByQuestion.get(option.question_id) ?? []
+    list.push(option.id)
+    correctByQuestion.set(option.question_id, list)
   }
 
-  let earned = 0
-  let total = 0
-  for (const question of questionRows) {
-    total += question.points
-    if (question.question_type === 'case') continue // non noté automatiquement
-
-    const questionOptions = optionsByQuestion.get(question.id) ?? []
-    const correctIds = new Set(questionOptions.filter((o) => o.is_correct).map((o) => o.id))
-    const selectedIds = new Set(params.answers[question.id] ?? [])
-
-    const isCorrect =
-      correctIds.size === selectedIds.size && [...correctIds].every((id) => selectedIds.has(id))
-    if (isCorrect) earned += question.points
-  }
-
-  const score = percentScore(earned, total)
-  const passed = score >= quiz.passing_score
+  const grade = gradeQuiz(
+    questionRows.map((q) => ({
+      id: q.id,
+      type: q.question_type as 'single_choice' | 'multiple_choice' | 'true_false' | 'case',
+      points: q.points,
+      correctOptionIds: correctByQuestion.get(q.id) ?? [],
+    })),
+    params.answers,
+    quiz.passing_score,
+  )
   const now = new Date().toISOString()
 
   const { data: attempt, error } = await admin
@@ -439,21 +485,39 @@ export async function submitQuizAttempt(
       quiz_id: params.quizId,
       profile_id: params.profileId,
       answers: params.answers,
-      score,
-      passed,
+      score: grade.score,
+      passed: grade.passed,
       submitted_at: now,
     })
     .select('id')
     .single()
   if (error || !attempt) return { ok: false, error: 'Écriture de la tentative impossible' }
 
+  const explanationById = new Map(questionRows.map((q) => [q.id, q.explanation]))
+  const feedback = quiz.show_feedback
+    ? grade.questions.map((g) => ({
+        questionId: g.questionId,
+        earned: g.earned,
+        points: g.points,
+        correct: g.correct,
+        pending: g.pending,
+        correctOptionIds: correctByQuestion.get(g.questionId) ?? [],
+        selectedOptionIds: params.answers[g.questionId] ?? [],
+        explanation: explanationById.get(g.questionId) ?? null,
+      }))
+    : undefined
+  const attemptsLeft =
+    gate.attemptsLeft == null ? null : grade.passed ? 0 : Math.max(0, gate.attemptsLeft - 1)
+
   return {
     ok: true,
-    score,
-    passed,
+    score: grade.score,
+    passed: grade.passed,
     attemptId: attempt.id,
     lessonId: quiz.lesson_id,
     moduleId: quiz.module_id,
+    attemptsLeft,
+    feedback,
   }
 }
 
@@ -538,8 +602,12 @@ export async function getProfileProgressSummary(
     created_at: string
   }
   const latestByQuiz = new Map<string, AttemptRow>()
+  const countByQuiz = new Map<string, number>()
+  const passedByQuiz = new Set<string>()
   for (const attempt of (attempts ?? []) as AttemptRow[]) {
     if (!latestByQuiz.has(attempt.quiz_id)) latestByQuiz.set(attempt.quiz_id, attempt)
+    countByQuiz.set(attempt.quiz_id, (countByQuiz.get(attempt.quiz_id) ?? 0) + 1)
+    if (attempt.passed) passedByQuiz.add(attempt.quiz_id)
   }
 
   const { data: assignments } = await admin
@@ -552,7 +620,7 @@ export async function getProfileProgressSummary(
     assignmentIds.length > 0
       ? await admin
           .from('academy_assignment_submissions')
-          .select('assignment_id, status, score, created_at')
+          .select('assignment_id, status, score, created_at, feedback, reviewed_at')
           .eq('profile_id', profileId)
           .in('assignment_id', assignmentIds)
           .order('created_at', { ascending: false })
@@ -563,6 +631,8 @@ export async function getProfileProgressSummary(
     status: string
     score: number | null
     created_at: string
+    feedback: string | null
+    reviewed_at: string | null
   }
   const latestByAssignment = new Map<string, SubmissionRow>()
   for (const submission of (submissions ?? []) as SubmissionRow[]) {
@@ -587,12 +657,16 @@ export async function getProfileProgressSummary(
       score: attempt.score,
       passed: attempt.passed,
       submitted_at: attempt.submitted_at,
+      attempts: countByQuiz.get(quizId) ?? 0,
+      any_passed: passedByQuiz.has(quizId),
     })),
     submissions: [...latestByAssignment.entries()].map(([assignmentId, submission]) => ({
       assignment_id: assignmentId,
       lesson_id: assignmentLessonById.get(assignmentId) ?? '',
       status: submission.status,
       score: submission.score,
+      feedback: submission.feedback,
+      reviewed_at: submission.reviewed_at,
     })),
   }
 }
