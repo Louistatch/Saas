@@ -20,6 +20,7 @@ import type {
 } from '@/types/domain'
 import type { Database } from '@/types/supabase'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { isLessonCompleted, missingForLesson, percentScore } from './completion-policy'
 
 type AdminClient = SupabaseClient<Database>
 
@@ -37,12 +38,23 @@ export interface QuizAttemptResult {
   score?: number
   passed?: boolean
   attemptId?: string
+  lessonId?: string | null
+  moduleId?: string
 }
 
 export interface AssignmentSubmissionResult {
   ok: boolean
   error?: string
   submissionId?: string
+  lessonId?: string
+  moduleId?: string
+}
+
+export interface LessonCompletionResult {
+  completed: boolean
+  /** Ce qui manque encore ('quiz', 'assignment'). */
+  missing: string[]
+  bestScore: number | null
 }
 
 export interface ProfileProgressSummary {
@@ -192,34 +204,172 @@ export async function getModuleWithLessons(
   return { ...module_, lessons: lessonsOut }
 }
 
-/** Upsert de progression sur la clé unique (profile_id, module_id, lesson_id). */
-export async function upsertProgress(
+/**
+ * Ouverture d'une leçon par la personne elle-même : la ligne de progression passe (ou reste)
+ * `in_progress`, `started_at` n'est posé qu'une fois, `last_viewed_at` suit chaque visite.
+ * Une leçon déjà validée n'est jamais rétrogradée. Idempotent : un double envoi ne change rien.
+ */
+export async function recordLessonOpened(
   admin: AdminClient,
-  params: {
-    profileId: string
-    moduleId: string
-    lessonId: string | null
-    status: AcademyProgressStatus
-    progressPercent: number
-  },
+  params: { profileId: string; moduleId: string; lessonId: string },
 ): Promise<ProgressResult> {
   const now = new Date().toISOString()
-  const { error } = await admin.from('academy_profile_progress').upsert(
-    {
+  const { data: existing } = await admin
+    .from('academy_profile_progress')
+    .select('id, status, started_at')
+    .eq('profile_id', params.profileId)
+    .eq('module_id', params.moduleId)
+    .eq('lesson_id', params.lessonId)
+    .maybeSingle()
+  if (!existing) {
+    const { error } = await admin.from('academy_profile_progress').insert({
       profile_id: params.profileId,
       module_id: params.moduleId,
       lesson_id: params.lessonId,
-      status: params.status,
-      progress_percent: params.progressPercent,
+      status: 'in_progress',
+      progress_percent: 0,
+      started_at: now,
       last_viewed_at: now,
-      started_at: params.status !== 'not_started' ? now : null,
-      completed_at: params.status === 'completed' ? now : null,
       updated_at: now,
-    },
-    { onConflict: 'profile_id,module_id,lesson_id' },
-  )
+    })
+    // Deux ouvertures simultanées : la seconde insertion heurte la clé unique, la première a
+    // déjà tout écrit.
+    if (error && error.code !== '23505')
+      return { ok: false, error: 'Écriture de la progression impossible' }
+    return { ok: true }
+  }
+  const { error } = await admin
+    .from('academy_profile_progress')
+    .update({
+      status: existing.status === 'completed' ? 'completed' : 'in_progress',
+      started_at: existing.started_at ?? now,
+      last_viewed_at: now,
+      updated_at: now,
+    })
+    .eq('id', existing.id)
   if (error) return { ok: false, error: 'Écriture de la progression impossible' }
   return { ok: true }
+}
+
+/**
+ * Recalcule l'état d'une leçon à partir des preuves en base (tentatives corrigées côté serveur,
+ * dépôts) selon lib/academy/completion-policy.ts, et persiste `completed` quand tout y est.
+ * `completed_at` n'est posé qu'une fois ; `started_at` est conservé. Appelée après chaque
+ * tentative de quiz et chaque dépôt : rejouable sans effet de bord supplémentaire.
+ */
+export async function evaluateLessonCompletion(
+  admin: AdminClient,
+  params: { profileId: string; moduleId: string; lessonId: string },
+): Promise<LessonCompletionResult> {
+  const [{ data: quiz }, { data: assignment }] = await Promise.all([
+    admin
+      .from('academy_quizzes')
+      .select('id, is_required')
+      .eq('lesson_id', params.lessonId)
+      .maybeSingle(),
+    admin
+      .from('academy_assignments')
+      .select('id, is_required')
+      .eq('lesson_id', params.lessonId)
+      .maybeSingle(),
+  ])
+
+  let quizPassed = false
+  let bestScore: number | null = null
+  if (quiz) {
+    const { data: attempts } = await admin
+      .from('academy_quiz_attempts')
+      .select('score, passed')
+      .eq('quiz_id', quiz.id)
+      .eq('profile_id', params.profileId)
+    for (const attempt of attempts ?? []) {
+      if (attempt.passed) quizPassed = true
+      if (attempt.score != null && (bestScore == null || attempt.score > bestScore))
+        bestScore = attempt.score
+    }
+  }
+  let assignmentSubmitted = false
+  if (assignment) {
+    const { count } = await admin
+      .from('academy_assignment_submissions')
+      .select('id', { count: 'exact', head: true })
+      .eq('assignment_id', assignment.id)
+      .eq('profile_id', params.profileId)
+    assignmentSubmitted = (count ?? 0) > 0
+  }
+
+  const requirements = {
+    quizRequired: Boolean(quiz?.is_required),
+    assignmentRequired: Boolean(assignment?.is_required),
+  }
+  const evidence = { quizPassed, assignmentSubmitted }
+  const completed = isLessonCompleted(requirements, evidence)
+  const missing = missingForLesson(requirements, evidence)
+  if (!completed) return { completed: false, missing, bestScore }
+
+  const now = new Date().toISOString()
+  const { data: existing } = await admin
+    .from('academy_profile_progress')
+    .select('id, status, started_at, completed_at')
+    .eq('profile_id', params.profileId)
+    .eq('module_id', params.moduleId)
+    .eq('lesson_id', params.lessonId)
+    .maybeSingle()
+  if (!existing) {
+    await admin.from('academy_profile_progress').insert({
+      profile_id: params.profileId,
+      module_id: params.moduleId,
+      lesson_id: params.lessonId,
+      status: 'completed',
+      progress_percent: 100,
+      score: bestScore,
+      started_at: now,
+      completed_at: now,
+      last_viewed_at: now,
+      updated_at: now,
+    })
+  } else if (existing.status !== 'completed' || existing.completed_at == null) {
+    await admin
+      .from('academy_profile_progress')
+      .update({
+        status: 'completed',
+        progress_percent: 100,
+        score: bestScore,
+        started_at: existing.started_at ?? now,
+        completed_at: existing.completed_at ?? now,
+        updated_at: now,
+      })
+      .eq('id', existing.id)
+  } else if (bestScore != null) {
+    // Déjà validée : on garde la date, on relève seulement le meilleur score.
+    await admin
+      .from('academy_profile_progress')
+      .update({ score: bestScore, updated_at: now })
+      .eq('id', existing.id)
+  }
+  return { completed: true, missing: [], bestScore }
+}
+
+/** Leçons validées / leçons du module pour une personne. */
+export async function countCompletedLessons(
+  admin: AdminClient,
+  profileId: string,
+  moduleId: string,
+): Promise<{ completed: number; total: number }> {
+  const [{ count: total }, { count: completed }] = await Promise.all([
+    admin
+      .from('academy_lessons')
+      .select('id', { count: 'exact', head: true })
+      .eq('module_id', moduleId),
+    admin
+      .from('academy_profile_progress')
+      .select('id', { count: 'exact', head: true })
+      .eq('profile_id', profileId)
+      .eq('module_id', moduleId)
+      .eq('status', 'completed')
+      .not('lesson_id', 'is', null),
+  ])
+  return { completed: completed ?? 0, total: total ?? 0 }
 }
 
 /**
@@ -238,7 +388,7 @@ export async function submitQuizAttempt(
 ): Promise<QuizAttemptResult> {
   const { data: quiz } = await admin
     .from('academy_quizzes')
-    .select('id, passing_score')
+    .select('id, passing_score, lesson_id, module_id')
     .eq('id', params.quizId)
     .maybeSingle()
   if (!quiz) return { ok: false, error: 'Quiz introuvable' }
@@ -279,7 +429,7 @@ export async function submitQuizAttempt(
     if (isCorrect) earned += question.points
   }
 
-  const score = total > 0 ? Math.round((earned / total) * 100) : 0
+  const score = percentScore(earned, total)
   const passed = score >= quiz.passing_score
   const now = new Date().toISOString()
 
@@ -297,7 +447,14 @@ export async function submitQuizAttempt(
     .single()
   if (error || !attempt) return { ok: false, error: 'Écriture de la tentative impossible' }
 
-  return { ok: true, score, passed, attemptId: attempt.id }
+  return {
+    ok: true,
+    score,
+    passed,
+    attemptId: attempt.id,
+    lessonId: quiz.lesson_id,
+    moduleId: quiz.module_id,
+  }
 }
 
 /** Dépôt d'un devoir — statut initial 'submitted', jamais 'draft' (pas d'édition en place côté V1). */
@@ -310,6 +467,12 @@ export async function submitAssignment(
     attachmentUrl: string | null
   },
 ): Promise<AssignmentSubmissionResult> {
+  const { data: assignment } = await admin
+    .from('academy_assignments')
+    .select('id, lesson_id, academy_lessons(module_id)')
+    .eq('id', params.assignmentId)
+    .maybeSingle<{ id: string; lesson_id: string; academy_lessons: { module_id: string } | null }>()
+  if (!assignment) return { ok: false, error: 'Devoir introuvable' }
   const now = new Date().toISOString()
   const { data, error } = await admin
     .from('academy_assignment_submissions')
@@ -324,7 +487,12 @@ export async function submitAssignment(
     .select('id')
     .single()
   if (error || !data) return { ok: false, error: 'Dépôt du devoir impossible' }
-  return { ok: true, submissionId: data.id }
+  return {
+    ok: true,
+    submissionId: data.id,
+    lessonId: assignment.lesson_id,
+    moduleId: assignment.academy_lessons?.module_id,
+  }
 }
 
 /** Vue d'ensemble « ma formation » : progression par leçon + dernière tentative par quiz + statut de devoirs. */

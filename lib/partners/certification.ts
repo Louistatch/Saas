@@ -18,9 +18,9 @@
  * planifiée) aura sa propre autorisation, différente de celle d'un admin.
  */
 import 'server-only'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database } from '@/types/supabase'
 import type { PartnerStatus } from '@/types/domain'
+import type { Database } from '@/types/supabase'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 type AdminClient = SupabaseClient<Database>
 
@@ -88,6 +88,36 @@ async function writeAuditLog(
       note: params.note ?? null,
     } as unknown as Database['public']['Tables']['audit_logs']['Insert']['details'],
   })
+}
+
+/**
+ * Première leçon ouverte : le dossier passe de 'candidate' à 'training', pour que l'espace
+ * Opérateur et la console admin disent « Formation en cours » (ce statut n'était écrit nulle
+ * part). Aucun autre statut n'est touché ; idempotent.
+ */
+export async function markPartnerTrainingStarted(
+  admin: AdminClient,
+  params: { partnerId: string; learnerId: string },
+): Promise<CertificationActionResult> {
+  const { partner } = await loadState(admin, params.partnerId)
+  if (!partner) return { ok: false, error: 'Candidature Opérateur introuvable' }
+  if (partner.status !== 'candidate') return { ok: true, partner_status: partner.status }
+  const now = new Date().toISOString()
+  const { error } = await admin
+    .from('partners')
+    .update({ status: 'training', updated_at: now })
+    .eq('id', params.partnerId)
+    .eq('status', 'candidate')
+  if (error) return { ok: false, error: 'Écriture impossible' }
+  await writeAuditLog(admin, {
+    validatorId: params.learnerId,
+    action: 'partner_training_started',
+    partnerId: params.partnerId,
+    previousState: { status: 'candidate' },
+    newState: { status: 'training' },
+    note: 'Première leçon ouverte par la personne',
+  })
+  return { ok: true, partner_status: 'training' }
 }
 
 /**

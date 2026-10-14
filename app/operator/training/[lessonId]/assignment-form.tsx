@@ -10,7 +10,10 @@ import { useState } from 'react'
 export function AssignmentForm({ assignment }: { assignment: AcademyAssignment }) {
   const [contentText, setContentText] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
+  const [submitted, setSubmitted] = useState<null | {
+    lessonCompleted?: boolean
+    training?: { lessonsCompleted: number; lessonsTotal: number; trainingCompleted: boolean } | null
+  }>(null)
   const [error, setError] = useState('')
 
   const submit = async () => {
@@ -32,7 +35,7 @@ export function AssignmentForm({ assignment }: { assignment: AcademyAssignment }
         setSubmitting(false)
         return
       }
-      setSubmitted(true)
+      setSubmitted(body)
     } catch {
       setError('Erreur de connexion. Vérifiez votre internet.')
       setSubmitting(false)
@@ -49,8 +52,13 @@ export function AssignmentForm({ assignment }: { assignment: AcademyAssignment }
       </CardHeader>
       <CardContent className="space-y-3">
         {submitted ? (
-          <p className="flex items-center gap-2 text-sm text-primary">
-            <CheckCircle2 className="h-4 w-4" /> Devoir soumis.
+          <p className="flex items-center gap-2 text-sm text-primary" aria-live="polite">
+            <CheckCircle2 className="h-4 w-4" />
+            {submitted.lessonCompleted
+              ? submitted.training?.trainingCompleted
+                ? 'Devoir déposé. Formation terminée : votre dossier passe à l’évaluation pratique.'
+                : `Devoir déposé, leçon validée (${submitted.training?.lessonsCompleted ?? '?'} sur ${submitted.training?.lessonsTotal ?? '?'}).`
+              : 'Devoir déposé. Réussissez le quiz pour valider la leçon.'}
           </p>
         ) : (
           <>

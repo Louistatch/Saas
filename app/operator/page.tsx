@@ -56,6 +56,7 @@ interface PartnerStatusResponse {
   training_completed_at?: string | null
   exam_passed_at?: string | null
   certified_at?: string | null
+  training?: { lessons_completed: number; lessons_total: number } | null
 }
 
 interface WalletLedgerRow {
@@ -617,6 +618,7 @@ function OperatorPageContent() {
                     training_completed_at: status.training_completed_at,
                     exam_passed_at: status.exam_passed_at,
                     certified_at: status.certified_at,
+                    training: status.training ?? null,
                     trainingAction: (
                       <Button className="min-h-11 w-full rounded-full sm:w-auto sm:px-6" asChild>
                         <Link href="/operator/training">

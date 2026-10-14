@@ -36,6 +36,8 @@ export function journeySteps(input: {
   training_completed_at?: string | null
   exam_passed_at?: string | null
   certified_at?: string | null
+  /** Leçons validées / leçons du module, quand la formation est en cours. */
+  training?: { lessons_completed: number; lessons_total: number } | null
   trainingAction?: ReactNode
   paymentAction?: ReactNode
 }): JourneyStep[] {
@@ -46,7 +48,11 @@ export function journeySteps(input: {
     { title: 'Candidature', detail: 'Dossier enregistré' },
     {
       title: 'Formation en ligne',
-      detail: trained ? `Terminée le ${trained}` : 'Gratuite, sur votre téléphone, à votre rythme',
+      detail: trained
+        ? `Terminée le ${trained}`
+        : input.training && input.training.lessons_completed > 0
+          ? `${input.training.lessons_completed} leçon(s) sur ${input.training.lessons_total} validée(s)`
+          : 'Gratuite, sur votre téléphone, à votre rythme',
       action: trained ? undefined : input.trainingAction,
     },
     {

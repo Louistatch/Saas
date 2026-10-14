@@ -13,6 +13,7 @@ import { ArrowLeft, ImageIcon } from 'lucide-react'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { AssignmentForm } from './assignment-form'
+import { LessonOpened } from './lesson-opened'
 import { QuizForm } from './quiz-form'
 
 const SLIDE_TYPE_LABEL: Record<string, string> = {
@@ -42,6 +43,7 @@ export default async function OperatorLessonPage({
   return (
     <div className="min-h-screen bg-background">
       <main className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+        <LessonOpened moduleId={OPERATOR_MODULE_ID} lessonId={lesson.id} />
         <Link
           href="/operator/training"
           className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
