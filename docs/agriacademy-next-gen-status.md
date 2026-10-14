@@ -37,7 +37,7 @@ Vérification restante de J1 : parcours complet contre une base (ouvrir → quiz
 | J0 | Lire l'audit, vérifier `main`, documenter l'état | Fait (ce document) |
 | J1 | Progression, règles de validation serveur, transitions, notification admin, sécurité | Fait sauf M3 et M5 |
 | J2 | Moteur d'évaluation : quiz, tentatives, seuils, explications, devoirs, correction | Fait (branche `feat/academy-j2-evaluation`) ; migration de contenu à appliquer après fusion |
-| J3 | Interface premium : tableau de bord, lecteur de cours, navigation, mobile, mouvement | À faire, spécification d'écrans à soumettre avant code |
+| J3 | Interface premium : tableau de bord, lecteur de cours, navigation, mobile, mouvement | Spécification et maquettes livrées (`docs/agriacademy-j3-spec.md`), code en attente de validation du design |
 | J4 | Contenu : texte long, captures authentiques, schémas, objectifs | À faire |
 | J5 | Laboratoire 3D pilote (inscription d'un producteur ou carte membre) | À faire, après J1 à J4 |
 | J6 | Gestion de la formation côté admin | Entamé : file de correction ; fiche candidat et alertes à faire |
