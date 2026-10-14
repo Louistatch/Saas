@@ -114,19 +114,11 @@ test('two people chat in real time, survive a network cut and a reload, and see 
   // 2. Ama walks (keyboard); on Yawa's phone her avatar moves smoothly, not in jumps.
   const remote = () =>
     yawa.page.evaluate(() => {
-      const app = (
-        window as unknown as {
-          __LOME_APP?: {
-            root: {
-              findByName: (n: string) => { getPosition: () => { x: number; z: number } } | null
-            }
-          }
-        }
-      ).__LOME_APP
-      const e = app?.root.findByName('Joueur Ama (test)')
-      if (!e) return null
-      const p = e.getPosition()
-      return { x: p.x, z: p.z }
+      const scene = (
+        window as unknown as { __LOME_SCENE?: import('../lib/haroolife/engine/types').SceneProbe }
+      ).__LOME_SCENE
+      const p = scene?.position('Joueur Ama (test)')
+      return p ? { x: p.x, z: p.z } : null
     })
   await ama.page.bringToFront()
   await ama.page.keyboard.down('ArrowRight')
@@ -136,8 +128,10 @@ test('two people chat in real time, survive a network cut and a reload, and see 
       ama.page.evaluate(() =>
         Boolean(
           (
-            window as unknown as { __LOME_APP?: { root: { findByName: (n: string) => unknown } } }
-          ).__LOME_APP?.root.findByName('Joueur Yawa (test)'),
+            window as unknown as {
+              __LOME_SCENE?: import('../lib/haroolife/engine/types').SceneProbe
+            }
+          ).__LOME_SCENE?.has('Joueur Yawa (test)'),
         ),
       ),
     )
@@ -148,22 +142,13 @@ test('two people chat in real time, survive a network cut and a reload, and see 
   const frames = await yawa.page.evaluate(
     () =>
       new Promise<{ x: number; z: number; t: number }[]>((resolve) => {
-        const app = (
-          window as unknown as {
-            __LOME_APP?: {
-              root: {
-                findByName: (n: string) => { getPosition: () => { x: number; z: number } } | null
-              }
-            }
-          }
-        ).__LOME_APP
+        const scene = (
+          window as unknown as { __LOME_SCENE?: import('../lib/haroolife/engine/types').SceneProbe }
+        ).__LOME_SCENE
         const out: { x: number; z: number; t: number }[] = []
         const tick = () => {
-          const e = app?.root.findByName('Joueur Ama (test)')
-          if (e) {
-            const p = e.getPosition()
-            out.push({ x: p.x, z: p.z, t: performance.now() })
-          }
+          const p = scene?.position('Joueur Ama (test)')
+          if (p) out.push({ x: p.x, z: p.z, t: performance.now() })
           if (out.length >= 24) resolve(out)
           else requestAnimationFrame(tick)
         }

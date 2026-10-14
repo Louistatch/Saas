@@ -103,24 +103,11 @@ test('billboards in the street: build, read, learn more, statistics, expiry, cos
   expect(on.drawCalls - off.drawCalls, 'a few draw calls per support').toBeLessThanOrEqual(12)
   // The supports' own geometry, counted exactly (scene totals move with pedestrians and traffic).
   const own = await page.evaluate(() => {
-    type E = {
-      name: string
-      render?: { meshInstances: { mesh: { primitive: { count: number }[] } }[] }
-      children: E[]
-    }
-    const app = (window as unknown as { __LOME_APP?: { root: E } }).__LOME_APP
-    let tris = 0
-    let boards = 0
-    const walk = (e: E, inside: boolean) => {
-      const mine = /^Panneau (lome|kara)-/.test(e.name)
-      const here = inside || mine
-      if (mine) boards++
-      if (here && e.render)
-        for (const mi of e.render.meshInstances) tris += Math.floor(mi.mesh.primitive[0].count / 3)
-      for (const c of e.children) walk(c, here)
-    }
-    if (app) walk(app.root, false)
-    return { tris, boards }
+    const scene = (
+      window as unknown as { __LOME_SCENE?: import('../lib/haroolife/engine/types').SceneProbe }
+    ).__LOME_SCENE
+    const g = scene?.geometry('^Panneau (lome|kara)-') ?? { matches: 0, triangles: 0 }
+    return { tris: g.triangles, boards: g.matches }
   })
   testInfo.annotations.push({ type: 'billboards own geometry', description: JSON.stringify(own) })
   expect(own.boards).toBe(2)
@@ -128,11 +115,11 @@ test('billboards in the street: build, read, learn more, statistics, expiry, cos
 
   // Physical supports exist in the scene, with their poster.
   const inScene = await page.evaluate(() => {
-    const app = (
-      window as unknown as { __LOME_APP?: { root: { findByName: (n: string) => unknown } } }
-    ).__LOME_APP
+    const scene = (
+      window as unknown as { __LOME_SCENE?: import('../lib/haroolife/engine/types').SceneProbe }
+    ).__LOME_SCENE
     return ['Panneau lome-avenue', 'Affiche lome-avenue', 'Panneau lome-jardin'].map((n) =>
-      Boolean(app?.root.findByName(n)),
+      Boolean(scene?.has(n)),
     )
   })
   expect(inScene).toEqual([true, true, true])

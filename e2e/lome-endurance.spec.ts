@@ -19,28 +19,16 @@ const live = (page: Page) =>
   page.evaluate(() => (window as unknown as { __LOME_CITY?: Live }).__LOME_CITY ?? null)
 const gpu = (page: Page) =>
   page.evaluate(() => {
-    const app = (
-      window as unknown as {
-        __LOME_APP?: {
-          graphicsDevice: {
-            textures?: Set<unknown>
-            buffers?: Set<unknown>
-            _vram?: { tex: number; vb: number; ib: number }
-          }
-          root: { find: (fn: () => boolean) => unknown[] }
-        }
-      }
-    ).__LOME_APP
+    const scene = (
+      window as unknown as { __LOME_SCENE?: import('../lib/haroolife/engine/types').SceneProbe }
+    ).__LOME_SCENE
     const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory
+    const g = scene?.gpu()
     return {
-      textures: app?.graphicsDevice.textures?.size ?? -1,
-      buffers: app?.graphicsDevice.buffers?.size ?? -1,
-      vramMB: {
-        tex: Math.round((app?.graphicsDevice._vram?.tex ?? -1048576) / 1048576),
-        vb: Math.round((app?.graphicsDevice._vram?.vb ?? -1048576) / 1048576),
-        ib: Math.round((app?.graphicsDevice._vram?.ib ?? -1048576) / 1048576),
-      },
-      entities: app?.root.find(() => true).length ?? -1,
+      textures: g?.textures ?? -1,
+      buffers: g?.buffers ?? -1,
+      vramMB: g?.vramMB ?? { tex: -1, vb: -1, ib: -1 },
+      entities: scene?.count() ?? -1,
       heapMB: mem ? Math.round(mem.usedJSHeapSize / 1048576) : null,
     } satisfies Gpu
   })

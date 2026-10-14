@@ -17,6 +17,7 @@ export default defineConfig({
     'lome-realtime.spec.ts',
     'lome-billboard.spec.ts',
     'lome-endurance.spec.ts',
+    'lome-interior-three.spec.ts',
   ],
   reporter: [['list'], ['html', { outputFolder: 'test-results/lome-report', open: 'never' }]],
   fullyParallel: false,

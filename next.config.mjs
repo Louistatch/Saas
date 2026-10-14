@@ -14,7 +14,7 @@ const realtimeSources = (() => {
 })()
 
 /** @type {import('next').NextConfig} */
-const securityHeaders = [
+const buildSecurityHeaders = ({ wasm = false } = {}) => [
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
@@ -33,7 +33,9 @@ const securityHeaders = [
       "default-src 'self'",
       // Next.js requires unsafe-inline for its inline scripts.
       // unsafe-eval removed for security — not needed by Next.js 16+
-      "script-src 'self' 'unsafe-inline' https:",
+      // 'wasm-unsafe-eval' lets WebAssembly compile (Rapier physics in HarooLife); unlike
+      // 'unsafe-eval' it does not allow eval() or new Function(). HarooLife routes only.
+      `script-src 'self' 'unsafe-inline'${wasm ? " 'wasm-unsafe-eval'" : ''} https:`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://*.supabase.co https:",
       "font-src 'self'",
@@ -50,6 +52,9 @@ const securityHeaders = [
     ].join('; '),
   },
 ]
+
+const securityHeaders = buildSecurityHeaders()
+const harooLifeSecurityHeaders = buildSecurityHeaders({ wasm: true })
 
 const nextConfig = {
   typescript: {
@@ -105,9 +110,11 @@ const nextConfig = {
         { key: 'Vercel-CDN-Cache-Control', value: 'no-store' },
       ] },
       {
-        source: '/((?!embed|api/widget|verify).*)',
+        source: '/((?!embed|api/widget|verify|haroolife).*)',
         headers: securityHeaders,
       },
+      { source: '/haroolife', headers: harooLifeSecurityHeaders },
+      { source: '/haroolife/:path*', headers: harooLifeSecurityHeaders },
       {
         // Verify pages: NEVER cache — always fetch fresh data after QR scan
         source: '/verify/:path*',

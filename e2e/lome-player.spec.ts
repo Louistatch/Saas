@@ -41,10 +41,10 @@ test('avatar, joystick, collisions, camera and taxi in the single 3D world', asy
   await expect.poll(async () => (await player())?.mode ?? null).toBe('idle')
   const start = (await player()) as Player
   const avatarEntity = await page.evaluate(() => {
-    const app = (
-      window as unknown as { __LOME_APP?: { root: { findByName: (n: string) => unknown } } }
-    ).__LOME_APP
-    return Boolean(app?.root.findByName('Joueur'))
+    const scene = (
+      window as unknown as { __LOME_SCENE?: import('../lib/haroolife/engine/types').SceneProbe }
+    ).__LOME_SCENE
+    return Boolean(scene?.has('Joueur'))
   })
   expect(avatarEntity, 'the player entity exists in the scene').toBe(true)
 

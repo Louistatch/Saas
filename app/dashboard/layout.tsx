@@ -23,6 +23,7 @@ import {
   IdCard,
   Leaf,
   LogOut,
+  type LucideIcon,
   Map as MapIcon,
   Menu,
   PhoneCall,
@@ -41,7 +42,7 @@ import { useEffect, useState } from 'react'
 interface NavItem {
   href: string
   label: string
-  icon: React.ElementType
+  icon: LucideIcon
   roles: string[]
 }
 
