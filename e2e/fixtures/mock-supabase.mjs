@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 // Faux Supabase local (auth + PostgREST + quelques RPC) pour jouer les parcours HarooLife
 // sans compte réel : un compte super_admin rattaché à la coopérative COOMARA-Kpalimé
 // (120 membres, 40 parcelles, cartes, regroupements). Aucune donnée réelle.
@@ -449,7 +450,107 @@ const PRESALES = [
   },
 ]
 
+// Formation Opérateur : contenu réel (lu en production, sans clé de correction) et une
+// progression d'exemple pour l'admin de test : 3 leçons validées, la 4 en cours, la 5 avec le
+// quiz réussi, le cas pratique 3 corrigé.
+const ACADEMY = JSON.parse(readFileSync(new URL('./academy-content.json', import.meta.url), 'utf8'))
+const academyLessonIds = ACADEMY.lessons.map((l) => l.id)
+const academyQuiz = (n) => ACADEMY.quizzes.find((q) => q.lesson_id === academyLessonIds[n - 1])
+const academyAssignment = (n) =>
+  ACADEMY.assignments.find((a) => a.lesson_id === academyLessonIds[n - 1])
+const ACADEMY_PROGRESS = [1, 2, 3].map((n) => ({
+  id: `pp${n}`,
+  profile_id: UID,
+  module_id: ACADEMY.module.id,
+  lesson_id: academyLessonIds[n - 1],
+  status: 'completed',
+  progress_percent: 100,
+  score: 80,
+  started_at: `2026-10-0${n}T08:00:00Z`,
+  last_viewed_at: `2026-10-0${n}T09:00:00Z`,
+  completed_at: `2026-10-0${n}T09:30:00Z`,
+  updated_at: `2026-10-0${n}T09:30:00Z`,
+}))
+ACADEMY_PROGRESS.push(
+  {
+    id: 'pp4',
+    profile_id: UID,
+    module_id: ACADEMY.module.id,
+    lesson_id: academyLessonIds[3],
+    status: 'in_progress',
+    progress_percent: 0,
+    score: null,
+    started_at: '2026-10-08T08:00:00Z',
+    last_viewed_at: '2026-10-09T08:00:00Z',
+    completed_at: null,
+    updated_at: '2026-10-09T08:00:00Z',
+  },
+  {
+    id: 'pp5',
+    profile_id: UID,
+    module_id: ACADEMY.module.id,
+    lesson_id: academyLessonIds[4],
+    status: 'in_progress',
+    progress_percent: 0,
+    score: null,
+    started_at: '2026-10-07T08:00:00Z',
+    last_viewed_at: '2026-10-07T08:00:00Z',
+    completed_at: null,
+    updated_at: '2026-10-07T08:00:00Z',
+  },
+)
+const ACADEMY_ATTEMPTS = [1, 2, 3, 5].map((n) => ({
+  id: `qa${n}`,
+  quiz_id: academyQuiz(n)?.id,
+  profile_id: UID,
+  score: n === 5 ? 80 : 100,
+  passed: true,
+  submitted_at: `2026-10-0${n}T09:10:00Z`,
+  created_at: `2026-10-0${n}T09:10:00Z`,
+}))
+const ACADEMY_SUBMISSIONS = [1, 2, 3].map((n) => ({
+  id: `as${n}`,
+  assignment_id: academyAssignment(n)?.id,
+  profile_id: UID,
+  status: n === 3 ? 'reviewed' : 'submitted',
+  score: n === 3 ? 82 : null,
+  feedback: n === 3 ? 'Bon diagnostic. Précisez le rôle du conseil d’administration.' : null,
+  reviewed_at: n === 3 ? '2026-10-05T10:00:00Z' : null,
+  created_at: `2026-10-0${n}T09:20:00Z`,
+}))
+
 const TABLES = {
+  academy_modules: [ACADEMY.module],
+  academy_lessons: ACADEMY.lessons,
+  academy_lesson_slides: ACADEMY.slides,
+  academy_media_assets: ACADEMY.assets ?? [],
+  academy_quizzes: ACADEMY.quizzes,
+  academy_quiz_questions: ACADEMY.quizzes.flatMap((q) =>
+    [1, 2, 3, 4, 5].map((n) => ({
+      id: `${q.id}-q${n}`,
+      quiz_id: q.id,
+      question_type: n === 5 ? 'multiple_choice' : 'single_choice',
+      prompt: `Question ${n} du quiz (données d’exercice)`,
+      points: 1,
+      order_index: n,
+      explanation: 'Explication d’exercice.',
+    })),
+  ),
+  academy_quiz_options: ACADEMY.quizzes.flatMap((q) =>
+    [1, 2, 3, 4, 5].flatMap((n) =>
+      ['A', 'B', 'C', 'D'].map((l, i) => ({
+        id: `${q.id}-q${n}-${l}`,
+        question_id: `${q.id}-q${n}`,
+        label: `Réponse ${l}`,
+        is_correct: i === 0 || (n === 5 && i === 1),
+        order_index: i + 1,
+      })),
+    ),
+  ),
+  academy_assignments: ACADEMY.assignments,
+  academy_profile_progress: ACADEMY_PROGRESS,
+  academy_quiz_attempts: ACADEMY_ATTEMPTS,
+  academy_assignment_submissions: ACADEMY_SUBMISSIONS,
   profiles: PROFILES,
   cooperatives: COOPS,
   cooperative_stats: COOPS,

@@ -1,34 +1,20 @@
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  OPERATOR_MODULE_ID,
-  getModuleWithLessons,
-  getProfileProgressSummary,
-} from '@/lib/academy/operator-training'
+import { LessonList } from '@/components/academy/lesson-list'
+import { LessonReadingView } from '@/components/academy/lesson-reading'
+import { LessonCrumbs, LessonTabs } from '@/components/academy/lesson-tabs'
+import { loadLearnerPage } from '@/lib/academy/learner-page'
+import { lessonReading } from '@/lib/academy/lesson-reading'
+import { OPERATOR_MODULE_ID } from '@/lib/academy/operator-training'
 import { assertOperatorCandidate } from '@/lib/security/assert-partner-access'
-import { createClient as createAdminClient } from '@/lib/supabase/admin'
-import { ArrowLeft, ImageIcon } from 'lucide-react'
 /**
- * Leçon Opérateur — server component : rend les slides en séquence, puis le
- * quiz et le devoir (sous-composants 'use client', seuls endroits ayant
- * besoin d'interaction). Aucun accès direct à la table depuis ici : tout
- * transite par lib/academy/operator-training.ts, comme la route API.
+ * Écran 3 et 4 : lecteur de leçon, espace « Cours ». Sommaire à gauche (colonne PC, tiroir
+ * Android), lecture au centre, repères à droite. Quiz et cas pratique vivent dans la salle
+ * d'évaluation (./evaluation), le laboratoire dans ./lab : pas de page interminable.
  */
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { AssignmentForm } from './assignment-form'
 import { LessonOpened } from './lesson-opened'
-import { QuizForm } from './quiz-form'
 
-const SLIDE_TYPE_LABEL: Record<string, string> = {
-  objective: 'Objectif',
-  concept: 'Concept',
-  screenshot: 'Capture d’écran',
-  procedure: 'Procédure',
-  warning: 'Attention',
-  case: 'Cas pratique',
-  summary: 'Résumé',
-}
+const SUPPORT_EMAIL = 'support@faitierehub.com'
 
 export default async function OperatorLessonPage({
   params,
@@ -39,89 +25,72 @@ export default async function OperatorLessonPage({
   if (!guard.ok) redirect('/operator')
 
   const { lessonId } = await params
-  const admin = createAdminClient()
-  const [module_, summary] = await Promise.all([
-    getModuleWithLessons(admin, OPERATOR_MODULE_ID, guard.ctx.userId),
-    getProfileProgressSummary(admin, guard.ctx.userId, OPERATOR_MODULE_ID),
-  ])
-  const lesson = module_?.lessons.find((l) => l.id === lessonId)
-  if (!module_ || !lesson) notFound()
-  const quizHistory = summary.latest_quiz_attempts.find((a) => a.quiz_id === lesson.quiz?.id)
-  const latestSubmission = summary.submissions.find(
-    (sub) => sub.assignment_id === lesson.assignment?.id,
-  )
+  const data = await loadLearnerPage(guard.ctx.userId)
+  const lesson = data?.module.lessons.find((l) => l.id === lessonId)
+  const view = data?.lessons.find((l) => l.id === lessonId)
+  if (!data || !lesson || !view) notFound()
+
+  const { module: module_, lessons } = data
+  const position = lessons.findIndex((l) => l.id === lessonId)
+  const prev = position > 0 ? lessons[position - 1] : null
+  const next = position < lessons.length - 1 ? lessons[position + 1] : null
+  const reading = lessonReading({ slides: lesson.slides, content_body: lesson.content_body })
+  const mailto = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
+    `Question sur la leçon ${view.order_index ?? ''} : ${view.title}`,
+  )}`
 
   return (
-    <div className="min-h-screen bg-background">
-      <main className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
-        <LessonOpened moduleId={OPERATOR_MODULE_ID} lessonId={lesson.id} />
-        <Link
-          href="/operator/training"
-          className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" /> Retour à la formation
-        </Link>
+    <div className="flex min-h-screen flex-col lg:flex-row">
+      <LessonOpened moduleId={OPERATOR_MODULE_ID} lessonId={lesson.id} />
+      <LessonList lessons={lessons} currentId={lesson.id} moduleTitle={module_.title} />
 
-        <h1 className="mb-6 text-xl font-bold text-foreground">{lesson.title}</h1>
-
-        <div className="space-y-4">
-          {lesson.slides.map((slide) => (
-            <Card key={slide.id}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base text-foreground">
-                  {slide.title}
-                  <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
-                    {SLIDE_TYPE_LABEL[slide.slide_type] ?? slide.slide_type}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="whitespace-pre-wrap text-sm text-foreground">{slide.body}</p>
-                {slide.media_asset?.storage_path && (
-                  <div className="flex items-center gap-2 rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
-                    <ImageIcon className="h-4 w-4" /> {slide.media_asset.alt_text ?? 'Illustration'}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {lesson.quiz && (
-          <div className="mt-6">
-            <QuizForm
-              quiz={lesson.quiz}
-              history={{
-                attempts: quizHistory?.attempts ?? 0,
-                anyPassed: quizHistory?.any_passed ?? false,
-                lastScore: quizHistory?.score ?? null,
-              }}
-            />
+      <main className="min-w-0 flex-1 px-4 pt-5 pb-24 sm:px-8 sm:pt-7 lg:pb-12">
+        <header className="mb-6 flex flex-col gap-3">
+          <LessonCrumbs lesson={view} moduleTitle={module_.title} />
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="mb-1 text-sm text-(--ac-muted)">
+                Leçon {position + 1} sur {lessons.length}
+                {lesson.duration_min ? `, environ ${lesson.duration_min} min (durée estimée)` : ''}
+              </p>
+              <h1 className="academy-display text-[26px] font-medium leading-tight sm:text-[30px]">
+                {view.title}
+              </h1>
+            </div>
+            <LessonTabs lesson={view} current="cours" variant="top" />
           </div>
-        )}
-
-        {lesson.assignment && (
-          <div className="mt-6">
-            <AssignmentForm
-              assignment={lesson.assignment}
-              latest={
-                latestSubmission
-                  ? {
-                      status: latestSubmission.status as
-                        | 'submitted'
-                        | 'reviewed'
-                        | 'revision_required'
-                        | 'draft',
-                      score: latestSubmission.score,
-                      feedback: latestSubmission.feedback,
-                      reviewed_at: latestSubmission.reviewed_at,
-                    }
-                  : null
-              }
-            />
-          </div>
-        )}
+        </header>
+        <LessonReadingView lesson={view} reading={reading} prev={prev} next={next} />
       </main>
+
+      <aside
+        aria-label="Objectifs et aide"
+        className="flex flex-col gap-4 border-t border-(--ac-line) px-4 py-6 sm:px-8 lg:w-[280px] lg:shrink-0 lg:border-t-0 lg:border-l lg:px-6 lg:py-7"
+      >
+        <div className="flex flex-col gap-1.5 rounded-[14px] border border-(--ac-line) bg-white p-4 text-sm">
+          <h2 className="font-bold">Pour valider cette leçon</h2>
+          <p className="m-0 text-[13px] leading-relaxed text-(--ac-muted)">
+            Quiz de 5 questions réussi à 70 % (3 tentatives par 24 h), puis cas pratique déposé. La
+            correction nourrit l’évaluation pratique, elle ne certifie pas.
+          </p>
+          <Link
+            href={`/operator/training/${lesson.id}/evaluation`}
+            className="font-bold no-underline"
+          >
+            Ouvrir la salle d’évaluation
+          </Link>
+        </div>
+        <div className="flex flex-col gap-1.5 rounded-[14px] border border-(--ac-line) bg-white p-4 text-sm">
+          <h2 className="font-bold">Question sur la leçon</h2>
+          <p className="m-0 text-[13px] leading-relaxed text-(--ac-muted)">
+            L’équipe répond par courriel, en général sous 24 h.
+          </p>
+          <a href={mailto} className="font-bold no-underline">
+            Écrire à l’équipe
+          </a>
+        </div>
+      </aside>
+      <LessonTabs lesson={view} current="cours" variant="bottom" />
     </div>
   )
 }

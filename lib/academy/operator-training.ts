@@ -82,6 +82,7 @@ export interface ProfileProgressSummary {
     status: AcademyProgressStatus
     progress_percent: number
     score: number | null
+    last_viewed_at: string | null
   }[]
   latest_quiz_attempts: {
     quiz_id: string
@@ -573,7 +574,7 @@ export async function getProfileProgressSummary(
 
   const { data: progress } = await admin
     .from('academy_profile_progress')
-    .select('lesson_id, status, progress_percent, score')
+    .select('lesson_id, status, progress_percent, score, last_viewed_at')
     .eq('profile_id', profileId)
     .eq('module_id', moduleId)
 
@@ -650,6 +651,7 @@ export async function getProfileProgressSummary(
       status: p.status as AcademyProgressStatus,
       progress_percent: p.progress_percent,
       score: p.score,
+      last_viewed_at: p.last_viewed_at,
     })),
     latest_quiz_attempts: [...latestByQuiz.entries()].map(([quizId, attempt]) => ({
       quiz_id: quizId,
