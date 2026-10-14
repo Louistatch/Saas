@@ -143,14 +143,19 @@ test('20 house visits and 10 trips keep one engine and no growing GPU state', as
   expect(before.buffers).toBeGreaterThan(0)
   // The first visit builds the interior once (measured: +77 buffers); after that every cycle
   // must leave the count flat. A leak would grow it on each of the 20 visits.
-  // Streamed street chunks move it by a few buffers either way; a leak is a trend.
+  // Streamed street chunks and the walkers near the house move it either way; a leak is a
+  // trend. One adult walker (four skinned primitives, a vertex and an index buffer each) is
+  // worth 8 buffers, so one walker more or less between two readings is noise, not a leak:
+  // a leak of a single buffer per visit would still add 20 over the run. Bone textures are
+  // held to +4 whatever happens (that bound caught the PlayCanvas skin-instance leak).
+  const FIGURE_BUFFERS = 8
   const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]
   expect(
     median(perCycle.slice(-5)) - median(perCycle.slice(0, 5)),
     'no growth over 20 visits',
-  ).toBeLessThanOrEqual(4)
+  ).toBeLessThanOrEqual(FIGURE_BUFFERS)
   expect(afterDoors.textures).toBeLessThanOrEqual(before.textures + 4)
-  expect(afterDoors.buffers).toBeLessThanOrEqual(perCycle[0] + 12)
+  expect(afterDoors.buffers).toBeLessThanOrEqual(perCycle[0] + 2 * FIGURE_BUFFERS + 4)
   expect(afterDoors.entities).toBeLessThanOrEqual(before.entities * 1.1 + 20)
   expect(afterTrips.textures).toBeLessThanOrEqual(before.textures * 1.25 + 8)
   expect(afterTrips.buffers).toBeLessThanOrEqual(perCycle[0] * 1.25 + 30)

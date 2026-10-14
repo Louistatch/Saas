@@ -11,7 +11,7 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
   const navigation = page.getByRole('navigation', { name: 'Navigation du jeu' })
   await expect(navigation).toBeVisible()
   await expect(navigation.getByRole('button', { name: 'Maison' })).toBeVisible()
-  await expect(navigation.getByRole('button', { name: 'Acheter' })).toBeVisible()
+  await expect(navigation.getByRole('button', { name: 'Aménager' })).toBeVisible()
   await expect(navigation.getByRole('button', { name: 'Carte' })).toBeVisible()
   await expect(navigation.getByRole('button', { name: 'Téléphone' })).toBeVisible()
   const webgl2 = await page.evaluate(() => !!document.createElement('canvas').getContext('webgl2'))
@@ -127,7 +127,7 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
       { timeout: 15000 },
     )
     .toContain('"route":0,')
-  await navigation.getByRole('button', { name: 'Acheter' }).click()
+  await navigation.getByRole('button', { name: 'Aménager' }).click()
   await expect(page.getByRole('dialog', { name: 'Marché & commerces' })).toBeVisible()
   await page.getByRole('button', { name: /Acheter un repas · 650 FCFA/ }).click()
   // The engine answers every action with a message; the purchase must be the last one.
@@ -185,7 +185,8 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
       }),
     )
     .toBe('market')
-  await expect(page.locator('canvas').first()).toBeVisible()
+  // Indoors the room renderer draws (Three by default): one visible canvas, whichever engine.
+  await expect(page.locator('canvas').filter({ visible: true }).first()).toBeVisible()
   await page.waitForTimeout(1200)
   const indoors = path.join('test-results', 'lome-visual', testInfo.project.name + '-interior.png')
   fs.mkdirSync(path.dirname(indoors), { recursive: true })

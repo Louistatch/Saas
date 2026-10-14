@@ -2,6 +2,7 @@
 
 import type { AdCampaign, AdPlacement } from '@/lib/haroolife/ads/campaigns'
 import type { ExposureTracker } from '@/lib/haroolife/ads/exposure'
+import { adultFor } from '@/lib/haroolife/city/avatar-catalogue'
 import { releaseEntity } from '@/lib/haroolife/city/gpu'
 import { type NpcAnim, type Prop, layoutFor } from '@/lib/haroolife/city/interiors'
 import type { Interior } from '@/lib/haroolife/city/life'
@@ -13,7 +14,13 @@ import {
   renders,
   watchLongTasks,
 } from '@/lib/haroolife/city/perf'
-import type { CameraRig, InputState, PlayerController } from '@/lib/haroolife/city/player'
+import {
+  type CameraRig,
+  FOLLOW_DISTANCE,
+  type InputState,
+  MAP_DISTANCE,
+  type PlayerController,
+} from '@/lib/haroolife/city/player'
 import { PRESETS, type Quality, renderPixelRatio } from '@/lib/haroolife/city/quality'
 import { type Agent, agentsNear } from '@/lib/haroolife/city/traffic'
 import {
@@ -211,7 +218,7 @@ const Agents = memo(function Agents({
             <Character
               key={a.id}
               name={`piéton ${a.id}`}
-              model={a.model ?? 'character-male-a'}
+              model={adultFor(a.model ?? 'character-male-a')}
               position={pos}
               rotation={a.heading}
               anim={a.activity === 'run' ? 'run' : 'walk'}
@@ -1027,7 +1034,7 @@ export default function CityWorld({
           aria-label="Recentrer sur moi"
           onClick={() => {
             controller.camera.follow = true
-            controller.camera.distance = Math.min(controller.camera.distance, 12)
+            controller.camera.distance = Math.min(controller.camera.distance, FOLLOW_DISTANCE)
           }}
           className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
         >
@@ -1041,8 +1048,8 @@ export default function CityWorld({
             rig.follow = false
             rig.tx = 60
             rig.tz = 40
-            rig.distance = 100
-            onCamera({ ...camera, tx: 60, tz: 40, distance: 100 })
+            rig.distance = MAP_DISTANCE
+            onCamera({ ...camera, tx: 60, tz: 40, distance: MAP_DISTANCE })
           }}
           className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
         >

@@ -162,7 +162,7 @@ export class PlayerController {
     this.camera = {
       tx: start.x,
       tz: start.y,
-      distance: 16,
+      distance: FOLLOW_DISTANCE,
       angle: 35,
       follow: true,
       ...camera,
@@ -428,8 +428,15 @@ function approach(v: number, target: number, step: number): number {
   return v
 }
 
+/**
+ * Game camera: the follow distance behind the player (about 40° above the street, the figure
+ * 80–140 px tall on a 412 × 915 phone) and the aerial distance of the city map view.
+ */
+export const FOLLOW_DISTANCE = 8
+export const MAP_DISTANCE = 100
+
 /** Camera pitch (degrees, negative looks down) for a follow distance: closer = flatter. */
 export function cameraPitch(distance: number): number {
-  const t = clamp((distance - 9) / 20, 0, 1)
-  return -30 - 22 * t
+  const t = clamp((distance - FOLLOW_DISTANCE) / 20, 0, 1)
+  return -40 - 14 * t
 }

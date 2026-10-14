@@ -170,12 +170,12 @@ test('enter and leave my house with continuous movement, taxi and reload', async
   if (mobile) await door.tap()
   else await page.keyboard.press('e') // 7. key E on a PC
   await expect.poll(async () => (await live(page))?.inside).toBe('house')
-  if (!mobile) {
-    await page.keyboard.press('e')
-    await expect.poll(async () => (await live(page))?.inside ?? null).toBe(null)
-  }
+  // Back out (key E on a PC, the door button on a phone): the interior renderer is torn down.
+  if (mobile) await door.tap()
+  else await page.keyboard.press('e')
+  await expect.poll(async () => (await live(page))?.inside ?? null).toBe(null)
 
-  expect(await page.locator('canvas').count(), 'one PlayCanvas canvas').toBe(1)
+  await expect.poll(() => page.locator('canvas').count(), 'one PlayCanvas canvas').toBe(1)
   expect(await page.evaluate(() => (window as unknown as { __LOST?: number }).__LOST ?? 0)).toBe(0)
   expect(errors).toEqual([])
 })

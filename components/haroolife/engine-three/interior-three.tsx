@@ -1,5 +1,6 @@
 'use client'
 
+import { adultFor } from '@/lib/haroolife/city/avatar-catalogue'
 import type { Layout, Npc, NpcAnim, Prop } from '@/lib/haroolife/city/interiors'
 import type { InputState } from '@/lib/haroolife/city/player'
 import {
@@ -362,12 +363,13 @@ function Player({
       onLeave()
     }
 
-    // Follow camera: a close three-quarter view that keeps the player in frame.
+    // Follow camera: a close three-quarter view (about 40° of elevation, the reference's
+    // framing) that keeps the player readable and the furniture identifiable without zooming.
     target.current.lerp(fig.position, 1 - Math.exp(-dt * 6))
-    const dist = 9.5
+    const dist = 7.2
     camera.position.set(
       target.current.x + Math.sin(a) * dist,
-      target.current.y + dist * 0.78,
+      target.current.y + dist * 0.84,
       target.current.z + Math.cos(a) * dist,
     )
     camera.lookAt(target.current.x, target.current.y + 0.6, target.current.z)
@@ -431,7 +433,7 @@ function Mover({ npc }: { npc: Npc }) {
     <Character
       ref={ref}
       name={`npc:${npc.id}`}
-      model={npc.model}
+      model={adultFor(npc.model)}
       anim={npc.anim}
       scale={NPC_SCALE}
     />
@@ -465,9 +467,10 @@ function Room({
 
   return (
     <>
-      <hemisphereLight args={['#eef4ff', '#6b5a45', 1.15]} />
-      <directionalLight position={[6, 10, 5]} intensity={1.7} />
-      <directionalLight position={[-4, 5, -8]} intensity={0.5} />
+      {/* Warm daylight: light floors, walls that stay readable, the figure detached from the back. */}
+      <hemisphereLight args={['#fff6e6', '#8a7a62', 1.45]} />
+      <directionalLight position={[6, 10, 5]} intensity={1.9} color="#fff1dc" />
+      <directionalLight position={[-4, 5, -8]} intensity={0.7} color="#dfe9ff" />
       {room.meshes.map((m) => (
         <mesh key={m.key} name={`static:${m.key}`} geometry={m.geometry} material={m.material} />
       ))}
@@ -515,7 +518,11 @@ function Room({
           <Character
             key={n.id}
             name={`npc:${n.id}`}
-            model={n.model}
+            model={
+              n.anim === 'sit' || n.anim === 'rest' || n.anim === 'drive'
+                ? n.model
+                : adultFor(n.model)
+            }
             position={[n.x, 0, n.z]}
             rotation={n.rot ?? 0}
             anim={n.anim}

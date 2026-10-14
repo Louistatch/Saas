@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   DEFAULT_CONFIG,
+  FOLLOW_DISTANCE,
+  MAP_DISTANCE,
   PlayerController,
   type WorldQuery,
   angleDelta,
@@ -55,6 +57,12 @@ describe('angles and camera basis', () => {
   })
   it('pitch flattens when close', () => {
     assert.ok(cameraPitch(9) > cameraPitch(28))
+  })
+  it('the game camera follows from about 40° above, the map from much higher', () => {
+    assert.equal(cameraPitch(FOLLOW_DISTANCE), -40)
+    assert.ok(MAP_DISTANCE > FOLLOW_DISTANCE * 5)
+    const p = new PlayerController({ walkable: () => true, drivable: () => false }, { x: 0, y: 0 })
+    assert.equal(p.camera.distance, FOLLOW_DISTANCE)
   })
 })
 

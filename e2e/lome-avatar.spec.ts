@@ -6,21 +6,32 @@ import { expect, test } from './lome-test'
  */
 type Player = { model: string; anim: string; mode: string; driving: boolean }
 
-test('one configurable avatar across street, room and taxi', async ({ page }) => {
+test('one configurable avatar across street, room and taxi', async ({ page }, testInfo) => {
   test.setTimeout(240_000)
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(e.message))
   const player = () =>
     page.evaluate(() => (window as unknown as { __LOME_PLAYER?: Player }).__LOME_PLAYER ?? null)
+  // New game on this device: the appearance sheet opens first, with the adult characters and
+  // an animated preview; « Commencer » keeps the choice and never touches the save.
+  await page.addInitScript(() => localStorage.removeItem('haroolife.avatar.chosen'))
   await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
   await expect(page.locator('canvas').first()).toBeVisible({ timeout: 30000 })
-  await expect.poll(async () => (await player())?.model).toBe('character-female-a')
+  await expect(page.getByRole('heading', { name: 'Mon apparence' })).toBeVisible({ timeout: 30000 })
+  await expect(page.getByRole('img', { name: 'Aperçu animé du personnage' })).toBeVisible()
+  await page.getByRole('button', { name: /^Kossi Chemise/ }).click()
+  await page.getByRole('button', { name: 'Commencer' }).click()
+  await expect(page.getByRole('heading', { name: 'Mon apparence' })).toBeHidden()
+  await expect.poll(async () => (await player())?.model).toBe('kossi')
+  expect(await page.evaluate(() => localStorage.getItem('haroolife.avatar.chosen'))).toBe('1')
+  await page.screenshot({ path: testInfo.outputPath('avatar-adult-street.png') })
 
-  // Choose Koffi and pagne 3 from the journal.
+  // Choose the classic Koffi (mini) and pagne 3 from the journal: the wrap is still drawn.
   await page.locator('button[role="status"]').first().click()
   await page.getByRole('button', { name: /Mon apparence/ }).click()
   await expect(page.getByRole('heading', { name: 'Mon apparence' })).toBeVisible()
-  await page.getByRole('button', { name: /Koffi/ }).click()
+  await page.getByText('Personnages classiques (mini)').click()
+  await page.getByRole('button', { name: /Koffi \(mini\)/ }).click()
   await page.getByRole('button', { name: 'Pagne 3' }).click()
   await page.getByRole('button', { name: 'Fermer', exact: true }).click()
   await expect.poll(async () => (await player())?.model).toBe('character-male-b')
@@ -71,13 +82,21 @@ test('one configurable avatar across street, room and taxi', async ({ page }) =>
       { timeout: 60000 },
     )
     .not.toBeNull()
-  const indoorModel = await page.evaluate(() => {
-    const scene = (
-      window as unknown as { __LOME_SCENE?: import('../lib/haroolife/engine/types').SceneProbe }
-    ).__LOME_SCENE
-    return scene?.childNames('Joueur')?.join(',') ?? null
-  })
-  expect(indoorModel, 'the indoor figure carries the pagne too').toContain('pagne')
+  // The room is drawn by the Three renderer once its scene is up: same model, same pagne wrap.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const scene = (
+            window as unknown as {
+              __LOME_SCENE?: import('../lib/haroolife/engine/types').SceneProbe
+            }
+          ).__LOME_SCENE
+          return scene?.childNames('Joueur')?.join(',') ?? null
+        }),
+      { message: 'the indoor figure carries the pagne too', timeout: 30000 },
+    )
+    .toContain('pagne')
   // Stepping out plays the door clip before idling.
   await page.getByRole('button', { name: 'Entrer ou sortir' }).click()
   await expect.poll(async () => (await player())?.anim, { timeout: 15000 }).toMatch(/enter|idle/)
