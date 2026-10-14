@@ -84,3 +84,58 @@ test('one configurable avatar across street, room and taxi', async ({ page }) =>
   await expect.poll(async () => (await player())?.mode).toBe('idle')
   expect(errors).toEqual([])
 })
+
+/**
+ * Jalon J2: a human avatar (Rocketbox, MIT) is chosen the same way, replaces the figure in the
+ * scene at the Kenney height, wears its own clothes (no pagne) and walks with its own clips.
+ */
+test('a human avatar replaces the figure, keeps its height and walks', async ({ page }) => {
+  test.setTimeout(180_000)
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  const player = () =>
+    page.evaluate(() => (window as unknown as { __LOME_PLAYER?: Player }).__LOME_PLAYER ?? null)
+  type Scene = { __LOME_SCENE?: import('../lib/haroolife/engine/types').SceneProbe }
+  const playerPos = () =>
+    page.evaluate(() => (window as unknown as Scene).__LOME_SCENE?.position('Joueur') ?? null)
+  const playerTris = () =>
+    page.evaluate(
+      () => (window as unknown as Scene).__LOME_SCENE?.geometry('^Joueur$').triangles ?? 0,
+    )
+  const hasPagne = () =>
+    page.evaluate(
+      () =>
+        (window as unknown as Scene).__LOME_SCENE?.childNames('Joueur')?.includes('pagne') ?? null,
+    )
+  await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
+  await expect(page.locator('canvas').first()).toBeVisible({ timeout: 30000 })
+  await expect.poll(async () => (await player())?.model).toBe('character-female-a')
+  // The probe is up before the player entity is placed: wait for a real position.
+  await expect.poll(playerPos).not.toBeNull()
+  const before = await playerPos()
+
+  await page.locator('button[role="status"]').first().click()
+  await page.getByRole('button', { name: /Mon apparence/ }).click()
+  await page.getByRole('button', { name: /Komlan/ }).click()
+  await page.getByRole('button', { name: 'Fermer', exact: true }).click()
+  await expect.poll(async () => (await player())?.model).toBe('rb-male-04')
+  // The 2 MB model streams in; then it is the only figure under "Joueur", 6 000+ triangles
+  // (a Kenney figure has under 900), and no pagne wrap.
+  await expect.poll(playerTris, { timeout: 60000 }).toBeGreaterThan(6000)
+  expect(await hasPagne()).toBe(false)
+  const after = await playerPos()
+  expect(after, 'the figure stays where it was').toEqual(before)
+
+  await page.keyboard.down('ArrowUp')
+  await expect.poll(async () => (await player())?.anim).toMatch(/walk|run/)
+  await page.waitForTimeout(800)
+  await page.keyboard.up('ArrowUp')
+  await expect.poll(async () => (await player())?.anim).toBe('idle')
+  const moved = await playerPos()
+  expect(moved?.z, 'the figure walked').not.toEqual(after?.z)
+
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page.locator('canvas').first()).toBeVisible({ timeout: 30000 })
+  await expect.poll(async () => (await player())?.model).toBe('rb-male-04')
+  expect(errors).toEqual([])
+})

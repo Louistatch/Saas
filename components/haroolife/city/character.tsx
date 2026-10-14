@@ -1,31 +1,17 @@
 'use client'
 
+import { avatarSpec, heightScale, playsOnce } from '@/lib/haroolife/city/avatar-catalog'
 import { deviceAlive, releaseEntity } from '@/lib/haroolife/city/gpu'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 /**
- * An animated Kenney Mini Character (CC0): a real skinned glTF with its own clips
- * (idle, walk, sprint, sit, crouch…). The entity is instantiated imperatively from the
+ * An animated figure: a Kenney Mini Character (CC0) or a Rocketbox human adult (MIT), a real
+ * skinned glTF with its own clips. Which file, which clip per activity, the pagne and the
+ * height come from `avatar-catalog.ts`. The entity is instantiated imperatively from the
  * loaded container so the PlayCanvas anim component can drive the skeleton.
  */
 import { useApp, useModel } from '@playcanvas/react/hooks'
 import * as pc from 'playcanvas'
 import { useEffect, useRef } from 'react'
-
-export const CHARACTER_BASE = '/haroolife/vendor/kenney-3d/mini-characters/'
-/** Kenney clip names for each activity. */
-const CLIP: Record<NpcAnim, string> = {
-  idle: 'idle',
-  walk: 'walk',
-  run: 'sprint',
-  sit: 'sit',
-  lift: 'holding-both',
-  talk: 'emote-yes',
-  work: 'interact-right',
-  pray: 'crouch',
-  rest: 'sit',
-  drive: 'drive',
-  enter: 'interact-right',
-}
 
 type Container = {
   instantiateRenderEntity: (opts?: object) => pc.Entity
@@ -63,11 +49,13 @@ export function Character({
   onEntity?: (e: pc.Entity | null) => void
 }) {
   const app = useApp()
-  const { asset } = useModel(`${CHARACTER_BASE}${model}.glb`)
+  const spec = avatarSpec(model)
+  const { asset } = useModel(spec.url)
   const holder = useRef<pc.Entity | null>(null)
   const figure = useRef<pc.Entity | null>(null)
   const current = useRef<string | null>(null)
   const band = useRef<pc.Entity | null>(null)
+  const placed = useRef(false)
 
   // Create the skinned figure once the container is loaded (the first clip is read once).
   // biome-ignore lint/correctness/useExhaustiveDependencies: anim changes are handled below
@@ -81,14 +69,22 @@ export function Character({
     holder.current = root
     figure.current = fig
     band.current = null
+    // Place the new entity at once: when the model changes mid-game (the player picks another
+    // figure), the imperative rig only moves the entity when the player moves, so without
+    // this the new figure sat at the origin until the first step.
+    root.setLocalPosition(position[0], position[1], position[2])
+    root.setLocalEulerAngles(0, rotation + spec.yaw, 0)
+    const s0 = scale * heightScale(spec)
+    root.setLocalScale(s0, s0, s0)
+    placed.current = true
     onEntity?.(root)
     const clips = container.animations
       .map((a) => a.resource as pc.AnimTrack | null)
       .filter((t): t is pc.AnimTrack => Boolean(t))
     if (clips.length) {
       fig.addComponent('anim', { activate: true })
-      const states = clips.map((t) => ({ name: t.name, speed: 1, loop: true }))
-      const first = CLIP[anim] ?? 'idle'
+      const states = clips.map((t) => ({ name: t.name, speed: 1, loop: !playsOnce(spec, t.name) }))
+      const first = spec.clips[anim] ?? 'idle'
       fig.anim?.loadStateGraph(
         new pc.AnimStateGraph({
           layers: [
@@ -121,22 +117,23 @@ export function Character({
   }, [active])
 
   // Follow position, rotation and scale from props without re-instantiating.
-  const placed = useRef(false)
   useEffect(() => {
     const root = holder.current
     if (!root) return
     if (imperative && placed.current) return
     placed.current = true
     root.setLocalPosition(position[0], position[1], position[2])
-    root.setLocalEulerAngles(0, rotation, 0)
-    root.setLocalScale(scale, scale, scale)
+    root.setLocalEulerAngles(0, rotation + spec.yaw, 0)
+    // Every caller's `scale` is tuned for Kenney figures: a human is shrunk to the same height.
+    const s = scale * heightScale(spec)
+    root.setLocalScale(s, s, s)
   })
   // Switch clip when the activity changes.
   useEffect(() => {
     const fig = figure.current
     const layer = fig?.anim?.baseLayer
     if (!fig || !layer) return
-    const clip = CLIP[anim] ?? 'idle'
+    const clip = spec.clips[anim] ?? 'idle'
     if (current.current === clip) return
     const known = (
       fig.anim as unknown as {
@@ -151,8 +148,9 @@ export function Character({
     } catch {
       /* clip missing in this model: keep the current one */
     }
-  }, [anim])
-  // The pagne: a wrap around the hips in the chosen colour (a flat ring of boxes).
+  }, [anim, spec])
+  // The pagne: a wrap around the hips in the chosen colour (Kenney figures only: the human
+  // avatars wear their own clothes).
   useEffect(() => {
     const root = holder.current
     if (!root || !app) return
@@ -160,16 +158,15 @@ export function Character({
       releaseEntity(band.current)
       band.current = null
     }
-    if (!pagne) return
+    if (!pagne || !spec.pagne) return
     const e = new pc.Entity('pagne')
     const mat = new pc.StandardMaterial()
     mat.diffuse.fromString(pagne)
     mat.gloss = 0.1
     mat.update()
     e.addComponent('render', { type: 'box', material: mat })
-    // Mini characters stand 0.66 units tall, hips at ~0.18: a wrap from the hips to mid-thigh.
-    e.setLocalPosition(0, 0.16, -0.02)
-    e.setLocalScale(0.3, 0.13, 0.22)
+    e.setLocalPosition(0, spec.pagne.y, -0.02)
+    e.setLocalScale(...spec.pagne.scale)
     root.addChild(e)
     band.current = e
     return () => {
@@ -177,7 +174,7 @@ export function Character({
       if (deviceAlive(app.graphicsDevice)) mat.destroy()
       band.current = null
     }
-  }, [pagne, app, asset])
+  }, [pagne, app, asset, spec])
   useEffect(() => {
     const fig = figure.current
     if (fig?.anim) fig.anim.speed = speed

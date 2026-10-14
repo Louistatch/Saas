@@ -2718,7 +2718,8 @@ export function LomeLifeImmersive() {
                 <>
                   <p className="text-sm text-slate-600">
                     Le même personnage te suit dans la rue, dans les bâtiments et au volant.
-                    Personnages Kenney (CC0) ; ton choix reste sur cet appareil.
+                    Personnages humains Rocketbox (MIT) et figurines Kenney (CC0) ; ton choix
+                    reste sur cet appareil.
                   </p>
                   <div
                     className="grid grid-cols-2 gap-2 sm:grid-cols-3"
@@ -2739,7 +2740,10 @@ export function LomeLifeImmersive() {
                         }
                       >
                         <span className="block text-sm font-black">{m.label}</span>
-                        <span className="block text-[11px] text-slate-500">{m.hint}</span>
+                        <span className="block text-[11px] text-slate-500">
+                          {m.kind === 'human' ? 'Humain · ' : 'Figurine · '}
+                          {m.hint}
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -2762,8 +2766,8 @@ export function LomeLifeImmersive() {
                     </div>
                   </fieldset>
                   <p className="text-[11px] text-slate-500">
-                    Animations : marche, course, pas de porte et conduite. Faute de clip de
-                    demi-tour dans le pack, le personnage pivote sur place.
+                    Animations : marche, course, pas de porte et conduite. Le pagne habille les
+                    figurines ; les personnages humains portent leurs vêtements.
                   </p>
                 </>
               )}

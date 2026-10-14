@@ -14,7 +14,10 @@ const realtimeSources = (() => {
 })()
 
 /** @type {import('next').NextConfig} */
-const buildSecurityHeaders = ({ wasm = false } = {}) => [
+// `game`: the HarooLife routes. They add 'wasm-unsafe-eval' (Rapier physics) and `blob:` in
+// connect-src: three.js reads the textures embedded in a GLB through blob: URLs (fetch), which
+// the strict policy otherwise refuses. Every other route keeps the stricter policy.
+const buildSecurityHeaders = ({ game = false } = {}) => [
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
@@ -35,11 +38,11 @@ const buildSecurityHeaders = ({ wasm = false } = {}) => [
       // unsafe-eval removed for security — not needed by Next.js 16+
       // 'wasm-unsafe-eval' lets WebAssembly compile (Rapier physics in HarooLife); unlike
       // 'unsafe-eval' it does not allow eval() or new Function(). HarooLife routes only.
-      `script-src 'self' 'unsafe-inline'${wasm ? " 'wasm-unsafe-eval'" : ''} https:`,
+      `script-src 'self' 'unsafe-inline'${game ? " 'wasm-unsafe-eval'" : ''} https:`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://*.supabase.co https:",
       "font-src 'self'",
-      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.vercel-analytics.com https://*.vercel.app https://*.i.posthog.com https://*.posthog.com${realtimeSources}`,
+      `connect-src 'self'${game ? ' blob:' : ''} https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.vercel-analytics.com https://*.vercel.app https://*.i.posthog.com https://*.posthog.com${realtimeSources}`,
       "worker-src 'self'",
       "manifest-src 'self'",
       "frame-ancestors 'none'",
@@ -54,7 +57,7 @@ const buildSecurityHeaders = ({ wasm = false } = {}) => [
 ]
 
 const securityHeaders = buildSecurityHeaders()
-const harooLifeSecurityHeaders = buildSecurityHeaders({ wasm: true })
+const harooLifeSecurityHeaders = buildSecurityHeaders({ game: true })
 
 const nextConfig = {
   typescript: {

@@ -1,17 +1,22 @@
 /**
- * The player's appearance: one of the Kenney Mini Characters (CC0) and the colour of the
- * pagne worn as a wrap, chosen by the player and kept on the device. Never part of the
- * account profile: no sensitive data, no server write.
+ * The player's appearance: a figure (Kenney Mini Character, CC0, or a Rocketbox human adult,
+ * MIT) and the colour of the pagne worn as a wrap, chosen by the player and kept on the
+ * device. Never part of the account profile: no sensitive data, no server write. Where each
+ * figure's model lives and how it animates is in `avatar-catalog.ts`.
  */
 import { PAGNES } from '@/components/haroolife/pagnes'
 
 export const AVATAR_MODELS = [
-  { id: 'character-female-a', label: 'Afi', hint: 'Robe et sandales' },
-  { id: 'character-female-b', label: 'Abra', hint: 'Jupe et chemisier' },
-  { id: 'character-female-c', label: 'Essi', hint: 'Tenue de ville' },
-  { id: 'character-male-a', label: 'Kossi', hint: 'Chemise et pantalon' },
-  { id: 'character-male-b', label: 'Koffi', hint: 'Polo et jean' },
-  { id: 'character-male-c', label: 'Yao', hint: 'Veste légère' },
+  { id: 'rb-female-party-02', label: 'Ama', hint: 'Robe de soirée', kind: 'human' },
+  { id: 'rb-male-04', label: 'Komlan', hint: 'Chemise claire et jean', kind: 'human' },
+  { id: 'rb-male-12', label: 'Edem', hint: 'T-shirt et pantalon', kind: 'human' },
+  { id: 'rb-male-18', label: 'Sena', hint: 'Tenue décontractée', kind: 'human' },
+  { id: 'character-female-a', label: 'Afi', hint: 'Robe et sandales', kind: 'kenney' },
+  { id: 'character-female-b', label: 'Abra', hint: 'Jupe et chemisier', kind: 'kenney' },
+  { id: 'character-female-c', label: 'Essi', hint: 'Tenue de ville', kind: 'kenney' },
+  { id: 'character-male-a', label: 'Kossi', hint: 'Chemise et pantalon', kind: 'kenney' },
+  { id: 'character-male-b', label: 'Koffi', hint: 'Polo et jean', kind: 'kenney' },
+  { id: 'character-male-c', label: 'Yao', hint: 'Veste légère', kind: 'kenney' },
 ] as const
 export type AvatarModel = (typeof AVATAR_MODELS)[number]['id']
 export interface Avatar {

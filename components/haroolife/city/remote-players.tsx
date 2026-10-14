@@ -15,6 +15,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Character } from './character'
 import { worldPos } from './city-chunks'
 
+const REMOTE_MODELS = AVATAR_MODELS.filter((m) => m.kind === 'kenney')
+
 export interface PoseFeed {
   onPose(fn: (s: { key: string; pose: Pose }) => void): () => void
 }
@@ -130,7 +132,9 @@ export default function RemotePlayers({
       {shown.map((p) => {
         const first = buffers.current.get(p.key)?.[0]
         const start = first ? worldPos(first.x, first.z) : worldPos(0, 0)
-        const model = AVATAR_MODELS[hash(p.key) % AVATAR_MODELS.length].id
+        // Other players are drawn as Kenney figures whatever they chose: one human avatar
+        // is a 2 MB download, and only the player's own is worth it on a phone.
+        const model = REMOTE_MODELS[hash(p.key) % REMOTE_MODELS.length].id
         const mode = modes[p.key] ?? 'idle'
         return (
           <Character

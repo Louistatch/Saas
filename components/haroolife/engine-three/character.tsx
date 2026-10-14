@@ -1,34 +1,19 @@
 'use client'
 
+import { avatarSpec, heightScale, playsOnce } from '@/lib/haroolife/city/avatar-catalog'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 /**
- * A Kenney Mini Character (CC0) for the React Three Fiber renderer: the same rigged glTF and
- * the same clips as the PlayCanvas `Character`, played by an AnimationMixer with 150 ms
- * cross-fades. Each instance clones the skeleton (`SkeletonUtils.clone`): a plain scene clone
- * would share bones between characters.
+ * A figure (Kenney Mini Character, CC0, or Rocketbox human adult, MIT) for the React Three
+ * Fiber renderer: the same rigged glTF and the same clips as the PlayCanvas `Character`, read
+ * from `avatar-catalog.ts` and played by an AnimationMixer with 150 ms cross-fades. Each
+ * instance clones the skeleton (`SkeletonUtils.clone`): a plain scene clone would share bones
+ * between characters.
  */
 import { useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { forwardRef, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js'
-
-export const CHARACTER_BASE = '/haroolife/vendor/kenney-3d/mini-characters/'
-
-/** Kenney clip played for each activity (same table as the PlayCanvas renderer). */
-export const CLIP: Record<NpcAnim, string> = {
-  idle: 'idle',
-  walk: 'walk',
-  run: 'sprint',
-  sit: 'sit',
-  lift: 'holding-both',
-  talk: 'emote-yes',
-  work: 'interact-right',
-  pray: 'crouch',
-  rest: 'sit',
-  drive: 'drive',
-  enter: 'interact-right',
-}
 
 export const Character = forwardRef<
   THREE.Group,
@@ -47,7 +32,8 @@ export const Character = forwardRef<
   { model, name, anim, scale = 1, position, rotation = 0, speed = 1, pagne },
   ref,
 ) {
-  const gltf = useGLTF(`${CHARACTER_BASE}${model}.glb`)
+  const spec = avatarSpec(model)
+  const gltf = useGLTF(spec.url)
   const figure = useMemo(() => cloneSkinned(gltf.scene), [gltf.scene])
   const mixer = useMemo(() => new THREE.AnimationMixer(figure), [figure])
   const actions = useMemo(() => {
@@ -58,12 +44,17 @@ export const Character = forwardRef<
   const current = useRef<THREE.AnimationAction | null>(null)
 
   useEffect(() => {
-    const next = actions.get(CLIP[anim]) ?? actions.get('idle') ?? null
+    const clip = spec.clips[anim] ?? 'idle'
+    const next = actions.get(clip) ?? actions.get('idle') ?? null
     if (!next || next === current.current) return
-    next.reset().setLoop(THREE.LoopRepeat, Number.POSITIVE_INFINITY).fadeIn(0.15).play()
+    if (playsOnce(spec, clip)) {
+      next.setLoop(THREE.LoopOnce, 1)
+      next.clampWhenFinished = true
+    } else next.setLoop(THREE.LoopRepeat, Number.POSITIVE_INFINITY)
+    next.reset().fadeIn(0.15).play()
     current.current?.fadeOut(0.15)
     current.current = next
-  }, [anim, actions])
+  }, [anim, actions, spec])
   useEffect(() => {
     if (current.current) current.current.timeScale = speed
   }, [speed])
@@ -76,9 +67,11 @@ export const Character = forwardRef<
   )
   useFrame((_, dt) => mixer.update(Math.min(dt, 0.1)))
 
+  // Kenney figures only: the human avatars wear their own clothes.
   const pagneMaterial = useMemo(
-    () => (pagne ? new THREE.MeshStandardMaterial({ color: pagne, roughness: 0.9 }) : null),
-    [pagne],
+    () =>
+      pagne && spec.pagne ? new THREE.MeshStandardMaterial({ color: pagne, roughness: 0.9 }) : null,
+    [pagne, spec],
   )
   useEffect(() => () => pagneMaterial?.dispose(), [pagneMaterial])
 
@@ -87,16 +80,17 @@ export const Character = forwardRef<
       ref={ref}
       name={name}
       position={position}
-      rotation={[0, THREE.MathUtils.degToRad(rotation), 0]}
-      scale={scale}
+      rotation={[0, THREE.MathUtils.degToRad(rotation + spec.yaw), 0]}
+      // Every caller's `scale` is tuned for Kenney figures: a human is shrunk to the same height.
+      scale={scale * heightScale(spec)}
     >
       <primitive object={figure} />
-      {pagneMaterial && (
+      {pagneMaterial && spec.pagne && (
         // Same wrap as the PlayCanvas renderer: hips to mid-thigh on a 0.66-unit figure.
         <mesh
           name="pagne"
-          position={[0, 0.16, -0.02]}
-          scale={[0.3, 0.13, 0.22]}
+          position={[0, spec.pagne.y, -0.02]}
+          scale={spec.pagne.scale}
           material={pagneMaterial}
         >
           <boxGeometry />

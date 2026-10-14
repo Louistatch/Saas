@@ -177,7 +177,7 @@ UPSTASH_REDIS_REST_TOKEN
 ### Security model
 
 - CSP is configured in `next.config.mjs` headers — `unsafe-eval` is NOT present (removed for security).
-- `/haroolife` routes add `'wasm-unsafe-eval'` (WebAssembly compilation only, for Rapier physics in the React Three Fiber renderer). It does not allow `eval()`; every other route keeps the stricter policy.
+- `/haroolife` routes add `'wasm-unsafe-eval'` (WebAssembly compilation only, for Rapier physics in the React Three Fiber renderer) and `blob:` in `connect-src` (three.js reads textures embedded in GLB files through blob URLs). Neither allows `eval()`; every other route keeps the stricter policy.
 - `/verify/*` routes are never cached (`Cache-Control: no-store`).
 - `/embed` allows framing; all other pages set `X-Frame-Options: DENY`.
 - Webhook endpoint (`/api/webhooks/kobo`) validates HMAC secret with timing-safe comparison.

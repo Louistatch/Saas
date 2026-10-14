@@ -17,6 +17,11 @@
    - Modèles « cuits » (72 bâtiments, véhicules, mobilier urbain) : `scripts/haroolife-bake-models.mjs` échantillonne la palette de chaque kit par sommet et produit `public/haroolife/city/kenney-pack.{bin,json}` (2,1 Mo, 755 Ko compressés) ; `lib/haroolife/city/pack.ts` les décode et les fusionne dans les maillages de chunk.
    - Les modèles du dépôt `simcity-threejs-clone` (260 GLB sans attribution) n'ont **pas** été réutilisés : provenance et licence non établies.
 
+4. **Microsoft Rocketbox Avatar Library**, avatars humains adultes riggés (squelette Biped 3ds Max, 80 os) et clips de capture de mouvement. Licence **MIT** (copyright 2020 Microsoft ; usage commercial et redistribution autorisés, avis de licence à conserver). Source : https://github.com/microsoft/Microsoft-Rocketbox (commit `0943055`, 2 octobre 2022).
+   - Quatre avatars convertis et cuits (`Male_Adult_04`, `Male_Adult_12`, `Male_Adult_18`, `Female_Party_02`) : `public/haroolife/vendor/rocketbox/rb-*.glb`, 1,6 à 2,3 Mo chacun, par `scripts/haroolife-bake-avatars.mjs` (FBX2glTF puis gltf-transform : textures 1024², 14 clips fusionnés par nom d'os, mouvement de racine supprimé, clips longs coupés à 8 s, quantification KHR).
+   - Avis de licence : `public/haroolife/vendor/rocketbox/LICENSE.txt`. Catalogue des figures (fichier, taille, clips) : `lib/haroolife/city/avatar-catalog.ts`.
+   - Ces avatars sont des personnes génériques fournies par la bibliothèque, ne représentent aucune personne réelle et ne sont pas des modèles générés par IA.
+
 ## Bases étudiées, pas copiées
 
 - **IsoCity** — https://github.com/amilich/isometric-city : MIT, Next.js/TypeScript, rendu Canvas avancé, circulation et PNJ ; dépôt conséquent. Potentiel futur moteur à intégrer par module, après audit des dépendances et licences des médias.
