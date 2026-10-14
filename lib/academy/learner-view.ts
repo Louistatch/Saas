@@ -28,6 +28,11 @@ export interface LearnerLesson extends LearnerLessonInput {
   lastViewedAt: string | null
 }
 
+/** Titre sans son numéro d'ordre (« 4. Gestion… » → « Gestion… ») : le numéro est affiché à part. */
+export function displayTitle(title: string): string {
+  return title.replace(/^\s*\d+\s*[.)]\s*/, '')
+}
+
 export const STATE_LABEL: Record<LearnerLessonState, string> = {
   completed: 'Validée',
   quiz_passed: 'Quiz réussi, cas pratique à déposer',

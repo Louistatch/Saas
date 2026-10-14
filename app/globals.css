@@ -202,3 +202,9 @@
     animation: none;
   }
 }
+/* Sur téléphone, le bouton de messagerie flotte au-dessus de la barre d'onglets d'AgriAcademy. */
+@media (max-width: 767px) {
+  body:has(.academy) [data-support-button] {
+    bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+}

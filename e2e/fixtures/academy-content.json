@@ -1,0 +1,1389 @@
+{
+ "module": {
+  "id": "2482e523-500e-4178-8102-1018af290c82",
+  "title": "Opérateur certifié FaîtiereHub — Pilote V1",
+  "description": "Formation gratuite préparatoire à la certification des opérateurs FaîtiereHub. Le parcours couvre le rôle de l'opérateur, la gouvernance des données, l'accompagnement des organisations, les membres et cartes, KoboToolbox, le suivi de projets, le modèle PAYG, la sécurité et la préparation à l'évaluation pratique.",
+  "category": "numerique",
+  "level": "intermediaire",
+  "duration_min": 365,
+  "is_published": true
+ },
+ "lessons": [
+  {
+   "id": "22aa3203-27f3-41b4-8c1b-6bf8add3fd74",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "title": "1. Comprendre FaîtiereHub et le rôle de l'Opérateur",
+   "content_type": "text",
+   "content_body": "OBJECTIFS\nÀ la fin de cette leçon, vous devez pouvoir expliquer FaîtiereHub en moins de 2 minutes et distinguer clairement l'organisation, Haroo et l'Opérateur.\n\n1. FAÎTIEREHUB EN UNE PHRASE\nFaîtiereHub est une infrastructure numérique destinée à aider les organisations agricoles à gérer leurs membres, cartes, données, activités et services numériques sans transformer le logiciel en charge mensuelle obligatoire pour l'organisation.\n\n2. LES TROIS ESPACES\n- Organisation : faîtière, union, coopérative, membres et gestion interne.\n- Haroo : profils professionnels Ouvrier, Acheteur et Agronome.\n- Opérateur : prestataire local certifié qui accompagne plusieurs organisations.\n\nUne même personne peut cumuler plusieurs capacités avec un seul compte.\n\n3. CE QUE FAIT UN OPÉRATEUR\nUn opérateur peut notamment :\n- aider une organisation à structurer et nettoyer ses données ;\n- enregistrer/importer des",
+   "duration_min": 25,
+   "order_index": 1
+  },
+  {
+   "id": "54a81ffc-2cbe-4bcd-a50f-a1c35ddb2035",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "title": "2. Gouvernance des organisations et propriété des données",
+   "content_type": "text",
+   "content_body": "OBJECTIFS\nSavoir intervenir sans casser la gouvernance d'une organisation.\n\n1. HIÉRARCHIE ORGANISATIONNELLE\nFaîtière → Union → Coopérative → Membres.\nL'opérateur reste transversal à cette hiérarchie.\n\n2. PRINCIPE DE PROPRIÉTÉ\nLes données appartiennent à l'organisation concernée. L'opérateur reçoit un accès délégué et limité aux services autorisés.\n\n3. ACCÈS PAR PÉRIMÈTRE\nUn mandat peut autoriser seulement certaines opérations :\n- members.read / members.manage ;\n- cards.read / cards.manage / cards.print ;\n- kobo.manage ;\n- imports.manage ;\n- analytics.read ;\n- reports.generate ;\n- projects.manage ;\n- support.manage.\n\n4. CHANGEMENT D'OPÉRATEUR\nUne organisation doit pouvoir retirer l'Opérateur A et choisir l'Opérateur B sans perdre : membres, cartes, cotisations, parcelles, historique, documents ou QR.\n\n5. BONNES PRATIQUES DE TERRAIN\n- expliquer à l'organisation ce qui sera collecté et pour",
+   "duration_min": 30,
+   "order_index": 2
+  },
+  {
+   "id": "03f6493f-a77e-4d7e-96f3-25c1c6685388",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "title": "3. Diagnostic initial et onboarding d'une organisation",
+   "content_type": "checklist",
+   "content_body": "CHECKLIST D'ONBOARDING\n\nAvant toute configuration :\n□ Identifier le niveau : faîtière, union ou coopérative.\n□ Vérifier le nom officiel et les responsables.\n□ Identifier la zone d'intervention et les localités.\n□ Recenser les sources de données existantes : cahiers, Excel, Kobo, Google Sheets, papier.\n□ Estimer le nombre de membres et la qualité des données.\n□ Identifier les besoins prioritaires : cartes, membres, cotisations, parcelles, projet, reporting, Kobo.\n□ Identifier qui sera administrateur côté organisation.\n□ Définir ce que l'opérateur est autorisé à faire.\n□ Définir le résultat attendu et la date de livraison.\n\nDIAGNOSTIC DE QUALITÉ DES DONNÉES\nVérifier notamment :\n- doublons de noms/téléphones ;\n- noms incomplets ;\n- localités non normalisées ;\n- numéros mal formatés ;\n- membres sans identifiant ;\n- données obsolètes ;\n- feuilles Excel avec colonnes incohérentes.\n\nLIVRABLE MI",
+   "duration_min": 30,
+   "order_index": 3
+  },
+  {
+   "id": "258ae45c-3569-43c5-a4b9-4dcb2b7ceb44",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "title": "4. Gestion des membres et qualité des données",
+   "content_type": "text",
+   "content_body": "OBJECTIFS\nCréer des bases de membres propres, vérifiables et réutilisables dans les projets.\n\n1. AVANT L'IMPORT\nNe jamais importer un fichier uniquement parce qu'il est disponible. Vérifier les colonnes, types, doublons, localités et identifiants.\n\n2. DONNÉES MINIMALES\nCollecter seulement les champs nécessaires au service. Éviter la collecte excessive.\n\n3. DÉDUPLICATION\nChercher les doublons avec plusieurs indices : nom, prénom, téléphone, localité, identifiant interne. Une similitude de nom seule ne suffit pas toujours.\n\n4. TRAÇABILITÉ\nQuand une correction importante est effectuée, elle doit être explicable. Éviter les remplacements massifs irréversibles.\n\n5. DONNÉES DE PROJET\nUn bailleur peut demander des indicateurs spécifiques. Ne mélangez pas automatiquement ces champs temporaires avec l'identité permanente du membre. Distinguez les données durables de l'organisation et les données ",
+   "duration_min": 35,
+   "order_index": 4
+  },
+  {
+   "id": "f05170a1-41c2-459c-af3a-8716b75cdd06",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "title": "5. Cartes numériques, QR et cartes physiques",
+   "content_type": "text",
+   "content_body": "OBJECTIFS\nComprendre la différence entre identité numérique et support physique.\n\n1. CARTE NUMÉRIQUE\nLa carte numérique et son QR servent à identifier/vérifier un membre. Cette identité ne doit pas dépendre de l'impression d'une carte PVC.\n\n2. CARTE PHYSIQUE\nLe support physique est un service distinct : préparation, impression, consommables, livraison et éventuellement réimpression.\n\n3. MODÈLE PILOTE PRÉVU\nPrix public prévu pour une carte physique : 2 000 FCFA.\nRépartition commerciale prévue :\n- 500 FCFA pour l'organisation ;\n- 1 500 FCFA dans le flux commercial de l'opérateur, qui supporte impression, consommables, logistique, service et coûts FaîtiereHub.\n\nImportant : le workflow complet d'impression/earnings est un module produit en cours de déploiement. Ne promettez pas une automatisation qui n'est pas encore activée.\n\n4. CONTRÔLES AVANT IMPRESSION\n- identité validée ;\n- photo correc",
+   "duration_min": 30,
+   "order_index": 5
+  },
+  {
+   "id": "cb7efd8b-6d0b-4fcd-99b7-4dc405b431c1",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "title": "6. KoboToolbox, collecte terrain et importation",
+   "content_type": "text",
+   "content_body": "OBJECTIFS\nSavoir organiser une collecte terrain réutilisable et propre.\n\n1. AVANT DE CRÉER UN FORMULAIRE\nPartir de la décision à prendre, pas de la liste de questions. Chaque variable doit avoir une utilité.\n\n2. STRUCTURE D'UN BON FORMULAIRE\n- identification minimale ;\n- localisation ;\n- sections courtes ;\n- choix codifiés ;\n- contraintes de saisie ;\n- questions conditionnelles lorsque nécessaire ;\n- métadonnées utiles.\n\n3. TEST PILOTE\nToujours tester avec quelques utilisateurs avant un déploiement massif.\n\n4. SYNCHRONISATION ET FAIBLE CONNEXION\nPrévoir le travail hors connexion, les reprises de synchronisation et les contrôles de doublons.\n\n5. IMPORT DANS FAÎTIEREHUB\nAvant import :\n- sauvegarder le fichier source ;\n- vérifier la correspondance des colonnes ;\n- contrôler les types ;\n- nettoyer les doublons ;\n- importer un petit lot ;\n- contrôler le résultat avant le lot complet.\n\n6. ERRE",
+   "duration_min": 35,
+   "order_index": 6
+  },
+  {
+   "id": "77525375-9105-4be6-9a39-22d411a3e920",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "title": "7. Suivi de projets, MEAL et rapports",
+   "content_type": "text",
+   "content_body": "OBJECTIFS\nTransformer les données de terrain en preuves utiles pour une organisation ou un projet.\n\n1. LOGIQUE PROJET\nLe financement d'un projet est temporaire. Les données organisationnelles utiles doivent rester exploitables après la fin du projet.\n\n2. INDICATEURS\nUn bon indicateur doit avoir : définition, unité, période, source et responsable.\n\n3. BASELINE ET CIBLES\nDistinguer la situation de départ, la cible et la valeur observée. Ne pas transformer une estimation en donnée observée.\n\n4. DÉSAGRÉGATION\nUtiliser les dimensions demandées uniquement si elles sont réellement collectées et autorisées. Ne jamais inventer âge, sexe, catégorie ou localisation manquants pour compléter un rapport.\n\n5. TABLEAUX DE BORD\nUn tableau de bord sert à décider. Prioriser : bénéficiaires, couverture, activités réalisées, qualité des données, anomalies, retards et indicateurs clés.\n\n6. RAPPORTING\nToujours",
+   "duration_min": 30,
+   "order_index": 7
+  },
+  {
+   "id": "3936859d-8d5f-47de-b575-1e963ce0f523",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "title": "8. Modèle économique de l'Opérateur et PAYG",
+   "content_type": "text",
+   "content_body": "OBJECTIFS\nComprendre comment gagner de l'argent sans rendre l'organisation dépendante.\n\n1. ORGANISATION CORE GRATUITE\nLe modèle cible est que l'organisation utilise le cœur de FaîtiereHub sans abonnement SaaS obligatoire.\n\n2. QUI PAIE FAÎTIEREHUB ?\nL'opérateur professionnel paie selon son utilisation : PAYG et, plus tard, éventuellement un plan opérateur.\n\n3. REVENUS POSSIBLES DE L'OPÉRATEUR\n- digitalisation initiale ;\n- nettoyage/import de données ;\n- collecte Kobo ;\n- production de rapports ;\n- support de projet ;\n- impression de cartes ;\n- formation et assistance ;\n- services MEAL et cartographie selon compétences.\n\n4. WALLET PAYG\nLe portefeuille FaîtiereHub enregistre les crédits et débits dans un grand livre. Un solde insuffisant doit bloquer uniquement une nouvelle opération payante, jamais les données de l'organisation.\n\n5. CERTIFICATION\nLa formation est gratuite. La certification",
+   "duration_min": 30,
+   "order_index": 8
+  },
+  {
+   "id": "a6996e1c-0598-4501-b721-de77f0059178",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "title": "9. Sécurité, confidentialité et gestion des incidents",
+   "content_type": "checklist",
+   "content_body": "CHECKLIST SÉCURITÉ OPÉRATEUR\n\n□ Utiliser son propre compte.\n□ Ne jamais partager un mot de passe.\n□ Ne jamais demander le mot de passe d'un administrateur.\n□ Vérifier l'organisation avant toute importation massive.\n□ Ne pas exporter plus de données que nécessaire.\n□ Protéger les fichiers téléchargés sur le téléphone/ordinateur.\n□ Supprimer les copies temporaires lorsqu'elles ne sont plus nécessaires.\n□ Ne jamais modifier un montant PAYG depuis le navigateur.\n□ Ne jamais contourner un refus d'accès par une autre organisation.\n□ Signaler les anomalies financières ou doublons de paiement.\n\nEN CAS D'INCIDENT\n1. arrêter l'opération concernée ;\n2. conserver les références utiles ;\n3. ne pas masquer l'erreur ;\n4. prévenir le support/administrateur ;\n5. expliquer clairement à l'organisation l'impact réel ;\n6. documenter la correction.\n\nEXEMPLES D'INCIDENTS\n- import dans la mauvaise coopérative ;",
+   "duration_min": 25,
+   "order_index": 9
+  },
+  {
+   "id": "d8248ebd-9967-4309-82b8-95931e82deb0",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "title": "10. Service client terrain et professionnalisme",
+   "content_type": "text",
+   "content_body": "OBJECTIFS\nConstruire une réputation d'opérateur fiable.\n\n1. PARLER RÉSULTAT, PAS LOGICIEL\nUne organisation achète rarement « du SaaS ». Elle cherche un registre propre, des cartes, un rapport, une collecte, un suivi de projet ou une assistance.\n\n2. EXPLIQUER AVANT D'AGIR\nAvant une opération importante, expliquer le résultat attendu et les données touchées.\n\n3. GÉRER LES ATTENTES\nNe pas annoncer comme disponible une fonction encore en développement. Distinguer : disponible maintenant, pilote, prévu.\n\n4. DOCUMENTATION SIMPLE\nÀ la fin d'une mission, laisser :\n- ce qui a été fait ;\n- combien d'enregistrements ont été traités ;\n- anomalies restantes ;\n- prochaine action ;\n- responsable.\n\n5. OBJECTIF DE PORTEFEUILLE\nUn opérateur mature peut viser environ 20 organisations, mais ce chiffre est un objectif commercial et non une limite technique.\n\n6. RÉPUTATION\nLa qualité du portefeuille se mesure",
+   "duration_min": 25,
+   "order_index": 10
+  },
+  {
+   "id": "62fef9b4-1ab7-4852-8e7c-ea4c7e015f64",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "title": "11. Mise en situation pratique — préparation à la certification",
+   "content_type": "checklist",
+   "content_body": "MISSION PRATIQUE\nVous recevez une coopérative fictive de 120 membres disposant d'un fichier Excel imparfait et souhaitant préparer une intervention financée.\n\nVous devez être capable de présenter oralement ou démontrer :\n\n□ Diagnostic de la structure et des besoins.\n□ Identification des erreurs et doublons dans les données.\n□ Proposition d'un plan d'import sûr.\n□ Explication de la différence carte numérique / carte physique.\n□ Proposition d'un mini-formulaire Kobo pertinent.\n□ Définition de 5 indicateurs utiles au projet.\n□ Explication de la propriété des données.\n□ Explication de ce qui se passe si la coopérative change d'opérateur.\n□ Estimation claire des services professionnels à facturer, sans commission de recrutement.\n□ Réaction correcte à un incident de données ou de paiement.\n\nCRITÈRES OBSERVABLES\n- précision ;\n- respect de la gouvernance ;\n- maîtrise de FaîtiereHub ;\n- qualité d",
+   "duration_min": 45,
+   "order_index": 11
+  },
+  {
+   "id": "a8675d5b-c5c7-4da8-a872-8003939fedb7",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "title": "12. Auto-évaluation avant l'examen pratique",
+   "content_type": "quiz",
+   "content_body": "AUTO-ÉVALUATION — RÉPONDEZ SANS CONSULTER LES LEÇONS\n\n1. Où se place l'Opérateur dans la hiérarchie Faîtière → Union → Coopérative ?\n2. Qui est propriétaire des données d'une coopérative ?\n3. Citez quatre périmètres d'accès qu'un mandat Opérateur peut autoriser.\n4. Que doit-il se passer avec les membres et cartes si l'organisation change d'opérateur ?\n5. Pourquoi une carte numérique ne doit-elle pas dépendre d'une carte PVC ?\n6. Quel est le prix pilote prévu d'une carte physique et quelle part revient à l'organisation ?\n7. Donnez trois contrôles à effectuer avant un import massif.\n8. Que doit faire le système si le wallet Opérateur est insuffisant ?\n9. Pourquoi FaîtiereHub n'est-il pas un MLM ?\n10. Quelle est la différence entre cible de projet et valeur observée ?\n11. Que devez-vous faire avant de promettre une fonctionnalité à une organisation ?\n12. Quelles sont les deux validations re",
+   "duration_min": 25,
+   "order_index": 12
+  }
+ ],
+ "slides": [
+  {
+   "id": "98e1a98a-df1b-46f1-967b-5b3bf28a1f11",
+   "lesson_id": "03f6493f-a77e-4d7e-96f3-25c1c6685388",
+   "title": "Objectif",
+   "body": "Transformer une première rencontre avec une organisation en diagnostic structuré et plan d’onboarding.",
+   "slide_type": "objective",
+   "order_index": 1,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "e6fd8e5e-2da6-477b-a97a-666a9510b83b",
+   "lesson_id": "03f6493f-a77e-4d7e-96f3-25c1c6685388",
+   "title": "Le diagnostic avant la configuration",
+   "body": "Identifier niveau de structure, responsables, zones, sources de données, besoins prioritaires, volumes et qualité des fichiers.",
+   "slide_type": "concept",
+   "order_index": 2,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "8927ec4b-8fde-4a65-8213-8b98f0f06a7b",
+   "lesson_id": "03f6493f-a77e-4d7e-96f3-25c1c6685388",
+   "title": "Repérer les informations d’une organisation",
+   "body": "Observer l’écran réel de gestion des organisations : nom, niveau, rattachement et contexte avant de modifier des données.",
+   "slide_type": "screenshot",
+   "order_index": 3,
+   "media_asset_id": "2b3c2717-8daf-4ff5-9183-bb288c7c0bf8",
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "1576a6aa-1546-4275-be13-37b86fa5f97f",
+   "lesson_id": "03f6493f-a77e-4d7e-96f3-25c1c6685388",
+   "title": "Cas pratique",
+   "body": "Une coopérative arrive avec trois fichiers Excel contradictoires et un cahier papier. Proposez l’ordre de traitement.",
+   "slide_type": "case",
+   "order_index": 4,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "e279e07a-2b33-4e4c-aa80-16f183922ff0",
+   "lesson_id": "03f6493f-a77e-4d7e-96f3-25c1c6685388",
+   "title": "Livrable minimum",
+   "body": "Organisation correctement identifiée, administrateur désigné, données prioritaires nettoyées, lot test validé et plan de travail court.",
+   "slide_type": "summary",
+   "order_index": 5,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "8cc96431-eb0b-4e16-ac0a-daefdd38cc6a",
+   "lesson_id": "22aa3203-27f3-41b4-8c1b-6bf8add3fd74",
+   "title": "Objectif de la leçon",
+   "body": "Expliquer FaîtiereHub en moins de deux minutes et distinguer les espaces Organisation, Haroo et Opérateur.",
+   "slide_type": "objective",
+   "order_index": 1,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "2d180165-67b5-4ce5-9931-4357f6440dc6",
+   "lesson_id": "22aa3203-27f3-41b4-8c1b-6bf8add3fd74",
+   "title": "Les trois capacités",
+   "body": "Organisation = gestion des OP. Haroo = profils professionnels. Opérateur = prestataire local certifié. Un même compte peut cumuler les trois capacités.",
+   "slide_type": "concept",
+   "order_index": 2,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "d534078c-bccc-4b3a-b16b-e08d35f7b4b2",
+   "lesson_id": "22aa3203-27f3-41b4-8c1b-6bf8add3fd74",
+   "title": "Repérer l’espace Opérateur",
+   "body": "Observer l’écran réel /operator : statut candidat, parcours de certification, wallet et actions disponibles. La capture exacte doit provenir du produit déployé.",
+   "slide_type": "screenshot",
+   "order_index": 3,
+   "media_asset_id": "500cf222-29ce-401b-beb5-36ff574e5681",
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "6e7007c6-f34c-46cd-a893-30ca16073180",
+   "lesson_id": "22aa3203-27f3-41b4-8c1b-6bf8add3fd74",
+   "title": "Cas pratique",
+   "body": "Une personne est admin d’une coopérative, agronome Haroo et souhaite devenir Opérateur. Expliquez pourquoi elle ne doit pas créer trois comptes.",
+   "slide_type": "case",
+   "order_index": 4,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "20fd47d3-82ca-48bb-b10b-abee66aa82dd",
+   "lesson_id": "22aa3203-27f3-41b4-8c1b-6bf8add3fd74",
+   "title": "À retenir",
+   "body": "L’Opérateur fournit des services aux organisations sans devenir propriétaire de leurs données et sans entrer dans leur hiérarchie.",
+   "slide_type": "summary",
+   "order_index": 5,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "f505183c-72b4-4c57-a075-56b4b8447229",
+   "lesson_id": "258ae45c-3569-43c5-a4b9-4dcb2b7ceb44",
+   "title": "Objectif",
+   "body": "Créer, importer et corriger des membres sans introduire de doublons ni d’incohérences.",
+   "slide_type": "objective",
+   "order_index": 1,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "1cc62259-71a4-4131-8626-edbccb376b44",
+   "lesson_id": "258ae45c-3569-43c5-a4b9-4dcb2b7ceb44",
+   "title": "Chaîne qualité",
+   "body": "Collecte → Vérification → lot test → contrôle → correction → import final → validation organisation.",
+   "slide_type": "concept",
+   "order_index": 2,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "08812599-9d9e-4845-a4ce-2c03ad57d03d",
+   "lesson_id": "258ae45c-3569-43c5-a4b9-4dcb2b7ceb44",
+   "title": "Page Membres",
+   "body": "Utiliser une capture exacte de /dashboard/members pour identifier recherche, filtres, création, import et actions sur un membre.",
+   "slide_type": "screenshot",
+   "order_index": 3,
+   "media_asset_id": "28c4c63f-615e-4f50-8c5e-a21687af9963",
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "dc970e5d-756c-463d-945a-96070b3e2eb2",
+   "lesson_id": "258ae45c-3569-43c5-a4b9-4dcb2b7ceb44",
+   "title": "Cas pratique",
+   "body": "Vous recevez un fichier de 120 membres avec doublons, téléphones incomplets et localités incohérentes. Décrivez votre protocole.",
+   "slide_type": "case",
+   "order_index": 4,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "62af8dcc-cd35-41f6-890a-ac20c95998b8",
+   "lesson_id": "258ae45c-3569-43c5-a4b9-4dcb2b7ceb44",
+   "title": "À retenir",
+   "body": "Une bonne base membre conditionne la fiabilité des cartes, rapports, cotisations et projets.",
+   "slide_type": "summary",
+   "order_index": 5,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "ac38cf25-0744-4264-a50f-54d73dbae14b",
+   "lesson_id": "3936859d-8d5f-47de-b575-1e963ce0f523",
+   "title": "Objectif",
+   "body": "Comprendre comment l’Opérateur gagne sa vie tout en gardant le Core gratuit pour les organisations.",
+   "slide_type": "objective",
+   "order_index": 1,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "1640e065-76a9-4902-b500-6484414da320",
+   "lesson_id": "3936859d-8d5f-47de-b575-1e963ce0f523",
+   "title": "Operator-funded SaaS",
+   "body": "L’Opérateur vend des services réels et paie son usage professionnel de FaîtiereHub via PAYG ou, plus tard, un plan.",
+   "slide_type": "concept",
+   "order_index": 2,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "a47effc0-ab67-4db1-b64e-43d5847ee266",
+   "lesson_id": "3936859d-8d5f-47de-b575-1e963ce0f523",
+   "title": "Wallet Opérateur",
+   "body": "Utiliser une capture exacte de /operator montrant solde, rechargement et historique PAYG.",
+   "slide_type": "screenshot",
+   "order_index": 3,
+   "media_asset_id": "478d7c64-4362-45ea-8046-2c8c771f82a3",
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "782e44ad-031e-455c-ab87-d2f62f875401",
+   "lesson_id": "3936859d-8d5f-47de-b575-1e963ce0f523",
+   "title": "Cas pratique",
+   "body": "Vous gérez 8 organisations et votre wallet devient insuffisant. Distinguez ce qui peut être bloqué de ce qui doit rester accessible.",
+   "slide_type": "case",
+   "order_index": 4,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "efd63ad0-6348-4d5a-979c-372004573c94",
+   "lesson_id": "3936859d-8d5f-47de-b575-1e963ce0f523",
+   "title": "À retenir",
+   "body": "Un manque de crédit bloque uniquement la nouvelle opération payante. Les données, cartes existantes et comptes des organisations restent intacts.",
+   "slide_type": "summary",
+   "order_index": 5,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "94685b38-904e-4829-a601-e76ac7d450c8",
+   "lesson_id": "54a81ffc-2cbe-4bcd-a50f-a1c35ddb2035",
+   "title": "Objectif",
+   "body": "Intervenir dans une organisation sans casser sa gouvernance ni confondre mandat de service et propriété.",
+   "slide_type": "objective",
+   "order_index": 1,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "33e656cb-1c95-41d9-9d81-c54246bb962e",
+   "lesson_id": "54a81ffc-2cbe-4bcd-a50f-a1c35ddb2035",
+   "title": "Hiérarchie et mandat",
+   "body": "Faîtière → Union → Coopérative → Membres. L’Opérateur reste transversal et agit uniquement dans les périmètres autorisés.",
+   "slide_type": "concept",
+   "order_index": 2,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "76134d06-9d90-48fd-a26b-6d01999aa829",
+   "lesson_id": "54a81ffc-2cbe-4bcd-a50f-a1c35ddb2035",
+   "title": "Lire le contexte organisationnel",
+   "body": "Observer l’écran réel du dashboard et le sélecteur d’organisation pour comprendre sur quelle structure une action va s’appliquer.",
+   "slide_type": "screenshot",
+   "order_index": 3,
+   "media_asset_id": "f53b7196-c595-4963-915c-3111238e03ea",
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "bc31fb0c-6ca6-4961-8210-7a616af9baf6",
+   "lesson_id": "54a81ffc-2cbe-4bcd-a50f-a1c35ddb2035",
+   "title": "Cas pratique",
+   "body": "Une union demande l’export de tous les téléphones de ses membres pour un partenaire commercial. Décrivez les vérifications à faire avant l’export.",
+   "slide_type": "case",
+   "order_index": 4,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "22568df8-c280-473a-b3ba-8d6bc52391e7",
+   "lesson_id": "54a81ffc-2cbe-4bcd-a50f-a1c35ddb2035",
+   "title": "À retenir",
+   "body": "Les données appartiennent à l’organisation. Un mandat peut être révoqué sans supprimer les membres, cartes ou historiques.",
+   "slide_type": "summary",
+   "order_index": 5,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "31505753-e335-4d19-8b76-7f5916ab2f1b",
+   "lesson_id": "62fef9b4-1ab7-4852-8e7c-ea4c7e015f64",
+   "title": "Objectif",
+   "body": "Mobiliser l’ensemble des compétences dans un scénario proche d’une mission réelle.",
+   "slide_type": "objective",
+   "order_index": 1,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "35e8abb2-e40f-4d0b-add9-418c31e8c774",
+   "lesson_id": "62fef9b4-1ab7-4852-8e7c-ea4c7e015f64",
+   "title": "Scénario",
+   "body": "Coopérative fictive de 120 membres, fichier imparfait, préparation d’une intervention financée, besoin de cartes et de reporting.",
+   "slide_type": "concept",
+   "order_index": 2,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "ee50a35d-3249-450e-8316-25164305d8a9",
+   "lesson_id": "62fef9b4-1ab7-4852-8e7c-ea4c7e015f64",
+   "title": "Parcours multi-écrans",
+   "body": "Utiliser des captures exactes Membres, Cartes, Kobo et Analytics pour que le candidat explique les étapes du workflow.",
+   "slide_type": "screenshot",
+   "order_index": 3,
+   "media_asset_id": "284df398-9346-4a66-ab38-39fcf3c58f00",
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "ba54d735-6350-4c26-a3a7-f2b55b2c9823",
+   "lesson_id": "62fef9b4-1ab7-4852-8e7c-ea4c7e015f64",
+   "title": "Mission pratique",
+   "body": "Diagnostiquer les données, proposer l’import, définir un mini-formulaire Kobo, cinq indicateurs et expliquer le modèle de carte et de gouvernance.",
+   "slide_type": "case",
+   "order_index": 4,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "456f846e-0984-4862-86d6-25e3d9f77700",
+   "lesson_id": "62fef9b4-1ab7-4852-8e7c-ea4c7e015f64",
+   "title": "Critères",
+   "body": "Précision, gouvernance, maîtrise du produit, qualité des données, sécurité, compréhension économique et capacité d’explication.",
+   "slide_type": "summary",
+   "order_index": 5,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "271ce7d5-4c17-4dc1-98b7-991d074c2371",
+   "lesson_id": "77525375-9105-4be6-9a39-22d411a3e920",
+   "title": "Objectif",
+   "body": "Transformer les données en indicateurs vérifiables utiles à la décision et au reporting.",
+   "slide_type": "objective",
+   "order_index": 1,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "00b90627-ceee-407c-9996-4545c9c66128",
+   "lesson_id": "77525375-9105-4be6-9a39-22d411a3e920",
+   "title": "Indicateur complet",
+   "body": "Définition + unité + période + source + responsable + cible éventuelle.",
+   "slide_type": "concept",
+   "order_index": 2,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "2d43173c-57d1-4c5c-9ed9-9c6f79c99feb",
+   "lesson_id": "77525375-9105-4be6-9a39-22d411a3e920",
+   "title": "Statistiques et rapports",
+   "body": "Utiliser une capture exacte de /dashboard/analytics pour montrer les indicateurs disponibles et la lecture des écarts.",
+   "slide_type": "screenshot",
+   "order_index": 3,
+   "media_asset_id": "3e138037-547f-42bd-adf5-8593889b3b03",
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "9896f1a0-5efc-46a5-b806-f8630f509d42",
+   "lesson_id": "77525375-9105-4be6-9a39-22d411a3e920",
+   "title": "Cas pratique",
+   "body": "Un projet annonce 1 200 bénéficiaires, mais 1 126 sont validés en base. Préparez la formulation correcte du rapport.",
+   "slide_type": "case",
+   "order_index": 4,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "47a5ca4d-bd83-4ee9-8b6c-11fccd8de26d",
+   "lesson_id": "77525375-9105-4be6-9a39-22d411a3e920",
+   "title": "À retenir",
+   "body": "Ne jamais transformer une cible, une estimation ou une donnée manquante en résultat observé.",
+   "slide_type": "summary",
+   "order_index": 5,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "0de600c3-1e5b-44d9-8525-51671e704e71",
+   "lesson_id": "a6996e1c-0598-4501-b721-de77f0059178",
+   "title": "Objectif",
+   "body": "Protéger les comptes, données et opérations financières lors des missions.",
+   "slide_type": "objective",
+   "order_index": 1,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "f8874ed3-6ee9-4569-a356-6a8b11384e5f",
+   "lesson_id": "a6996e1c-0598-4501-b721-de77f0059178",
+   "title": "Moindre privilège",
+   "body": "Utiliser son propre compte, ne jamais partager de mot de passe et n’exporter que les données nécessaires.",
+   "slide_type": "concept",
+   "order_index": 2,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "940e5d1d-1882-4477-8323-889bd0c25d66",
+   "lesson_id": "a6996e1c-0598-4501-b721-de77f0059178",
+   "title": "Repérer son contexte de travail",
+   "body": "Utiliser une capture exacte de l’espace connecté pour montrer identité, organisation/partenaire actif et navigation avant une opération sensible.",
+   "slide_type": "screenshot",
+   "order_index": 3,
+   "media_asset_id": "7a41a9ad-ed0b-4dbe-be34-49f0b89c2dc0",
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "4f6cee5c-b497-4f14-a54a-1af989ce23f3",
+   "lesson_id": "a6996e1c-0598-4501-b721-de77f0059178",
+   "title": "Cas pratique",
+   "body": "Un téléphone contenant un export de membres est perdu. Décrivez les actions immédiates et la documentation de l’incident.",
+   "slide_type": "case",
+   "order_index": 4,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "77a95792-bcce-431c-ad2c-c45d7c4a2503",
+   "lesson_id": "a6996e1c-0598-4501-b721-de77f0059178",
+   "title": "À retenir",
+   "body": "Arrêter, conserver les références, signaler, expliquer l’impact réel, corriger et documenter.",
+   "slide_type": "summary",
+   "order_index": 5,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "31a0f9b8-3e30-40a9-9aae-29f65c8e9397",
+   "lesson_id": "a8675d5b-c5c7-4da8-a872-8003939fedb7",
+   "title": "Objectif",
+   "body": "Vérifier sa préparation avant l’évaluation pratique officielle.",
+   "slide_type": "objective",
+   "order_index": 1,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "dbdb06cc-b0a7-44a1-bd9a-b22da8f73802",
+   "lesson_id": "a8675d5b-c5c7-4da8-a872-8003939fedb7",
+   "title": "Auto-évaluation formative",
+   "body": "Le score aide à identifier les points à revoir mais ne remplace pas l’évaluation officielle validée par un administrateur/examinateur.",
+   "slide_type": "concept",
+   "order_index": 2,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "92be5502-5c81-42ca-8824-a4f3ac31ddbd",
+   "lesson_id": "a8675d5b-c5c7-4da8-a872-8003939fedb7",
+   "title": "Parcours de certification",
+   "body": "Utiliser une capture exacte de /operator pour montrer les étapes formation → évaluation → paiement → certification/activation.",
+   "slide_type": "screenshot",
+   "order_index": 3,
+   "media_asset_id": "2b3e31ba-30b8-4dc0-9854-f0f6940a6e7d",
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "d72470f0-26ec-4f5e-9738-8767804a6eef",
+   "lesson_id": "a8675d5b-c5c7-4da8-a872-8003939fedb7",
+   "title": "Décision de préparation",
+   "body": "Si votre score est inférieur au seuil, identifiez les leçons faibles et préparez un plan de révision.",
+   "slide_type": "case",
+   "order_index": 4,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "2a236fc0-b428-4cea-8976-feb653c665ac",
+   "lesson_id": "a8675d5b-c5c7-4da8-a872-8003939fedb7",
+   "title": "Seuil conseillé",
+   "body": "Viser au moins 70 % sur les quiz et une maîtrise opérationnelle réelle avant l’évaluation pratique.",
+   "slide_type": "summary",
+   "order_index": 5,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "2c95cafc-5d67-4ebe-859e-3c9e8ba774cf",
+   "lesson_id": "cb7efd8b-6d0b-4fcd-99b7-4dc405b431c1",
+   "title": "Objectif",
+   "body": "Préparer une collecte terrain utile, testée et importable dans FaîtiereHub.",
+   "slide_type": "objective",
+   "order_index": 1,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "7a79c56d-640a-4e36-8636-fb2c7ea6ee38",
+   "lesson_id": "cb7efd8b-6d0b-4fcd-99b7-4dc405b431c1",
+   "title": "Commencer par la décision",
+   "body": "Chaque question doit servir une décision, un indicateur ou une opération. Éviter les variables inutiles.",
+   "slide_type": "concept",
+   "order_index": 2,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "433adb25-a959-4b71-bc3a-8518c8cf85df",
+   "lesson_id": "cb7efd8b-6d0b-4fcd-99b7-4dc405b431c1",
+   "title": "Intégration Kobo",
+   "body": "Utiliser la capture exacte de /dashboard/kobo-setup pour présenter configuration, connexion et flux d’import.",
+   "slide_type": "screenshot",
+   "order_index": 3,
+   "media_asset_id": "056eb257-d7f6-4627-bca3-664b0a306fb4",
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "df631549-f596-4097-828b-c689689ad5fb",
+   "lesson_id": "cb7efd8b-6d0b-4fcd-99b7-4dc405b431c1",
+   "title": "Cas pratique",
+   "body": "Vous devez collecter 300 producteurs en zone à faible connexion. Décrivez le test pilote, le mode hors ligne et les contrôles.",
+   "slide_type": "case",
+   "order_index": 4,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "fa007160-b607-4c29-8a5d-a48f350cda58",
+   "lesson_id": "cb7efd8b-6d0b-4fcd-99b7-4dc405b431c1",
+   "title": "À retenir",
+   "body": "Sauvegarder la source, tester le formulaire, importer un petit lot puis contrôler avant le lot complet.",
+   "slide_type": "summary",
+   "order_index": 5,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "12a56f4d-b669-444c-bf2c-5ab646fae968",
+   "lesson_id": "d8248ebd-9967-4309-82b8-95931e82deb0",
+   "title": "Objectif",
+   "body": "Vendre et livrer un résultat professionnel plutôt qu’un simple accès logiciel.",
+   "slide_type": "objective",
+   "order_index": 1,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "12e92fbc-8419-4f5b-baab-53107c13d96f",
+   "lesson_id": "d8248ebd-9967-4309-82b8-95931e82deb0",
+   "title": "Parler résultat",
+   "body": "Le client recherche une base propre, des cartes, un rapport, une collecte ou un suivi de projet—notre outil sert ces résultats.",
+   "slide_type": "concept",
+   "order_index": 2,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "1bf7a778-c583-493d-b13c-b23d48e41a06",
+   "lesson_id": "d8248ebd-9967-4309-82b8-95931e82deb0",
+   "title": "Suivre son activité",
+   "body": "Utiliser l’espace Opérateur réel pour montrer les organisations suivies, actions en attente et statut de certification lorsque le dashboard complet sera disponible.",
+   "slide_type": "screenshot",
+   "order_index": 3,
+   "media_asset_id": "ae5cd7cb-2c2f-432f-9370-a8ea53b10052",
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "7c309bc1-3bff-49f0-a104-151e5b4c8669",
+   "lesson_id": "d8248ebd-9967-4309-82b8-95931e82deb0",
+   "title": "Cas pratique",
+   "body": "Un client demande une fonction encore en développement. Formulez une réponse professionnelle distinguant disponible, pilote et prévu.",
+   "slide_type": "case",
+   "order_index": 4,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "ed4eefee-4b98-4adc-942e-206c62c166a8",
+   "lesson_id": "d8248ebd-9967-4309-82b8-95931e82deb0",
+   "title": "À retenir",
+   "body": "À la fin d’une mission, laisser un bilan : actions réalisées, volumes traités, anomalies, prochaine étape et responsable.",
+   "slide_type": "summary",
+   "order_index": 5,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "37140816-5936-4189-93b7-243687b9fbfc",
+   "lesson_id": "f05170a1-41c2-459c-af3a-8716b75cdd06",
+   "title": "Objectif",
+   "body": "Distinguer identité numérique, QR de vérification et service de carte physique.",
+   "slide_type": "objective",
+   "order_index": 1,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "d8acc275-898a-40bc-a385-b7e99d10c99a",
+   "lesson_id": "f05170a1-41c2-459c-af3a-8716b75cdd06",
+   "title": "Deux couches différentes",
+   "body": "La carte numérique identifie le membre. Le PVC est un support matériel optionnel avec impression, logistique et livraison.",
+   "slide_type": "concept",
+   "order_index": 2,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "8853453d-ad1a-4825-9169-1d76196ffaf2",
+   "lesson_id": "f05170a1-41c2-459c-af3a-8716b75cdd06",
+   "title": "Page Cartes",
+   "body": "Utiliser la capture exacte de /dashboard/cards puis de /verify/[card_number] pour montrer génération, statut, aperçu et vérification publique.",
+   "slide_type": "screenshot",
+   "order_index": 3,
+   "media_asset_id": "55f60620-5dd9-4abd-8e13-888174c19285",
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "1dc7669a-5030-4cbc-bdd2-2efff976e7c9",
+   "lesson_id": "f05170a1-41c2-459c-af3a-8716b75cdd06",
+   "title": "Cas pratique",
+   "body": "Une coopérative affirme qu’un membre n’existe pas tant que son PVC n’est pas imprimé. Expliquez la distinction.",
+   "slide_type": "case",
+   "order_index": 4,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "9e601d6c-31bc-41b4-ad1d-90e3f9127853",
+   "lesson_id": "f05170a1-41c2-459c-af3a-8716b75cdd06",
+   "title": "Modèle pilote",
+   "body": "Carte physique prévue à 2 000 FCFA : 500 FCFA pour l’organisation, 1 500 FCFA dans le flux commercial de l’Opérateur.",
+   "slide_type": "summary",
+   "order_index": 5,
+   "media_asset_id": null,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  }
+ ],
+ "assets": [
+  {
+   "id": "500cf222-29ce-401b-beb5-36ff574e5681",
+   "lesson_id": "22aa3203-27f3-41b4-8c1b-6bf8add3fd74",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "alt_text": "Capture exacte de l’interface FaîtiereHub pour 1. Comprendre FaîtiereHub et le rôle de l'Opérateur",
+   "asset_type": "screenshot",
+   "status": "pending_capture",
+   "storage_path": null,
+   "asset_key": "operator-v2-lesson-1-screen",
+   "source_route": "/operator",
+   "annotations": [],
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "f53b7196-c595-4963-915c-3111238e03ea",
+   "lesson_id": "54a81ffc-2cbe-4bcd-a50f-a1c35ddb2035",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "alt_text": "Capture exacte de l’interface FaîtiereHub pour 2. Gouvernance des organisations et propriété des données",
+   "asset_type": "screenshot",
+   "status": "pending_capture",
+   "storage_path": null,
+   "asset_key": "operator-v2-lesson-2-screen",
+   "source_route": "/dashboard",
+   "annotations": [],
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "2b3c2717-8daf-4ff5-9183-bb288c7c0bf8",
+   "lesson_id": "03f6493f-a77e-4d7e-96f3-25c1c6685388",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "alt_text": "Capture exacte de l’interface FaîtiereHub pour 3. Diagnostic initial et onboarding d'une organisation",
+   "asset_type": "screenshot",
+   "status": "pending_capture",
+   "storage_path": null,
+   "asset_key": "operator-v2-lesson-3-screen",
+   "source_route": "/admin/cooperatives",
+   "annotations": [],
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "28c4c63f-615e-4f50-8c5e-a21687af9963",
+   "lesson_id": "258ae45c-3569-43c5-a4b9-4dcb2b7ceb44",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "alt_text": "Capture exacte de l’interface FaîtiereHub pour 4. Gestion des membres et qualité des données",
+   "asset_type": "screenshot",
+   "status": "pending_capture",
+   "storage_path": null,
+   "asset_key": "operator-v2-lesson-4-screen",
+   "source_route": "/dashboard/members",
+   "annotations": [],
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "55f60620-5dd9-4abd-8e13-888174c19285",
+   "lesson_id": "f05170a1-41c2-459c-af3a-8716b75cdd06",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "alt_text": "Capture exacte de l’interface FaîtiereHub pour 5. Cartes numériques, QR et cartes physiques",
+   "asset_type": "screenshot",
+   "status": "pending_capture",
+   "storage_path": null,
+   "asset_key": "operator-v2-lesson-5-screen",
+   "source_route": "/dashboard/cards",
+   "annotations": [],
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "056eb257-d7f6-4627-bca3-664b0a306fb4",
+   "lesson_id": "cb7efd8b-6d0b-4fcd-99b7-4dc405b431c1",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "alt_text": "Capture exacte de l’interface FaîtiereHub pour 6. KoboToolbox, collecte terrain et importation",
+   "asset_type": "screenshot",
+   "status": "pending_capture",
+   "storage_path": null,
+   "asset_key": "operator-v2-lesson-6-screen",
+   "source_route": "/dashboard/kobo-setup",
+   "annotations": [],
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "3e138037-547f-42bd-adf5-8593889b3b03",
+   "lesson_id": "77525375-9105-4be6-9a39-22d411a3e920",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "alt_text": "Capture exacte de l’interface FaîtiereHub pour 7. Suivi de projets, MEAL et rapports",
+   "asset_type": "screenshot",
+   "status": "pending_capture",
+   "storage_path": null,
+   "asset_key": "operator-v2-lesson-7-screen",
+   "source_route": "/dashboard/analytics",
+   "annotations": [],
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "478d7c64-4362-45ea-8046-2c8c771f82a3",
+   "lesson_id": "3936859d-8d5f-47de-b575-1e963ce0f523",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "alt_text": "Capture exacte de l’interface FaîtiereHub pour 8. Modèle économique de l'Opérateur et PAYG",
+   "asset_type": "screenshot",
+   "status": "pending_capture",
+   "storage_path": null,
+   "asset_key": "operator-v2-lesson-8-screen",
+   "source_route": "/operator",
+   "annotations": [],
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "7a41a9ad-ed0b-4dbe-be34-49f0b89c2dc0",
+   "lesson_id": "a6996e1c-0598-4501-b721-de77f0059178",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "alt_text": "Capture exacte de l’interface FaîtiereHub pour 9. Sécurité, confidentialité et gestion des incidents",
+   "asset_type": "screenshot",
+   "status": "pending_capture",
+   "storage_path": null,
+   "asset_key": "operator-v2-lesson-9-screen",
+   "source_route": "/operator",
+   "annotations": [],
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "ae5cd7cb-2c2f-432f-9370-a8ea53b10052",
+   "lesson_id": "d8248ebd-9967-4309-82b8-95931e82deb0",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "alt_text": "Capture exacte de l’interface FaîtiereHub pour 10. Service client terrain et professionnalisme",
+   "asset_type": "screenshot",
+   "status": "pending_capture",
+   "storage_path": null,
+   "asset_key": "operator-v2-lesson-10-screen",
+   "source_route": "/operator",
+   "annotations": [],
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "284df398-9346-4a66-ab38-39fcf3c58f00",
+   "lesson_id": "62fef9b4-1ab7-4852-8e7c-ea4c7e015f64",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "alt_text": "Capture exacte de l’interface FaîtiereHub pour 11. Mise en situation pratique — préparation à la certification",
+   "asset_type": "screenshot",
+   "status": "pending_capture",
+   "storage_path": null,
+   "asset_key": "operator-v2-lesson-11-screen",
+   "source_route": "/dashboard/members",
+   "annotations": [],
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "2b3e31ba-30b8-4dc0-9854-f0f6940a6e7d",
+   "lesson_id": "a8675d5b-c5c7-4da8-a872-8003939fedb7",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "alt_text": "Capture exacte de l’interface FaîtiereHub pour 12. Auto-évaluation avant l'examen pratique",
+   "asset_type": "screenshot",
+   "status": "pending_capture",
+   "storage_path": null,
+   "asset_key": "operator-v2-lesson-12-screen",
+   "source_route": "/operator",
+   "annotations": [],
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  }
+ ],
+ "quizzes": [
+  {
+   "id": "be6f6988-439c-41c5-8a55-d7ed2c12bd78",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "lesson_id": "22aa3203-27f3-41b4-8c1b-6bf8add3fd74",
+   "title": "Quiz — 1. Comprendre FaîtiereHub et le rôle de l'Opérateur",
+   "description": "Knowledge Check inspiré du format WQU : questions courtes, feedback immédiat et seuil de validation.",
+   "passing_score": 70,
+   "max_attempts": 3,
+   "randomize_questions": true,
+   "show_feedback": true,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "58257dee-e5a3-4ad2-9cd6-e01a06f96978",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "lesson_id": "54a81ffc-2cbe-4bcd-a50f-a1c35ddb2035",
+   "title": "Quiz — 2. Gouvernance des organisations et propriété des données",
+   "description": "Knowledge Check inspiré du format WQU : questions courtes, feedback immédiat et seuil de validation.",
+   "passing_score": 70,
+   "max_attempts": 3,
+   "randomize_questions": true,
+   "show_feedback": true,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "176be884-b41f-499a-b5b3-b7e8cca885d9",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "lesson_id": "03f6493f-a77e-4d7e-96f3-25c1c6685388",
+   "title": "Quiz — 3. Diagnostic initial et onboarding d'une organisation",
+   "description": "Knowledge Check inspiré du format WQU : questions courtes, feedback immédiat et seuil de validation.",
+   "passing_score": 70,
+   "max_attempts": 3,
+   "randomize_questions": true,
+   "show_feedback": true,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "d7a26bc5-6fe4-46f0-add1-a0c8559f6d3e",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "lesson_id": "258ae45c-3569-43c5-a4b9-4dcb2b7ceb44",
+   "title": "Quiz — 4. Gestion des membres et qualité des données",
+   "description": "Knowledge Check inspiré du format WQU : questions courtes, feedback immédiat et seuil de validation.",
+   "passing_score": 70,
+   "max_attempts": 3,
+   "randomize_questions": true,
+   "show_feedback": true,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "37d1c735-3c9c-4526-92eb-f0347dad087c",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "lesson_id": "f05170a1-41c2-459c-af3a-8716b75cdd06",
+   "title": "Quiz — 5. Cartes numériques, QR et cartes physiques",
+   "description": "Knowledge Check inspiré du format WQU : questions courtes, feedback immédiat et seuil de validation.",
+   "passing_score": 70,
+   "max_attempts": 3,
+   "randomize_questions": true,
+   "show_feedback": true,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "fac722f6-1022-44a4-9878-e906aefbf505",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "lesson_id": "cb7efd8b-6d0b-4fcd-99b7-4dc405b431c1",
+   "title": "Quiz — 6. KoboToolbox, collecte terrain et importation",
+   "description": "Knowledge Check inspiré du format WQU : questions courtes, feedback immédiat et seuil de validation.",
+   "passing_score": 70,
+   "max_attempts": 3,
+   "randomize_questions": true,
+   "show_feedback": true,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "9ebc74f0-490c-49b0-be5c-505f5cec3880",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "lesson_id": "77525375-9105-4be6-9a39-22d411a3e920",
+   "title": "Quiz — 7. Suivi de projets, MEAL et rapports",
+   "description": "Knowledge Check inspiré du format WQU : questions courtes, feedback immédiat et seuil de validation.",
+   "passing_score": 70,
+   "max_attempts": 3,
+   "randomize_questions": true,
+   "show_feedback": true,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "71f7503f-5852-497a-a925-21c5f2a436bb",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "lesson_id": "3936859d-8d5f-47de-b575-1e963ce0f523",
+   "title": "Quiz — 8. Modèle économique de l'Opérateur et PAYG",
+   "description": "Knowledge Check inspiré du format WQU : questions courtes, feedback immédiat et seuil de validation.",
+   "passing_score": 70,
+   "max_attempts": 3,
+   "randomize_questions": true,
+   "show_feedback": true,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "6800908d-53f6-429a-9998-c50f0d3841f4",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "lesson_id": "a6996e1c-0598-4501-b721-de77f0059178",
+   "title": "Quiz — 9. Sécurité, confidentialité et gestion des incidents",
+   "description": "Knowledge Check inspiré du format WQU : questions courtes, feedback immédiat et seuil de validation.",
+   "passing_score": 70,
+   "max_attempts": 3,
+   "randomize_questions": true,
+   "show_feedback": true,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "c496334d-2b74-4ed7-b4ad-8c52b99d9559",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "lesson_id": "d8248ebd-9967-4309-82b8-95931e82deb0",
+   "title": "Quiz — 10. Service client terrain et professionnalisme",
+   "description": "Knowledge Check inspiré du format WQU : questions courtes, feedback immédiat et seuil de validation.",
+   "passing_score": 70,
+   "max_attempts": 3,
+   "randomize_questions": true,
+   "show_feedback": true,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "38a14d94-1b1f-4a14-85c5-d43a1e4155dd",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "lesson_id": "62fef9b4-1ab7-4852-8e7c-ea4c7e015f64",
+   "title": "Quiz — 11. Mise en situation pratique — préparation à la certification",
+   "description": "Knowledge Check inspiré du format WQU : questions courtes, feedback immédiat et seuil de validation.",
+   "passing_score": 70,
+   "max_attempts": 3,
+   "randomize_questions": true,
+   "show_feedback": true,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "70d71401-1d33-4b5f-9e03-6ef94f42010f",
+   "module_id": "2482e523-500e-4178-8102-1018af290c82",
+   "lesson_id": "a8675d5b-c5c7-4da8-a872-8003939fedb7",
+   "title": "Quiz — 12. Auto-évaluation avant l'examen pratique",
+   "description": "Knowledge Check inspiré du format WQU : questions courtes, feedback immédiat et seuil de validation.",
+   "passing_score": 70,
+   "max_attempts": 3,
+   "randomize_questions": true,
+   "show_feedback": true,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  }
+ ],
+ "assignments": [
+  {
+   "id": "13401c69-dc8b-448c-95ff-12957f718ca0",
+   "lesson_id": "a6996e1c-0598-4501-b721-de77f0059178",
+   "title": "Cas pratique — 9. Sécurité, confidentialité et gestion des incidents",
+   "instructions": "Rédigez une fiche d’incident pour un import effectué par erreur dans la mauvaise organisation.",
+   "rubric": {
+    "criteria": [
+     {
+      "name": "Exactitude métier",
+      "weight": 30
+     },
+     {
+      "name": "Respect gouvernance et données",
+      "weight": 25
+     },
+     {
+      "name": "Maîtrise de la plateforme",
+      "weight": 25
+     },
+     {
+      "name": "Clarté professionnelle",
+      "weight": 20
+     }
+    ]
+   },
+   "max_score": 100,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "02b195af-e67a-4055-b770-93b32d8c060c",
+   "lesson_id": "cb7efd8b-6d0b-4fcd-99b7-4dc405b431c1",
+   "title": "Cas pratique — 6. KoboToolbox, collecte terrain et importation",
+   "instructions": "Concevez le plan d’un mini formulaire Kobo de 12 champs pour enregistrer des producteurs d’une coopérative.",
+   "rubric": {
+    "criteria": [
+     {
+      "name": "Exactitude métier",
+      "weight": 30
+     },
+     {
+      "name": "Respect gouvernance et données",
+      "weight": 25
+     },
+     {
+      "name": "Maîtrise de la plateforme",
+      "weight": 25
+     },
+     {
+      "name": "Clarté professionnelle",
+      "weight": 20
+     }
+    ]
+   },
+   "max_score": 100,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "efb14bbc-9cf3-4429-a867-0d53dae5ae27",
+   "lesson_id": "03f6493f-a77e-4d7e-96f3-25c1c6685388",
+   "title": "Cas pratique — 3. Diagnostic initial et onboarding d'une organisation",
+   "instructions": "Construisez une checklist d’onboarding en 10 points pour une coopérative de 250 membres.",
+   "rubric": {
+    "criteria": [
+     {
+      "name": "Exactitude métier",
+      "weight": 30
+     },
+     {
+      "name": "Respect gouvernance et données",
+      "weight": 25
+     },
+     {
+      "name": "Maîtrise de la plateforme",
+      "weight": 25
+     },
+     {
+      "name": "Clarté professionnelle",
+      "weight": 20
+     }
+    ]
+   },
+   "max_score": 100,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "cf3d0148-af10-4cda-bdd2-9878f85c676c",
+   "lesson_id": "3936859d-8d5f-47de-b575-1e963ce0f523",
+   "title": "Cas pratique — 8. Modèle économique de l'Opérateur et PAYG",
+   "instructions": "Construisez une mini-offre commerciale pour trois coopératives en séparant services, coûts terrain et usage FaîtiereHub.",
+   "rubric": {
+    "criteria": [
+     {
+      "name": "Exactitude métier",
+      "weight": 30
+     },
+     {
+      "name": "Respect gouvernance et données",
+      "weight": 25
+     },
+     {
+      "name": "Maîtrise de la plateforme",
+      "weight": 25
+     },
+     {
+      "name": "Clarté professionnelle",
+      "weight": 20
+     }
+    ]
+   },
+   "max_score": 100,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "5e51158c-b4e2-43b8-ad64-65627f577fee",
+   "lesson_id": "77525375-9105-4be6-9a39-22d411a3e920",
+   "title": "Cas pratique — 7. Suivi de projets, MEAL et rapports",
+   "instructions": "Construisez cinq indicateurs de suivi pour un projet de digitalisation de 8 coopératives.",
+   "rubric": {
+    "criteria": [
+     {
+      "name": "Exactitude métier",
+      "weight": 30
+     },
+     {
+      "name": "Respect gouvernance et données",
+      "weight": 25
+     },
+     {
+      "name": "Maîtrise de la plateforme",
+      "weight": 25
+     },
+     {
+      "name": "Clarté professionnelle",
+      "weight": 20
+     }
+    ]
+   },
+   "max_score": 100,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "e3725bde-4a8b-4991-b25b-4d0d2ea050d0",
+   "lesson_id": "d8248ebd-9967-4309-82b8-95931e82deb0",
+   "title": "Cas pratique — 10. Service client terrain et professionnalisme",
+   "instructions": "Préparez un compte rendu de fin de mission d’une page pour une opération d’import et de nettoyage de 300 membres.",
+   "rubric": {
+    "criteria": [
+     {
+      "name": "Exactitude métier",
+      "weight": 30
+     },
+     {
+      "name": "Respect gouvernance et données",
+      "weight": 25
+     },
+     {
+      "name": "Maîtrise de la plateforme",
+      "weight": 25
+     },
+     {
+      "name": "Clarté professionnelle",
+      "weight": 20
+     }
+    ]
+   },
+   "max_score": 100,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "ec34279c-0fd3-4bb9-8146-2bc20c7e2063",
+   "lesson_id": "62fef9b4-1ab7-4852-8e7c-ea4c7e015f64",
+   "title": "Cas pratique — 11. Mise en situation pratique — préparation à la certification",
+   "instructions": "Produisez votre réponse complète au scénario de la coopérative de 120 membres : diagnostic, workflow, contrôles, indicateurs et offre de service.",
+   "rubric": {
+    "criteria": [
+     {
+      "name": "Exactitude métier",
+      "weight": 30
+     },
+     {
+      "name": "Respect gouvernance et données",
+      "weight": 25
+     },
+     {
+      "name": "Maîtrise de la plateforme",
+      "weight": 25
+     },
+     {
+      "name": "Clarté professionnelle",
+      "weight": 20
+     }
+    ]
+   },
+   "max_score": 100,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "c58cab95-661d-4a71-a699-ccf7f914e984",
+   "lesson_id": "54a81ffc-2cbe-4bcd-a50f-a1c35ddb2035",
+   "title": "Cas pratique — 2. Gouvernance des organisations et propriété des données",
+   "instructions": "Rédigez un exemple de mandat limité pour un Opérateur chargé uniquement de l’import des membres et de la génération de rapports.",
+   "rubric": {
+    "criteria": [
+     {
+      "name": "Exactitude métier",
+      "weight": 30
+     },
+     {
+      "name": "Respect gouvernance et données",
+      "weight": 25
+     },
+     {
+      "name": "Maîtrise de la plateforme",
+      "weight": 25
+     },
+     {
+      "name": "Clarté professionnelle",
+      "weight": 20
+     }
+    ]
+   },
+   "max_score": 100,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "5538f945-b692-4236-8415-6ae13481d43b",
+   "lesson_id": "f05170a1-41c2-459c-af3a-8716b75cdd06",
+   "title": "Cas pratique — 5. Cartes numériques, QR et cartes physiques",
+   "instructions": "Rédigez une explication client courte sur la différence entre carte numérique, QR et carte physique.",
+   "rubric": {
+    "criteria": [
+     {
+      "name": "Exactitude métier",
+      "weight": 30
+     },
+     {
+      "name": "Respect gouvernance et données",
+      "weight": 25
+     },
+     {
+      "name": "Maîtrise de la plateforme",
+      "weight": 25
+     },
+     {
+      "name": "Clarté professionnelle",
+      "weight": 20
+     }
+    ]
+   },
+   "max_score": 100,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "7ad1a8ae-8644-4da8-87e0-7d344ad9f5ab",
+   "lesson_id": "a8675d5b-c5c7-4da8-a872-8003939fedb7",
+   "title": "Cas pratique — 12. Auto-évaluation avant l'examen pratique",
+   "instructions": "Rédigez votre plan personnel de préparation à l’examen : trois points forts, trois points à réviser et deux cas pratiques à refaire.",
+   "rubric": {
+    "criteria": [
+     {
+      "name": "Exactitude métier",
+      "weight": 30
+     },
+     {
+      "name": "Respect gouvernance et données",
+      "weight": 25
+     },
+     {
+      "name": "Maîtrise de la plateforme",
+      "weight": 25
+     },
+     {
+      "name": "Clarté professionnelle",
+      "weight": 20
+     }
+    ]
+   },
+   "max_score": 100,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "5fbdfbf1-0aec-4da5-bb93-a30e549f0095",
+   "lesson_id": "258ae45c-3569-43c5-a4b9-4dcb2b7ceb44",
+   "title": "Cas pratique — 4. Gestion des membres et qualité des données",
+   "instructions": "Décrivez un protocole de nettoyage et d’import pour 120 membres en distinguant contrôle avant, pendant et après import.",
+   "rubric": {
+    "criteria": [
+     {
+      "name": "Exactitude métier",
+      "weight": 30
+     },
+     {
+      "name": "Respect gouvernance et données",
+      "weight": 25
+     },
+     {
+      "name": "Maîtrise de la plateforme",
+      "weight": 25
+     },
+     {
+      "name": "Clarté professionnelle",
+      "weight": 20
+     }
+    ]
+   },
+   "max_score": 100,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  },
+  {
+   "id": "b0fea508-d055-44bb-9204-295a59d4786b",
+   "lesson_id": "22aa3203-27f3-41b4-8c1b-6bf8add3fd74",
+   "title": "Cas pratique — 1. Comprendre FaîtiereHub et le rôle de l'Opérateur",
+   "instructions": "Présentez FaîtiereHub et le rôle d’un Opérateur en 8 à 12 lignes à un responsable de coopérative qui découvre la plateforme.",
+   "rubric": {
+    "criteria": [
+     {
+      "name": "Exactitude métier",
+      "weight": 30
+     },
+     {
+      "name": "Respect gouvernance et données",
+      "weight": 25
+     },
+     {
+      "name": "Maîtrise de la plateforme",
+      "weight": 25
+     },
+     {
+      "name": "Clarté professionnelle",
+      "weight": 20
+     }
+    ]
+   },
+   "max_score": 100,
+   "is_required": true,
+   "created_at": "2026-09-19T14:06:39.329886+00:00"
+  }
+ ]
+}

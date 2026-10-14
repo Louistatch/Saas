@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
+  displayTitle,
   learnerLessons,
   objectivesFromSlides,
   remainingCounts,
@@ -156,6 +157,11 @@ describe('vue apprenant (J3)', () => {
     assert.equal(counts.assignments, 1)
     assert.equal(counts.reviewed, 1)
     assert.equal(out[0].review?.revision, true)
+  })
+
+  it('retire le numéro d’ordre du titre', () => {
+    assert.equal(displayTitle('4. Gestion des membres'), 'Gestion des membres')
+    assert.equal(displayTitle('Gestion des membres'), 'Gestion des membres')
   })
 
   it('extrait les objectifs des diapositives « objective »', () => {

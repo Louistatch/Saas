@@ -41,7 +41,7 @@ export default async function OperatorLessonPage({
   )
   const objectives = objectivesFromSlides(lesson.slides)
   const mailto = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
-    `Question sur la leçon ${view.order_index ?? ''} : ${lesson.title}`,
+    `Question sur la leçon ${view.order_index ?? ''} : ${view.title}`,
   )}`
 
   return (
@@ -51,7 +51,7 @@ export default async function OperatorLessonPage({
 
       <main className="min-w-0 flex-1 px-4 pt-6 pb-10 sm:px-8 sm:pt-7">
         <LessonPlayer
-          lesson={lesson}
+          lesson={{ ...lesson, title: view.title }}
           position={{ index: position + 1, total: lessons.length }}
           gates={{ quizPassed: view.quizPassed, assignmentSubmitted: view.assignmentSubmitted }}
           prev={prev ? { id: prev.id, title: prev.title } : null}

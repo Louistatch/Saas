@@ -82,6 +82,7 @@ export function SupportButton() {
     return (
       <Link
         href="/admin/messages"
+        data-support-button=""
         className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 print:hidden"
       >
         <MessageCircle aria-hidden="true" className="h-5 w-5" />
@@ -152,6 +153,7 @@ export function SupportButton() {
       <button
         type="button"
         onClick={openButton}
+        data-support-button=""
         className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 print:hidden"
       >
         <MessageCircle aria-hidden="true" className="h-5 w-5" />

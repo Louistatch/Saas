@@ -6,7 +6,7 @@
 import 'server-only'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import type { AcademyModuleWithLessons } from '@/types/domain'
-import { type LearnerLesson, learnerLessons, resumeLesson } from './learner-view'
+import { type LearnerLesson, displayTitle, learnerLessons, resumeLesson } from './learner-view'
 import {
   OPERATOR_MODULE_ID,
   type ProfileProgressSummary,
@@ -33,7 +33,7 @@ export async function loadLearnerPage(userId: string): Promise<LearnerPageData |
   const lessons = learnerLessons(
     module_.lessons.map((l) => ({
       id: l.id,
-      title: l.title,
+      title: displayTitle(l.title),
       order_index: l.order_index,
       duration_min: l.duration_min,
       hasQuiz: !!l.quiz,
