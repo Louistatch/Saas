@@ -1039,11 +1039,13 @@ export function LomeLifeImmersive() {
     return () => window.clearInterval(id)
   }, [insideAny])
 
-  // Travelling or entering a place ends the map view (the game camera comes back).
+  // Starting a trip or a walk, or entering a place, ends the map view (the game camera comes
+  // back). Only the start counts: the map can be opened again while a walk is under way.
+  const walking = cityLife.route.length > 0
   // biome-ignore lint/correctness/useExhaustiveDependencies: reacts to these transitions only
   useEffect(() => {
-    if (mapView && (insideAny || riding || cityLife.route.length > 0)) exitMap()
-  }, [insideAny, riding, cityLife.route.length])
+    if (mapView && (insideAny || riding || walking)) exitMap()
+  }, [insideAny, riding, walking])
   function enterMap() {
     setPanel(null)
     const rig = controller.camera
