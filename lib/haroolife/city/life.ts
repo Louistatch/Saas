@@ -85,6 +85,11 @@ export interface CityLife {
   pose?: { x: number; z: number; heading: number }
   /** The player's taxi, parked somewhere in the town (Lomé), or absent. */
   vehicle?: { x: number; z: number; heading: number } | null
+  /**
+   * Driver's job in service: zémidjan (the vehicle is a moto-taxi) or taxi; absent when off.
+   * Passers-by hail the driver; fares are paid on arrival (see fares.ts).
+   */
+  duty?: 'moto' | 'taxi' | null
 }
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)))
@@ -199,6 +204,7 @@ export function decodeCityLife(value: unknown): CityLife | null {
             heading: Number.isFinite(v.vehicle.heading) ? v.vehicle.heading : 0,
           }
         : (v.vehicle ?? undefined),
+    duty: v.duty === 'moto' || v.duty === 'taxi' ? v.duty : null,
   }
 }
 

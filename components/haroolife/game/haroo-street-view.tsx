@@ -8,6 +8,7 @@
 import type { PlayerController } from '@/lib/haroolife/city/player'
 import {
   type StreetAds,
+  type StreetFare,
   type StreetPoseFeed,
   type StreetStats,
   StreetWorld,
@@ -38,6 +39,10 @@ export default function HarooStreetView(props: {
   onStats?: (s: StreetStats) => void
   /** Daylight of the game's hour (sun 0.65 at night to 1 at noon). */
   light?: { sun: number; sunColor: string }
+  /** The vehicle and the driver's fare (zémidjan or taxi). */
+  fare?: StreetFare | null
+  /** A passer-by close enough to climb on (or null). */
+  onHail?: (name: string | null) => void
 }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const markers = useRef<HTMLDivElement>(null)
@@ -47,7 +52,7 @@ export default function HarooStreetView(props: {
   live.current = props
 
   const { controller, avatarModel, avatarPagne, pixelRatio, estate, locality, remoteFeed } = props
-  const { ads, remotePresent, light } = props
+  const { ads, remotePresent, light, fare } = props
   // biome-ignore lint/correctness/useExhaustiveDependencies: the estate is pushed below without remounting
   useEffect(() => {
     const c = canvas.current
@@ -65,6 +70,7 @@ export default function HarooStreetView(props: {
       locality,
       ads: live.current.ads ?? null,
       remote: remoteFeed ? { feed: remoteFeed, present: live.current.remotePresent ?? [] } : null,
+      fare: live.current.fare ?? null,
       events: {
         onEvents: (events, ctl) => live.current.onPlayerEvents(events, ctl),
         onLot: (id) => live.current.onLot(id),
@@ -74,6 +80,7 @@ export default function HarooStreetView(props: {
         onError: () => setState('error'),
         onFrame: (s) => live.current.onFrame?.(s),
         onStats: (s) => live.current.onStats?.(s),
+        onHail: (name) => live.current.onHail?.(name),
       },
     })
     world.current = w
@@ -97,6 +104,9 @@ export default function HarooStreetView(props: {
   useEffect(() => {
     if (state === 'ready') world.current?.setPresent(remotePresent ?? [])
   }, [remotePresent, state])
+  useEffect(() => {
+    if (state === 'ready' && fare) world.current?.setFare(fare)
+  }, [fare, state])
 
   return (
     <div className="relative h-full w-full" data-engine="haroo" data-scene="street">

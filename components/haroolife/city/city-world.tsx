@@ -10,7 +10,11 @@ import type { InputState, PlayerController } from '@/lib/haroolife/city/player'
 import { type Quality, renderPixelRatio } from '@/lib/haroolife/city/quality'
 import { type Category, ESTATE, type Lot, inEstate, lotById } from '@/lib/haroolife/city/world'
 import type { RendererId } from '@/lib/haroolife/engine/types'
-import type { StreetPoseFeed, StreetStats } from '@/lib/haroolife/game/render/street-world'
+import type {
+  StreetFare,
+  StreetPoseFeed,
+  StreetStats,
+} from '@/lib/haroolife/game/render/street-world'
 import type { Transport } from '@/lib/haroolife/lome-life-engine'
 import type { PresenceEntry } from '@/lib/haroolife/realtime/protocol'
 import type { City } from '@/lib/haroolife/townsmen-engine'
@@ -96,6 +100,8 @@ export default function CityWorld({
   onCell,
   onLotIcon,
   onPlayer,
+  fare,
+  onHail,
   filter,
   selectedLot,
   showNames = false,
@@ -145,6 +151,10 @@ export default function CityWorld({
   onLotIcon: (lot: Lot) => void
   /** Another player was touched in the street (their presence key). */
   onPlayer?: (key: string) => void
+  /** The vehicle and the driver's fare (zémidjan or taxi job). */
+  fare?: StreetFare | null
+  /** A passer-by close enough to climb on (or null). */
+  onHail?: (name: string | null) => void
   filter: Category | 'all'
   selectedLot: Lot | null
   /** Map view: write every place's name (by priority, without overlaps); off by default. */
@@ -273,6 +283,8 @@ export default function CityWorld({
             onStats={onStats}
             onPlayer={onPlayer}
             light={light}
+            fare={fare}
+            onHail={onHail}
           />
         </div>
       )}

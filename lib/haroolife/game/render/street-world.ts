@@ -29,6 +29,7 @@ import {
   recolorMap,
 } from '@/lib/haroolife/city/avatar-catalogue'
 import { type Bank, loadBank } from '@/lib/haroolife/city/bank'
+import { HAIL_RADIUS, type VehicleKind } from '@/lib/haroolife/city/fares'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 import { DEFAULT_CONFIG, type PlayerController } from '@/lib/haroolife/city/player'
 import {
@@ -57,6 +58,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { DETAIL_CELLS, buildCityGeometry } from './city-models'
 import { createGltfLoader } from './gltf'
+import { type MotoParts, buildMoto } from './moto'
 import { PerfProbe } from './perf-probe'
 
 /**
@@ -117,6 +119,18 @@ export interface StreetWorldEvents {
   onFrame?: (s: { drawCalls: number; fps: number }) => void
   /** Building tiles loaded around the player (the game's chunk statistics). */
   onStats?: (s: StreetStats) => void
+  /** At the wheel, looking for clients: the passer-by close enough to climb on (or null). */
+  onHail?: (name: string | null) => void
+}
+
+/** The driver's job in the street: the vehicle, who is on board, where they go. */
+export interface StreetFare {
+  vehicle: VehicleKind
+  /** Passers-by may hail the driver (the job is on and nobody is on board). */
+  hailing: boolean
+  passenger: string | null
+  /** Destination door (road cell) and its name, while a passenger is on board. */
+  dest: { x: number; y: number; name: string } | null
 }
 
 export interface StreetStats {
@@ -145,6 +159,8 @@ export interface StreetWorldOptions {
   ads?: StreetAds | null
   /** Other players in this town (realtime relay): snapshots and who is present. */
   remote?: { feed: StreetPoseFeed; present: PresenceEntry[] } | null
+  /** The vehicle and the driver's fare (zémidjan or taxi). */
+  fare?: StreetFare | null
 }
 
 export interface StreetAds {
@@ -226,6 +242,13 @@ export class StreetWorld {
   private player: Person | null = null
   private car: THREE.Object3D | null = null
   private carLoading = false
+  private moto: MotoParts | null = null
+  private fare: StreetFare = { vehicle: 'taxi', hailing: false, passenger: null, dest: null }
+  private hailed: string | null = null
+  private hailTimer = 0
+  /** Destination of the fare: a beacon on the ground and its label. */
+  private beacon: THREE.Group | null = null
+  private beaconTag: HTMLDivElement | null = null
   /** The baked Kenney pack (same models as the PlayCanvas city); null while loading or if it failed. */
   private bank: Bank | null = null
   /** Duration of the last neighbourhood rebuild (ms), for the probe. */
@@ -310,6 +333,7 @@ export class StreetWorld {
     this.pagne = o.pagne
     this.locality = o.locality
     this.ads = o.ads ?? null
+    if (o.fare) this.fare = { ...o.fare }
     this.supports = PLACEMENTS.filter((p) => p.locality === o.locality)
     if (o.remote) {
       this.remoteFeed = o.remote.feed
@@ -390,6 +414,23 @@ export class StreetWorld {
       this.play(person, clipFor(person.spec, 'walk'))
       person.actions.get(person.current)?.setEffectiveTimeScale(1)
     }
+    // End-to-end tests only (flag set by the test): bring a passer-by next to the vehicle, as
+    // waiting for one to wander by would make the test depend on chance.
+    try {
+      if (localStorage.getItem('haroolife.e2e') === '1')
+        (window as unknown as { __LOME_SUMMON_WALKER?: () => string | null }).__LOME_SUMMON_WALKER =
+          () => {
+            const v = this.controller.vehicle
+            const w = this.walkers.find((x) => x.name !== this.fare.passenger)
+            if (!v || !w) return null
+            w.from = { x: Math.round(v.x) + 1, y: Math.round(v.z) }
+            w.to = { ...w.from }
+            w.t = 0
+            return w.name
+          }
+    } catch {
+      // Storage refused: no test hook.
+    }
     this.startAds()
     this.startRemote()
     this.publishProbe()
@@ -449,9 +490,9 @@ export class StreetWorld {
     this.walkers = []
     if (this.player) this.disposePerson(this.player)
     this.player = null
-    this.car?.removeFromParent()
-    this.car = null
-    this.wheels = []
+    this.dropCar()
+    this.setBeacon(null)
+    ;(window as unknown as { __LOME_SUMMON_WALKER?: unknown }).__LOME_SUMMON_WALKER = undefined
     this.unitBox.dispose()
     this.boardFrame?.dispose()
     for (const m of this.materials.values()) m.dispose()
@@ -752,8 +793,125 @@ export class StreetWorld {
     this.tiles.delete(key)
   }
 
+  /** Someone astride the zémidjan, at `along` (units, +Z forward) on its seat. */
+  private seat(p: Person, v: { x: number; z: number; heading: number }, along: number): void {
+    const h = (v.heading * Math.PI) / 180
+    p.root.position.set(
+      v.x * U + Math.sin(h) * along,
+      (this.moto?.seat ?? 0) - FIGURE * 0.42,
+      v.z * U + Math.cos(h) * along,
+    )
+    p.root.rotation.y = h
+  }
+
+  private dropCar(): void {
+    this.car?.removeFromParent()
+    this.car = null
+    this.carLoading = false
+    this.wheels = []
+    if (this.moto) {
+      for (const g of this.moto.geometries) g.dispose()
+      for (const m of this.moto.materials) m.dispose()
+      this.moto = null
+    }
+  }
+
+  /**
+   * The driver's job: the vehicle (zémidjan or taxi), whether passers-by may hail, who is on
+   * board and where they go. A passenger who leaves is set down at the destination's door.
+   */
+  setFare(fare: StreetFare): void {
+    const was = this.fare
+    this.fare = { ...fare }
+    if (was.vehicle !== fare.vehicle) this.dropCar()
+    if (was.passenger && was.passenger !== fare.passenger) {
+      const w = this.walkers.find((x) => x.name === was.passenger)
+      const at = was.dest ?? this.controller.cell
+      if (w) {
+        w.from = { x: at.x, y: at.y }
+        w.to = this.nextRoad(w.from, w.from)
+        w.t = 0
+        w.person.root.visible = true
+      }
+    }
+    this.setBeacon(fare.passenger ? fare.dest : null)
+    if (!fare.hailing || fare.passenger) this.hailed = null
+  }
+
+  private setBeacon(dest: StreetFare['dest']): void {
+    if (this.beacon) {
+      this.beacon.removeFromParent()
+      this.beacon.traverse((o) => {
+        const m = o as THREE.Mesh
+        if (m.isMesh) m.geometry.dispose()
+      })
+      this.beacon = null
+    }
+    this.beaconTag?.remove()
+    this.beaconTag = null
+    if (!dest) return
+    const g = new THREE.Group()
+    g.name = `Destination ${dest.name}`
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(U * 0.9, U * 0.08, 8, 32),
+      this.mat('#f59e0b'),
+    )
+    ring.rotation.x = Math.PI / 2
+    ring.position.y = 0.05
+    const beam = new THREE.Mesh(
+      new THREE.CylinderGeometry(U * 0.12, U * 0.12, FIGURE * 1.4, 10),
+      this.mat('#f59e0b'),
+    )
+    beam.position.y = FIGURE * 0.7
+    g.add(ring, beam)
+    g.position.set(dest.x * U, 0, dest.y * U)
+    this.scene.add(g)
+    this.beacon = g
+    const tag = document.createElement('div')
+    tag.dataset.fareDest = dest.name
+    tag.className =
+      'pointer-events-none absolute left-0 top-0 whitespace-nowrap rounded-full bg-amber-500 px-3 py-1 text-xs font-bold text-white shadow-md'
+    tag.textContent = `📍 Déposer ici · ${dest.name}`
+    tag.style.visibility = 'hidden'
+    this.markersRoot.append(tag)
+    this.beaconTag = tag
+  }
+
+  /** At the wheel with the job on: the nearest passer-by close to the vehicle hails (4 times a second). */
+  private stepHail(dt: number): void {
+    this.hailTimer += dt
+    if (this.hailTimer < 0.25) return
+    this.hailTimer = 0
+    const ctl = this.controller
+    const v = ctl.vehicle
+    let best: { name: string; d: number } | null = null
+    if (ctl.driving && v && this.fare.hailing && !this.fare.passenger) {
+      for (const w of this.walkers) {
+        const p = w.person.root.position
+        const d = Math.hypot(p.x / U - v.x, p.z / U - v.z)
+        if (d <= HAIL_RADIUS && (!best || d < best.d)) best = { name: w.name, d }
+      }
+    }
+    const name = best?.name ?? null
+    if (name !== this.hailed) {
+      this.hailed = name
+      this.events.onHail?.(name)
+    }
+  }
+
   private loadCar(): void {
     this.carLoading = true
+    if (this.fare.vehicle === 'moto') {
+      const moto = buildMoto(FIGURE)
+      this.moto = moto
+      moto.root.traverse((o) => {
+        if (o.name.startsWith('wheel-'))
+          this.wheels.push({ node: o, front: o.name.startsWith('wheel-front') })
+      })
+      this.scene.add(moto.root)
+      this.car = moto.root
+      return
+    }
     this.load(TAXI_URL)
       .then((g) => {
         if (this.disposed) return
@@ -814,7 +972,20 @@ export class StreetWorld {
 
   private stepWalkers(dt: number): void {
     const speed = 1.1 // units/s: a calm walk
+    const v = this.controller.vehicle
     for (const w of this.walkers) {
+      if (w.name === this.fare.passenger && v) {
+        // On board: behind the driver on the zémidjan, out of sight in the taxi.
+        w.person.root.visible = !!this.moto
+        if (this.moto) {
+          this.seat(w.person, v, this.moto.passengerZ)
+          this.play(w.person, clipFor(w.person.spec, 'drive'))
+        }
+        w.person.mixer.update(dt)
+        continue
+      }
+      w.person.root.visible = true
+      this.play(w.person, clipFor(w.person.spec, 'walk'))
       const dx = (w.to.x - w.from.x) * U
       const dz = (w.to.y - w.from.y) * U
       const len = Math.hypot(dx, dz) || 1
@@ -906,12 +1077,23 @@ export class StreetWorld {
     const pl = this.player
     if (pl) {
       const onFoot = !ctl.driving && ctl.mode !== 'inside'
-      pl.root.visible = onFoot
-      pl.root.position.set(ctl.pos.x * U, 0, ctl.pos.z * U)
-      pl.root.rotation.y = (ctl.heading * Math.PI) / 180
+      // On the zémidjan the driver is seen, astride; in the taxi, inside.
+      const astride = ctl.driving && !!this.moto && !!ctl.vehicle
+      pl.root.visible = onFoot || astride
+      if (astride && ctl.vehicle && this.moto) {
+        this.seat(pl, ctl.vehicle, this.moto.driverZ)
+      } else {
+        pl.root.position.set(ctl.pos.x * U, 0, ctl.pos.z * U)
+        pl.root.rotation.y = (ctl.heading * Math.PI) / 180
+      }
       const speed = ctl.speed * U
-      const anim: NpcAnim =
-        ctl.mode === 'run' ? 'run' : ctl.mode === 'walk' && speed > 0.05 ? 'walk' : 'idle'
+      const anim: NpcAnim = astride
+        ? 'drive'
+        : ctl.mode === 'run'
+          ? 'run'
+          : ctl.mode === 'walk' && speed > 0.05
+            ? 'walk'
+            : 'idle'
       this.anim = anim
       this.play(pl, clipFor(pl.spec, anim))
       if (anim === 'walk' || anim === 'run') {
@@ -942,6 +1124,7 @@ export class StreetWorld {
     const wanted = ctl.driving ? 1.35 : 1
     this.framing += (wanted - this.framing) * Math.min(1, dt * 2.5)
     this.stepWalkers(dt)
+    this.stepHail(dt)
     this.stepRemotes(dt)
     this.updateCamera()
     const p = new THREE.Vector3()
@@ -964,7 +1147,21 @@ export class StreetWorld {
       const y = (-p.y * 0.5 + 0.5) * this.height
       w.tag.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`
       w.tag.style.visibility =
-        near && p.z < 1 && x > 0 && x < this.width && y > 40 ? 'visible' : 'hidden'
+        near && w.name !== this.fare.passenger && p.z < 1 && x > 0 && x < this.width && y > 40
+          ? 'visible'
+          : 'hidden'
+    }
+    // The fare's destination, labelled over its beacon.
+    if (this.beacon && this.beaconTag) {
+      p.copy(this.beacon.position)
+      p.y += FIGURE * 1.6
+      p.project(this.camera)
+      const x = (p.x * 0.5 + 0.5) * this.width
+      const y = (-p.y * 0.5 + 0.5) * this.height
+      const on = p.z < 1 && x > 0 && x < this.width && y > 40 && y < this.height
+      this.beaconTag.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`
+      this.beaconTag.style.visibility = on ? 'visible' : 'hidden'
+      this.beacon.rotation.y += dt * 1.5
     }
     // Other players' name tags, over their heads.
     for (const r of this.remotes.values()) {
@@ -1285,6 +1482,10 @@ export class StreetWorld {
       cell: ctl.cell,
       camera: { ...ctl.camera },
       vehicle: ctl.vehicle ? { ...ctl.vehicle } : null,
+      vehicleKind: this.car ? (this.moto ? 'moto' : 'taxi') : null,
+      hailed: this.hailed,
+      passenger: this.fare.passenger,
+      astride: !!this.moto && ctl.driving && this.player?.root.visible === true,
       driving: ctl.driving,
       model: this.avatarModel,
       anim: this.anim,

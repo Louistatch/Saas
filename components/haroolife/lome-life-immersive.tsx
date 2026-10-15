@@ -52,6 +52,14 @@ import {
   useProp,
   walkStep,
 } from '@/lib/haroolife/city/life'
+import {
+  type Fare,
+  bearingTo,
+  canDrop,
+  completeFare,
+  remaining,
+  startFare,
+} from '@/lib/haroolife/city/fares'
 import { LOCALITIES, LOCALITY_IDS, type LocalityId } from '@/lib/haroolife/city/locality'
 import { CITY_STORAGE, loadCityLife } from '@/lib/haroolife/city/migrate'
 import { ESTATE_GATE } from '@/lib/haroolife/city/navigation'
@@ -342,6 +350,14 @@ export function LomeLifeImmersive() {
   const reportedCell = useRef('')
   const [nearVehicle, setNearVehicle] = useState(false)
   const [driving, setDriving] = useState(false)
+  // Driver's job: the passer-by hailing, the fare on board and its live progress.
+  const [hail, setHail] = useState<string | null>(null)
+  const [fare, setFare] = useState<Fare | null>(null)
+  const [fareLive, setFareLive] = useState<{ left: number; can: boolean; arrow: number }>({
+    left: 0,
+    can: false,
+    arrow: 0,
+  })
   // The player's look: chosen on this device, shared by the street, the rooms and the taxi.
   const [avatar, setAvatar] = useState<Avatar>(DEFAULT_AVATAR)
   // New game: no look chosen yet on this device → the appearance sheet opens first, with a
@@ -958,10 +974,23 @@ export function LomeLifeImmersive() {
             vehicle: v ? { x: v.x, z: v.z, heading: v.heading } : old.vehicle,
             pose: { x: c.pos.x, z: c.pos.z, heading: c.heading },
           }))
+          const moto = cityLifeRef.current.duty === 'moto'
+          if (ev.state === 'left') {
+            // Getting off ends the ride: a passenger on board leaves without paying.
+            setFare((f) => {
+              if (f) setNotice(`${f.passenger} est descendu·e sans payer : course annulée.`)
+              return null
+            })
+            setHail(null)
+          }
           setNotice(
             ev.state === 'entered'
-              ? 'Tu conduis le taxi : joystick pour accélérer, freiner et tourner.'
-              : 'Tu es descendu du taxi.',
+              ? moto
+                ? 'Tu conduis ton zémidjan : approche-toi des passants qui font signe.'
+                : 'Tu conduis le taxi : joystick pour accélérer, freiner et tourner.'
+              : moto
+                ? 'Tu es descendu de ton zémidjan.'
+                : 'Tu es descendu du taxi.',
           )
         }
       }
@@ -997,10 +1026,105 @@ export function LomeLifeImmersive() {
     }
   }, [controller])
   function toggleVehicle() {
+    const what = cityLife.duty === 'moto' ? 'ton zémidjan' : 'du taxi'
     if (controller.driving) {
-      if (!controller.exitVehicle()) setNotice('Freine avant de descendre du taxi.')
-    } else if (!controller.enterVehicle()) setNotice('Approche-toi du taxi pour monter.')
+      if (!controller.exitVehicle()) setNotice(`Freine avant de descendre ${what}.`)
+    } else if (!controller.enterVehicle())
+      setNotice(
+        cityLife.duty === 'moto' ? 'Approche-toi de ta moto.' : 'Approche-toi du taxi pour monter.',
+      )
   }
+  // ── Driver's job (zémidjan or taxi): pick up, drive, drop off, get paid ──
+  const vehicleKind = cityLife.duty === 'moto' ? 'moto' : 'taxi'
+  const streetFare = useMemo(
+    () => ({
+      vehicle: vehicleKind,
+      hailing: !!cityLife.duty && driving,
+      passenger: fare?.passenger ?? null,
+      dest: fare ? { x: fare.to.x, y: fare.to.y, name: fare.to.name } : null,
+    }),
+    [vehicleKind, cityLife.duty, driving, fare],
+  ) as {
+    vehicle: 'moto' | 'taxi'
+    hailing: boolean
+    passenger: string | null
+    dest: { x: number; y: number; name: string } | null
+  }
+  function takePassenger() {
+    const v = controller.vehicle
+    if (!hail || !v || fare) return
+    const f = startFare(hail, { x: v.x, y: v.z }, vehicleKind, Math.random)
+    if (!f) {
+      setNotice('Aucune destination connue dans cette ville.')
+      return
+    }
+    setFare(f)
+    setHail(null)
+    setNotice(
+      `${f.passenger} monte : « Emmène-moi à ${f.to.name} ». ${money(f.price)} à l’arrivée.`,
+    )
+  }
+  function dropPassenger() {
+    const v = controller.vehicle
+    if (!fare || !v || !canDrop(fare, v, v.speed)) return
+    setCityLife((old) => completeFare(old, fare, vehicleKind))
+    setNotice(`${fare.passenger} descend à ${fare.to.name} et te paie ${money(fare.price)}.`)
+    setFare(null)
+  }
+  function setDuty(duty: 'moto' | 'taxi' | null) {
+    if (controller.driving) {
+      setNotice('Descends du véhicule avant de changer de métier.')
+      return
+    }
+    setFare(null)
+    setHail(null)
+    setCityLife((old) => ({ ...old, duty }))
+  }
+  // While a passenger is on board: distance left, arrival, and the arrow towards the place.
+  useEffect(() => {
+    if (!fare) return
+    const id = window.setInterval(() => {
+      const v = controller.vehicle
+      if (!v) return
+      const screenUp = controller.camera.angle + 180
+      setFareLive({
+        left: remaining(fare, v),
+        can: canDrop(fare, v, v.speed),
+        arrow: screenUp - bearingTo(fare, v),
+      })
+    }, 250)
+    return () => window.clearInterval(id)
+  }, [fare, controller])
+  // Probe for the tests: the driver's job as the game sees it.
+  useEffect(() => {
+    ;(window as unknown as { __LOME_FARE?: unknown }).__LOME_FARE = {
+      duty: cityLife.duty ?? null,
+      hail,
+      fare,
+      ...fareLive,
+    }
+  }, [cityLife.duty, hail, fare, fareLive])
+  // End-to-end tests only: park the vehicle at the fare's door (driving there by joystick in a
+  // test would be slow and depend on the town's layout).
+  useEffect(() => {
+    let e2e = false
+    try {
+      e2e = localStorage.getItem('haroolife.e2e') === '1'
+    } catch {
+      e2e = false
+    }
+    if (!e2e) return
+    const w = window as unknown as { __LOME_PARK_AT_FARE?: () => boolean }
+    w.__LOME_PARK_AT_FARE = () => {
+      const v = controller.vehicle
+      if (!fare || !v) return false
+      Object.assign(v, { x: fare.to.x, z: fare.to.y, speed: 0 })
+      return true
+    }
+    return () => {
+      w.__LOME_PARK_AT_FARE = undefined
+    }
+  }, [fare, controller])
   useEffect(() => {
     if (!playing) return
     const id = window.setInterval(() => {
@@ -1435,6 +1559,8 @@ export function LomeLifeImmersive() {
               setNpcDraft('')
               setPanel('player')
             }}
+            fare={streetFare}
+            onHail={setHail}
             filter={cityFilter}
             selectedLot={selectedLot}
             showNames={showNames}
@@ -1696,14 +1822,72 @@ export function LomeLifeImmersive() {
             />
           </div>
           <div className="pointer-events-auto flex flex-col items-end gap-2">
+            {driving && hail && !fare && (
+              <button
+                type="button"
+                data-testid="fare-take"
+                onClick={takePassenger}
+                className="flex min-h-12 max-w-[12rem] items-center gap-2 rounded-2xl bg-amber-400 px-3 py-2 text-left text-xs font-black text-slate-900 shadow-lg"
+              >
+                <span aria-hidden className="text-lg leading-none">
+                  🙋
+                </span>
+                <span className="leading-tight">
+                  {hail} te fait signe
+                  <span className="block font-semibold">Prendre le client</span>
+                </span>
+              </button>
+            )}
+            {driving && fare && (
+              <output
+                data-testid="fare-banner"
+                aria-label={`Course vers ${fare.to.name}`}
+                className="flex max-w-[13rem] items-center gap-2 rounded-2xl bg-white/95 px-3 py-2 text-xs shadow-lg ring-1 ring-amber-300"
+              >
+                <span
+                  aria-hidden
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-400 text-base font-black text-slate-900"
+                  style={{ transform: `rotate(${fareLive.arrow.toFixed(0)}deg)` }}
+                >
+                  ↑
+                </span>
+                <span className="min-w-0 leading-tight">
+                  <strong className="block truncate">
+                    {fare.passenger} → {fare.to.name}
+                  </strong>
+                  <span className="text-slate-600">
+                    {fareLive.left} cases · {money(fare.price)}
+                  </span>
+                </span>
+              </output>
+            )}
+            {driving && fare && (
+              <button
+                type="button"
+                data-testid="fare-drop"
+                disabled={!fareLive.can}
+                onClick={dropPassenger}
+                className="flex min-h-12 max-w-[12rem] items-center gap-2 rounded-2xl bg-emerald-600 px-3 py-2 text-left text-xs font-black text-white shadow-lg disabled:bg-slate-400"
+              >
+                {fareLive.can ? `Déposer ${fare.passenger}` : 'Arrête-toi à la destination'}
+              </button>
+            )}
             {(nearVehicle || driving) && (
               <button
                 type="button"
-                aria-label={driving ? 'Descendre du taxi' : 'Monter dans le taxi'}
+                aria-label={
+                  vehicleKind === 'moto'
+                    ? driving
+                      ? 'Descendre du zémidjan'
+                      : 'Monter sur le zémidjan'
+                    : driving
+                      ? 'Descendre du taxi'
+                      : 'Monter dans le taxi'
+                }
                 onClick={toggleVehicle}
                 className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-400 text-[10px] font-black text-slate-900 shadow"
               >
-                {driving ? 'Descendre' : '🚕 Monter'}
+                {driving ? 'Descendre' : vehicleKind === 'moto' ? '🏍️ Monter' : '🚕 Monter'}
               </button>
             )}
             {nearAd && !insideAny && !driving && panel === null && (
@@ -2368,6 +2552,46 @@ export function LomeLifeImmersive() {
                         outline
                         onClick={() => action('work')}
                       />
+                    </div>
+                    <div className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                      <p className="text-sm font-black">Au volant : payé à la course</p>
+                      <p className="text-xs text-slate-600">
+                        Monte sur ton véhicule, approche-toi d’un passant qui fait signe, emmène-le
+                        où il veut aller et arrête-toi devant : il te paie à l’arrivée selon la
+                        distance.
+                      </p>
+                      {(
+                        [
+                          ['moto', '🏍️ Zémidjan (moto-taxi)', 'Dès 200 FCFA la course'],
+                          ['taxi', '🚕 Taxi', 'Dès 400 FCFA la course'],
+                        ] as const
+                      ).map(([kind, label, price]) => (
+                        <button
+                          type="button"
+                          key={kind}
+                          data-testid={`duty-${kind}`}
+                          onClick={() => setDuty(cityLife.duty === kind ? null : kind)}
+                          className={
+                            'flex w-full items-center justify-between rounded-2xl border p-3 text-left text-sm ' +
+                            (cityLife.duty === kind
+                              ? 'border-emerald-600 bg-emerald-50'
+                              : 'border-slate-200 bg-white')
+                          }
+                        >
+                          <span>
+                            <strong className="block">{label}</strong>
+                            <span className="text-xs text-slate-500">{price}</span>
+                          </span>
+                          <span className="text-xs font-bold">
+                            {cityLife.duty === kind ? '✓ En service · Arrêter' : 'Commencer'}
+                          </span>
+                        </button>
+                      ))}
+                      {cityLife.duty && !cityLife.vehicle && (
+                        <p className="text-xs text-slate-600">
+                          Ton véhicule t’attend à Lomé, devant ta concession.
+                        </p>
+                      )}
                     </div>
                     <DailyStatus life={life} />
                   </>

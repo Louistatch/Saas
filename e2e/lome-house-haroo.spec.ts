@@ -602,3 +602,98 @@ test('HarooLife street taxi: walk to it, get in, drive, brake, get out', async (
   expect(Math.hypot(out.x - stopped.vehicle!.x, out.z - stopped.vehicle!.z)).toBeLessThan(2)
   expect(errors).toEqual([])
 })
+
+test('HarooLife zémidjan: take the job, ride the moto, pick up a passer-by, drop them, get paid', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(180_000)
+  const mobile = /mobile/.test(testInfo.project.name)
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  // Test hooks only: bring a passer-by next to the moto, park at the destination.
+  await page.addInitScript(() => localStorage.setItem('haroolife.e2e', '1'))
+  type Street = {
+    engine: string
+    vehicleKind: string | null
+    astride: boolean
+    hailed: string | null
+  }
+  const street = () =>
+    page.evaluate(() => (window as unknown as { __LOME_STREET?: Street }).__LOME_STREET ?? null)
+  type Rider = { vehicleKind: string | null; astride: boolean }
+  const rider = () =>
+    page.evaluate(() => (window as unknown as { __LOME_PLAYER?: Rider }).__LOME_PLAYER ?? null)
+  type FareProbe = {
+    duty: string | null
+    hail: string | null
+    fare: { passenger: string; price: number; to: { name: string } } | null
+    left: number
+    can: boolean
+  }
+  const fareProbe = () =>
+    page.evaluate(() => (window as unknown as { __LOME_FARE?: FareProbe }).__LOME_FARE ?? null)
+  const wallet = () =>
+    page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem('haroolife.lome-city.v1') || 'null')?.life?.wallet as
+          | number
+          | undefined,
+    )
+  const tap = (l: ReturnType<Page['getByRole']>) => (mobile ? l.tap() : l.click())
+
+  await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
+  await expect.poll(async () => (await street())?.engine, { timeout: 60000 }).toBe('haroo')
+
+  // Phone → Métiers → Zémidjan: the parked vehicle becomes a moto-taxi.
+  await page
+    .getByRole('navigation', { name: 'Navigation du jeu' })
+    .getByRole('button', { name: 'Téléphone' })
+    .click()
+  await page.getByRole('button', { name: /Métiers/ }).click()
+  await page.getByTestId('duty-moto').click()
+  await expect(page.getByTestId('duty-moto')).toContainText('En service')
+  await page.keyboard.press('Escape')
+  await expect.poll(async () => (await fareProbe())?.duty).toBe('moto')
+
+  // Walk to it, climb on: the driver is seen astride.
+  await page.evaluate(() =>
+    (window as unknown as { __LOME_GOTO_TAXI?: () => void }).__LOME_GOTO_TAXI?.(),
+  )
+  const getOn = page.getByRole('button', { name: 'Monter sur le zémidjan' })
+  await expect(getOn).toBeVisible({ timeout: 45000 })
+  await tap(getOn)
+  await expect.poll(async () => (await rider())?.vehicleKind, { timeout: 10000 }).toBe('moto')
+  await expect.poll(async () => (await rider())?.astride).toBe(true)
+
+  // A passer-by close to the moto hails: take them.
+  const name = await page.evaluate(() =>
+    (window as unknown as { __LOME_SUMMON_WALKER?: () => string | null }).__LOME_SUMMON_WALKER?.(),
+  )
+  expect(name).toBeTruthy()
+  const take = page.getByTestId('fare-take')
+  await expect(take).toBeVisible({ timeout: 10000 })
+  await expect(take).toContainText('te fait signe')
+  await tap(take)
+  const banner = page.getByTestId('fare-banner')
+  await expect(banner).toBeVisible()
+  const started = (await fareProbe())?.fare
+  expect(started?.price).toBeGreaterThanOrEqual(200)
+  await expect(banner).toContainText(started?.to.name ?? '???')
+  await expect(page.locator('[data-fare-dest]')).toHaveCount(1)
+  // Not there yet: dropping is not possible.
+  await expect(page.getByTestId('fare-drop')).toBeDisabled()
+  await page.screenshot({ path: testInfo.outputPath('zemidjan-fare.png') })
+
+  // At the door, still: drop them, get paid the agreed price.
+  const before = (await wallet()) ?? 0
+  await page.evaluate(() =>
+    (window as unknown as { __LOME_PARK_AT_FARE?: () => boolean }).__LOME_PARK_AT_FARE?.(),
+  )
+  const drop = page.getByTestId('fare-drop')
+  await expect(drop).toBeEnabled({ timeout: 5000 })
+  await tap(drop)
+  await expect.poll(wallet, { timeout: 5000 }).toBe(before + (started?.price ?? 0))
+  await expect.poll(async () => (await fareProbe())?.fare).toBeNull()
+  await expect(page.locator('[data-fare-dest]')).toHaveCount(0)
+  expect(errors).toEqual([])
+})
