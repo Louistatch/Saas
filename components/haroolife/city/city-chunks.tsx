@@ -706,7 +706,8 @@ function buildSub(
     const spec = buildingFor(lot, bank?.sizes ?? {})
     const [ax, , az] = worldPos(lot.x, lot.y)
     const [bx, , bz] = worldPos(lot.x + lot.w - 1, lot.y + lot.h - 1)
-    const inset = lot.w === 1 ? 0.14 : 0.1
+    // Keep the courtyard margin at every LOD, including the far silhouettes.
+    const inset = lot.name === null ? 0.27 : lot.w === 1 ? 0.14 : 0.1
     const fx0 = ax - E + inset
     const fz0 = az - E + inset
     const fx1 = bx + E - inset

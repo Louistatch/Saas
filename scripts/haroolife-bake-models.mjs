@@ -15,7 +15,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import sharp from 'sharp'
 
-const [kitsDir, outDir] = process.argv.slice(2)
+const [kitsDir, outDir, reuse] = process.argv.slice(2)
 if (!kitsDir || !outDir) {
   console.error('usage: haroolife-bake-models.mjs <kits-dir> <out-dir>')
   process.exit(1)
@@ -295,11 +295,32 @@ async function bake(kit, name) {
   return { pos, nrm, col, idx, min, max, source: `${kit}/${name}.glb` }
 }
 
+// A supplied city kit may not contain vehicles, furniture and nature already baked by the
+// project. Reuse those exact entries, without downloading or replacing their source assets.
+const prior =
+  reuse === '--reuse-existing'
+    ? JSON.parse(fs.readFileSync(path.join(outDir, 'kenney-pack.json'), 'utf8'))
+    : null
+const priorBin = prior ? fs.readFileSync(path.join(outDir, 'kenney-pack.bin')) : null
 const manifest = { version: 1, license: 'CC0-1.0 (Kenney, kenney.nl)', models: {} }
 const chunks = []
 let offset = 0
 const align = (n) => (n + 3) & ~3
 for (const [key, [kit, name]] of Object.entries(MODELS)) {
+  if (!fs.existsSync(path.join(kitsDir, kit, `${name}.glb`)) && prior && priorBin) {
+    const old = prior.models[key]
+    if (!old) throw new Error(`Missing source and existing baked model: ${key}`)
+    const end = align(old.layout.idx + old.tris * 3 * (old.wide ? 4 : 2))
+    const shift = offset - old.off
+    manifest.models[key] = {
+      ...old,
+      off: offset,
+      layout: Object.fromEntries(Object.entries(old.layout).map(([k, v]) => [k, v + shift])),
+    }
+    chunks.push(priorBin.subarray(old.off, end))
+    offset += end - old.off
+    continue
+  }
   const m = await bake(kit, name)
   const verts = m.pos.length / 3
   const extent = Math.max(...m.min.map(Math.abs), ...m.max.map(Math.abs)) || 1

@@ -30,6 +30,8 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Validate the active city pack and supplied models
+        run: npm run test:haroolife-map
       - name: Install local Chromium with headless WebGL drivers
         run: npx playwright install --with-deps chromium
       - name: Start the local Supabase stand-in (fixtures only, no real backend)

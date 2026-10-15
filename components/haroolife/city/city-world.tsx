@@ -35,6 +35,7 @@ import {
   WORLD_W,
   inEstate,
   landmarks,
+  worldLots,
 } from '@/lib/haroolife/city/world'
 import type { RendererId } from '@/lib/haroolife/engine/types'
 import type { Transport } from '@/lib/haroolife/lome-life-engine'
@@ -78,7 +79,7 @@ type EditTool = BuildType | 'inspect' | 'demolish'
 // React Three Fiber interior (behind ?engine=three): its own chunk, never downloaded otherwise.
 const InteriorThree = dynamic(() => import('../engine-three/interior-three'), { ssr: false })
 
-export const PLAYER_MODEL = 'character-female-a'
+export const PLAYER_MODEL = 'afi'
 
 function Model({
   url,
@@ -236,11 +237,11 @@ const Agents = memo(function Agents({
             <Character
               key={a.id}
               name={`zémidjan ${a.id}`}
-              model="character-male-b"
+              model={adultFor('character-male-b')}
               position={pos}
               rotation={a.heading}
               anim="rest"
-              scale={0.85}
+              scale={STREET_SCALE}
               active={animated.has(a.id)}
               onEntity={register(a.id)}
             />
@@ -324,11 +325,11 @@ export function daylight(hour: number) {
           .padStart(2, '0'),
       )
       .join('')}`
-  const sun = 0.72 + t * 1.05
+  const sun = 0.65 + t * 0.35
   const sunColor = hex(
     mix([0.8, 0.85, 1], mix([1, 1, 0.96], [1, 0.78, 0.55], warm), Math.min(1, t * 2)),
   )
-  const ambient = hex(mix([0.4, 0.46, 0.56], [0.72, 0.8, 0.86], Math.min(1, t * 1.8)))
+  const ambient = hex(mix([0.4, 0.46, 0.56], [0.5, 0.55, 0.6], Math.min(1, t * 1.8)))
   return { sky: hex(sky), sun, sunColor, ambient, night: t < 0.08 }
 }
 type double = number
@@ -360,6 +361,10 @@ function Picker({
   const app = useApp()
   const cam = useRef(camera)
   cam.current = camera
+  // Camera sync happens while dragging. Keep the listeners and the active pointer gesture
+  // alive across those renders; only their callbacks change.
+  const actions = useRef({ onPan, onOrbit, onZoom, onTap })
+  actions.current = { onPan, onOrbit, onZoom, onTap }
   // Pending pan since the last React commit: applied to the camera entity every frame,
   // handed to React at most every 120 ms (and when the finger lifts).
   const pending = useRef({ dx: 0, dz: 0, since: 0 })
@@ -367,8 +372,8 @@ function Picker({
     const p = pending.current
     if (p.dx === 0 && p.dz === 0) return
     pending.current = { dx: 0, dz: 0, since: 0 }
-    onPan(p.dx, p.dz)
-  }, [onPan])
+    actions.current.onPan(p.dx, p.dz)
+  }, [])
   useAppEvent('update', () => {
     const p = pending.current
     if (!app || (p.dx === 0 && p.dz === 0)) return
@@ -382,6 +387,7 @@ function Picker({
     let startDist = 0
     let last: { x: number; y: number } | null = null
     const down = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
       if (pointers.size === 1) {
         moved = false
@@ -389,6 +395,7 @@ function Picker({
       } else if (pointers.size === 2) {
         const [a, b] = [...pointers.values()]
         startDist = Math.hypot(a.x - b.x, a.y - b.y)
+        moved = true
       }
     }
     const move = (e: PointerEvent) => {
@@ -398,7 +405,7 @@ function Picker({
         const [a, b] = [...pointers.values()]
         const d = Math.hypot(a.x - b.x, a.y - b.y)
         if (startDist > 0 && Math.abs(d - startDist) > 6) {
-          onZoom(startDist / d)
+          actions.current.onZoom(startDist / d)
           startDist = d
         }
         moved = true
@@ -410,7 +417,7 @@ function Picker({
       if (!moved && Math.hypot(dx, dy) < 7) return
       moved = true
       last = { x: e.clientX, y: e.clientY }
-      if (onOrbit(dx, dy)) return
+      if (actions.current.onOrbit(dx, dy)) return
       // Screen drag → ground drag, rotated by the camera azimuth and scaled with distance.
       const k = cam.current.distance / 520
       const a = (cam.current.angle * Math.PI) / 180
@@ -422,11 +429,13 @@ function Picker({
       p.dz += gz
     }
     const up = (e: PointerEvent) => {
+      // A tap on a place icon, drawer or joystick never started on this canvas.
+      if (!pointers.has(e.pointerId)) return
       const wasSingle = pointers.size === 1
       pointers.delete(e.pointerId)
       flush()
       if (!wasSingle || moved) {
-        if (pointers.size === 0) last = null
+        last = pointers.size === 1 ? [...pointers.values()][0] : null
         return
       }
       last = null
@@ -434,8 +443,9 @@ function Picker({
       const cc = camEntity?.camera
       if (!cc) return
       const rect = canvas.getBoundingClientRect()
-      const sx = ((e.clientX - rect.left) * canvas.width) / rect.width
-      const sy = ((e.clientY - rect.top) * canvas.height) / rect.height
+      // CameraComponent uses CSS pixels (device.clientRect), not the render backbuffer.
+      const sx = e.clientX - rect.left
+      const sy = e.clientY - rect.top
       const from = cc.screenToWorld(sx, sy, cc.nearClip)
       const to = cc.screenToWorld(sx, sy, cc.farClip)
       const dir = new pc.Vec3().sub2(to, from)
@@ -443,19 +453,32 @@ function Picker({
       const t = -from.y / dir.y
       if (t < 0) return
       const hit = new pc.Vec3().copy(dir).mulScalar(t).add(from)
-      onTap(cellOf(hit.x, hit.z))
+      actions.current.onTap(cellOf(hit.x, hit.z))
+    }
+    const cancel = (e: PointerEvent) => {
+      if (!pointers.has(e.pointerId)) return
+      pointers.delete(e.pointerId)
+      moved = true
+      last = pointers.size === 1 ? [...pointers.values()][0] : null
+      flush()
+    }
+    const wheel = (e: WheelEvent) => {
+      e.preventDefault()
+      actions.current.onZoom(Math.exp(Math.max(-0.2, Math.min(0.2, e.deltaY * 0.001))))
     }
     canvas.addEventListener('pointerdown', down)
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
-    window.addEventListener('pointercancel', up)
+    window.addEventListener('pointercancel', cancel)
+    canvas.addEventListener('wheel', wheel, { passive: false })
     return () => {
       canvas.removeEventListener('pointerdown', down)
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
-      window.removeEventListener('pointercancel', up)
+      window.removeEventListener('pointercancel', cancel)
+      canvas.removeEventListener('wheel', wheel)
     }
-  }, [app, onZoom, onTap, flush, onOrbit])
+  }, [app, flush])
   return null
 }
 
@@ -477,7 +500,7 @@ function LabelProjector({
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new names state = new sizes
   useEffect(() => {
     sizes.current = new WeakMap()
-  }, [names])
+  }, [names, lots])
   useEffect(() => {
     const drop = () => {
       rect.current = null
@@ -498,8 +521,6 @@ function LabelProjector({
     const canvas = app.graphicsDevice.canvas as HTMLCanvasElement
     if (!rect.current || rect.current.width === 0) rect.current = canvas.getBoundingClientRect()
     const r = rect.current
-    const kx = r.width / canvas.width
-    const ky = r.height / canvas.height
     const children = overlay.current.children
     // Project every label, then place them by priority (the selected place first, then the
     // nearest to the screen centre): a label that would overlap one already placed is hidden.
@@ -512,8 +533,8 @@ function LabelProjector({
       const [px, , pz] = worldPos(lot.x + (lot.w - 1) / 2, lot.y + (lot.h - 1) / 2)
       const h = 0.6 + lot.floors * 0.5 + 0.9
       const p = cc.worldToScreen(at.current.set(px, h, pz), tmp.current)
-      const x = p.x * kx
-      const y = p.y * ky
+      const x = p.x
+      const y = p.y
       // Inside the map area: below the top bars, above the bottom navigation, off the edges.
       const visible = p.z > 0 && x >= 24 && y >= 200 && x <= r.width - 24 && y <= r.height - 110
       if (!visible) {
@@ -524,7 +545,10 @@ function LabelProjector({
       items.push({ el, x, y, pri: (el.dataset.priority === '1' ? -1e6 : 0) + d })
     }
     items.sort((a, b) => a.pri - b.pri)
-    const placed: [number, number, number, number][] = []
+    // Reserve the compact camera toolbar as well as other labels.
+    const placed: [number, number, number, number][] = [
+      [r.width - 64, r.height * 0.38, r.width - 8, r.height * 0.38 + 250],
+    ]
     let shownNames = 0
     for (const it of items) {
       let size = sizes.current.get(it.el)
@@ -533,6 +557,9 @@ function LabelProjector({
         size = { w: it.el.offsetWidth || 44, h: it.el.offsetHeight || 44 }
         sizes.current.set(it.el, size)
       }
+      // Long names must fit inside the viewport, not merely have an anchor inside it.
+      it.x = Math.max(8 + size.w / 2, Math.min(r.width - 8 - size.w / 2, it.x))
+      it.y = Math.max(200 + size.h, it.y)
       const box: [number, number, number, number] = [
         it.x - size.w / 2,
         it.y - size.h,
@@ -540,7 +567,7 @@ function LabelProjector({
         it.y,
       ]
       const hit = placed.some(
-        (b) => box[0] < b[2] - 4 && box[2] > b[0] + 4 && box[1] < b[3] - 4 && box[3] > b[1] + 4,
+        (b) => box[0] < b[2] + 4 && box[2] > b[0] - 4 && box[1] < b[3] + 4 && box[3] > b[1] - 4,
       )
       const tooManyNames = names && it.el.dataset.priority !== '1' && shownNames >= 8
       if (hit || tooManyNames) {
@@ -722,6 +749,9 @@ export default function CityWorld({
   renderer = 'playcanvas',
   input,
   onLeave,
+  mapView = false,
+  onOverview,
+  onFollow,
 }: {
   city: City
   tool: EditTool
@@ -779,6 +809,9 @@ export default function CityWorld({
   input?: InputState
   /** Leave the current building (walking out of the door in the 'three' interior). */
   onLeave?: () => void
+  mapView?: boolean
+  onOverview?: () => void
+  onFollow?: () => void
 }) {
   bump('world')
   const hasEstate = LOCALITIES[locality].estate !== null
@@ -811,7 +844,9 @@ export default function CityWorld({
   onBillboardRef.current = onBillboard
   const stableOnBillboard = useCallback((id: string) => onBillboardRef.current(id), [])
   const labels = useMemo(() => {
-    const all = landmarks().filter((l) => filter === 'all' || CATEGORY_OF[l.type] === filter)
+    const source = filter === 'homes' || filter === 'lots' ? worldLots() : landmarks()
+    const all = source.filter((l) => filter === 'all' || CATEGORY_OF[l.type] === filter)
+    if (selectedLot && !all.some((l) => l.id === selectedLot.id)) all.unshift(selectedLot)
     const radius = camera.distance < 40 ? 20 : 30
     // The nearest places first: the projector then keeps those that fit on screen.
     return all
@@ -820,13 +855,14 @@ export default function CityWorld({
       )
       .sort(
         (a, b) =>
-          Math.hypot(a.x - centerCell.x, a.y - centerCell.y) -
-          Math.hypot(b.x - centerCell.x, b.y - centerCell.y),
+          (a.id === selectedLot?.id ? -1e6 : Math.hypot(a.x - centerCell.x, a.y - centerCell.y)) -
+          (b.id === selectedLot?.id ? -1e6 : Math.hypot(b.x - centerCell.x, b.y - centerCell.y)),
       )
       .slice(0, camera.distance < 40 ? 24 : 16)
     // biome-ignore lint/correctness/useExhaustiveDependencies: landmarks() reads the active locality
-  }, [centerCell.x, centerCell.y, filter, camera.distance, locality])
-  const light = useMemo(() => daylight(hour), [hour])
+  }, [centerCell.x, centerCell.y, filter, camera.distance, locality, selectedLot])
+  // The aerial map is a readable territory guide; the street keeps the game's day/night cycle.
+  const light = useMemo(() => daylight(mapView ? 10 : hour), [hour, mapView])
 
   // Free camera (not following): drag pans the rig's target in ground units.
   const onPan = useCallback(
@@ -836,7 +872,8 @@ export default function CityWorld({
       rig.follow = false
       rig.tx = Math.max(-5, Math.min(WORLD_W + 5, rig.tx + dx / CELL))
       rig.tz = Math.max(-5, Math.min(WORLD_H + 5, rig.tz + dz / CELL))
-      onCamera({ ...camera, tx: rig.tx, tz: rig.tz })
+      const [tx, , tz] = worldPos(rig.tx, rig.tz)
+      onCamera({ ...camera, tx, tz })
     },
     [camera, onCamera, controller],
   )
@@ -921,7 +958,15 @@ export default function CityWorld({
           centerX={centerCell.x}
           centerY={centerCell.y}
           onStats={onStats}
-          rings={{ near: preset.nearRing, mid: preset.midRing, far: preset.farRing }}
+          rings={{
+            near: preset.nearRing,
+            mid: preset.midRing,
+            // Keep land and water under the whole aerial frame. Only the cheap far
+            // silhouettes extend; the detailed geometry and animation budgets stay bounded.
+            far: mapView
+              ? Math.max(preset.farRing, Math.ceil(camera.distance / 20))
+              : preset.farRing,
+          }}
           detailCells={preset.detailCells}
           lowCells={preset.lowCells}
           triangleBudget={preset.triangleBudget}
@@ -980,6 +1025,7 @@ export default function CityWorld({
             )}
             <Agents agents={agents} step={step} animated={animated} />
             <PlayerRig
+              mapView={mapView}
               controller={controller}
               model={avatarModel}
               pagne={avatarPagne}
@@ -1060,74 +1106,85 @@ export default function CityWorld({
                 style={{ display: 'none' }}
               >
                 <span
-                  className={`flex h-8 items-center gap-1.5 rounded-full border-2 px-1.5 text-[11px] font-bold shadow-md ${
+                  className={`flex h-8 min-w-0 max-w-full items-center gap-1.5 rounded-full border-2 px-1.5 text-[11px] font-bold shadow-md ${
                     selectedLot?.id === lot.id
                       ? 'border-emerald-800 bg-emerald-700 text-white'
                       : 'border-white bg-white/95 text-slate-900'
                   } ${named ? 'pr-2.5' : 'w-8 justify-center'}`}
                 >
-                  <span className="text-sm leading-none">{TYPE_ICONS[lot.type]}</span>
-                  {named && <span className="truncate">{lot.name}</span>}
+                  <span className="shrink-0 text-sm leading-none">{TYPE_ICONS[lot.type]}</span>
+                  {named && <span className="min-w-0 truncate">{lot.name}</span>}
                 </span>
               </button>
             )
           })}
         </div>
       )}
-      <div className="absolute right-3 top-[33%] flex flex-col gap-2">
-        <button
-          type="button"
-          aria-label="Zoom avant"
-          onClick={() => onZoom(0.8)}
-          className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
-        >
-          <Plus className="h-5 w-5" />
-        </button>
-        <button
-          type="button"
-          aria-label="Zoom arrière"
-          onClick={() => onZoom(1.25)}
-          className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
-        >
-          <Minus className="h-5 w-5" />
-        </button>
-        <button
-          type="button"
-          aria-label="Tourner la caméra"
-          onClick={() => {
-            controller.camera.angle = (controller.camera.angle + 45) % 360
-          }}
-          className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
-        >
-          <RotateCcw className="h-5 w-5" />
-        </button>
-        <button
-          type="button"
-          aria-label="Recentrer sur moi"
-          onClick={() => {
-            controller.camera.follow = true
-            controller.camera.distance = Math.min(controller.camera.distance, FOLLOW_DISTANCE)
-          }}
-          className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
-        >
-          <Maximize2 className="h-5 w-5" />
-        </button>
-        <button
-          type="button"
-          aria-label="Vue de la ville"
-          onClick={() => {
-            const rig = controller.camera
-            rig.follow = false
-            rig.tx = 60
-            rig.tz = 40
-            rig.distance = MAP_DISTANCE
-            onCamera({ ...camera, tx: 60, tz: 40, distance: MAP_DISTANCE })
-          }}
-          className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
-        >
-          <Compass className="h-5 w-5" />
-        </button>
-      </div>
+      {!scene && (
+        <div className="absolute right-3 top-[38%] flex flex-col gap-1 rounded-2xl bg-white/95 p-1 shadow-lg [&>button]:min-h-11 [&>button]:min-w-11 [&>button]:shadow-none">
+          <button
+            type="button"
+            aria-label="Zoom avant"
+            onClick={() => onZoom(0.8)}
+            className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
+          >
+            <Plus className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            aria-label="Zoom arrière"
+            onClick={() => onZoom(1.25)}
+            className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
+          >
+            <Minus className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            aria-label="Tourner la caméra"
+            onClick={() => {
+              controller.camera.angle = (controller.camera.angle + 45) % 360
+            }}
+            className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
+          >
+            <RotateCcw className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            aria-label="Recentrer sur moi"
+            onClick={() => {
+              if (onFollow) {
+                onFollow()
+                return
+              }
+              controller.camera.follow = true
+              controller.camera.distance = Math.min(controller.camera.distance, FOLLOW_DISTANCE)
+            }}
+            className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
+          >
+            <Maximize2 className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            aria-label="Vue de la ville"
+            onClick={() => {
+              if (onOverview) {
+                onOverview()
+                return
+              }
+              const rig = controller.camera
+              rig.follow = false
+              rig.tx = 60
+              rig.tz = 40
+              rig.distance = MAP_DISTANCE
+              const [tx, , tz] = worldPos(60, 40)
+              onCamera({ ...camera, tx, tz, distance: MAP_DISTANCE })
+            }}
+            className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
+          >
+            <Compass className="h-5 w-5" />
+          </button>
+        </div>
+      )}
     </div>
   )
 }

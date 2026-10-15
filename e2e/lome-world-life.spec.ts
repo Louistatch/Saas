@@ -101,6 +101,7 @@ test('a day in Lomé: from home to the gym, a workout on real equipment, and bac
     () => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? '{}').life?.wallet,
   )
   await sheet.getByRole('button', { name: /Zémidjan/ }).click()
+  await sheet.getByRole('button', { name: 'Confirmer le trajet' }).click()
   await expect(page.getByLabel('Trajet en cours')).toBeVisible()
   await shot('03-ride')
   await expect.poll(() => stats(page).then((s) => s?.route ?? 99), { timeout: 20000 }).toBe(0)

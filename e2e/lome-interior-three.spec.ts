@@ -38,6 +38,7 @@ async function enterGym(page: Page) {
   await page.getByRole('button', { name: /Salle Fitness Tokoin/ }).click()
   const sheet = page.getByRole('dialog', { name: 'Lieu' })
   await sheet.getByRole('button', { name: /Taxi/ }).click()
+  await sheet.getByRole('button', { name: 'Confirmer le trajet' }).click()
   await page
     .getByLabel('Trajet en cours')
     .getByRole('button', { name: /Passer/ })

@@ -72,6 +72,7 @@ test('« Ma coopérative » : camera, entrance and the spatial dashboard of a re
 
   // Go there by taxi (skip the ride), then enter: the dashboard opens by itself.
   await lotSheet.getByRole('button', { name: /Taxi/ }).click()
+  await lotSheet.getByRole('button', { name: 'Confirmer le trajet' }).click()
   await expect(page.getByLabel('Trajet en cours')).toBeVisible()
   await page
     .getByLabel('Trajet en cours')
@@ -182,6 +183,7 @@ test('the market shows real presales and announcements, never a phone number', a
   await page.getByRole('button', { name: /Grand marché d’Assigamé/ }).click()
   const lotSheet = page.getByRole('dialog', { name: 'Lieu' })
   await lotSheet.getByRole('button', { name: /Taxi/ }).click()
+  await lotSheet.getByRole('button', { name: 'Confirmer le trajet' }).click()
   await page
     .getByLabel('Trajet en cours')
     .getByRole('button', { name: /Passer/ })

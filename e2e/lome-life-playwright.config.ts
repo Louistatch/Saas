@@ -1,8 +1,12 @@
 import { defineConfig, devices } from '@playwright/test'
 
+const port = Number(process.env.HAROOLIFE_TEST_PORT || 3000)
+const baseURL = `http://127.0.0.1:${port}`
+
 export default defineConfig({
   testDir: './',
   testMatch: [
+    'lome-map-native.spec.ts',
     'lome-life.spec.ts',
     'lome-presence.spec.ts',
     'lome-city.spec.ts',
@@ -25,7 +29,7 @@ export default defineConfig({
   timeout: 160_000,
   expect: { timeout: 20_000 },
   use: {
-    baseURL: 'http://127.0.0.1:3000',
+    baseURL,
     launchOptions: {
       // Cloud sessions ship Chromium at this path; a local Playwright install may override it.
       executablePath: process.env.PW_CHROMIUM_PATH || undefined,
@@ -54,8 +58,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: '[ -f .next/BUILD_ID ] || npm run build; npm run start -- --hostname 127.0.0.1',
-    url: 'http://127.0.0.1:3000/haroolife/territoire/lome',
+    command: `[ -f .next/BUILD_ID ] || npm run build; npm run start -- --hostname 127.0.0.1 --port ${port}`,
+    url: `${baseURL}/haroolife/territoire/lome`,
     reuseExistingServer: !process.env.CI,
     timeout: 300_000,
   },

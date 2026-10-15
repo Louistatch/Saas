@@ -153,6 +153,7 @@ test('performance scenarios A–F', async ({ page, browserName }, testInfo) => {
     .click()
   await page.getByRole('button', { name: /Salle Fitness Tokoin/ }).click()
   await page.getByRole('dialog', { name: 'Lieu' }).getByRole('button', { name: /Taxi/ }).click()
+  await page.getByRole('button', { name: 'Confirmer le trajet' }).click()
   await page
     .getByLabel('Trajet en cours')
     .getByRole('button', { name: /Passer/ })

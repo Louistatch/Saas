@@ -117,6 +117,7 @@ test('Lomé Life 3D opens on a dense, explorable city and completes a full outin
   await expect(page.getByRole('dialog', { name: 'Lieu' })).toBeVisible()
   await expect(page.getByText('S’entraîner')).toBeVisible()
   await page.getByRole('button', { name: /Zémidjan/ }).click()
+  await page.getByRole('button', { name: 'Confirmer le trajet' }).click()
   await expect(page.getByLabel('Trajet en cours')).toBeVisible()
   await page
     .getByLabel('Trajet en cours')
@@ -161,6 +162,7 @@ test('Lomé Life 3D opens on a dense, explorable city and completes a full outin
       .click()
     await page.getByRole('button', { name }).click()
     await page.getByRole('button', { name: /Taxi/ }).click()
+    await page.getByRole('button', { name: 'Confirmer le trajet' }).click()
     await page
       .getByLabel('Trajet en cours')
       .getByRole('button', { name: /Passer/ })

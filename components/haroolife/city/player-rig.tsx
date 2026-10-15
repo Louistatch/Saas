@@ -92,6 +92,7 @@ export default function PlayerRig({
   vehicleEntity,
   onEvents,
   onCameraSync,
+  mapView = false,
 }: {
   controller: PlayerController
   model: string
@@ -103,6 +104,7 @@ export default function PlayerRig({
   onEvents: (events: ReturnType<PlayerController['drain']>, c: PlayerController) => void
   /** Low-rate camera report for chunk streaming and labels. */
   onCameraSync: (cam: CameraRig) => void
+  mapView?: boolean
 }) {
   const app = useApp()
   const avatar = useRef<pc.Entity | null>(null)
@@ -186,7 +188,7 @@ export default function PlayerRig({
     const cam = cameraEntity.current
     if (cam) {
       const c = controller.camera
-      const pitch = cameraPitch(c.distance)
+      const pitch = mapView ? -65 : cameraPitch(c.distance)
       const az = (c.angle * Math.PI) / 180
       const pr = (-pitch * Math.PI) / 180
       const horiz = c.distance * Math.cos(pr)

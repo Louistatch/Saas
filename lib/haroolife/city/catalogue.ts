@@ -247,12 +247,15 @@ export function buildingFor(lot: Lot, sizes: SizeTable): BuildingSpec {
     margin?: number,
   ): Placement => {
     const f = margin === undefined ? fp : footprint(lot, margin)
+    // Preserve every persisted lot and its door. Only its visual footprint changes: ordinary
+    // buildings keep a garden/courtyard instead of filling the entire cadastral square.
+    const yard = lot.name === null ? 0.78 : 0.9
     return {
       model,
       cx: c.cx,
       cy: c.cy,
       rot,
-      scale: scaleFor(sizes[model] ?? [1, 1, 1], f.w, f.d, rot, lo, hi),
+      scale: scaleFor(sizes[model] ?? [1, 1, 1], f.w, f.d, rot, lo, hi) * yard,
       tint,
     }
   }
@@ -287,7 +290,7 @@ export function buildingFor(lot: Lot, sizes: SizeTable): BuildingSpec {
     case 'house': {
       const model = lot.w >= 2 ? pick(LARGE_HOUSES, r1) : pick(SMALL_HOUSES, r1)
       const tint = pick(HOUSE_TINTS, r2)
-      const m = main(model, tint, 0.8, lot.w >= 2 ? 1.9 : 1.45, lot.w >= 2 ? 0.9 : 0.3)
+      const m = main(model, tint, 0.4, lot.w >= 2 ? 1.9 : 1.45, lot.w >= 2 ? 0.9 : 0.3)
       // Concessions: a low wall with a gate on the door side, a tree and a planter.
       if (lot.w >= 2 || r3 > 0.45) {
         const gap = rot === 0 ? 's' : rot === 180 ? 'n' : rot === 90 ? 'w' : 'e'
@@ -324,13 +327,15 @@ export function buildingFor(lot: Lot, sizes: SizeTable): BuildingSpec {
     case 'apartment': {
       const wide = lot.w >= 2
       const model =
-        lot.floors >= 6
-          ? pick(wide ? TOWERS_WIDE : TOWERS, r1)
-          : lot.floors >= 4
-            ? pick(wide ? TALL_WIDE : TALL_COMMERCIAL, r1)
-            : lot.floors === 3
-              ? pick(MID_COMMERCIAL, r1)
-              : pick(wide ? LOW_WIDE : LOW_COMMERCIAL, r1)
+        lot.name === null
+          ? pick(wide ? ['com-e', 'com-k', 'sub-f', 'sub-n'] : ['com-c', 'com-b', 'sub-b'], r1)
+          : lot.floors >= 6
+            ? pick(wide ? TOWERS_WIDE : TOWERS, r1)
+            : lot.floors >= 4
+              ? pick(wide ? TALL_WIDE : TALL_COMMERCIAL, r1)
+              : lot.floors === 3
+                ? pick(MID_COMMERCIAL, r1)
+                : pick(wide ? LOW_WIDE : LOW_COMMERCIAL, r1)
       const tint = pick(HOUSE_TINTS, r2)
       const m = main(model, tint, 0.5, 2.6, 0.2)
       if (lot.w >= 2 && r3 > 0.5) {

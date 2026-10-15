@@ -136,7 +136,7 @@ import {
   Clock3,
   Hammer,
   Home,
-  Map,
+  Map as MapIcon,
   Pause,
   Phone,
   Play,
@@ -153,6 +153,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Drawer } from 'vaul'
 import CooperativePanel from './city/cooperative-panel'
 import DiagOverlay, { initialDiag, rememberDiag } from './city/diag-overlay'
 import Joystick, { useKeyboardInput } from './city/joystick'
@@ -227,12 +228,12 @@ const VENUE_LABELS: Record<string, string> = {
 }
 const LOCATION_ICONS = ['🏠', '🛒', '🥖', '🏛️', '🚰', '🌳']
 /** Camera distance of the map view: a neighbourhood with its streets and landmarks. */
-const MAP_VIEW_DISTANCE = 46
+const MAP_VIEW_DISTANCE = 68
 
 const NAV_ITEMS = [
   { id: 'home', label: 'Maison', icon: Home },
   { id: 'shop', label: 'Aménager', icon: ShoppingBag },
-  { id: 'map', label: 'Carte', icon: Map },
+  { id: 'map', label: 'Carte', icon: MapIcon },
   { id: 'phone', label: 'Téléphone', icon: Phone },
 ] as const
 const NEEDS = [
@@ -420,6 +421,7 @@ export function LomeLifeImmersive() {
    * view keeps the close camera and shows no town-wide filters or names.
    */
   const [mapView, setMapView] = useState(false)
+  const playHeading = useRef(35)
   const [showNames, setShowNames] = useState(false)
   const [chunkStats, setChunkStats] = useState({
     chunks: 0,
@@ -469,6 +471,8 @@ export function LomeLifeImmersive() {
   const [selection, setSelection] = useState<{ x: number; y: number } | null>(null)
   const [playing, setPlaying] = useState(false)
   const [transport, setTransport] = useState<Transport>('walk')
+  const [tripChoice, setTripChoice] = useState<Transport | null>(null)
+  useEffect(() => setTripChoice(null), [selectedLot?.id, panel])
   const [riding, setRiding] = useState(false)
   const [mapFilter, setMapFilter] = useState<MapFilter>('all')
   const [billboard, setBillboard] = useState<string | null>(null)
@@ -952,7 +956,10 @@ export function LomeLifeImmersive() {
       setCityLife((old) => ({ ...old, route: [], target: null }))
   }, [controller])
   // Indoors the keyboard walks the player only where the renderer lets them walk (R3F interiors).
-  useKeyboardInput(input, panel === null && (!insideAny || renderer === 'three') && !riding)
+  useKeyboardInput(
+    input,
+    panel === null && !mapView && (!insideAny || renderer === 'three') && !riding,
+  )
   // Test hooks: walkability of a cell and an automatic walk to the player's taxi.
   useEffect(() => {
     const w = window as unknown as {
@@ -1049,19 +1056,23 @@ export function LomeLifeImmersive() {
   function enterMap() {
     setPanel(null)
     const rig = controller.camera
+    if (!mapView) playHeading.current = rig.angle
     rig.follow = false
+    rig.angle = 0
     rig.tx = controller.pos.x
     rig.tz = controller.pos.z
     rig.distance = MAP_VIEW_DISTANCE
-    setCamera((c) => ({ ...c, tx: rig.tx, tz: rig.tz, distance: rig.distance }))
+    const [tx, , tz] = worldPos(rig.tx, rig.tz)
+    setCamera((c) => ({ ...c, tx, tz, distance: rig.distance, angle: rig.angle }))
     setMapView(true)
   }
   /** Back to the game: the close camera on the player, as it was before the map. */
   function exitMap() {
     const rig = controller.camera
     rig.follow = true
+    rig.angle = playHeading.current
     rig.distance = FOLLOW_DISTANCE
-    setCamera((c) => ({ ...c, distance: rig.distance }))
+    setCamera((c) => ({ ...c, distance: rig.distance, angle: rig.angle }))
     setShowNames(false)
     setMapView(false)
   }
@@ -1091,7 +1102,6 @@ export function LomeLifeImmersive() {
   function rideTo(lot: Lot, t: Transport) {
     if (life.wallet < TRAVEL_COST[t]) {
       setNotice('Solde insuffisant pour ce transport fictif.')
-      goLot(lot)
       return
     }
     if (mapView) exitMap()
@@ -1396,7 +1406,7 @@ export function LomeLifeImmersive() {
               if (lot) {
                 setSelectedLot(lot)
                 setPanel('lot')
-              } else {
+              } else if (!mapView) {
                 controller.camera.follow = true
                 setCityLife((old) => goToPoint(old, cell))
               }
@@ -1409,6 +1419,15 @@ export function LomeLifeImmersive() {
             selectedLot={selectedLot}
             labelsHidden={panel !== null || !mapView}
             showNames={showNames}
+            mapView={mapView}
+            onOverview={() => {
+              if (!mapView) enterMap()
+              else {
+                controller.camera.distance = 100
+                setCamera((c) => ({ ...c, distance: 100 }))
+              }
+            }}
+            onFollow={exitMap}
             onStats={(s) =>
               setChunkStats((old) =>
                 old.chunks === s.chunks &&
@@ -1753,7 +1772,7 @@ export function LomeLifeImmersive() {
           <button
             type="button"
             onClick={() => open('journal')}
-            role="status"
+            aria-live="polite"
             className="max-w-[94%] rounded-2xl bg-slate-950/65 px-3 py-2 text-left text-[11px] font-medium text-white shadow backdrop-blur sm:text-xs"
           >
             {status.length > 95 ? status.slice(0, 92) + '…' : status}
@@ -1929,956 +1948,992 @@ export function LomeLifeImmersive() {
         />
       )}
       {panel && panel !== 'residence' && panel !== 'phone' && (
-        <div className="absolute inset-0 z-40" aria-label={title}>
-          <button
-            type="button"
-            aria-label="Fermer le panneau"
-            className="absolute inset-0 bg-slate-950/40"
-            onClick={() => setPanel(null)}
-          />
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-label={title}
-            className="absolute inset-x-0 bottom-[calc(85px+env(safe-area-inset-bottom))] mx-auto flex max-h-[min(68dvh,680px)] w-[calc(100%-16px)] max-w-[620px] flex-col overflow-hidden rounded-[30px] border border-white/80 bg-white shadow-2xl sm:max-h-[70dvh]"
-          >
-            <div className="mx-auto mt-2 h-1.5 w-11 shrink-0 rounded-full bg-slate-200" />
-            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 px-5 pb-3 pt-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
-                  {panel === 'messages' && realtime.state.status === 'online'
-                    ? 'Lomé Life · En direct'
-                    : 'Lomé Life · Quartier fictif'}
-                </p>
-                <h2 className="text-xl font-black">{title}</h2>
-              </div>
-              <button
-                type="button"
-                aria-label="Fermer"
-                onClick={() => (firstRun && panel === 'avatar' ? confirmAvatar() : setPanel(null))}
-                className="rounded-full bg-slate-100 p-2"
-              >
-                <X size={21} />
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 pb-5 pt-4 sm:px-5">
-              {notice && (
-                <div
-                  role="alert"
-                  className="rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-900"
-                >
-                  {notice}
+        <Drawer.Root
+          open
+          autoFocus
+          handleOnly
+          shouldScaleBackground={false}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) {
+              if (firstRun && panel === 'avatar') confirmAvatar()
+              else setPanel(null)
+            }
+          }}
+        >
+          <Drawer.Portal>
+            <Drawer.Overlay className="fixed inset-0 z-[110] bg-slate-950/30" />
+            <Drawer.Content
+              aria-label={title}
+              aria-describedby={undefined}
+              className="fixed inset-x-0 bottom-[calc(85px+env(safe-area-inset-bottom))] z-[120] mx-auto flex max-h-[min(68dvh,680px)] w-[calc(100%-16px)] max-w-[620px] flex-col overflow-hidden rounded-[30px] border border-white/80 bg-white shadow-2xl outline-none sm:max-h-[70dvh]"
+            >
+              <Drawer.Handle
+                aria-label="Faire glisser pour fermer"
+                className="mx-auto mt-3 h-1.5 w-11 shrink-0 rounded-full bg-slate-300"
+              />
+              <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 px-5 pb-3 pt-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                    {panel === 'messages' && realtime.state.status === 'online'
+                      ? 'Lomé Life · En direct'
+                      : 'Lomé Life · Quartier fictif'}
+                  </p>
+                  <Drawer.Title className="text-xl font-black">{title}</Drawer.Title>
                 </div>
-              )}
-              {panel === 'home' && (
-                <>
-                  <p className="text-sm text-slate-600">
-                    Prends soin de ton personnage. Ses besoins influencent sa journée.
-                  </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {NEEDS.map((n) => (
-                      <div key={n.key} className="rounded-2xl bg-slate-50 p-3">
-                        <div className="mb-2 flex items-center justify-between text-xs">
-                          <span>
-                            {n.icon} {n.label}
-                          </span>
-                          <strong>{needs[n.key]}%</strong>
-                        </div>
-                        <NeedBar value={needs[n.key]} color={n.color} />
-                      </div>
-                    ))}
+                <button
+                  type="button"
+                  aria-label="Fermer"
+                  onClick={() =>
+                    firstRun && panel === 'avatar' ? confirmAvatar() : setPanel(null)
+                  }
+                  className="rounded-full bg-slate-100 p-2"
+                >
+                  <X size={21} />
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 pb-5 pt-4 sm:px-5">
+                {notice && (
+                  <div
+                    role="alert"
+                    className="rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-900"
+                  >
+                    {notice}
                   </div>
-                  <DailyStatus life={life} />
-                  {actor && <OnboardingSteps actor={actor} />}
-                  <div className="grid grid-cols-2 gap-2">
-                    <ActionButton
-                      title="Rentrer chez moi"
-                      onClick={() => go(9, 9)}
-                      icon={<Home size={17} />}
-                    />
-                    <ActionButton title="Entrer" outline onClick={() => action('enter')} />
-                    <ActionButton title="Dormir" outline onClick={() => atHome('sleep')} />
-                    <ActionButton title="Se laver" outline onClick={() => atHome('wash')} />
-                    <ActionButton title="Manger" outline onClick={() => atHome('eat')} />
-                    <ActionButton title="Se détendre" outline onClick={() => atHome('relax')} />
-                    <ActionButton title="Toilettes" outline onClick={() => atHome('toilet')} />
-                    <ActionButton title="Sortir" outline onClick={() => action('leave')} />
-                  </div>
-                </>
-              )}
-              {panel === 'shop' && (
-                <>
-                  <p className="text-sm text-slate-600">
-                    Les achats modifient ton argent et le stock réel du moteur de simulation
-                    fictive.
-                  </p>
-                  <div className="flex items-center justify-between rounded-2xl bg-emerald-50 p-4">
-                    <div>
-                      <strong className="block">🍲 Repas du quartier</strong>
-                      <span className="text-xs text-slate-600">
-                        Stock municipal : {life.city.food} · À consommer ensuite
-                      </span>
-                    </div>
-                    <strong className="text-sm">650 FCFA</strong>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <ActionButton title="Aller au marché" onClick={() => go(12, 11)} />
-                    <ActionButton
-                      title="Aller à la boulangerie"
-                      outline
-                      onClick={() => go(13, 11)}
-                    />
-                  </div>
-                  <ActionButton
-                    title="Acheter un repas · 650 FCFA"
-                    icon={<ShoppingBag size={17} />}
-                    onClick={() => action('buy-meal')}
-                  />
-                  <ActionButton
-                    title={'Manger · ' + life.meals + ' repas disponible(s)'}
-                    outline
-                    icon={<Utensils size={17} />}
-                    onClick={() => action('eat')}
-                  />
-                </>
-              )}
-              {panel === 'map' && (
-                <>
-                  <div className="rounded-2xl bg-slate-50 p-3" data-testid="national-map">
-                    <p className="text-sm font-black">Le Togo</p>
-                    <p className="text-[11px] text-slate-500">
-                      Tu es à {LOCALITIES[cityLife.locality].name} (
-                      {LOCALITIES[cityLife.locality].region}). Choisis une destination : le car
-                      interurbain t’y dépose à la gare routière, la ville se charge au fur et à
-                      mesure autour de toi.
+                )}
+                {panel === 'home' && (
+                  <>
+                    <p className="text-sm text-slate-600">
+                      Prends soin de ton personnage. Ses besoins influencent sa journée.
                     </p>
-                    <NationalMap current={cityLife.locality} onPick={travel} />
-                    <div className="mt-2 grid gap-1">
-                      {LOCALITY_IDS.filter((id) => id !== cityLife.locality).map((id) => {
-                        const trip = tripTo(cityLife, id)
-                        return (
-                          <button
-                            type="button"
-                            key={id}
-                            onClick={() => travel(id)}
-                            className="flex items-center gap-3 rounded-xl bg-white px-3 py-2 text-left text-xs ring-1 ring-slate-200 hover:ring-emerald-400"
-                          >
-                            <span className="text-base">🚌</span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block font-bold">
-                                Voyager vers {LOCALITIES[id].name}
-                              </span>
-                              <span className="block text-slate-500">
-                                {LOCALITIES[id].note} Car interurbain : {trip.hours} h,{' '}
-                                {money(trip.fare)} (tarif fictif).
-                              </span>
+                    <div className="grid grid-cols-2 gap-3">
+                      {NEEDS.map((n) => (
+                        <div key={n.key} className="rounded-2xl bg-slate-50 p-3">
+                          <div className="mb-2 flex items-center justify-between text-xs">
+                            <span>
+                              {n.icon} {n.label}
                             </span>
-                            <ArrowRight size={14} className="shrink-0 text-emerald-700" />
-                          </button>
-                        )
-                      })}
+                            <strong>{needs[n.key]}%</strong>
+                          </div>
+                          <NeedBar value={needs[n.key]} color={n.color} />
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                  <p className="text-sm text-slate-600">
-                    Toute la ville est là : touche un bâtiment dans la scène ou choisis un lieu. Ton
-                    personnage suit les rues, les ponts et les avenues.
-                  </p>
-                  <div className="flex flex-wrap gap-1" role="group" aria-label="Filtrer la ville">
-                    {(
-                      [
-                        'all',
-                        'homes',
-                        'shops',
-                        'education',
-                        'health',
-                        'transport',
-                        'services',
-                        'leisure',
-                        'worship',
-                        'lots',
-                      ] as const
-                    ).map((f) => (
-                      <button
-                        type="button"
-                        key={f}
-                        aria-pressed={cityFilter === f}
-                        onClick={() => setCityFilter(f)}
-                        className={
-                          'rounded-full px-3 py-1.5 text-xs font-semibold ' +
-                          (cityFilter === f
-                            ? 'bg-slate-900 text-white'
-                            : 'bg-slate-100 text-slate-700')
-                        }
-                      >
-                        {f === 'all' ? 'Tout' : CATEGORY_LABELS[f]}
-                      </button>
-                    ))}
-                  </div>
-                  {districts().map((d) => {
-                    const places = landmarksIn(d.id).filter(
-                      (l) => cityFilter === 'all' || CATEGORY_OF[l.type] === cityFilter,
-                    )
-                    if (places.length === 0) return null
-                    return (
-                      <div key={d.id} className="rounded-2xl bg-slate-50 p-3">
-                        <p className="text-sm font-black">{d.name}</p>
-                        <p className="text-[11px] text-slate-500">{d.note}</p>
-                        <div className="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-2">
-                          {places.map((lot) => (
+                    <DailyStatus life={life} />
+                    {actor && <OnboardingSteps actor={actor} />}
+                    <div className="grid grid-cols-2 gap-2">
+                      <ActionButton
+                        title="Rentrer chez moi"
+                        onClick={() => go(9, 9)}
+                        icon={<Home size={17} />}
+                      />
+                      <ActionButton title="Entrer" outline onClick={() => action('enter')} />
+                      <ActionButton title="Dormir" outline onClick={() => atHome('sleep')} />
+                      <ActionButton title="Se laver" outline onClick={() => atHome('wash')} />
+                      <ActionButton title="Manger" outline onClick={() => atHome('eat')} />
+                      <ActionButton title="Se détendre" outline onClick={() => atHome('relax')} />
+                      <ActionButton title="Toilettes" outline onClick={() => atHome('toilet')} />
+                      <ActionButton title="Sortir" outline onClick={() => action('leave')} />
+                    </div>
+                  </>
+                )}
+                {panel === 'shop' && (
+                  <>
+                    <p className="text-sm text-slate-600">
+                      Les achats modifient ton argent et le stock réel du moteur de simulation
+                      fictive.
+                    </p>
+                    <div className="flex items-center justify-between rounded-2xl bg-emerald-50 p-4">
+                      <div>
+                        <strong className="block">🍲 Repas du quartier</strong>
+                        <span className="text-xs text-slate-600">
+                          Stock municipal : {life.city.food} · À consommer ensuite
+                        </span>
+                      </div>
+                      <strong className="text-sm">650 FCFA</strong>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <ActionButton title="Aller au marché" onClick={() => go(12, 11)} />
+                      <ActionButton
+                        title="Aller à la boulangerie"
+                        outline
+                        onClick={() => go(13, 11)}
+                      />
+                    </div>
+                    <ActionButton
+                      title="Acheter un repas · 650 FCFA"
+                      icon={<ShoppingBag size={17} />}
+                      onClick={() => action('buy-meal')}
+                    />
+                    <ActionButton
+                      title={'Manger · ' + life.meals + ' repas disponible(s)'}
+                      outline
+                      icon={<Utensils size={17} />}
+                      onClick={() => action('eat')}
+                    />
+                  </>
+                )}
+                {panel === 'map' && (
+                  <>
+                    <div className="rounded-2xl bg-slate-50 p-3" data-testid="national-map">
+                      <p className="text-sm font-black">Le Togo</p>
+                      <p className="text-[11px] text-slate-500">
+                        Tu es à {LOCALITIES[cityLife.locality].name} (
+                        {LOCALITIES[cityLife.locality].region}). Choisis une destination : le car
+                        interurbain t’y dépose à la gare routière, la ville se charge au fur et à
+                        mesure autour de toi.
+                      </p>
+                      <NationalMap current={cityLife.locality} onPick={travel} />
+                      <div className="mt-2 grid gap-1">
+                        {LOCALITY_IDS.filter((id) => id !== cityLife.locality).map((id) => {
+                          const trip = tripTo(cityLife, id)
+                          return (
                             <button
                               type="button"
-                              key={lot.id}
-                              onClick={() => {
-                                setSelectedLot(lot)
-                                setPanel('lot')
-                              }}
-                              className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-left text-xs ring-1 ring-slate-200 hover:ring-emerald-400"
+                              key={id}
+                              onClick={() => travel(id)}
+                              className="flex items-center gap-3 rounded-xl bg-white px-3 py-2 text-left text-xs ring-1 ring-slate-200 hover:ring-emerald-400"
                             >
-                              <span className="text-base">{TYPE_ICONS[lot.type]}</span>
-                              <span className="min-w-0 flex-1 truncate font-semibold">
-                                {lot.name}
+                              <span className="text-base">🚌</span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block font-bold">
+                                  Voyager vers {LOCALITIES[id].name}
+                                </span>
+                                <span className="block text-slate-500">
+                                  {LOCALITIES[id].note} Car interurbain : {trip.hours} h,{' '}
+                                  {money(trip.fare)} (tarif fictif).
+                                </span>
                               </span>
                               <ArrowRight size={14} className="shrink-0 text-emerald-700" />
                             </button>
-                          ))}
-                        </div>
+                          )
+                        })}
                       </div>
-                    )
-                  })}
-                  <p className="text-sm font-black">Mon quartier</p>
-                  <div className="flex flex-wrap gap-1" role="group" aria-label="Filtrer la carte">
-                    {MAP_FILTERS.map((f) => (
-                      <button
-                        type="button"
-                        key={f.id}
-                        aria-pressed={mapFilter === f.id}
-                        onClick={() => setMapFilter(f.id)}
-                        className={
-                          'rounded-full px-3 py-1.5 text-xs font-semibold ' +
-                          (mapFilter === f.id
-                            ? 'bg-slate-900 text-white'
-                            : 'bg-slate-100 text-slate-700')
-                        }
-                      >
-                        {f.label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {LIFE_LOCATIONS.filter((place) => matchesFilter(mapFilter, place.venue)).map(
-                      (place) => (
-                        <button
-                          type="button"
-                          key={place.name}
-                          onClick={() => go(place.x, place.y)}
-                          className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left hover:border-emerald-400"
-                        >
-                          <span className="text-xl">
-                            {LOCATION_ICONS[LIFE_LOCATIONS.indexOf(place)]}
-                          </span>
-                          <span className="min-w-0 text-xs font-bold">
-                            {place.name}
-                            <span className="block font-normal text-slate-500">
-                              {districtAt(life.cityId, place.x, place.y).name}
-                            </span>
-                          </span>
-                          <ArrowRight size={14} className="ml-auto shrink-0 text-emerald-700" />
-                        </button>
-                      ),
-                    )}
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 p-3 text-sm">
-                    <strong>Les quartiers de {cityDef.name}</strong>
-                    <ul className="mt-2 space-y-1 text-xs text-slate-600">
-                      {cityDef.districts.map((d) => (
-                        <li key={d.id}>
-                          <strong className="text-slate-800">{d.name}</strong> · {d.note}
-                        </li>
-                      ))}
-                      <li>
-                        <strong className="text-sky-800">{cityDef.water.northEast}</strong> au
-                        nord-est,{' '}
-                        <strong className="text-sky-800">{cityDef.water.southWest}</strong> au
-                        sud-ouest.
-                      </li>
-                    </ul>
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      Les noms du domaine suivent la ville où tu habites. Pour changer de ville,
-                      voyage depuis la carte du Togo ci-dessus.
-                    </p>
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 p-3 text-sm">
-                    <strong>Panneaux publicitaires</strong>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Un panneau par quartier, visible par tous les habitants. Tarif affiché par
-                      semaine ; aucune réservation n’est encore facturée.
-                    </p>
-                    <ul className="mt-2 space-y-1">
-                      {BILLBOARDS.map((bb) => (
-                        <li key={bb.id}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setBillboard(bb.id)
-                              setPanel('billboard')
-                            }}
-                            className="flex w-full items-center justify-between rounded-xl bg-white px-3 py-2 text-left text-xs ring-1 ring-slate-200"
-                          >
-                            <span>
-                              <strong>{cityDef.districts[bb.district].name}</strong> ·{' '}
-                              {bb.status === 'house' ? bb.headline : 'Disponible'}
-                            </span>
-                            <span className="font-bold text-emerald-800">
-                              {money(bb.priceWeek)}/sem.
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 p-3 text-sm">
-                    <strong>Déplacement</strong>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {life.route.length} tronçon(s) restant(s) · {money(life.wallet)} disponibles
-                    </p>
-                    <div className="mt-3 grid grid-cols-3 gap-2">
-                      {(['walk', 'moto', 'taxi'] as const).map((t) => (
-                        <button
-                          type="button"
-                          key={t}
-                          onClick={() => trip(t)}
-                          className="rounded-xl border border-emerald-200 bg-white px-2 py-3 text-xs font-semibold"
-                        >
-                          {t === 'walk' ? '🚶 Marche' : t === 'moto' ? '🏍️ Moto' : '🚕 Taxi'}
-                          <span className="mt-1 block text-[10px] text-slate-500">
-                            {t === 'walk' ? 'Gratuit' : money(TRAVEL_COST[t])}
-                          </span>
-                        </button>
-                      ))}
                     </div>
-                    <p className="mt-2 text-[11px] text-slate-500">
-                      Les déplacements motorisés accélèrent le trajet simulé, sans véhicules
-                      physiques pilotables pour le moment.
+                    <p className="text-sm text-slate-600">
+                      Toute la ville est là : touche un bâtiment dans la scène ou choisis un lieu.
+                      Ton personnage suit les rues, les ponts et les avenues.
                     </p>
-                  </div>
-                </>
-              )}
-              {panel === 'jobs' && (
-                <>
-                  <p className="text-sm text-slate-600">
-                    Choisis un métier et rends-toi sur place entre 7h et 19h. Un seul salaire par
-                    journée.
-                  </p>
-                  {JOBS.map((job) => (
-                    <button
-                      type="button"
-                      key={job}
-                      onClick={() => setLife((old) => selectJob(old, job))}
-                      className={
-                        'flex w-full items-center justify-between rounded-2xl border p-4 text-left text-sm ' +
-                        (life.job === job
-                          ? 'border-emerald-600 bg-emerald-50'
-                          : 'border-slate-200 bg-white')
-                      }
-                    >
-                      <span>
-                        <strong className="block capitalize">{job}</strong>
-                        <span className="text-xs text-slate-500">
-                          Lieu : {VENUE_LABELS[jobVenue(job)]}
-                        </span>
-                      </span>
-                      <span className="text-right">
-                        <strong className="block">{money(SALARIES[job])}</strong>
-                        <span className="text-xs">
-                          {life.job === job ? '✓ Sélectionné' : 'Choisir'}
-                        </span>
-                      </span>
-                    </button>
-                  ))}
-                  <div className="grid grid-cols-2 gap-2">
-                    <ActionButton
-                      title="Aller travailler"
-                      onClick={() => {
-                        const target = LIFE_LOCATIONS.find(
-                          (loc) => loc.venue === jobVenue(life.job),
-                        )
-                        if (target) go(target.x, target.y)
-                      }}
-                    />
-                    <ActionButton
-                      title="Faire mon service"
-                      outline
-                      onClick={() => action('work')}
-                    />
-                  </div>
-                  <DailyStatus life={life} />
-                </>
-              )}
-              {panel === 'wallet' && (
-                <>
-                  <div className="rounded-2xl bg-emerald-900 p-5 text-white">
-                    <p className="text-xs">Mon solde fictif</p>
-                    <p className="mt-2 text-3xl font-black">{money(life.wallet)}</p>
-                    <p className="mt-1 text-xs text-emerald-200">
-                      Aucun paiement réel et aucune connexion Mobile Money.
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="rounded-xl bg-emerald-50 p-4 text-sm">
-                      <p>Revenus personnels</p>
-                      <strong>{money(life.earned)}</strong>
-                    </div>
-                    <div className="rounded-xl bg-amber-50 p-4 text-sm">
-                      <p>Dépenses</p>
-                      <strong>{money(life.spent)}</strong>
-                    </div>
-                  </div>
-                  <div className="rounded-xl bg-slate-100 p-4 text-sm">
-                    Budget municipal distinct : <strong>{money(life.city.coins)}</strong> · bois
-                    disponible : {life.city.wood}
-                  </div>
-                  <ActionButton title="Trouver un travail" onClick={() => open('jobs')} />
-                </>
-              )}
-              {panel === 'messages' && realtime.state.status !== 'disabled' && (
-                <LiveChat
-                  client={realtime.client}
-                  state={realtime.state}
-                  locality={cityLife.locality === 'kara' ? 'kara' : 'lome'}
-                  onChooseHome={() => open('residence')}
-                />
-              )}
-              {panel === 'messages' && here && (
-                <>
-                  <p className="text-xs text-slate-500">
-                    La place de {here.canton.canton} : messages des habitants connectés à HarooLife,
-                    200 caractères, visibles par tous les habitants du canton.
-                  </p>
-                  {presence.world?.me.home === null && (
-                    <button
-                      type="button"
-                      onClick={() => open('residence')}
-                      className="block w-full rounded-xl bg-amber-50 p-3 text-left text-xs font-semibold text-amber-900"
-                    >
-                      Choisissez d’abord votre maison dans HarooLife pour parler sur la place.
-                    </button>
-                  )}
-                  <div className="space-y-2 rounded-2xl bg-slate-50 p-3">
-                    {here.messages.length === 0 && (
-                      <p className="text-center text-xs text-slate-500">
-                        Personne n’a encore parlé ici aujourd’hui.
-                      </p>
-                    )}
-                    {here.messages.map((m) => (
-                      <div
-                        key={m.id}
-                        className={'flex ' + (m.is_me ? 'justify-end' : 'justify-start')}
-                      >
-                        <span
-                          className={
-                            'max-w-[85%] rounded-2xl px-3 py-2 text-sm ' +
-                            (m.is_me
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-white text-slate-800 shadow-sm')
-                          }
-                        >
-                          {!m.is_me && (
-                            <strong className="block text-[11px]">{m.display_name}</strong>
-                          )}
-                          {m.body}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  {placeError && (
-                    <p role="alert" className="text-xs font-semibold text-rose-700">
-                      {placeError}
-                    </p>
-                  )}
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault()
-                      void sayOnThePlace()
-                    }}
-                    className="flex gap-2"
-                  >
-                    <input
-                      aria-label="Parler sur la place"
-                      value={placeDraft}
-                      maxLength={200}
-                      onChange={(e) => setPlaceDraft(e.target.value)}
-                      className="min-w-0 flex-1 rounded-2xl border border-slate-200 px-3 py-3 text-sm"
-                      placeholder={'Dire quelque chose à ' + here.canton.canton + '…'}
-                    />
-                    <button
-                      type="submit"
-                      disabled={placeBusy}
-                      aria-label="Envoyer sur la place"
-                      className="rounded-2xl bg-emerald-600 px-4 text-white disabled:opacity-50"
-                    >
-                      <Send size={18} />
-                    </button>
-                  </form>
-                </>
-              )}
-              {panel === 'messages' && !here && realtime.state.status !== 'online' && (
-                <>
-                  <p className="text-xs text-slate-500">
-                    {presence.status === 'offline'
-                      ? 'Connectez-vous à FaîtiereHub pour retrouver les habitants de votre canton. En attendant : '
-                      : ''}
-                    Discussion avec Afi, personnage fictif. Réponses scénarisées, sans joueurs en
-                    ligne.
-                  </p>
-                  <div className="space-y-3 rounded-2xl bg-slate-50 p-3">
-                    {chat.map((item, i) => (
-                      <div
-                        key={i}
-                        className={'flex ' + (item.by === 'me' ? 'justify-end' : 'justify-start')}
-                      >
-                        <span
-                          className={
-                            'max-w-[85%] rounded-2xl px-3 py-2 text-sm ' +
-                            (item.by === 'me'
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-white text-slate-800 shadow-sm')
-                          }
-                        >
-                          {item.body}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault()
-                      sendMessage()
-                    }}
-                    className="flex gap-2"
-                  >
-                    <input
-                      aria-label="Écrire à Afi"
-                      value={chatDraft}
-                      maxLength={180}
-                      onChange={(e) => setChatDraft(e.target.value)}
-                      className="min-w-0 flex-1 rounded-2xl border border-slate-200 px-3 py-3 text-sm"
-                      placeholder="Écrire à Afi…"
-                    />
-                    <button
-                      type="submit"
-                      aria-label="Envoyer le message simulé"
-                      className="rounded-2xl bg-emerald-600 px-4 text-white"
-                    >
-                      <Send size={18} />
-                    </button>
-                  </form>
-                </>
-              )}
-              {panel === 'build' && (
-                <>
-                  <p className="text-sm text-slate-600">
-                    Sélectionne une construction puis touche une parcelle libre dans la scène 3D.
-                    Les ressources sont déduites du budget municipal fictif.
-                  </p>
-                  <div className="flex items-center justify-between rounded-xl bg-slate-100 p-3 text-xs font-semibold">
-                    <span>🏛️ {money(life.city.coins)}</span>
-                    <span>🪵 {life.city.wood} bois</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {BUILDINGS.map((b) => (
-                      <button
-                        type="button"
-                        key={b}
-                        onClick={() => {
-                          setBuilding(b)
-                          setMode('build')
-                          setPanel(null)
-                        }}
-                        className={
-                          'rounded-2xl border p-3 text-left text-xs ' +
-                          (building === b
-                            ? 'border-emerald-600 bg-emerald-50'
-                            : 'border-slate-200 bg-white')
-                        }
-                      >
-                        <span className="text-2xl">{CATALOG[b].icon}</span>
-                        <strong className="mt-1 block">{CATALOG[b].label}</strong>
-                        <span className="block text-slate-500">
-                          {CATALOG[b].coins} FCFA · {CATALOG[b].wood} bois
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                  <ActionButton
-                    title="Passer en mode démolition"
-                    outline
-                    onClick={() => {
-                      setMode('demolish')
-                      setPanel(null)
-                    }}
-                    icon={<Hammer size={17} />}
-                  />
-                </>
-              )}
-              {panel === 'missions' && (
-                <>
-                  <p className="text-sm text-slate-600">
-                    Développe ta vie et ta ville : objectifs liés à de vraies actions de jeu.
-                  </p>
-                  <div className="flex items-center justify-between rounded-2xl bg-emerald-50 p-4">
-                    <strong>Progression</strong>
-                    <strong>
-                      {completion} / {missions.length}
-                    </strong>
-                  </div>
-                  {missions.map((m, i) => (
                     <div
-                      key={i}
-                      className="flex items-center gap-3 rounded-xl border border-slate-100 p-3 text-sm"
+                      className="flex flex-wrap gap-1"
+                      role="group"
+                      aria-label="Filtrer la ville"
                     >
-                      <span
-                        className={
-                          'flex h-7 w-7 shrink-0 items-center justify-center rounded-full ' +
-                          (m.done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100')
-                        }
-                      >
-                        {m.done ? <Check size={16} /> : i + 1}
-                      </span>
-                      <span>{m.text}</span>
+                      {(
+                        [
+                          'all',
+                          'homes',
+                          'shops',
+                          'education',
+                          'health',
+                          'transport',
+                          'services',
+                          'leisure',
+                          'worship',
+                          'lots',
+                        ] as const
+                      ).map((f) => (
+                        <button
+                          type="button"
+                          key={f}
+                          aria-pressed={cityFilter === f}
+                          onClick={() => setCityFilter(f)}
+                          className={
+                            'rounded-full px-3 py-1.5 text-xs font-semibold ' +
+                            (cityFilter === f
+                              ? 'bg-slate-900 text-white'
+                              : 'bg-slate-100 text-slate-700')
+                          }
+                        >
+                          {f === 'all' ? 'Tout' : CATEGORY_LABELS[f]}
+                        </button>
+                      ))}
                     </div>
-                  ))}
-                  <div className="grid grid-cols-2 gap-2">
-                    <ActionButton title="Aller au marché" onClick={() => go(12, 11)} />
-                    <ActionButton title="Voir les métiers" outline onClick={() => open('jobs')} />
-                    {actor && (
-                      <ActionButton
-                        title="Ma coopérative"
-                        outline
-                        onClick={goMyCooperative}
-                        icon={<Users size={17} />}
-                      />
-                    )}
-                  </div>
-                </>
-              )}
-              {panel === 'lot' &&
-                selectedLot &&
-                (() => {
-                  const lot = selectedLot
-                  const here =
-                    cityLife.insideLot === lot.id || doorLot?.id === lot.id || door?.id === lot.id
-                  const insideHere = cityLife.insideLot === lot.id
-                  const room = interiorFor(lot.type)
-                  const layout = room ? layoutFor(room) : null
-                  const acts = actionsFor(lot.type)
-                  const path = here ? null : findPath(cityLife.at, lot.door, roadsOf(cityLife))
-                  const cells = path ? path.length - 1 : null
-                  const eta = (perCell: number) =>
-                    cells === null
-                      ? 'hors réseau'
-                      : `~ ${Math.max(1, Math.round(cells * perCell))} min`
-                  return (
-                    <>
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-100 text-3xl">
-                          {TYPE_ICONS[lot.type]}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="truncate text-xl font-black">
-                            {lot.name ?? TYPE_LABELS[lot.type]}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            📍 {districts().find((d) => d.id === lot.district)?.name},{' '}
-                            {cityDef.name} · {TYPE_LABELS[lot.type]}
-                            {lot.floors > 1 ? ` · ${lot.floors} niveaux` : ''}
-                          </p>
-                        </div>
-                      </div>
-                      {acts.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5" aria-label="Activités proposées">
-                          {acts.map((a) => (
-                            <span
-                              key={a.id}
-                              className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-800"
-                            >
-                              {a.label}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      {layout && layout.npcs.length > 0 && (
-                        <div className="space-y-1">
-                          <p className="text-xs font-bold text-slate-700">Personnages sur place</p>
-                          <div className="flex items-center gap-1">
-                            {layout.npcs.slice(0, 5).map((n, i) => (
-                              <span
-                                key={n.id}
-                                title={n.role}
-                                className={
-                                  'flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-[11px] font-black text-white ' +
-                                  [
-                                    'bg-emerald-600',
-                                    'bg-amber-500',
-                                    'bg-sky-600',
-                                    'bg-rose-500',
-                                    'bg-violet-600',
-                                  ][i % 5]
-                                }
+                    {districts().map((d) => {
+                      const places = landmarksIn(d.id).filter(
+                        (l) => cityFilter === 'all' || CATEGORY_OF[l.type] === cityFilter,
+                      )
+                      if (places.length === 0) return null
+                      return (
+                        <div key={d.id} className="rounded-2xl bg-slate-50 p-3">
+                          <p className="text-sm font-black">{d.name}</p>
+                          <p className="text-[11px] text-slate-500">{d.note}</p>
+                          <div className="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-2">
+                            {places.map((lot) => (
+                              <button
+                                type="button"
+                                key={lot.id}
+                                onClick={() => {
+                                  setSelectedLot(lot)
+                                  setPanel('lot')
+                                }}
+                                className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-left text-xs ring-1 ring-slate-200 hover:ring-emerald-400"
                               >
-                                {n.role
-                                  .replace(/^(Le |La |L’|Un |Une |Coach )/, '')
-                                  .slice(0, 2)
-                                  .toUpperCase()}
-                              </span>
+                                <span className="text-base">{TYPE_ICONS[lot.type]}</span>
+                                <span className="min-w-0 flex-1 truncate font-semibold">
+                                  {lot.name}
+                                </span>
+                                <ArrowRight size={14} className="shrink-0 text-emerald-700" />
+                              </button>
                             ))}
-                            <span className="ml-1 text-[11px] text-slate-500">
-                              {layout.npcs.length} personnages du jeu (pas de vrais joueurs)
-                            </span>
                           </div>
                         </div>
-                      )}
-                      {insideHere && acts.length > 0 && (
-                        <div className="space-y-2">
-                          <p className="text-xs font-bold text-slate-700">Choisir une activité</p>
-                          {acts.map((a) => (
-                            <button
-                              type="button"
-                              key={a.id}
-                              onClick={() => startActivity(a.id)}
-                              className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm"
-                            >
-                              <span className="font-bold">{a.label}</span>
-                              <span className="text-xs text-slate-500">{a.hint}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {lot.type === 'cooperative' && actor && (
-                        <p className="text-xs text-slate-600">
-                          {worldAdapter.organizationsAt(lot, actor.organizations).length > 0
-                            ? 'Ici siège : ' +
-                              worldAdapter
-                                .organizationsAt(lot, actor.organizations)
-                                .map((o) => o.name)
-                                .join(', ')
-                            : 'Aucune de vos organisations ne siège ici.'}
-                        </p>
-                      )}
-                      {here && !insideAny && room && (
-                        <ActionButton
-                          title={
-                            lot.type === 'cooperative' ? 'Entrer dans la coopérative' : 'Entrer'
+                      )
+                    })}
+                    <p className="text-sm font-black">Mon quartier</p>
+                    <div
+                      className="flex flex-wrap gap-1"
+                      role="group"
+                      aria-label="Filtrer la carte"
+                    >
+                      {MAP_FILTERS.map((f) => (
+                        <button
+                          type="button"
+                          key={f.id}
+                          aria-pressed={mapFilter === f.id}
+                          onClick={() => setMapFilter(f.id)}
+                          className={
+                            'rounded-full px-3 py-1.5 text-xs font-semibold ' +
+                            (mapFilter === f.id
+                              ? 'bg-slate-900 text-white'
+                              : 'bg-slate-100 text-slate-700')
                           }
-                          onClick={() => cityAction('enter')}
-                        />
-                      )}
-                      {insideHere && (
-                        <ActionButton title="Sortir" outline onClick={() => cityAction('leave')} />
-                      )}
-                      {!here && (
-                        <div
-                          className="grid grid-cols-3 gap-2"
-                          role="group"
-                          aria-label="Comment y aller"
                         >
-                          {(
-                            [
-                              {
-                                t: 'walk' as const,
-                                icon: '🚶',
-                                label: 'À pied',
-                                price: 'Gratuit',
-                                eta: eta(0.4),
-                              },
-                              {
-                                t: 'moto' as const,
-                                icon: '🛵',
-                                label: 'Zémidjan',
-                                price: money(TRAVEL_COST.moto),
-                                eta: eta(0.12),
-                              },
-                              {
-                                t: 'taxi' as const,
-                                icon: '🚕',
-                                label: 'Taxi',
-                                price: money(TRAVEL_COST.taxi),
-                                eta: eta(0.1),
-                              },
-                            ] as const
-                          ).map((o) => (
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {LIFE_LOCATIONS.filter((place) => matchesFilter(mapFilter, place.venue)).map(
+                        (place) => (
+                          <button
+                            type="button"
+                            key={place.name}
+                            onClick={() => go(place.x, place.y)}
+                            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left hover:border-emerald-400"
+                          >
+                            <span className="text-xl">
+                              {LOCATION_ICONS[LIFE_LOCATIONS.indexOf(place)]}
+                            </span>
+                            <span className="min-w-0 text-xs font-bold">
+                              {place.name}
+                              <span className="block font-normal text-slate-500">
+                                {districtAt(life.cityId, place.x, place.y).name}
+                              </span>
+                            </span>
+                            <ArrowRight size={14} className="ml-auto shrink-0 text-emerald-700" />
+                          </button>
+                        ),
+                      )}
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 p-3 text-sm">
+                      <strong>Les quartiers de {cityDef.name}</strong>
+                      <ul className="mt-2 space-y-1 text-xs text-slate-600">
+                        {cityDef.districts.map((d) => (
+                          <li key={d.id}>
+                            <strong className="text-slate-800">{d.name}</strong> · {d.note}
+                          </li>
+                        ))}
+                        <li>
+                          <strong className="text-sky-800">{cityDef.water.northEast}</strong> au
+                          nord-est,{' '}
+                          <strong className="text-sky-800">{cityDef.water.southWest}</strong> au
+                          sud-ouest.
+                        </li>
+                      </ul>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        Les noms du domaine suivent la ville où tu habites. Pour changer de ville,
+                        voyage depuis la carte du Togo ci-dessus.
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 p-3 text-sm">
+                      <strong>Panneaux publicitaires</strong>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Un panneau par quartier, visible par tous les habitants. Tarif affiché par
+                        semaine ; aucune réservation n’est encore facturée.
+                      </p>
+                      <ul className="mt-2 space-y-1">
+                        {BILLBOARDS.map((bb) => (
+                          <li key={bb.id}>
                             <button
                               type="button"
-                              key={o.t}
-                              onClick={() => (o.t === 'walk' ? goLot(lot) : rideTo(lot, o.t))}
-                              className="flex flex-col items-center gap-0.5 rounded-2xl border border-slate-200 bg-white px-2 py-3 text-center"
+                              onClick={() => {
+                                setBillboard(bb.id)
+                                setPanel('billboard')
+                              }}
+                              className="flex w-full items-center justify-between rounded-xl bg-white px-3 py-2 text-left text-xs ring-1 ring-slate-200"
                             >
-                              <span className="text-2xl">{o.icon}</span>
-                              <span className="text-sm font-bold">{o.label}</span>
-                              <span className="text-xs text-slate-600">{o.price}</span>
-                              <span className="text-[11px] text-slate-400">{o.eta}</span>
+                              <span>
+                                <strong>{cityDef.districts[bb.district].name}</strong> ·{' '}
+                                {bb.status === 'house' ? bb.headline : 'Disponible'}
+                              </span>
+                              <span className="font-bold text-emerald-800">
+                                {money(bb.priceWeek)}/sem.
+                              </span>
                             </button>
-                          ))}
-                        </div>
-                      )}
-                      <p className="text-[11px] text-slate-500">
-                        {cityLife.visited.includes(lot.id) ? 'Déjà visité.' : 'Jamais visité.'}{' '}
-                        Condition physique : {cityLife.fitness}/100.
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 p-3 text-sm">
+                      <strong>Déplacement</strong>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {life.route.length} tronçon(s) restant(s) · {money(life.wallet)} disponibles
                       </p>
-                    </>
-                  )
-                })()}
-              {panel === 'market' && <MarketPanel actor={actor} />}
-              {panel === 'cooperative' &&
-                (coopOrg ? (
-                  <CooperativePanel
-                    org={coopOrg}
-                    actor={actor}
-                    onPickOrg={setCoopOrg}
-                    engine={engine}
-                  />
-                ) : actor ? (
-                  <p className="text-sm text-slate-600">
-                    Votre compte n’est rattaché à aucune coopérative. Rapprochez-vous de votre
-                    organisation pour être enregistré comme membre.
-                  </p>
-                ) : (
-                  <p className="text-sm text-slate-600">
-                    <Link
-                      href="/auth/login?redirect=%2Fharoolife"
-                      className="font-bold text-emerald-700 underline"
-                    >
-                      Connectez-vous
-                    </Link>{' '}
-                    pour retrouver votre coopérative, ses membres et ses regroupements.
-                  </p>
-                ))}
-              {panel === 'ad' && adFocus && (
-                <>
-                  <div
-                    data-testid="ad-focus"
-                    className="relative overflow-hidden rounded-2xl p-5"
-                    style={{
-                      background: adFocus.campaign.creative.palette[0],
-                      color: adFocus.campaign.creative.palette[1],
-                    }}
-                  >
-                    <span
-                      aria-hidden
-                      className="absolute inset-y-0 left-0 w-2"
-                      style={{ background: adFocus.campaign.creative.palette[2] }}
-                    />
-                    <p className="text-[11px] font-bold uppercase tracking-wide opacity-80">
-                      {adFocus.campaign.advertiser.name}
-                      {isSponsored(adFocus.campaign) ? ' · Promotion' : ''}
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        {(['walk', 'moto', 'taxi'] as const).map((t) => (
+                          <button
+                            type="button"
+                            key={t}
+                            onClick={() => trip(t)}
+                            className="rounded-xl border border-emerald-200 bg-white px-2 py-3 text-xs font-semibold"
+                          >
+                            {t === 'walk' ? '🚶 Marche' : t === 'moto' ? '🏍️ Moto' : '🚕 Taxi'}
+                            <span className="mt-1 block text-[10px] text-slate-500">
+                              {t === 'walk' ? 'Gratuit' : money(TRAVEL_COST[t])}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-2 text-[11px] text-slate-500">
+                        Les déplacements motorisés accélèrent le trajet simulé, sans véhicules
+                        physiques pilotables pour le moment.
+                      </p>
+                    </div>
+                  </>
+                )}
+                {panel === 'jobs' && (
+                  <>
+                    <p className="text-sm text-slate-600">
+                      Choisis un métier et rends-toi sur place entre 7h et 19h. Un seul salaire par
+                      journée.
                     </p>
-                    <p className="mt-2 text-xl font-black">{adFocus.campaign.creative.title}</p>
-                    <p className="mt-1 text-sm opacity-90">{adFocus.campaign.creative.body}</p>
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    {adFocus.placement.label}.{' '}
-                    {isSponsored(adFocus.campaign)
-                      ? 'Contenu sponsorisé, validé par l’équipe FaîtiereHub.'
-                      : 'Information sur un service FaîtiereHub (pas une publicité payée).'}{' '}
-                    Le lien s’ouvre dans un nouvel onglet ; ta partie reste ouverte.
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      data-testid="ad-learn-more"
-                      onClick={learnMore}
-                      className="min-h-12 rounded-2xl bg-emerald-600 px-4 text-sm font-bold text-white"
-                    >
-                      {adFocus.campaign.creative.cta}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPanel(null)}
-                      className="min-h-12 rounded-2xl bg-slate-100 px-4 text-sm font-bold text-slate-800"
-                    >
-                      Retour au jeu
-                    </button>
-                  </div>
-                </>
-              )}
-              {panel === 'billboard' && board && (
-                <>
-                  <div
-                    className={
-                      'rounded-2xl p-5 text-center ' +
-                      (board.status === 'house'
-                        ? 'bg-emerald-800 text-white'
-                        : 'border-2 border-dashed border-emerald-400 bg-emerald-50 text-emerald-900')
-                    }
-                  >
-                    <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">
-                      {cityDef.districts[board.district].name} · {cityDef.name}
-                    </p>
-                    <p className="mt-2 text-xl font-black">{board.headline}</p>
-                  </div>
-                  <div className="flex items-center justify-between rounded-xl bg-slate-50 p-3 text-sm">
-                    <span>
-                      {board.status === 'house' ? 'Occupé par FaîtiereHub' : 'Disponible'}
-                    </span>
-                    <strong>{money(board.priceWeek)} / 7 jours</strong>
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    Vu par les habitants du quartier à chaque passage. Tarif indicatif : la
-                    réservation se fait avec l’équipe, aucune facturation automatique.
-                  </p>
-                  <Link
-                    href={board.href}
-                    className="flex min-h-12 items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white"
-                  >
-                    {board.status === 'house' ? 'Ouvrir le service' : 'Réserver ce panneau'}
-                  </Link>
-                </>
-              )}
-              {panel === 'avatar' && (
-                <>
-                  <p className="text-sm text-slate-600">
-                    {firstRun
-                      ? 'Choisis qui tu es dans Lomé : le même personnage te suit dans la rue, dans les bâtiments et au volant. Tu pourras changer depuis le téléphone.'
-                      : 'Le même personnage te suit dans la rue, dans les bâtiments et au volant. Personnages Quaternius et Kenney (CC0) ; ton choix reste sur cet appareil.'}
-                  </p>
-                  <AvatarPreview model={shownModel(avatar)} pagne={pagneColor(avatar.pagne)} />
-                  <div
-                    className="grid grid-cols-2 gap-2 sm:grid-cols-4"
-                    role="group"
-                    aria-label="Choisir mon personnage"
-                  >
-                    {AVATAR_MODELS.filter((m) => m.family === 'quaternius').map((m) => (
+                    {JOBS.map((job) => (
                       <button
                         type="button"
-                        key={m.id}
-                        aria-pressed={shownModel(avatar) === m.id}
-                        onClick={() => chooseAvatar({ model: m.id, classic: undefined })}
+                        key={job}
+                        onClick={() => setLife((old) => selectJob(old, job))}
                         className={
-                          'rounded-2xl border p-3 text-left ' +
-                          (shownModel(avatar) === m.id
+                          'flex w-full items-center justify-between rounded-2xl border p-4 text-left text-sm ' +
+                          (life.job === job
                             ? 'border-emerald-600 bg-emerald-50'
                             : 'border-slate-200 bg-white')
                         }
                       >
-                        <span className="block text-sm font-black">{m.label}</span>
-                        <span className="block text-[11px] text-slate-500">{m.hint}</span>
+                        <span>
+                          <strong className="block capitalize">{job}</strong>
+                          <span className="text-xs text-slate-500">
+                            Lieu : {VENUE_LABELS[jobVenue(job)]}
+                          </span>
+                        </span>
+                        <span className="text-right">
+                          <strong className="block">{money(SALARIES[job])}</strong>
+                          <span className="text-xs">
+                            {life.job === job ? '✓ Sélectionné' : 'Choisir'}
+                          </span>
+                        </span>
                       </button>
                     ))}
-                  </div>
-                  <details className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
-                    <summary className="cursor-pointer text-sm font-semibold text-slate-700">
-                      Personnages classiques (mini)
-                    </summary>
-                    <div
-                      className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3"
-                      role="group"
-                      aria-label="Choisir un personnage classique"
+                    <div className="grid grid-cols-2 gap-2">
+                      <ActionButton
+                        title="Aller travailler"
+                        onClick={() => {
+                          const target = LIFE_LOCATIONS.find(
+                            (loc) => loc.venue === jobVenue(life.job),
+                          )
+                          if (target) go(target.x, target.y)
+                        }}
+                      />
+                      <ActionButton
+                        title="Faire mon service"
+                        outline
+                        onClick={() => action('work')}
+                      />
+                    </div>
+                    <DailyStatus life={life} />
+                  </>
+                )}
+                {panel === 'wallet' && (
+                  <>
+                    <div className="rounded-2xl bg-emerald-900 p-5 text-white">
+                      <p className="text-xs">Mon solde fictif</p>
+                      <p className="mt-2 text-3xl font-black">{money(life.wallet)}</p>
+                      <p className="mt-1 text-xs text-emerald-200">
+                        Aucun paiement réel et aucune connexion Mobile Money.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-xl bg-emerald-50 p-4 text-sm">
+                        <p>Revenus personnels</p>
+                        <strong>{money(life.earned)}</strong>
+                      </div>
+                      <div className="rounded-xl bg-amber-50 p-4 text-sm">
+                        <p>Dépenses</p>
+                        <strong>{money(life.spent)}</strong>
+                      </div>
+                    </div>
+                    <div className="rounded-xl bg-slate-100 p-4 text-sm">
+                      Budget municipal distinct : <strong>{money(life.city.coins)}</strong> · bois
+                      disponible : {life.city.wood}
+                    </div>
+                    <ActionButton title="Trouver un travail" onClick={() => open('jobs')} />
+                  </>
+                )}
+                {panel === 'messages' && realtime.state.status !== 'disabled' && (
+                  <LiveChat
+                    client={realtime.client}
+                    state={realtime.state}
+                    locality={cityLife.locality === 'kara' ? 'kara' : 'lome'}
+                    onChooseHome={() => open('residence')}
+                  />
+                )}
+                {panel === 'messages' && here && (
+                  <>
+                    <p className="text-xs text-slate-500">
+                      La place de {here.canton.canton} : messages des habitants connectés à
+                      HarooLife, 200 caractères, visibles par tous les habitants du canton.
+                    </p>
+                    {presence.world?.me.home === null && (
+                      <button
+                        type="button"
+                        onClick={() => open('residence')}
+                        className="block w-full rounded-xl bg-amber-50 p-3 text-left text-xs font-semibold text-amber-900"
+                      >
+                        Choisissez d’abord votre maison dans HarooLife pour parler sur la place.
+                      </button>
+                    )}
+                    <div className="space-y-2 rounded-2xl bg-slate-50 p-3">
+                      {here.messages.length === 0 && (
+                        <p className="text-center text-xs text-slate-500">
+                          Personne n’a encore parlé ici aujourd’hui.
+                        </p>
+                      )}
+                      {here.messages.map((m) => (
+                        <div
+                          key={m.id}
+                          className={'flex ' + (m.is_me ? 'justify-end' : 'justify-start')}
+                        >
+                          <span
+                            className={
+                              'max-w-[85%] rounded-2xl px-3 py-2 text-sm ' +
+                              (m.is_me
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-white text-slate-800 shadow-sm')
+                            }
+                          >
+                            {!m.is_me && (
+                              <strong className="block text-[11px]">{m.display_name}</strong>
+                            )}
+                            {m.body}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    {placeError && (
+                      <p role="alert" className="text-xs font-semibold text-rose-700">
+                        {placeError}
+                      </p>
+                    )}
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        void sayOnThePlace()
+                      }}
+                      className="flex gap-2"
                     >
-                      {AVATAR_MODELS.filter((m) => m.family === 'kenney-mini').map((m) => (
+                      <input
+                        aria-label="Parler sur la place"
+                        value={placeDraft}
+                        maxLength={200}
+                        onChange={(e) => setPlaceDraft(e.target.value)}
+                        className="min-w-0 flex-1 rounded-2xl border border-slate-200 px-3 py-3 text-sm"
+                        placeholder={'Dire quelque chose à ' + here.canton.canton + '…'}
+                      />
+                      <button
+                        type="submit"
+                        disabled={placeBusy}
+                        aria-label="Envoyer sur la place"
+                        className="rounded-2xl bg-emerald-600 px-4 text-white disabled:opacity-50"
+                      >
+                        <Send size={18} />
+                      </button>
+                    </form>
+                  </>
+                )}
+                {panel === 'messages' && !here && realtime.state.status !== 'online' && (
+                  <>
+                    <p className="text-xs text-slate-500">
+                      {presence.status === 'offline'
+                        ? 'Connectez-vous à FaîtiereHub pour retrouver les habitants de votre canton. En attendant : '
+                        : ''}
+                      Discussion avec Afi, personnage fictif. Réponses scénarisées, sans joueurs en
+                      ligne.
+                    </p>
+                    <div className="space-y-3 rounded-2xl bg-slate-50 p-3">
+                      {chat.map((item, i) => (
+                        <div
+                          key={i}
+                          className={'flex ' + (item.by === 'me' ? 'justify-end' : 'justify-start')}
+                        >
+                          <span
+                            className={
+                              'max-w-[85%] rounded-2xl px-3 py-2 text-sm ' +
+                              (item.by === 'me'
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-white text-slate-800 shadow-sm')
+                            }
+                          >
+                            {item.body}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        sendMessage()
+                      }}
+                      className="flex gap-2"
+                    >
+                      <input
+                        aria-label="Écrire à Afi"
+                        value={chatDraft}
+                        maxLength={180}
+                        onChange={(e) => setChatDraft(e.target.value)}
+                        className="min-w-0 flex-1 rounded-2xl border border-slate-200 px-3 py-3 text-sm"
+                        placeholder="Écrire à Afi…"
+                      />
+                      <button
+                        type="submit"
+                        aria-label="Envoyer le message simulé"
+                        className="rounded-2xl bg-emerald-600 px-4 text-white"
+                      >
+                        <Send size={18} />
+                      </button>
+                    </form>
+                  </>
+                )}
+                {panel === 'build' && (
+                  <>
+                    <p className="text-sm text-slate-600">
+                      Sélectionne une construction puis touche une parcelle libre dans la scène 3D.
+                      Les ressources sont déduites du budget municipal fictif.
+                    </p>
+                    <div className="flex items-center justify-between rounded-xl bg-slate-100 p-3 text-xs font-semibold">
+                      <span>🏛️ {money(life.city.coins)}</span>
+                      <span>🪵 {life.city.wood} bois</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {BUILDINGS.map((b) => (
+                        <button
+                          type="button"
+                          key={b}
+                          onClick={() => {
+                            setBuilding(b)
+                            setMode('build')
+                            setPanel(null)
+                          }}
+                          className={
+                            'rounded-2xl border p-3 text-left text-xs ' +
+                            (building === b
+                              ? 'border-emerald-600 bg-emerald-50'
+                              : 'border-slate-200 bg-white')
+                          }
+                        >
+                          <span className="text-2xl">{CATALOG[b].icon}</span>
+                          <strong className="mt-1 block">{CATALOG[b].label}</strong>
+                          <span className="block text-slate-500">
+                            {CATALOG[b].coins} FCFA · {CATALOG[b].wood} bois
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    <ActionButton
+                      title="Passer en mode démolition"
+                      outline
+                      onClick={() => {
+                        setMode('demolish')
+                        setPanel(null)
+                      }}
+                      icon={<Hammer size={17} />}
+                    />
+                  </>
+                )}
+                {panel === 'missions' && (
+                  <>
+                    <p className="text-sm text-slate-600">
+                      Développe ta vie et ta ville : objectifs liés à de vraies actions de jeu.
+                    </p>
+                    <div className="flex items-center justify-between rounded-2xl bg-emerald-50 p-4">
+                      <strong>Progression</strong>
+                      <strong>
+                        {completion} / {missions.length}
+                      </strong>
+                    </div>
+                    {missions.map((m, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center gap-3 rounded-xl border border-slate-100 p-3 text-sm"
+                      >
+                        <span
+                          className={
+                            'flex h-7 w-7 shrink-0 items-center justify-center rounded-full ' +
+                            (m.done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100')
+                          }
+                        >
+                          {m.done ? <Check size={16} /> : i + 1}
+                        </span>
+                        <span>{m.text}</span>
+                      </div>
+                    ))}
+                    <div className="grid grid-cols-2 gap-2">
+                      <ActionButton title="Aller au marché" onClick={() => go(12, 11)} />
+                      <ActionButton title="Voir les métiers" outline onClick={() => open('jobs')} />
+                      {actor && (
+                        <ActionButton
+                          title="Ma coopérative"
+                          outline
+                          onClick={goMyCooperative}
+                          icon={<Users size={17} />}
+                        />
+                      )}
+                    </div>
+                  </>
+                )}
+                {panel === 'lot' &&
+                  selectedLot &&
+                  (() => {
+                    const lot = selectedLot
+                    const here =
+                      cityLife.insideLot === lot.id || doorLot?.id === lot.id || door?.id === lot.id
+                    const insideHere = cityLife.insideLot === lot.id
+                    const room = interiorFor(lot.type)
+                    const layout = room ? layoutFor(room) : null
+                    const acts = actionsFor(lot.type)
+                    const path = here ? null : findPath(cityLife.at, lot.door, roadsOf(cityLife))
+                    const cells = path ? path.length - 1 : null
+                    const eta = (perCell: number) =>
+                      cells === null
+                        ? 'hors réseau'
+                        : `~ ${Math.max(1, Math.round(cells * perCell))} min`
+                    return (
+                      <>
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-100 text-3xl">
+                            {TYPE_ICONS[lot.type]}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-xl font-black">
+                              {lot.name ?? TYPE_LABELS[lot.type]}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              📍 {districts().find((d) => d.id === lot.district)?.name},{' '}
+                              {cityDef.name} · {TYPE_LABELS[lot.type]}
+                              {lot.name && lot.floors > 1 ? ` · ${lot.floors} niveaux` : ''}
+                            </p>
+                          </div>
+                        </div>
+                        {acts.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5" aria-label="Activités proposées">
+                            {acts.map((a) => (
+                              <span
+                                key={a.id}
+                                className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-800"
+                              >
+                                {a.label}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {layout && layout.npcs.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-bold text-slate-700">
+                              Personnages sur place
+                            </p>
+                            <div className="flex items-center gap-1">
+                              {layout.npcs.slice(0, 5).map((n, i) => (
+                                <span
+                                  key={n.id}
+                                  title={n.role}
+                                  className={
+                                    'flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-[11px] font-black text-white ' +
+                                    [
+                                      'bg-emerald-600',
+                                      'bg-amber-500',
+                                      'bg-sky-600',
+                                      'bg-rose-500',
+                                      'bg-violet-600',
+                                    ][i % 5]
+                                  }
+                                >
+                                  {n.role
+                                    .replace(/^(Le |La |L’|Un |Une |Coach )/, '')
+                                    .slice(0, 2)
+                                    .toUpperCase()}
+                                </span>
+                              ))}
+                              <span className="ml-1 text-[11px] text-slate-500">
+                                {layout.npcs.length} personnages du jeu (pas de vrais joueurs)
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        {insideHere && acts.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-xs font-bold text-slate-700">Choisir une activité</p>
+                            {acts.map((a) => (
+                              <button
+                                type="button"
+                                key={a.id}
+                                onClick={() => startActivity(a.id)}
+                                className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm"
+                              >
+                                <span className="font-bold">{a.label}</span>
+                                <span className="text-xs text-slate-500">{a.hint}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {lot.type === 'cooperative' && actor && (
+                          <p className="text-xs text-slate-600">
+                            {worldAdapter.organizationsAt(lot, actor.organizations).length > 0
+                              ? 'Ici siège : ' +
+                                worldAdapter
+                                  .organizationsAt(lot, actor.organizations)
+                                  .map((o) => o.name)
+                                  .join(', ')
+                              : 'Aucune de vos organisations ne siège ici.'}
+                          </p>
+                        )}
+                        {here && !insideAny && room && (
+                          <ActionButton
+                            title={
+                              lot.type === 'cooperative' ? 'Entrer dans la coopérative' : 'Entrer'
+                            }
+                            onClick={() => cityAction('enter')}
+                          />
+                        )}
+                        {insideHere && (
+                          <ActionButton
+                            title="Sortir"
+                            outline
+                            onClick={() => cityAction('leave')}
+                          />
+                        )}
+                        {!here && (
+                          <div
+                            className="grid grid-cols-3 gap-2"
+                            role="group"
+                            aria-label="Comment y aller"
+                          >
+                            {(
+                              [
+                                {
+                                  t: 'walk' as const,
+                                  icon: '🚶',
+                                  label: 'À pied',
+                                  price: 'Gratuit',
+                                  eta: eta(0.4),
+                                },
+                                {
+                                  t: 'moto' as const,
+                                  icon: '🛵',
+                                  label: 'Zémidjan',
+                                  price: money(TRAVEL_COST.moto),
+                                  eta: eta(0.12),
+                                },
+                                {
+                                  t: 'taxi' as const,
+                                  icon: '🚕',
+                                  label: 'Taxi',
+                                  price: money(TRAVEL_COST.taxi),
+                                  eta: eta(0.1),
+                                },
+                              ] as const
+                            ).map((o) => (
+                              <button
+                                type="button"
+                                key={o.t}
+                                onClick={() => setTripChoice(o.t)}
+                                disabled={cells === null || life.wallet < TRAVEL_COST[o.t]}
+                                aria-pressed={tripChoice === o.t}
+                                className={`flex flex-col items-center gap-0.5 rounded-2xl border px-2 py-3 text-center disabled:opacity-40 ${tripChoice === o.t ? 'border-emerald-700 bg-emerald-50' : 'border-slate-200 bg-white'}`}
+                              >
+                                <span className="text-2xl">{o.icon}</span>
+                                <span className="text-sm font-bold">{o.label}</span>
+                                <span className="text-xs text-slate-600">{o.price}</span>
+                                <span className="text-[11px] text-slate-400">{o.eta}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {!here && tripChoice && (
+                          <div
+                            className="space-y-3 rounded-2xl bg-emerald-50 p-4"
+                            aria-label="Confirmer le trajet"
+                          >
+                            <p className="text-sm font-bold">
+                              {tripChoice === 'walk'
+                                ? 'À pied'
+                                : tripChoice === 'moto'
+                                  ? 'Zémidjan'
+                                  : 'Taxi'}{' '}
+                              vers {lot.name ?? TYPE_LABELS[lot.type]}
+                            </p>
+                            <p className="text-xs text-slate-600">
+                              {TRAVEL_COST[tripChoice] === 0
+                                ? 'Trajet gratuit.'
+                                : `${money(TRAVEL_COST[tripChoice])} de monnaie de jeu seront déduits au départ.`}
+                            </p>
+                            <div className="flex gap-2">
+                              <ActionButton
+                                title="Confirmer le trajet"
+                                onClick={() => {
+                                  const chosen = tripChoice
+                                  setTripChoice(null)
+                                  if (chosen === 'walk') goLot(lot)
+                                  else rideTo(lot, chosen)
+                                }}
+                              />
+                              <ActionButton
+                                title="Annuler"
+                                outline
+                                onClick={() => setTripChoice(null)}
+                              />
+                            </div>
+                          </div>
+                        )}
+                        <p className="text-[11px] text-slate-500">
+                          {cityLife.visited.includes(lot.id) ? 'Déjà visité.' : 'Jamais visité.'}{' '}
+                          Condition physique : {cityLife.fitness}/100.
+                        </p>
+                      </>
+                    )
+                  })()}
+                {panel === 'market' && <MarketPanel actor={actor} />}
+                {panel === 'cooperative' &&
+                  (coopOrg ? (
+                    <CooperativePanel
+                      org={coopOrg}
+                      actor={actor}
+                      onPickOrg={setCoopOrg}
+                      engine={engine}
+                    />
+                  ) : actor ? (
+                    <p className="text-sm text-slate-600">
+                      Votre compte n’est rattaché à aucune coopérative. Rapprochez-vous de votre
+                      organisation pour être enregistré comme membre.
+                    </p>
+                  ) : (
+                    <p className="text-sm text-slate-600">
+                      <Link
+                        href="/auth/login?redirect=%2Fharoolife"
+                        className="font-bold text-emerald-700 underline"
+                      >
+                        Connectez-vous
+                      </Link>{' '}
+                      pour retrouver votre coopérative, ses membres et ses regroupements.
+                    </p>
+                  ))}
+                {panel === 'ad' && adFocus && (
+                  <>
+                    <div
+                      data-testid="ad-focus"
+                      className="relative overflow-hidden rounded-2xl p-5"
+                      style={{
+                        background: adFocus.campaign.creative.palette[0],
+                        color: adFocus.campaign.creative.palette[1],
+                      }}
+                    >
+                      <span
+                        aria-hidden
+                        className="absolute inset-y-0 left-0 w-2"
+                        style={{ background: adFocus.campaign.creative.palette[2] }}
+                      />
+                      <p className="text-[11px] font-bold uppercase tracking-wide opacity-80">
+                        {adFocus.campaign.advertiser.name}
+                        {isSponsored(adFocus.campaign) ? ' · Promotion' : ''}
+                      </p>
+                      <p className="mt-2 text-xl font-black">{adFocus.campaign.creative.title}</p>
+                      <p className="mt-1 text-sm opacity-90">{adFocus.campaign.creative.body}</p>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      {adFocus.placement.label}.{' '}
+                      {isSponsored(adFocus.campaign)
+                        ? 'Contenu sponsorisé, validé par l’équipe FaîtiereHub.'
+                        : 'Information sur un service FaîtiereHub (pas une publicité payée).'}{' '}
+                      Le lien s’ouvre dans un nouvel onglet ; ta partie reste ouverte.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        data-testid="ad-learn-more"
+                        onClick={learnMore}
+                        className="min-h-12 rounded-2xl bg-emerald-600 px-4 text-sm font-bold text-white"
+                      >
+                        {adFocus.campaign.creative.cta}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPanel(null)}
+                        className="min-h-12 rounded-2xl bg-slate-100 px-4 text-sm font-bold text-slate-800"
+                      >
+                        Retour au jeu
+                      </button>
+                    </div>
+                  </>
+                )}
+                {panel === 'billboard' && board && (
+                  <>
+                    <div
+                      className={
+                        'rounded-2xl p-5 text-center ' +
+                        (board.status === 'house'
+                          ? 'bg-emerald-800 text-white'
+                          : 'border-2 border-dashed border-emerald-400 bg-emerald-50 text-emerald-900')
+                      }
+                    >
+                      <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">
+                        {cityDef.districts[board.district].name} · {cityDef.name}
+                      </p>
+                      <p className="mt-2 text-xl font-black">{board.headline}</p>
+                    </div>
+                    <div className="flex items-center justify-between rounded-xl bg-slate-50 p-3 text-sm">
+                      <span>
+                        {board.status === 'house' ? 'Occupé par FaîtiereHub' : 'Disponible'}
+                      </span>
+                      <strong>{money(board.priceWeek)} / 7 jours</strong>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Vu par les habitants du quartier à chaque passage. Tarif indicatif : la
+                      réservation se fait avec l’équipe, aucune facturation automatique.
+                    </p>
+                    <Link
+                      href={board.href}
+                      className="flex min-h-12 items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white"
+                    >
+                      {board.status === 'house' ? 'Ouvrir le service' : 'Réserver ce panneau'}
+                    </Link>
+                  </>
+                )}
+                {panel === 'avatar' && (
+                  <>
+                    <p className="text-sm text-slate-600">
+                      {firstRun
+                        ? 'Choisis qui tu es dans Lomé : le même personnage te suit dans la rue, dans les bâtiments et au volant. Tu pourras changer depuis le téléphone.'
+                        : 'Le même personnage te suit dans la rue, dans les bâtiments et au volant. Personnages Quaternius et Kenney (CC0) ; ton choix reste sur cet appareil.'}
+                    </p>
+                    <AvatarPreview model={shownModel(avatar)} pagne={pagneColor(avatar.pagne)} />
+                    <div
+                      className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+                      role="group"
+                      aria-label="Choisir mon personnage"
+                    >
+                      {AVATAR_MODELS.filter((m) => m.family === 'quaternius').map((m) => (
                         <button
                           type="button"
                           key={m.id}
                           aria-pressed={shownModel(avatar) === m.id}
-                          onClick={() => chooseAvatar({ model: m.id, classic: true })}
+                          onClick={() => chooseAvatar({ model: m.id, classic: undefined })}
                           className={
                             'rounded-2xl border p-3 text-left ' +
                             (shownModel(avatar) === m.id
@@ -2891,113 +2946,142 @@ export function LomeLifeImmersive() {
                         </button>
                       ))}
                     </div>
-                  </details>
-                  <fieldset className="space-y-2">
-                    <legend className="text-sm font-black">Mon pagne</legend>
-                    <div className="flex flex-wrap gap-2">
-                      {PAGNES.map((tone, i) => (
-                        <button
-                          key={tone}
-                          type="button"
-                          aria-label={`Pagne ${i + 1}`}
-                          aria-pressed={avatar.pagne === i + 1}
-                          onClick={() => chooseAvatar({ pagne: i + 1 })}
-                          style={{
-                            background: `repeating-linear-gradient(135deg, ${tone} 0 6px, ${tone}cc 6px 10px)`,
-                          }}
-                          className={`h-10 w-10 rounded-full ${avatar.pagne === i + 1 ? 'ring-4 ring-slate-900' : 'ring-2 ring-white'}`}
-                        />
-                      ))}
-                    </div>
-                  </fieldset>
-                  <p className="text-[11px] text-slate-500">
-                    Animations : marche, course, geste d’interaction et salut. Les personnages
-                    adultes n’ont pas encore de clip assis ni de conduite : ils gardent une pose
-                    debout à côté du meuble ou du véhicule.
-                  </p>
-                  {firstRun && (
+                    <details className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                      <summary className="cursor-pointer text-sm font-semibold text-slate-700">
+                        Personnages classiques (mini)
+                      </summary>
+                      <div
+                        className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3"
+                        role="group"
+                        aria-label="Choisir un personnage classique"
+                      >
+                        {AVATAR_MODELS.filter((m) => m.family === 'kenney-mini').map((m) => (
+                          <button
+                            type="button"
+                            key={m.id}
+                            aria-pressed={shownModel(avatar) === m.id}
+                            onClick={() => chooseAvatar({ model: m.id, classic: true })}
+                            className={
+                              'rounded-2xl border p-3 text-left ' +
+                              (shownModel(avatar) === m.id
+                                ? 'border-emerald-600 bg-emerald-50'
+                                : 'border-slate-200 bg-white')
+                            }
+                          >
+                            <span className="block text-sm font-black">{m.label}</span>
+                            <span className="block text-[11px] text-slate-500">{m.hint}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </details>
+                    <fieldset className="space-y-2">
+                      <legend className="text-sm font-black">Mon pagne</legend>
+                      <div className="flex flex-wrap gap-2">
+                        {PAGNES.map((tone, i) => (
+                          <button
+                            key={tone}
+                            type="button"
+                            aria-label={`Pagne ${i + 1}`}
+                            aria-pressed={avatar.pagne === i + 1}
+                            onClick={() => chooseAvatar({ pagne: i + 1 })}
+                            style={{
+                              background: `repeating-linear-gradient(135deg, ${tone} 0 6px, ${tone}cc 6px 10px)`,
+                            }}
+                            className={`h-10 w-10 rounded-full ${avatar.pagne === i + 1 ? 'ring-4 ring-slate-900' : 'ring-2 ring-white'}`}
+                          />
+                        ))}
+                      </div>
+                    </fieldset>
+                    <p className="text-[11px] text-slate-500">
+                      Animations : marche, course, geste d’interaction et salut. Les personnages
+                      adultes n’ont pas encore de clip assis ni de conduite : ils gardent une pose
+                      debout à côté du meuble ou du véhicule.
+                    </p>
+                    {firstRun && (
+                      <button
+                        type="button"
+                        onClick={confirmAvatar}
+                        className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#218b70] text-base font-black text-white"
+                      >
+                        Commencer
+                      </button>
+                    )}
+                  </>
+                )}
+                {panel === 'journal' && (
+                  <>
+                    <p className="text-sm text-slate-600">
+                      Événements enregistrés de ta partie. Pas de véritables nouvelles ou
+                      utilisateurs.
+                    </p>
+                    {life.events.map((ev, i) => (
+                      <div
+                        key={i}
+                        className="rounded-xl border-l-4 border-emerald-400 bg-slate-50 p-3 text-sm"
+                      >
+                        {ev}
+                      </div>
+                    ))}
+                    <DailyStatus life={life} />
                     <button
                       type="button"
-                      onClick={confirmAvatar}
-                      className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#218b70] text-base font-black text-white"
+                      onClick={() => setLife((old) => advanceLifeHour(old))}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 p-3 text-sm font-semibold"
                     >
-                      Commencer
+                      <Clock3 size={17} /> Avancer d’une heure
                     </button>
-                  )}
-                </>
-              )}
-              {panel === 'journal' && (
-                <>
-                  <p className="text-sm text-slate-600">
-                    Événements enregistrés de ta partie. Pas de véritables nouvelles ou
-                    utilisateurs.
-                  </p>
-                  {life.events.map((ev, i) => (
-                    <div
-                      key={i}
-                      className="rounded-xl border-l-4 border-emerald-400 bg-slate-50 p-3 text-sm"
-                    >
-                      {ev}
-                    </div>
-                  ))}
-                  <DailyStatus life={life} />
-                  <button
-                    type="button"
-                    onClick={() => setLife((old) => advanceLifeHour(old))}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 p-3 text-sm font-semibold"
-                  >
-                    <Clock3 size={17} /> Avancer d’une heure
-                  </button>
-                  <button
-                    type="button"
-                    onClick={reset}
-                    className="w-full rounded-xl border border-rose-200 p-3 text-sm font-semibold text-rose-700"
-                  >
-                    Recommencer ma partie fictive
-                  </button>
-                  <Link
-                    href="/haroolife/territoire"
-                    className="block p-2 text-center text-sm font-semibold text-emerald-700 underline"
-                  >
-                    Ouvrir HarooVille
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => open('avatar')}
-                    className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-800"
-                  >
-                    Mon apparence : {AVATAR_MODELS.find((m) => m.id === shownModel(avatar))?.label},
-                    pagne {avatar.pagne}
-                  </button>
-                  {presence.status === 'ready' && (
                     <button
                       type="button"
-                      onClick={() => open('residence')}
-                      className="w-full rounded-xl border border-emerald-200 p-3 text-sm font-semibold text-emerald-800"
+                      onClick={reset}
+                      className="w-full rounded-xl border border-rose-200 p-3 text-sm font-semibold text-rose-700"
                     >
-                      {presence.world?.me.home
-                        ? `Ma résidence : ${presence.world.me.home.canton}`
-                        : 'Choisir ma résidence au Togo'}
+                      Recommencer ma partie fictive
                     </button>
-                  )}
-                  <nav
-                    aria-label="Mes services FaîtiereHub"
-                    className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs font-semibold text-slate-600"
-                  >
-                    <Link href="/dashboard">Mon tableau de bord</Link>
-                    <Link href="/haroo">Mon espace Haroo</Link>
-                    <Link href="/marche">Le marché</Link>
-                  </nav>
-                </>
-              )}
-              <p className="pt-1 text-center text-[10px] text-slate-500">
-                {panel === 'messages' && realtime.state.status === 'online'
-                  ? 'Discussion entre vrais comptes HarooLife : messages enregistrés, signalables et modérés'
-                  : 'HarooLife · Mode fictif, hors paiements et comptes réels'}
-              </p>
-            </div>
-          </section>
-        </div>
+                    <Link
+                      href="/haroolife/territoire"
+                      className="block p-2 text-center text-sm font-semibold text-emerald-700 underline"
+                    >
+                      Ouvrir HarooVille
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => open('avatar')}
+                      className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-800"
+                    >
+                      Mon apparence :{' '}
+                      {AVATAR_MODELS.find((m) => m.id === shownModel(avatar))?.label}, pagne{' '}
+                      {avatar.pagne}
+                    </button>
+                    {presence.status === 'ready' && (
+                      <button
+                        type="button"
+                        onClick={() => open('residence')}
+                        className="w-full rounded-xl border border-emerald-200 p-3 text-sm font-semibold text-emerald-800"
+                      >
+                        {presence.world?.me.home
+                          ? `Ma résidence : ${presence.world.me.home.canton}`
+                          : 'Choisir ma résidence au Togo'}
+                      </button>
+                    )}
+                    <nav
+                      aria-label="Mes services FaîtiereHub"
+                      className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs font-semibold text-slate-600"
+                    >
+                      <Link href="/dashboard">Mon tableau de bord</Link>
+                      <Link href="/haroo">Mon espace Haroo</Link>
+                      <Link href="/marche">Le marché</Link>
+                    </nav>
+                  </>
+                )}
+                <p className="pt-1 text-center text-[10px] text-slate-500">
+                  {panel === 'messages' && realtime.state.status === 'online'
+                    ? 'Discussion entre vrais comptes HarooLife : messages enregistrés, signalables et modérés'
+                    : 'HarooLife · Mode fictif, hors paiements et comptes réels'}
+                </p>
+              </div>
+            </Drawer.Content>
+          </Drawer.Portal>
+        </Drawer.Root>
       )}
       {panel === 'residence' && presence.world && (
         <HomeDialog

@@ -42,6 +42,7 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
   await openPlaces(page)
   await page.getByRole('button', { name: /Grand marché d’Assigamé/ }).click()
   await page.getByRole('dialog', { name: 'Lieu' }).getByRole('button', { name: /Taxi/ }).click()
+  await page.getByRole('button', { name: 'Confirmer le trajet' }).click()
   await expect(page.getByLabel('Trajet en cours')).toBeVisible()
   await page
     .getByLabel('Trajet en cours')
