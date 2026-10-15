@@ -184,7 +184,7 @@ export default function Home() {
           </div>
 
           {/* 3 profile cards */}
-          <div className="grid gap-6 sm:grid-cols-3">
+          <div className="mx-auto grid max-w-xl gap-6 lg:max-w-none lg:grid-cols-3">
             {HAROO_PROFILES.map(
               ({ role, type, action, icon: Icon, badgeBg, tagline, description, perks }) => (
                 <div
@@ -209,7 +209,7 @@ export default function Home() {
                         <Icon className="h-4 w-4 text-amber-700" /> {role}
                       </span>
                       <span
-                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${badgeBg}`}
+                        className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${badgeBg}`}
                       >
                         {tagline}
                       </span>
@@ -245,23 +245,23 @@ export default function Home() {
 
           {/* Haroo CTA */}
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <Link href="/auth/signup/haroo">
-              <Button
-                size="lg"
-                className="gap-2 bg-amber-600 text-white hover:bg-amber-700 border-amber-600"
-              >
-                <UserPlus className="h-4 w-4" /> Créer mon profil Haroo
-              </Button>
-            </Link>
-            <Link href="/haroo">
-              <Button
-                size="lg"
-                variant="outline"
-                className="gap-2 border-amber-200 text-amber-700 hover:bg-amber-50"
-              >
-                Accéder à mon espace Haroo
-              </Button>
-            </Link>
+            <Button
+              asChild
+              size="lg"
+              className="min-h-11 gap-2 border-amber-700 bg-amber-700 text-white hover:bg-amber-800"
+            >
+              <Link href="/auth/signup/haroo">
+                <UserPlus aria-hidden="true" className="h-4 w-4" /> Créer mon profil Haroo
+              </Link>
+            </Button>
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="min-h-11 gap-2 border-amber-300 text-amber-800 hover:bg-amber-50"
+            >
+              <Link href="/haroo">Accéder à mon espace Haroo</Link>
+            </Button>
           </div>
 
           {/* Haroo integration note */}
@@ -276,9 +276,9 @@ export default function Home() {
             </p>
             <Link
               href="/scan"
-              className="mt-3 inline-block text-sm font-semibold text-amber-700 hover:text-amber-900 underline underline-offset-2"
+              className="mt-2 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-amber-800 underline underline-offset-2 hover:text-amber-900"
             >
-              Essayer le scanner →
+              Essayer le scanner <ArrowRight aria-hidden="true" className="h-4 w-4" />
             </Link>
           </div>
         </div>
@@ -301,12 +301,12 @@ export default function Home() {
                 WhatsApp, sans intermédiaire ni commission.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <Button asChild>
+                <Button asChild size="lg" className="min-h-11">
                   <Link href="/marche">
                     Voir le marché <ArrowRight className="ml-1.5 h-4 w-4" />
                   </Link>
                 </Button>
-                <Button variant="outline" asChild>
+                <Button variant="outline" asChild size="lg" className="min-h-11">
                   <Link href="/haroo">Publier une annonce</Link>
                 </Button>
               </div>
@@ -336,7 +336,7 @@ export default function Home() {
                 },
               ].map((item) => (
                 <div key={item.title} className="rounded-xl border border-border bg-card p-5">
-                  <item.icon className="h-5 w-5 text-primary" />
+                  <item.icon aria-hidden="true" className="h-5 w-5 text-primary" />
                   <div className="mt-3 font-semibold text-foreground">{item.title}</div>
                   <p className="mt-1 text-sm text-muted-foreground">{item.text}</p>
                 </div>
@@ -349,7 +349,7 @@ export default function Home() {
       {/* ── ECOSYSTEM OVERVIEW ───────────────────────────────────────── */}
       <section className="border-y border-border bg-muted/30 py-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             <div className="flex items-start gap-4 rounded-xl border border-primary/20 bg-primary/5 p-5">
               <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-primary text-white">
                 <Users className="h-5 w-5" />
@@ -422,8 +422,8 @@ export default function Home() {
                 className="w-full rounded-2xl border border-border shadow-2xl transition-transform duration-500 group-hover:scale-[1.02]"
               />
               <div className="absolute -inset-4 -z-10 rounded-3xl bg-gradient-to-r from-primary/20 via-transparent to-primary/20 blur-2xl opacity-50 transition-opacity group-hover:opacity-70" />
-              <div className="absolute top-4 right-4 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-lg">
-                ✓ Vérifiable par QR
+              <div className="absolute top-4 right-4 inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-lg">
+                <CheckCircle aria-hidden="true" className="h-3.5 w-3.5" /> Vérifiable par QR
               </div>
             </div>
           </div>
@@ -482,7 +482,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid gap-6 sm:grid-cols-3">
+          <div className="mx-auto grid max-w-2xl gap-6 lg:max-w-none lg:grid-cols-3">
             <div className="rounded-2xl border border-border bg-background p-6">
               <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <GraduationCap className="h-5 w-5" />
@@ -521,19 +521,20 @@ export default function Home() {
           </div>
 
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <Link href="/auth/signup/operator">
-              <Button size="lg" className="gap-2">
-                <Handshake className="h-4 w-4" /> Créer mon compte Opérateur
-              </Button>
-            </Link>
-            <Link href="/operator">
-              <Button size="lg" variant="outline" className="gap-2">
-                <GraduationCap className="h-4 w-4" /> J&apos;ai déjà un compte Opérateur
-              </Button>
-            </Link>
+            <Button asChild size="lg" className="min-h-11 gap-2">
+              <Link href="/auth/signup/operator">
+                <Handshake aria-hidden="true" className="h-4 w-4" /> Créer mon compte Opérateur
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="outline" className="min-h-11 gap-2">
+              <Link href="/operator">
+                <GraduationCap aria-hidden="true" className="h-4 w-4" /> J&apos;ai déjà un compte
+                Opérateur
+              </Link>
+            </Button>
           </div>
 
-          <p className="mt-4 text-center text-xs text-muted-foreground">
+          <p className="mx-auto mt-4 max-w-2xl text-center text-sm text-muted-foreground">
             La formation Opérateur s&apos;ouvre dès la création du compte, et le tableau de bord
             Opérateur une fois les frais de certification réglés. Membres de coopérative et profils
             Haroo ont leurs propres formations dans AgriAcademy.
@@ -549,20 +550,25 @@ export default function Home() {
               Comment fonctionne FaîtiereHub
             </h2>
           </div>
-          <div className="grid gap-10 md:grid-cols-3">
+          <ol className="mx-auto grid max-w-2xl gap-10 lg:max-w-none lg:grid-cols-3">
             {HOW_IT_WORKS.map(({ step, title, description }, i) => (
-              <div key={step} className="relative space-y-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold text-lg">
+              <li key={step} className="relative flex gap-5 lg:block lg:space-y-4">
+                <div className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-lg font-bold text-primary-foreground">
                   {step}
                 </div>
-                <h3 className="font-semibold text-lg text-foreground">{title}</h3>
-                <p className="text-muted-foreground leading-relaxed">{description}</p>
                 {i < 2 && (
-                  <div className="absolute top-6 -right-5 hidden h-px w-10 bg-border md:block" />
+                  <div
+                    aria-hidden="true"
+                    className="absolute left-6 top-12 -bottom-10 w-px bg-border lg:left-12 lg:right-[-2.5rem] lg:top-6 lg:bottom-auto lg:h-px lg:w-auto"
+                  />
                 )}
-              </div>
+                <div className="space-y-2 lg:space-y-4">
+                  <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+                  <p className="leading-relaxed text-muted-foreground">{description}</p>
+                </div>
+              </li>
             ))}
-          </div>
+          </ol>
         </div>
       </section>
 
@@ -573,7 +579,7 @@ export default function Home() {
             Ils nous font confiance
           </p>
           <div className="flex justify-center">
-            <div className="flex items-center gap-8 rounded-2xl border border-border bg-card/60 px-8 py-6 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-card/60 px-6 py-6 text-center shadow-sm sm:flex-row sm:gap-8 sm:px-8 sm:text-left">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/images/partners/fenomat.webp"
@@ -602,50 +608,56 @@ export default function Home() {
                 <Briefcase className="h-6 w-6" />
               </div>
               <h3 className="text-2xl font-extrabold mb-3">Gérez votre coopérative</h3>
-              <p className="text-primary-foreground/80 mb-6 leading-relaxed">
+              <p className="mb-6 leading-relaxed text-primary-foreground/90">
                 Rejoignez les coopératives agricoles du Togo qui utilisent FaîtiereHub pour
                 structurer leur organisation, gérer leurs membres et développer leurs activités.
               </p>
-              <Link href="/auth/signup">
-                <Button
-                  size="lg"
-                  className="gap-2 bg-white text-primary hover:bg-white/90 border-0"
-                >
-                  Démarrer l&apos;essai gratuit <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-              <p className="mt-3 text-xs text-primary-foreground/60">
+              <Button
+                asChild
+                size="lg"
+                className="min-h-11 gap-2 border-0 bg-white text-primary hover:bg-white/90"
+              >
+                <Link href="/auth/signup">
+                  Démarrer l&apos;essai gratuit{' '}
+                  <ArrowRight aria-hidden="true" className="h-4 w-4" />
+                </Link>
+              </Button>
+              <p className="mt-3 text-sm text-primary-foreground/85">
                 30 jours gratuits · Sans carte bancaire
               </p>
             </div>
 
             {/* Haroo CTA */}
-            <div className="rounded-2xl bg-gradient-to-br from-amber-600 to-amber-800 p-8 text-white">
+            <div className="rounded-2xl bg-gradient-to-br from-amber-700 to-amber-900 p-8 text-white">
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-white/20">
                 <Network className="h-6 w-6" />
               </div>
               <h3 className="text-2xl font-extrabold mb-3">Rejoignez Haroo</h3>
-              <p className="text-white/80 mb-6 leading-relaxed">
+              <p className="mb-6 leading-relaxed text-white/90">
                 Vous êtes ouvrier agricole, acheteur ou agronome ? Créez votre profil professionnel
                 Haroo — obtenez votre carte vérifiable et accédez à des opportunités dans votre
                 région.
               </p>
-              <Link href="/auth/signup/haroo">
-                <Button
-                  size="lg"
-                  className="gap-2 bg-white text-amber-700 hover:bg-white/90 border-0"
-                >
-                  <UserPlus className="h-4 w-4" /> Créer mon profil Haroo
-                </Button>
-              </Link>
-              <p className="mt-3 text-xs text-white/60">Gratuit · Emploi · Préventes · Missions</p>
+              <Button
+                asChild
+                size="lg"
+                className="min-h-11 gap-2 border-0 bg-white text-amber-800 hover:bg-white/90"
+              >
+                <Link href="/auth/signup/haroo">
+                  <UserPlus aria-hidden="true" className="h-4 w-4" /> Créer mon profil Haroo
+                </Link>
+              </Button>
+              <p className="mt-3 text-sm text-white/90">Gratuit · Emploi · Préventes · Missions</p>
             </div>
           </div>
 
           {/* Already have account */}
           <p className="mt-8 text-center text-sm text-muted-foreground">
             Déjà inscrit ?{' '}
-            <Link href="/auth/login" className="font-medium text-primary hover:underline">
+            <Link
+              href="/auth/login"
+              className="inline-flex min-h-11 items-center font-semibold text-primary underline-offset-2 hover:underline"
+            >
               Se connecter
             </Link>
           </p>

@@ -190,7 +190,6 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
             </button>
           </div>
         </nav>
-
       </header>
 
       <MobileNavigationDrawer open={mobileMenuOpen} onClose={closeMobileMenu} />
@@ -213,12 +212,12 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
             {footerColumns.map((column) => (
               <div key={column.title}>
                 <h4 className="font-semibold text-foreground mb-4">{column.title}</h4>
-                <ul className="space-y-2">
+                <ul className="space-y-1 lg:space-y-2">
                   {column.links.map((link) => (
                     <li key={link.label}>
                       <Link
                         href={link.href}
-                        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                        className="inline-flex min-h-11 items-center text-sm text-muted-foreground transition-colors hover:text-foreground lg:min-h-0"
                       >
                         {link.label}
                       </Link>
@@ -233,7 +232,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
               © {new Date().getFullYear()} FaîtiereHub. Tous droits réservés.
             </p>
             <p className="text-sm text-muted-foreground">
-              Fait avec <span className="text-primary">♥</span> pour les coopératives agricoles
+              Fait au Togo pour les coopératives agricoles
             </p>
           </div>
         </div>
