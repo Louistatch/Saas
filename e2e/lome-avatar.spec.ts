@@ -27,7 +27,7 @@ test('one configurable avatar across street, room and taxi', async ({ page }, te
   await page.screenshot({ path: testInfo.outputPath('avatar-adult-street.png') })
 
   // Choose the classic Koffi (mini) and pagne 3 from the journal: the wrap is still drawn.
-  await page.locator('button[role="status"]').first().click()
+  await page.locator('button[aria-live="polite"]').first().click()
   await page.getByRole('button', { name: /Mon apparence/ }).click()
   await expect(page.getByRole('heading', { name: 'Mon apparence' })).toBeVisible()
   await page.getByText('Personnages classiques (mini)').click()

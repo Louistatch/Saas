@@ -113,7 +113,7 @@ test('Lomé Life 3D opens on a dense, explorable city and completes a full outin
     .getByRole('group', { name: 'Filtrer la ville' })
     .getByRole('button', { name: 'Loisirs' })
     .click()
-  await page.getByRole('button', { name: /Salle Fitness Tokoin/ }).click()
+  await page.getByRole('button', { name: /^🏋️ Salle Fitness Tokoin/ }).click()
   await expect(page.getByRole('dialog', { name: 'Lieu' })).toBeVisible()
   await expect(page.getByText('S’entraîner')).toBeVisible()
   await page.getByRole('button', { name: /Zémidjan/ }).click()
@@ -135,7 +135,7 @@ test('Lomé Life 3D opens on a dense, explorable city and completes a full outin
     .getByRole('group', { name: 'Filtrer la ville' })
     .getByRole('button', { name: 'Loisirs' })
     .click()
-  await page.getByRole('button', { name: /Salle Fitness Tokoin/ }).click()
+  await page.getByRole('button', { name: /^🏋️ Salle Fitness Tokoin/ }).click()
   const wallet = await page.evaluate(
     () => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? '{}').life?.wallet,
   )

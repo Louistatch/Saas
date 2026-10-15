@@ -43,7 +43,7 @@ test('repeated 3D transitions, backgrounding and WebGL context loss never throw'
 
   for (let i = 0; i < transitions; i++) {
     // Lomé → module « Construire » through the in-game link: same world, same canvas.
-    await page.locator('button[role="status"]').first().click() // opens the life journal
+    await page.locator('button[aria-live="polite"]').first().click() // opens the life journal
     await page.getByRole('link', { name: 'Ouvrir HarooVille' }).click()
     await expect(page).toHaveURL(/\/haroolife\/territoire$/)
     await expect(page.getByRole('heading', { name: 'Construire' })).toBeVisible()
