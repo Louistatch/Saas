@@ -69,7 +69,11 @@ test('a day in Lomé: from home to the gym, a workout on real equipment, and bac
   )
   expect(stepB, 'traffic step advances without input').toBeGreaterThan(stepA)
 
-  // Category chips over the city filter the place labels.
+  // Category chips over the map view (V3: filters live on the map, not in the game view)
+  // filter the place labels.
+  const navigation = page.getByRole('navigation', { name: 'Navigation du jeu' })
+  await expect(page.getByRole('group', { name: 'Catégories de lieux' })).toHaveCount(0)
+  await navigation.getByRole('button', { name: 'Carte' }).click()
   const chips = page.getByRole('group', { name: 'Catégories de lieux' })
   await chips.getByRole('button', { name: 'Loisirs' }).click()
   // Labels off-screen are kept in the DOM but hidden, so count by title rather than by role.
@@ -78,8 +82,7 @@ test('a day in Lomé: from home to the gym, a workout on real equipment, and bac
   await chips.getByRole('button', { name: 'Tous' }).click()
   await expect(page.locator('button[title="Marché de Tokoin"]')).toHaveCount(1)
 
-  // 2–3. Open the map and select the gym.
-  const navigation = page.getByRole('navigation', { name: 'Navigation du jeu' })
+  // 2–3. Open the list of places and select the gym.
   await openPlaces(page)
   await page
     .getByRole('group', { name: 'Filtrer la ville' })
