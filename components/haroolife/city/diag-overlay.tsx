@@ -16,9 +16,12 @@ const KEY = 'haroolife:diag'
 export function initialDiag(): boolean {
   if (typeof window === 'undefined') return false
   const q = new URLSearchParams(window.location.search).get('diag')
+  // A diagnostic flag remembered during phone testing must never leak into the public build.
+  // Keep an explicit query switch for support sessions, while normal production visits stay clean.
+  if (q === '1') return true
   try {
-    if (q === '1') window.localStorage.setItem(KEY, '1')
     if (q === '0') window.localStorage.removeItem(KEY)
+    if (process.env.NODE_ENV === 'production') return false
     return window.localStorage.getItem(KEY) === '1'
   } catch {
     return q === '1'

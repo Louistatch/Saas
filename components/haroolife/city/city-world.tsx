@@ -311,7 +311,7 @@ export function daylight(hour: number) {
   ]
   // Night floor: dark enough to read as night, bright enough that the city stays legible on a
   // phone screen outdoors (measured on a Motorola at 21h: buildings were nearly black).
-  const night: [number, number, number] = [0.14, 0.21, 0.37]
+  const night: [number, number, number] = [0.23, 0.31, 0.48]
   const day: [number, number, number] = [0.62, 0.82, 0.91]
   const gold: [number, number, double] = [0.96, 0.68, 0.45] as unknown as [number, number, number]
   let sky = mix(night, day, Math.min(1, t * 1.6))
@@ -324,11 +324,11 @@ export function daylight(hour: number) {
           .padStart(2, '0'),
       )
       .join('')}`
-  const sun = 0.5 + t * 1.05
+  const sun = 0.72 + t * 1.05
   const sunColor = hex(
     mix([0.8, 0.85, 1], mix([1, 1, 0.96], [1, 0.78, 0.55], warm), Math.min(1, t * 2)),
   )
-  const ambient = hex(mix([0.27, 0.31, 0.42], [0.72, 0.8, 0.86], Math.min(1, t * 1.8)))
+  const ambient = hex(mix([0.4, 0.46, 0.56], [0.72, 0.8, 0.86], Math.min(1, t * 1.8)))
   return { sky: hex(sky), sun, sunColor, ambient, night: t < 0.08 }
 }
 type double = number
@@ -812,7 +812,7 @@ export default function CityWorld({
   const stableOnBillboard = useCallback((id: string) => onBillboardRef.current(id), [])
   const labels = useMemo(() => {
     const all = landmarks().filter((l) => filter === 'all' || CATEGORY_OF[l.type] === filter)
-    const radius = camera.distance < 40 ? 20 : 34
+    const radius = camera.distance < 40 ? 20 : 30
     // The nearest places first: the projector then keeps those that fit on screen.
     return all
       .filter(
@@ -823,7 +823,7 @@ export default function CityWorld({
           Math.hypot(a.x - centerCell.x, a.y - centerCell.y) -
           Math.hypot(b.x - centerCell.x, b.y - centerCell.y),
       )
-      .slice(0, 28)
+      .slice(0, camera.distance < 40 ? 24 : 16)
     // biome-ignore lint/correctness/useExhaustiveDependencies: landmarks() reads the active locality
   }, [centerCell.x, centerCell.y, filter, camera.distance, locality])
   const light = useMemo(() => daylight(hour), [hour])
