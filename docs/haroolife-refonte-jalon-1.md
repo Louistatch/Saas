@@ -264,5 +264,5 @@ Les tests qui mesuraient la ville aérienne PlayCanvas mesurent maintenant le qu
 | Transfert à froid | 23,9 Mo en 79 requêtes | 23,9 Mo en 79 requêtes |
 
 - Ces chiffres valent pour la comparaison entre versions, pas comme fluidité réelle : SwiftShader dessine sur le processeur.
-- La ligne « salle » du rapport de perf n'est pas une mesure : `RoomWorld` ne publie pas encore `__LOME_PERF`, le rapport relit le dernier relevé de la rue.
+- La salle publie aussi ses statistiques : une sonde commune (`lib/haroolife/game/render/perf-probe.ts`) sert la rue et les intérieurs, et s'efface quand son moteur est détruit, si bien qu'aucun relevé périmé ne reste. Salle de sport : 233 appels de dessin et 96 k triangles sur ordinateur, 224 et 94 k sur Android émulé.
 - Le test de la rue vérifie qu'aucun script téléchargé ne contient le moteur PlayCanvas.
