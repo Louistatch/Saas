@@ -166,7 +166,6 @@ function agentOffset(a: Agent): [number, number, number] {
   if (a.kind === 'zem') return [-0.25, 0.05, 0]
   return a.fx !== 0 ? [0, 0.02, 0.26 * Math.sign(a.fx)] : [-0.26 * Math.sign(a.fy || 1), 0.02, 0]
 }
-const NPC_STATIC = ['npc-a', 'npc-b', 'npc-c', 'npc-d']
 
 /**
  * Vehicles and pedestrians. React only decides who exists (once per traffic step); the
@@ -216,27 +215,19 @@ const Agents = memo(function Agents({
         const off = agentOffset(a)
         const pos: [number, number, number] = [base[0] + off[0], off[1], base[2] + off[2]]
         if (a.kind === 'walker')
-          return animated.has(a.id) ? (
+          return (
             <Character
               key={a.id}
               name={`piéton ${a.id}`}
               model={adultFor(a.model ?? 'character-male-a')}
               position={pos}
               rotation={a.heading}
-              anim={a.activity === 'run' ? 'run' : 'walk'}
+              anim={animated.has(a.id) ? (a.activity === 'run' ? 'run' : 'walk') : 'rest'}
+              active={animated.has(a.id)}
               scale={STREET_SCALE}
-              groundSpeed={(CELL * 1000) / (TRAFFIC_STEP_MS * (a.steps ?? 1))}
-              onEntity={register(a.id)}
-            />
-          ) : (
-            <Baked
-              key={a.id}
-              name={`piéton ${a.id}`}
-              model={NPC_STATIC[a.id % NPC_STATIC.length]}
-              position={pos}
-              rotation={a.heading}
-              // Baked mini figures (raw height FIGURE_HEIGHT): the same height as the adults.
-              scale={STREET_SCALE * 1.2}
+              groundSpeed={
+                animated.has(a.id) ? (CELL * 1000) / (TRAFFIC_STEP_MS * (a.steps ?? 1)) : undefined
+              }
               onEntity={register(a.id)}
             />
           )
