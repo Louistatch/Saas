@@ -30,6 +30,23 @@ const MODELS = {
   'awning-wide': ['city-commercial', 'detail-awning-wide'],
   overhang: ['city-commercial', 'detail-overhang'],
   'overhang-wide': ['city-commercial', 'detail-overhang-wide'],
+  // City Kit — Commercial, V3: a few towers kept for named landmarks, market parasols
+  ...Object.fromEntries(
+    'abcde'.split('').map((c) => [`sky-${c}`, ['city-commercial', `building-skyscraper-${c}`]]),
+  ),
+  'parasol-a': ['city-commercial', 'detail-parasol-a'],
+  'parasol-b': ['city-commercial', 'detail-parasol-b'],
+  // City Kit — Industrial, V3 (the port and industrial zone)
+  ...Object.fromEntries(
+    'ehijklms'.split('').map((c) => [`ind-${c}`, ['city-industrial', `building-${c}`]]),
+  ),
+  'tank-large': ['city-industrial', 'detail-tank-large'],
+  tank: ['city-industrial', 'detail-tank'],
+  'container-a': ['city-industrial', 'shipping-container-a'],
+  'container-b': ['city-industrial', 'shipping-container-b'],
+  'container-c': ['city-industrial', 'shipping-container-c'],
+  'water-tower': ['city-industrial', 'water-tower'],
+  chimney: ['city-industrial', 'chimney-large'],
   // City Kit — Suburban (houses, villas)
   ...Object.fromEntries(
     'abcdefghijklmnopqrstu'

@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import type { SceneProbe } from '../lib/haroolife/engine/types'
-import { expect, test } from './lome-test'
+import { expect, openPlaces, test } from './lome-test'
 
 /**
  * Jalon J1: the gym drawn by React Three Fiber (`?engine=three`) with Rapier collisions.
@@ -30,8 +30,7 @@ const live = (page: Page) =>
 
 /** From the street: map → gym → taxi (skipped) → door. */
 async function enterGym(page: Page) {
-  const navigation = page.getByRole('navigation', { name: 'Navigation du jeu' })
-  await navigation.getByRole('button', { name: 'Carte' }).click()
+  await openPlaces(page)
   await page
     .getByRole('group', { name: 'Filtrer la ville' })
     .getByRole('button', { name: 'Loisirs' })

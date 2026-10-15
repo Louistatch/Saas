@@ -389,6 +389,7 @@ export const labelOf = (t: LotType) =>
       townhall: 'l’hôtel de ville',
       billboard: 'le panneau',
       cooperative: 'la maison des coopératives',
+      industry: 'l’entrepôt',
     }) as Record<LotType, string>
   )[t]
 
@@ -407,6 +408,7 @@ export function interiorFor(t: LotType): Interior | null {
     case 'university':
     case 'station':
     case 'cooperative':
+    case 'industry':
       return 'hall'
     case 'sport':
     case 'stadium':
@@ -484,6 +486,7 @@ export function actionsFor(t: LotType): { id: CityAction; label: string; hint: s
       return [{ id: 'relax', label: 'Se détendre', hint: 'Loisir +25' }]
     case 'townhall':
     case 'station':
+    case 'industry':
       return [
         {
           id: 'work-city',

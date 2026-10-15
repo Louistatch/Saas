@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { expect, test } from './lome-test'
+import { expect, openPlaces, test } from './lome-test'
 
 test('immersive 3D Lomé life completes navigation, shopping, meals and work on desktop and Android', async ({
   page,
@@ -39,7 +39,7 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
   // First a taxi to a distant place from its sheet (the ride starts at once), then "Chez
   // moi" from there: the way home is long enough for the map's zémidjan button to find a
   // route still in progress whatever the pace of the machine.
-  await navigation.getByRole('button', { name: 'Carte' }).click()
+  await openPlaces(page)
   await page.getByRole('button', { name: /Grand marché d’Assigamé/ }).click()
   await page.getByRole('dialog', { name: 'Lieu' }).getByRole('button', { name: /Taxi/ }).click()
   await expect(page.getByLabel('Trajet en cours')).toBeVisible()
@@ -49,9 +49,9 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
     .click({ timeout: 15000, force: true })
     .catch(() => undefined)
   await expect(page.getByLabel('Trajet en cours')).toBeHidden()
-  await navigation.getByRole('button', { name: 'Carte' }).click()
+  await openPlaces(page)
   await page.getByRole('button', { name: /Chez moi/ }).click()
-  await navigation.getByRole('button', { name: 'Carte' }).click()
+  await openPlaces(page)
   await page.getByRole('button', { name: /Moto/ }).click()
   const ride = page.getByLabel('Trajet en cours')
   await expect(ride).toBeVisible()
@@ -68,7 +68,7 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
     .click({ timeout: 15000, force: true })
     .catch(() => undefined)
   await expect(ride).toBeHidden()
-  await navigation.getByRole('button', { name: 'Carte' }).click()
+  await openPlaces(page)
   await expect(page.getByRole('dialog', { name: 'Explorer Lomé' })).toBeVisible()
   // Named city: filters narrow the destinations, districts are listed.
   await page
@@ -99,7 +99,7 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
     page.getByRole('link', { name: /Partenaire.*50 000 FCFA\/mois/ }).first(),
   ).toBeVisible()
   await page.getByRole('button', { name: 'Fermer', exact: true }).click()
-  await navigation.getByRole('button', { name: 'Carte' }).click()
+  await openPlaces(page)
   await page.getByRole('button', { name: /Marché de quartier/ }).click()
   // Automatic road movement must reach market without pressing +1 hour per tile.
   await expect

@@ -131,6 +131,7 @@ const FAR_BODY: Record<LotType, RGB> = {
   townhall: rgb('#e4d8b8'),
   billboard: rgb('#333333'),
   cooperative: rgb('#d9ead3'),
+  industry: rgb('#9aa3b2'),
 }
 const ROOFS: RGB[] = [
   rgb('#b5541f'),
@@ -172,8 +173,14 @@ const LOW_WIDE = ['com-c', 'com-e', 'com-k']
 const MID_COMMERCIAL = ['com-a', 'com-b', 'com-d', 'com-h']
 const TALL_COMMERCIAL = ['com-f', 'com-g']
 const TALL_WIDE = ['com-f', 'com-g', 'com-i', 'com-j', 'com-l']
-const TOWERS = ['com-m']
+// V3: the five skyscrapers of the Commercial kit are kept for named landmarks (a few
+// recognisable towers), never for plain filler blocks (those top out at five floors).
+const TOWERS = ['sky-a', 'sky-b', 'sky-c', 'sky-d', 'sky-e']
 const TOWERS_WIDE = ['com-m', 'com-n']
+/** Industrial kit (V3): warehouses and sheds first, a few factories. */
+const WAREHOUSES = ['ind-h', 'ind-i', 'ind-j', 'ind-k', 'ind-s']
+const FACTORIES = ['ind-e', 'ind-l', 'ind-m']
+const CONTAINERS = ['container-a', 'container-b', 'container-c']
 
 const pick = <T>(arr: T[], r: number) => arr[Math.floor(r * arr.length) % arr.length]
 /** Rotation (degrees around Y) turning a model's +Z front towards the door cell. */
@@ -413,6 +420,14 @@ export function buildingFor(lot: Lot, sizes: SizeTable): BuildingSpec {
               scale: 0.6,
             })
         }
+      // V3: café parasols at the market's edge (Commercial kit).
+      props.push({
+        model: hash(lot.x, lot.y, 77) > 0.5 ? 'parasol-a' : 'parasol-b',
+        cx: lot.x - 0.3,
+        cy: lot.y + lot.h - 0.7,
+        rot: 0,
+        scale: 0.9,
+      })
       return { main: null, props, extras, far: far('flat', 0.75, FAR_BODY.market, rgb('#c2410c')) }
     }
     case 'school': {
@@ -637,6 +652,40 @@ export function buildingFor(lot: Lot, sizes: SizeTable): BuildingSpec {
       palms(2, 95)
       props.push({ model: 'truck', cx: lot.x + 0.2, cy: lot.y + 0.1, rot: 90, scale: 0.4 })
       return { main: null, props, extras, far: far('flat', 0.4, FAR_BODY.port, FAR_BODY.port) }
+    }
+    case 'industry': {
+      // Port and industrial zone (V3, Industrial kit): a warehouse or a factory on a concrete
+      // yard, containers or tanks beside it, a water tower on some larger plots.
+      extras.push({ kind: 'ground', cx: c.cx, cy: c.cy, w: lot.w, d: lot.h, color: rgb('#a3a39b') })
+      const big = lot.w >= 2
+      const m = main(
+        r1 < 0.72 ? pick(WAREHOUSES, r2) : pick(FACTORIES, r2),
+        undefined,
+        0.5,
+        2.4,
+        big ? 0.9 : 0.35,
+      )
+      if (big) {
+        const t = doorSide(lot, -0.45)
+        const side = rot === 0 || rot === 180
+        props.push({
+          model: r3 < 0.6 ? pick(CONTAINERS, r1) : 'tank-large',
+          cx: t.cx + (side ? 0.7 : 0),
+          cy: t.cy + (side ? 0 : 0.7),
+          rot: side ? 90 : 0,
+          scale: r3 < 0.6 ? 0.55 : 0.8,
+        })
+        if (r1 > 0.7)
+          props.push({ model: 'water-tower', cx: lot.x - 0.2, cy: lot.y - 0.2, rot: 0, scale: 0.9 })
+      } else if (r3 > 0.7)
+        props.push({
+          model: pick(CONTAINERS, r2),
+          cx: c.cx + 0.3,
+          cy: c.cy + 0.3,
+          rot: 90,
+          scale: 0.45,
+        })
+      return { main: m, props, extras, far: far('flat', 1.1, FAR_BODY.industry, rgb('#5b6475')) }
     }
     case 'cooperative': {
       const m = main('com-k', [0.86, 0.98, 0.86], 0.5, 2.6, 0.3)

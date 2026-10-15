@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { expect, test } from './lome-test'
+import { expect, openPlaces, test } from './lome-test'
 
 /**
  * Phase 2 — the living world. One complete outing, end to end, on desktop and Android:
@@ -80,7 +80,7 @@ test('a day in Lomé: from home to the gym, a workout on real equipment, and bac
 
   // 2–3. Open the map and select the gym.
   const navigation = page.getByRole('navigation', { name: 'Navigation du jeu' })
-  await navigation.getByRole('button', { name: 'Carte' }).click()
+  await openPlaces(page)
   await page
     .getByRole('group', { name: 'Filtrer la ville' })
     .getByRole('button', { name: 'Loisirs' })

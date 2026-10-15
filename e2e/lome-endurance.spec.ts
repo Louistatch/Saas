@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { expect, test } from './lome-test'
+import { expect, openPlaces, test } from './lome-test'
 
 /**
  * M4 (D4+): endurance of the single PlayCanvas application. 20 house entries and exits, then 10
@@ -117,7 +117,7 @@ test('20 house visits and 10 trips keep one engine and no growing GPU state', as
   for (let i = 0; i < 10; i++) {
     const to = i % 2 === 0 ? 'Kara' : 'Lomé'
     await settle()
-    await page.getByRole('button', { name: 'Carte' }).click()
+    await openPlaces(page)
     await page
       .getByTestId('national-map')
       .getByRole('button', { name: new RegExp(`Voyager vers ${to}`) })

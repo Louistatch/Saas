@@ -57,6 +57,11 @@ export interface LocalityDef {
   waterNames: { lagoon: string; ocean: string; sand: string }
   landmarks: Landmark[]
   decor: LocalityDecor
+  /**
+   * Industrial area (V3): filler plots there hold warehouses, tanks and containers instead of
+   * houses. Scene data only: lot ids and positions do not change.
+   */
+  industry?: { x0: number; x1: number; y0: number; y1: number }
 }
 
 const W = 120
@@ -293,6 +298,8 @@ export const LOME: LocalityDef = {
   districts: LOME_DISTRICTS,
   waterNames: { lagoon: 'Lagune de Bè', ocean: 'Océan Atlantique', sand: 'Plage' },
   landmarks: LOME_LANDMARKS,
+  // The port and its warehouses, on the coast east of Bè.
+  industry: { x0: 88, x1: 106, y0: 53, y1: 68 },
   decor: {
     grass: {
       agoe: '#9cbf6a',

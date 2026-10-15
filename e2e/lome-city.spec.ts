@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { expect, test } from './lome-test'
 import sharp from 'sharp'
+import { expect, openPlaces, test } from './lome-test'
 
 /**
  * The city must dominate the screen: a dense 3D Lomé, not a small plateau in an empty sea.
@@ -102,8 +102,7 @@ test('Lomé Life 3D opens on a dense, explorable city and completes a full outin
   await page.getByRole('button', { name: 'Recentrer sur moi' }).click()
 
   // 4. Places: filter, open a sheet from the map, go there by zémidjan, enter the interior.
-  const navigation = page.getByRole('navigation', { name: 'Navigation du jeu' })
-  await navigation.getByRole('button', { name: 'Carte' }).click()
+  await openPlaces(page)
   await page
     .getByRole('group', { name: 'Filtrer la ville' })
     .getByRole('button', { name: 'Éducation' })
@@ -130,7 +129,7 @@ test('Lomé Life 3D opens on a dense, explorable city and completes a full outin
     .not.toBeNull()
   await page.waitForTimeout(1200)
   await page.screenshot({ path: path.join(dir, `${testInfo.project.name}-gym.png`) })
-  await navigation.getByRole('button', { name: 'Carte' }).click()
+  await openPlaces(page)
   await page
     .getByRole('group', { name: 'Filtrer la ville' })
     .getByRole('button', { name: 'Loisirs' })
@@ -155,7 +154,7 @@ test('Lomé Life 3D opens on a dense, explorable city and completes a full outin
     ['Cultes', /Grande mosquée de Lomé/],
     ['Santé', /CHU de Tokoin/],
   ] as const) {
-    await navigation.getByRole('button', { name: 'Carte' }).click()
+    await openPlaces(page)
     await page
       .getByRole('group', { name: 'Filtrer la ville' })
       .getByRole('button', { name: filter })

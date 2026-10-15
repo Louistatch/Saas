@@ -61,6 +61,7 @@ export type LotType =
   | 'townhall'
   | 'billboard'
   | 'cooperative'
+  | 'industry'
 export type Category =
   | 'homes'
   | 'shops'
@@ -91,6 +92,7 @@ export const CATEGORY_OF: Record<LotType, Category> = {
   billboard: 'leisure',
   worship: 'worship',
   lot: 'lots',
+  industry: 'services',
 }
 export const CATEGORY_LABELS: Record<Category, string> = {
   homes: 'Maisons',
@@ -123,6 +125,7 @@ export const TYPE_LABELS: Record<LotType, string> = {
   townhall: 'Hôtel de ville',
   billboard: 'Panneau',
   cooperative: 'Maison des coopératives',
+  industry: 'Entrepôt',
 }
 export const TYPE_ICONS: Record<LotType, string> = {
   house: '🏠',
@@ -144,6 +147,7 @@ export const TYPE_ICONS: Record<LotType, string> = {
   townhall: '🏛️',
   billboard: '📢',
   cooperative: '🤝',
+  industry: '🏭',
 }
 
 export interface Lot {
@@ -263,10 +267,19 @@ function doorOf(x: number, y: number, w: number, h: number): { x: number; y: num
   for (let i = 0; i < w; i++) if (road(x + i, y - 1)) return { x: x + i, y: y - 1 }
   return null
 }
+/**
+ * What stands on a filler plot. V3 composition (closer to the reference's readable map):
+ * gardens are three times as common (about a fifth of the plots, more in the residential
+ * districts), and the town's industrial area holds warehouses. Ids and positions of the plots
+ * are unchanged; only what is drawn on them changes.
+ */
 function fillerType(d: DistrictDef, x: number, y: number, onAvenue: boolean): LotType {
   const r = hash(x, y, 11)
-  if (r < 0.06) return 'park'
-  if (r < 0.1 + (d.density === 1 ? 0.06 : 0)) return 'lot'
+  const zone = current().industry
+  if (zone && x >= zone.x0 && x < zone.x1 && y >= zone.y0 && y < zone.y1)
+    return r < 0.12 ? 'park' : 'industry'
+  if (r < (d.density === 1 ? 0.22 : d.density === 2 ? 0.17 : 0.12)) return 'park'
+  if (r < (d.density === 1 ? 0.28 : 0.2)) return 'lot'
   if (onAvenue && r < 0.42) return 'shop'
   if (d.density === 3) return r < 0.8 ? 'apartment' : 'shop'
   if (d.density === 2) return r < 0.55 ? 'apartment' : r < 0.9 ? 'house' : 'shop'
@@ -364,10 +377,11 @@ export function worldIndex(): WorldIndex {
       const onAvenue =
         x % 12 === 1 || y % 10 === 1 || (x + w + 1) % 12 === 0 || (y + h + 1) % 10 === 0
       const type = fillerType(d, x, y, onAvenue)
+      // Plain blocks top out at five floors: the few towers are named landmarks (V3).
       const floors =
         type === 'apartment'
           ? d.density === 3
-            ? 3 + Math.floor(hash(x, y, 5) * 5)
+            ? 3 + Math.floor(hash(x, y, 5) * 3)
             : 2 + Math.floor(hash(x, y, 5) * 3)
           : type === 'shop'
             ? 1 + Math.floor(hash(x, y, 5) * 2)

@@ -1,4 +1,4 @@
-import { expect, test } from './lome-test'
+import { expect, openPlaces, test } from './lome-test'
 
 /**
  * One national world: from Lomé the player opens the Togo map (sourced boundaries), takes
@@ -31,7 +31,7 @@ test('travel Lomé → Kara → Lomé inside the single 3D world', async ({ page
   }
   const openMap = async () => {
     await settle()
-    await page.getByRole('button', { name: 'Carte' }).click()
+    await openPlaces(page)
   }
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(e.message))

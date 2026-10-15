@@ -14,7 +14,7 @@ import {
   stepDir,
   walkStep,
 } from '../lib/haroolife/city/life'
-import { landmarks, lotById, toWorld } from '../lib/haroolife/city/world'
+import { landmarks, lotById, toWorld, worldLots } from '../lib/haroolife/city/world'
 import { initialLomeLife, interact } from '../lib/haroolife/lome-life-engine'
 
 const byName = (n: string) => landmarks().find((l) => l.name === n)!
@@ -87,6 +87,22 @@ test('each place category has an interior and actions with real consequences', (
   const worked = cityInteract(hall, 'work-city')
   assert.equal(worked.life.wallet, hall.life.wallet + 1500)
   assert.match(cityInteract(worked, 'work-city').life.lastEvent, /déjà/)
+})
+
+test('a warehouse of the industrial zone leads to a paid odd job, once a day', () => {
+  const s = initialCityLife()
+  const depot = worldLots().find((l) => l.type === 'industry')
+  assert.ok(depot, 'Lomé has an industrial zone')
+  assert.equal(interiorFor(depot.type), 'hall')
+  assert.deepEqual(
+    actionsFor(depot.type).map((a) => a.id),
+    ['work-city'],
+  )
+  const inside = cityInteract(arrive(goToLot(s, depot)), 'enter')
+  assert.equal(inside.insideLot, depot.id)
+  const worked = cityInteract(inside, 'work-city')
+  assert.equal(worked.life.wallet, inside.life.wallet + 1500)
+  assert.equal(cityInteract(worked, 'work-city').life.wallet, worked.life.wallet)
 })
 
 test('rides charge once and land at the destination; saves migrate and reload', () => {

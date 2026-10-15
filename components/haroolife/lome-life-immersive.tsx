@@ -161,6 +161,7 @@ import NationalMap from './city/national-map'
 import OnboardingSteps from './city/onboarding'
 import LiveChat from './live-chat'
 import { PAGNES } from './pagnes'
+import { PhoneDevice } from './phone-device'
 import { HomeDialog } from './residence-dialog'
 import { sayOnPlace, usePresence } from './use-presence'
 import { useRealtime } from './use-realtime'
@@ -225,6 +226,9 @@ const VENUE_LABELS: Record<string, string> = {
   park: 'Jardin',
 }
 const LOCATION_ICONS = ['🏠', '🛒', '🥖', '🏛️', '🚰', '🌳']
+/** Camera distance of the map view: a neighbourhood with its streets and landmarks. */
+const MAP_VIEW_DISTANCE = 46
+
 const NAV_ITEMS = [
   { id: 'home', label: 'Maison', icon: Home },
   { id: 'shop', label: 'Aménager', icon: ShoppingBag },
@@ -410,6 +414,13 @@ export function LomeLifeImmersive() {
   const myOrg = actor ? primaryOrganization(actor) : null
   const myCoopLot = myOrg ? worldAdapter.lotForOrganization(myOrg) : null
   const [cityFilter, setCityFilter] = useState<Category | 'all'>('all')
+  /**
+   * Map view (V3): an aerial view of the town with its filters, round place icons and the
+   * « Noms » switch; the game controls (joystick, door, needs) are hidden meanwhile. The game
+   * view keeps the close camera and shows no town-wide filters or names.
+   */
+  const [mapView, setMapView] = useState(false)
+  const [showNames, setShowNames] = useState(false)
   const [chunkStats, setChunkStats] = useState({
     chunks: 0,
     buildings: 0,
@@ -1028,6 +1039,30 @@ export function LomeLifeImmersive() {
     return () => window.clearInterval(id)
   }, [insideAny])
 
+  // Travelling or entering a place ends the map view (the game camera comes back).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reacts to these transitions only
+  useEffect(() => {
+    if (mapView && (insideAny || riding || cityLife.route.length > 0)) exitMap()
+  }, [insideAny, riding, cityLife.route.length])
+  function enterMap() {
+    setPanel(null)
+    const rig = controller.camera
+    rig.follow = false
+    rig.tx = controller.pos.x
+    rig.tz = controller.pos.z
+    rig.distance = MAP_VIEW_DISTANCE
+    setCamera((c) => ({ ...c, tx: rig.tx, tz: rig.tz, distance: rig.distance }))
+    setMapView(true)
+  }
+  /** Back to the game: the close camera on the player, as it was before the map. */
+  function exitMap() {
+    const rig = controller.camera
+    rig.follow = true
+    rig.distance = FOLLOW_DISTANCE
+    setCamera((c) => ({ ...c, distance: rig.distance }))
+    setShowNames(false)
+    setMapView(false)
+  }
   function open(id: Exclude<Sheet, null>) {
     setPanel((cur) => (cur === id ? null : id))
     setNotice(null)
@@ -1365,7 +1400,8 @@ export function LomeLifeImmersive() {
             }}
             filter={cityFilter}
             selectedLot={selectedLot}
-            labelsHidden={panel !== null}
+            labelsHidden={panel !== null || !mapView}
+            showNames={showNames}
             onStats={(s) =>
               setChunkStats((old) =>
                 old.chunks === s.chunks &&
@@ -1405,7 +1441,33 @@ export function LomeLifeImmersive() {
         />
       )}
 
-      {!insideAny && !riding && webgl !== false && (
+      {mapView && !insideAny && !riding && webgl !== false && (
+        <div className="pointer-events-auto absolute left-3 right-3 top-[150px] z-10 flex flex-wrap gap-1.5 sm:top-[160px]">
+          <button
+            type="button"
+            onClick={exitMap}
+            className="rounded-full bg-emerald-800 px-3 py-1.5 text-xs font-bold text-white shadow"
+          >
+            Retour au jeu
+          </button>
+          <button
+            type="button"
+            aria-pressed={showNames}
+            onClick={() => setShowNames((v) => !v)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-bold shadow ${showNames ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-white/70 bg-white/95 text-slate-800'}`}
+          >
+            🏷️ Noms
+          </button>
+          <button
+            type="button"
+            onClick={() => open('map')}
+            className="rounded-full border border-white/70 bg-white/95 px-3 py-1.5 text-xs font-bold text-slate-800 shadow"
+          >
+            Lieux et villes
+          </button>
+        </div>
+      )}
+      {mapView && !insideAny && !riding && webgl !== false && (
         <div
           role="group"
           aria-label="Catégories de lieux"
@@ -1554,7 +1616,9 @@ export function LomeLifeImmersive() {
         )}
       </header>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-[calc(100px+env(safe-area-inset-bottom))] z-20 px-3 sm:px-5">
+      <div
+        className={`pointer-events-none absolute inset-x-0 bottom-[calc(100px+env(safe-area-inset-bottom))] z-20 px-3 sm:px-5 ${mapView ? 'hidden' : ''}`}
+      >
         <div className="mx-auto flex max-w-[900px] items-end justify-between gap-2">
           <div className="flex min-w-0 flex-col items-start gap-2">
             <button
@@ -1749,11 +1813,20 @@ export function LomeLifeImmersive() {
               <button
                 type="button"
                 key={item.id}
-                aria-pressed={panel === item.id}
-                onClick={() => open(item.id)}
+                aria-pressed={item.id === 'map' ? mapView || panel === 'map' : panel === item.id}
+                onClick={() => {
+                  if (item.id === 'map') {
+                    if (mapView) exitMap()
+                    else if (insideAny) open('map')
+                    else enterMap()
+                    return
+                  }
+                  if (mapView) exitMap()
+                  open(item.id)
+                }}
                 className={
                   'relative flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-[18px] text-[11px] font-semibold transition ' +
-                  (panel === item.id
+                  ((item.id === 'map' ? mapView || panel === 'map' : panel === item.id)
                     ? 'bg-slate-900 text-white'
                     : 'text-slate-600 hover:bg-slate-100')
                 }
@@ -1814,7 +1887,41 @@ export function LomeLifeImmersive() {
           </section>
         </div>
       )}
-      {panel && panel !== 'residence' && (
+      {panel === 'phone' && (
+        <PhoneDevice
+          hour={life.hour}
+          day={life.day}
+          place={LOCALITIES[cityLife.locality].name}
+          wallet={money(life.wallet)}
+          partners={PARTNER_APPS.map((app) => ({
+            id: app.id,
+            icon: app.icon,
+            name: app.name,
+            href: app.href,
+            note: app.status === 'available' ? `${money(app.priceMonth)}/mois` : undefined,
+          }))}
+          diag={diag}
+          onDiag={(on) => {
+            setDiag(on)
+            rememberDiag(on)
+          }}
+          quality={quality}
+          qualities={(['eco', 'balanced', 'high'] as const).map((q) => ({
+            id: q,
+            label: PRESETS[q].label,
+            hint: PRESETS[q].hint,
+          }))}
+          onQuality={(id) => {
+            const q = id as Quality
+            setQuality(q)
+            rememberQuality(q)
+            if (governor.current) governor.current.ceiling = q
+          }}
+          onOpen={(app) => open(app)}
+          onClose={() => setPanel(null)}
+        />
+      )}
+      {panel && panel !== 'residence' && panel !== 'phone' && (
         <div className="absolute inset-0 z-40" aria-label={title}>
           <button
             type="button"
@@ -2147,106 +2254,6 @@ export function LomeLifeImmersive() {
                       physiques pilotables pour le moment.
                     </p>
                   </div>
-                </>
-              )}
-              {panel === 'phone' && (
-                <>
-                  <label className="flex items-center justify-between rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-700">
-                    Diagnostic images/s et réseau
-                    <input
-                      type="checkbox"
-                      checked={diag}
-                      onChange={(e) => {
-                        setDiag(e.target.checked)
-                        rememberDiag(e.target.checked)
-                      }}
-                      className="h-4 w-4"
-                    />
-                  </label>
-                  <div className="rounded-2xl bg-slate-50 p-3">
-                    <p className="text-xs font-bold text-slate-700">Qualité graphique</p>
-                    <p className="text-[11px] text-slate-500">{PRESETS[quality].hint}</p>
-                    <div className="mt-2 flex gap-1" role="group" aria-label="Qualité graphique">
-                      {(['eco', 'balanced', 'high'] as const).map((q) => (
-                        <button
-                          type="button"
-                          key={q}
-                          aria-pressed={quality === q}
-                          onClick={() => {
-                            setQuality(q)
-                            rememberQuality(q)
-                            if (governor.current) governor.current.ceiling = q
-                          }}
-                          className={`flex-1 rounded-xl px-2 py-2 text-xs font-bold ${
-                            quality === q
-                              ? 'bg-slate-900 text-white'
-                              : 'bg-white text-slate-800 ring-1 ring-slate-200'
-                          }`}
-                        >
-                          {PRESETS[q].label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="rounded-[24px] bg-gradient-to-br from-indigo-700 via-violet-700 to-orange-400 p-4 text-white">
-                    <p className="text-3xl font-light">{String(life.hour).padStart(2, '0')}:00</p>
-                    <p className="text-xs opacity-90">Jour {life.day} · Lomé</p>
-                    <div className="mt-5 grid grid-cols-3 gap-3 text-center">
-                      {(
-                        [
-                          { id: 'jobs', icon: '💼', name: 'Métiers' },
-                          { id: 'messages', icon: '💬', name: 'Messages' },
-                          { id: 'wallet', icon: '💵', name: 'Argent' },
-                          { id: 'missions', icon: '🎯', name: 'Missions' },
-                          { id: 'journal', icon: '📰', name: 'Journal' },
-                          { id: 'build', icon: '🏗️', name: 'Construire' },
-                        ] as const
-                      ).map((app) => (
-                        <button
-                          key={app.id}
-                          type="button"
-                          onClick={() => open(app.id)}
-                          className="rounded-xl bg-white/20 p-3 backdrop-blur-sm hover:bg-white/30"
-                        >
-                          <span className="block text-2xl">{app.icon}</span>
-                          <span className="mt-1 block text-[11px]">{app.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 p-3">
-                    <p className="text-xs font-bold text-slate-700">Services et partenaires</p>
-                    <div className="mt-2 grid grid-cols-3 gap-2 text-center">
-                      {PARTNER_APPS.map((app) => (
-                        <Link
-                          key={app.id}
-                          href={app.href}
-                          className={
-                            'rounded-xl p-3 text-[11px] font-semibold ' +
-                            (app.status === 'house'
-                              ? 'bg-white text-slate-800 ring-1 ring-slate-200'
-                              : 'border border-dashed border-emerald-400 bg-emerald-50 text-emerald-800')
-                          }
-                        >
-                          <span className="block text-2xl">{app.icon}</span>
-                          {app.name}
-                          {app.status === 'available' && (
-                            <span className="block font-normal text-emerald-700">
-                              {money(app.priceMonth)}/mois
-                            </span>
-                          )}
-                        </Link>
-                      ))}
-                    </div>
-                    <p className="mt-2 text-[11px] text-slate-500">
-                      Trois emplacements partenaires ouverts (banque, assurance, intrants…). Tarif
-                      affiché ; aucun partenaire n’est encore facturé.
-                    </p>
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    Les services et conversations de ce téléphone sont simulés localement. Aucun
-                    message réel n’est envoyé.
-                  </p>
                 </>
               )}
               {panel === 'jobs' && (
