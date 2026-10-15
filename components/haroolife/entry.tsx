@@ -1,4 +1,4 @@
-import { ArrowRight, Sprout } from 'lucide-react'
+import { ArrowRight, MapPinned } from 'lucide-react'
 import Link from 'next/link'
 
 export function HarooLifeEntry() {
@@ -8,16 +8,23 @@ export function HarooLifeEntry() {
       href="/haroolife"
       // Le monde 3D est lourd : on ne le précharge pas depuis le tableau de bord, il se charge au clic.
       prefetch={false}
-      className="flex items-center gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950 hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-offset-4"
+      className="group relative flex min-h-48 overflow-hidden rounded-[1.5rem] border border-emerald-100 bg-gradient-to-br from-white via-emerald-50 to-emerald-100 p-6 text-emerald-950 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-4 sm:min-h-52 sm:p-8"
     >
-      <Sprout aria-hidden="true" className="h-8 w-8 shrink-0" />
-      <span className="flex-1">
-        <span className="block font-semibold">HarooLife · mon territoire en action</span>
-        <span className="text-sm">
-          Découvrez le pilote : former une équipe et regrouper les travaux.
+      <span className="relative z-10 flex max-w-md flex-col items-start justify-center">
+        <span className="block text-2xl font-bold">HarooLife · Votre territoire</span>
+        <span className="mt-2 text-sm leading-relaxed text-emerald-900/75 sm:text-base">
+          Découvrez la carte de votre coopérative, formez une équipe et regroupez vos travaux.
+        </span>
+        <span className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-800 px-5 font-semibold text-white transition group-hover:bg-emerald-900 group-active:scale-[0.98]">
+          <MapPinned className="h-5 w-5" /> Ouvrir
         </span>
       </span>
-      <ArrowRight aria-hidden="true" className="h-5 w-5" />
+      <span className="absolute -bottom-14 -right-12 h-60 w-60 rounded-full border-[34px] border-emerald-300/35" />
+      <span className="absolute bottom-14 right-16 h-20 w-20 rounded-full border-[15px] border-emerald-500/25" />
+      <ArrowRight
+        aria-hidden="true"
+        className="absolute bottom-8 right-8 h-6 w-6 text-emerald-800 transition-transform group-hover:translate-x-1"
+      />
     </Link>
   )
 }
