@@ -117,15 +117,6 @@ test('performance scenarios A–F', async ({ page, browserName }, testInfo) => {
   // B. Tokoin street at home (follow camera, idle).
   report.B_tokoin_street = { perf: await sample(page, 4000) }
 
-  // C. Walking down the street: the camera follows, building tiles stream in.
-  await page.evaluate(() =>
-    (window as unknown as { __LOME_PERF_RESET?: () => void }).__LOME_PERF_RESET?.(),
-  )
-  await page.keyboard.down('ArrowUp')
-  await page.waitForTimeout(3000)
-  report.C_walk = { perf: await perf(page) }
-  await page.keyboard.up('ArrowUp')
-
   // D. The city map (SVG, no 3D scene behind it) and back to the street.
   await page
     .getByRole('navigation', { name: 'Navigation du jeu' })
@@ -175,6 +166,16 @@ test('performance scenarios A–F', async ({ page, browserName }, testInfo) => {
     .toBeGreaterThanOrEqual(9)
   const backAt = Date.now() - tF
   report.F_back_to_city = { backMs: backAt, perf: await sample(page, 3000) }
+
+  // C (measured last: walking may leave the road network, which the trips above need).
+  // Walking down the street: the camera follows, building tiles stream in.
+  await page.evaluate(() =>
+    (window as unknown as { __LOME_PERF_RESET?: () => void }).__LOME_PERF_RESET?.(),
+  )
+  await page.keyboard.down('ArrowUp')
+  await page.waitForTimeout(3000)
+  report.C_walk = { perf: await perf(page) }
+  await page.keyboard.up('ArrowUp')
   report.G_cooperative = 'non mesuré : jalon 2'
   report.H_multi_actors = 'non mesuré : jalon 2'
 

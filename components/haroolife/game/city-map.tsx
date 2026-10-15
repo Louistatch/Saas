@@ -129,7 +129,8 @@ export default function CityMap({
         x: (lot.x + lot.w / 2 - view.cx) * s + size.w / 2,
         y: (lot.y + lot.h / 2 - view.cy) * s + size.h / 2,
       }
-      if (p.x < -GAP || p.y < -GAP || p.x > size.w + GAP || p.y > size.h + GAP) continue
+      // Only places whose spot is on screen: a marker cut in half by the edge is not usable.
+      if (p.x < 0 || p.y < 0 || p.x > size.w || p.y > size.h) continue
       if (lot.id !== selectedLot?.id && placed.some((q) => Math.hypot(q.x - p.x, q.y - p.y) < GAP))
         continue
       placed.push({ lot, ...p })

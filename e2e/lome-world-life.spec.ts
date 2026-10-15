@@ -77,11 +77,13 @@ test('a day in Lomé: from home to the gym, a workout on real equipment, and bac
   await navigation.getByRole('button', { name: 'Carte' }).click()
   const chips = page.getByRole('group', { name: 'Catégories de lieux' })
   await chips.getByRole('button', { name: 'Loisirs' }).click()
-  // Labels off-screen are kept in the DOM but hidden, so count by title rather than by role.
+  // The clear map's markers carry the place name as their title.
   await expect(page.locator('button[title="Marché de Tokoin"]')).toHaveCount(0)
   await expect(page.locator('button[title="Salle Fitness Tokoin"]')).toHaveCount(1)
-  await chips.getByRole('button', { name: 'Tous' }).click()
+  await chips.getByRole('button', { name: 'Commerces' }).click()
   await expect(page.locator('button[title="Marché de Tokoin"]')).toHaveCount(1)
+  await expect(page.locator('button[title="Salle Fitness Tokoin"]')).toHaveCount(0)
+  await chips.getByRole('button', { name: 'Tous' }).click()
 
   // 2–3. Open the list of places and select the gym.
   await openPlaces(page)

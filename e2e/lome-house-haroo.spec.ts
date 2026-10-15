@@ -286,6 +286,17 @@ test('HarooLife street and clear map: walk, places without overlap, sheet, route
   test.setTimeout(180_000)
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(e.message))
+  // Every script the page loads, to prove the PlayCanvas engine is never downloaded.
+  const scripts: Promise<boolean>[] = []
+  page.on('response', (r) => {
+    if (r.request().resourceType() === 'script')
+      scripts.push(
+        r
+          .text()
+          .then((t) => t.includes('playcanvas.com/engine'))
+          .catch(() => false),
+      )
+  })
   type Player = { x: number; z: number; heading: number; mode: string; camera: { angle: number } }
   const player = () =>
     page.evaluate(() => (window as unknown as { __LOME_PLAYER?: Player }).__LOME_PLAYER ?? null)
@@ -352,6 +363,10 @@ test('HarooLife street and clear map: walk, places without overlap, sheet, route
   await expect
     .poll(async () => (await live(page)) as unknown as { route: number } | null)
     .not.toBeNull()
+  // The street, its map and the walk never loaded PlayCanvas (only ?engine=playcanvas does).
+  const playcanvas = (await Promise.all(scripts)).filter(Boolean).length
+  expect(scripts.length, 'scripts observed').toBeGreaterThan(0)
+  expect(playcanvas, 'PlayCanvas engine chunks downloaded').toBe(0)
   expect(errors).toEqual([])
 })
 
