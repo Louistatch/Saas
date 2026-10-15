@@ -1,18 +1,21 @@
 /**
  * Which renderer draws the scenes it supports (today: interiors; the street is always
  * PlayCanvas). Order: `?engine=` in the address (remembered on this device), then the remembered
- * choice, then NEXT_PUBLIC_HAROOLIFE_ENGINE, then the default. The default is React Three Fiber
- * since the adult avatars: it is the interior where the player walks, collides and leaves by the
- * open side. `?engine=playcanvas` is the controlled way back and overwrites the remembered choice.
+ * choice, then NEXT_PUBLIC_HAROOLIFE_ENGINE, then the default.
+ *
+ * - `haroo` (default): the HarooLife engine (imperative Three.js) draws the house; the other
+ *   interiors stay on React Three Fiber while they are ported.
+ * - `three`: React Three Fiber for every interior (the previous default, the way back).
+ * - `playcanvas`: PlayCanvas everywhere.
  */
 import type { RendererId } from './types'
 
 export const ENGINE_STORAGE = 'haroolife.engine'
 /** Renderer used when nothing else decides. */
-export const DEFAULT_RENDERER: RendererId = 'three'
+export const DEFAULT_RENDERER: RendererId = 'haroo'
 
 const parse = (v: string | null | undefined): RendererId | null =>
-  v === 'three' || v === 'playcanvas' ? v : null
+  v === 'haroo' || v === 'three' || v === 'playcanvas' ? v : null
 
 export function resolveRenderer(
   search: string,

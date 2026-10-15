@@ -1,0 +1,18 @@
+Reused 3D assets — source and licensing
+
+Character models: Quaternius Ultimate Modular Men Pack and Ultimate Modular Women Pack, CC0 1.0.
+Primary source: https://quaternius.com/packs/ultimatemodularcharacters.html
+Primary source: https://quaternius.com/packs/ultimatemodularwomen.html
+Public optimized GLB mirror: https://github.com/martian56/ufazien/tree/main/frontend/public/avatars
+Mirror conversion provenance: https://github.com/martian56/ufazien/blob/main/frontend/scripts/build-avatars.mjs
+Models include original Idle, Idle_Neutral, Interact, Run, Walk, Wave clips, with no textures or decoder dependency.
+
+Furniture: Kenney Furniture Kit, Creative Commons CC0.
+https://kenney.nl/assets/furniture-kit
+
+Vehicles: Kenney Car Kit, Creative Commons CC0.
+https://kenney.nl/assets/car-kit
+Vehicles reference the included Textures/colormap.png.
+
+CC0 license: https://creativecommons.org/publicdomain/zero/1.0/
+Models are reusable open assets, not proprietary Lagos Life source or extracted game assets.

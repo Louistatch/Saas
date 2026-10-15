@@ -22,6 +22,7 @@ export default defineConfig({
     'lome-billboard.spec.ts',
     'lome-endurance.spec.ts',
     'lome-interior-three.spec.ts',
+    'lome-house-haroo.spec.ts',
   ],
   reporter: [['list'], ['html', { outputFolder: 'test-results/lome-report', open: 'never' }]],
   fullyParallel: false,

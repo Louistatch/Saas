@@ -1,15 +1,19 @@
 /**
  * The contract between the HarooLife game (state, HUD, saves, realtime) and a 3D renderer.
  *
- * The game never reaches into a renderer: it hands a scene its props and reads back events. Two
- * renderers exist: PlayCanvas (the default, every scene) and React Three Fiber (behind a flag,
- * interiors only for now). Saves and game state do not depend on the renderer, so switching
+ * The game never reaches into a renderer: it hands a scene its props and reads back events.
+ * Renderers: PlayCanvas (the street), React Three Fiber (interiors) and the HarooLife engine
+ * (the house, replacing both scene by scene). Saves and game state do not depend on the renderer, so switching
  * back is a setting, never a data migration.
  */
 import type { Layout, Npc, NpcAnim, Prop } from '@/lib/haroolife/city/interiors'
 import type { InputState } from '@/lib/haroolife/city/player'
 
-export type RendererId = 'playcanvas' | 'three'
+/**
+ * `haroo`: the HarooLife engine (imperative Three.js, `lib/haroolife/game`) for the scenes it has
+ * ported (the house), React Three Fiber for the other interiors.
+ */
+export type RendererId = 'playcanvas' | 'three' | 'haroo'
 
 /** Props every interior renderer takes. */
 export interface InteriorViewProps {

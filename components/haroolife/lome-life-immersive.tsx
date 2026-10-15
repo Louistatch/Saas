@@ -958,7 +958,7 @@ export function LomeLifeImmersive() {
   // Indoors the keyboard walks the player only where the renderer lets them walk (R3F interiors).
   useKeyboardInput(
     input,
-    panel === null && !mapView && (!insideAny || renderer === 'three') && !riding,
+    panel === null && !mapView && (!insideAny || renderer !== 'playcanvas') && !riding,
   )
   // Test hooks: walkability of a cell and an automatic walk to the player's taxi.
   useEffect(() => {
@@ -1170,7 +1170,7 @@ export function LomeLifeImmersive() {
    */
   function atHome(a: Action) {
     const prop =
-      life.inside === 'house' && renderer === 'three'
+      life.inside === 'house' && renderer !== 'playcanvas'
         ? layoutFor('house').props.find((p) => p.action === a)
         : undefined
     if (!prop) {
@@ -1234,7 +1234,7 @@ export function LomeLifeImmersive() {
   function startActivity(a: CityAction) {
     const room = cityLife.insideLot ? interiorFor(lotById(cityLife.insideLot)?.type ?? 'lot') : null
     const prop = room ? layoutFor(room).props.find((p) => p.action === a) : null
-    if (prop && renderer === 'three') {
+    if (prop && renderer !== 'playcanvas') {
       setPanel(null)
       setApproachReq((r) => ({ prop: prop.id, n: (r?.n ?? 0) + 1 }))
     } else if (prop) useEquipment(prop)

@@ -78,6 +78,7 @@ type EditTool = BuildType | 'inspect' | 'demolish'
 /** The player's own look (a Kenney Mini Character). */
 // React Three Fiber interior (behind ?engine=three): its own chunk, never downloaded otherwise.
 const InteriorThree = dynamic(() => import('../engine-three/interior-three'), { ssr: false })
+const HarooHouseView = dynamic(() => import('../game/haroo-house-view'), { ssr: false })
 
 export const PLAYER_MODEL = 'afi'
 
@@ -934,8 +935,10 @@ export default function CityWorld({
   }, [hasVehicle])
   const estateCenter = worldPos(ESTATE.x0 + (SIZE_HINT - 1) / 2, ESTATE.y0 + (SIZE_HINT - 1) / 2)
   const scene = interior || ride
-  // Interiors drawn by React Three Fiber: PlayCanvas pauses and draws nothing underneath.
-  const threeInterior = renderer === 'three' && Boolean(interior) && !ride && Boolean(input)
+  // Interiors drawn by Three.js (the HarooLife engine for the house, React Three Fiber for the
+  // others): PlayCanvas pauses and draws nothing underneath.
+  const threeInterior = renderer !== 'playcanvas' && Boolean(interior) && !ride && Boolean(input)
+  const harooHouse = threeInterior && renderer === 'haroo' && interior === 'house'
   const selPos = selectedLot
     ? worldPos(selectedLot.x + (selectedLot.w - 1) / 2, selectedLot.y + (selectedLot.h - 1) / 2)
     : null
@@ -1060,7 +1063,26 @@ export default function CityWorld({
           </>
         )}
       </Application>
-      {threeInterior && interior && input && (
+      {harooHouse && interior && input && (
+        <div className="absolute inset-0" data-renderer="haroo">
+          <HarooHouseView
+            layout={layoutFor(interior)}
+            title={interiorTitle}
+            angle={camera.angle}
+            activity={activity}
+            playerModel={avatarModel}
+            playerPagne={avatarPagne}
+            onUse={onUseProp}
+            approach={approach}
+            onNotice={onNotice}
+            input={input}
+            onLeave={onLeave ?? (() => {})}
+            onFrame={onFrame}
+            pixelRatio={renderPixelRatio(quality)}
+          />
+        </div>
+      )}
+      {threeInterior && !harooHouse && interior && input && (
         <div className="absolute inset-0" data-renderer="three">
           <InteriorThree
             layout={layoutFor(interior)}

@@ -6,9 +6,9 @@ import { SHAPE_MATERIALS, footprintOf, shapeOf } from '../lib/haroolife/city/pro
 import { resolveRenderer } from '../lib/haroolife/engine/select'
 
 describe('renderer selection', () => {
-  it('defaults to React Three Fiber (interiors)', () => {
+  it('defaults to the HarooLife engine (house), React Three Fiber for the other interiors', () => {
     assert.deepEqual(resolveRenderer('', null, undefined), {
-      renderer: 'three',
+      renderer: 'haroo',
       remember: null,
     })
   })
@@ -28,8 +28,14 @@ describe('renderer selection', () => {
     assert.equal(resolveRenderer('', 'three', 'playcanvas').renderer, 'three')
     assert.equal(resolveRenderer('', null, 'three').renderer, 'three')
   })
+  it('?engine=haroo is accepted and remembered', () => {
+    assert.deepEqual(resolveRenderer('?engine=haroo', 'three', undefined), {
+      renderer: 'haroo',
+      remember: 'haroo',
+    })
+  })
   it('ignores unknown values', () => {
-    assert.equal(resolveRenderer('?engine=unity', 'babylon', 'x').renderer, 'three')
+    assert.equal(resolveRenderer('?engine=unity', 'babylon', 'x').renderer, 'haroo')
   })
 })
 
