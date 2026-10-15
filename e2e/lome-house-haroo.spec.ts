@@ -143,8 +143,9 @@ test('HarooLife house: walk, eat, sleep, save, leave and come back', async ({ pa
   await expect
     .poll(async () => (await live(page))?.lastEvent, { timeout: 30000 })
     .toMatch(/Tu as mangé/)
+  // The save is throttled (400 ms): wait for the written value.
+  await expect.poll(async () => (await needs(page))?.hunger).toBeGreaterThan(before.hunger)
   const fed = (await needs(page)) as Needs
-  expect(fed.hunger).toBeGreaterThan(before.hunger)
   await page.waitForTimeout(2000)
   expect((await needs(page))?.hunger, 'one meal, one effect').toBe(fed.hunger)
 
@@ -152,8 +153,8 @@ test('HarooLife house: walk, eat, sleep, save, leave and come back', async ({ pa
   await page.locator('[data-hotspot="sleep"]').click()
   await expect.poll(async () => (await interior(page))?.goal).toBe('bed')
   await expect.poll(async () => (await live(page))?.lastEvent, { timeout: 30000 }).toMatch(/reposé/)
+  await expect.poll(async () => (await needs(page))?.energy).toBeGreaterThan(before.energy)
   const rested = (await needs(page)) as Needs
-  expect(rested.energy).toBeGreaterThan(before.energy)
   await page.screenshot({ path: testInfo.outputPath('house-sleep.png') })
 
   // The save survives a reload: still at home, needs as left.
@@ -248,8 +249,8 @@ test('HarooLife market: travel, buy a meal once, talk to the seller, leave', asy
   await expect
     .poll(async () => (await live(page))?.lastEvent ?? '', { timeout: 30000 })
     .toMatch(/Un repas acheté/)
+  await expect.poll(async () => (await save()).wallet).toBe(before.wallet - 650)
   const bought = await save()
-  expect(bought.wallet).toBe(before.wallet - 650)
   expect(bought.meals).toBe(before.meals + 1)
   await page.waitForTimeout(1500)
   expect((await save()).wallet, 'one purchase, one payment').toBe(bought.wallet)

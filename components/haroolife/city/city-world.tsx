@@ -35,8 +35,10 @@ import {
   WORLD_W,
   inEstate,
   landmarks,
+  lotById,
   worldLots,
 } from '@/lib/haroolife/city/world'
+import type { StreetEngine } from '@/lib/haroolife/engine/select'
 import type { RendererId } from '@/lib/haroolife/engine/types'
 import type { Transport } from '@/lib/haroolife/lome-life-engine'
 import type { PlacedResident } from '@/lib/haroolife/lome-presence'
@@ -79,6 +81,8 @@ type EditTool = BuildType | 'inspect' | 'demolish'
 // React Three Fiber interior (behind ?engine=three): its own chunk, never downloaded otherwise.
 const InteriorThree = dynamic(() => import('../engine-three/interior-three'), { ssr: false })
 const HarooRoomView = dynamic(() => import('../game/haroo-room-view'), { ssr: false })
+const HarooStreetView = dynamic(() => import('../game/haroo-street-view'), { ssr: false })
+const CityMap = dynamic(() => import('../game/city-map'), { ssr: false })
 
 export const PLAYER_MODEL = 'afi'
 
@@ -748,6 +752,7 @@ export default function CityWorld({
   remotePresent,
   ads,
   renderer = 'playcanvas',
+  street = 'playcanvas',
   input,
   onLeave,
   mapView = false,
@@ -806,6 +811,8 @@ export default function CityWorld({
   locality?: LocalityId
   /** Renderer for the scenes it supports (interiors for 'three'); PlayCanvas draws the rest. */
   renderer?: RendererId
+  /** Engine of the street and its map (`haroo`: the HarooLife engine and the clear map). */
+  street?: StreetEngine
   /** Joystick and keyboard input, read by renderers that let the player walk indoors. */
   input?: InputState
   /** Leave the current building (walking out of the door in the 'three' interior). */
@@ -939,6 +946,10 @@ export default function CityWorld({
   // ?engine=three): PlayCanvas pauses and draws nothing underneath.
   const threeInterior = renderer !== 'playcanvas' && Boolean(interior) && !ride && Boolean(input)
   const harooRoom = threeInterior && renderer === 'haroo'
+  // The street drawn by the HarooLife engine (and its clear map): PlayCanvas pauses and its
+  // player rig is not mounted (the engine steps the same PlayerController instead).
+  const harooStreet = street === 'haroo' && !interior && !ride
+  const paused = threeInterior || harooStreet
   const selPos = selectedLot
     ? worldPos(selectedLot.x + (selectedLot.w - 1) / 2, selectedLot.y + (selectedLot.h - 1) / 2)
     : null
@@ -954,8 +965,8 @@ export default function CityWorld({
         className="h-full w-full"
         style={{ width: '100%', height: '100%' }}
       >
-        {onFrame && <StatsProbe onFrame={onFrame} paused={threeInterior} />}
-        <PauseRendering paused={threeInterior} />
+        {onFrame && <StatsProbe onFrame={onFrame} paused={paused} />}
+        <PauseRendering paused={paused} />
         <QualityController quality={quality} />
         <CityChunks
           centerX={centerCell.x}
@@ -973,11 +984,11 @@ export default function CityWorld({
           detailCells={preset.detailCells}
           lowCells={preset.lowCells}
           triangleBudget={preset.triangleBudget}
-          hidden={Boolean(scene)}
+          hidden={Boolean(scene) || harooStreet}
         />
         {ride ? (
           <Ride transport={ride.transport} rain={ride.rain} />
-        ) : threeInterior ? null : interior ? (
+        ) : threeInterior || harooStreet ? null : interior ? (
           <InteriorScene
             layout={layoutFor(interior)}
             title={interiorTitle}
@@ -1105,7 +1116,35 @@ export default function CityWorld({
           />
         </div>
       )}
-      {!scene && (
+      {harooStreet && !mapView && (
+        <div className="absolute inset-0" data-renderer="haroo">
+          <HarooStreetView
+            controller={controller}
+            avatarModel={avatarModel}
+            avatarPagne={avatarPagne}
+            estate={hasEstate ? city.buildings : []}
+            pixelRatio={renderPixelRatio(quality)}
+            onPlayerEvents={onPlayerEvents}
+            onLot={(id) => {
+              const lot = lotById(id)
+              if (lot) onLotIcon(lot)
+            }}
+            onCell={onCell}
+            onFrame={onFrame}
+          />
+        </div>
+      )}
+      {harooStreet && mapView && (
+        <CityMap
+          locality={locality}
+          filter={filter}
+          showNames={showNames}
+          selectedLot={selectedLot}
+          player={controller.cell}
+          onLot={onLotIcon}
+        />
+      )}
+      {!scene && !harooStreet && (
         <div
           ref={overlay}
           className="pointer-events-none absolute inset-0"
@@ -1145,7 +1184,7 @@ export default function CityWorld({
           })}
         </div>
       )}
-      {!scene && (
+      {!scene && !harooStreet && (
         <div className="absolute right-3 top-[38%] flex flex-col gap-1 rounded-2xl bg-white/95 p-1 shadow-lg [&>button]:min-h-11 [&>button]:min-w-11 [&>button]:shadow-none">
           <button
             type="button"

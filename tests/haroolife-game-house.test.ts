@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { activitiesOf, layoutFor } from '../lib/haroolife/city/interiors'
+import { DRIVEWAY_Y, ESTATE, worldLots } from '../lib/haroolife/city/world'
 import { HOUSE_SCENE, hotspotForProp } from '../lib/haroolife/game/core/house'
 import { isFree, pathfind } from '../lib/haroolife/game/core/pathfind'
 import { sceneFor } from '../lib/haroolife/game/core/scene'
+import { groundAt, streetWindow } from '../lib/haroolife/game/core/street'
 
 const { bounds, obstacles } = HOUSE_SCENE
 const open = { minX: -3, maxX: 3, minZ: -3, maxZ: 3 }
@@ -115,4 +117,26 @@ describe('every Saas interior in the HarooLife engine', () => {
       )
     })
   }
+})
+
+describe('the street around the player (HarooLife engine)', () => {
+  it('reads roads, lots and doors from the Saas city, with their own ids', () => {
+    // Around the estate driveway, where every new game starts.
+    const win = streetWindow(ESTATE.x0 - 2, DRIVEWAY_Y, 13, [
+      { x: 9, y: 9, type: 'house' },
+      { x: 9, y: 12, type: 'road' },
+    ])
+    assert.equal(win.cells.length, 27 * 27)
+    assert.ok(win.roads.length > 20, 'roads to walk on')
+    assert.ok(
+      win.buildings.some((b) => b.id === 'estate:9:9'),
+      "the player's house is drawn",
+    )
+    const lots = new Set(worldLots().map((l) => l.id))
+    for (const b of win.buildings) if (!b.id.startsWith('estate:')) assert.ok(lots.has(b.id), b.id)
+    for (const d of win.doors) {
+      assert.ok(lots.has(d.lotId), `${d.lotId} is a Saas lot`)
+      assert.equal(groundAt(d.x, d.y), 'road', `${d.name}: its door opens on a road`)
+    }
+  })
 })

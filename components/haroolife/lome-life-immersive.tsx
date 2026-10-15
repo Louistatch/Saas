@@ -95,7 +95,7 @@ import { type Actor, type OrgRef, primaryOrganization } from '@/lib/haroolife/do
 import { createInteractionEngine } from '@/lib/haroolife/domain/engine'
 import { HttpAggregationService, HttpIdentityAdapter } from '@/lib/haroolife/domain/http'
 import { GameWorldAdapter } from '@/lib/haroolife/domain/services'
-import { currentRenderer } from '@/lib/haroolife/engine/select'
+import { type StreetEngine, currentRenderer, currentStreet } from '@/lib/haroolife/engine/select'
 import type { RendererId } from '@/lib/haroolife/engine/types'
 import {
   CITIES,
@@ -321,6 +321,9 @@ export function LomeLifeImmersive() {
   // Renderer for the scenes it supports (?engine=three), read once on the client.
   const [renderer, setRenderer] = useState<RendererId>('playcanvas')
   useEffect(() => setRenderer(currentRenderer()), [])
+  // The street and its map: PlayCanvas by default, the HarooLife engine with ?street=haroo.
+  const [street, setStreet] = useState<StreetEngine>('playcanvas')
+  useEffect(() => setStreet(currentStreet()), [])
   const controller = useMemo(() => {
     const c = new PlayerController(
       {
@@ -1446,6 +1449,7 @@ export function LomeLifeImmersive() {
             quality={quality}
             locality={cityLife.locality}
             renderer={renderer}
+            street={street}
             input={input}
             onLeave={() => action('leave')}
           />

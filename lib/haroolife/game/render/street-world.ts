@@ -1,0 +1,676 @@
+/**
+ * HarooLife engine — the street (imperative Three.js). Draws the neighbourhood around the player
+ * from the Saas city data (`core/street.ts`) in the prototype's style: orthographic three-quarter
+ * camera, soft palette, adult avatars. The walking rules are not here: the existing
+ * PlayerController (collisions, routes, doors, taxi) is stepped by this loop and its events go
+ * back to the game unchanged, exactly as the PlayCanvas rig did.
+ *
+ * Lifecycle as the rooms: one renderer, one frame loop; `dispose()` releases everything.
+ */
+import {
+  type AvatarSpec,
+  adultFor,
+  avatarSpec,
+  clipFor,
+  needsPagneWrap,
+  recolorMap,
+} from '@/lib/haroolife/city/avatar-catalogue'
+import type { NpcAnim } from '@/lib/haroolife/city/interiors'
+import type { PlayerController } from '@/lib/haroolife/city/player'
+import {
+  type GroundKind,
+  STREET_CELL,
+  type StreetDoor,
+  type StreetWindow,
+  streetWindow,
+} from '@/lib/haroolife/game/core/street'
+import type { Building } from '@/lib/haroolife/townsmen-engine'
+import * as THREE from 'three'
+import { type GLTF, GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js'
+
+const FIGURE = 1.85
+/** Cells drawn around the player; the window is rebuilt when the player gets near its edge. */
+const RADIUS = 13
+const REBUILD_AT = 6
+const CAMERA_ELEVATION = 0.7
+const CAMERA_DISTANCE = 80
+const PEDESTRIANS = 6
+const PEDESTRIAN_MODELS = [
+  'character-female-a',
+  'character-male-b',
+  'character-female-c',
+  'character-male-a',
+]
+const U = STREET_CELL
+
+const GROUND: Record<GroundKind, string> = {
+  land: '#b9cc9f',
+  sand: '#e6d7a8',
+  water: '#7fb6c2',
+  hill: '#a6b88c',
+  road: '#8d918f',
+  estate: '#c7d6ad',
+  'estate-road': '#a39c8a',
+}
+
+export interface StreetWorldEvents {
+  /** The controller's events (cells, arrivals, vehicle), as the PlayCanvas rig sent them. */
+  onEvents: (events: ReturnType<PlayerController['drain']>, c: PlayerController) => void
+  /** A named place was touched: open its sheet (name, district, trip, cost, Aller). */
+  onLot: (lotId: string) => void
+  /** The street ground was touched: walk there. */
+  onCell: (cell: { x: number; y: number }) => void
+  onReady?: () => void
+  onError?: (message: string) => void
+  onFrame?: (s: { drawCalls: number; fps: number }) => void
+}
+
+export interface StreetWorldOptions {
+  canvas: HTMLCanvasElement
+  markers: HTMLElement
+  controller: PlayerController
+  avatarModel: string
+  pagne?: string
+  /** The player's own buildings (townsmen-engine, local cells), drawn on the estate. */
+  estate: readonly Building[]
+  events: StreetWorldEvents
+  pixelRatio?: number
+}
+
+interface Person {
+  root: THREE.Group
+  mixer: THREE.AnimationMixer
+  actions: Map<string, THREE.AnimationAction>
+  current: string
+  spec: AvatarSpec
+  owned: THREE.Material[]
+  ownedGeometry: THREE.BufferGeometry[]
+}
+
+interface Walker {
+  person: Person
+  from: { x: number; y: number }
+  to: { x: number; y: number }
+  t: number
+}
+
+export class StreetWorld {
+  private readonly canvas: HTMLCanvasElement
+  private readonly markersRoot: HTMLElement
+  private readonly controller: PlayerController
+  private readonly events: StreetWorldEvents
+  private readonly renderer: THREE.WebGLRenderer
+  private readonly scene = new THREE.Scene()
+  private readonly camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 400)
+  private readonly loader = new GLTFLoader()
+  private readonly loaded: GLTF[] = []
+  private readonly materials = new Map<string, THREE.MeshStandardMaterial>()
+  private readonly unitBox = new THREE.BoxGeometry(1, 1, 1)
+  private readonly raycaster = new THREE.Raycaster()
+  private readonly groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
+  private readonly resizeObserver: ResizeObserver
+  private readonly sun = new THREE.DirectionalLight('#fff1d6', 3)
+  private estate: readonly Building[]
+  private win: StreetWindow | null = null
+  private winGroup: THREE.Group | null = null
+  private markers: { door: StreetDoor; el: HTMLButtonElement; at: THREE.Vector3 }[] = []
+  private player: Person | null = null
+  private car: THREE.Mesh | null = null
+  private walkers: Walker[] = []
+  private readonly avatarModel: string
+  private readonly pagne?: string
+  private width = 1
+  private height = 1
+  private raf = 0
+  private last = 0
+  private disposed = false
+  private frames = 0
+  private statsAt = 0
+  private seed = 1
+  private down: { x: number; y: number } | null = null
+  /** Animation of the player, in the game's words (idle, walk, run), for the probes. */
+  private anim: NpcAnim = 'idle'
+  private readonly onPointerDown = (e: PointerEvent) => {
+    this.down = { x: e.clientX, y: e.clientY }
+  }
+  private readonly onPointerUp = (e: PointerEvent) => {
+    const start = this.down
+    this.down = null
+    if (!start || Math.hypot(e.clientX - start.x, e.clientY - start.y) > 12) return
+    const r = this.canvas.getBoundingClientRect()
+    this.raycaster.setFromCamera(
+      new THREE.Vector2(
+        ((e.clientX - r.left) / r.width) * 2 - 1,
+        -((e.clientY - r.top) / r.height) * 2 + 1,
+      ),
+      this.camera,
+    )
+    const hit = new THREE.Vector3()
+    if (this.raycaster.ray.intersectPlane(this.groundPlane, hit))
+      this.events.onCell({ x: Math.round(hit.x / U), y: Math.round(hit.z / U) })
+  }
+  private readonly onPointerCancel = () => {
+    this.down = null
+  }
+
+  constructor(o: StreetWorldOptions) {
+    this.canvas = o.canvas
+    this.markersRoot = o.markers
+    this.controller = o.controller
+    this.events = o.events
+    this.estate = o.estate
+    this.avatarModel = o.avatarModel
+    this.pagne = o.pagne
+    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true })
+    this.renderer.setPixelRatio(o.pixelRatio ?? Math.min(window.devicePixelRatio || 1, 1.7))
+    this.renderer.shadowMap.enabled = true
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping
+    this.renderer.toneMappingExposure = 1.15
+    this.scene.name = 'HarooLife rue'
+    this.scene.background = new THREE.Color('#c6d9bd')
+    this.scene.add(new THREE.HemisphereLight('#f2f6ff', '#9aa380', 2.4))
+    this.sun.castShadow = true
+    this.sun.shadow.mapSize.set(1024, 1024)
+    Object.assign(this.sun.shadow.camera, { left: -26, right: 26, top: 26, bottom: -26, far: 120 })
+    this.sun.shadow.bias = -0.0004
+    this.sun.shadow.normalBias = 0.04
+    this.scene.add(this.sun, this.sun.target)
+    this.canvas.addEventListener('pointerdown', this.onPointerDown)
+    this.canvas.addEventListener('pointerup', this.onPointerUp)
+    this.canvas.addEventListener('pointercancel', this.onPointerCancel)
+    this.resizeObserver = new ResizeObserver(() => this.resize())
+    this.resizeObserver.observe(this.canvas)
+    this.resize()
+  }
+
+  async init(): Promise<void> {
+    const spec = avatarSpec(this.avatarModel)
+    const pedSpecs = PEDESTRIAN_MODELS.map((m) => avatarSpec(adultFor(m)))
+    const [avatar, ...peds] = await Promise.allSettled([
+      this.load(spec.url),
+      ...pedSpecs.map((s) => this.load(s.url)),
+    ])
+    if (this.disposed) return
+    if (avatar.status === 'rejected') {
+      this.events.onError?.('Le personnage 3D n’a pas pu être chargé.')
+      return
+    }
+    this.player = this.makePerson(avatar.value, spec, this.pagne)
+    this.player.root.name = 'Joueur'
+    this.scene.add(this.player.root)
+    this.rebuild()
+    for (let i = 0; i < PEDESTRIANS; i++) {
+      const r = peds[i % peds.length]
+      if (r.status !== 'fulfilled') continue
+      const person = this.makePerson(r.value, pedSpecs[i % pedSpecs.length])
+      person.root.name = `Piéton ${i + 1}`
+      this.scene.add(person.root)
+      const start = this.randomRoad()
+      this.walkers.push({ person, from: start, to: this.nextRoad(start, start), t: Math.random() })
+      this.play(person, clipFor(person.spec, 'walk'))
+      person.actions.get(person.current)?.setEffectiveTimeScale(1)
+    }
+    this.publishProbe()
+    this.last = performance.now()
+    this.raf = requestAnimationFrame(this.frame)
+    this.events.onReady?.()
+  }
+
+  /** The player's own buildings changed (construction): redraw the window. */
+  setEstate(estate: readonly Building[]): void {
+    this.estate = estate
+    if (this.player) this.rebuild()
+  }
+
+  dispose(): void {
+    if (this.disposed) return
+    this.disposed = true
+    cancelAnimationFrame(this.raf)
+    this.canvas.removeEventListener('pointerdown', this.onPointerDown)
+    this.canvas.removeEventListener('pointerup', this.onPointerUp)
+    this.canvas.removeEventListener('pointercancel', this.onPointerCancel)
+    this.resizeObserver.disconnect()
+    this.clearWindow()
+    for (const w of this.walkers) this.disposePerson(w.person)
+    this.walkers = []
+    if (this.player) this.disposePerson(this.player)
+    this.player = null
+    this.car?.removeFromParent()
+    this.car = null
+    this.unitBox.dispose()
+    for (const m of this.materials.values()) m.dispose()
+    for (const gltf of this.loaded.splice(0))
+      gltf.scene.traverse((o) => {
+        const mesh = o as THREE.Mesh
+        if (!mesh.isMesh) return
+        mesh.geometry.dispose()
+        for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+          for (const v of Object.values(m)) if (v instanceof THREE.Texture) v.dispose()
+          m.dispose()
+        }
+      })
+    this.renderer.dispose()
+    const w = window as unknown as { __LOME_STREET?: unknown; __LOME_SCENE?: unknown }
+    w.__LOME_STREET = undefined
+    w.__LOME_SCENE = undefined
+  }
+
+  // ── construction ─────────────────────────────────────────────────────────────────────────
+
+  private load(url: string): Promise<GLTF> {
+    return this.loader.loadAsync(url).then((g) => {
+      this.loaded.push(g)
+      return g
+    })
+  }
+
+  private mat(color: string): THREE.MeshStandardMaterial {
+    let m = this.materials.get(color)
+    if (!m) {
+      m = new THREE.MeshStandardMaterial({ color, roughness: 0.92 })
+      this.materials.set(color, m)
+    }
+    return m
+  }
+
+  private clearWindow(): void {
+    for (const m of this.markers) m.el.remove()
+    this.markers = []
+    if (!this.winGroup) return
+    this.winGroup.traverse((o) => {
+      const im = o as THREE.InstancedMesh
+      if (im.isInstancedMesh) im.dispose()
+    })
+    this.winGroup.removeFromParent()
+    this.winGroup = null
+  }
+
+  /** Draws the neighbourhood around the player's current cell. */
+  private rebuild(): void {
+    this.clearWindow()
+    const c = this.controller.cell
+    const win = streetWindow(c.x, c.y, RADIUS, this.estate)
+    this.win = win
+    const g = new THREE.Group()
+    g.name = 'Quartier'
+    // Ground: one instanced mesh per kind (one draw call each).
+    const byKind = new Map<GroundKind, { x: number; y: number }[]>()
+    for (const cell of win.cells) {
+      const list = byKind.get(cell.kind) ?? []
+      list.push(cell)
+      byKind.set(cell.kind, list)
+    }
+    const m4 = new THREE.Matrix4()
+    for (const [kind, list] of byKind) {
+      const water = kind === 'water'
+      const road = kind === 'road' || kind === 'estate-road'
+      const h = water ? 0.05 : road ? 0.12 : 0.18
+      const im = new THREE.InstancedMesh(this.unitBox, this.mat(GROUND[kind]), list.length)
+      im.name = `sol:${kind}`
+      list.forEach((cell, i) => {
+        m4.makeScale(U, h, U)
+        m4.setPosition(cell.x * U, (water ? -0.15 : road ? -0.05 : 0) - h / 2, cell.y * U)
+        im.setMatrixAt(i, m4)
+      })
+      im.receiveShadow = true
+      g.add(im)
+    }
+    // Lane markings on city roads (thin, light).
+    const marks = win.cells.filter((cell) => cell.kind === 'road')
+    if (marks.length) {
+      const im = new THREE.InstancedMesh(this.unitBox, this.mat('#e9e4d4'), marks.length)
+      im.name = 'marquage'
+      marks.forEach((cell, i) => {
+        m4.makeScale(0.5, 0.02, 0.12)
+        m4.setPosition(cell.x * U, -0.03, cell.y * U)
+        im.setMatrixAt(i, m4)
+      })
+      g.add(im)
+    }
+    // Buildings: body and roof, as boxes in the prototype's palette.
+    for (const b of win.buildings) {
+      const x = (b.x + (b.w - 1) / 2) * U
+      const z = (b.y + (b.h - 1) / 2) * U
+      if (b.floors === 0) {
+        // Parks and empty lots: a low green or sand plot with a few trees.
+        const plot = new THREE.Mesh(
+          this.unitBox,
+          this.mat(b.type === 'park' ? '#8fbf7a' : '#d6cdb5'),
+        )
+        plot.scale.set(b.w * U - 0.4, 0.06, b.h * U - 0.4)
+        plot.position.set(x, 0.03, z)
+        plot.receiveShadow = true
+        plot.name = `lot:${b.id}`
+        g.add(plot)
+        continue
+      }
+      const height = 1.6 + b.floors * 1.5
+      const body = new THREE.Mesh(this.unitBox, this.mat(b.color))
+      body.scale.set(b.w * U - 0.5, height, b.h * U - 0.5)
+      body.position.set(x, height / 2, z)
+      body.castShadow = true
+      body.receiveShadow = true
+      body.name = `lot:${b.id}`
+      g.add(body)
+      const roof = new THREE.Mesh(this.unitBox, this.mat(b.roof))
+      roof.scale.set(b.w * U - 0.2, 0.3, b.h * U - 0.2)
+      roof.position.set(x, height + 0.15, z)
+      roof.castShadow = true
+      g.add(roof)
+      // A darker band of windows on each floor (reads as a building, not a block).
+      for (let f = 0; f < b.floors; f++) {
+        const band = new THREE.Mesh(this.unitBox, this.mat('#5f7a86'))
+        band.scale.set(b.w * U - 0.45, 0.45, b.h * U - 0.45)
+        band.position.set(x, 1.3 + f * 1.5, z)
+        g.add(band)
+      }
+    }
+    this.scene.add(g)
+    this.winGroup = g
+    // Doors of named places: a marker each (44 px), opening the place's sheet.
+    for (const d of win.doors) {
+      const el = document.createElement('button')
+      el.type = 'button'
+      el.dataset.door = d.lotId
+      el.setAttribute('aria-label', d.name)
+      el.title = d.name
+      el.textContent = d.icon
+      el.className =
+        'pointer-events-auto absolute left-0 top-0 flex h-11 w-11 items-center justify-center rounded-full border-2 border-white bg-white/90 text-lg shadow-md'
+      el.addEventListener('click', (e) => {
+        e.stopPropagation()
+        this.events.onLot(d.lotId)
+      })
+      this.markersRoot.append(el)
+      this.markers.push({ door: d, el, at: new THREE.Vector3(d.x * U, 3.2, d.y * U) })
+    }
+  }
+
+  private makePerson(gltf: GLTF, spec: AvatarSpec, pagne?: string): Person {
+    const root = new THREE.Group()
+    const figure = cloneSkeleton(gltf.scene) as THREE.Group
+    figure.name = 'figure'
+    figure.rotation.y = THREE.MathUtils.degToRad(spec.yaw)
+    const k = FIGURE / spec.height
+    figure.scale.setScalar(k)
+    root.add(figure)
+    const colors = recolorMap(spec, pagne)
+    const owned: THREE.Material[] = []
+    const clones = new Map<THREE.Material, THREE.Material>()
+    figure.traverse((o) => {
+      const mesh = o as THREE.Mesh
+      if (!mesh.isMesh) return
+      mesh.castShadow = true
+      mesh.frustumCulled = false
+      const swap = (m: THREE.Material) => {
+        const color = colors.get(m.name)
+        if (!color) return m
+        let c = clones.get(m)
+        if (!c) {
+          c = m.clone()
+          ;(c as THREE.MeshStandardMaterial).color?.set(color)
+          clones.set(m, c)
+          owned.push(c)
+        }
+        return c
+      }
+      mesh.material = Array.isArray(mesh.material) ? mesh.material.map(swap) : swap(mesh.material)
+    })
+    const ownedGeometry: THREE.BufferGeometry[] = []
+    if (pagne && needsPagneWrap(spec)) {
+      const geo = new THREE.BoxGeometry(1, 1, 1)
+      const mat = new THREE.MeshStandardMaterial({ color: pagne, roughness: 0.9 })
+      const wrap = new THREE.Mesh(geo, mat)
+      wrap.name = 'pagne'
+      wrap.position.set(0, 0.16 * k, -0.02 * k)
+      wrap.scale.set(0.3 * k, 0.13 * k, 0.22 * k)
+      root.add(wrap)
+      ownedGeometry.push(geo)
+      owned.push(mat)
+    }
+    const mixer = new THREE.AnimationMixer(figure)
+    const actions = new Map<string, THREE.AnimationAction>()
+    for (const clip of gltf.animations) actions.set(clip.name, mixer.clipAction(clip))
+    const idle = clipFor(spec, 'idle')
+    actions.get(idle)?.play()
+    return { root, mixer, actions, current: idle, spec, owned, ownedGeometry }
+  }
+
+  private disposePerson(p: Person): void {
+    p.mixer.stopAllAction()
+    p.mixer.uncacheRoot(p.root)
+    p.root.removeFromParent()
+    p.root.traverse((o) => {
+      const s = o as THREE.SkinnedMesh
+      if (s.isSkinnedMesh) s.skeleton.dispose()
+    })
+    for (const m of p.owned) m.dispose()
+    for (const g of p.ownedGeometry) g.dispose()
+  }
+
+  private play(p: Person, clip: string): void {
+    if (p.current === clip) return
+    const next = p.actions.get(clip)
+    if (!next) return
+    p.actions.get(p.current)?.fadeOut(0.2)
+    next.reset().fadeIn(0.2).play()
+    p.current = clip
+  }
+
+  // ── pedestrians (non-player characters on the roads around the player) ──────────────────
+
+  private rand(): number {
+    this.seed = (this.seed * 16807) % 2147483647
+    return this.seed / 2147483647
+  }
+
+  private randomRoad(): { x: number; y: number } {
+    const roads = this.win?.roads ?? []
+    return roads.length ? roads[Math.floor(this.rand() * roads.length)] : this.controller.cell
+  }
+
+  private nextRoad(at: { x: number; y: number }, prev: { x: number; y: number }) {
+    const roads = new Set((this.win?.roads ?? []).map((r) => `${r.x}:${r.y}`))
+    const options = [
+      { x: at.x + 1, y: at.y },
+      { x: at.x - 1, y: at.y },
+      { x: at.x, y: at.y + 1 },
+      { x: at.x, y: at.y - 1 },
+    ].filter((p) => roads.has(`${p.x}:${p.y}`))
+    const ahead = options.filter((p) => p.x !== prev.x || p.y !== prev.y)
+    const pick = ahead.length ? ahead : options
+    return pick.length ? pick[Math.floor(this.rand() * pick.length)] : at
+  }
+
+  private stepWalkers(dt: number): void {
+    const speed = 1.1 // units/s: a calm walk
+    for (const w of this.walkers) {
+      const dx = (w.to.x - w.from.x) * U
+      const dz = (w.to.y - w.from.y) * U
+      const len = Math.hypot(dx, dz) || 1
+      w.t += (speed * dt) / len
+      if (w.t >= 1) {
+        const prev = w.from
+        w.from = w.to
+        w.to = this.nextRoad(w.from, prev)
+        w.t = 0
+        // Far from the player (the window moved): reappear on a road nearby.
+        const c = this.controller.cell
+        if (Math.abs(w.from.x - c.x) > RADIUS || Math.abs(w.from.y - c.y) > RADIUS) {
+          w.from = this.randomRoad()
+          w.to = this.nextRoad(w.from, w.from)
+        }
+      }
+      // Walk on the right-hand side of the lane.
+      const side = 0.55
+      const nx = len ? -dz / len : 0
+      const nz = len ? dx / len : 0
+      const x = w.from.x * U + dx * w.t + nx * side
+      const z = w.from.y * U + dz * w.t + nz * side
+      w.person.root.position.set(x, 0, z)
+      if (dx || dz) w.person.root.rotation.y = Math.atan2(dx, dz)
+      const natural = w.person.spec.pace.walk * FIGURE
+      w.person.actions.get(w.person.current)?.setEffectiveTimeScale(Math.max(0.5, speed / natural))
+      w.person.mixer.update(dt)
+    }
+  }
+
+  // ── loop ─────────────────────────────────────────────────────────────────────────────────
+
+  private resize(): void {
+    this.width = this.canvas.clientWidth || 1
+    this.height = this.canvas.clientHeight || 1
+    this.renderer.setSize(this.width, this.height, false)
+  }
+
+  private updateCamera(): void {
+    const c = this.controller.camera
+    const aspect = this.width / this.height
+    // The rig's distance (zoom buttons, pinch) sets the framing; 8 is the follow distance.
+    const zoom = this.width < 650 ? 1.12 : 1
+    const size = Math.max(5.5, Math.min(40, 7.2 * (c.distance / 8))) / zoom
+    const half = Math.max(size, (size * 1.15) / aspect)
+    this.camera.left = -half * aspect
+    this.camera.right = half * aspect
+    this.camera.top = half
+    this.camera.bottom = -half
+    this.camera.updateProjectionMatrix()
+    const yaw = (c.angle * Math.PI) / 180
+    const tx = c.tx * U
+    const tz = c.tz * U
+    this.camera.position.set(
+      tx + Math.sin(yaw) * Math.cos(CAMERA_ELEVATION) * CAMERA_DISTANCE,
+      Math.sin(CAMERA_ELEVATION) * CAMERA_DISTANCE,
+      tz + Math.cos(yaw) * Math.cos(CAMERA_ELEVATION) * CAMERA_DISTANCE,
+    )
+    this.camera.lookAt(tx, 0.5, tz)
+    this.camera.updateMatrixWorld()
+    this.sun.position.set(tx - 14, 30, tz + 16)
+    this.sun.target.position.set(tx, 0, tz)
+  }
+
+  private readonly frame = () => {
+    if (this.disposed) return
+    this.raf = requestAnimationFrame(this.frame)
+    const now = performance.now()
+    const dt = Math.min((now - this.last) / 1000, 0.25)
+    this.last = now
+    if (document.hidden) return
+    const ctl = this.controller
+    ctl.update(dt)
+    const events = ctl.drain()
+    if (events.length) this.events.onEvents(events, ctl)
+    const c = ctl.cell
+    if (
+      this.win &&
+      (Math.abs(c.x - this.win.cx) > REBUILD_AT || Math.abs(c.y - this.win.cy) > REBUILD_AT)
+    )
+      this.rebuild()
+    const pl = this.player
+    if (pl) {
+      const onFoot = !ctl.driving && ctl.mode !== 'inside'
+      pl.root.visible = onFoot
+      pl.root.position.set(ctl.pos.x * U, 0, ctl.pos.z * U)
+      pl.root.rotation.y = (ctl.heading * Math.PI) / 180
+      const speed = ctl.speed * U
+      const anim: NpcAnim =
+        ctl.mode === 'run' ? 'run' : ctl.mode === 'walk' && speed > 0.05 ? 'walk' : 'idle'
+      this.anim = anim
+      this.play(pl, clipFor(pl.spec, anim))
+      if (anim === 'walk' || anim === 'run') {
+        const natural = pl.spec.pace[anim] * FIGURE
+        pl.actions
+          .get(pl.current)
+          ?.setEffectiveTimeScale(Math.min(3, Math.max(0.5, speed / natural)))
+      } else pl.actions.get(pl.current)?.setEffectiveTimeScale(1)
+      pl.mixer.update(dt)
+    }
+    // The player's taxi, when this town has one.
+    const v = ctl.vehicle
+    if (v) {
+      if (!this.car) {
+        this.car = new THREE.Mesh(this.unitBox, this.mat('#f2c230'))
+        this.car.name = 'Taxi du joueur'
+        this.car.scale.set(1.7, 1.1, 3.4)
+        this.car.castShadow = true
+        this.scene.add(this.car)
+      }
+      this.car.position.set(v.x * U, 0.6, v.z * U)
+      this.car.rotation.y = (v.heading * Math.PI) / 180
+    }
+    this.stepWalkers(dt)
+    this.updateCamera()
+    const p = new THREE.Vector3()
+    for (const m of this.markers) {
+      p.copy(m.at).project(this.camera)
+      const x = (p.x * 0.5 + 0.5) * this.width
+      const y = (-p.y * 0.5 + 0.5) * this.height
+      m.el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`
+      const near = Math.hypot(m.door.x - c.x, m.door.y - c.y) < 9
+      m.el.style.visibility =
+        near && p.z < 1 && x > 0 && x < this.width && y > 40 ? 'visible' : 'hidden'
+    }
+    this.renderer.render(this.scene, this.camera)
+    this.frames++
+    if (now - this.statsAt >= 500) {
+      const fps = (this.frames * 1000) / Math.max(1, now - this.statsAt)
+      this.events.onFrame?.({ drawCalls: this.renderer.info.render.calls, fps })
+      this.frames = 0
+      this.statsAt = now
+      this.publishProbe()
+    }
+  }
+
+  /** Test hooks: the same `__LOME_PLAYER` the PlayCanvas rig published, plus the street. */
+  private publishProbe(): void {
+    const ctl = this.controller
+    const w = window as unknown as Record<string, unknown>
+    w.__LOME_STREET = {
+      engine: 'haroo',
+      window: this.win ? { cx: this.win.cx, cy: this.win.cy, doors: this.win.doors.length } : null,
+      buildings: this.win?.buildings.length ?? 0,
+      pedestrians: this.walkers.length,
+    }
+    w.__LOME_PLAYER = {
+      x: ctl.pos.x,
+      z: ctl.pos.z,
+      heading: ctl.heading,
+      speed: ctl.speed,
+      mode: ctl.mode,
+      cell: ctl.cell,
+      camera: { ...ctl.camera },
+      vehicle: ctl.vehicle ? { ...ctl.vehicle } : null,
+      driving: ctl.driving,
+      model: this.avatarModel,
+      anim: this.anim,
+    }
+    const scene = this.scene
+    w.__LOME_SCENE = {
+      engine: 'haroo',
+      has: (n: string) => Boolean(scene.getObjectByName(n)),
+      childNames: (n: string) => scene.getObjectByName(n)?.children.map((c) => c.name) ?? null,
+      position: (n: string) => {
+        const o = scene.getObjectByName(n)
+        if (!o) return null
+        const q = o.getWorldPosition(new THREE.Vector3())
+        return { x: q.x, y: q.y, z: q.z }
+      },
+      count: () => {
+        let n = 0
+        scene.traverse(() => {
+          n++
+        })
+        return n
+      },
+      geometry: () => ({ matches: 0, triangles: 0 }),
+      gpu: () => ({
+        textures: this.renderer.info.memory.textures,
+        buffers: this.renderer.info.memory.geometries,
+        vramMB: null,
+      }),
+    }
+  }
+}
