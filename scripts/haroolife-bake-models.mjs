@@ -10,6 +10,7 @@
  * files and the kit's Textures/colormap.png. Output: kenney-pack.bin + kenney-pack.json.
  * Sources: https://kenney.nl (CC0 1.0), mirrored at github.com/shorepine/kenney.
  */
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import sharp from 'sharp'
@@ -344,8 +345,16 @@ for (const [key, [kit, name]] of Object.entries(MODELS)) {
 }
 fs.mkdirSync(outDir, { recursive: true })
 const bin = Buffer.concat(chunks)
+// Build fingerprint of the binary: written into the manifest and into the client, which loads
+// the pack under ?v=<build> and rejects a cached manifest of another build (stale CDN or
+// browser cache after a re-bake). See components/haroolife/city/model-bank.ts.
+manifest.build = createHash('sha256').update(bin).digest('hex').slice(0, 12)
 fs.writeFileSync(path.join(outDir, 'kenney-pack.bin'), bin)
 fs.writeFileSync(path.join(outDir, 'kenney-pack.json'), JSON.stringify(manifest))
+fs.writeFileSync(
+  new URL('../lib/haroolife/city/pack-version.ts', import.meta.url),
+  `/** Build of public/haroolife/city/kenney-pack.* — written by scripts/haroolife-bake-models.mjs. */\nexport const PACK_BUILD = '${manifest.build}'\n`,
+)
 const tri = Object.values(manifest.models).reduce((s, m) => s + m.tris, 0)
 console.log(
   `${Object.keys(manifest.models).length} models, ${tri} triangles, ${Math.round(bin.length / 1024)} KB`,

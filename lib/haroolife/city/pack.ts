@@ -17,6 +17,8 @@ export interface PackModel {
 }
 export interface PackManifest {
   version: 1
+  /** Fingerprint of the matching kenney-pack.bin (absent in packs baked before it existed). */
+  build?: string
   license: string
   models: Record<string, PackModel>
 }
