@@ -21,8 +21,8 @@ import type { City } from '@/lib/haroolife/townsmen-engine'
 /**
  * The game's scene, by situation: the street around the player, the clear map, a trip, or an
  * interior. Every one is drawn by the HarooLife engine (imperative Three.js), each in its own
- * chunk and canvas, one at a time. PlayCanvas is only kept as the way back for interiors
- * (`?engine=playcanvas`), in its own chunk: the street and its map never load it.
+ * chunk and canvas, one at a time. No PlayCanvas anywhere: the street, its map, the rooms and
+ * the trips are all Three.js.
  */
 import dynamic from 'next/dynamic'
 import { useMemo } from 'react'
@@ -32,7 +32,6 @@ import type { CameraState } from '@/lib/haroolife/city/geometry'
 
 // Each renderer is its own chunk, downloaded when its scene is first shown.
 const InteriorThree = dynamic(() => import('../engine-three/interior-three'), { ssr: false })
-const PlayCanvasInterior = dynamic(() => import('./playcanvas-interior'), { ssr: false })
 const HarooRoomView = dynamic(() => import('../game/haroo-room-view'), { ssr: false })
 const HarooStreetView = dynamic(() => import('../game/haroo-street-view'), { ssr: false })
 const HarooRideView = dynamic(() => import('../game/haroo-ride-view'), { ssr: false })
@@ -165,7 +164,7 @@ export default function CityWorld({
   quality?: Quality
   /** Town on screen; the estate is drawn only where it exists (Lomé). */
   locality?: LocalityId
-  /** Renderer of the interiors: the HarooLife engine, React Three Fiber or PlayCanvas. */
+  /** Renderer of the interiors: the HarooLife engine or React Three Fiber. */
   renderer?: RendererId
   /** Joystick and keyboard input, read by renderers that let the player walk indoors. */
   input?: InputState
@@ -177,10 +176,9 @@ export default function CityWorld({
   const hasEstate = LOCALITIES[locality].estate !== null
   const light = useMemo(() => daylight(mapView ? 10 : hour), [hour, mapView])
   const pixelRatio = renderPixelRatio(quality)
-  // Interiors walked with the joystick (HarooLife engine by default, React Three Fiber with
-  // ?engine=three); without input, or with ?engine=playcanvas, the PlayCanvas interior.
-  const walkable = renderer !== 'playcanvas' && Boolean(input)
-  const room = !ride && interior ? (walkable ? renderer : 'playcanvas') : null
+  // Interiors walked with the joystick: the HarooLife engine, or React Three Fiber with
+  // ?engine=three.
+  const room = !ride && interior ? renderer : null
 
   return (
     <div
@@ -237,22 +235,6 @@ export default function CityWorld({
             onLeave={onLeave ?? (() => {})}
             onFrame={onFrame}
             pixelRatio={pixelRatio}
-          />
-        </div>
-      )}
-      {room === 'playcanvas' && interior && (
-        <div className="absolute inset-0" data-renderer="playcanvas">
-          <PlayCanvasInterior
-            key={interior}
-            layout={layoutFor(interior)}
-            title={interiorTitle}
-            angle={camera.angle}
-            activity={activity}
-            playerModel={avatarModel}
-            playerPagne={avatarPagne}
-            onUse={onUseProp}
-            quality={quality}
-            onFrame={onFrame}
           />
         </div>
       )}

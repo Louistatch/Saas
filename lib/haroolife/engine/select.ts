@@ -5,7 +5,7 @@
  *
  * - `haroo` (default): the HarooLife engine (imperative Three.js) draws every interior.
  * - `three`: React Three Fiber for every interior (the previous default, the way back).
- * - `playcanvas`: PlayCanvas interiors (the way back).
+ * A remembered `playcanvas` choice (engine removed) falls back to the default.
  */
 import type { RendererId } from './types'
 
@@ -14,7 +14,7 @@ export const ENGINE_STORAGE = 'haroolife.engine'
 export const DEFAULT_RENDERER: RendererId = 'haroo'
 
 const parse = (v: string | null | undefined): RendererId | null =>
-  v === 'haroo' || v === 'three' || v === 'playcanvas' ? v : null
+  v === 'haroo' || v === 'three' ? v : null
 
 export function resolveRenderer(
   search: string,

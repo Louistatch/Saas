@@ -195,7 +195,7 @@ const CityWorld = dynamic(() => import('./city/city-world'), {
     </div>
   ),
 })
-const RideOverlay = dynamic(() => import('./travel-scene-3d'), { ssr: false })
+import RideOverlay from './ride-overlay'
 // Animated preview of the chosen character (three.js), loaded only when the sheet opens.
 const AvatarPreview = dynamic(() => import('./avatar-preview'), { ssr: false })
 type Sheet =
@@ -1027,11 +1027,8 @@ export function LomeLifeImmersive() {
     if (cityLifeRef.current.route.length)
       setCityLife((old) => ({ ...old, route: [], target: null }))
   }, [controller])
-  // Indoors the keyboard walks the player only where the renderer lets them walk (R3F interiors).
-  useKeyboardInput(
-    input,
-    panel === null && !mapView && (!insideAny || renderer !== 'playcanvas') && !riding,
-  )
+  // The keyboard walks the player in the street and indoors (every renderer lets them walk).
+  useKeyboardInput(input, panel === null && !mapView && !riding)
   // Test hooks: walkability of a cell and an automatic walk to the player's taxi.
   useEffect(() => {
     const w = window as unknown as {
@@ -1422,9 +1419,7 @@ export function LomeLifeImmersive() {
    */
   function atHome(a: Action) {
     const prop =
-      life.inside === 'house' && renderer !== 'playcanvas'
-        ? layoutFor('house').props.find((p) => p.action === a)
-        : undefined
+      life.inside === 'house' ? layoutFor('house').props.find((p) => p.action === a) : undefined
     if (!prop) {
       action(a)
       return
@@ -1486,11 +1481,10 @@ export function LomeLifeImmersive() {
   function startActivity(a: CityAction) {
     const room = cityLife.insideLot ? interiorFor(lotById(cityLife.insideLot)?.type ?? 'lot') : null
     const prop = room ? layoutFor(room).props.find((p) => p.action === a) : null
-    if (prop && renderer !== 'playcanvas') {
+    if (prop) {
       setPanel(null)
       setApproachReq((r) => ({ prop: prop.id, n: (r?.n ?? 0) + 1 }))
-    } else if (prop) useEquipment(prop)
-    else cityAction(a)
+    } else cityAction(a)
   }
   function tile(x: number, y: number) {
     setSelection({ x, y })

@@ -6,8 +6,8 @@ import { expect, openPlaces, test } from './lome-test'
  * Jalon J1: the gym drawn by React Three Fiber (`?engine=three`) with Rapier collisions.
  * The player walks inside under the joystick, cannot cross walls or equipment, uses a
  * treadmill, walks out of the open front, and the HarooLife street comes back. A second run
- * checks that repeated visits do not accumulate GPU resources, and that `?engine=playcanvas`
- * remains the way back to the PlayCanvas interiors (the default is now Three).
+ * checks that repeated visits do not accumulate GPU resources, and that an old `?engine=playcanvas`
+ * address (PlayCanvas removed) still opens the game.
  */
 type Interior = { x: number; z: number; anim: string; using: string | null; left: boolean }
 type Live = {
@@ -116,7 +116,7 @@ test('R3F gym: walk, collide, use a treadmill, walk out', async ({ page }, testI
   expect(errors).toEqual([])
 })
 
-test('R3F interior: repeated visits keep GPU resources flat; ?engine=playcanvas is the way back', async ({
+test('R3F interior: repeated visits keep GPU resources flat; an old PlayCanvas address still opens', async ({
   page,
 }) => {
   test.setTimeout(300_000)
@@ -142,9 +142,10 @@ test('R3F interior: repeated visits keep GPU resources flat; ?engine=playcanvas 
     2,
   )
 
-  // The way back: ?engine=playcanvas replaces the remembered choice, interiors on PlayCanvas.
+  // PlayCanvas is gone: an old ?engine=playcanvas address opens the default interiors.
   await page.goto('/haroolife/territoire/lome?engine=playcanvas', { waitUntil: 'domcontentloaded' })
   await expect
-    .poll(() => page.evaluate(() => localStorage.getItem('haroolife.engine')))
-    .toBe('playcanvas')
+    .poll(async () => (await live(page))?.chunks ?? 0, { timeout: 60000 })
+    .toBeGreaterThan(0)
+  expect(await page.evaluate(() => localStorage.getItem('haroolife.engine'))).toBe('three')
 })

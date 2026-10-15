@@ -13,19 +13,20 @@ describe('renderer selection', () => {
     })
   })
   it('takes ?engine= first and remembers it', () => {
-    assert.deepEqual(resolveRenderer('?engine=three', 'playcanvas', 'playcanvas'), {
+    assert.deepEqual(resolveRenderer('?engine=three', 'haroo', 'haroo'), {
       renderer: 'three',
       remember: 'three',
     })
   })
-  it('?engine=playcanvas is the way back from a remembered choice', () => {
-    assert.deepEqual(resolveRenderer('?engine=playcanvas', 'three', undefined), {
-      renderer: 'playcanvas',
-      remember: 'playcanvas',
+  it('PlayCanvas is gone: ?engine=playcanvas or a remembered PlayCanvas choice falls back', () => {
+    assert.deepEqual(resolveRenderer('?engine=playcanvas', null, undefined), {
+      renderer: 'haroo',
+      remember: null,
     })
+    assert.equal(resolveRenderer('', 'playcanvas', undefined).renderer, 'haroo')
   })
   it('then the remembered choice, then the environment', () => {
-    assert.equal(resolveRenderer('', 'three', 'playcanvas').renderer, 'three')
+    assert.equal(resolveRenderer('', 'three', 'haroo').renderer, 'three')
     assert.equal(resolveRenderer('', null, 'three').renderer, 'three')
   })
   it('?engine=haroo is accepted and remembered', () => {
@@ -61,7 +62,7 @@ describe('shared prop shapes', () => {
       }
     }
   })
-  it('a treadmill keeps its exact PlayCanvas geometry', () => {
+  it('a treadmill keeps its exact geometry', () => {
     const t = shapeOf('treadmill')
     assert.equal(t.length, 8)
     assert.deepEqual(t[0], {

@@ -10,7 +10,7 @@ import type { Layout, Npc, NpcAnim, Prop } from '@/lib/haroolife/city/interiors'
 import type { InputState } from '@/lib/haroolife/city/player'
 
 /** `haroo`: the HarooLife engine (imperative Three.js, `lib/haroolife/game`) for the interiors. */
-export type RendererId = 'playcanvas' | 'three' | 'haroo'
+export type RendererId = 'three' | 'haroo'
 
 /** Props every interior renderer takes. */
 export interface InteriorViewProps {
