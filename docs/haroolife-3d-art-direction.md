@@ -1,5 +1,9 @@
 # HarooVille — rendu 3D véritable, sans réécrire le moteur
 
+Les piétons de la carte utilisent toujours les personnages glTF habillés et animés du catalogue
+HarooLife. Les anciens personnages statiques cuits dans le pack ne sont plus utilisés comme
+fallback : aucun avatar cubique ne doit apparaître lorsque la qualité graphique baisse.
+
 ## Motivation
 Le rendu isométrique 2D constitué de tuiles cubiques Kenney Sketch Town reste trop pauvre. Le mode principal devient un véritable environnement **WebGL2 / PlayCanvas** (déjà installé), et le Canvas 2D demeure un mode léger de repli.
 

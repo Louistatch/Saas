@@ -86,11 +86,8 @@ const MODELS = {
   truck: ['car', 'truck'],
   ambulance: ['car', 'ambulance'],
   police: ['car', 'police'],
-  // Mini Characters in bind pose: static stand-ins for far pedestrians (no skinning)
-  'npc-a': ['mini-characters', 'character-female-a'],
-  'npc-b': ['mini-characters', 'character-male-a'],
-  'npc-c': ['mini-characters', 'character-female-c'],
-  'npc-d': ['mini-characters', 'character-male-c'],
+  // Pedestrians are always loaded as skinned glTF characters by the city renderer. Keep
+  // characters out of this baked prop pack so a low-detail fallback can never regress to cubes.
   // Nature Kit (vertex colours / material colours only)
   palm: ['nature', 'tree-palm'],
   oak: ['nature', 'tree-oak'],
