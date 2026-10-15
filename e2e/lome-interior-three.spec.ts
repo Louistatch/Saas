@@ -142,10 +142,9 @@ test('R3F interior: repeated visits keep GPU resources flat; an old PlayCanvas a
     2,
   )
 
-  // PlayCanvas is gone: an old ?engine=playcanvas address opens the default interiors.
+  // PlayCanvas is gone: an old ?engine=playcanvas address keeps the remembered renderer. The
+  // save brings the player back inside the gym, drawn by React Three Fiber.
   await page.goto('/haroolife/territoire/lome?engine=playcanvas', { waitUntil: 'domcontentloaded' })
-  await expect
-    .poll(async () => (await live(page))?.chunks ?? 0, { timeout: 60000 })
-    .toBeGreaterThan(0)
+  await expect.poll(async () => (await scene(page))?.engine, { timeout: 60000 }).toBe('three')
   expect(await page.evaluate(() => localStorage.getItem('haroolife.engine'))).toBe('three')
 })
