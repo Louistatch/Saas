@@ -80,30 +80,37 @@ export default function AdminHome() {
   const urgent = inbox?.items.filter((i) => i.level === 'urgent').length ?? 0
 
   return (
-    <div className="mx-auto max-w-3xl space-y-10">
-      <header className="space-y-3">
-        <p className="text-sm text-muted-foreground first-letter:uppercase">{today}</p>
-        <h1 className="text-3xl font-bold leading-tight text-foreground sm:text-4xl">
-          {inbox === null
-            ? 'Ce qui vous attend aujourd’hui'
-            : total === 0
-              ? `Tout est à jour${user?.firstName ? `, ${user.firstName}` : ''}.`
-              : urgent > 0
-                ? `${urgent} point${urgent > 1 ? 's' : ''} urgent${urgent > 1 ? 's' : ''} à traiter en premier.`
-                : `${total} demande${total > 1 ? 's' : ''} attend${total > 1 ? 'ent' : ''} votre action.`}
-        </h1>
-        <button
-          type="button"
-          onClick={() => void load()}
-          disabled={loading}
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"
-        >
-          <RefreshCw
-            aria-hidden="true"
-            className={`h-4 w-4 ${loading ? 'motion-safe:animate-spin' : ''}`}
-          />
-          Actualiser
-        </button>
+    <div className="mx-auto max-w-6xl space-y-8">
+      <header className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-7">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-primary first-letter:uppercase">{today}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Centre de pilotage
+            </p>
+            <h1 className="max-w-3xl text-2xl font-bold leading-tight text-foreground sm:text-3xl">
+              {inbox === null
+                ? 'Ce qui vous attend aujourd’hui'
+                : total === 0
+                  ? `Tout est à jour${user?.firstName ? `, ${user.firstName}` : ''}.`
+                  : urgent > 0
+                    ? `${urgent} point${urgent > 1 ? 's' : ''} urgent${urgent > 1 ? 's' : ''} à traiter en premier.`
+                    : `${total} demande${total > 1 ? 's' : ''} attend${total > 1 ? 'ent' : ''} votre action.`}
+            </h1>
+          </div>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground shadow-sm hover:bg-muted disabled:opacity-50"
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={`h-4 w-4 ${loading ? 'motion-safe:animate-spin' : ''}`}
+            />
+            Actualiser
+          </button>
+        </div>
       </header>
 
       {error && (
@@ -115,21 +122,36 @@ export default function AdminHome() {
         </p>
       )}
 
-      <section aria-labelledby="todo-title">
-        <h2 id="todo-title" className="mb-3 text-lg font-semibold text-foreground">
-          À traiter
-        </h2>
+      <section aria-labelledby="todo-title" className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 id="todo-title" className="text-xl font-semibold text-foreground">
+              À traiter maintenant
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Les files qui nécessitent une décision ou une intervention.
+            </p>
+          </div>
+          {inbox && inbox.items.length > 0 && (
+            <span className="rounded-full bg-red-50 px-3 py-1 text-sm font-semibold text-red-700">
+              {fmt.format(total)} en attente
+            </span>
+          )}
+        </div>
         {inbox && inbox.items.length === 0 ? (
           <p className="rounded-xl bg-primary/5 px-5 py-4 text-sm text-foreground">
             Aucune file n’attend : dossiers, messages, paiements, cartes et notifications sont à
             jour.
           </p>
         ) : (
-          <ol className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+          <ol className="grid overflow-hidden rounded-xl border border-border bg-card shadow-sm md:grid-cols-2 md:divide-x md:divide-border">
             {(inbox?.items ?? []).map((item) => {
               const tone = LEVEL[item.level]
               return (
-                <li key={item.key} className="relative">
+                <li
+                  key={item.key}
+                  className="relative border-b border-border last:border-b-0 md:[&:nth-last-child(-n+2)]:border-b-0"
+                >
                   <span
                     aria-hidden="true"
                     className={`absolute inset-y-0 left-0 w-1 ${tone.rule}`}
@@ -172,11 +194,16 @@ export default function AdminHome() {
       <ViewAsPanel />
 
       {inbox && (
-        <section aria-labelledby="pulse-title">
-          <h2 id="pulse-title" className="mb-3 text-lg font-semibold text-foreground">
-            Pouls de la plateforme
-          </h2>
-          <ul className="grid grid-cols-2 gap-y-5 border-y border-border py-5 sm:grid-cols-5 sm:divide-x sm:divide-border">
+        <section aria-labelledby="pulse-title" className="space-y-3">
+          <div>
+            <h2 id="pulse-title" className="text-xl font-semibold text-foreground">
+              Vue d’ensemble
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Les principaux volumes de la plateforme.
+            </p>
+          </div>
+          <ul className="grid grid-cols-2 overflow-hidden rounded-xl border border-border bg-card shadow-sm sm:grid-cols-5 sm:divide-x sm:divide-border">
             {(
               [
                 ['Organisations', inbox.vitals.coops, '/admin/cooperatives'],
@@ -186,8 +213,11 @@ export default function AdminHome() {
                 ['Professionnels validés', inbox.vitals.pros, '/admin/haroo'],
               ] as const
             ).map(([label, value, href]) => (
-              <li key={label} className="sm:px-4 sm:first:pl-0">
-                <Link href={href} className="block hover:text-primary">
+              <li key={label} className="border-b border-border p-4 sm:border-b-0 sm:p-5">
+                <Link
+                  href={href}
+                  className="block rounded-md hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
                   <span className="block text-2xl font-bold tabular-nums text-foreground">
                     {fmt.format(value)}
                   </span>
@@ -200,7 +230,10 @@ export default function AdminHome() {
       )}
 
       {inbox?.haroolife && (
-        <section aria-labelledby="hl-title" className="space-y-2">
+        <section
+          aria-labelledby="hl-title"
+          className="space-y-3 rounded-xl border border-border bg-card p-5 shadow-sm"
+        >
           <h2 id="hl-title" className="text-lg font-semibold text-foreground">
             Pilote HarooLife
           </h2>

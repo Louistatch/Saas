@@ -10,6 +10,7 @@ import {
   Briefcase,
   Bug,
   Building2,
+  ChevronRight,
   Coins,
   Copy,
   Cpu,
@@ -136,63 +137,96 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   // pour un panneau modal.
   useEffect(() => {
     if (!sidebarOpen) return
+    document.body.style.overflow = 'hidden'
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setSidebarOpen(false)
     }
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    return () => {
+      document.body.style.overflow = ''
+      window.removeEventListener('keydown', onKeyDown)
+    }
   }, [sidebarOpen])
 
+  const sectionIsActive = (links: AdminLink[]) =>
+    links.some((link) =>
+      link.href === '/admin' ? pathname === link.href : pathname.startsWith(link.href),
+    )
+
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-background">
+    <div className="min-h-screen bg-muted/20 xl:flex">
       {/* Sidebar */}
-      <div
-        className={`fixed md:static left-0 top-0 z-40 w-64 h-dvh md:h-screen flex flex-col bg-sidebar border-r border-sidebar-border transition-transform duration-300 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+      <aside
+        aria-label="Navigation d’administration"
+        className={`fixed inset-y-0 left-0 z-50 flex w-[min(88vw,19rem)] flex-col border-r border-sidebar-border bg-sidebar shadow-2xl transition-transform duration-200 xl:sticky xl:top-0 xl:h-dvh xl:w-72 xl:shrink-0 xl:translate-x-0 xl:shadow-none ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="p-6 flex items-center gap-3 border-b border-sidebar-border shrink-0">
-          <Logo size="lg" textClassName="text-sidebar-foreground" />
+        <div className="flex h-20 shrink-0 items-center justify-between border-b border-sidebar-border px-5">
+          <div>
+            <Logo size="md" textClassName="text-sidebar-foreground" />
+            <p className="mt-1 pl-9 text-[11px] font-medium uppercase tracking-[0.16em] text-sidebar-foreground/55">
+              Administration nationale
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="xl:hidden"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Fermer le menu"
+          >
+            <X className="h-5 w-5" />
+          </Button>
         </div>
 
-        <nav className="space-y-3 p-4 flex-1 min-h-0 overflow-y-auto">
-          {ADMIN_SECTIONS.map((section) => (
-            <div key={section.title} className="space-y-1">
-              <p className="px-4 pb-1 pt-3 text-xs font-medium text-sidebar-foreground/60 first:pt-0">
+        <nav className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-4">
+          {ADMIN_SECTIONS.map((section, sectionIndex) => (
+            <details
+              key={section.title}
+              open={sectionIndex < 2 || sectionIsActive(section.links)}
+              className="group"
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/55 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground">
                 {section.title}
-              </p>
-              {section.links.map((link) => {
-                const Icon = link.icon
-                const isActive = pathname === link.href
-                const count = link.badge ? (badges[link.badge] ?? 0) : 0
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    // HarooLife est un monde 3D : pas de préchargement depuis le menu admin.
-                    prefetch={link.href.startsWith('/haroolife') ? false : undefined}
-                    aria-current={isActive ? 'page' : undefined}
-                    onClick={() => setSidebarOpen(false)}
-                    className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 transition-colors ${
-                      isActive
-                        ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                        : 'text-sidebar-foreground hover:bg-sidebar-accent/10'
-                    }`}
-                  >
-                    <Icon className="h-5 w-5" />
-                    {link.label}
-                    {count > 0 && (
-                      <span
-                        className="ml-auto rounded-full bg-red-600 px-2 py-0.5 text-xs font-semibold text-white"
-                        aria-label={`${count} en attente`}
-                      >
-                        {count}
-                      </span>
-                    )}
-                  </Link>
-                )
-              })}
-            </div>
+                <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+              </summary>
+              <div className="mt-1 space-y-1">
+                {section.links.map((link) => {
+                  const Icon = link.icon
+                  const isActive =
+                    link.href === '/admin' ? pathname === link.href : pathname.startsWith(link.href)
+                  const count = link.badge ? (badges[link.badge] ?? 0) : 0
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      // HarooLife est un monde 3D : pas de préchargement depuis le menu admin.
+                      prefetch={link.href.startsWith('/haroolife') ? false : undefined}
+                      aria-current={isActive ? 'page' : undefined}
+                      onClick={() => setSidebarOpen(false)}
+                      className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                        isActive
+                          ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                          : 'text-sidebar-foreground hover:bg-sidebar-accent/10'
+                      }`}
+                    >
+                      <Icon className="h-[18px] w-[18px] shrink-0" />
+                      <span className="min-w-0 flex-1">{link.label}</span>
+                      {count > 0 && (
+                        <span
+                          className="ml-auto rounded-full bg-red-600 px-2 py-0.5 text-xs font-semibold text-white"
+                          aria-label={`${count} en attente`}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </Link>
+                  )
+                })}
+              </div>
+            </details>
           ))}
         </nav>
 
@@ -215,14 +249,17 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             Déconnexion
           </Button>
         </div>
-      </div>
+      </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        <div className="md:hidden p-4 border-b border-border flex items-center justify-between bg-card">
+      <main className="min-w-0 flex-1">
+        <div className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur xl:hidden">
           <div className="flex items-center gap-3">
             <Logo size="sm" showText={false} />
-            <span className="font-semibold text-foreground">Plateforme (super-admin)</span>
+            <span>
+              <span className="block text-sm font-semibold text-foreground">Administration</span>
+              <span className="block text-xs text-muted-foreground">FaîtièreHub</span>
+            </span>
           </div>
           <Button
             size="icon"
@@ -231,18 +268,18 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             aria-label={sidebarOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
             className="border-border"
           >
-            {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            <Menu className="h-5 w-5" />
           </Button>
         </div>
 
-        <div className="p-6 md:p-8">{children}</div>
+        <div className="px-4 py-6 sm:px-6 lg:px-8 xl:px-10 xl:py-10">{children}</div>
       </main>
 
       {/* Mobile overlay */}
       {sidebarOpen && (
         // biome-ignore lint/a11y/useKeyWithClickEvents: arrière-plan de tiroir modal — jamais une cible clavier, la fermeture au clavier passe par Escape (cf. le useEffect ci-dessus)
         <div
-          className="fixed inset-0 bg-black/50 z-30 md:hidden"
+          className="fixed inset-0 z-40 bg-black/55 backdrop-blur-[1px] xl:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
