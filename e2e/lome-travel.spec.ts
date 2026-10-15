@@ -39,6 +39,22 @@ test('travel Lomé → Kara → Lomé inside the single 3D world', async ({ page
     if (m.type() === 'error' && /deleteBuffer|WebGL|GL_INVALID/i.test(m.text()))
       errors.push(m.text())
   })
+  // Real coach fares (7 500 FCFA Lomé – Kara) take most of a new game's 8 000 FCFA: the round
+  // trip gets fictional savings in the player's own local save; nothing real is involved.
+  await page.addInitScript(() => {
+    const get = Storage.prototype.getItem
+    Storage.prototype.getItem = function (key: string) {
+      const v = get.call(this, key)
+      if (key !== 'haroolife.lome-city.v1' || !v) return v
+      try {
+        const s = JSON.parse(v)
+        if (s?.life && s.life.wallet < 50000) s.life.wallet = 100000
+        return JSON.stringify(s)
+      } catch {
+        return v
+      }
+    }
+  })
   await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
   await expect(page.locator('canvas').first()).toBeVisible({ timeout: 30000 })
   await expect.poll(async () => (await live())?.chunks ?? 0).toBeGreaterThan(0)
@@ -57,14 +73,28 @@ test('travel Lomé → Kara → Lomé inside the single 3D world', async ({ page
     .getByRole('button', { name: /Voyager vers Kara/ })
     .first()
     .click()
+  // The real companies of the line, each with its next departure, hours and fare.
+  const companies = map.getByTestId('coach-companies')
+  await expect(companies).toBeVisible()
+  for (const c of ['Solim', 'Nagodé Transfert', 'CTT Rakieta'])
+    await expect(
+      companies.getByRole('button', { name: `Prendre le car ${c} vers Kara` }),
+    ).toBeVisible()
+  await expect(companies).toContainText('7 500')
+  await companies.getByRole('button', { name: 'Prendre le car Solim vers Kara' }).click()
 
-  // The journey is shown full screen: the map of Togo, the road from Lomé to Kara.
+  // The journey is shown full screen: the map of Togo, the real road from Lomé to Kara.
   const splash = page.getByTestId('travel-splash')
   // Read as soon as it shows: it closes by itself once Kara is drawn (2.6 s at least).
   await expect(splash).toBeVisible()
   const shown = (await splash.textContent()) ?? ''
   expect(shown).toContain('En route vers Kara')
   expect(shown).toContain('Lomé → Kara')
+  expect(shown).toContain('Solim')
+  expect(shown).toContain('413 km')
+  // The towns of the RN1 on the way.
+  for (const stop of ['Tsévié', 'Notsé', 'Atakpamé', 'Blitta', 'Sokodé'])
+    await expect(splash.locator(`[data-stop="${stop}"]`)).toHaveCount(1)
   await page.screenshot({ path: testInfo.outputPath('travel-splash.png') })
 
   // Arrival: the locality switched, the sheet closed, Kara's chunks and buildings stream in.
@@ -75,7 +105,7 @@ test('travel Lomé → Kara → Lomé inside the single 3D world', async ({ page
     .poll(async () => (await live())?.buildings ?? 0, { timeout: 30000 })
     .toBeGreaterThan(80)
   const kara = await live()
-  expect(kara?.wallet).toBe(wallet - 4000)
+  expect(kara?.wallet).toBe(wallet - 7500)
   expect(kara?.lastEvent).toMatch(/Arrivée à Kara/)
   expect(kara?.estateBuildings).toBe(estate)
   expect(await page.locator('canvas').count()).toBe(1)
@@ -117,8 +147,11 @@ test('travel Lomé → Kara → Lomé inside the single 3D world', async ({ page
     .getByRole('button', { name: /Voyager vers Lomé/ })
     .first()
     .click()
+  await map.getByRole('button', { name: 'Prendre le car CTT Rakieta vers Lomé' }).click()
   await expect(splash).toBeVisible()
-  expect(await splash.textContent()).toContain('En route vers Lomé')
+  const back2 = (await splash.textContent()) ?? ''
+  expect(back2).toContain('En route vers Lomé')
+  expect(back2).toContain('CTT Rakieta')
   await expect.poll(async () => (await live())?.locality).toBe('lome')
   expect((await live())?.estateBuildings).toBe(estate)
   await expect.poll(async () => (await live())?.chunks ?? 0, { timeout: 30000 }).toBeGreaterThan(0)

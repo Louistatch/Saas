@@ -53,6 +53,14 @@ import {
   walkStep,
 } from '@/lib/haroolife/city/life'
 import {
+  COMPANIES,
+  type Stop,
+  coachTrip,
+  companyById,
+  hh,
+  routeOf,
+} from '@/lib/haroolife/city/coaches'
+import {
   type Fare,
   bearingTo,
   canDrop,
@@ -497,7 +505,11 @@ export function LomeLifeImmersive() {
     from: LocalityId
     to: LocalityId
     hours: number
+    company?: string
+    stops?: Stop[]
   } | null>(null)
+  // Destination whose coach companies are being compared in the map sheet.
+  const [coachTo, setCoachTo] = useState<LocalityId | null>(null)
   const endJourney = useCallback(() => setJourney(null), [])
   const [mode, setMode] = useState<Mode>('walk')
   const [building, setBuilding] = useState<BuildType>('house')
@@ -1453,11 +1465,21 @@ export function LomeLifeImmersive() {
   }, [presence.status, presence.world, residencePrompted])
 
   /** The bush taxi to another town: fare, hours on the road, arrival at its station. */
-  function travel(to: LocalityId) {
-    const trip = tripTo(cityLife, to)
-    if (!trip || to === cityLife.locality) return
-    if (life.wallet < trip.fare) {
-      setNotice(`Il te faut ${money(trip.fare)} pour le car vers ${LOCALITIES[to].name}.`)
+  /**
+   * Take the coach to another town. With a company: its fare, the wait for its next departure
+   * and its hours on the real road (RN1). Without one (no line known): the bush taxi of before.
+   */
+  function travel(to: LocalityId, companyId?: string) {
+    const legacy = tripTo(cityLife, to)
+    if (!legacy || to === cityLife.locality) return
+    const company = companyId ? companyById(companyId) : null
+    const coach = company ? coachTrip(cityLife.locality, to, company, life.hour) : null
+    const fare = coach ? coach.fare : legacy.fare
+    const hours = coach ? coach.wait + coach.hours : legacy.hours
+    if (life.wallet < fare) {
+      setNotice(
+        `Il te faut ${money(fare)} pour le car${company ? ` ${company.name}` : ''} vers ${LOCALITIES[to].name}.`,
+      )
       return
     }
     setCityLife((old) => {
@@ -1465,16 +1487,23 @@ export function LomeLifeImmersive() {
         ...old,
         life: {
           ...old.life,
-          wallet: old.life.wallet - trip.fare,
-          spent: old.life.spent + trip.fare,
+          wallet: old.life.wallet - fare,
+          spent: old.life.spent + fare,
         },
       }
-      for (let h = 0; h < trip.hours; h++) next = { ...next, life: advanceLifeHour(next.life) }
+      for (let h = 0; h < hours; h++) next = { ...next, life: advanceLifeHour(next.life) }
       if (to in CITIES) next = { ...next, life: selectCity(next.life, to) }
       return travelTo(next, to)
     })
+    setCoachTo(null)
     // The change of map is shown while the new town loads (its street reports its tiles).
-    setJourney({ from: cityLife.locality, to, hours: trip.hours })
+    setJourney({
+      from: cityLife.locality,
+      to,
+      hours: coach ? coach.hours : legacy.hours,
+      company: company?.name,
+      stops: coach?.stops,
+    })
     setChunkStats({ chunks: 0, buildings: 0, tris: 0, detailed: false })
     // Arriving in another town is a departure like any other: back to the game camera.
     if (mapView) exitMap()
@@ -1591,6 +1620,8 @@ export function LomeLifeImmersive() {
           from={journey.from}
           to={journey.to}
           hours={journey.hours}
+          company={journey.company}
+          stops={journey.stops}
           ready={cityLife.locality === journey.to && chunkStats.chunks > 0}
           onDone={endJourney}
         />
@@ -2286,29 +2317,78 @@ export function LomeLifeImmersive() {
                         interurbain t’y dépose à la gare routière, la ville se charge au fur et à
                         mesure autour de toi.
                       </p>
-                      <NationalMap current={cityLife.locality} onPick={travel} />
+                      <NationalMap
+                        current={cityLife.locality}
+                        onPick={(id) => setCoachTo(routeOf(cityLife.locality, id) ? id : null)}
+                      />
                       <div className="mt-2 grid gap-1">
                         {LOCALITY_IDS.filter((id) => id !== cityLife.locality).map((id) => {
                           const trip = tripTo(cityLife, id)
+                          const road = routeOf(cityLife.locality, id)
                           return (
-                            <button
-                              type="button"
-                              key={id}
-                              onClick={() => travel(id)}
-                              className="flex items-center gap-3 rounded-xl bg-white px-3 py-2 text-left text-xs ring-1 ring-slate-200 hover:ring-emerald-400"
-                            >
-                              <span className="text-base">🚌</span>
-                              <span className="min-w-0 flex-1">
-                                <span className="block font-bold">
-                                  Voyager vers {LOCALITIES[id].name}
+                            <div key={id} className="grid gap-1">
+                              <button
+                                type="button"
+                                aria-expanded={road ? coachTo === id : undefined}
+                                onClick={() =>
+                                  road ? setCoachTo(coachTo === id ? null : id) : travel(id)
+                                }
+                                className="flex items-center gap-3 rounded-xl bg-white px-3 py-2 text-left text-xs ring-1 ring-slate-200 hover:ring-emerald-400"
+                              >
+                                <span className="text-base">🚌</span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="block font-bold">
+                                    Voyager vers {LOCALITIES[id].name}
+                                  </span>
+                                  <span className="block text-slate-500">
+                                    {road
+                                      ? `${LOCALITIES[id].note} Par la RN1 (${road
+                                          .slice(1, -1)
+                                          .map((s) => s.name)
+                                          .join(
+                                            ', ',
+                                          )}), ≈ ${Math.abs(road[road.length - 1].km - road[0].km)} km. Choisis ta compagnie.`
+                                      : `${LOCALITIES[id].note} Car interurbain : ${trip.hours} h, ${money(trip.fare)} (tarif fictif).`}
+                                  </span>
                                 </span>
-                                <span className="block text-slate-500">
-                                  {LOCALITIES[id].note} Car interurbain : {trip.hours} h,{' '}
-                                  {money(trip.fare)} (tarif fictif).
-                                </span>
-                              </span>
-                              <ArrowRight size={14} className="shrink-0 text-emerald-700" />
-                            </button>
+                                <ArrowRight size={14} className="shrink-0 text-emerald-700" />
+                              </button>
+                              {road && coachTo === id && (
+                                <ul
+                                  aria-label={`Compagnies vers ${LOCALITIES[id].name}`}
+                                  data-testid="coach-companies"
+                                  className="grid gap-1 pl-3"
+                                >
+                                  {COMPANIES.map((c) => {
+                                    const t = coachTrip(cityLife.locality, id, c, life.hour)
+                                    if (!t) return null
+                                    return (
+                                      <li key={c.id}>
+                                        <button
+                                          type="button"
+                                          aria-label={`Prendre le car ${c.name} vers ${LOCALITIES[id].name}`}
+                                          onClick={() => travel(id, c.id)}
+                                          className="flex w-full items-center gap-3 rounded-xl bg-amber-50 px-3 py-2 text-left text-xs ring-1 ring-amber-200 hover:ring-amber-500"
+                                        >
+                                          <span className="min-w-0 flex-1">
+                                            <span className="block font-bold">{c.name}</span>
+                                            <span className="block text-slate-600">
+                                              Départ {hh(t.departs)}
+                                              {t.wait ? ` (dans ${t.wait} h)` : ' (maintenant)'} ·{' '}
+                                              {t.hours} h de route · {c.note}
+                                            </span>
+                                          </span>
+                                          <strong className="shrink-0">{money(t.fare)}</strong>
+                                        </button>
+                                      </li>
+                                    )
+                                  })}
+                                  <li className="px-1 text-[10px] text-slate-500">
+                                    Compagnies réelles ; horaires et prix du jeu, indicatifs.
+                                  </li>
+                                </ul>
+                              )}
+                            </div>
                           )
                         })}
                       </div>

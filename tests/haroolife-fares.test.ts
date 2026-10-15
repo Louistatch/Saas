@@ -43,16 +43,22 @@ test('prix : minimum, par case, arrondi à 50, taxi plus cher que zémidjan', ()
 
 test('destination : un lieu nommé, ni trop près ni à l’autre bout de la ville', () => {
   for (const r of [0, 0.3, 0.99])
-    assert.deepEqual(pickDestination({ x: 0, y: 0 }, () => r, PLACES), {
-      lotId: 'mid',
-      name: 'Grand marché',
-      x: 20,
-      y: 0,
-    })
+    assert.deepEqual(
+      pickDestination({ x: 0, y: 0 }, () => r, PLACES),
+      {
+        lotId: 'mid',
+        name: 'Grand marché',
+        x: 20,
+        y: 0,
+      },
+    )
   // Aucun lieu à bonne distance : n'importe quel lieu nommé plutôt que rien.
   const only = pickDestination({ x: 0, y: 0 }, () => 0, [PLACES[0]])
   assert.equal(only?.name, 'Kiosque')
-  assert.equal(pickDestination({ x: 0, y: 0 }, () => 0, [PLACES[3]]), null)
+  assert.equal(
+    pickDestination({ x: 0, y: 0 }, () => 0, [PLACES[3]]),
+    null,
+  )
 })
 
 test('course : prise en charge, distance, direction, dépôt seulement arrêté devant la porte', () => {

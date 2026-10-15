@@ -6,9 +6,10 @@
  * the bus covers it, and the time the trip takes in the game. It stays at least `MIN_MS` so the
  * change of map is seen, and until the street of the arrival town is drawn.
  */
+import type { Stop } from '@/lib/haroolife/city/coaches'
 import { LOCALITIES, type LocalityId } from '@/lib/haroolife/city/locality'
 import { useEffect, useState } from 'react'
-import { H, REGION_FILL, W, data, path, poleOf, px, py } from './national-map'
+import { path, H, REGION_FILL, W, data, poleOf, px, py } from './national-map'
 
 export const MIN_MS = 2600
 
@@ -18,6 +19,8 @@ export default function TravelSplash({
   hours,
   ready,
   onDone,
+  company,
+  stops,
 }: {
   from: LocalityId
   to: LocalityId
@@ -26,6 +29,10 @@ export default function TravelSplash({
   /** The arrival town's street is drawn. */
   ready: boolean
   onDone: () => void
+  /** The coach company, when one was chosen. */
+  company?: string
+  /** The real road, town by town (RN1), when known: drawn instead of a curve. */
+  stops?: Stop[]
 }) {
   const [shown, setShown] = useState(false)
   useEffect(() => {
@@ -36,8 +43,10 @@ export default function TravelSplash({
     if (shown && ready) onDone()
   }, [shown, ready, onDone])
 
-  const a = poleOf(from)
-  const b = poleOf(to)
+  const along = stops && stops.length > 1 ? stops : null
+  // The towns' own position on the road when the road is known, the prefecture otherwise.
+  const a = along ? along[0] : poleOf(from)
+  const b = along ? along[along.length - 1] : poleOf(to)
   const ax = a ? px(a.lon) : W / 2
   const ay = a ? py(a.lat) : H / 2
   const bx = b ? px(b.lon) : W / 2
@@ -45,7 +54,12 @@ export default function TravelSplash({
   // A gentle curve, like a road that bends with the land.
   const mx = (ax + bx) / 2 + (by - ay) * 0.18
   const my = (ay + by) / 2 - (bx - ax) * 0.18
-  const road = `M${ax.toFixed(1)},${ay.toFixed(1)} Q${mx.toFixed(1)},${my.toFixed(1)} ${bx.toFixed(1)},${by.toFixed(1)}`
+  const road = along
+    ? along
+        .map((s, i) => `${i ? 'L' : 'M'}${px(s.lon).toFixed(1)},${py(s.lat).toFixed(1)}`)
+        .join(' ')
+    : `M${ax.toFixed(1)},${ay.toFixed(1)} Q${mx.toFixed(1)},${my.toFixed(1)} ${bx.toFixed(1)},${by.toFixed(1)}`
+  const km = along ? Math.abs(along[along.length - 1].km - along[0].km) : null
   const dest = LOCALITIES[to].name
 
   return (
@@ -66,7 +80,9 @@ export default function TravelSplash({
         }
       `}</style>
       <p className="text-sm font-semibold text-emerald-200">
+        {company ? `${company} · ` : ''}
         {LOCALITIES[from].name} → {dest} · {hours} h de car
+        {km ? ` · ≈ ${km} km` : ''}
       </p>
       <h2 className="text-center text-3xl font-black leading-tight">En route vers {dest}</h2>
       <svg
@@ -95,6 +111,24 @@ export default function TravelSplash({
           strokeWidth={3}
           strokeLinecap="round"
         />
+        {along?.slice(1, -1).map((s) => (
+          <g key={s.name} data-stop={s.name}>
+            <circle cx={px(s.lon)} cy={py(s.lat)} r={3} fill="#f7f8f1" stroke="#c2410c" />
+            <text
+              x={px(s.lon) - 7}
+              y={py(s.lat) + 3}
+              textAnchor="end"
+              fontSize={9}
+              fontWeight={700}
+              fill="#1f2a44"
+              stroke="#f7f8f1"
+              strokeWidth={2.5}
+              paintOrder="stroke"
+            >
+              {s.name}
+            </text>
+          </g>
+        ))}
         {[
           { x: ax, y: ay, name: LOCALITIES[from].name, here: false },
           { x: bx, y: by, name: dest, here: true },

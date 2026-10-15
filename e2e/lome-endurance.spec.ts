@@ -123,6 +123,11 @@ test('20 house visits and 10 trips keep one engine and no growing GPU state', as
       .getByRole('button', { name: new RegExp(`Voyager vers ${to}`) })
       .first()
       .click()
+    await page
+      .getByTestId('coach-companies')
+      .getByRole('button', { name: /^Prendre le car / })
+      .first()
+      .click()
     await expect
       .poll(async () => (await live(page))?.locality)
       .toBe(to === 'Kara' ? 'kara' : 'lome')
