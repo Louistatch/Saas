@@ -30,7 +30,6 @@ import {
 } from '@/lib/haroolife/city/avatar-catalogue'
 import { type Bank, loadBank } from '@/lib/haroolife/city/bank'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
-import { FrameRing, type PerfSnapshot, renders, watchLongTasks } from '@/lib/haroolife/city/perf'
 import { DEFAULT_CONFIG, type PlayerController } from '@/lib/haroolife/city/player'
 import {
   type GroundKind,
@@ -58,6 +57,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { DETAIL_CELLS, buildCityGeometry } from './city-models'
 import { createGltfLoader } from './gltf'
+import { PerfProbe } from './perf-probe'
 
 const FIGURE = 1.85
 /** Background by day (the prototype's soft green) and at night. */
@@ -251,9 +251,7 @@ export class StreetWorld {
   private frames = 0
   private statsAt = 0
   /** Frame times and long tasks for `__LOME_PERF` (same snapshot as the PlayCanvas city had). */
-  private readonly ring = new FrameRing(600)
-  private readonly longTasks = watchLongTasks()
-  private prevFrame = 0
+  private readonly perf = new PerfProbe()
   private seed = 1
   private down: { x: number; y: number } | null = null
   /** Animation of the player, in the game's words (idle, walk, run), for the probes. */
@@ -420,14 +418,12 @@ export class StreetWorld {
         }
       })
     this.renderer.dispose()
-    this.longTasks.stop()
+    this.perf.dispose()
     const w = window as unknown as {
       __LOME_STREET?: unknown
       __LOME_SCENE?: unknown
       __LOME_ADS?: unknown
-      __LOME_PERF_RESET?: unknown
     }
-    w.__LOME_PERF_RESET = undefined
     w.__LOME_STREET = undefined
     w.__LOME_SCENE = undefined
     w.__LOME_ADS = undefined
@@ -842,11 +838,10 @@ export class StreetWorld {
     const dt = Math.min((now - this.last) / 1000, 0.25)
     this.last = now
     if (document.hidden) {
-      this.prevFrame = 0
+      this.perf.pause()
       return
     }
-    if (this.prevFrame) this.ring.push(now - this.prevFrame)
-    this.prevFrame = now
+    this.perf.frame(now)
     const ctl = this.controller
     ctl.update(dt)
     const events = ctl.drain()
@@ -1128,7 +1123,6 @@ export class StreetWorld {
 
   /** Chunk statistics for the game (`__LOME_CITY`) and the frame snapshot (`__LOME_PERF`). */
   private publishPerf(now: number): void {
-    const info = this.renderer.info
     let buildings = 0
     let tris = 0
     for (const t of this.tiles.values()) {
@@ -1141,35 +1135,11 @@ export class StreetWorld {
       tris,
       detailed: Boolean(this.bank),
     })
-    let meshes = 0
-    this.scene.traverse((o) => {
-      if ((o as THREE.Mesh).isMesh && o.visible) meshes++
-    })
-    const people = [this.player, ...this.walkers.map((w) => w.person)].filter((p): p is Person =>
-      Boolean(p),
-    )
-    const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory
-    const size = this.renderer.getDrawingBufferSize(new THREE.Vector2())
-    const snap: PerfSnapshot = {
-      at: Math.round(now),
-      frame: this.ring.summary(),
-      drawCalls: info.render.calls,
-      triangles: info.render.triangles,
-      renderEntities: meshes,
-      meshInstances: meshes,
-      animated: people.length + this.remotes.size,
-      animating: people.length + this.remotes.size,
-      heapMB: mem ? Math.round(mem.usedJSHeapSize / 1048576) : null,
-      longTasks: this.longTasks.count(),
-      longTaskMs: this.longTasks.totalMs(),
-      renders: { ...renders },
+    const people = (this.player ? 1 : 0) + this.walkers.length + this.remotes.size
+    this.perf.publish(now, this.renderer, this.scene, {
+      animated: people,
       assets: this.loaded.length + (this.bank ? 1 : 0),
-      pixelRatio: this.renderer.getPixelRatio(),
-      resolution: [size.x, size.y],
-    }
-    const w = window as unknown as { __LOME_PERF?: PerfSnapshot; __LOME_PERF_RESET?: () => void }
-    w.__LOME_PERF = snap
-    w.__LOME_PERF_RESET = () => this.ring.reset()
+    })
   }
 
   /** Test hooks: the same `__LOME_PLAYER` the PlayCanvas rig published, plus the street. */

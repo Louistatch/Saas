@@ -110,6 +110,27 @@ test('HarooLife house: walk, eat, sleep, save, leave and come back', async ({ pa
   await expect(page.locator('[data-hotspot]')).toHaveCount(7)
   await page.screenshot({ path: testInfo.outputPath('house.png') })
 
+  // The room publishes its own frame statistics (diagnostics overlay, performance scenarios).
+  await page.evaluate(() =>
+    (window as unknown as { __LOME_PERF_RESET?: () => void }).__LOME_PERF_RESET?.(),
+  )
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const p = (
+            window as unknown as {
+              __LOME_PERF?: { frame: { n: number }; drawCalls: number; animated: number }
+            }
+          ).__LOME_PERF
+          return p
+            ? { frames: p.frame.n > 0, draws: p.drawCalls > 0, animated: p.animated >= 1 }
+            : null
+        }),
+      { timeout: 15000 },
+    )
+    .toEqual({ frames: true, draws: true, animated: true })
+
   // Four directions and the diagonals, each followed by its opposite (back near the start).
   const dirs: [number, number][] = [
     [0, 1],

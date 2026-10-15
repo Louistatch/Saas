@@ -150,6 +150,18 @@ test('performance scenarios A–F', async ({ page, browserName }, testInfo) => {
   await expect
     .poll(() => city(page).then((c) => c?.inside ?? null), { timeout: 10000 })
     .not.toBeNull()
+  // The room engine is drawing (it publishes its own __LOME_PERF once running).
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          Boolean((window as unknown as { __LOME_INTERIOR?: unknown }).__LOME_INTERIOR),
+        ),
+      {
+        timeout: 30000,
+      },
+    )
+    .toBe(true)
   await page.waitForTimeout(2500)
   report.E_gym = {
     enterMs: Date.now() - tE,
@@ -208,4 +220,6 @@ test('performance scenarios A–F', async ({ page, browserName }, testInfo) => {
   testInfo.annotations.push({ type: 'perf', description: md })
   // Software rendering can be slower than one frame per second; the report is the deliverable.
   expect((report.A_cold_open as { perf: Perf }).perf.frame.n).toBeGreaterThanOrEqual(1)
+  // The gym figures are the room's own (not the street's last snapshot).
+  expect((report.E_gym as { perf: Perf }).perf.frame.n, 'room frames').toBeGreaterThanOrEqual(1)
 })

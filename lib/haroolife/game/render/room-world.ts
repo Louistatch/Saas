@@ -26,6 +26,7 @@ import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { createGltfLoader } from './gltf'
+import { PerfProbe } from './perf-probe'
 
 /** Walk and run speeds (units/s). The clips play at the rate that keeps the feet planted. */
 export const WALK_SPEED = 1.3
@@ -126,6 +127,8 @@ export class RoomWorld {
   private speed = 0
   private frames = 0
   private statsAt = 0
+  /** Frame statistics for `__LOME_PERF` (diagnostics overlay, performance scenarios). */
+  private readonly perf = new PerfProbe()
   private probed = false
   private down: { x: number; y: number } | null = null
   private readonly onPointerDown = (e: PointerEvent) => {
@@ -250,6 +253,7 @@ export class RoomWorld {
     for (const m of this.materials.values()) m.dispose()
     this.freeLoaded()
     this.renderer.dispose()
+    this.perf.dispose()
     const w = window as unknown as { __LOME_INTERIOR?: unknown; __LOME_SCENE?: unknown }
     w.__LOME_INTERIOR = undefined
     w.__LOME_SCENE = undefined
@@ -812,7 +816,11 @@ export class RoomWorld {
     // keeps the real walking speed and never steps through furniture.
     const dt = Math.min((now - this.last) / 1000, 0.25)
     this.last = now
-    if (document.hidden) return
+    if (document.hidden) {
+      this.perf.pause()
+      return
+    }
+    this.perf.frame(now)
     const steps = Math.max(1, Math.ceil(dt / 0.05))
     for (let i = 0; i < steps; i++) this.move(dt / steps)
     this.player?.mixer.update(dt)
@@ -842,6 +850,10 @@ export class RoomWorld {
       this.events.onFrame?.({ drawCalls: this.renderer.info.render.calls, fps })
       this.frames = 0
       this.statsAt = now
+      this.perf.publish(now, this.renderer, this.scene, {
+        animated: (this.player ? 1 : 0) + this.npcs.length,
+        assets: this.loaded.length,
+      })
     }
   }
 
