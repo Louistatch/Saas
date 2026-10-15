@@ -22,9 +22,10 @@ import { SHAPE_MATERIALS, type ShapeMaterial } from '@/lib/haroolife/city/prop-s
 import { type Point, isFree, pathfind } from '@/lib/haroolife/game/core/pathfind'
 import type { Hotspot, PrimitivePlacement, RoomScene } from '@/lib/haroolife/game/core/scene'
 import * as THREE from 'three'
-import { type GLTF, GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js'
+import { createGltfLoader } from './gltf'
 
 /** Walk and run speeds (units/s). The clips play at the rate that keeps the feet planted. */
 export const WALK_SPEED = 1.3
@@ -97,7 +98,7 @@ export class RoomWorld {
   private readonly scene = new THREE.Scene()
   private readonly camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 350)
   private readonly target = new THREE.Vector3(0, 0.5, 0)
-  private readonly loader = new GLTFLoader()
+  private readonly loader = createGltfLoader()
   private readonly gltfs = new Map<string, Promise<GLTF>>()
   private readonly loaded: GLTF[] = []
   private readonly geometries = new Map<string, THREE.BufferGeometry>()
@@ -156,7 +157,7 @@ export class RoomWorld {
     })
     this.renderer.setPixelRatio(o.pixelRatio ?? Math.min(window.devicePixelRatio || 1, 1.7))
     this.renderer.shadowMap.enabled = true
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    this.renderer.shadowMap.type = THREE.PCFShadowMap
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.15

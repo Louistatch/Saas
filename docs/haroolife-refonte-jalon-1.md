@@ -180,3 +180,24 @@ Les tests de bout en bout de la suite complète sont à 44 réussis et 3 ignoré
   - le fixture épingle la rue au niveau du contexte, si bien que les pages ouvertes par un test suivent le même choix.
 
 Il reste à porter dans la nouvelle rue le modèle du taxi et la conduite. Le taxi n'y est pour l'instant qu'un volume jaune.
+
+---
+
+# Taxi et conduite dans la nouvelle rue
+
+- Le taxi est le modèle Kenney Car Kit (`car-kit/taxi.glb`, CC0), à l'échelle 1,3. Son avant suit +Z, comme le cap 0 du contrôleur : il n'y a pas de correction de 180°, qui était propre au pack PlayCanvas.
+  - Les roues tournent selon la vitesse réelle, rapportée à leur rayon.
+  - Les roues avant braquent selon le stick.
+- La conduite reste celle du `PlayerController` partagé :
+  - monter, accélérer, freiner, reculer, braquer, descendre ;
+  - les roues doivent rester sur une route praticable.
+  - Au volant, le personnage est masqué et la caméra s'élargit en douceur (× 1,35).
+- **Correctif.** Les textures intégrées aux GLB (`colormap` du taxi) étaient décodées par `ImageBitmapLoader` au moyen de `fetch(blob:…)`. Le `connect-src` de la CSP refusait cet appel, si bien que le taxi apparaissait blanc, en local comme en production.
+  - Le chargeur commun (`lib/haroolife/game/render/gltf.ts`) décode désormais ces images par une balise `<img>` sur une URL `blob:`, autorisée par `img-src`.
+  - La CSP n'est pas élargie.
+- Test de bout en bout, sur ordinateur et sur Android :
+  - les quatre roues du modèle sont présentes ;
+  - « Monter dans le taxi », vitesse > 2 cellules/s, freinage puis arrêt, plus de 2 cellules parcourues ;
+  - « Descendre du taxi », le joueur à pied à côté de la voiture.
+
+La nouvelle rue couvre maintenant ce que l'ancienne faisait : les panneaux, les autres joueurs, le taxi et la conduite. `?street=playcanvas` reste le retour en arrière.

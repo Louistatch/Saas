@@ -49,8 +49,9 @@ import {
 import type { Pose, PresenceEntry } from '@/lib/haroolife/realtime/protocol'
 import type { Building } from '@/lib/haroolife/townsmen-engine'
 import * as THREE from 'three'
-import { type GLTF, GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js'
+import { createGltfLoader } from './gltf'
 
 const FIGURE = 1.85
 /** Cells drawn around the player; the window is rebuilt when the player gets near its edge. */
@@ -66,6 +67,13 @@ const PEDESTRIAN_MODELS = [
   'character-male-a',
 ]
 const U = STREET_CELL
+/** The player's taxi (Kenney Car Kit, CC0): front along +Z, as the controller's heading 0. */
+const TAXI_URL = '/haroolife/vendor/kenney-3d/car-kit/taxi.glb'
+/** 1.5 × 2.7 units raw: brought next to the 1.85-unit adult avatar on a 2-unit road. */
+const TAXI_SCALE = 1.3
+const WHEEL_RADIUS = 0.3 * TAXI_SCALE
+/** Front wheels at full steering (radians), drawn from the stick. */
+const MAX_STEER = 0.45
 
 const GROUND: Record<GroundKind, string> = {
   land: '#b9cc9f',
@@ -162,7 +170,7 @@ export class StreetWorld {
   private readonly renderer: THREE.WebGLRenderer
   private readonly scene = new THREE.Scene()
   private readonly camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 400)
-  private readonly loader = new GLTFLoader()
+  private readonly loader = createGltfLoader()
   private readonly loaded: GLTF[] = []
   private readonly materials = new Map<string, THREE.MeshStandardMaterial>()
   private readonly unitBox = new THREE.BoxGeometry(1, 1, 1)
@@ -175,7 +183,12 @@ export class StreetWorld {
   private winGroup: THREE.Group | null = null
   private markers: { door: StreetDoor; el: HTMLButtonElement; at: THREE.Vector3 }[] = []
   private player: Person | null = null
-  private car: THREE.Mesh | null = null
+  private car: THREE.Object3D | null = null
+  private carLoading = false
+  private wheels: { node: THREE.Object3D; front: boolean }[] = []
+  private wheelSpin = 0
+  /** Camera framing factor (1 on foot, wider at the wheel), eased. */
+  private framing = 1
   private walkers: Walker[] = []
   private readonly avatarModel: string
   private readonly pagne?: string
@@ -248,7 +261,7 @@ export class StreetWorld {
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true })
     this.renderer.setPixelRatio(o.pixelRatio ?? Math.min(window.devicePixelRatio || 1, 1.7))
     this.renderer.shadowMap.enabled = true
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    this.renderer.shadowMap.type = THREE.PCFShadowMap
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.15
@@ -333,6 +346,7 @@ export class StreetWorld {
     this.player = null
     this.car?.removeFromParent()
     this.car = null
+    this.wheels = []
     this.unitBox.dispose()
     for (const m of this.materials.values()) m.dispose()
     for (const gltf of this.loaded.splice(0))
@@ -566,6 +580,41 @@ export class StreetWorld {
     p.current = clip
   }
 
+  private loadCar(): void {
+    this.carLoading = true
+    this.load(TAXI_URL)
+      .then((g) => {
+        if (this.disposed) return
+        const root = new THREE.Group()
+        root.name = 'Taxi du joueur'
+        const model = g.scene.clone(true)
+        model.scale.setScalar(TAXI_SCALE)
+        model.traverse((o) => {
+          const mesh = o as THREE.Mesh
+          if (mesh.isMesh) {
+            mesh.castShadow = true
+            mesh.receiveShadow = true
+          }
+          if (o.name.startsWith('wheel-'))
+            this.wheels.push({ node: o, front: o.name.startsWith('wheel-front') })
+        })
+        root.add(model)
+        this.scene.add(root)
+        this.car = root
+      })
+      .catch(() => {
+        // Honest fallback: a yellow volume of the taxi's size, never an invisible car.
+        const box = new THREE.Mesh(this.unitBox, this.mat('#f2c230'))
+        box.name = 'Taxi du joueur'
+        box.scale.set(1.5 * TAXI_SCALE, 1.1 * TAXI_SCALE, 2.7 * TAXI_SCALE)
+        box.position.y = 0.55 * TAXI_SCALE
+        const root = new THREE.Group()
+        root.add(box)
+        this.scene.add(root)
+        this.car = root
+      })
+  }
+
   // ── pedestrians (non-player characters on the roads around the player) ──────────────────
 
   private rand(): number {
@@ -637,7 +686,7 @@ export class StreetWorld {
     const aspect = this.width / this.height
     // The rig's distance (zoom buttons, pinch) sets the framing; 8 is the follow distance.
     const zoom = this.width < 650 ? 1.12 : 1
-    const size = Math.max(6, Math.min(40, 9 * (c.distance / 8))) / zoom
+    const size = (Math.max(6, Math.min(40, 9 * (c.distance / 8))) * this.framing) / zoom
     const half = Math.max(size, (size * 1.15) / aspect)
     this.camera.left = -half * aspect
     this.camera.right = half * aspect
@@ -694,19 +743,25 @@ export class StreetWorld {
       } else pl.actions.get(pl.current)?.setEffectiveTimeScale(1)
       pl.mixer.update(dt)
     }
-    // The player's taxi, when this town has one.
+    // The player's taxi, when this town has one: the Kenney model, wheels turning and steering.
     const v = ctl.vehicle
     if (v) {
-      if (!this.car) {
-        this.car = new THREE.Mesh(this.unitBox, this.mat('#f2c230'))
-        this.car.name = 'Taxi du joueur'
-        this.car.scale.set(1.7, 1.1, 3.4)
-        this.car.castShadow = true
-        this.scene.add(this.car)
+      if (!this.car && !this.carLoading) this.loadCar()
+      const car = this.car
+      if (car) {
+        car.position.set(v.x * U, 0, v.z * U)
+        car.rotation.y = (v.heading * Math.PI) / 180
+        this.wheelSpin += ((v.speed * U) / WHEEL_RADIUS) * dt
+        const steer = ctl.driving ? Math.max(-1, Math.min(1, ctl.input.x)) * MAX_STEER : 0
+        for (const w of this.wheels) {
+          w.node.rotation.x = this.wheelSpin
+          if (w.front) w.node.rotation.y = steer
+        }
       }
-      this.car.position.set(v.x * U, 0.6, v.z * U)
-      this.car.rotation.y = (v.heading * Math.PI) / 180
     }
+    // At the wheel the camera frames wider (the car is faster than a walk), eased both ways.
+    const wanted = ctl.driving ? 1.35 : 1
+    this.framing += (wanted - this.framing) * Math.min(1, dt * 2.5)
     this.stepWalkers(dt)
     this.stepRemotes(dt)
     this.updateCamera()

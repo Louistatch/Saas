@@ -447,3 +447,95 @@ test('HarooLife street billboards: built near, read, learn more, statistics', as
   expect(JSON.stringify(body)).not.toMatch(/@|user|email|phone/)
   expect(errors).toEqual([])
 })
+
+test('HarooLife street taxi: walk to it, get in, drive, brake, get out', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(180_000)
+  const mobile = /mobile/.test(testInfo.project.name)
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  type V = { x: number; z: number; heading: number; speed: number }
+  type P = { x: number; z: number; mode: string; driving: boolean; vehicle: V | null }
+  const me = () =>
+    page.evaluate(() => (window as unknown as { __LOME_PLAYER?: P }).__LOME_PLAYER ?? null)
+  const scene = (fn: string) =>
+    page.evaluate((name) => {
+      const s = (
+        window as unknown as { __LOME_SCENE?: import('../lib/haroolife/engine/types').SceneProbe }
+      ).__LOME_SCENE
+      return s?.childNames(name) ?? null
+    }, fn)
+  await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () => (window as unknown as { __LOME_STREET?: { engine: string } }).__LOME_STREET?.engine,
+        ),
+      { timeout: 60000 },
+    )
+    .toBe('haroo')
+  const before = (await me()) as P
+  expect(before.vehicle, 'the player taxi is parked in Lomé').not.toBeNull()
+  // The Kenney taxi model (not a placeholder volume), with its four wheels.
+  await expect.poll(() => scene('Taxi du joueur'), { timeout: 20000 }).not.toBeNull()
+  const wheels = await page.evaluate(() => {
+    const s = (
+      window as unknown as { __LOME_SCENE?: import('../lib/haroolife/engine/types').SceneProbe }
+    ).__LOME_SCENE
+    return ['wheel-front-left', 'wheel-front-right', 'wheel-back-left', 'wheel-back-right'].every(
+      (n) => s?.has(n),
+    )
+  })
+  expect(wheels, 'taxi model with its wheels').toBe(true)
+
+  // Walk to it (the controller's own route), get in.
+  await page.evaluate(() =>
+    (window as unknown as { __LOME_GOTO_TAXI?: () => void }).__LOME_GOTO_TAXI?.(),
+  )
+  const getIn = page.getByRole('button', { name: 'Monter dans le taxi' })
+  await expect(getIn).toBeVisible({ timeout: 45000 })
+  await (mobile ? getIn.tap() : getIn.click())
+  await expect.poll(async () => (await me())?.driving).toBe(true)
+  await expect(page.getByRole('button', { name: 'Descendre du taxi' })).toBeVisible()
+  // Seated: the walking figure is not drawn beside the car.
+  expect(
+    await page.evaluate(() => {
+      const s = (
+        window as unknown as { __LOME_SCENE?: import('../lib/haroolife/engine/types').SceneProbe }
+      ).__LOME_SCENE
+      return s?.has('Joueur')
+    }),
+  ).toBe(true)
+
+  // Throttle (screen up), then brake (screen down).
+  await page.keyboard.down('ArrowUp')
+  await expect
+    .poll(async () => (await me())?.vehicle?.speed ?? 0, { timeout: 8000 })
+    .toBeGreaterThan(2)
+  // Keep the throttle a moment at speed (as the PlayCanvas taxi spec, 2.5 s in all).
+  await page.waitForTimeout(1200)
+  await page.screenshot({ path: testInfo.outputPath('haroo-taxi-driving.png') })
+  await page.keyboard.up('ArrowUp')
+  // Brake a moment (held longer, the same key reverses), then the car coasts to a stop.
+  await page.keyboard.down('ArrowDown')
+  await page.waitForTimeout(500)
+  await page.keyboard.up('ArrowDown')
+  await expect
+    .poll(async () => Math.abs((await me())?.vehicle?.speed ?? 9), { timeout: 8000 })
+    .toBeLessThan(0.6)
+  const stopped = (await me()) as P
+  expect(
+    Math.hypot(stopped.vehicle!.x - before.vehicle!.x, stopped.vehicle!.z - before.vehicle!.z),
+    'the taxi drove',
+  ).toBeGreaterThan(2)
+
+  // Get out: on foot again, beside the car.
+  await page.getByRole('button', { name: 'Descendre du taxi' }).click()
+  await expect.poll(async () => (await me())?.driving).toBe(false)
+  await expect.poll(async () => (await me())?.mode).toBe('idle')
+  const out = (await me()) as P
+  expect(Math.hypot(out.x - stopped.vehicle!.x, out.z - stopped.vehicle!.z)).toBeLessThan(2)
+  expect(errors).toEqual([])
+})
