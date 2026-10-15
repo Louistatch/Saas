@@ -6,14 +6,18 @@ import {
   loadAvatar,
   pagneColor,
   saveAvatar,
+  shownModel,
 } from '../lib/haroolife/city/avatar'
 import {
   AVATAR_SPECS,
   FIGURE_HEIGHT,
   HAIR_COLOR,
+  STREET_SCALE,
   adultFor,
   avatarSpec,
   clipFor,
+  clipRate,
+  figureHeight,
   figureScale,
   needsPagneWrap,
   recolorMap,
@@ -47,11 +51,43 @@ describe('avatar appearance', () => {
     assert.equal(clipFor(mini, 'sit'), 'sit')
     assert.equal(needsPagneWrap(mini), true)
     assert.equal(needsPagneWrap(afi), false)
-    assert.equal(recolorMap(afi, '#123456').get('Orange'), '#123456')
+    // V3: the pagne colours a garment (Afi's top), never the hair or the shoes; every other
+    // garment has a chosen colour, so no light-grey `White` top is left on screen.
+    assert.equal(recolorMap(afi, '#123456').get('White'), '#123456')
+    assert.notEqual(recolorMap(afi).get('Orange'), undefined, 'trousers coloured')
     assert.equal(recolorMap(afi).get('Hair_Brown'), HAIR_COLOR)
+    const abra = avatarSpec('abra')
+    assert.equal(recolorMap(abra, '#123456').get('LimeGreen'), '#123456', 'the dress')
+    assert.equal(recolorMap(abra, '#123456').get('Red'), HAIR_COLOR, 'Red is her hair')
+    assert.equal(recolorMap(avatarSpec('kossi'), '#123456').get('LightBrown'), '#123456')
+    assert.notEqual(recolorMap(avatarSpec('kossi'), '#123456').get('Red_Dark'), '#123456')
     // An NPC model name unknown to the catalogue still resolves to a mini character file.
     assert.match(avatarSpec('character-female-z').url, /mini-characters\/character-female-z\.glb$/)
     for (const s of AVATAR_SPECS) assert.ok(s.url.startsWith('/haroolife/vendor/'), s.id)
+  })
+  it('faces the move direction: one yaw convention, measured 0 for every file', () => {
+    // Both renderers turn the figure to `heading` (0 = +Z, atan2(dx, dz)); every file of the
+    // catalogue faces +Z in bind pose and in its clips, so no file needs an extra turn.
+    for (const s of AVATAR_SPECS) assert.equal(s.yaw, 0, s.id)
+  })
+  it('plays walk and run at the rate where the feet match the ground', () => {
+    const afi = avatarSpec('afi')
+    const h = figureHeight(afi, STREET_SCALE)
+    assert.ok(Math.abs(clipRate(afi, 'walk', afi.pace.walk * h, STREET_SCALE) - 1) < 1e-9)
+    assert.equal(clipRate(afi, 'idle', 3, STREET_SCALE), 1)
+    assert.equal(clipRate(afi, 'walk', 0, STREET_SCALE), 1)
+    assert.equal(clipRate(afi, 'run', 100, STREET_SCALE), 3, 'capped')
+  })
+  it('shows an old mini save as its dressed adult unless the classic look was chosen', () => {
+    const old = { v: 1 as const, model: 'character-male-b', pagne: 4 }
+    assert.equal(shownModel(old), 'koffi')
+    assert.equal(old.model, 'character-male-b', 'the stored model is never rewritten')
+    assert.equal(shownModel({ ...old, model: 'character-female-c' }), 'afi')
+    assert.equal(shownModel({ ...old, model: 'character-male-c' }), 'kossi')
+    assert.equal(shownModel({ ...old, classic: true }), 'character-male-b')
+    assert.deepEqual(decodeAvatar({ ...old, classic: true }), { ...old, classic: true })
+    assert.equal(decodeAvatar({ ...old, classic: 'yes' })?.classic, undefined)
+    assert.equal(shownModel({ v: 1, model: 'abra', pagne: 1 }), 'abra')
   })
   it('round-trips through storage and falls back to the default', () => {
     const store = new Map<string, string>()

@@ -2,9 +2,9 @@
 
 import type { AdCampaign, AdPlacement } from '@/lib/haroolife/ads/campaigns'
 import type { ExposureTracker } from '@/lib/haroolife/ads/exposure'
-import { adultFor } from '@/lib/haroolife/city/avatar-catalogue'
+import { STREET_SCALE, adultFor } from '@/lib/haroolife/city/avatar-catalogue'
 import { releaseEntity } from '@/lib/haroolife/city/gpu'
-import { type NpcAnim, type Prop, layoutFor } from '@/lib/haroolife/city/interiors'
+import { type Npc, type NpcAnim, type Prop, layoutFor } from '@/lib/haroolife/city/interiors'
 import type { Interior } from '@/lib/haroolife/city/life'
 import { LOCALITIES, type LocalityId } from '@/lib/haroolife/city/locality'
 import {
@@ -22,7 +22,7 @@ import {
   type PlayerController,
 } from '@/lib/haroolife/city/player'
 import { PRESETS, type Quality, renderPixelRatio } from '@/lib/haroolife/city/quality'
-import { type Agent, agentsNear } from '@/lib/haroolife/city/traffic'
+import { type Agent, TRAFFIC_STEP_MS, agentsNear } from '@/lib/haroolife/city/traffic'
 import {
   CATEGORY_OF,
   CELL,
@@ -198,10 +198,12 @@ const Agents = memo(function Agents({
     return fn
   }
   useAppEvent('update', () => {
-    const p = Math.min(1, (performance.now() - last.current.at) / 700)
+    const k = Math.min(1, (performance.now() - last.current.at) / TRAFFIC_STEP_MS)
     for (const [id, e] of entities.current) {
       const a = byId.current.get(id)
       if (!a) continue
+      // Walkers spread one cell over `steps` traffic steps.
+      const p = a.steps ? (Math.min(a.sub ?? 0, a.steps - 1) + k) / a.steps : k
       const pos = worldPos(a.x + a.fx * p, a.y + a.fy * p)
       const off = agentOffset(a)
       e.setLocalPosition(pos[0] + off[0], off[1], pos[2] + off[2])
@@ -222,7 +224,8 @@ const Agents = memo(function Agents({
               position={pos}
               rotation={a.heading}
               anim={a.activity === 'run' ? 'run' : 'walk'}
-              scale={0.95}
+              scale={STREET_SCALE}
+              groundSpeed={(CELL * 1000) / (TRAFFIC_STEP_MS * (a.steps ?? 1))}
               onEntity={register(a.id)}
             />
           ) : (
@@ -232,7 +235,8 @@ const Agents = memo(function Agents({
               model={NPC_STATIC[a.id % NPC_STATIC.length]}
               position={pos}
               rotation={a.heading}
-              scale={0.95}
+              // Baked mini figures (raw height FIGURE_HEIGHT): the same height as the adults.
+              scale={STREET_SCALE * 1.2}
               onEntity={register(a.id)}
             />
           )
@@ -660,6 +664,9 @@ export default function CityWorld({
   interiorTitle,
   activity,
   onUseProp,
+  approach,
+  onTalk,
+  onNotice,
   ride,
   visitors,
   onBillboard,
@@ -710,6 +717,10 @@ export default function CityWorld({
   interiorTitle: string
   activity: { prop: string; anim: NpcAnim } | null
   onUseProp: (p: Prop) => void
+  /** HUD activity button: walk to that equipment, then use it (Three interiors). */
+  approach?: { prop: string; n: number } | null
+  onTalk?: (npc: Npc) => void
+  onNotice?: (message: string) => void
   ride: { transport: Transport; rain: boolean } | null
   visitors: PlacedResident[]
   onBillboard: (id: string) => void
@@ -968,6 +979,9 @@ export default function CityWorld({
             playerModel={avatarModel}
             playerPagne={avatarPagne}
             onUse={onUseProp}
+            approach={approach}
+            onTalk={onTalk}
+            onNotice={onNotice}
             input={input}
             onLeave={onLeave ?? (() => {})}
             onFrame={onFrame}

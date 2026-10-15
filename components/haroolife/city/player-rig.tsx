@@ -1,5 +1,6 @@
 'use client'
 
+import { STREET_SCALE } from '@/lib/haroolife/city/avatar-catalogue'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 /**
  * Steps the player controller once per rendered frame and writes the result straight
@@ -13,6 +14,7 @@ import {
   type PlayerController,
   cameraPitch,
 } from '@/lib/haroolife/city/player'
+import { CELL } from '@/lib/haroolife/city/world'
 import { useApp, useAppEvent } from '@playcanvas/react/hooks'
 import type * as pc from 'playcanvas'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -67,7 +69,8 @@ export default function PlayerRig({
   const avatar = useRef<pc.Entity | null>(null)
   const cameraEntity = useRef<pc.Entity | null>(null)
   const [anim, setAnim] = useState<NpcAnim>('idle')
-  const [clipSpeed, setClipSpeed] = useState(1)
+  // Ground speed really achieved (render units/s, after collisions) drives the walk cycle.
+  const [groundSpeed, setGroundSpeed] = useState(0)
   const lastMode = useRef<Mode>(controller.mode)
   /** While the step-out clip plays, locomotion clips wait. */
   const exitUntil = useRef(0)
@@ -122,14 +125,10 @@ export default function PlayerRig({
     if (now - lastSpeedSync.current > 150) {
       lastSpeedSync.current = now
       const m = controller.mode
-      const rate =
-        m === 'walk'
-          ? Math.min(1.5, Math.max(0.6, controller.speed / controller.config.walkSpeed))
-          : m === 'run'
-            ? Math.min(1.4, Math.max(0.8, controller.speed / controller.config.runSpeed))
-            : 1
-      const rounded = Math.round(rate * 10) / 10
-      setClipSpeed((cur) => (cur === rounded ? cur : rounded))
+      // Controller speeds are in cells/s; the figure moves in render units (worldPos × CELL).
+      const v = m === 'walk' || m === 'run' ? controller.speed * CELL : 0
+      const rounded = Math.round(v * 10) / 10
+      setGroundSpeed((cur) => (cur === rounded ? cur : rounded))
     }
     // Camera: position and pitch from the rig every frame.
     if (!cameraEntity.current)
@@ -189,9 +188,9 @@ export default function PlayerRig({
       position={[sx, 0.05, sz]}
       rotation={controller.heading}
       anim={anim}
-      speed={clipSpeed}
+      groundSpeed={groundSpeed}
       pagne={pagne}
-      scale={1.15}
+      scale={STREET_SCALE}
       imperative
       onEntity={onAvatar}
     />

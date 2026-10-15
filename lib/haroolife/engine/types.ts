@@ -6,7 +6,7 @@
  * interiors only for now). Saves and game state do not depend on the renderer, so switching
  * back is a setting, never a data migration.
  */
-import type { Layout, NpcAnim, Prop } from '@/lib/haroolife/city/interiors'
+import type { Layout, Npc, NpcAnim, Prop } from '@/lib/haroolife/city/interiors'
 import type { InputState } from '@/lib/haroolife/city/player'
 
 export type RendererId = 'playcanvas' | 'three'
@@ -27,6 +27,15 @@ export interface InteriorViewProps {
   input: InputState
   /** Leave the building (walking out through the door, where the renderer supports it). */
   onLeave: () => void
+  /**
+   * Walk to this equipment, then use it (an activity button of the HUD). `n` changes on every
+   * request, so asking twice for the same equipment is two requests.
+   */
+  approach?: { prop: string; n: number } | null
+  /** A non-player character was reached after being tapped: open the conversation. */
+  onTalk?: (npc: Npc) => void
+  /** Short message for the player (an approach that could not reach its target). */
+  onNotice?: (message: string) => void
 }
 
 /**

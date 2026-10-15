@@ -72,7 +72,8 @@ describe('walking', () => {
     hold(slow, 0, 0.7, 2, false, 1 / 20)
     const fast = make()
     hold(fast, 0, 0.7, 2, false, 1 / 120)
-    assert.ok(slow.pos.z < 10 - 2.5, `walked ${10 - slow.pos.z} cells`)
+    // 0.7 stick = 0.63 cells/s at the V3 walk speed (0.9 cells/s, matched to the stride).
+    assert.ok(slow.pos.z < 10 - 1, `walked ${10 - slow.pos.z} cells`)
     assert.ok(
       Math.abs(slow.pos.z - fast.pos.z) < 0.15,
       `20 Hz ${slow.pos.z} vs 120 Hz ${fast.pos.z}`,
@@ -183,7 +184,8 @@ describe('vehicle', () => {
   it('steers while moving', () => {
     const p = make(10, 10)
     p.vehicle = { x: 10, z: 5, heading: 0, speed: 0 }
-    hold(p, 0, 0.7, 2.2)
+    // Walk to the car (simulated time: 3.2 cells at the V3 walk speed).
+    hold(p, 0, 0.7, 6)
     assert.ok(p.enterVehicle())
     hold(p, 0.6, 1, 0.8)
     assert.ok(Math.abs(angleDelta(0, p.vehicle.heading)) > 5)

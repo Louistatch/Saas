@@ -8,6 +8,9 @@
  * switches between idle / walk / run / drive.
  */
 import { AVATAR_MODELS, pagneColor } from '@/lib/haroolife/city/avatar'
+import { STREET_SCALE } from '@/lib/haroolife/city/avatar-catalogue'
+import { DEFAULT_CONFIG } from '@/lib/haroolife/city/player'
+import { CELL } from '@/lib/haroolife/city/world'
 import type { Pose, PresenceEntry } from '@/lib/haroolife/realtime/protocol'
 import { useAppEvent } from '@playcanvas/react/hooks'
 import type * as pc from 'playcanvas'
@@ -22,6 +25,8 @@ type Sample = { at: number; x: number; z: number; heading: number }
 /** Render this far in the past: two snapshots at 5–8 Hz always bracket it. */
 export const INTERP_DELAY_MS = 220
 const MAX_SHOWN = 12
+/** Other players are drawn as dressed adults (never a mini character). */
+const ADULTS = AVATAR_MODELS.filter((m) => m.family === 'quaternius')
 const STALE_MS = 4000
 
 const hash = (s: string) => {
@@ -142,7 +147,7 @@ export default function RemotePlayers({
       {shown.map((p) => {
         const first = buffers.current.get(p.key)?.[0]
         const start = first ? worldPos(first.x, first.z) : worldPos(0, 0)
-        const model = AVATAR_MODELS[hash(p.key) % AVATAR_MODELS.length].id
+        const model = ADULTS[hash(p.key) % ADULTS.length].id
         const mode = modes[p.key] ?? 'idle'
         return (
           <Character
@@ -159,7 +164,14 @@ export default function RemotePlayers({
                     ? 'drive'
                     : 'idle'
             }
-            scale={1.15}
+            scale={STREET_SCALE}
+            groundSpeed={
+              mode === 'run'
+                ? DEFAULT_CONFIG.runSpeed * CELL
+                : mode === 'walk'
+                  ? DEFAULT_CONFIG.walkSpeed * CELL
+                  : undefined
+            }
             imperative
             pagne={pagneColor(p.pagne)}
             onEntity={register(p.key)}

@@ -17,6 +17,7 @@ import {
   loadAvatar,
   pagneColor,
   saveAvatar,
+  shownModel,
 } from '@/lib/haroolife/city/avatar'
 import { CAMERA_HOME, type CameraState, worldPos } from '@/lib/haroolife/city/geometry'
 import {
@@ -25,7 +26,7 @@ import {
   lotRef,
   resolveInteraction,
 } from '@/lib/haroolife/city/interaction'
-import { type Prop, animFor, layoutFor } from '@/lib/haroolife/city/interiors'
+import { type Npc, type Prop, animFor, layoutFor } from '@/lib/haroolife/city/interiors'
 import {
   type CityAction,
   type CityLife,
@@ -71,6 +72,7 @@ import {
   rememberQuality,
   softwareRenderer,
 } from '@/lib/haroolife/city/quality'
+import { TRAFFIC_STEP_MS } from '@/lib/haroolife/city/traffic'
 import {
   CATEGORY_LABELS,
   CATEGORY_OF,
@@ -360,11 +362,16 @@ export function LomeLifeImmersive() {
   }
   const chooseAvatar = (next: Partial<Avatar>) =>
     setAvatar((cur) => {
-      const a = { ...cur, ...next }
+      const { classic, ...rest } = { ...cur, ...next }
+      const a: Avatar = classic ? { ...rest, classic } : rest
       saveAvatar(localStorage, a)
       return a
     })
   const [selectedLot, setSelectedLot] = useState<Lot | null>(null)
+  /** Walk-then-use request for the Three interior (HUD activity buttons). */
+  const [approachReq, setApproachReq] = useState<{ prop: string; n: number } | null>(null)
+  /** Resident reached after a tap: the conversation sheet. */
+  const [talkNpc, setTalkNpc] = useState<Npc | null>(null)
   // The real actor behind the player (null when signed out) and the organisation shown
   // inside a house of cooperatives. Buildings are assigned to organisations by the adapter,
   // never the other way round: the domain layer knows nothing about PlayCanvas.
@@ -1017,7 +1024,7 @@ export function LomeLifeImmersive() {
             ? old
             : { ...old, life: { ...old.life, trafficStep: old.life.trafficStep + 1 } },
         )
-    }, 700)
+    }, TRAFFIC_STEP_MS)
     return () => window.clearInterval(id)
   }, [insideAny])
 
@@ -1104,6 +1111,23 @@ export function LomeLifeImmersive() {
     setLife((old) => interact(old, a))
     if (a === 'enter' || a === 'leave') setPanel(null)
   }
+  /**
+   * A home action from the needs sheet. Inside the house drawn by Three, the player walks to
+   * the equipment that offers it and the action runs on arrival (once); elsewhere the rules of
+   * `interact` apply unchanged (they refuse what is not possible here).
+   */
+  function atHome(a: Action) {
+    const prop =
+      life.inside === 'house' && renderer === 'three'
+        ? layoutFor('house').props.find((p) => p.action === a)
+        : undefined
+    if (!prop) {
+      action(a)
+      return
+    }
+    setPanel(null)
+    setApproachReq((r) => ({ prop: prop.id, n: (r?.n ?? 0) + 1 }))
+  }
   function cityAction(a: CityAction) {
     if (a === 'offers') {
       setPanel('market')
@@ -1151,11 +1175,17 @@ export function LomeLifeImmersive() {
     action(p.action as Action)
     setCityLife((old) => ({ ...old, activity: { prop: p.id, anim: animFor(p.kind) } }))
   }
-  /** Starts an activity from the sheet: the first prop in the room that offers it. */
+  /**
+   * Starts an activity from the sheet: the first prop in the room that offers it. In a Three
+   * interior the player first walks to it (the action runs on arrival, see InteriorThree).
+   */
   function startActivity(a: CityAction) {
     const room = cityLife.insideLot ? interiorFor(lotById(cityLife.insideLot)?.type ?? 'lot') : null
     const prop = room ? layoutFor(room).props.find((p) => p.action === a) : null
-    if (prop) useEquipment(prop)
+    if (prop && renderer === 'three') {
+      setPanel(null)
+      setApproachReq((r) => ({ prop: prop.id, n: (r?.n ?? 0) + 1 }))
+    } else if (prop) useEquipment(prop)
     else cityAction(a)
   }
   function tile(x: number, y: number) {
@@ -1292,7 +1322,7 @@ export function LomeLifeImmersive() {
             ads={adsProp}
             onCameraSync={onCameraSync}
             hasVehicle={cityLife.locality === 'lome' && Boolean(cityLife.vehicle)}
-            avatarModel={avatar.model}
+            avatarModel={shownModel(avatar)}
             avatarPagne={pagneColor(avatar.pagne)}
             camera={camera}
             onCamera={setCamera}
@@ -1307,6 +1337,12 @@ export function LomeLifeImmersive() {
             }
             activity={cityLife.activity}
             onUseProp={useEquipment}
+            approach={approachReq}
+            onTalk={(npc) => {
+              setPanel(null)
+              setTalkNpc(npc)
+            }}
+            onNotice={setNotice}
             ride={riding && cityLife.route.length > 0 && !insideAny ? { transport, rain } : null}
             visitors={visitors}
             onBillboard={(id) => {
@@ -1665,6 +1701,43 @@ export function LomeLifeImmersive() {
         />
       )}
 
+      {talkNpc && (
+        <section
+          aria-label="Conversation"
+          className="pointer-events-auto absolute inset-x-3 bottom-[calc(100px+env(safe-area-inset-bottom))] z-40 mx-auto max-w-[520px] rounded-[24px] border border-white/70 bg-white/95 p-4 shadow-2xl backdrop-blur"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-bold text-emerald-700">Personnage du jeu (PNJ)</p>
+              <p className="text-base font-black text-slate-900">{talkNpc.role}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setTalkNpc(null)}
+              className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold"
+            >
+              Fermer
+            </button>
+          </div>
+          <p className="mt-2 rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
+            « Bonjour voisin ! Il fait bon aujourd’hui. Passe me voir au marché si tu as besoin de
+            quelque chose. »
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                // The game's own social action (need « Social »), applied once per greeting.
+                action('socialize')
+                setTalkNpc(null)
+              }}
+              className="flex-1 rounded-2xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white"
+            >
+              Saluer et discuter
+            </button>
+          </div>
+        </section>
+      )}
       <nav
         aria-label="Navigation du jeu"
         className="absolute inset-x-0 bottom-0 z-30 px-3 pb-[max(10px,env(safe-area-inset-bottom))]"
@@ -1810,11 +1883,11 @@ export function LomeLifeImmersive() {
                       icon={<Home size={17} />}
                     />
                     <ActionButton title="Entrer" outline onClick={() => action('enter')} />
-                    <ActionButton title="Dormir" outline onClick={() => action('sleep')} />
-                    <ActionButton title="Se laver" outline onClick={() => action('wash')} />
-                    <ActionButton title="Manger" outline onClick={() => action('eat')} />
-                    <ActionButton title="Se détendre" outline onClick={() => action('relax')} />
-                    <ActionButton title="Toilettes" outline onClick={() => action('toilet')} />
+                    <ActionButton title="Dormir" outline onClick={() => atHome('sleep')} />
+                    <ActionButton title="Se laver" outline onClick={() => atHome('wash')} />
+                    <ActionButton title="Manger" outline onClick={() => atHome('eat')} />
+                    <ActionButton title="Se détendre" outline onClick={() => atHome('relax')} />
+                    <ActionButton title="Toilettes" outline onClick={() => atHome('toilet')} />
                     <ActionButton title="Sortir" outline onClick={() => action('leave')} />
                   </div>
                 </>
@@ -2753,7 +2826,7 @@ export function LomeLifeImmersive() {
                       ? 'Choisis qui tu es dans Lomé : le même personnage te suit dans la rue, dans les bâtiments et au volant. Tu pourras changer depuis le téléphone.'
                       : 'Le même personnage te suit dans la rue, dans les bâtiments et au volant. Personnages Quaternius et Kenney (CC0) ; ton choix reste sur cet appareil.'}
                   </p>
-                  <AvatarPreview model={avatar.model} pagne={pagneColor(avatar.pagne)} />
+                  <AvatarPreview model={shownModel(avatar)} pagne={pagneColor(avatar.pagne)} />
                   <div
                     className="grid grid-cols-2 gap-2 sm:grid-cols-4"
                     role="group"
@@ -2763,11 +2836,11 @@ export function LomeLifeImmersive() {
                       <button
                         type="button"
                         key={m.id}
-                        aria-pressed={avatar.model === m.id}
-                        onClick={() => chooseAvatar({ model: m.id })}
+                        aria-pressed={shownModel(avatar) === m.id}
+                        onClick={() => chooseAvatar({ model: m.id, classic: undefined })}
                         className={
                           'rounded-2xl border p-3 text-left ' +
-                          (avatar.model === m.id
+                          (shownModel(avatar) === m.id
                             ? 'border-emerald-600 bg-emerald-50'
                             : 'border-slate-200 bg-white')
                         }
@@ -2790,11 +2863,11 @@ export function LomeLifeImmersive() {
                         <button
                           type="button"
                           key={m.id}
-                          aria-pressed={avatar.model === m.id}
-                          onClick={() => chooseAvatar({ model: m.id })}
+                          aria-pressed={shownModel(avatar) === m.id}
+                          onClick={() => chooseAvatar({ model: m.id, classic: true })}
                           className={
                             'rounded-2xl border p-3 text-left ' +
-                            (avatar.model === m.id
+                            (shownModel(avatar) === m.id
                               ? 'border-emerald-600 bg-emerald-50'
                               : 'border-slate-200 bg-white')
                           }
@@ -2879,8 +2952,8 @@ export function LomeLifeImmersive() {
                     onClick={() => open('avatar')}
                     className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-800"
                   >
-                    Mon apparence : {AVATAR_MODELS.find((m) => m.id === avatar.model)?.label}, pagne{' '}
-                    {avatar.pagne}
+                    Mon apparence : {AVATAR_MODELS.find((m) => m.id === shownModel(avatar))?.label},
+                    pagne {avatar.pagne}
                   </button>
                   {presence.status === 'ready' && (
                     <button

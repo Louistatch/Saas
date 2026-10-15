@@ -3,6 +3,7 @@
 import {
   avatarSpec,
   clipFor,
+  clipRate,
   figureScale,
   needsPagneWrap,
   recolorMap,
@@ -27,6 +28,9 @@ type Container = {
   animations: pc.Asset[]
 }
 
+/** File material of each mesh instance, before any recolouring (see the recolour effect). */
+const baseMaterials = new WeakMap<pc.MeshInstance, pc.Material>()
+
 export function Character({
   model,
   position,
@@ -37,6 +41,7 @@ export function Character({
   active = true,
   imperative = false,
   speed = 1,
+  groundSpeed,
   pagne,
   onEntity,
 }: {
@@ -50,8 +55,13 @@ export function Character({
   active?: boolean
   /** True when a rig moves the entity every frame: props place it once, never again. */
   imperative?: boolean
-  /** Playback rate of the current clip (walk cycles match the ground speed). */
+  /** Playback rate of the current clip (used when `groundSpeed` is not given). */
   speed?: number
+  /**
+   * Ground speed really achieved (render units per second): walk and run clips then play at
+   * the rate where the feet cover that ground (`clipRate`), whatever the figure's size.
+   */
+  groundSpeed?: number
   /** Hex colour of a pagne worn as a wrap around the hips, or none. */
   pagne?: string
   /** Receives the root entity, so a parent can move it imperatively between renders. */
@@ -59,6 +69,10 @@ export function Character({
 }) {
   const app = useApp()
   const spec = avatarSpec(model)
+  const rate =
+    groundSpeed === undefined
+      ? speed
+      : Math.round(clipRate(spec, anim, groundSpeed, scale) * 20) / 20
   const { asset } = useModel(spec.url)
   const holder = useRef<pc.Entity | null>(null)
   const figure = useRef<pc.Entity | null>(null)
@@ -122,33 +136,41 @@ export function Character({
       current.current = null
     }
   }, [app, asset, model, name])
-  // Garment (pagne colour), skin and hair: clone the named materials of this figure only.
+  // Garments (outfit and pagne), skin and hair on materials cloned for this figure only. The
+  // file's own material of every mesh instance is remembered and always used as the source,
+  // so a second pass never clones a clone that was just destroyed; clones are cached per
+  // source material object (two materials sharing a name are not merged). The cleanup puts
+  // the source materials back before destroying the clones.
   useEffect(() => {
     const fig = figure.current
     if (!fig || !app) return
     const colors = recolorMap(spec, pagne)
     if (colors.size === 0) return
-    const cache = new Map<string, pc.StandardMaterial>()
+    const cache = new Map<pc.Material, pc.StandardMaterial>()
     const made: pc.Material[] = []
+    const touched: [pc.MeshInstance, pc.Material][] = []
     for (const render of fig.findComponents('render') as pc.RenderComponent[]) {
       for (const mi of render.meshInstances) {
-        const src = mi.material as pc.StandardMaterial
+        const src = (baseMaterials.get(mi) ?? mi.material) as pc.StandardMaterial
+        baseMaterials.set(mi, src)
         const color = colors.get(src?.name ?? '')
         if (!color) continue
-        let m = cache.get(src.name)
+        let m = cache.get(src)
         if (!m) {
           m = src.clone() as pc.StandardMaterial
           m.diffuse.fromString(color)
           m.update()
-          cache.set(src.name, m)
+          cache.set(src, m)
           made.push(m)
         }
+        touched.push([mi, src])
         mi.material = m
       }
     }
     tinted.current = made
     return () => {
       tinted.current = []
+      for (const [mi, src] of touched) mi.material = src
       if (deviceAlive(app.graphicsDevice)) for (const m of made) m.destroy()
     }
   }, [app, asset, spec, pagne])
@@ -218,7 +240,7 @@ export function Character({
   }, [pagne, app, asset, spec])
   useEffect(() => {
     const fig = figure.current
-    if (fig?.anim) fig.anim.speed = speed
-  }, [speed])
+    if (fig?.anim) fig.anim.speed = rate
+  }, [rate])
   return null
 }

@@ -340,7 +340,8 @@ export function interact(state: LifeState, action: Action): LifeState {
     return events({ ...state, needs: { ...state.needs, hygiene: 100 } }, 'Hygiène restaurée.')
   }
   if (action === 'socialize') {
-    if (!nearVenue(state, 'park') && !nearVenue(state, 'market'))
+    // At home a neighbour drops by (the house's table « Discuter » and its resident).
+    if (!nearVenue(state, 'park') && !nearVenue(state, 'market') && !nearVenue(state, 'house'))
       return events(state, 'Va au jardin public ou au marché pour rencontrer quelqu’un.')
     return events(
       { ...state, needs: { ...state.needs, social: clamp(state.needs.social + 38) } },
