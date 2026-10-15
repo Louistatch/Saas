@@ -33,6 +33,12 @@ const field =
 export function SupportButton() {
   const { user } = useAuth()
   const pathname = usePathname()
+  // Le tableau de bord possède sa propre barre d’onglets fixe sur mobile.
+  // Le bouton flottant doit rester au-dessus et sous son niveau d’empilement,
+  // sinon il intercepte les clics destinés notamment à l’onglet « Plus ».
+  const floatingPosition = pathname.startsWith('/dashboard')
+    ? 'bottom-24 z-30 xl:bottom-5'
+    : 'bottom-5 z-40'
   const [open, setOpen] = useState(false)
   const [category, setCategory] = useState<SupportCategory>('assistance')
   const [subject, setSubject] = useState('')
@@ -83,7 +89,7 @@ export function SupportButton() {
       <Link
         href="/admin/messages"
         data-support-button=""
-        className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 print:hidden"
+        className={`fixed right-5 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 print:hidden ${floatingPosition}`}
       >
         <MessageCircle aria-hidden="true" className="h-5 w-5" />
         Messagerie
@@ -154,7 +160,7 @@ export function SupportButton() {
         type="button"
         onClick={openButton}
         data-support-button=""
-        className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 print:hidden"
+        className={`fixed right-5 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 print:hidden ${floatingPosition}`}
       >
         <MessageCircle aria-hidden="true" className="h-5 w-5" />
         Écrire à l’équipe
