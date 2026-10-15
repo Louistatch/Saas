@@ -1330,6 +1330,8 @@ export function LomeLifeImmersive() {
       if (to in CITIES) next = { ...next, life: selectCity(next.life, to) }
       return travelTo(next, to)
     })
+    // Arriving in another town is a departure like any other: back to the game camera.
+    if (mapView) exitMap()
     const gate = LOCALITIES[to].gate
     setCamera(CAMERA_HOME(gate.x, gate.y))
     controller.camera.follow = true

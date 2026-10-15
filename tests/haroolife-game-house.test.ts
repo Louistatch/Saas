@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { layoutFor } from '../lib/haroolife/city/interiors'
+import { activitiesOf, layoutFor } from '../lib/haroolife/city/interiors'
 import { HOUSE_SCENE, hotspotForProp } from '../lib/haroolife/game/core/house'
 import { isFree, pathfind } from '../lib/haroolife/game/core/pathfind'
+import { sceneFor } from '../lib/haroolife/game/core/scene'
 
 const { bounds, obstacles } = HOUSE_SCENE
 const open = { minX: -3, maxX: 3, minZ: -3, maxZ: 3 }
@@ -68,4 +69,50 @@ describe('house scene', () => {
       assert.ok(Math.hypot(end.x - h.at.x, end.z - h.at.z) < 0.5, `${h.id}: path ends near it`)
     }
   })
+})
+
+describe('every Saas interior in the HarooLife engine', () => {
+  const ids = [
+    'house',
+    'gym',
+    'market',
+    'bakery',
+    'hall',
+    'well',
+    'chapel',
+    'clinic',
+    'park',
+  ] as const
+  for (const id of ids) {
+    const layout = layoutFor(id)
+    const scene = sceneFor(id, layout)
+    it(`${id}: free spawn, every activity reachable, ids from the Saas layout`, () => {
+      assert.ok(isFree(scene.spawn.x, scene.spawn.z, scene.obstacles, scene.bounds), 'free spawn')
+      const props = new Set(layout.props.map((p) => p.id))
+      for (const h of scene.hotspots) {
+        if (h.kind === 'prop') assert.ok(props.has(h.ref), `${h.ref} is a Saas prop`)
+        if (h.kind === 'npc')
+          assert.ok(
+            layout.npcs.some((n) => n.id === h.ref),
+            `${h.ref} is a Saas NPC`,
+          )
+      }
+      for (const p of activitiesOf(layout)) {
+        const h = scene.hotspots.find((x) => x.kind === 'prop' && x.ref === p.id)
+        assert.ok(h, `${id}/${p.id} (${p.label}) has an interaction point`)
+      }
+      for (const h of scene.hotspots) {
+        assert.ok(isFree(h.at.x, h.at.z, scene.obstacles, scene.bounds, 0.19), `${id}/${h.id} free`)
+        const path = pathfind(scene.spawn, h.at, scene.obstacles, scene.bounds)
+        assert.ok(
+          path.length > 0 || Math.hypot(h.at.x - scene.spawn.x, h.at.z - scene.spawn.z) < 0.6,
+          `${id}/${h.id} reachable`,
+        )
+      }
+      assert.ok(
+        scene.hotspots.some((h) => h.kind === 'exit'),
+        'a way out',
+      )
+    })
+  }
 })

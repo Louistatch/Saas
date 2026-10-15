@@ -78,7 +78,7 @@ type EditTool = BuildType | 'inspect' | 'demolish'
 /** The player's own look (a Kenney Mini Character). */
 // React Three Fiber interior (behind ?engine=three): its own chunk, never downloaded otherwise.
 const InteriorThree = dynamic(() => import('../engine-three/interior-three'), { ssr: false })
-const HarooHouseView = dynamic(() => import('../game/haroo-house-view'), { ssr: false })
+const HarooRoomView = dynamic(() => import('../game/haroo-room-view'), { ssr: false })
 
 export const PLAYER_MODEL = 'afi'
 
@@ -935,10 +935,10 @@ export default function CityWorld({
   }, [hasVehicle])
   const estateCenter = worldPos(ESTATE.x0 + (SIZE_HINT - 1) / 2, ESTATE.y0 + (SIZE_HINT - 1) / 2)
   const scene = interior || ride
-  // Interiors drawn by Three.js (the HarooLife engine for the house, React Three Fiber for the
-  // others): PlayCanvas pauses and draws nothing underneath.
+  // Interiors drawn by Three.js (the HarooLife engine, or React Three Fiber with
+  // ?engine=three): PlayCanvas pauses and draws nothing underneath.
   const threeInterior = renderer !== 'playcanvas' && Boolean(interior) && !ride && Boolean(input)
-  const harooHouse = threeInterior && renderer === 'haroo' && interior === 'house'
+  const harooRoom = threeInterior && renderer === 'haroo'
   const selPos = selectedLot
     ? worldPos(selectedLot.x + (selectedLot.w - 1) / 2, selectedLot.y + (selectedLot.h - 1) / 2)
     : null
@@ -1063,9 +1063,11 @@ export default function CityWorld({
           </>
         )}
       </Application>
-      {harooHouse && interior && input && (
+      {harooRoom && interior && input && (
         <div className="absolute inset-0" data-renderer="haroo">
-          <HarooHouseView
+          <HarooRoomView
+            key={interior}
+            interior={interior}
             layout={layoutFor(interior)}
             title={interiorTitle}
             angle={camera.angle}
@@ -1074,6 +1076,7 @@ export default function CityWorld({
             playerPagne={avatarPagne}
             onUse={onUseProp}
             approach={approach}
+            onTalk={onTalk}
             onNotice={onNotice}
             input={input}
             onLeave={onLeave ?? (() => {})}
@@ -1082,7 +1085,7 @@ export default function CityWorld({
           />
         </div>
       )}
-      {threeInterior && !harooHouse && interior && input && (
+      {threeInterior && !harooRoom && interior && input && (
         <div className="absolute inset-0" data-renderer="three">
           <InteriorThree
             layout={layoutFor(interior)}

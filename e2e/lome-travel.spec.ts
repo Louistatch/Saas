@@ -76,6 +76,9 @@ test('travel Lomé → Kara → Lomé inside the single 3D world', async ({ page
   await expect(page.getByRole('button', { name: /Grand marché d’Assigamé/ })).toHaveCount(0)
   await expect(map.getByRole('button', { name: 'Kara, vous êtes ici' })).toBeVisible()
   await page.getByRole('button', { name: 'Fermer', exact: true }).click()
+  // The map is a mode of its own (V3): back to the game to walk.
+  const back = page.getByRole('button', { name: 'Retour au jeu' })
+  if (await back.isVisible().catch(() => false)) await back.click()
 
   // A few steps in Kara's streets.
   const before = (await live())?.at

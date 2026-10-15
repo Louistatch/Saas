@@ -1,15 +1,16 @@
 /**
- * HarooLife engine — the house scene (imperative Three.js, ported from the « Une vie à Lomé »
+ * HarooLife engine — an interior (imperative Three.js, ported from the « Une vie à Lomé »
  * prototype `scene.js`). One instance owns one WebGL renderer, one animation frame loop, the
  * DOM markers of the room and every GPU resource it loaded: `dispose()` releases all of them,
  * so React can mount, unmount and mount again (strict mode, route changes) without leaking
  * canvases, listeners or loops.
  *
  * The engine draws and moves; it never applies game rules. Reaching an interaction point
- * calls `events.onUse(propId)` once, and the game (lome-life-engine) decides the effect.
+ * calls `events.onUse(propId)` (or `onTalk`, `onLeave`) once, and the game decides the effect.
  */
 import {
   type AvatarSpec,
+  adultFor,
   avatarSpec,
   clipFor,
   needsPagneWrap,
@@ -17,52 +18,53 @@ import {
 } from '@/lib/haroolife/city/avatar-catalogue'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 import type { InputState } from '@/lib/haroolife/city/player'
-import { HOUSE_SCENE, type Hotspot, type HouseScene } from '@/lib/haroolife/game/core/house'
+import { SHAPE_MATERIALS, type ShapeMaterial } from '@/lib/haroolife/city/prop-shapes'
 import { type Point, isFree, pathfind } from '@/lib/haroolife/game/core/pathfind'
+import type { Hotspot, PrimitivePlacement, RoomScene } from '@/lib/haroolife/game/core/scene'
 import * as THREE from 'three'
 import { type GLTF, GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js'
-
-export const HAROO_ASSETS = {
-  furniture: '/haroolife/assets/furniture/',
-} as const
 
 /** Walk and run speeds (units/s). The clips play at the rate that keeps the feet planted. */
 export const WALK_SPEED = 1.3
 export const RUN_SPEED = 2.4
-/** Height of the player in the house (the adult characters' own height, as in the prototype). */
-const PLAYER_HEIGHT = 1.85
+/** Height of every figure in the room (the adult characters' own height, as in the prototype). */
+const FIGURE = 1.85
 /** Distance at which an interaction point counts as reached. */
 const ARRIVE = 0.12
 /** Default camera bearing (radians): the prototype's three-quarter view. */
 export const CAMERA_YAW = 0.74
 const CAMERA_ELEVATION = 0.7
 const CAMERA_DISTANCE = 55
+const WALL_HEIGHT = 3.3
 
-export interface HouseWorldEvents {
-  /** Reached an interaction point: run the action of this Saas prop (once). */
+export interface RoomWorldEvents {
+  /** Reached the interaction point of a Saas prop: run its action (once). */
   onUse: (propId: string) => void
-  /** Reached the door. */
+  /** Reached a non-player character: open the conversation. */
+  onTalk?: (npcId: string) => void
+  /** Reached the way out. */
   onLeave: () => void
   /** The requested target cannot be reached. */
   onNotice?: (message: string) => void
   /** The world is drawn (assets loaded). */
   onReady?: () => void
-  /** Loading failed for the avatar (the scene cannot be played). */
+  /** Loading failed for the player's avatar (the scene cannot be played). */
   onError?: (message: string) => void
   /** Rendering statistics, about twice a second (diagnostics overlay). */
   onFrame?: (s: { drawCalls: number; fps: number }) => void
 }
 
-export interface HouseWorldOptions {
+export interface RoomWorldOptions {
   canvas: HTMLCanvasElement
   /** Layer above the canvas for interaction markers (buttons, 44 px targets). */
   markers: HTMLElement
   input: InputState
   avatarModel: string
   pagne?: string
-  events: HouseWorldEvents
-  scene?: HouseScene
+  events: RoomWorldEvents
+  scene: RoomScene
   pixelRatio?: number
 }
 
@@ -72,11 +74,8 @@ interface Person {
   actions: Map<string, THREE.AnimationAction>
   current: string
   spec: AvatarSpec
-  /** Displayed height (the walk cadence is computed from it). */
-  height: number
-  /** Materials cloned for this person (recoloured), disposed with it. */
+  /** Materials and geometries created for this person, disposed with it. */
   owned: THREE.Material[]
-  /** Geometries created for this person (the pagne wrap of the classic characters). */
   ownedGeometry: THREE.BufferGeometry[]
 }
 
@@ -88,12 +87,12 @@ interface Marker {
 
 type Goal = { hotspot: Hotspot; path: Point[] } | { point: Point; path: Point[] }
 
-export class HouseWorld {
+export class RoomWorld {
   private readonly canvas: HTMLCanvasElement
   private readonly markersRoot: HTMLElement
   private readonly input: InputState
-  private readonly events: HouseWorldEvents
-  private readonly def: HouseScene
+  private readonly events: RoomWorldEvents
+  private readonly def: RoomScene
   private readonly renderer: THREE.WebGLRenderer
   private readonly scene = new THREE.Scene()
   private readonly camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 350)
@@ -106,18 +105,20 @@ export class HouseWorld {
   private readonly stage = new THREE.Group()
   private readonly walls: THREE.Mesh[] = []
   private readonly markers: Marker[] = []
+  private readonly npcs: Person[] = []
   private readonly raycaster = new THREE.Raycaster()
   private readonly ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
   private readonly resizeObserver: ResizeObserver
   private player: Person | null = null
-  private avatarModel: string
-  private pagne?: string
+  private readonly avatarModel: string
+  private readonly pagne?: string
   private goal: Goal | null = null
   private performing: { propId: string; anim: NpcAnim } | null = null
+  /** Where the player stood before stepping onto a machine (back there on the next move). */
+  private offDevice: { x: number; z: number } | null = null
   private width = 1
   private height = 1
   private yaw = CAMERA_YAW
-  private zoom = 1
   private raf = 0
   private last = 0
   private disposed = false
@@ -139,12 +140,12 @@ export class HouseWorld {
     this.down = null
   }
 
-  constructor(o: HouseWorldOptions) {
+  constructor(o: RoomWorldOptions) {
     this.canvas = o.canvas
     this.markersRoot = o.markers
     this.input = o.input
     this.events = o.events
-    this.def = o.scene ?? HOUSE_SCENE
+    this.def = o.scene
     this.avatarModel = o.avatarModel
     this.pagne = o.pagne
     this.renderer = new THREE.WebGLRenderer({
@@ -165,11 +166,12 @@ export class HouseWorld {
     sun.position.set(-12, 24, 14)
     sun.castShadow = true
     sun.shadow.mapSize.set(1024, 1024)
-    Object.assign(sun.shadow.camera, { left: -18, right: 18, top: 18, bottom: -18 })
+    const reach = Math.max(18, Math.max(this.def.room.w, this.def.room.d) * 0.9)
+    Object.assign(sun.shadow.camera, { left: -reach, right: reach, top: reach, bottom: -reach })
     sun.shadow.bias = -0.0003
     sun.shadow.normalBias = 0.035
     this.scene.add(sun, sun.target)
-    this.stage.name = 'Maison'
+    this.stage.name = this.def.title
     this.scene.add(this.stage)
     this.canvas.addEventListener('pointerdown', this.onPointerDown)
     this.canvas.addEventListener('pointerup', this.onPointerUp)
@@ -183,10 +185,12 @@ export class HouseWorld {
 
   async init(): Promise<void> {
     const spec = avatarSpec(this.avatarModel)
-    const furniture = [...new Set(this.def.furniture.map((f) => f.model))]
+    const urls = [...new Set(this.def.models.map((m) => m.url))]
+    const npcSpecs = this.def.npcs.map((n) => avatarSpec(adultFor(n.model)))
     const [avatar, ...rest] = await Promise.allSettled([
       this.load(spec.url),
-      ...furniture.map((m) => this.load(`${HAROO_ASSETS.furniture}${m}.glb`)),
+      ...urls.map((u) => this.load(u)),
+      ...npcSpecs.map((s) => this.load(s.url)),
     ])
     if (this.disposed) return
     if (avatar.status === 'rejected') {
@@ -194,8 +198,23 @@ export class HouseWorld {
       return
     }
     this.buildRoom()
-    rest.forEach((r, i) => {
-      if (r.status === 'fulfilled') this.placeFurniture(furniture[i], r.value)
+    this.buildPrimitives()
+    urls.forEach((u, i) => {
+      const r = rest[i]
+      if (r.status === 'fulfilled') this.placeModels(u, r.value)
+    })
+    this.def.npcs.forEach((n, i) => {
+      const r = rest[urls.length + i]
+      if (r.status !== 'fulfilled') return
+      const npc = this.makePerson(r.value, npcSpecs[i])
+      npc.root.name = `PNJ:${n.id}`
+      npc.root.position.set(n.x, 0, n.z)
+      npc.root.rotation.y = n.heading
+      // Characters stay where the layout puts them: a walking clip would slide in place.
+      const anim = n.anim === 'walk' || n.anim === 'run' ? 'idle' : (n.anim as NpcAnim)
+      this.play(npc, clipFor(npc.spec, anim))
+      this.stage.add(npc.root)
+      this.npcs.push(npc)
     })
     this.buildMarkers()
     this.player = this.makePerson(avatar.value, spec, this.pagne)
@@ -203,7 +222,7 @@ export class HouseWorld {
     this.player.root.position.set(this.def.spawn.x, 0, this.def.spawn.z)
     this.player.root.rotation.y = this.def.spawnHeading
     this.stage.add(this.player.root)
-    this.updateCamera()
+    this.updateCamera(true)
     this.publishProbes()
     this.last = performance.now()
     this.raf = requestAnimationFrame(this.frame)
@@ -222,6 +241,8 @@ export class HouseWorld {
     this.markers.length = 0
     if (this.player) this.disposePerson(this.player)
     this.player = null
+    for (const n of this.npcs) this.disposePerson(n)
+    this.npcs.length = 0
     // Everything below was created or loaded by this instance only.
     for (const g of this.geometries.values()) g.dispose()
     for (const m of this.materials.values()) m.dispose()
@@ -249,7 +270,7 @@ export class HouseWorld {
 
   /** Walk to the interaction point of this Saas prop, then use it (HUD activity buttons). */
   approach(propId: string): void {
-    const h = this.def.hotspots.find((x) => x.propId === propId)
+    const h = this.def.hotspots.find((x) => x.kind === 'prop' && x.ref === propId)
     if (!h) {
       this.events.onNotice?.('Cette activité n’est pas disponible ici.')
       return
@@ -260,6 +281,22 @@ export class HouseWorld {
   /** The activity the game says is running (equipment and animation), or none. */
   setActivity(activity: { prop: string; anim: NpcAnim } | null): void {
     this.performing = activity ? { propId: activity.prop, anim: activity.anim } : null
+    const pl = this.player
+    if (!pl) return
+    const spot = activity ? this.def.onDevice[activity.prop] : undefined
+    if (spot && !this.offDevice) {
+      // Machines are used standing on them (treadmill, bike, bench, mat).
+      this.offDevice = { x: pl.root.position.x, z: pl.root.position.z }
+      pl.root.position.set(spot.x, 0, spot.z)
+      pl.root.rotation.y = spot.heading
+    } else if (!spot) this.stepOff()
+  }
+
+  private stepOff(): void {
+    const pl = this.player
+    if (!pl || !this.offDevice) return
+    pl.root.position.set(this.offDevice.x, 0, this.offDevice.z)
+    this.offDevice = null
   }
 
   // ── scene construction ───────────────────────────────────────────────────────────────────
@@ -278,11 +315,22 @@ export class HouseWorld {
     return p
   }
 
-  private mat(color: string): THREE.MeshStandardMaterial {
-    let m = this.materials.get(color)
+  private mat(
+    color: string,
+    gloss = 0.07,
+    metalness = 0,
+    emissive?: string,
+  ): THREE.MeshStandardMaterial {
+    const key = `${color}|${gloss}|${metalness}|${emissive ?? ''}`
+    let m = this.materials.get(key)
     if (!m) {
-      m = new THREE.MeshStandardMaterial({ color, roughness: 0.93 })
-      this.materials.set(color, m)
+      m = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 1 - gloss * 0.8,
+        metalness,
+        emissive: emissive ? new THREE.Color(emissive) : undefined,
+      })
+      this.materials.set(key, m)
     }
     return m
   }
@@ -319,51 +367,65 @@ export class HouseWorld {
   private buildRoom(): void {
     const g = this.stage
     const p = this.def.palette
+    const W = this.def.room.w
+    const D = this.def.room.d
     // Lawn and plinth around the cut-away room.
-    this.box(g, 0, -0.45, 0, 200, 0.3, 200, p.ground, false)
-    const lawnGeo = new THREE.CylinderGeometry(11.3, 11.3, 0.07, 64)
+    this.box(g, 0, -0.45, 0, 300, 0.3, 300, p.ground, false)
+    const lawnGeo = new THREE.CylinderGeometry(
+      Math.hypot(W, D) * 0.6,
+      Math.hypot(W, D) * 0.6,
+      0.07,
+      64,
+    )
     this.geometries.set('lawn', lawnGeo)
     const lawn = new THREE.Mesh(lawnGeo, this.mat(p.lawn))
     lawn.position.y = -0.29
     lawn.receiveShadow = true
     g.add(lawn)
-    this.box(g, 0, -0.15, 0, 12.5, 0.3, 10.5, p.plinth)
-    this.box(g, 0, -0.04, 0, 12.25, 0.1, 10.25, p.floor)
-    // Checker tiles (one draw per colour after instancing would be nicer; 120 boxes is cheap).
-    for (let x = -5.5; x < 6; x++)
-      for (let z = -4.5; z < 5; z++)
-        this.box(
-          g,
-          x,
-          0.005,
-          z,
-          0.985,
-          0.016,
-          0.985,
-          Math.round(x + z) % 2 ? p.tileA : p.tileB,
-          false,
-        )
+    this.box(g, 0, -0.15, 0, W + 0.25, 0.3, D + 0.25, p.plinth)
+    this.box(g, 0, -0.04, 0, W, 0.1, D, p.floor)
+    // Checker tiles (only where two tile colours are set: the house).
+    if (p.tileA !== p.tileB) {
+      for (let x = -W / 2 + 0.5; x < W / 2; x++)
+        for (let z = -D / 2 + 0.5; z < D / 2; z++)
+          this.box(
+            g,
+            x,
+            0.005,
+            z,
+            0.985,
+            0.016,
+            0.985,
+            Math.round(x + z) % 2 ? p.tileA : p.tileB,
+            false,
+          )
+    }
     // Two walls; the one between the camera and the room is hidden (cut-away).
-    const back = this.box(g, 0, 1.65, -5.1, 12.3, 3.3, 0.19, p.wall)
+    const back = this.box(g, 0, WALL_HEIGHT / 2, -D / 2 - 0.1, W + 0.05, WALL_HEIGHT, 0.19, p.wall)
     back.userData.axis = 'z'
     back.name = 'Mur du fond'
-    const side = this.box(g, -6.1, 1.65, 0, 0.19, 3.3, 10.3, p.wall)
+    const side = this.box(g, -W / 2 - 0.1, WALL_HEIGHT / 2, 0, 0.19, WALL_HEIGHT, D + 0.05, p.wall)
     side.userData.axis = 'x'
     side.name = 'Mur latéral'
     this.walls.push(back, side)
-    this.box(g, 0, 0.13, -4.98, 12.1, 0.2, 0.05, p.trim)
-    this.box(g, -5.98, 0.13, 0, 0.05, 0.2, 10.1, p.trim)
-    // Door on the back wall and a window on the side wall.
-    const d = this.def.door
-    this.box(g, d.x, 1.25, d.z, 1.35, 2.5, 0.09, '#916c48')
-    this.box(g, d.x, 1.22, d.z + 0.07, 1.1, 2.28, 0.08, '#a78258')
-    this.box(g, -5.95, 1.95, -1.6, 0.08, 1.45, 2.35, '#e5dfcb')
-    this.box(g, -5.89, 1.95, -1.6, 0.05, 1.2, 2.1, '#a4ced1')
+    this.box(g, 0, 0.13, -D / 2 + 0.02, W - 0.15, 0.2, 0.05, p.trim)
+    this.box(g, -W / 2 + 0.02, 0.13, 0, 0.05, 0.2, D - 0.15, p.trim)
+    // A window on the side wall.
+    const wz = -D * 0.16
+    this.box(g, -W / 2 - 0.05, 1.95, wz, 0.08, 1.45, 2.35, '#e5dfcb')
+    this.box(g, -W / 2 + 0.01, 1.95, wz, 0.05, 1.2, 2.1, '#a4ced1')
     for (let i = 0; i < 6; i++)
-      this.box(g, -5.85, 1.45 + i * 0.2, -1.6, 0.04, 0.045, 2.1, '#d7e3dc')
-    for (const r of this.def.rugs) {
-      this.box(g, r.x, 0.015, r.z, r.w, 0.025, r.d, r.color, false)
+      this.box(g, -W / 2 + 0.05, 1.45 + i * 0.2, wz, 0.04, 0.045, 2.1, '#d7e3dc')
+    const d = this.def.door
+    if (d.z < 0) {
+      // Door on the back wall (the house).
+      this.box(g, d.x, 1.25, d.z, 1.35, 2.5, 0.09, '#916c48')
+      this.box(g, d.x, 1.22, d.z + 0.07, 1.1, 2.28, 0.08, '#a78258')
+    } else {
+      // Entrance on the open front: a doormat.
+      this.box(g, d.x, 0.02, d.z - 0.55, 1.9, 0.02, 0.8, '#2f6f55', false)
     }
+    for (const r of this.def.rugs) this.box(g, r.x, 0.015, r.z, r.w, 0.025, r.d, r.color, false)
     for (const pl of this.def.plants) this.plant(pl.x, pl.z, pl.scale)
   }
 
@@ -391,12 +453,61 @@ export class HouseWorld {
     }
   }
 
-  private placeFurniture(model: string, gltf: GLTF): void {
-    for (const f of this.def.furniture) {
-      if (f.model !== model) continue
+  /** The primitive parts of the Saas props, merged into one mesh per material. */
+  private buildPrimitives(): void {
+    const groups = new Map<ShapeMaterial, THREE.BufferGeometry[]>()
+    for (const pp of this.def.primitives) {
+      const list = groups.get(pp.part.m) ?? []
+      list.push(this.partGeometry(pp))
+      groups.set(pp.part.m, list)
+    }
+    for (const [key, list] of groups) {
+      const merged = mergeGeometries(list, false)
+      for (const g of list) g.dispose()
+      if (!merged) continue
+      this.geometries.set(`prim:${key}`, merged)
+      const s = SHAPE_MATERIALS[key]
+      const mesh = new THREE.Mesh(merged, this.mat(s.color, s.gloss, s.metalness ?? 0, s.emissive))
+      mesh.name = `objets:${key}`
+      mesh.castShadow = true
+      mesh.receiveShadow = true
+      this.stage.add(mesh)
+    }
+  }
+
+  private partGeometry(pp: PrimitivePlacement): THREE.BufferGeometry {
+    const part = pp.part
+    const deg = THREE.MathUtils.degToRad
+    const g =
+      part.t === 'box'
+        ? new THREE.BoxGeometry(1, 1, 1)
+        : part.t === 'cyl'
+          ? new THREE.CylinderGeometry(part.r, part.r, part.h, 14)
+          : new THREE.SphereGeometry(part.r, 14, 10)
+    const rot = part.t === 'ball' ? undefined : part.rot
+    const local = new THREE.Matrix4().compose(
+      new THREE.Vector3(...part.p),
+      new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(deg(rot?.[0] ?? 0), deg(rot?.[1] ?? 0), deg(rot?.[2] ?? 0)),
+      ),
+      part.t === 'box' ? new THREE.Vector3(...part.s) : new THREE.Vector3(1, 1, 1),
+    )
+    const placed = new THREE.Matrix4().compose(
+      new THREE.Vector3(pp.x, 0, pp.z),
+      new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), pp.rotation),
+      new THREE.Vector3(pp.scale, pp.scale, pp.scale),
+    )
+    g.applyMatrix4(local)
+    g.applyMatrix4(placed)
+    return g.index ? g.toNonIndexed() : g
+  }
+
+  private placeModels(url: string, gltf: GLTF): void {
+    for (const f of this.def.models) {
+      if (f.url !== url) continue
       const anchor = new THREE.Group()
-      anchor.name = `meuble:${model}`
-      anchor.position.set(f.x, 0, f.z)
+      anchor.name = f.name ?? url
+      anchor.position.set(f.x, f.y ?? 0, f.z)
       anchor.rotation.y = f.rotation ?? 0
       // Clones share the loaded geometry and materials (owned by this world, disposed once).
       const mesh = gltf.scene.clone(true)
@@ -420,6 +531,10 @@ export class HouseWorld {
     for (const h of this.def.hotspots) {
       const anchor = new THREE.Object3D()
       anchor.position.set(h.at.x, h.markerY, h.at.z)
+      if (h.kind !== 'exit') {
+        // Above the object itself, not above the spot where the player stands.
+        anchor.position.set((h.at.x + h.faces.x) / 2, h.markerY, (h.at.z + h.faces.z) / 2)
+      }
       this.stage.add(anchor)
       const el = document.createElement('button')
       el.type = 'button'
@@ -428,7 +543,9 @@ export class HouseWorld {
       el.title = h.label
       el.textContent = h.icon
       el.className =
-        'pointer-events-auto absolute left-0 top-0 flex h-11 w-11 items-center justify-center rounded-full border-2 border-white bg-white/90 text-lg shadow-md'
+        h.kind === 'npc'
+          ? 'pointer-events-auto absolute left-0 top-0 flex h-11 w-11 items-center justify-center rounded-full border-2 border-white bg-[#f7f8f1]/80 text-base shadow'
+          : 'pointer-events-auto absolute left-0 top-0 flex h-11 w-11 items-center justify-center rounded-full border-2 border-white bg-white/90 text-lg shadow-md'
       el.addEventListener('click', (e) => {
         e.stopPropagation()
         this.walkTo({ hotspot: h, path: [] })
@@ -444,7 +561,7 @@ export class HouseWorld {
     figure.name = 'figure'
     figure.rotation.y = THREE.MathUtils.degToRad(spec.yaw)
     // Adults keep their own size; the classic mini characters are brought to the same height.
-    const k = PLAYER_HEIGHT / spec.height
+    const k = FIGURE / spec.height
     figure.scale.setScalar(k)
     root.add(figure)
     // Recolour from the file's own materials (never from a material already disposed): one
@@ -490,16 +607,7 @@ export class HouseWorld {
     for (const clip of gltf.animations) actions.set(clip.name, mixer.clipAction(clip))
     const idle = clipFor(spec, 'idle')
     actions.get(idle)?.play()
-    return {
-      root,
-      mixer,
-      actions,
-      current: idle,
-      spec,
-      height: PLAYER_HEIGHT,
-      owned,
-      ownedGeometry,
-    }
+    return { root, mixer, actions, current: idle, spec, owned, ownedGeometry }
   }
 
   private disposePerson(p: Person): void {
@@ -518,6 +626,7 @@ export class HouseWorld {
 
   private walkTo(goal: Goal): void {
     if (!this.player) return
+    this.stepOff()
     const pos = this.player.root.position
     const dest = 'hotspot' in goal ? goal.hotspot.at : goal.point
     const path = pathfind({ x: pos.x, z: pos.z }, dest, this.def.obstacles, this.def.bounds)
@@ -544,8 +653,9 @@ export class HouseWorld {
     const h = g.hotspot
     const p = this.player.root.position
     this.player.root.rotation.y = Math.atan2(h.faces.x - p.x, h.faces.z - p.z)
-    if (h.propId === 'exit') this.events.onLeave()
-    else this.events.onUse(h.propId)
+    if (h.kind === 'exit') this.events.onLeave()
+    else if (h.kind === 'npc') this.events.onTalk?.(h.ref)
+    else this.events.onUse(h.ref)
   }
 
   private move(dt: number): void {
@@ -561,6 +671,7 @@ export class HouseWorld {
       // The stick always wins: it cancels a walk towards a target and ends an activity pose.
       this.goal = null
       this.performing = null
+      this.stepOff()
       const m = Math.min(1, mag)
       // Walk by default; Shift or a joystick pushed to its rim (it sets `run`) runs.
       running = this.input.run
@@ -612,7 +723,7 @@ export class HouseWorld {
     else if (this.performing) anim = this.performing.anim
     this.play(pl, clipFor(pl.spec, anim))
     if (anim === 'walk' || anim === 'run') {
-      const natural = pl.spec.pace[anim] * pl.height
+      const natural = pl.spec.pace[anim] * FIGURE
       const rate = Math.min(3, Math.max(0.5, this.speed / natural))
       pl.actions.get(pl.current)?.setEffectiveTimeScale(rate)
     } else pl.actions.get(pl.current)?.setEffectiveTimeScale(1)
@@ -640,19 +751,31 @@ export class HouseWorld {
     this.width = this.canvas.clientWidth || 1
     this.height = this.canvas.clientHeight || 1
     this.renderer.setSize(this.width, this.height, false)
-    this.updateCamera()
+    this.updateCamera(true)
   }
 
-  private updateCamera(): void {
+  private updateCamera(snap = false, dt = 0): void {
     const aspect = this.width / this.height
     // Phones (narrow) zoom in a little, as in the prototype.
-    this.zoom = this.width < 650 ? 1.12 : 1
-    const size = Math.max(7.7, 8.8 / aspect) / this.zoom
+    const zoom = this.width < 650 ? 1.12 : 1
+    const v = this.def.view
+    const size = Math.max(v.height, v.width / aspect) / zoom
     this.camera.left = -size * aspect
     this.camera.right = size * aspect
     this.camera.top = size
     this.camera.bottom = -size
     this.camera.updateProjectionMatrix()
+    if (v.follow && this.player) {
+      // Bigger rooms: the camera keeps the player in view, without leaving the room.
+      const p = this.player.root.position
+      const hw = this.def.room.w / 2
+      const hd = this.def.room.d / 2
+      const tx = Math.max(-hw * 0.6, Math.min(hw * 0.6, p.x))
+      const tz = Math.max(-hd * 0.6, Math.min(hd * 0.6, p.z))
+      const k = snap ? 1 : Math.min(1, dt * 4)
+      this.target.x += (tx - this.target.x) * k
+      this.target.z += (tz - this.target.z) * k
+    }
     const el = CAMERA_ELEVATION
     const t = this.target
     this.camera.position.set(
@@ -663,7 +786,8 @@ export class HouseWorld {
     this.camera.lookAt(t)
     this.camera.updateMatrixWorld()
     for (const w of this.walls)
-      w.visible = w.userData.axis === 'x' ? this.camera.position.x > 0 : this.camera.position.z > 0
+      w.visible =
+        w.userData.axis === 'x' ? this.camera.position.x > t.x : this.camera.position.z > t.z
   }
 
   private screenToFloor(clientX: number, clientY: number): Point | null {
@@ -681,13 +805,17 @@ export class HouseWorld {
     if (this.disposed) return
     this.raf = requestAnimationFrame(this.frame)
     const now = performance.now()
-    // Capped at 100 ms: a slow phone keeps the real walking speed, a tab coming back from the
-    // background does not jump (furniture is wider than one capped step).
-    const dt = Math.min((now - this.last) / 1000, 0.1)
+    // Real time, whatever the frame rate: up to 250 ms per frame (a tab coming back from the
+    // background does not jump further), integrated in steps of at most 50 ms so a slow phone
+    // keeps the real walking speed and never steps through furniture.
+    const dt = Math.min((now - this.last) / 1000, 0.25)
     this.last = now
     if (document.hidden) return
-    this.move(dt)
+    const steps = Math.max(1, Math.ceil(dt / 0.05))
+    for (let i = 0; i < steps; i++) this.move(dt / steps)
     this.player?.mixer.update(dt)
+    for (const n of this.npcs) n.mixer.update(dt)
+    if (this.def.view.follow) this.updateCamera(false, dt)
     this.scene.updateMatrixWorld()
     const v = new THREE.Vector3()
     for (const m of this.markers) {
@@ -696,7 +824,9 @@ export class HouseWorld {
       const x = (v.x * 0.5 + 0.5) * this.width
       const y = (-v.y * 0.5 + 0.5) * this.height
       m.el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`
-      m.el.style.visibility = v.z < 1 && v.z > -1 ? 'visible' : 'hidden'
+      const inside =
+        v.z < 1 && v.z > -1 && x > -20 && x < this.width + 20 && y > 0 && y < this.height + 40
+      m.el.style.visibility = inside && this.markerShown(m.hotspot) ? 'visible' : 'hidden'
     }
     this.renderer.render(this.scene, this.camera)
     this.publishInterior()
@@ -709,6 +839,20 @@ export class HouseWorld {
     }
   }
 
+  /**
+   * Big rooms (the camera follows): only what is within reach is marked, plus the way out and
+   * the current target, so a gym full of machines stays readable on a phone. Small rooms (the
+   * house) mark everything, as in the prototype.
+   */
+  private markerShown(h: Hotspot): boolean {
+    if (!this.def.view.follow || h.kind === 'exit') return true
+    const g = this.goal
+    if (g && 'hotspot' in g && g.hotspot.id === h.id) return true
+    const p = this.player?.root.position
+    if (!p) return false
+    return Math.hypot(h.at.x - p.x, h.at.z - p.z) < (h.kind === 'npc' ? 3 : 4.5)
+  }
+
   /** Same probe shapes as the other renderers, so the end-to-end specs read every engine. */
   private publishInterior(): void {
     const w = window as unknown as Record<string, unknown>
@@ -717,13 +861,14 @@ export class HouseWorld {
     w.__LOME_INTERIOR = pl
       ? {
           engine: 'haroo',
+          scene: this.def.id,
           x: pl.root.position.x,
           z: pl.root.position.z,
           heading: pl.root.rotation.y,
           speed: this.speed,
           anim: pl.current,
           using: this.performing?.propId ?? null,
-          goal: g ? ('hotspot' in g ? g.hotspot.propId : 'point') : null,
+          goal: g ? ('hotspot' in g ? g.hotspot.ref : 'point') : null,
           left: false,
         }
       : null

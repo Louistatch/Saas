@@ -3,8 +3,7 @@
  * PlayCanvas). Order: `?engine=` in the address (remembered on this device), then the remembered
  * choice, then NEXT_PUBLIC_HAROOLIFE_ENGINE, then the default.
  *
- * - `haroo` (default): the HarooLife engine (imperative Three.js) draws the house; the other
- *   interiors stay on React Three Fiber while they are ported.
+ * - `haroo` (default): the HarooLife engine (imperative Three.js) draws every interior.
  * - `three`: React Three Fiber for every interior (the previous default, the way back).
  * - `playcanvas`: PlayCanvas everywhere.
  */

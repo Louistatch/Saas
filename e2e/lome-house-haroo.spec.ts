@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { expect, test } from './lome-test'
+import { expect, openPlaces, test } from './lome-test'
 
 /**
  * Refonte, jalon 1: the house drawn by the HarooLife engine (imperative Three.js) on the normal
@@ -185,5 +185,81 @@ test('HarooLife house: walk, eat, sleep, save, leave and come back', async ({ pa
     )
   }
   expect(new Set(gpu).size, `GPU state stays flat: ${gpu.join(' | ')}`).toBe(1)
+  expect(errors).toEqual([])
+})
+
+test('HarooLife market: travel, buy a meal once, talk to the seller, leave', async ({ page }) => {
+  test.setTimeout(240_000)
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  const save = () =>
+    page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem('haroolife.lome-city.v1') || 'null')?.life as {
+          wallet: number
+          meals: number
+        },
+    )
+  await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
+  await expect(page.locator('canvas').first()).toBeVisible({ timeout: 30000 })
+  await openPlaces(page)
+  await page
+    .getByRole('group', { name: 'Filtrer la ville' })
+    .getByRole('button', { name: 'Commerces' })
+    .click()
+  await page
+    .getByRole('button', { name: /^\S+ Marché de Tokoin/ })
+    .first()
+    .click()
+  const sheet = page.getByRole('dialog', { name: 'Lieu' })
+  await sheet.getByRole('button', { name: /Zémidjan/ }).click()
+  await sheet.getByRole('button', { name: 'Confirmer le trajet' }).click()
+  await expect
+    .poll(
+      async () => {
+        const c = await live(page)
+        return c ? (c as unknown as { route: number }).route : 99
+      },
+      { timeout: 60000 },
+    )
+    .toBe(0)
+  const back = page.getByRole('button', { name: 'Retour au jeu' })
+  if (await back.isVisible().catch(() => false)) await back.click()
+  await page.getByRole('button', { name: 'Entrer ou sortir' }).click()
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            (window as unknown as { __LOME_INTERIOR?: { scene?: string } }).__LOME_INTERIOR
+              ?.scene ?? null,
+        ),
+      { timeout: 60000 },
+    )
+    .toBe('market')
+
+  // Buy from the activities: the player walks to the counter, the rule applies once.
+  const before = await save()
+  await page.getByRole('button', { name: /Activités du lieu|Activités · / }).click()
+  await sheet
+    .getByRole('button', { name: /Acheter un repas/ })
+    .first()
+    .click()
+  await expect
+    .poll(async () => (await live(page))?.lastEvent ?? '', { timeout: 30000 })
+    .toMatch(/Un repas acheté/)
+  const bought = await save()
+  expect(bought.wallet).toBe(before.wallet - 650)
+  expect(bought.meals).toBe(before.meals + 1)
+  await page.waitForTimeout(1500)
+  expect((await save()).wallet, 'one purchase, one payment').toBe(bought.wallet)
+
+  // The seller is a character of the game: reaching them opens the conversation.
+  await page.locator('[data-hotspot="npc:seller"]').click()
+  await expect(page.getByLabel('Conversation')).toBeVisible({ timeout: 30000 })
+  await expect(page.getByLabel('Conversation')).toContainText('PNJ')
+
+  await page.getByRole('button', { name: 'Entrer ou sortir' }).click()
+  await expect.poll(async () => (await live(page))?.inside ?? null).toBeNull()
   expect(errors).toEqual([])
 })
