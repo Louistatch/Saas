@@ -201,3 +201,27 @@ Il reste à porter dans la nouvelle rue le modèle du taxi et la conduite. Le ta
   - « Descendre du taxi », le joueur à pied à côté de la voiture.
 
 La nouvelle rue couvre maintenant ce que l'ancienne faisait : les panneaux, les autres joueurs, le taxi et la conduite. `?street=playcanvas` reste le retour en arrière.
+
+---
+
+# Bâtiments Kenney dans la nouvelle rue
+
+- **Modèles.** Les bâtiments viennent du pack Kenney cuit (`kenney-pack.{json,bin}`), celui de la ville PlayCanvas. Ils sont choisis par le même catalogue `buildingFor` : modèle, orientation vers la porte, échelle, teinte, accessoires (auvents, arbres, clôtures, bancs…) et éléments propres au lieu.
+  - Les éléments propres au lieu (dômes, minarets, clochers, croix, auvents de marché, champs, jetées, murs d'enceinte avec portail, enseignes, bancs, drapeaux) sont dessinés par des formes simples, aux couleurs du catalogue.
+  - Le domaine du joueur utilise les mêmes modèles : `sub-a` (maison), `sub-t`, `sub-f`, `com-a`, `com-d`, `bush`, `tree`.
+- **Chargement du pack.** Le chargement (empreinte de build, rechargement hors cache, modèle manquant non bloquant) est sorti de `model-bank.ts` vers `lib/haroolife/city/bank.ts`. Il ne dépend d'aucun moteur.
+- **Unités.** Le catalogue place en unités PlayCanvas (1 cellule = 1,35). La rue convertit : positions en cellules × 2, hauteurs et échelles × 2/1,35.
+- **Coût.**
+  - Les bâtiments sont regroupés par tuiles de 8 × 8 cellules, chacune fusionnée en un seul maillage à couleurs de sommets, et mises en cache.
+  - Les tuiles sont construites au fil du déplacement, une par image au plus, et libérées hors de portée (11 cellules).
+  - Les modèles complets avec accessoires sont gardés à 8 cellules au plus. Au-delà, ce sont les modèles simplifiés de la ville (environ un cinquième des triangles), sans accessoires.
+
+| Mesure (SwiftShader, 412 × 915) | Avant (un seul maillage) | Après (tuiles) |
+|---|---|---|
+| Reconstruction du quartier | 94 à 118 ms (saccade) | 1 à 4 ms (sol seul) |
+| Construction d'une tuile | — | 0 à 25 ms, une par image |
+| Triangles des bâtiments | 188 464 | 111 000 à 137 000 |
+
+La ville PlayCanvas se fixe 160 000 triangles au niveau de qualité le plus bas (téléphones) : la rue reste en dessous.
+
+Les volumes stylisés restent le repli honnête si le pack ne se charge pas.

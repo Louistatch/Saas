@@ -47,6 +47,8 @@ export interface StreetBuilding {
   roof: string
   /** Named place with a door (marker in the street); null for anonymous buildings. */
   name: string | null
+  /** The city lot (models chosen by the shared catalogue); absent for the player's estate. */
+  lot?: Lot
 }
 
 export interface StreetDoor {
@@ -136,6 +138,7 @@ export function streetWindow(
       color,
       roof,
       name: lot.name,
+      lot,
     })
     if (lot.name && Math.abs(lot.door.x - cx) <= radius && Math.abs(lot.door.y - cy) <= radius)
       doors.push(doorOf(lot))
@@ -160,6 +163,61 @@ export function streetWindow(
     })
   }
   return { cx, cy, radius, cells, buildings, doors, roads }
+}
+
+/** Buildings are drawn by tiles of TILE × TILE cells, cached and built as the player moves. */
+export const TILE = 8
+
+/**
+ * The buildings owned by tile (tx, ty): those whose top-left cell lies in it, so a building
+ * spanning two tiles is drawn once. Same entries as `streetWindow` (lot ids, estate ids).
+ */
+export function buildingsInTile(
+  tx: number,
+  ty: number,
+  estate: readonly Building[] = [],
+): StreetBuilding[] {
+  const x0 = tx * TILE
+  const y0 = ty * TILE
+  const inside = (x: number, y: number) => x >= x0 && x < x0 + TILE && y >= y0 && y < y0 + TILE
+  const out: StreetBuilding[] = []
+  for (const lot of worldLots()) {
+    if (lot.type === 'billboard' || !inside(lot.x, lot.y)) continue
+    const [color, roof] = PALETTE[CATEGORY_OF[lot.type]] ?? PALETTE.homes
+    out.push({
+      id: lot.id,
+      x: lot.x,
+      y: lot.y,
+      w: lot.w,
+      h: lot.h,
+      floors: lot.type === 'park' || lot.type === 'lot' ? 0 : lot.floors,
+      type: lot.type,
+      color,
+      roof,
+      name: lot.name,
+      lot,
+    })
+  }
+  for (const b of estate) {
+    if (b.type === 'road') continue
+    const x = b.x + ESTATE.x0
+    const y = b.y + ESTATE.y0
+    if (!inside(x, y)) continue
+    const [color, roof] = PALETTE.estate
+    out.push({
+      id: `estate:${b.x}:${b.y}`,
+      x,
+      y,
+      w: 1,
+      h: 1,
+      floors: b.type === 'house' ? 1 : b.type === 'hall' ? 2 : 1,
+      type: b.type,
+      color,
+      roof,
+      name: null,
+    })
+  }
+  return out
 }
 
 export const doorOf = (lot: Lot): StreetDoor => ({

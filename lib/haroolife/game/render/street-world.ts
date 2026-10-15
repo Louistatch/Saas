@@ -28,6 +28,7 @@ import {
   needsPagneWrap,
   recolorMap,
 } from '@/lib/haroolife/city/avatar-catalogue'
+import { type Bank, loadBank } from '@/lib/haroolife/city/bank'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 import { DEFAULT_CONFIG, type PlayerController } from '@/lib/haroolife/city/player'
 import {
@@ -35,6 +36,8 @@ import {
   STREET_CELL,
   type StreetDoor,
   type StreetWindow,
+  TILE,
+  buildingsInTile,
   streetWindow,
 } from '@/lib/haroolife/game/core/street'
 import {
@@ -51,12 +54,15 @@ import type { Building } from '@/lib/haroolife/townsmen-engine'
 import * as THREE from 'three'
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js'
+import { DETAIL_CELLS, buildCityGeometry } from './city-models'
 import { createGltfLoader } from './gltf'
 
 const FIGURE = 1.85
 /** Cells drawn around the player; the window is rebuilt when the player gets near its edge. */
 const RADIUS = 13
 const REBUILD_AT = 6
+/** Building tiles kept within this many cells of the player (the camera shows about ±9). */
+const TILE_RANGE = 11
 const CAMERA_ELEVATION = 0.7
 const CAMERA_DISTANCE = 80
 const PEDESTRIANS = 6
@@ -185,6 +191,14 @@ export class StreetWorld {
   private player: Person | null = null
   private car: THREE.Object3D | null = null
   private carLoading = false
+  /** The baked Kenney pack (same models as the PlayCanvas city); null while loading or if it failed. */
+  private bank: Bank | null = null
+  /** Duration of the last neighbourhood rebuild (ms), for the probe. */
+  private rebuildMs = 0
+  /** Building tiles (Kenney models), cached: key → mesh and level of detail. */
+  private tiles = new Map<string, { mesh: THREE.Mesh; detail: boolean }>()
+  private tileMs = 0
+  private cityMaterial: THREE.MeshStandardMaterial | null = null
   private wheels: { node: THREE.Object3D; front: boolean }[] = []
   private wheelSpin = 0
   /** Camera framing factor (1 on foot, wider at the wheel), eased. */
@@ -285,10 +299,12 @@ export class StreetWorld {
   async init(): Promise<void> {
     const spec = avatarSpec(this.avatarModel)
     const pedSpecs = PEDESTRIAN_MODELS.map((m) => avatarSpec(adultFor(m)))
-    const [avatar, ...peds] = await Promise.allSettled([
+    const [bank, avatar, ...peds] = await Promise.allSettled([
+      loadBank(),
       this.load(spec.url),
       ...pedSpecs.map((s) => this.load(s.url)),
     ])
+    this.bank = bank.status === 'fulfilled' ? bank.value : null
     if (this.disposed) return
     if (avatar.status === 'rejected') {
       this.events.onError?.('Le personnage 3D n’a pas pu être chargé.')
@@ -298,6 +314,7 @@ export class StreetWorld {
     this.player.root.name = 'Joueur'
     this.scene.add(this.player.root)
     this.rebuild()
+    this.updateTiles(Number.POSITIVE_INFINITY)
     for (let i = 0; i < PEDESTRIANS; i++) {
       const r = peds[i % peds.length]
       if (r.status !== 'fulfilled') continue
@@ -320,7 +337,11 @@ export class StreetWorld {
   /** The player's own buildings changed (construction): redraw the window. */
   setEstate(estate: readonly Building[]): void {
     this.estate = estate
-    if (this.player) this.rebuild()
+    if (!this.player) return
+    this.rebuild()
+    // The estate changed (construction): its tiles are drawn again.
+    for (const k of [...this.tiles.keys()]) this.dropTile(k)
+    this.updateTiles(Number.POSITIVE_INFINITY)
   }
 
   dispose(): void {
@@ -336,6 +357,8 @@ export class StreetWorld {
     window.clearTimeout(this.rotationTimer)
     for (const id of [...this.boards.keys()]) this.dropBoard(id)
     this.posterGeometry.dispose()
+    for (const k of [...this.tiles.keys()]) this.dropTile(k)
+    this.cityMaterial?.dispose()
     this.unsubscribe?.()
     this.unsubscribe = null
     for (const r of this.remotes.values()) if (r.person) this.disposePerson(r.person)
@@ -401,6 +424,7 @@ export class StreetWorld {
     this.winGroup.traverse((o) => {
       const im = o as THREE.InstancedMesh
       if (im.isInstancedMesh) im.dispose()
+      else if (o.userData.ownsGeometry) (o as THREE.Mesh).geometry.dispose()
     })
     this.winGroup.removeFromParent()
     this.winGroup = null
@@ -408,6 +432,7 @@ export class StreetWorld {
 
   /** Draws the neighbourhood around the player's current cell. */
   private rebuild(): void {
+    const t0 = performance.now()
     this.clearWindow()
     const c = this.controller.cell
     const win = streetWindow(c.x, c.y, RADIUS, this.estate)
@@ -448,48 +473,54 @@ export class StreetWorld {
       })
       g.add(im)
     }
-    // Buildings: body and roof, as boxes in the prototype's palette.
-    for (const b of win.buildings) {
-      const x = (b.x + (b.w - 1) / 2) * U
-      const z = (b.y + (b.h - 1) / 2) * U
-      if (b.floors === 0) {
-        // Parks and empty lots: a low green or sand plot with a few trees.
-        const plot = new THREE.Mesh(
-          this.unitBox,
-          this.mat(b.type === 'park' ? '#8fbf7a' : '#d6cdb5'),
-        )
-        plot.scale.set(b.w * U - 0.4, 0.06, b.h * U - 0.4)
-        plot.position.set(x, 0.03, z)
-        plot.receiveShadow = true
-        plot.name = `lot:${b.id}`
-        g.add(plot)
-        continue
-      }
-      // Low-rise, as in the prototype: the street stays readable from the game camera.
-      const floors = Math.min(4, b.floors)
-      const height = 1.4 + floors * 1.15
-      const body = new THREE.Mesh(this.unitBox, this.mat(b.color))
-      body.scale.set(b.w * U - 0.5, height, b.h * U - 0.5)
-      body.position.set(x, height / 2, z)
-      body.castShadow = true
-      body.receiveShadow = true
-      body.name = `lot:${b.id}`
-      g.add(body)
-      const roof = new THREE.Mesh(this.unitBox, this.mat(b.roof))
-      roof.scale.set(b.w * U - 0.2, 0.3, b.h * U - 0.2)
-      roof.position.set(x, height + 0.15, z)
-      roof.castShadow = true
-      g.add(roof)
-      // A darker band of windows on each floor (reads as a building, not a block).
-      for (let f = 0; f < floors; f++) {
-        const band = new THREE.Mesh(this.unitBox, this.mat('#5f7a86'))
-        band.scale.set(b.w * U - 0.45, 0.4, b.h * U - 0.45)
-        band.position.set(x, 1.2 + f * 1.15, z)
-        g.add(band)
+    // Buildings: the Kenney models by tiles (updateTiles); boxes only when the pack is missing.
+    if (this.bank) {
+      // Drawn by the tile cache.
+    } else {
+      // Fallback (pack unavailable): stylised volumes in the prototype's palette.
+      for (const b of win.buildings) {
+        const x = (b.x + (b.w - 1) / 2) * U
+        const z = (b.y + (b.h - 1) / 2) * U
+        if (b.floors === 0) {
+          // Parks and empty lots: a low green or sand plot with a few trees.
+          const plot = new THREE.Mesh(
+            this.unitBox,
+            this.mat(b.type === 'park' ? '#8fbf7a' : '#d6cdb5'),
+          )
+          plot.scale.set(b.w * U - 0.4, 0.06, b.h * U - 0.4)
+          plot.position.set(x, 0.03, z)
+          plot.receiveShadow = true
+          plot.name = `lot:${b.id}`
+          g.add(plot)
+          continue
+        }
+        // Low-rise, as in the prototype: the street stays readable from the game camera.
+        const floors = Math.min(4, b.floors)
+        const height = 1.4 + floors * 1.15
+        const body = new THREE.Mesh(this.unitBox, this.mat(b.color))
+        body.scale.set(b.w * U - 0.5, height, b.h * U - 0.5)
+        body.position.set(x, height / 2, z)
+        body.castShadow = true
+        body.receiveShadow = true
+        body.name = `lot:${b.id}`
+        g.add(body)
+        const roof = new THREE.Mesh(this.unitBox, this.mat(b.roof))
+        roof.scale.set(b.w * U - 0.2, 0.3, b.h * U - 0.2)
+        roof.position.set(x, height + 0.15, z)
+        roof.castShadow = true
+        g.add(roof)
+        // A darker band of windows on each floor (reads as a building, not a block).
+        for (let f = 0; f < floors; f++) {
+          const band = new THREE.Mesh(this.unitBox, this.mat('#5f7a86'))
+          band.scale.set(b.w * U - 0.45, 0.4, b.h * U - 0.45)
+          band.position.set(x, 1.2 + f * 1.15, z)
+          g.add(band)
+        }
       }
     }
     this.scene.add(g)
     this.winGroup = g
+    this.rebuildMs = Math.round(performance.now() - t0)
     // Doors of named places: a marker each (44 px), opening the place's sheet.
     for (const d of win.doors) {
       const el = document.createElement('button')
@@ -578,6 +609,65 @@ export class StreetWorld {
     p.actions.get(p.current)?.fadeOut(0.2)
     next.reset().fadeIn(0.2).play()
     p.current = clip
+  }
+
+  /**
+   * Keeps the building tiles around the player: missing ones are built, those whose level of
+   * detail changed are rebuilt (at most `budget` per call), those out of range are freed.
+   */
+  private updateTiles(budget: number): void {
+    const bank = this.bank
+    if (!bank) return
+    const c = this.controller.cell
+    const t0x = Math.floor((c.x - TILE_RANGE) / TILE)
+    const t1x = Math.floor((c.x + TILE_RANGE) / TILE)
+    const t0y = Math.floor((c.y - TILE_RANGE) / TILE)
+    const t1y = Math.floor((c.y + TILE_RANGE) / TILE)
+    for (const k of [...this.tiles.keys()]) {
+      const [tx, ty] = k.split(':').map(Number)
+      if (tx < t0x - 1 || tx > t1x + 1 || ty < t0y - 1 || ty > t1y + 1) this.dropTile(k)
+    }
+    // Nearest tiles first.
+    const wanted: { tx: number; ty: number; d: number }[] = []
+    for (let ty = t0y; ty <= t1y; ty++)
+      for (let tx = t0x; tx <= t1x; tx++)
+        wanted.push({
+          tx,
+          ty,
+          d: Math.hypot(tx * TILE + TILE / 2 - c.x, ty * TILE + TILE / 2 - c.y),
+        })
+    wanted.sort((a, b) => a.d - b.d)
+    let built = 0
+    for (const w of wanted) {
+      if (built >= budget) break
+      const key = `${w.tx}:${w.ty}`
+      const detail = w.d <= DETAIL_CELLS
+      const have = this.tiles.get(key)
+      if (have && have.detail === detail) continue
+      const t = performance.now()
+      if (!this.cityMaterial)
+        this.cityMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })
+      const mesh = new THREE.Mesh(
+        buildCityGeometry(bank, buildingsInTile(w.tx, w.ty, this.estate), detail),
+        this.cityMaterial,
+      )
+      mesh.name = `Bâtiments ${key}`
+      mesh.castShadow = true
+      mesh.receiveShadow = true
+      if (have) this.dropTile(key)
+      this.scene.add(mesh)
+      this.tiles.set(key, { mesh, detail })
+      this.tileMs = Math.round(performance.now() - t)
+      built++
+    }
+  }
+
+  private dropTile(key: string): void {
+    const t = this.tiles.get(key)
+    if (!t) return
+    t.mesh.removeFromParent()
+    t.mesh.geometry.dispose()
+    this.tiles.delete(key)
   }
 
   private loadCar(): void {
@@ -724,6 +814,8 @@ export class StreetWorld {
       (Math.abs(c.x - this.win.cx) > REBUILD_AT || Math.abs(c.y - this.win.cy) > REBUILD_AT)
     )
       this.rebuild()
+    // At most one building tile per frame: the cost of the Kenney models is spread out.
+    this.updateTiles(1)
     const pl = this.player
     if (pl) {
       const onFoot = !ctl.driving && ctl.mode !== 'inside'
@@ -995,6 +1087,10 @@ export class StreetWorld {
       window: this.win ? { cx: this.win.cx, cy: this.win.cy, doors: this.win.doors.length } : null,
       buildings: this.win?.buildings.length ?? 0,
       pedestrians: this.walkers.length,
+      kenney: Boolean(this.bank),
+      rebuildMs: this.rebuildMs,
+      tiles: this.tiles.size,
+      tileMs: this.tileMs,
     }
     w.__LOME_PLAYER = {
       x: ctl.pos.x,
