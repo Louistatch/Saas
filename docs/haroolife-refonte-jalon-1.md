@@ -266,3 +266,40 @@ Les tests qui mesuraient la ville aérienne PlayCanvas mesurent maintenant le qu
 - Ces chiffres valent pour la comparaison entre versions, pas comme fluidité réelle : SwiftShader dessine sur le processeur.
 - La salle publie aussi ses statistiques : une sonde commune (`lib/haroolife/game/render/perf-probe.ts`) sert la rue et les intérieurs, et s'efface quand son moteur est détruit, si bien qu'aucun relevé périmé ne reste. Salle de sport : 233 appels de dessin et 96 k triangles sur ordinateur, 224 et 94 k sur Android émulé.
 - Le test de la rue vérifie qu'aucun script téléchargé ne contient le moteur PlayCanvas.
+
+---
+
+# Proportions, messages privés et voyage entre villes
+
+## Proportions de la rue
+
+Avant, un personnage (1,85 unité) était plus grand qu'une maison Kenney : 0,7 à 1,5 unité de haut, une fois le modèle ajusté à sa parcelle.
+
+- **Personnage :** 1,15 unité, soit 1,75 m.
+- **Bâtiments :** dessinés 1,8 fois plus hauts, sans être élargis, pour rester dans leur parcelle. Les normales sont corrigées, donc l'éclairage reste juste. Une maison fait ainsi 1 à 1,5 étage de personnage, un immeuble 3 à 5.
+- **Inchangés :** les éléments de rue gardent leur taille (arbres, bancs, clôtures, voitures). Le taxi mesure 4,5 m et les panneaux publicitaires environ 5 m.
+- **Cadrage :** la caméra est resserrée sur le joueur, un peu plus sur téléphone.
+
+## Parler à un joueur rencontré (messages privés, Socket.IO)
+
+- **Dans la rue :** chaque autre joueur porte une étiquette avec son nom. Toucher l'étiquette, ou le joueur lui-même, ouvre sa fiche : « Discuter », « Bloquer », « Signaler ».
+- **« Discuter » :** ouvre une conversation privée `dm:<clé>:<clé>` dans le téléphone, nommée d'après la personne.
+  - Le relais y fait entrer aussitôt les deux personnes, sur tous leurs onglets.
+  - Le correspondant voit la conversation apparaître avec un compteur de non-lus.
+- **Règles en base** (migration additive `20261015_120000_haroolife_chat_dm.sql`, avec son retour arrière) :
+  - seuls les habitants peuvent écrire ;
+  - un blocage, dans un sens ou dans l'autre, ferme la conversation, en lecture comme en écriture ;
+  - au plus 20 nouvelles conversations par personne et par 24 h ;
+  - personne d'autre n'y accède, ni un tiers ni un super_admin : l'équipe ne voit que ce qui est signalé ;
+  - on peut signaler un joueur depuis sa fiche, sans message à joindre.
+- **Tests :**
+  - migration dans PGlite (ouverture, consentement, vie privée, plafond, signalement) ;
+  - relais avec de vrais clients (rejoint en direct, fermé par un blocage) ;
+  - parcours à deux joueurs (étiquette, fiche, conversation, réponse ; un troisième client n'entend rien).
+- **Pas encore en production :** ni cette migration ni celle de la messagerie (`20261013`) n'y sont appliquées, et le relais n'y est pas déployé. Il faut l'accord du fondateur pour les deux.
+
+## Voyage entre villes
+
+- Choisir une autre ville ouvre un écran plein. Il montre la carte sourcée du Togo, le trajet du car tracé d'une ville à l'autre (le car suit la route) et la durée du voyage dans le jeu.
+- L'écran reste au moins 2,6 s, puis jusqu'à ce que la rue de la ville d'arrivée soit dessinée.
+- Si l'appareil demande moins d'animations, la route s'affiche directement, sans animation.

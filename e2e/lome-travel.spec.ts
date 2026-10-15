@@ -16,7 +16,7 @@ type Live = {
   hour: number
   lastEvent: string
 }
-test('travel Lomé → Kara → Lomé inside the single 3D world', async ({ page }) => {
+test('travel Lomé → Kara → Lomé inside the single 3D world', async ({ page }, testInfo) => {
   test.setTimeout(240_000)
   const live = () =>
     page.evaluate(() => (window as unknown as { __LOME_CITY?: Live }).__LOME_CITY ?? null)
@@ -58,6 +58,15 @@ test('travel Lomé → Kara → Lomé inside the single 3D world', async ({ page
     .first()
     .click()
 
+  // The journey is shown full screen: the map of Togo, the road from Lomé to Kara.
+  const splash = page.getByTestId('travel-splash')
+  // Read as soon as it shows: it closes by itself once Kara is drawn (2.6 s at least).
+  await expect(splash).toBeVisible()
+  const shown = (await splash.textContent()) ?? ''
+  expect(shown).toContain('En route vers Kara')
+  expect(shown).toContain('Lomé → Kara')
+  await page.screenshot({ path: testInfo.outputPath('travel-splash.png') })
+
   // Arrival: the locality switched, the sheet closed, Kara's chunks and buildings stream in.
   await expect.poll(async () => (await live())?.locality).toBe('kara')
   await expect(page.getByRole('heading', { name: 'Explorer Lomé' })).toBeHidden()
@@ -70,6 +79,8 @@ test('travel Lomé → Kara → Lomé inside the single 3D world', async ({ page
   expect(kara?.lastEvent).toMatch(/Arrivée à Kara/)
   expect(kara?.estateBuildings).toBe(estate)
   expect(await page.locator('canvas').count()).toBe(1)
+  // Once Kara's street is drawn (and the journey seen), the game is back.
+  await expect(splash).toBeHidden()
   // Kara's own places appear in the Explorer sheet, none of Lomé's.
   await openMap()
   await expect(page.getByRole('button', { name: /Grand marché de Kara/ })).toBeVisible()
@@ -106,9 +117,12 @@ test('travel Lomé → Kara → Lomé inside the single 3D world', async ({ page
     .getByRole('button', { name: /Voyager vers Lomé/ })
     .first()
     .click()
+  await expect(splash).toBeVisible()
+  expect(await splash.textContent()).toContain('En route vers Lomé')
   await expect.poll(async () => (await live())?.locality).toBe('lome')
   expect((await live())?.estateBuildings).toBe(estate)
   await expect.poll(async () => (await live())?.chunks ?? 0, { timeout: 30000 }).toBeGreaterThan(0)
+  await expect(splash).toBeHidden()
   await settle()
   await page.waitForTimeout(1000)
   expect(errors).toEqual([])

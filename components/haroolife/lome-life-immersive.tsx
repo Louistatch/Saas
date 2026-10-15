@@ -159,6 +159,7 @@ import DiagOverlay, { initialDiag, rememberDiag } from './city/diag-overlay'
 import Joystick, { useKeyboardInput } from './city/joystick'
 import MarketPanel from './city/market-panel'
 import NationalMap from './city/national-map'
+import TravelSplash from './city/travel-splash'
 import OnboardingSteps from './city/onboarding'
 import LiveChat from './live-chat'
 import { PAGNES } from './pagnes'
@@ -472,6 +473,13 @@ export function LomeLifeImmersive() {
   const [playerKey, setPlayerKey] = useState<string | null>(null)
   const [playerNote, setPlayerNote] = useState('')
   const [chatRoom, setChatRoom] = useState<string | null>(null)
+  // The journey between two towns, shown full screen while the arrival town loads.
+  const [journey, setJourney] = useState<{
+    from: LocalityId
+    to: LocalityId
+    hours: number
+  } | null>(null)
+  const endJourney = useCallback(() => setJourney(null), [])
   const [mode, setMode] = useState<Mode>('walk')
   const [building, setBuilding] = useState<BuildType>('house')
   const [selection, setSelection] = useState<{ x: number; y: number } | null>(null)
@@ -1336,6 +1344,9 @@ export function LomeLifeImmersive() {
       if (to in CITIES) next = { ...next, life: selectCity(next.life, to) }
       return travelTo(next, to)
     })
+    // The change of map is shown while the new town loads (its street reports its tiles).
+    setJourney({ from: cityLife.locality, to, hours: trip.hours })
+    setChunkStats({ chunks: 0, buildings: 0, tris: 0, detailed: false })
     // Arriving in another town is a departure like any other: back to the game camera.
     if (mapView) exitMap()
     const gate = LOCALITIES[to].gate
@@ -1442,6 +1453,15 @@ export function LomeLifeImmersive() {
           />
         )}
       </div>
+      {journey && (
+        <TravelSplash
+          from={journey.from}
+          to={journey.to}
+          hours={journey.hours}
+          ready={cityLife.locality === journey.to && chunkStats.chunks > 0}
+          onDone={endJourney}
+        />
+      )}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-[#203d49]/40 via-[#203d49]/10 to-transparent" />
       {riding && cityLife.route.length > 0 && !insideAny && webgl !== false && (
         <RideOverlay

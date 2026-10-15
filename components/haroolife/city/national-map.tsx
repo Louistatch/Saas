@@ -16,7 +16,7 @@ interface Shape {
   rings: Ring[]
   region?: string | null
 }
-const data = boundaries as unknown as {
+export const data = boundaries as unknown as {
   source: { attribution: string; license: string; boundaryYear: string }
   country: Shape & { bbox: [number, number, number, number] }
   regions: Shape[]
@@ -25,8 +25,8 @@ const data = boundaries as unknown as {
 
 const [minX, minY, maxX, maxY] = data.country.bbox
 const PAD = 0.12
-const W = 240
-const H = 440
+export const W = 240
+export const H = 440
 // Equirectangular with the latitude scale of the country's middle: a map, not a survey.
 const kx = Math.cos((((minY + maxY) / 2) * Math.PI) / 180)
 const sx = (W - 2 * PAD * W) / ((maxX - minX) * kx)
@@ -34,14 +34,14 @@ const sy = (H - 2 * PAD * H) / (maxY - minY)
 const scale = Math.min(sx, sy)
 const ox = (W - (maxX - minX) * kx * scale) / 2
 const oy = (H - (maxY - minY) * scale) / 2
-const px = (lon: number) => ox + (lon - minX) * kx * scale
-const py = (lat: number) => oy + (maxY - lat) * scale
-const path = (rings: Ring[]) =>
+export const px = (lon: number) => ox + (lon - minX) * kx * scale
+export const py = (lat: number) => oy + (maxY - lat) * scale
+export const path = (rings: Ring[]) =>
   rings
     .map((r) => `M${r.map(([x, y]) => `${px(x).toFixed(1)},${py(y).toFixed(1)}`).join('L')}Z`)
     .join(' ')
 
-const REGION_FILL: Record<string, string> = {
+export const REGION_FILL: Record<string, string> = {
   'Savanes Region': '#e9d9a6',
   'Kara Region': '#d9cf8f',
   'Centrale Region': '#cfd79a',
