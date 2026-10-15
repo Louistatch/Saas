@@ -148,7 +148,7 @@ import {
 } from '@/lib/haroolife/lome-life-engine'
 import { placeResidents, residentsAt } from '@/lib/haroolife/lome-presence'
 import { BILLBOARDS, PARTNER_APPS, billboardById } from '@/lib/haroolife/lome-sponsors'
-import { STREET_VENDORS, TOGO_JOBS } from '@/lib/haroolife/togo-social-life'
+import { STREET_VENDORS, TOGO_JOBS, TOGO_JOB_IDS } from '@/lib/haroolife/togo-social-life'
 import { type BuildType, CATALOG } from '@/lib/haroolife/townsmen-engine'
 import { ROLE_LABELS } from '@/lib/haroolife/world'
 import {
@@ -243,7 +243,7 @@ const BUILDINGS: BuildType[] = [
   'well',
   'park',
 ]
-const JOBS: Career[] = ['vendeur', 'boulanger', 'agent-communal']
+const JOBS: Career[] = TOGO_JOB_IDS
 const VENUE_LABELS: Record<string, string> = {
   house: 'Maison',
   market: 'Marché',

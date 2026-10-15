@@ -32,6 +32,7 @@ export const TOGO_JOBS = {
 } as const satisfies Record<string, { label: string; icon: string; venue: JobVenue; wage: number }>
 
 export type TogoJobId = keyof typeof TOGO_JOBS
+export const TOGO_JOB_IDS = Object.keys(TOGO_JOBS) as TogoJobId[]
 
 export const STREET_VENDORS = [
   {

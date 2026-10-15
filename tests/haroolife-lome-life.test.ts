@@ -82,6 +82,9 @@ test('jobs pay once a day only near workplace with municipal funds', () => {
   assert.equal(interact(paid, 'work').wallet, paid.wallet)
   assert.equal(jobVenue('boulanger'), 'bakery')
   assert.equal(selectJob(paid, 'agent-communal').job, 'agent-communal')
+  assert.equal(jobVenue('livreur'), 'market')
+  assert.equal(jobVenue('conducteur-tricycle'), 'hall')
+  assert.equal(selectJob(paid, 'vendeur-mobile-money').job, 'vendeur-mobile-money')
 })
 test('construction preserves city budget and personal savings', () => {
   const s = initialLomeLife()
