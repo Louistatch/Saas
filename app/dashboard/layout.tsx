@@ -26,6 +26,7 @@ import {
   type LucideIcon,
   Map as MapIcon,
   Menu,
+  MoreHorizontal,
   PhoneCall,
   Settings,
   Shield,
@@ -429,23 +430,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { currentCooperative, cooperatives } = useCooperative()
   const { user } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const pathname = usePathname()
+
+  const mobileTabs = [
+    { href: '/dashboard', label: 'Accueil', icon: Home },
+    { href: '/dashboard/members', label: 'Membres', icon: Users },
+    { href: '/dashboard/cards', label: 'Cartes', icon: IdCard },
+    { href: '/dashboard/agrimarket', label: 'Activités', icon: BarChart3 },
+  ]
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen flex bg-background">
+      <div className="min-h-screen flex bg-[#f7f8f3]">
         {/* Desktop sidebar — fixed */}
-        <aside className="hidden md:flex md:flex-col md:w-60 lg:w-64 shrink-0 border-r border-border bg-card sticky top-0 h-screen">
+        <aside className="hidden xl:flex xl:flex-col xl:w-72 shrink-0 border-r border-border bg-card sticky top-0 h-screen">
           <SidebarContent />
         </aside>
 
         {/* Mobile: Sheet overlay */}
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild>
-            <button
-              type="button"
-              aria-label="Ouvrir le menu"
-              className="md:hidden fixed top-3 left-3 z-50 flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background shadow-sm text-muted-foreground hover:text-foreground"
-            >
+            <button type="button" aria-label="Ouvrir le menu" className="hidden">
               <Menu className="h-5 w-5" />
             </button>
           </SheetTrigger>
@@ -457,26 +462,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Main content */}
         <main className="flex-1 flex flex-col min-w-0 overflow-auto">
           {/* Top bar */}
-          <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-background/80 backdrop-blur-sm px-4 md:px-6 py-3">
-            {/* Mobile: spacer for hamburger button */}
-            <div className="md:hidden w-9" />
-
+          <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between border-b border-border bg-background/90 px-4 py-3 backdrop-blur-md sm:px-6">
             {/* Desktop: cooperative name */}
-            <div className="hidden md:block">
+            <div className="hidden xl:block">
               <p className="text-sm font-semibold text-foreground">
                 {currentCooperative?.name || 'Tableau de bord'}
               </p>
             </div>
 
             {/* Mobile: logo centered */}
-            <div className="md:hidden flex-1 flex justify-center">
+            <div className="flex min-w-0 items-center gap-3 xl:hidden">
               <Logo size="sm" />
+              <span className="hidden h-7 w-px bg-border sm:block" />
+              <p className="hidden max-w-56 truncate text-sm font-medium text-muted-foreground sm:block">
+                {currentCooperative?.name || 'Tableau de bord'}
+              </p>
             </div>
 
             {/* Right: cooperative switcher + notification bell */}
             <div className="flex items-center gap-2">
               {user?.role === 'super_admin' && cooperatives.length > 1 && (
-                <CoopSwitcher className="hidden h-8 w-44 text-xs md:block" />
+                <CoopSwitcher className="hidden h-8 w-44 text-xs xl:block" />
               )}
               <ServiceLauncher role={user?.role} />
               {currentCooperative && <NotificationBell cooperativeId={currentCooperative.id} />}
@@ -485,8 +491,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <ViewAsBanner />
 
           {/* Page content */}
-          <div className="flex-1 p-4 md:p-6 lg:p-8">{children}</div>
+          <div className="flex-1 px-4 pb-28 pt-5 sm:px-6 lg:px-8 xl:pb-10 xl:pt-8">{children}</div>
           <SupportButton />
+
+          <nav
+            aria-label="Navigation principale"
+            className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-5 rounded-2xl border border-border bg-white/95 p-1.5 shadow-[0_12px_40px_rgba(15,23,42,0.18)] backdrop-blur-xl xl:hidden"
+          >
+            {mobileTabs.map((tab) => {
+              const Icon = tab.icon
+              const active =
+                tab.href === '/dashboard' ? pathname === tab.href : pathname.startsWith(tab.href)
+              return (
+                <Link
+                  key={tab.href}
+                  href={tab.href}
+                  className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-medium transition-all active:scale-95 ${active ? 'bg-emerald-50 text-emerald-800' : 'text-slate-500'}`}
+                >
+                  <Icon className="h-5 w-5" />
+                  {tab.label}
+                </Link>
+              )
+            })}
+            <button
+              type="button"
+              onClick={() => setMobileOpen(true)}
+              className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-medium text-slate-500 transition-all active:scale-95"
+            >
+              <MoreHorizontal className="h-5 w-5" />
+              Plus
+            </button>
+          </nav>
         </main>
       </div>
     </ProtectedRoute>

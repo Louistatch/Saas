@@ -68,20 +68,22 @@ export function ViewAsPanel() {
     .filter((o) => now - new Date(o.created_at).getTime() < RECENT_MS)
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
   return (
-    <section aria-labelledby="viewas-title" className="space-y-3">
-      <h2 id="viewas-title" className="text-lg font-semibold text-foreground">
-        Voir comme
-      </h2>
-      <p className="text-sm text-muted-foreground">
-        Ouvrez l’espace de chaque rôle pour voir ce qu’il voit et agir à sa place.
-      </p>
-      <div className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-end">
+    <section aria-labelledby="viewas-title" className="space-y-4">
+      <div>
+        <h2 id="viewas-title" className="text-xl font-semibold text-foreground">
+          Accéder à un espace
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Ouvrez l’espace de chaque rôle pour voir ce qu’il voit et agir à sa place.
+        </p>
+      </div>
+      <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-end">
         <label className="flex-1 space-y-1 text-sm font-medium text-foreground">
           Coopérative, union ou faîtière
           <select
             value={coopId}
             onChange={(e) => setCoopId(e.target.value)}
-            className="w-full rounded-md border border-border bg-background p-2 text-sm"
+            className="min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm"
           >
             <option value="">Choisir une organisation</option>
             {recent.length > 0 && (
@@ -109,17 +111,17 @@ export function ViewAsPanel() {
             setBusy(true)
             await openCooperative(coopId)
           }}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          className="min-h-11 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
         >
           {busy ? 'Ouverture…' : 'Ouvrir son tableau de bord'}
         </button>
       </div>
-      <ul className="grid gap-2 sm:grid-cols-3">
+      <ul className="grid gap-3 sm:grid-cols-3">
         {VIEW_AS_SPACES.slice(1).map((s) => (
           <li key={s.href}>
             <a
               href={s.href}
-              className="block rounded-xl border border-border bg-card px-4 py-3 hover:border-primary"
+              className="block min-h-24 rounded-xl border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary hover:shadow-md"
             >
               <span className="block text-sm font-medium text-foreground">{s.label}</span>
               <span className="block text-xs text-muted-foreground">{s.hint}</span>
