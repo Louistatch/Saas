@@ -1,7 +1,7 @@
 # HarooLife D4P — hébergement du relais Socket.IO : Railway ou Vercel WebSocket
 
-Date : 13 octobre 2026. Rien n'a été provisionné : chaque option ci-dessous engage une dépense et
-attend une autorisation explicite.
+Date : 13 octobre 2026. Mise à jour du 15 octobre 2026 : **déployé sur Railway** avec l'accord du
+fondateur (voir « Déploiement » en fin de document).
 
 ## Ce qu'il faut héberger
 
@@ -61,3 +61,23 @@ Aucune ressource n'a été créée.
 - Vercel, *Functions › WebSockets* (exemple Socket.IO, `transports: ['websocket']`, fermeture à
   la durée maximale, messages épinglés à une instance).
 - Railway, *Public networking › Specs and limits* (WebSockets exemptés des délais), *Pricing*.
+
+## Déploiement (15 octobre 2026)
+
+- **Base** : migrations `20261013_120000_haroolife_realtime_chat` et `20261015_130000_haroolife_chat_dm`
+  appliquées en production. Tables fermées (RLS, aucun accès direct) ; fonctions réservées aux comptes
+  connectés, jamais à `anon`.
+- **Relais** : service Railway `haroolife-realtime`, projet `agritogo`, environnement `production`,
+  région `europe-west4`, veille désactivée, redémarrage sur échec.
+  - Construit par `npm run realtime:build` (un fichier, esbuild), lancé par `npm run realtime:start`.
+  - Contrôle de santé : `/health`.
+  - Adresse : `https://haroolife-realtime-production.up.railway.app`.
+- **Variables du relais** : `SUPABASE_URL`, `SUPABASE_ANON_KEY` (clé publique, jamais la clé
+  service_role), `HAROOLIFE_REALTIME_ORIGINS=https://www.faitierehub.com,https://faitierehub.com`,
+  `HAROOLIFE_REALTIME_DISABLED=false`.
+- **Site (Vercel, production)** : `NEXT_PUBLIC_HAROOLIFE_REALTIME_URL` pointe vers le relais ; la CSP
+  (`connect-src`) l'ajoute d'elle-même.
+- **Coupe-circuit** : `HAROOLIFE_REALTIME_DISABLED=true` sur le service Railway. Le jeu repasse alors
+  aux messages de la place par HTTP, sans redéploiement du site.
+- **Retour arrière complet** : retirer la variable côté Vercel, arrêter le service Railway, puis appliquer
+  les retours arrière SQL (`supabase/rollbacks/`) dans l'ordre inverse.
