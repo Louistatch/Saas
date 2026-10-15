@@ -28,6 +28,13 @@ import {
   routeOf,
 } from '@/lib/haroolife/city/coaches'
 import {
+  CAMERA_MODE_STORAGE,
+  STREET_CAMERA_MODES,
+  type StreetCameraMode,
+  isStreetCameraMode,
+  nextStreetCameraMode,
+} from '@/lib/haroolife/city/camera-modes'
+import {
   type Fare,
   bearingTo,
   canDrop,
@@ -147,6 +154,7 @@ import { ROLE_LABELS } from '@/lib/haroolife/world'
 import {
   ArrowRight,
   Bell,
+  Camera,
   Check,
   Clock3,
   Hammer,
@@ -448,6 +456,7 @@ export function LomeLifeImmersive() {
    * view keeps the close camera and shows no town-wide filters or names.
    */
   const [mapView, setMapView] = useState(false)
+  const [cameraMode, setCameraMode] = useState<StreetCameraMode>('follow')
   const playHeading = useRef(35)
   const [showNames, setShowNames] = useState(false)
   const [chunkStats, setChunkStats] = useState({
@@ -459,6 +468,17 @@ export function LomeLifeImmersive() {
   const frameRef = useRef({ drawCalls: 0, fps: 0 })
   const [quality, setQuality] = useState<Quality>('balanced')
   useEffect(() => setQuality(detectQuality()), [])
+  useEffect(() => {
+    let saved: string | null = null
+    try {
+      saved = localStorage.getItem(CAMERA_MODE_STORAGE)
+    } catch {
+      /* storage can be blocked; the normal follow camera remains available */
+    }
+    const mode = isStreetCameraMode(saved) ? saved : 'follow'
+    setCameraMode(mode)
+    controller.camera.distance = STREET_CAMERA_MODES[mode].distance
+  }, [controller])
   // Adaptive quality: when frames stay slow for two consecutive checks the preset steps down
   // (the machine, not the player, decides), so the interface never freezes behind the renderer.
   // With hysteresis: three slow checks step down, a fast minute steps back up (never above
@@ -1318,10 +1338,22 @@ export function LomeLifeImmersive() {
     const rig = controller.camera
     rig.follow = true
     rig.angle = playHeading.current
-    rig.distance = FOLLOW_DISTANCE
+    rig.distance = STREET_CAMERA_MODES[cameraMode].distance
     setCamera((c) => ({ ...c, distance: rig.distance, angle: rig.angle }))
     setShowNames(false)
     setMapView(false)
+  }
+  function cycleCameraMode() {
+    const next = nextStreetCameraMode(cameraMode)
+    setCameraMode(next)
+    controller.camera.follow = true
+    controller.camera.distance = STREET_CAMERA_MODES[next].distance
+    setCamera((old) => ({ ...old, distance: controller.camera.distance }))
+    try {
+      localStorage.setItem(CAMERA_MODE_STORAGE, next)
+    } catch {
+      /* the selected mode still works for this session */
+    }
   }
   function open(id: Exclude<Sheet, null>) {
     setPanel((cur) => (cur === id ? null : id))
@@ -1946,6 +1978,18 @@ export function LomeLifeImmersive() {
             />
           </div>
           <div className="pointer-events-auto flex flex-col items-end gap-2">
+            {!insideAny && !riding && (
+              <button
+                type="button"
+                onClick={cycleCameraMode}
+                aria-label={`${STREET_CAMERA_MODES[cameraMode].label}. Changer de caméra`}
+                title="Changer la distance de la caméra"
+                className="flex min-h-11 items-center gap-2 rounded-full border border-white/70 bg-white/95 px-3 py-2 text-xs font-black text-slate-800 shadow-lg backdrop-blur"
+              >
+                <Camera size={18} className="text-emerald-700" />
+                {STREET_CAMERA_MODES[cameraMode].shortLabel}
+              </button>
+            )}
             {driving && hail && !fare && (
               <button
                 type="button"
