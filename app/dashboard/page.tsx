@@ -305,9 +305,11 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-500">
-      <section className="relative overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-emerald-900 via-emerald-800 to-emerald-700 p-6 text-white shadow-lg sm:p-8">
-        <div className="absolute -right-14 -top-20 h-64 w-64 rounded-full bg-emerald-400/20 blur-2xl" />
-        <div className="absolute -bottom-24 right-16 h-52 w-52 rounded-full bg-lime-300/10 blur-2xl" />
+      <section
+        className="relative overflow-hidden rounded-[1.75rem] bg-emerald-900 bg-cover bg-center p-6 text-white shadow-lg sm:p-8"
+        style={{ backgroundImage: "url('/images/dashboard/cooperative-hero.webp')" }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-r from-emerald-950/30 via-emerald-950/10 to-transparent" />
         <div className="relative max-w-2xl space-y-4">
           <p className="text-sm font-medium text-emerald-100">
             {new Intl.DateTimeFormat('fr-FR', {
@@ -331,7 +333,7 @@ export default function DashboardPage() {
             <Plus className="h-5 w-5" /> Ajouter un membre
           </Link>
         </div>
-        <Sparkles className="absolute bottom-7 right-8 h-16 w-16 text-emerald-300/25" />
+        <Sparkles className="absolute bottom-7 right-8 h-16 w-16 text-emerald-100/20" />
       </section>
 
       {/* Seconde couche du compte : ne s'affiche que si Haroo n'est pas

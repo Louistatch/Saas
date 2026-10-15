@@ -8,8 +8,10 @@ export function HarooLifeEntry() {
       href="/haroolife"
       // Le monde 3D est lourd : on ne le précharge pas depuis le tableau de bord, il se charge au clic.
       prefetch={false}
-      className="group relative flex min-h-48 overflow-hidden rounded-[1.5rem] border border-emerald-100 bg-gradient-to-br from-white via-emerald-50 to-emerald-100 p-6 text-emerald-950 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-4 sm:min-h-52 sm:p-8"
+      className="group relative flex min-h-48 overflow-hidden rounded-[1.5rem] border border-emerald-100 bg-emerald-50 bg-cover bg-center p-6 text-emerald-950 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-4 sm:min-h-52 sm:p-8"
+      style={{ backgroundImage: "url('/images/dashboard/haroolife-territory.webp')" }}
     >
+      <span className="absolute inset-0 bg-gradient-to-r from-[#fffdf2] via-[#fffdf2]/95 to-transparent sm:via-[#fffdf2]/75" />
       <span className="relative z-10 flex max-w-md flex-col items-start justify-center">
         <span className="block text-2xl font-bold">HarooLife · Votre territoire</span>
         <span className="mt-2 text-sm leading-relaxed text-emerald-900/75 sm:text-base">
@@ -19,8 +21,6 @@ export function HarooLifeEntry() {
           <MapPinned className="h-5 w-5" /> Ouvrir
         </span>
       </span>
-      <span className="absolute -bottom-14 -right-12 h-60 w-60 rounded-full border-[34px] border-emerald-300/35" />
-      <span className="absolute bottom-14 right-16 h-20 w-20 rounded-full border-[15px] border-emerald-500/25" />
       <ArrowRight
         aria-hidden="true"
         className="absolute bottom-8 right-8 h-6 w-6 text-emerald-800 transition-transform group-hover:translate-x-1"
