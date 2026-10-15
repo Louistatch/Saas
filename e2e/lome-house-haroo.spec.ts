@@ -357,3 +357,93 @@ test('HarooLife street and clear map: walk, places without overlap, sheet, route
     .not.toBeNull()
   expect(errors).toEqual([])
 })
+
+test('HarooLife street billboards: built near, read, learn more, statistics', async ({
+  page,
+  context,
+}, testInfo) => {
+  test.setTimeout(180_000)
+  const mobile = /mobile/.test(testInfo.project.name)
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  type Ads = { built: string[]; showing: Record<string, string>; impressions: number }
+  const ads = () =>
+    page.evaluate(() => (window as unknown as { __LOME_ADS?: Ads }).__LOME_ADS ?? null)
+  type P = { x: number; z: number; camera: { angle: number } }
+  const me = () =>
+    page.evaluate(() => (window as unknown as { __LOME_PLAYER?: P }).__LOME_PLAYER ?? null)
+  await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () => (window as unknown as { __LOME_STREET?: { engine: string } }).__LOME_STREET?.engine,
+        ),
+      { timeout: 60000 },
+    )
+    .toBe('haroo')
+  // Both supports near the arrival are built, each with its poster, at a small geometric cost.
+  await expect.poll(async () => (await ads())?.built.length ?? 0, { timeout: 15000 }).toBe(2)
+  const own = await page.evaluate(() => {
+    const s = (
+      window as unknown as { __LOME_SCENE?: import('../lib/haroolife/engine/types').SceneProbe }
+    ).__LOME_SCENE
+    return {
+      g: s?.geometry('^Panneau (lome|kara)-') ?? { matches: 0, triangles: 0 },
+      names: ['Panneau lome-avenue', 'Affiche lome-avenue', 'Panneau lome-jardin'].map((n) =>
+        Boolean(s?.has(n)),
+      ),
+    }
+  })
+  expect(own.names).toEqual([true, true, true])
+  expect(own.g.matches).toBe(2)
+  expect(own.g.triangles / own.g.matches, 'triangles per support').toBeLessThan(100)
+
+  // Walk next to the avenue support: « Lire l'annonce » appears.
+  const read = page.getByTestId('ad-read')
+  for (let i = 0; i < 80; i++) {
+    const p = await me()
+    if (!p) break
+    const dx = 48.1 - p.x
+    const dz = 36.2 - p.z
+    if (Math.hypot(dx, dz) < 0.35) break
+    const a = (p.camera.angle * Math.PI) / 180
+    const up = -dx * Math.sin(a) - dz * Math.cos(a)
+    const right = dx * Math.cos(a) - dz * Math.sin(a)
+    const key =
+      Math.abs(up) > Math.abs(right)
+        ? up > 0
+          ? 'ArrowUp'
+          : 'ArrowDown'
+        : right > 0
+          ? 'ArrowRight'
+          : 'ArrowLeft'
+    await page.keyboard.down(key)
+    await page.waitForTimeout(140)
+    await page.keyboard.up(key)
+  }
+  await expect(read).toBeVisible({ timeout: 5000 })
+  await page.screenshot({ path: testInfo.outputPath('haroo-billboard-street.png') })
+  await (mobile ? read.tap() : read.click())
+  await expect(page.getByTestId('ad-focus')).toBeVisible()
+  const popup = context.waitForEvent('page')
+  await page.getByTestId('ad-learn-more').click()
+  const tab = await popup
+  expect(new URL(tab.url()).pathname).toMatch(/^\/(marche|haroo|contact)/)
+  await tab.close()
+  await page.getByRole('button', { name: 'Retour au jeu' }).click()
+
+  // Aggregated statistics: the click is counted, nothing personal is sent.
+  const sent = page.waitForRequest(
+    (r) => r.url().endsWith('/api/haroolife/ads/events') && r.method() === 'POST',
+  )
+  await page.evaluate(() =>
+    (window as unknown as { __LOME_ADS_FLUSH?: () => void }).__LOME_ADS_FLUSH?.(),
+  )
+  const body = (await sent).postDataJSON() as {
+    items: { placement: string; clicks: number }[]
+  }
+  expect(body.items.some((i) => i.placement === 'lome-avenue' && i.clicks === 1)).toBe(true)
+  expect(JSON.stringify(body)).not.toMatch(/@|user|email|phone/)
+  expect(errors).toEqual([])
+})

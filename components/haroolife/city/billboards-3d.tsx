@@ -12,7 +12,9 @@ import {
   PLACEMENTS,
   ROTATION_MS,
   campaignFor,
-  exposed,
+  supportNear,
+  supportsSeen,
+  supportsToBuild,
 } from '@/lib/haroolife/ads/campaigns'
 import type { ExposureTracker } from '@/lib/haroolife/ads/exposure'
 import { POSTER_H, POSTER_W, drawPoster, loadPosterImage } from '@/lib/haroolife/ads/poster'
@@ -23,8 +25,7 @@ import * as pc from 'playcanvas'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { worldPos } from './city-chunks'
 
-export const NEAR = 26
-export const FAR = 34
+export { FAR, NEAR } from '@/lib/haroolife/ads/campaigns'
 const YAW = { N: 180, E: 90, S: 0, W: 270 } as const
 
 export interface AdsDebug {
@@ -180,32 +181,13 @@ export default function Billboards({
     const id = window.setInterval(() => {
       const p = controller.pos
       setBuilt((cur) => {
-        const next = here
-          .filter((b) => {
-            const d = Math.hypot(b.x - p.x, b.y - p.z)
-            return cur.includes(b.id) ? d <= FAR : d <= NEAR
-          })
-          .map((b) => b.id)
+        const next = supportsToBuild(here, p, cur)
         return next.length === cur.length && next.every((x, i) => x === cur[i]) ? cur : next
       })
-      // The camera's eye: behind the target along its azimuth (see player.ts cameraBasis).
-      const cam = controller.camera
-      const a = (cam.angle * Math.PI) / 180
-      const back = cam.distance * 0.55
-      const eye = {
-        x: cam.tx + Math.sin(a) * back,
-        z: cam.tz + Math.cos(a) * back,
-        angle: cam.angle,
-      }
-      const visible = here
-        .filter((b) => showingRef.current[b.id] && exposed(b, eye))
-        .map((b) => ({ campaign: showingRef.current[b.id].id, placement: b.id }))
+      const visible = supportsSeen(here, showingRef.current, controller.camera)
       impressions.current += tracker.observe(Date.now(), visible)
       // Standing by a support, on foot, on its front side: offer to read it.
-      const close = controller.driving
-        ? null
-        : (here.find((b) => Math.hypot(b.x - p.x, b.y - p.z) <= 2.2 && showingRef.current[b.id]) ??
-          null)
+      const close = supportNear(here, showingRef.current, p, controller.driving)
       const key = close?.id ?? null
       if (key !== near) {
         near = key

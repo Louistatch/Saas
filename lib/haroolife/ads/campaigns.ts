@@ -243,3 +243,49 @@ export function exposed(
   const cos = (dx * -Math.sin(a) + dz * -Math.cos(a)) / d
   return cos >= Math.cos(((fovDeg / 2) * Math.PI) / 180)
 }
+
+/** Supports are built within NEAR cells of the player and freed beyond FAR (hysteresis). */
+export const NEAR = 26
+export const FAR = 34
+
+/** Supports to keep built around the player (`built`: those built so far). Pure. */
+export function supportsToBuild(
+  here: readonly AdPlacement[],
+  pos: { x: number; z: number },
+  built: readonly string[],
+): string[] {
+  return here
+    .filter((b) => {
+      const d = Math.hypot(b.x - pos.x, b.y - pos.z)
+      return built.includes(b.id) ? d <= FAR : d <= NEAR
+    })
+    .map((b) => b.id)
+}
+
+/**
+ * Faces seen now, for the exposure counter: the camera's eye is behind its target along its
+ * azimuth (see player.ts cameraBasis). Pure.
+ */
+export function supportsSeen(
+  here: readonly AdPlacement[],
+  showing: Readonly<Record<string, AdCampaign>>,
+  cam: { tx: number; tz: number; distance: number; angle: number },
+): { campaign: string; placement: string }[] {
+  const a = (cam.angle * Math.PI) / 180
+  const back = cam.distance * 0.55
+  const eye = { x: cam.tx + Math.sin(a) * back, z: cam.tz + Math.cos(a) * back, angle: cam.angle }
+  return here
+    .filter((b) => showing[b.id] && exposed(b, eye))
+    .map((b) => ({ campaign: showing[b.id].id, placement: b.id }))
+}
+
+/** The support the player stands by, on foot, showing a campaign (« Lire l'annonce »). Pure. */
+export function supportNear(
+  here: readonly AdPlacement[],
+  showing: Readonly<Record<string, AdCampaign>>,
+  pos: { x: number; z: number },
+  driving: boolean,
+): AdPlacement | null {
+  if (driving) return null
+  return here.find((b) => Math.hypot(b.x - pos.x, b.y - pos.z) <= 2.2 && showing[b.id]) ?? null
+}

@@ -6,7 +6,12 @@
  * One engine per mount, disposed on unmount.
  */
 import type { PlayerController } from '@/lib/haroolife/city/player'
-import { StreetWorld } from '@/lib/haroolife/game/render/street-world'
+import {
+  type StreetAds,
+  type StreetPoseFeed,
+  StreetWorld,
+} from '@/lib/haroolife/game/render/street-world'
+import type { PresenceEntry } from '@/lib/haroolife/realtime/protocol'
 import type { Building } from '@/lib/haroolife/townsmen-engine'
 import { useEffect, useRef, useState } from 'react'
 
@@ -16,6 +21,13 @@ export default function HarooStreetView(props: {
   avatarPagne?: string
   estate: readonly Building[]
   pixelRatio: number
+  /** Town on screen (billboard supports are per town). */
+  locality: string
+  /** Street billboards (campaigns, exposure, nearby support); null when switched off. */
+  ads?: StreetAds | null
+  /** Other players in this town (realtime relay). */
+  remoteFeed?: StreetPoseFeed
+  remotePresent?: PresenceEntry[]
   onPlayerEvents: (events: ReturnType<PlayerController['drain']>, c: PlayerController) => void
   onLot: (lotId: string) => void
   onCell: (cell: { x: number; y: number }) => void
@@ -28,7 +40,8 @@ export default function HarooStreetView(props: {
   const live = useRef(props)
   live.current = props
 
-  const { controller, avatarModel, avatarPagne, pixelRatio, estate } = props
+  const { controller, avatarModel, avatarPagne, pixelRatio, estate, locality, remoteFeed } = props
+  const { ads, remotePresent } = props
   // biome-ignore lint/correctness/useExhaustiveDependencies: the estate is pushed below without remounting
   useEffect(() => {
     const c = canvas.current
@@ -43,6 +56,9 @@ export default function HarooStreetView(props: {
       pagne: avatarPagne,
       estate: live.current.estate,
       pixelRatio,
+      locality,
+      ads: live.current.ads ?? null,
+      remote: remoteFeed ? { feed: remoteFeed, present: live.current.remotePresent ?? [] } : null,
       events: {
         onEvents: (events, ctl) => live.current.onPlayerEvents(events, ctl),
         onLot: (id) => live.current.onLot(id),
@@ -58,10 +74,17 @@ export default function HarooStreetView(props: {
       world.current = null
       w.dispose()
     }
-  }, [controller, avatarModel, avatarPagne, pixelRatio])
+  }, [controller, avatarModel, avatarPagne, pixelRatio, locality, remoteFeed])
   useEffect(() => {
     if (state === 'ready') world.current?.setEstate(estate)
   }, [estate, state])
+  // Campaigns and presence change without rebuilding the street.
+  useEffect(() => {
+    if (state === 'ready') world.current?.setAds(ads ?? null)
+  }, [ads, state])
+  useEffect(() => {
+    if (state === 'ready') world.current?.setPresent(remotePresent ?? [])
+  }, [remotePresent, state])
 
   return (
     <div className="relative h-full w-full" data-engine="haroo" data-scene="street">

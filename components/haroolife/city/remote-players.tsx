@@ -7,10 +7,18 @@
  * without any React update per frame. React only learns when a player appears, leaves, or
  * switches between idle / walk / run / drive.
  */
-import { AVATAR_MODELS, pagneColor } from '@/lib/haroolife/city/avatar'
+import { pagneColor } from '@/lib/haroolife/city/avatar'
 import { STREET_SCALE } from '@/lib/haroolife/city/avatar-catalogue'
 import { DEFAULT_CONFIG } from '@/lib/haroolife/city/player'
 import { CELL } from '@/lib/haroolife/city/world'
+import {
+  INTERP_DELAY_MS,
+  MAX_SHOWN,
+  STALE_MS,
+  type Sample,
+  remoteModel,
+  sampleAt,
+} from '@/lib/haroolife/realtime/interpolate'
 import type { Pose, PresenceEntry } from '@/lib/haroolife/realtime/protocol'
 import { useAppEvent } from '@playcanvas/react/hooks'
 import type * as pc from 'playcanvas'
@@ -21,47 +29,7 @@ import { worldPos } from './city-chunks'
 export interface PoseFeed {
   onPose(fn: (s: { key: string; pose: Pose }) => void): () => void
 }
-type Sample = { at: number; x: number; z: number; heading: number }
-/** Render this far in the past: two snapshots at 5–8 Hz always bracket it. */
-export const INTERP_DELAY_MS = 220
-const MAX_SHOWN = 12
-/** Other players are drawn as dressed adults (never a mini character). */
-const ADULTS = AVATAR_MODELS.filter((m) => m.family === 'quaternius')
-const STALE_MS = 4000
-
-const hash = (s: string) => {
-  let h = 0
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0
-  return Math.abs(h)
-}
-const lerpAngle = (a: number, b: number, t: number) => {
-  const d = ((((b - a) % 360) + 540) % 360) - 180
-  return a + d * t
-}
-
-/** Pure: the interpolated pose at `at` from time-ordered samples (exported for tests). */
-export function sampleAt(samples: Sample[], at: number): Sample | null {
-  if (!samples.length) return null
-  if (at <= samples[0].at) return samples[0]
-  for (let i = samples.length - 1; i >= 0; i--) {
-    const a = samples[i]
-    if (a.at <= at) {
-      const b = samples[i + 1]
-      if (!b) {
-        // Past the newest sample: hold (no extrapolation beyond the last known point).
-        return a
-      }
-      const t = (at - a.at) / Math.max(1, b.at - a.at)
-      return {
-        at,
-        x: a.x + (b.x - a.x) * t,
-        z: a.z + (b.z - a.z) * t,
-        heading: lerpAngle(a.heading, b.heading, t),
-      }
-    }
-  }
-  return samples[0]
-}
+export { INTERP_DELAY_MS, sampleAt } from '@/lib/haroolife/realtime/interpolate'
 
 export default function RemotePlayers({
   feed,
@@ -147,7 +115,7 @@ export default function RemotePlayers({
       {shown.map((p) => {
         const first = buffers.current.get(p.key)?.[0]
         const start = first ? worldPos(first.x, first.z) : worldPos(0, 0)
-        const model = ADULTS[hash(p.key) % ADULTS.length].id
+        const model = remoteModel(p.key)
         const mode = modes[p.key] ?? 'idle'
         return (
           <Character

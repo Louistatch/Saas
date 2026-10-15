@@ -1124,6 +1124,10 @@ export default function CityWorld({
             avatarPagne={avatarPagne}
             estate={hasEstate ? city.buildings : []}
             pixelRatio={renderPixelRatio(quality)}
+            locality={locality}
+            ads={ads && ads.campaigns.length > 0 ? ads : null}
+            remoteFeed={remoteFeed}
+            remotePresent={remotePresent}
             onPlayerEvents={onPlayerEvents}
             onLot={(id) => {
               const lot = lotById(id)

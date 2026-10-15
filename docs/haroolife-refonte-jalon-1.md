@@ -159,3 +159,24 @@ Les tests de bout en bout de la suite complète sont à 44 réussis et 3 ignoré
 - `DEFAULT_STREET = 'haroo'` : `/haroolife` ouvre la rue et la carte claire du moteur HarooLife.
 - Retour en arrière, retenu sur l'appareil : `?street=playcanvas`. Cette rue PlayCanvas garde ce que la nouvelle n'a pas encore : les panneaux publicitaires dans la rue, les autres joueurs à l'écran, le modèle du taxi et la conduite.
 - Les tests de bout en bout écrits pour la ville PlayCanvas (densité, panneaux, présence, temps réel, taxi) la testent toujours, grâce à l'option `street: 'playcanvas'` du fixture. Le parcours par défaut (maison, commerce, rue et carte) est testé avec `street: 'haroo'`.
+
+---
+
+# Panneaux et autres joueurs dans la nouvelle rue
+
+- **Panneaux.** Ce sont les mêmes supports (`PLACEMENTS`), la même rotation (`campaignFor`, `ROTATION_MS`) et la même affiche (`drawPoster`, image optionnelle).
+  - Ils sont construits à moins de 26 cellules et libérés au-delà de 34.
+  - L'exposition est comptée par le même `ExposureTracker`, une face vue pendant 1 s au moins.
+  - « Lire l'annonce » apparaît à moins de 2,2 cellules d'un panneau, à pied.
+  - Le clic « En savoir plus » et l'envoi groupé des statistiques n'ont pas changé.
+  - La logique commune (`supportsToBuild`, `supportsSeen`, `supportNear`) est sortie du composant PlayCanvas vers `lib/haroolife/ads/campaigns.ts`. Les deux rues l'utilisent.
+- **Autres joueurs.** Ce sont les mêmes poses du relais temps réel, interpolées 220 ms dans le passé (`sampleAt`, déplacé vers `lib/haroolife/realtime/interpolate.ts`).
+  - Chaque joueur est une figure adulte habillée, stable d'une session à l'autre, avec son pagne. Elle est nommée `Joueur <nom>`.
+  - 12 joueurs au plus sont affichés. Un joueur silencieux depuis 4 s est masqué.
+  - Un joueur qui quitte la présence est retiré.
+- **Tests de bout en bout :**
+  - le scénario temps réel tourne sur les deux rues ;
+  - un scénario « panneaux » couvre la nouvelle rue : 2 supports, moins de 100 triangles par support, « Lire l'annonce », « En savoir plus », statistiques ;
+  - le fixture épingle la rue au niveau du contexte, si bien que les pages ouvertes par un test suivent le même choix.
+
+Il reste à porter dans la nouvelle rue le modèle du taxi et la conduite. Le taxi n'y est pour l'instant qu'un volume jaune.

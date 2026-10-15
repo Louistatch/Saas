@@ -1,3 +1,16 @@
+import {
+  type AdCampaign,
+  type AdPlacement,
+  PLACEMENTS,
+  ROTATION_MS,
+  campaignFor,
+  supportNear,
+  supportsSeen,
+  supportsToBuild,
+} from '@/lib/haroolife/ads/campaigns'
+import type { ExposureTracker } from '@/lib/haroolife/ads/exposure'
+import { POSTER_H, POSTER_W, drawPoster, loadPosterImage } from '@/lib/haroolife/ads/poster'
+import { pagneColor } from '@/lib/haroolife/city/avatar'
 /**
  * HarooLife engine — the street (imperative Three.js). Draws the neighbourhood around the player
  * from the Saas city data (`core/street.ts`) in the prototype's style: orthographic three-quarter
@@ -16,7 +29,7 @@ import {
   recolorMap,
 } from '@/lib/haroolife/city/avatar-catalogue'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
-import type { PlayerController } from '@/lib/haroolife/city/player'
+import { DEFAULT_CONFIG, type PlayerController } from '@/lib/haroolife/city/player'
 import {
   type GroundKind,
   STREET_CELL,
@@ -24,6 +37,16 @@ import {
   type StreetWindow,
   streetWindow,
 } from '@/lib/haroolife/game/core/street'
+import {
+  INTERP_DELAY_MS,
+  MAX_SHOWN,
+  STALE_MS,
+  type Sample,
+  remoteAnim,
+  remoteModel,
+  sampleAt,
+} from '@/lib/haroolife/realtime/interpolate'
+import type { Pose, PresenceEntry } from '@/lib/haroolife/realtime/protocol'
 import type { Building } from '@/lib/haroolife/townsmen-engine'
 import * as THREE from 'three'
 import { type GLTF, GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
@@ -76,6 +99,42 @@ export interface StreetWorldOptions {
   estate: readonly Building[]
   events: StreetWorldEvents
   pixelRatio?: number
+  /** Town on screen (billboard supports are per town). */
+  locality: string
+  /** Street billboards: campaigns, the exposure counter, the support the player stands by. */
+  ads?: StreetAds | null
+  /** Other players in this town (realtime relay): snapshots and who is present. */
+  remote?: { feed: StreetPoseFeed; present: PresenceEntry[] } | null
+}
+
+export interface StreetAds {
+  campaigns: AdCampaign[]
+  tracker: ExposureTracker
+  onNear: (p: { placement: AdPlacement; campaign: AdCampaign } | null) => void
+}
+export interface StreetPoseFeed {
+  onPose(fn: (s: { key: string; pose: Pose }) => void): () => void
+}
+
+/** Billboard yaw per face (degrees), as the PlayCanvas street: the poster looks at its road. */
+const BOARD_YAW = { N: 180, E: 90, S: 0, W: 270 } as const
+/** Billboards were drawn for 1.2-unit figures: scaled to the adult avatar. */
+const BOARD_SCALE = FIGURE / 1.2
+
+interface Board {
+  placement: AdPlacement
+  root: THREE.Group
+  canvas: HTMLCanvasElement
+  texture: THREE.CanvasTexture
+  material: THREE.MeshBasicMaterial
+  shown: string | null
+}
+
+interface Remote {
+  key: string
+  name: string
+  person: Person | null
+  loading: boolean
 }
 
 interface Person {
@@ -120,6 +179,23 @@ export class StreetWorld {
   private walkers: Walker[] = []
   private readonly avatarModel: string
   private readonly pagne?: string
+  private readonly locality: string
+  private ads: StreetAds | null
+  private readonly supports: AdPlacement[]
+  private boards = new Map<string, Board>()
+  private showing: Record<string, AdCampaign> = {}
+  private nearBoard: string | null = null
+  private impressions = 0
+  private adsTimer = 0
+  private rotationTimer = 0
+  private readonly posterGeometry = new THREE.PlaneGeometry(1, 1)
+  private readonly gltfCache = new Map<string, Promise<GLTF>>()
+  private remoteFeed: StreetPoseFeed | null = null
+  private unsubscribe: (() => void) | null = null
+  private present: PresenceEntry[] = []
+  private readonly buffers = new Map<string, Sample[]>()
+  private readonly modes = new Map<string, string>()
+  private readonly remotes = new Map<string, Remote>()
   private width = 1
   private height = 1
   private raf = 0
@@ -162,6 +238,13 @@ export class StreetWorld {
     this.estate = o.estate
     this.avatarModel = o.avatarModel
     this.pagne = o.pagne
+    this.locality = o.locality
+    this.ads = o.ads ?? null
+    this.supports = PLACEMENTS.filter((p) => p.locality === o.locality)
+    if (o.remote) {
+      this.remoteFeed = o.remote.feed
+      this.present = o.remote.present
+    }
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true })
     this.renderer.setPixelRatio(o.pixelRatio ?? Math.min(window.devicePixelRatio || 1, 1.7))
     this.renderer.shadowMap.enabled = true
@@ -213,6 +296,8 @@ export class StreetWorld {
       this.play(person, clipFor(person.spec, 'walk'))
       person.actions.get(person.current)?.setEffectiveTimeScale(1)
     }
+    this.startAds()
+    this.startRemote()
     this.publishProbe()
     this.last = performance.now()
     this.raf = requestAnimationFrame(this.frame)
@@ -234,6 +319,14 @@ export class StreetWorld {
     this.canvas.removeEventListener('pointercancel', this.onPointerCancel)
     this.resizeObserver.disconnect()
     this.clearWindow()
+    window.clearInterval(this.adsTimer)
+    window.clearTimeout(this.rotationTimer)
+    for (const id of [...this.boards.keys()]) this.dropBoard(id)
+    this.posterGeometry.dispose()
+    this.unsubscribe?.()
+    this.unsubscribe = null
+    for (const r of this.remotes.values()) if (r.person) this.disposePerson(r.person)
+    this.remotes.clear()
     for (const w of this.walkers) this.disposePerson(w.person)
     this.walkers = []
     if (this.player) this.disposePerson(this.player)
@@ -253,18 +346,29 @@ export class StreetWorld {
         }
       })
     this.renderer.dispose()
-    const w = window as unknown as { __LOME_STREET?: unknown; __LOME_SCENE?: unknown }
+    const w = window as unknown as {
+      __LOME_STREET?: unknown
+      __LOME_SCENE?: unknown
+      __LOME_ADS?: unknown
+    }
     w.__LOME_STREET = undefined
     w.__LOME_SCENE = undefined
+    w.__LOME_ADS = undefined
+    if (this.nearBoard) this.ads?.onNear(null)
   }
 
   // ── construction ─────────────────────────────────────────────────────────────────────────
 
   private load(url: string): Promise<GLTF> {
-    return this.loader.loadAsync(url).then((g) => {
-      this.loaded.push(g)
-      return g
-    })
+    let p = this.gltfCache.get(url)
+    if (!p) {
+      p = this.loader.loadAsync(url).then((g) => {
+        this.loaded.push(g)
+        return g
+      })
+      this.gltfCache.set(url, p)
+    }
+    return p
   }
 
   private mat(color: string): THREE.MeshStandardMaterial {
@@ -604,6 +708,7 @@ export class StreetWorld {
       this.car.rotation.y = (v.heading * Math.PI) / 180
     }
     this.stepWalkers(dt)
+    this.stepRemotes(dt)
     this.updateCamera()
     const p = new THREE.Vector3()
     for (const m of this.markers) {
@@ -623,6 +728,206 @@ export class StreetWorld {
       this.frames = 0
       this.statsAt = now
       this.publishProbe()
+    }
+  }
+
+  // ── billboards (same supports, rotation, exposure and « Lire l'annonce » as before) ────────
+
+  /** New campaigns (API refresh, kill switch): faces are redrawn on the next tick. */
+  setAds(ads: StreetAds | null): void {
+    this.ads = ads
+    this.rotate()
+    if (!ads) for (const id of [...this.boards.keys()]) this.dropBoard(id)
+  }
+
+  private startAds(): void {
+    this.rotate()
+    // Rotation: on the rotation boundary, then every ROTATION_MS (all players see the same face).
+    const wait = ROTATION_MS - (Date.now() % ROTATION_MS)
+    this.rotationTimer = window.setTimeout(() => {
+      this.rotate()
+      this.rotationTimer = window.setInterval(() => this.rotate(), ROTATION_MS)
+    }, wait)
+    // Streaming, exposure and proximity: 4 Hz, off the render loop.
+    this.adsTimer = window.setInterval(() => this.tickAds(), 250)
+    this.tickAds()
+  }
+
+  private rotate(): void {
+    const now = Date.now()
+    const m: Record<string, AdCampaign> = {}
+    if (this.ads)
+      for (const p of this.supports) {
+        const c = campaignFor(p, this.ads.campaigns, now)
+        if (c) m[p.id] = c
+      }
+    this.showing = m
+    for (const b of this.boards.values()) this.paint(b)
+  }
+
+  private tickAds(): void {
+    if (this.disposed) return
+    const ctl = this.controller
+    const ads = this.ads
+    const wanted = ads
+      ? supportsToBuild(this.supports, ctl.pos, [...this.boards.keys()]).filter(
+          (id) => this.showing[id],
+        )
+      : []
+    for (const id of [...this.boards.keys()]) if (!wanted.includes(id)) this.dropBoard(id)
+    for (const id of wanted) if (!this.boards.has(id)) this.buildBoard(id)
+    if (ads) {
+      this.impressions += ads.tracker.observe(
+        Date.now(),
+        supportsSeen(this.supports, this.showing, ctl.camera),
+      )
+      const close = supportNear(this.supports, this.showing, ctl.pos, ctl.driving)
+      const key = close?.id ?? null
+      if (key !== this.nearBoard) {
+        this.nearBoard = key
+        ads.onNear(close ? { placement: close, campaign: this.showing[close.id] } : null)
+      }
+    }
+    ;(window as unknown as { __LOME_ADS?: unknown }).__LOME_ADS = {
+      built: [...this.boards.keys()],
+      showing: Object.fromEntries(Object.entries(this.showing).map(([k, v]) => [k, v.id])),
+      textures: this.boards.size,
+      impressions: this.impressions,
+    }
+  }
+
+  private buildBoard(id: string): void {
+    const placement = this.supports.find((p) => p.id === id)
+    if (!placement) return
+    const root = new THREE.Group()
+    root.name = `Panneau ${id}`
+    root.position.set(placement.x * U, 0, placement.y * U)
+    root.rotation.y = THREE.MathUtils.degToRad(BOARD_YAW[placement.faces])
+    root.scale.setScalar(BOARD_SCALE)
+    const metal = this.mat('#383d45')
+    // Square steel posts and the frame: 12 triangles per box.
+    for (const [x, y, w, h] of [
+      [-0.72, 0.8, 0.09, 1.6],
+      [0.72, 0.8, 0.09, 1.6],
+      [0, 2.05, 1.95, 1.2],
+    ] as const) {
+      const m = new THREE.Mesh(this.unitBox, metal)
+      m.scale.set(w, h, w === 1.95 ? 0.08 : 0.09)
+      m.position.set(x, y, -0.06)
+      m.castShadow = true
+      root.add(m)
+    }
+    const canvas = document.createElement('canvas')
+    canvas.width = POSTER_W
+    canvas.height = POSTER_H
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.colorSpace = THREE.SRGBColorSpace
+    texture.anisotropy = 4
+    // Lit like a backlit street panel: readable at dusk too.
+    const material = new THREE.MeshBasicMaterial({ map: texture, toneMapped: false })
+    const poster = new THREE.Mesh(this.posterGeometry, material)
+    poster.name = `Affiche ${id}`
+    poster.scale.set(1.82, 1.04, 1)
+    poster.position.set(0, 2.05, -0.015)
+    root.add(poster)
+    this.scene.add(root)
+    const board: Board = { placement, root, canvas, texture, material, shown: null }
+    this.boards.set(id, board)
+    this.paint(board)
+  }
+
+  private paint(b: Board): void {
+    const c = this.showing[b.placement.id]
+    if (!c) return
+    const key = `${c.id}@${c.version}`
+    if (b.shown === key) return
+    b.shown = key
+    drawPoster(b.canvas, c)
+    b.texture.needsUpdate = true
+    void loadPosterImage(c).then((img) => {
+      if (!img || this.disposed || this.boards.get(b.placement.id) !== b || b.shown !== key) return
+      drawPoster(b.canvas, c, img)
+      b.texture.needsUpdate = true
+    })
+  }
+
+  private dropBoard(id: string): void {
+    const b = this.boards.get(id)
+    if (!b) return
+    b.root.removeFromParent()
+    b.texture.dispose()
+    b.material.dispose()
+    this.boards.delete(id)
+  }
+
+  // ── other players (realtime relay), interpolated between snapshots ────────────────────────
+
+  /** Who is in town now (presence): others who left are removed. */
+  setPresent(present: PresenceEntry[]): void {
+    this.present = present
+    const keys = new Set(present.map((p) => p.key))
+    for (const [k, r] of this.remotes)
+      if (!keys.has(k)) {
+        if (r.person) this.disposePerson(r.person)
+        this.remotes.delete(k)
+      }
+    for (const k of this.buffers.keys()) if (!keys.has(k)) this.buffers.delete(k)
+  }
+
+  private startRemote(): void {
+    if (!this.remoteFeed) return
+    this.unsubscribe = this.remoteFeed.onPose(({ key, pose }) => {
+      const list = this.buffers.get(key) ?? []
+      list.push({ at: performance.now(), x: pose.x, z: pose.z, heading: pose.heading })
+      if (list.length > 20) list.splice(0, list.length - 20)
+      this.buffers.set(key, list)
+      this.modes.set(key, pose.mode)
+      if (!this.remotes.has(key)) this.spawnRemote(key)
+    })
+  }
+
+  private spawnRemote(key: string): void {
+    const who = this.present.find((p) => p.key === key)
+    if (!who || this.remotes.size >= MAX_SHOWN) return
+    const r: Remote = { key, name: who.name, person: null, loading: true }
+    this.remotes.set(key, r)
+    const spec = avatarSpec(remoteModel(key))
+    void this.load(spec.url)
+      .then((g) => {
+        if (this.disposed || this.remotes.get(key) !== r) return
+        r.person = this.makePerson(g, spec, pagneColor(who.pagne))
+        r.person.root.name = `Joueur ${who.name}`
+        this.scene.add(r.person.root)
+        r.loading = false
+      })
+      .catch(() => {
+        r.loading = false
+      })
+  }
+
+  private stepRemotes(dt: number): void {
+    const now = performance.now()
+    const at = now - INTERP_DELAY_MS
+    for (const r of this.remotes.values()) {
+      const p = r.person
+      const list = this.buffers.get(r.key)
+      if (!p || !list?.length) continue
+      // Forget samples older than the bracket still needed.
+      while (list.length > 2 && list[1].at < at) list.shift()
+      const s = sampleAt(list, at)
+      if (!s) continue
+      p.root.position.set(s.x * U, 0, s.z * U)
+      p.root.rotation.y = (s.heading * Math.PI) / 180
+      p.root.visible = now - list[list.length - 1].at < STALE_MS
+      const anim = remoteAnim(this.modes.get(r.key) ?? 'idle')
+      const clip = clipFor(p.spec, anim === 'drive' ? 'idle' : anim)
+      this.play(p, clip)
+      if (anim === 'walk' || anim === 'run') {
+        const speed = (anim === 'run' ? DEFAULT_CONFIG.runSpeed : DEFAULT_CONFIG.walkSpeed) * U
+        const natural = p.spec.pace[anim] * FIGURE
+        p.actions.get(p.current)?.setEffectiveTimeScale(Math.min(3, Math.max(0.5, speed / natural)))
+      } else p.actions.get(p.current)?.setEffectiveTimeScale(1)
+      p.mixer.update(dt)
     }
   }
 
@@ -667,7 +972,22 @@ export class StreetWorld {
         })
         return n
       },
-      geometry: () => ({ matches: 0, triangles: 0 }),
+      geometry: (pattern: string) => {
+        const re = new RegExp(pattern)
+        let matches = 0
+        let triangles = 0
+        scene.traverse((o) => {
+          if (!re.test(o.name)) return
+          matches++
+          o.traverse((c) => {
+            const mesh = c as THREE.Mesh
+            if (!mesh.isMesh) return
+            const geo = mesh.geometry
+            triangles += (geo.index ? geo.index.count : geo.attributes.position.count) / 3
+          })
+        })
+        return { matches, triangles }
+      },
       gpu: () => ({
         textures: this.renderer.info.memory.textures,
         buffers: this.renderer.info.memory.geometries,

@@ -16,8 +16,9 @@ export const test = base.extend<{
   // through the remembered `?street=playcanvas` choice, which stays the way back.
   street: ['playcanvas', { option: true }],
   streetEngine: [
-    async ({ page, street }, use) => {
-      await page.addInitScript((engine) => {
+    // On the context: pages a spec opens itself (context.newPage()) get the same street.
+    async ({ context, street }, use) => {
+      await context.addInitScript((engine) => {
         try {
           localStorage.setItem('haroolife.street', engine)
         } catch {
