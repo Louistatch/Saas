@@ -63,6 +63,8 @@ const LOCAL_RPC: Record<string, string[]> = {
   haroolife_dm_read: ['p_room'],
   haroolife_chat_history: ['p_room', 'p_after', 'p_before', 'p_limit'],
   haroolife_chat_send: ['p_room', 'p_body', 'p_client_id'],
+  haroolife_money_send: ['p_key', 'p_amount', 'p_note', 'p_client_id'],
+  haroolife_money_claim: [],
 }
 
 export type LocalChat = ChatRepository & {
@@ -127,7 +129,7 @@ export async function pgliteChat(migrationPaths: string | string[]): Promise<Loc
     rpc: (t, fn, args) => {
       const names = LOCAL_RPC[fn]
       if (!names) return null
-      const params = names.map((n, i) => `$${i + 1}`).join(',')
+      const params = names.map((_, i) => `$${i + 1}`).join(',')
       return run(
         t,
         `SELECT ${fn}(${params})`,

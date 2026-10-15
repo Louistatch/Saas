@@ -122,6 +122,8 @@ import {
   placeNameAt,
 } from '@/lib/haroolife/lome-districts'
 import { eventById, resolveEvent } from '@/lib/haroolife/lome-events'
+import { claimMoney, sendMoney } from '@/lib/haroolife/money'
+import { uuid } from '@/lib/haroolife/realtime/client'
 import {
   type Action,
   type Career,
@@ -496,6 +498,9 @@ export function LomeLifeImmersive() {
   // A player touched in the street (presence key), and the conversation to open in the phone.
   const [playerKey, setPlayerKey] = useState<string | null>(null)
   const [playerNote, setPlayerNote] = useState('')
+  // Game money to another player: amount, a word, and one clientId per attempt (never paid twice).
+  const [gift, setGift] = useState({ amount: '1000', note: '', busy: false })
+  const giftClient = useRef<string | null>(null)
   const [chatRoom, setChatRoom] = useState<string | null>(null)
   // A conversation with a passer-by of the game (never stored, never sent anywhere).
   const [npcTalk, setNpcTalk] = useState<{ from: 'me' | 'npc'; text: string }[]>([])
@@ -1107,6 +1112,90 @@ export function LomeLifeImmersive() {
     }, 250)
     return () => window.clearInterval(id)
   }, [fare, controller])
+  // Money other players sent: collected once when the game opens, then every half minute.
+  useEffect(() => {
+    if (!loaded) return
+    let stop = false
+    const collect = async () => {
+      if (document.visibilityState !== 'visible') return
+      const got = await claimMoney()
+      if (stop || !got?.length) return
+      const total = got.reduce((n, g) => n + g.amount, 0)
+      const lines = got.map(
+        (g) => `${g.from.name} t’a envoyé ${money(g.amount)}${g.note ? ` : « ${g.note} »` : ''}.`,
+      )
+      setCityLife((old) => ({
+        ...old,
+        life: {
+          ...old.life,
+          wallet: Math.min(100_000_000, old.life.wallet + total),
+          lastEvent: lines[lines.length - 1],
+          events: [...lines.reverse(), ...old.life.events].slice(0, 8),
+        },
+      }))
+      setNotice(
+        got.length === 1 ? lines[0] : `Tu as reçu ${money(total)} de ${got.length} joueurs.`,
+      )
+    }
+    void collect()
+    const id = window.setInterval(() => void collect(), 30_000)
+    return () => {
+      stop = true
+      window.clearInterval(id)
+    }
+  }, [loaded])
+  async function giveMoney(key: string, name: string) {
+    const amount = Math.floor(Number(gift.amount))
+    if (!Number.isFinite(amount) || amount < 1 || amount > 50000) {
+      setPlayerNote('Choisis un montant entre 1 et 50 000 FCFA.')
+      return
+    }
+    if (life.wallet < amount) {
+      setPlayerNote(`Il te manque ${money(amount - life.wallet)} pour envoyer ${money(amount)}.`)
+      return
+    }
+    giftClient.current ??= uuid()
+    setGift((g) => ({ ...g, busy: true }))
+    const r = await sendMoney(key, amount, gift.note, giftClient.current)
+    setGift((g) => ({ ...g, busy: false }))
+    if ('error' in r) {
+      setPlayerNote(r.error)
+      return
+    }
+    giftClient.current = null
+    const line = `Tu as envoyé ${money(r.amount)} à ${r.to.name ?? name}.`
+    setCityLife((old) => ({
+      ...old,
+      life: {
+        ...old.life,
+        wallet: Math.max(0, old.life.wallet - r.amount),
+        lastEvent: line,
+        events: [line, ...old.life.events].slice(0, 8),
+      },
+    }))
+    setGift({ amount: gift.amount, note: '', busy: false })
+    setPlayerNote(line)
+  }
+  // End-to-end tests only: open a player's sheet by their key (finding them in the street
+  // would make the test depend on where they walked).
+  useEffect(() => {
+    let e2e = false
+    try {
+      e2e = localStorage.getItem('haroolife.e2e') === '1'
+    } catch {
+      e2e = false
+    }
+    if (!e2e) return
+    const w = window as unknown as { __LOME_OPEN_PLAYER?: (key: string) => void }
+    w.__LOME_OPEN_PLAYER = (key) => {
+      setPlayerKey(key)
+      setPlayerNote('')
+      setPanel('player')
+    }
+    return () => {
+      w.__LOME_OPEN_PLAYER = undefined
+    }
+  }, [])
   // Probe for the tests: the driver's job as the game sees it.
   useEffect(() => {
     ;(window as unknown as { __LOME_FARE?: unknown }).__LOME_FARE = {
@@ -3085,6 +3174,70 @@ export function LomeLifeImmersive() {
                             🚩 Signaler
                           </button>
                         </div>
+                        <form
+                          aria-label={`Envoyer de l’argent à ${name}`}
+                          className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-3"
+                          onSubmit={(e) => {
+                            e.preventDefault()
+                            void giveMoney(playerKey, name)
+                          }}
+                        >
+                          <p className="text-sm font-black">💸 Envoyer de l’argent du jeu</p>
+                          <div className="flex flex-wrap gap-1">
+                            {[500, 1000, 2000, 5000].map((v) => (
+                              <button
+                                type="button"
+                                key={v}
+                                aria-pressed={gift.amount === String(v)}
+                                onClick={() => {
+                                  giftClient.current = null
+                                  setGift((g) => ({ ...g, amount: String(v) }))
+                                }}
+                                className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ${
+                                  gift.amount === String(v)
+                                    ? 'bg-amber-500 text-white ring-amber-500'
+                                    : 'bg-white text-slate-800 ring-amber-200'
+                                }`}
+                              >
+                                {money(v)}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="flex gap-2">
+                            <input
+                              aria-label="Montant en FCFA"
+                              inputMode="numeric"
+                              value={gift.amount}
+                              onChange={(e) => {
+                                giftClient.current = null
+                                setGift((g) => ({
+                                  ...g,
+                                  amount: e.target.value.replace(/[^0-9]/g, '').slice(0, 5),
+                                }))
+                              }}
+                              className="w-24 rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm"
+                            />
+                            <input
+                              aria-label="Un mot (facultatif)"
+                              value={gift.note}
+                              maxLength={80}
+                              placeholder="Un mot (facultatif)"
+                              onChange={(e) => setGift((g) => ({ ...g, note: e.target.value }))}
+                              className="min-w-0 flex-1 rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm"
+                            />
+                          </div>
+                          <button
+                            type="submit"
+                            disabled={gift.busy || blocked}
+                            className="w-full rounded-xl bg-amber-500 px-3 py-3 text-sm font-black text-white disabled:opacity-50"
+                          >
+                            {gift.busy ? 'Envoi…' : `Envoyer ${money(Number(gift.amount) || 0)}`}
+                          </button>
+                          <p className="text-[11px] text-slate-600">
+                            Argent du jeu uniquement. Au plus 50 000 FCFA par envoi et 100 000 par
+                            jour.
+                          </p>
+                        </form>
                         {playerNote && (
                           <output className="block rounded-xl bg-amber-50 p-3 text-xs font-semibold text-amber-900">
                             {playerNote}

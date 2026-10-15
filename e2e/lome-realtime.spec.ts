@@ -1,5 +1,5 @@
-import { type Browser, type BrowserContext, type Page, devices } from '@playwright/test'
 import { createHash, randomUUID } from 'node:crypto'
+import { type Browser, type BrowserContext, type Page, devices } from '@playwright/test'
 import { type Socket, io } from 'socket.io-client'
 import { expect, test } from './lome-test'
 
@@ -429,6 +429,61 @@ test('a private message is seen and answered from the dashboard, and the answer 
   })
   expect(refused.status).toBe(403)
 
+  expect(ama.errors).toEqual([])
+  expect(kofi.errors).toEqual([])
+  await ama.context.close()
+  await kofi.context.close()
+})
+
+test('game money sent to another player reaches their game once', async ({ browser }, testInfo) => {
+  test.setTimeout(180_000)
+  test.skip(/mobile/.test(testInfo.project.name), 'opens its own desktop contexts')
+  const wallet = (page: Page) =>
+    page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem('haroolife.lome-city.v1') || 'null')?.life
+          ?.wallet as number,
+    )
+  const run = Date.now().toString(36)
+  // Ama in the game (test hooks on: her sheet of Kofi opens by his key).
+  const ama = await signIn(browser, 'ama', devices['Desktop Chrome'])
+  await ama.context.addInitScript(() => localStorage.setItem('haroolife.e2e', '1'))
+  await ama.page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
+  await expect(ama.page.locator('canvas:visible').first()).toBeVisible({ timeout: 30000 })
+  await expect.poll(() => wallet(ama.page), { timeout: 20000 }).toBeGreaterThan(0)
+  // Nothing waiting for Ama from earlier runs once her game has collected.
+  await ama.page.waitForTimeout(1500)
+  const amaBefore = await wallet(ama.page)
+  await ama.page.evaluate(
+    (key) =>
+      (window as unknown as { __LOME_OPEN_PLAYER?: (k: string) => void }).__LOME_OPEN_PLAYER?.(key),
+    keyOf(ACCOUNTS.kofi),
+  )
+  const form = ama.page.getByRole('form', { name: /Envoyer de l’argent à/ })
+  await expect(form).toBeVisible()
+  await form.getByRole('button', { name: '1 000 FCFA', exact: false }).first().click()
+  await form.getByLabel('Un mot (facultatif)').fill(`pour l’essence ${run}`)
+  await form.getByRole('button', { name: /^Envoyer 1/ }).click()
+  await expect(ama.page.getByTestId('player-sheet')).toContainText('Tu as envoyé 1')
+  await expect.poll(() => wallet(ama.page)).toBe(amaBefore - 1000)
+
+  // Kofi opens his game: the money is collected once, with Ama's word.
+  const kofi = await signIn(browser, 'kofi', devices['Desktop Chrome'])
+  await kofi.page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
+  await expect(kofi.page.locator('canvas:visible').first()).toBeVisible({ timeout: 30000 })
+  await expect
+    .poll(
+      () =>
+        kofi.page.evaluate(
+          () =>
+            (JSON.parse(localStorage.getItem('haroolife.lome-city.v1') || 'null')?.life?.events ??
+              []) as string[],
+        ),
+      { timeout: 20000 },
+    )
+    .toContainEqual(expect.stringContaining(`pour l’essence ${run}`))
+  // Collected once: nothing is left to claim for Kofi.
+  expect(await rpcAs('kofi', 'haroolife_money_claim')).toEqual([])
   expect(ama.errors).toEqual([])
   expect(kofi.errors).toEqual([])
   await ama.context.close()
