@@ -18,6 +18,11 @@ rue en PlayCanvas, intérieurs en React Three Fiber + Rapier (défaut `three`).
 | Ville = nappe uniforme de tours (30 lots ≥ 6 étages, 30,4 % de surface bâtie) | Remplissage aléatoire sans zones | Zone industrielle (80 lots d'entrepôts, citernes, conteneurs, kits city-industrial), parcs plus fréquents, immeubles de remplissage plafonnés ; tours réservées aux lieux nommés. Mesure : 27,1 % bâti, 1 lot ≥ 6 étages. Identifiants des lieux conservés |
 | Discussion avec un PNJ impossible dans la maison | `socialize` refusé hors des lieux publics | Règle du domaine étendue à la maison ; fiche « Personnage du jeu (PNJ) » → Saluer et discuter |
 
+| Approche bloquée par les machines voisines (salle, mobile) | Ligne droite vers le point d'approche à travers les autres équipements | Chemin A* sur une grille de 0,25 u autour des meubles |
+| Joueur entièrement caché à la sortie de la maison | Le parc de la parcelle se trouvait entre la caméra et la porte | Découpe : les objets hauts de la parcelle sur la ligne de visée sont masqués puis rétablis |
+| Carte qui se refermait pendant une marche ; bouton qui disparaissait sous le doigt | La carte se fermait à chaque pas d'un itinéraire, puis via un effet décalé d'une image | Fermeture dans la même action que le départ d'une marche ou d'un trajet |
+| Entrepôts sans action | Nouveau type de lieu sans activité | « Petit boulot » du domaine (une fois par jour) |
+
 ## Reste à vérifier / limites connues
 
 - Conversation privée entre joueurs, transfert de monnaie de jeu, invitations/visites : non livrés dans cette tranche (le prompt les place après le parcours de base ; ils exigent un contrat serveur et des migrations).
