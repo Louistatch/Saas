@@ -5,7 +5,29 @@ import { test as base } from '@playwright/test'
  * with Chromium's CPU throttling (n× slower), which reproduces the GitHub runner locally:
  * the suite must stay green there without any timeout being raised.
  */
-export const test = base.extend<{ cpuThrottle: void; returningPlayer: void }>({
+export const test = base.extend<{
+  cpuThrottle: void
+  returningPlayer: void
+  street: 'haroo' | 'playcanvas'
+  streetEngine: void
+}>({
+  // Engine of the street. The HarooLife engine is the default in the game; the specs written
+  // for the PlayCanvas city (billboards, other players, taxi, chunk density) keep testing it
+  // through the remembered `?street=playcanvas` choice, which stays the way back.
+  street: ['playcanvas', { option: true }],
+  streetEngine: [
+    async ({ page, street }, use) => {
+      await page.addInitScript((engine) => {
+        try {
+          localStorage.setItem('haroolife.street', engine)
+        } catch {
+          /* blocked storage */
+        }
+      }, street)
+      await use()
+    },
+    { auto: true },
+  ],
   // Every scenario plays as someone who already chose a look: the new-game appearance sheet
   // (opened on a device with no choice yet) is covered by lome-avatar.spec.ts, which clears it.
   returningPlayer: [

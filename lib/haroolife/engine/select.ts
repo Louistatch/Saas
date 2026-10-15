@@ -51,13 +51,14 @@ export function currentRenderer(): RendererId {
 }
 
 /**
- * Which engine draws the street. `haroo`: the HarooLife engine (`StreetWorld`) and its clear
- * map; `playcanvas` (default until parity: billboards, other players, taxi model): the city as
- * before. `?street=` in the address is remembered on this device, like `?engine=`.
+ * Which engine draws the street. `haroo` (default): the HarooLife engine (`StreetWorld`) and its
+ * clear map; `playcanvas`: the city as before, with its billboards, other players and taxi model
+ * (the way back while the new street reaches them). `?street=` in the address is remembered on
+ * this device, like `?engine=`.
  */
 export type StreetEngine = 'haroo' | 'playcanvas'
 export const STREET_STORAGE = 'haroolife.street'
-export const DEFAULT_STREET: StreetEngine = 'playcanvas'
+export const DEFAULT_STREET: StreetEngine = 'haroo'
 const parseStreet = (v: string | null | undefined): StreetEngine | null =>
   v === 'haroo' || v === 'playcanvas' ? v : null
 

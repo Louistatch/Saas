@@ -321,8 +321,8 @@ export function LomeLifeImmersive() {
   // Renderer for the scenes it supports (?engine=three), read once on the client.
   const [renderer, setRenderer] = useState<RendererId>('playcanvas')
   useEffect(() => setRenderer(currentRenderer()), [])
-  // The street and its map: PlayCanvas by default, the HarooLife engine with ?street=haroo.
-  const [street, setStreet] = useState<StreetEngine>('playcanvas')
+  // The street and its map: the HarooLife engine by default, PlayCanvas with ?street=playcanvas.
+  const [street, setStreet] = useState<StreetEngine>('haroo')
   useEffect(() => setStreet(currentStreet()), [])
   const controller = useMemo(() => {
     const c = new PlayerController(

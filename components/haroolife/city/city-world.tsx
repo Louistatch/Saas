@@ -752,7 +752,7 @@ export default function CityWorld({
   remotePresent,
   ads,
   renderer = 'playcanvas',
-  street = 'playcanvas',
+  street = 'haroo',
   input,
   onLeave,
   mapView = false,

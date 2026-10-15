@@ -1,6 +1,9 @@
 import type { Page } from '@playwright/test'
 import { expect, openPlaces, test } from './lome-test'
 
+// The game as players get it now: the HarooLife street and its clear map.
+test.use({ street: 'haroo' })
+
 /**
  * Refonte, jalon 1: the house drawn by the HarooLife engine (imperative Three.js) on the normal
  * /haroolife. A clothed avatar walks the way the stick points (four directions and the
@@ -99,7 +102,7 @@ test('HarooLife house: walk, eat, sleep, save, leave and come back', async ({ pa
   page.on('pageerror', (e) => errors.push(e.message))
 
   await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
-  await expect(page.locator('canvas').first()).toBeVisible({ timeout: 30000 })
+  await expect(page.locator('canvas:visible').first()).toBeVisible({ timeout: 30000 })
   await page.getByRole('button', { name: 'Maison', exact: true }).click()
   await page.getByRole('button', { name: 'Rentrer chez moi' }).click()
   await expect
@@ -216,7 +219,7 @@ test('HarooLife market: travel, buy a meal once, talk to the seller, leave', asy
         },
     )
   await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
-  await expect(page.locator('canvas').first()).toBeVisible({ timeout: 30000 })
+  await expect(page.locator('canvas:visible').first()).toBeVisible({ timeout: 30000 })
   await openPlaces(page)
   await page
     .getByRole('group', { name: 'Filtrer la ville' })
@@ -277,5 +280,80 @@ test('HarooLife market: travel, buy a meal once, talk to the seller, leave', asy
 
   await page.getByRole('button', { name: 'Entrer ou sortir' }).click()
   await expect.poll(async () => (await live(page))?.inside ?? null).toBeNull()
+  expect(errors).toEqual([])
+})
+
+test('HarooLife street and clear map: walk, places without overlap, sheet, route on foot', async ({
+  page,
+}) => {
+  test.setTimeout(180_000)
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  type Player = { x: number; z: number; heading: number; mode: string; camera: { angle: number } }
+  const player = () =>
+    page.evaluate(() => (window as unknown as { __LOME_PLAYER?: Player }).__LOME_PLAYER ?? null)
+  await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            (window as unknown as { __LOME_STREET?: { engine: string; buildings: number } })
+              .__LOME_STREET ?? null,
+        ),
+      { timeout: 60000 },
+    )
+    .toMatchObject({ engine: 'haroo' })
+  // One engine draws the street: PlayCanvas is paused, no third canvas.
+  expect(await page.locator('canvas').count()).toBeLessThanOrEqual(2)
+
+  // Screen up walks away from the camera, facing forward.
+  const a = (await player()) as Player
+  await page.keyboard.down('ArrowUp')
+  await expect.poll(async () => (await player())?.mode).toMatch(/walk|run/)
+  await page.waitForTimeout(600)
+  const held = (await player()) as Player
+  await page.keyboard.up('ArrowUp')
+  const yaw = (a.camera.angle * Math.PI) / 180
+  const fwd = { x: -Math.sin(yaw), z: -Math.cos(yaw) }
+  const dx = held.x - a.x
+  const dz = held.z - a.z
+  const d = Math.hypot(dx, dz)
+  expect(d).toBeGreaterThan(0.3)
+  expect((dx * fwd.x + dz * fwd.z) / d).toBeGreaterThan(0.85)
+  const h = (held.heading * Math.PI) / 180
+  expect(Math.sin(h) * fwd.x + Math.cos(h) * fwd.z).toBeGreaterThan(0.85)
+
+  // The clear map: districts, places that never overlap, a sheet with the trip.
+  await page
+    .getByRole('navigation', { name: 'Navigation du jeu' })
+    .getByRole('button', { name: 'Carte' })
+    .click()
+  await expect(page.getByTestId('city-map')).toBeVisible()
+  const places = await page.locator('[data-place]').evaluateAll((els) =>
+    els.map((e) => {
+      const r = e.getBoundingClientRect()
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 }
+    }),
+  )
+  expect(places.length).toBeGreaterThan(5)
+  for (let i = 0; i < places.length; i++)
+    for (let j = i + 1; j < places.length; j++)
+      expect(
+        Math.hypot(places[i].x - places[j].x, places[i].y - places[j].y),
+        'markers never overlap',
+      ).toBeGreaterThanOrEqual(36)
+  await page.locator('[data-place]').first().click()
+  const sheet = page.getByRole('dialog', { name: 'Lieu' })
+  await expect(sheet).toBeVisible()
+  await expect(sheet.getByRole('button', { name: /À pied/ })).toBeVisible()
+  await sheet.getByRole('button', { name: /À pied/ }).click()
+  const confirm = sheet.getByRole('button', { name: 'Confirmer le trajet' })
+  if (await confirm.isVisible().catch(() => false)) await confirm.click()
+  // A real route is walked in the street, the map gives way to the game.
+  await expect(page.getByTestId('city-map')).toBeHidden({ timeout: 10000 })
+  await expect
+    .poll(async () => (await live(page)) as unknown as { route: number } | null)
+    .not.toBeNull()
   expect(errors).toEqual([])
 })

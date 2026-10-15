@@ -151,3 +151,11 @@ Les tests de bout en bout de la suite complète sont à 44 réussis et 3 ignoré
 
 - Dans la rue, le clavier fait courir. C'est la règle actuelle du `PlayerController` du Saas, qui court au-delà de 0,92 de déflexion, et la rue PlayCanvas fait pareil. À aligner sur la maison (Shift pour courir) dans une étape dédiée, car les tests du joueur existant en dépendent.
 - Les bâtiments sont des volumes stylisés : ce ne sont pas encore les modèles Kenney de la ville.
+
+---
+
+# La nouvelle rue par défaut
+
+- `DEFAULT_STREET = 'haroo'` : `/haroolife` ouvre la rue et la carte claire du moteur HarooLife.
+- Retour en arrière, retenu sur l'appareil : `?street=playcanvas`. Cette rue PlayCanvas garde ce que la nouvelle n'a pas encore : les panneaux publicitaires dans la rue, les autres joueurs à l'écran, le modèle du taxi et la conduite.
+- Les tests de bout en bout écrits pour la ville PlayCanvas (densité, panneaux, présence, temps réel, taxi) la testent toujours, grâce à l'option `street: 'playcanvas'` du fixture. Le parcours par défaut (maison, commerce, rue et carte) est testé avec `street: 'haroo'`.

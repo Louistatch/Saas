@@ -88,14 +88,17 @@ describe('shared prop shapes', () => {
 })
 
 describe('street engine selection', () => {
-  it('stays on PlayCanvas by default, ?street=haroo switches and is remembered', () => {
-    assert.deepEqual(resolveStreet('', null), { street: 'playcanvas', remember: null })
-    assert.deepEqual(resolveStreet('?street=haroo', null), { street: 'haroo', remember: 'haroo' })
-    assert.equal(resolveStreet('', 'haroo').street, 'haroo')
-    assert.deepEqual(resolveStreet('?street=playcanvas', 'haroo'), {
+  it('defaults to the HarooLife street; ?street=playcanvas is the remembered way back', () => {
+    assert.deepEqual(resolveStreet('', null), { street: 'haroo', remember: null })
+    assert.deepEqual(resolveStreet('?street=playcanvas', null), {
       street: 'playcanvas',
       remember: 'playcanvas',
     })
-    assert.equal(resolveStreet('?street=x', 'y').street, 'playcanvas')
+    assert.equal(resolveStreet('', 'playcanvas').street, 'playcanvas')
+    assert.deepEqual(resolveStreet('?street=haroo', 'playcanvas'), {
+      street: 'haroo',
+      remember: 'haroo',
+    })
+    assert.equal(resolveStreet('?street=x', 'y').street, 'haroo')
   })
 })
