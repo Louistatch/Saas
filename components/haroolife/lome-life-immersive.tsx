@@ -19,6 +19,22 @@ import {
   saveAvatar,
   shownModel,
 } from '@/lib/haroolife/city/avatar'
+import {
+  COMPANIES,
+  type Stop,
+  coachTrip,
+  companyById,
+  hh,
+  routeOf,
+} from '@/lib/haroolife/city/coaches'
+import {
+  type Fare,
+  bearingTo,
+  canDrop,
+  completeFare,
+  remaining,
+  startFare,
+} from '@/lib/haroolife/city/fares'
 import { CAMERA_HOME, type CameraState, worldPos } from '@/lib/haroolife/city/geometry'
 import {
   type InteractionTarget,
@@ -52,33 +68,12 @@ import {
   useProp,
   walkStep,
 } from '@/lib/haroolife/city/life'
-import {
-  COMPANIES,
-  type Stop,
-  coachTrip,
-  companyById,
-  hh,
-  routeOf,
-} from '@/lib/haroolife/city/coaches'
-import {
-  type Fare,
-  bearingTo,
-  canDrop,
-  completeFare,
-  remaining,
-  startFare,
-} from '@/lib/haroolife/city/fares'
 import { LOCALITIES, LOCALITY_IDS, type LocalityId } from '@/lib/haroolife/city/locality'
 import { CITY_STORAGE, loadCityLife } from '@/lib/haroolife/city/migrate'
 import { ESTATE_GATE } from '@/lib/haroolife/city/navigation'
 import { findPath } from '@/lib/haroolife/city/navigation'
 import { bump } from '@/lib/haroolife/city/perf'
-import {
-  type CameraRig,
-  FOLLOW_DISTANCE,
-  type InputState,
-  PlayerController,
-} from '@/lib/haroolife/city/player'
+import { FOLLOW_DISTANCE, type InputState, PlayerController } from '@/lib/haroolife/city/player'
 import {
   PRESETS,
   type Quality,
@@ -146,6 +141,7 @@ import {
 } from '@/lib/haroolife/lome-life-engine'
 import { placeResidents, residentsAt } from '@/lib/haroolife/lome-presence'
 import { BILLBOARDS, PARTNER_APPS, billboardById } from '@/lib/haroolife/lome-sponsors'
+import { STREET_VENDORS, TOGO_JOBS } from '@/lib/haroolife/togo-social-life'
 import { type BuildType, CATALOG } from '@/lib/haroolife/townsmen-engine'
 import { ROLE_LABELS } from '@/lib/haroolife/world'
 import {
@@ -178,8 +174,8 @@ import DiagOverlay, { initialDiag, rememberDiag } from './city/diag-overlay'
 import Joystick, { useKeyboardInput } from './city/joystick'
 import MarketPanel from './city/market-panel'
 import NationalMap from './city/national-map'
-import TravelSplash from './city/travel-splash'
 import OnboardingSteps from './city/onboarding'
+import TravelSplash from './city/travel-splash'
 import LiveChat from './live-chat'
 import { PAGNES } from './pagnes'
 import { PhoneDevice } from './phone-device'
@@ -2788,7 +2784,9 @@ export function LomeLifeImmersive() {
                         }
                       >
                         <span>
-                          <strong className="block capitalize">{job}</strong>
+                          <strong className="block">
+                            {TOGO_JOBS[job].icon} {TOGO_JOBS[job].label}
+                          </strong>
                           <span className="text-xs text-slate-500">
                             Lieu : {VENUE_LABELS[jobVenue(job)]}
                           </span>
@@ -3374,6 +3372,23 @@ export function LomeLifeImmersive() {
                             </p>
                           </div>
                         </div>
+                        {lot.type === 'market' && (
+                          <div className="grid grid-cols-2 gap-2" aria-label="Vendeurs du marché">
+                            {STREET_VENDORS.map((vendor, index) => (
+                              <div key={vendor.id} className="rounded-2xl bg-amber-50 p-3 text-xs">
+                                <strong className="block text-sm">
+                                  {vendor.icon} {vendor.name}
+                                </strong>
+                                <span className="block text-slate-600">
+                                  {vendor.offer} · {money(vendor.price)}
+                                </span>
+                                <span className="mt-1 block italic text-amber-900">
+                                  « {vendor.lines[(life.day + index) % vendor.lines.length]} »
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         {acts.length > 0 && (
                           <div className="flex flex-wrap gap-1.5" aria-label="Activités proposées">
                             {acts.map((a) => (
