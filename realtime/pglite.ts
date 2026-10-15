@@ -4,7 +4,6 @@
  * by the RealtimeAuth adapter (Supabase Auth or its local mock) before any call reaches here.
  */
 import { readFileSync } from 'node:fs'
-import { PGlite } from '@electric-sql/pglite'
 import type { ChatMessage, Me } from '../lib/haroolife/realtime/protocol'
 import { type ChatRepository, RepoError } from './core'
 
@@ -57,6 +56,8 @@ const subOf = (token: string): string | null => {
 export async function pgliteChat(migrationPaths: string | string[]): Promise<ChatRepository> {
   if (process.env.NODE_ENV === 'production' && process.env.HAROOLIFE_REALTIME_ALLOW_PGLITE !== '1')
     throw new Error('PGlite repository is for local development and tests only.')
+  // Loaded here, not at the top: the production bundle never needs the package.
+  const { PGlite } = await import('@electric-sql/pglite')
   const db = new PGlite()
   const accounts = Object.values(LOCAL_ACCOUNTS)
   await db.exec(`

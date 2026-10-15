@@ -2,14 +2,14 @@
  * HarooLife realtime relay entry point. Always-on Node process, separate from the Next.js app.
  *
  *   npm run realtime            # PORT=3001, Supabase adapters (needs SUPABASE_URL / SUPABASE_ANON_KEY)
- *   HAROOLIFE_REALTIME_REPO=pglite npm run realtime   # local: real migration in PGlite
+ *   HAROOLIFE_REALTIME_REPO=pglite npm run realtime   # local: real migrations in PGlite
+ *   npm run realtime:build && npm run realtime:start  # production: one bundled file, no tsx
  *
  * HAROOLIFE_REALTIME_DISABLED=true refuses every connection at once (kill switch); clients then
  * fall back to the existing HTTP place messages.
  */
 import { resolve } from 'node:path'
 import { createRealtime } from './core'
-import { pgliteChat } from './pglite'
 import { supabaseAdapters } from './supabase'
 
 const env = process.env
@@ -18,8 +18,9 @@ const say = (line: string) => process.stdout.write(`[realtime] ${line}\n`)
 async function main(url: string, anonKey: string) {
   const adapters = supabaseAdapters(url, anonKey)
   const local = env.HAROOLIFE_REALTIME_REPO === 'pglite'
+  // PGlite (local and tests only) is loaded on demand: production never needs it installed.
   const chat = local
-    ? await pgliteChat([
+    ? await (await import('./pglite')).pgliteChat([
         resolve('supabase/migrations/20261013_120000_haroolife_realtime_chat.sql'),
         resolve('supabase/migrations/20261015_130000_haroolife_chat_dm.sql'),
       ])

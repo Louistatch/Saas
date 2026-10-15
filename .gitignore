@@ -69,3 +69,4 @@ test-results/
 
 # Supabase CLI cache
 supabase/.temp/
+/dist-realtime
