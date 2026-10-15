@@ -13,6 +13,18 @@ const realtimeSources = (() => {
   }
 })()
 
+// Local builds only (never on Vercel): the local Supabase on the loopback interface (development
+// and end-to-end tests), which the production policy would otherwise refuse.
+const localSupabase = (() => {
+  if (process.env.VERCEL) return ''
+  try {
+    const u = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '')
+    return ['127.0.0.1', 'localhost'].includes(u.hostname) ? ` ${u.origin}` : ''
+  } catch {
+    return ''
+  }
+})()
+
 /** @type {import('next').NextConfig} */
 const buildSecurityHeaders = ({ wasm = false } = {}) => [
   { key: 'X-Frame-Options', value: 'DENY' },
@@ -39,7 +51,7 @@ const buildSecurityHeaders = ({ wasm = false } = {}) => [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://*.supabase.co https:",
       "font-src 'self'",
-      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.vercel-analytics.com https://*.vercel.app https://*.i.posthog.com https://*.posthog.com${realtimeSources}`,
+      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.vercel-analytics.com https://*.vercel.app https://*.i.posthog.com https://*.posthog.com${realtimeSources}${localSupabase}`,
       "worker-src 'self'",
       "manifest-src 'self'",
       "frame-ancestors 'none'",

@@ -66,6 +66,14 @@ export function uuid(): string {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
 }
 
+/** Side effects outside the relay, for private conversations seen out of the game. */
+export interface ClientHooks {
+  /** A private conversation was read (on screen, or a message arrived while on screen). */
+  dmRead?: (room: RoomId) => void
+  /** A private message was stored: its recipient may be alerted on their phone. */
+  dmSent?: () => void
+}
+
 export class RealtimeClient {
   private socket: IOSocket | null = null
   private state: RealtimeSnapshot = {
@@ -95,6 +103,7 @@ export class RealtimeClient {
   constructor(
     private url: string,
     private token: () => Promise<string | null>,
+    private hooks: ClientHooks = {},
   ) {}
 
   snapshot = () => this.state
@@ -291,6 +300,7 @@ export class RealtimeClient {
     const unread = { ...this.state.unread }
     const blocked = new Set(this.state.me?.blocked ?? [])
     let outbox = this.state.outbox
+    const readNow = new Set<RoomId>()
     for (const m of list) {
       if (blocked.has(m.author.key)) continue
       const cur = rooms[m.room] ?? []
@@ -301,11 +311,13 @@ export class RealtimeClient {
         next = [...cur, m].sort((a, b) => a.seq - b.seq).slice(-KEEP)
         const mine = m.author.key === this.state.me?.key
         if (fresh && !mine && this.reading !== m.room) unread[m.room] = (unread[m.room] ?? 0) + 1
+        else if (fresh && !mine && m.room.startsWith('dm:')) readNow.add(m.room)
       }
       rooms[m.room] = next
       if (m.client_id) outbox = outbox.filter((o) => o.clientId !== m.client_id)
     }
     this.set({ rooms, unread, outbox })
+    for (const room of readNow) this.hooks.dmRead?.(room)
   }
 
   /** Send now if online, otherwise queue (bounded). Same clientId on every retry. */
@@ -358,8 +370,10 @@ export class RealtimeClient {
         body: item.body,
         clientId: item.clientId,
       })
-      if (r.ok) this.receive([{ ...r.message, client_id: item.clientId }], false)
-      else if (r.code === 'auth_expired') {
+      if (r.ok) {
+        this.receive([{ ...r.message, client_id: item.clientId }], false)
+        if (item.room.startsWith('dm:')) this.hooks.dmSent?.()
+      } else if (r.code === 'auth_expired') {
         // The relay holds the token from the handshake: reconnect so a refreshed one is sent;
         // the queued message goes out again (same clientId) once connected.
         update({ state: 'queued' })
@@ -407,6 +421,7 @@ export class RealtimeClient {
   /** The room on screen: its messages count as read. */
   read(room: RoomId | null) {
     this.reading = room
+    if (room?.startsWith('dm:')) this.hooks.dmRead?.(room)
     if (room && this.state.unread[room]) this.set({ unread: { ...this.state.unread, [room]: 0 } })
   }
 

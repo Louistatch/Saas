@@ -19,12 +19,15 @@ async function main(url: string, anonKey: string) {
   const adapters = supabaseAdapters(url, anonKey)
   const local = env.HAROOLIFE_REALTIME_REPO === 'pglite'
   // PGlite (local and tests only) is loaded on demand: production never needs it installed.
-  const chat = local
-    ? await (await import('./pglite')).pgliteChat([
+  const pglite = local ? await import('./pglite') : null
+  const localChat = pglite
+    ? await pglite.pgliteChat([
         resolve('supabase/migrations/20261013_120000_haroolife_realtime_chat.sql'),
         resolve('supabase/migrations/20261015_130000_haroolife_chat_dm.sql'),
+        resolve('supabase/migrations/20261015_140000_haroolife_dm_inbox.sql'),
       ])
-    : adapters.chat
+    : null
+  const chat = localChat ?? adapters.chat
   const origins = (env.HAROOLIFE_REALTIME_ORIGINS ?? 'http://127.0.0.1:3000,http://localhost:3000')
     .split(',')
     .map((s) => s.trim())
@@ -42,6 +45,11 @@ async function main(url: string, anonKey: string) {
   const port = Number(env.PORT ?? 3001)
   await relay.listen(port, env.HOST ?? '0.0.0.0')
   say(`listening on :${port} (${local ? 'pglite' : 'supabase'})`)
+  if (pglite && localChat) {
+    // The dashboard's RPCs, forwarded by the mock Supabase (local and tests only).
+    await pglite.serveLocalRpc(localChat, port + 1)
+    say(`local rpc on 127.0.0.1:${port + 1}`)
+  }
   const stop = () => void relay.close().then(() => process.exit(0))
   process.on('SIGTERM', stop)
   process.on('SIGINT', stop)

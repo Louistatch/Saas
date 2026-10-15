@@ -69,33 +69,88 @@ export async function dispatchPendingEvents(): Promise<{ events: number; sent: n
       link: event.link,
       tag: `${event.kind}:${event.id}`,
     })
-    await Promise.all(
-      (subs ?? []).map(async (sub) => {
-        try {
-          await webpush.sendNotification(
-            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-            payload,
-            { TTL: 86_400, timeout: 8_000 },
-          )
-          sent++
+    sent += await sendTo(admin, subs ?? [], payload)
+  }
+  const dm = await dispatchHarooLifeMessages(admin)
+  return { events: (events?.length ?? 0) + dm.events, sent: sent + dm.sent }
+}
+
+interface DmPush {
+  id: number
+  recipient_id: string
+  title: string
+  body: string
+}
+
+/** Envoie une notification à chaque appareil de l'abonnement ; nettoie les abonnements morts. */
+async function sendTo(
+  admin: ReturnType<typeof createAdminClient>,
+  subs: Subscription[],
+  payload: string,
+): Promise<number> {
+  let sent = 0
+  await Promise.all(
+    subs.map(async (sub) => {
+      try {
+        await webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          payload,
+          { TTL: 86_400, timeout: 8_000 },
+        )
+        sent++
+        await admin
+          .from('push_subscriptions')
+          .update({ last_success_at: new Date().toISOString(), failures: 0 })
+          .eq('id', sub.id)
+      } catch (error) {
+        const status = (error as { statusCode?: number }).statusCode
+        if (status === 404 || status === 410 || sub.failures >= 9) {
+          await admin.from('push_subscriptions').delete().eq('id', sub.id)
+        } else {
           await admin
             .from('push_subscriptions')
-            .update({ last_success_at: new Date().toISOString(), failures: 0 })
+            .update({ failures: sub.failures + 1 })
             .eq('id', sub.id)
-        } catch (error) {
-          const status = (error as { statusCode?: number }).statusCode
-          // 404/410 : l'abonnement n'existe plus côté navigateur.
-          if (status === 404 || status === 410 || sub.failures >= 9) {
-            await admin.from('push_subscriptions').delete().eq('id', sub.id)
-          } else {
-            await admin
-              .from('push_subscriptions')
-              .update({ failures: sub.failures + 1 })
-              .eq('id', sub.id)
-          }
         }
+      }
+    }),
+  )
+  return sent
+}
+
+/**
+ * Messages privés HarooLife reçus hors du jeu : « Ama t'a écrit », vers les appareils du seul
+ * destinataire. Réservés avant l'envoi (une seule expédition). Sans la file en base (migration
+ * non appliquée), ne fait rien.
+ */
+async function dispatchHarooLifeMessages(
+  admin: ReturnType<typeof createAdminClient>,
+): Promise<{ events: number; sent: number }> {
+  const { data: pending, error } = await admin
+    .from('haroolife_dm_push')
+    .update({ dispatched_at: new Date().toISOString() })
+    .is('dispatched_at', null)
+    .select('id, recipient_id, title, body')
+    .returns<DmPush[]>()
+  if (error || !pending?.length) return { events: 0, sent: 0 }
+  let sent = 0
+  for (const item of pending) {
+    const { data: subs } = await admin
+      .from('push_subscriptions')
+      .select('id, user_id, endpoint, p256dh, auth, failures')
+      .eq('user_id', item.recipient_id)
+      .returns<Subscription[]>()
+    if (!subs?.length) continue
+    sent += await sendTo(
+      admin,
+      subs,
+      JSON.stringify({
+        title: item.title,
+        body: item.body,
+        link: '/messages',
+        tag: `haroolife.dm:${item.recipient_id}`,
       }),
     )
   }
-  return { events: events?.length ?? 0, sent }
+  return { events: pending.length, sent }
 }

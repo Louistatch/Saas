@@ -7,6 +7,7 @@
  * the Supabase client; the relay verifies it.
  */
 import { RealtimeClient, type RealtimeSnapshot } from '@/lib/haroolife/realtime/client'
+import { dmHooks } from '@/lib/haroolife/realtime/dm-hooks'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 
 export const REALTIME_URL = process.env.NEXT_PUBLIC_HAROOLIFE_REALTIME_URL ?? ''
@@ -34,7 +35,7 @@ export function useRealtime(enabled = true) {
   const [client, setClient] = useState<RealtimeClient | null>(null)
   useEffect(() => {
     if (!REALTIME_URL || !enabled) return
-    const c = new RealtimeClient(REALTIME_URL, sessionToken)
+    const c = new RealtimeClient(REALTIME_URL, sessionToken, dmHooks)
     setClient(c)
     void c.start()
     return () => {

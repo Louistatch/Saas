@@ -33,6 +33,11 @@ const REALTIME_ACCOUNTS = new Set([
   'b2b2b2b2-0000-4000-8000-000000000002',
   'c3c3c3c3-0000-4000-8000-000000000003',
 ])
+const REALTIME_BY_REFRESH = {
+  'r-ama': 'a1a1a1a1-0000-4000-8000-000000000001',
+  'r-kofi': 'b2b2b2b2-0000-4000-8000-000000000002',
+  'r-yawa': 'c3c3c3c3-0000-4000-8000-000000000003',
+}
 const C1 = 'c1000000-0000-4000-8000-000000000001'
 const C2 = 'c2000000-0000-4000-8000-000000000002'
 const C3 = 'c3000000-0000-4000-8000-000000000003'
@@ -214,6 +219,31 @@ const PROFILES = [
   { id: 'u-m0', email: 'm0@test.local' },
   { id: 'u-m1', email: 'm1@test.local' },
   { id: 'u-x', email: 'x@test.local' },
+  // The realtime chat's fictional players (see realtime/pglite.ts): every account has a profile,
+  // or the app signs it out as a zombie session. Kofi reads his messages from his dashboard.
+  ...[
+    ['a1a1a1a1-0000-4000-8000-000000000001', 'Ama'],
+    ['c3c3c3c3-0000-4000-8000-000000000003', 'Yawa'],
+  ].map(([id, first]) => ({
+    id,
+    email: `${first.toLowerCase()}@test.local`,
+    first_name: first,
+    last_name: 'Test',
+    role: 'member',
+    haroo_type: null,
+    cooperative_id: C1,
+    deleted_at: null,
+  })),
+  {
+    id: 'b2b2b2b2-0000-4000-8000-000000000002',
+    email: 'kofi@test.local',
+    first_name: 'Kofi',
+    last_name: 'Test',
+    role: 'cooperative_admin',
+    haroo_type: null,
+    cooperative_id: C1,
+    deleted_at: null,
+  },
 ]
 // Mes parcelles (compte membre m0 par e-mail ? non : l'admin n'a pas de parcelle ; le pilote en prête 3 pour le jeu)
 const MY_PARCELS = [...PARCELS.slice(0, 3), PARCELS[7]].map((p) => ({
@@ -663,9 +693,45 @@ http
       if (p === '/auth/v1/token') {
         refreshCount++
         log.push('token-refresh')
+        // A realtime chat account (refresh token r-<who>) stays the same person, as on Supabase.
+        let refresh = ''
+        try {
+          refresh = JSON.parse(body || '{}').refresh_token ?? ''
+        } catch {}
+        const sub = REALTIME_BY_REFRESH[refresh]
+        if (sub) {
+          const access = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub, role: 'authenticated', aud: 'authenticated', exp: 4102444800, n: refreshCount })}.c2ln`
+          return send(200, {
+            access_token: access,
+            refresh_token: refresh,
+            token_type: 'bearer',
+            expires_in: 3600,
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+            user: { ...user, id: sub, email: `${refresh.slice(2)}@test.local`, app_metadata: {} },
+          })
+        }
         return send(200, session())
       }
       if (p.startsWith('/auth/v1/')) return send(200, {})
+      // Private messages outside the game: run in the local relay's PGlite (the real
+      // migrations), as the token's subject, so the dashboard and the game share one database.
+      const localRpc =
+        /^\/rest\/v1\/rpc\/(haroolife_dm_inbox|haroolife_dm_read|haroolife_chat_history|haroolife_chat_send)$/.exec(
+          p,
+        )?.[1]
+      if (localRpc) {
+        fetch(`http://127.0.0.1:${process.env.HAROOLIFE_LOCAL_RPC_PORT ?? 3002}/rpc/${localRpc}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: req.headers.authorization ?? '',
+          },
+          body: body || '{}',
+        })
+          .then(async (r) => send(r.status, await r.json()))
+          .catch(() => send(404, { message: 'local relay not running' }))
+        return
+      }
       if (p === '/rest/v1/rpc/haroolife_world') return send(200, WORLD)
       if (p === '/rest/v1/rpc/haroolife_set_home') return send(200, null)
       if (p === '/rest/v1/rpc/haroolife_say') return send(200, 'm3')

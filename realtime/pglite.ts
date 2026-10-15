@@ -53,7 +53,24 @@ const subOf = (token: string): string | null => {
   }
 }
 
-export async function pgliteChat(migrationPaths: string | string[]): Promise<ChatRepository> {
+/**
+ * The functions the dashboard calls through Supabase's REST API (/rest/v1/rpc/<name>), with
+ * their named arguments in order. Local and tests only: the mock Supabase forwards them here so
+ * the dashboard and the relay share one database.
+ */
+const LOCAL_RPC: Record<string, string[]> = {
+  haroolife_dm_inbox: [],
+  haroolife_dm_read: ['p_room'],
+  haroolife_chat_history: ['p_room', 'p_after', 'p_before', 'p_limit'],
+  haroolife_chat_send: ['p_room', 'p_body', 'p_client_id'],
+}
+
+export type LocalChat = ChatRepository & {
+  /** A dashboard RPC run as the token's subject; null for a function that is not offered. */
+  rpc: (token: string, fn: string, args: Record<string, unknown>) => Promise<unknown> | null
+}
+
+export async function pgliteChat(migrationPaths: string | string[]): Promise<LocalChat> {
   if (process.env.NODE_ENV === 'production' && process.env.HAROOLIFE_REALTIME_ALLOW_PGLITE !== '1')
     throw new Error('PGlite repository is for local development and tests only.')
   // Loaded here, not at the top: the production bundle never needs the package.
@@ -107,6 +124,16 @@ export async function pgliteChat(migrationPaths: string | string[]): Promise<Cha
     return job
   }
   return {
+    rpc: (t, fn, args) => {
+      const names = LOCAL_RPC[fn]
+      if (!names) return null
+      const params = names.map((n, i) => `$${i + 1}`).join(',')
+      return run(
+        t,
+        `SELECT ${fn}(${params})`,
+        names.map((n) => args[n] ?? null),
+      )
+    },
     me: (t) => run<Me>(t, 'SELECT haroolife_chat_me()', []),
     send: (t, room, body, clientId) =>
       run(t, 'SELECT haroolife_chat_send($1,$2,$3)', [room, body, clientId]),
@@ -130,4 +157,43 @@ export async function pgliteChat(migrationPaths: string | string[]): Promise<Cha
       await run(t, 'SELECT haroolife_chat_report_user($1,$2)', [key, reason])
     },
   }
+}
+
+/**
+ * Local and tests only: answers POST /rpc/<name> (Authorization: Bearer <token>, JSON named
+ * arguments) on the loopback interface, for the mock Supabase to forward dashboard RPCs to.
+ */
+export async function serveLocalRpc(chat: LocalChat, port: number): Promise<void> {
+  const { createServer } = await import('node:http')
+  const server = createServer((req, res) => {
+    const send = (status: number, data: unknown) => {
+      res.writeHead(status, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify(data))
+    }
+    const fn = /^\/rpc\/([a-z_]+)$/.exec(req.url ?? '')?.[1]
+    if (req.method !== 'POST' || !fn) return send(404, { message: 'not found' })
+    let raw = ''
+    req.on('data', (c) => {
+      raw += c
+    })
+    req.on('end', () => {
+      let args: Record<string, unknown> = {}
+      try {
+        args = raw ? JSON.parse(raw) : {}
+      } catch {
+        return send(400, { message: 'invalid json' })
+      }
+      const token = (req.headers.authorization ?? '').replace(/^Bearer /, '')
+      const job = chat.rpc(token, fn, args)
+      if (!job) return send(404, { message: `function ${fn} not offered` })
+      job.then(
+        (data) => send(200, data ?? null),
+        (e) =>
+          send(e instanceof RepoError && e.code === 'forbidden' ? 403 : 400, {
+            message: e instanceof Error ? e.message : String(e),
+          }),
+      )
+    })
+  })
+  await new Promise<void>((done) => server.listen(port, '127.0.0.1', done))
 }

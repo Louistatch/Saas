@@ -1,4 +1,5 @@
 import { type Browser, type BrowserContext, type Page, devices } from '@playwright/test'
+import { createHash, randomUUID } from 'node:crypto'
 import { type Socket, io } from 'socket.io-client'
 import { expect, test } from './lome-test'
 
@@ -34,7 +35,7 @@ const rt = (page: Page) =>
     return r ? { ...r, drop: undefined } : null
   })
 
-async function player(browser: Browser, who: 'ama' | 'yawa', device: object) {
+async function signIn(browser: Browser, who: keyof typeof ACCOUNTS, device: object) {
   const context: BrowserContext = await browser.newContext({
     ...device,
     baseURL: 'http://127.0.0.1:3000',
@@ -69,6 +70,10 @@ async function player(browser: Browser, who: 'ama' | 'yawa', device: object) {
     errors.push(`dialog: ${d.message()}`)
     void d.dismiss()
   })
+  return { context, page, errors }
+}
+async function player(browser: Browser, who: keyof typeof ACCOUNTS, device: object) {
+  const { context, page, errors } = await signIn(browser, who, device)
   await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
   await expect(page.locator('canvas:visible').first()).toBeVisible({ timeout: 30000 })
   await expect.poll(async () => (await rt(page))?.status, { timeout: 30000 }).toBe('online')
@@ -335,4 +340,97 @@ test('two people chat in real time, survive a network cut and a reload, and see 
   expect(yawa.errors).toEqual([])
   await ama.context.close()
   await yawa.context.close()
+})
+
+// The database RPCs the dashboard calls, as a given person (through the mock Supabase, which
+// runs them in the relay's PGlite: the real migrations).
+const SUPABASE = 'http://127.0.0.1:54329'
+const keyOf = (sub: string) =>
+  createHash('md5').update(`haroolife-author:${sub}`).digest('hex').slice(0, 16)
+const dmOf = (a: string, b: string) => `dm:${[keyOf(a), keyOf(b)].sort().join(':')}`
+async function rpcAs(who: keyof typeof ACCOUNTS, fn: string, args: object = {}) {
+  const r = await fetch(`${SUPABASE}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: 'e2e-anon-key',
+      Authorization: `Bearer ${tokenOf(ACCOUNTS[who])}`,
+    },
+    body: JSON.stringify(args),
+  })
+  expect(r.status, `${fn} as ${who}`).toBe(200)
+  return r.json()
+}
+type Inbox = { room: string; peer: { name: string }; last: { body: string }; unread: number }[]
+
+test('a private message is seen and answered from the dashboard, and the answer reaches the game', async ({
+  browser,
+}, testInfo) => {
+  test.setTimeout(180_000)
+  test.skip(/mobile/.test(testInfo.project.name), 'opens its own desktop context')
+  const run = Date.now().toString(36)
+  const room = dmOf(ACCOUNTS.ama, ACCOUNTS.kofi)
+
+  // Ama writes to Kofi; Kofi is not in the game.
+  await rpcAs('ama', 'haroolife_chat_send', {
+    p_room: room,
+    p_body: `Kofi, tu as vu le match ? ${run}`,
+    p_client_id: randomUUID(),
+  })
+  // Ama is in the game (connected after the conversation exists: it is one of her rooms).
+  const ama = await player(browser, 'ama', devices['Desktop Chrome'])
+
+  // Kofi opens his dashboard: the card shows Ama, the message and an unread count.
+  const kofi = await signIn(browser, 'kofi', devices['Desktop Chrome'])
+  await kofi.page.goto('/dashboard', { waitUntil: 'domcontentloaded' })
+  const card = kofi.page.getByTestId('haroolife-messages-card')
+  await expect(card).toBeVisible({ timeout: 30000 })
+  await expect(card).toContainText('Ama (test)')
+  await expect(card).toContainText(`Kofi, tu as vu le match ? ${run}`)
+  await expect(card).toContainText(/\d+ non lus?/)
+
+  // He opens the conversation and answers from there.
+  await card.getByRole('link', { name: /Ama \(test\)/ }).click()
+  await expect(kofi.page).toHaveURL(/\/messages\?room=dm%3A/)
+  const thread = kofi.page.getByRole('log', { name: 'Messages avec Ama (test)' })
+  await expect(thread).toContainText(`Kofi, tu as vu le match ? ${run}`)
+  // Read on screen: no unread left for Kofi.
+  await expect
+    .poll(
+      async () =>
+        ((await rpcAs('kofi', 'haroolife_dm_inbox')) as Inbox).find((e) => e.room === room)?.unread,
+    )
+    .toBe(0)
+  await kofi.page.getByRole('textbox', { name: 'Répondre à Ama (test)' }).fill(`Oui, 2-1 ! ${run}`)
+  await kofi.page.getByRole('button', { name: 'Envoyer' }).click()
+  await expect(thread).toContainText(`Oui, 2-1 ! ${run}`)
+
+  // Ama sees the answer in the game without reloading, and in her own inbox as unread.
+  await openChat(ama.page, /^💬 Kofi \(test\)/)
+  await expect(log(ama.page)).toContainText(`Oui, 2-1 ! ${run}`)
+  const amaBox = (await rpcAs('ama', 'haroolife_dm_inbox')) as Inbox
+  expect(amaBox.find((e) => e.room === room)?.last.body).toBe(`Oui, 2-1 ! ${run}`)
+  // Open in the game: read there too.
+  await expect
+    .poll(
+      async () =>
+        ((await rpcAs('ama', 'haroolife_dm_inbox')) as Inbox).find((e) => e.room === room)?.unread,
+    )
+    .toBe(0)
+
+  // A third person cannot read the conversation.
+  const refused = await fetch(`${SUPABASE}/rest/v1/rpc/haroolife_chat_history`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${tokenOf(ACCOUNTS.yawa)}`,
+    },
+    body: JSON.stringify({ p_room: room, p_limit: 50 }),
+  })
+  expect(refused.status).toBe(403)
+
+  expect(ama.errors).toEqual([])
+  expect(kofi.errors).toEqual([])
+  await ama.context.close()
+  await kofi.context.close()
 })
