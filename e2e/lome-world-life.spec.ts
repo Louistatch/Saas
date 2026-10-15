@@ -123,14 +123,25 @@ test('a day in Lomé: from home to the gym, a workout on real equipment, and bac
   await page.waitForTimeout(3500) // characters and furniture load
   await shot('04-gym-inside')
 
-  // 8–10. Pick the treadmill from the activities: the run animation starts, energy drops,
-  // fitness rises, the fee is paid.
+  // 8–10. Pick the treadmill from the activities: the player first walks up to the machine
+  // (V3: touch → approach → activity), nothing applied on the way; on arrival the run
+  // animation starts, energy drops, fitness rises, the fee is paid.
   const before = (await stats(page))!
   await page.getByRole('button', { name: /Activités du lieu|Activités · / }).click()
   await page
     .getByRole('dialog', { name: 'Lieu' })
     .getByRole('button', { name: 'Tapis de course' })
     .click()
+  const interior = () =>
+    page.evaluate(
+      () =>
+        (window as unknown as { __LOME_INTERIOR?: { goal: string | null; using: string | null } })
+          .__LOME_INTERIOR ?? null,
+    )
+  // The walk to the machine crosses the room at running pace (2 u/s): up to ~10 u.
+  await expect
+    .poll(async () => (await interior())?.using ?? null, { timeout: 15000 })
+    .toMatch(/treadmill/)
   await expect
     .poll(() => stats(page).then((s) => s?.activity?.anim ?? null), { timeout: 5000 })
     .toBe('run')

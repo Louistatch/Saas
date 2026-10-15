@@ -1069,7 +1069,10 @@ export function LomeLifeImmersive() {
     setPanel((cur) => (cur === id ? null : id))
     setNotice(null)
   }
+  // Starting a walk or a ride from a sheet closes the map in the same action, so nothing on
+  // the map bar is left under the finger for a frame.
   function go(x: number, y: number) {
+    if (mapView) exitMap()
     setMode('walk')
     setPanel(null)
     setSelection({ x, y })
@@ -1078,6 +1081,7 @@ export function LomeLifeImmersive() {
     setCityLife((old) => goToEstate(old, x, y))
   }
   function goLot(lot: Lot) {
+    if (mapView) exitMap()
     setMode('walk')
     setPanel(null)
     setTransport('walk')
@@ -1090,6 +1094,7 @@ export function LomeLifeImmersive() {
       goLot(lot)
       return
     }
+    if (mapView) exitMap()
     setMode('walk')
     setPanel(null)
     controller.camera.follow = true

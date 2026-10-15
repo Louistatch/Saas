@@ -308,6 +308,114 @@ function approachPoint(
   return null
 }
 
+/** True when the straight walk from a to b stays on free floor (sampled every 0.1 u). */
+function clearLine(
+  a: { x: number; z: number },
+  b: { x: number; z: number },
+  layout: Layout,
+  boxes: Box[],
+): boolean {
+  const n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.1)
+  for (let i = 1; i <= n; i++) {
+    const t = i / n
+    if (!freeAt(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t, layout, boxes)) return false
+  }
+  return true
+}
+
+/**
+ * Waypoints from the player to a goal around the furniture: A* on a 0.25 u grid of free floor
+ * (8 neighbours), then shortened to the turns that are really needed. A straight line when it
+ * is already clear; the goal alone when no path exists (the stuck check then reports it).
+ */
+export function planPath(
+  from: { x: number; z: number },
+  to: { x: number; z: number },
+  layout: Layout,
+  boxes: Box[],
+): { x: number; z: number }[] {
+  if (clearLine(from, to, layout, boxes)) return [to]
+  const S = 0.25
+  const nx = Math.floor(layout.w / S) + 1
+  const nz = Math.floor(layout.d / S) + 1
+  const x0 = -layout.w / 2
+  const z0 = -layout.d / 2
+  const cell = (p: { x: number; z: number }) => [
+    Math.max(0, Math.min(nx - 1, Math.round((p.x - x0) / S))),
+    Math.max(0, Math.min(nz - 1, Math.round((p.z - z0) / S))),
+  ]
+  const pos = (i: number, j: number) => ({ x: x0 + i * S, z: z0 + j * S })
+  const free = new Uint8Array(nx * nz)
+  for (let i = 0; i < nx; i++)
+    for (let j = 0; j < nz; j++) {
+      const q = pos(i, j)
+      free[j * nx + i] = freeAt(q.x, q.z, layout, boxes) ? 1 : 0
+    }
+  const [si, sj] = cell(from)
+  const [gi, gj] = cell(to)
+  const start = sj * nx + si
+  const end = gj * nx + gi
+  free[start] = 1
+  free[end] = 1
+  const g = new Float32Array(nx * nz).fill(Number.POSITIVE_INFINITY)
+  const prev = new Int32Array(nx * nz).fill(-1)
+  const closed = new Uint8Array(nx * nz)
+  const h = (k: number) => Math.hypot((k % nx) - gi, Math.floor(k / nx) - gj)
+  const open: number[] = [start]
+  g[start] = 0
+  while (open.length > 0) {
+    let best = 0
+    for (let k = 1; k < open.length; k++)
+      if (g[open[k]] + h(open[k]) < g[open[best]] + h(open[best])) best = k
+    const cur = open.splice(best, 1)[0]
+    if (cur === end) break
+    if (closed[cur]) continue
+    closed[cur] = 1
+    const ci = cur % nx
+    const cj = Math.floor(cur / nx)
+    for (let di = -1; di <= 1; di++)
+      for (let dj = -1; dj <= 1; dj++) {
+        const ni = ci + di
+        const njj = cj + dj
+        if ((di === 0 && dj === 0) || ni < 0 || njj < 0 || ni >= nx || njj >= nz) continue
+        const k = njj * nx + ni
+        // No corner cutting: a diagonal step needs both side cells free.
+        if (!free[k] || closed[k]) continue
+        if (di !== 0 && dj !== 0 && (!free[cj * nx + ni] || !free[njj * nx + ci])) continue
+        const cost = g[cur] + (di !== 0 && dj !== 0 ? Math.SQRT2 : 1)
+        if (cost < g[k]) {
+          g[k] = cost
+          prev[k] = cur
+          open.push(k)
+        }
+      }
+  }
+  if (prev[end] === -1) return [to]
+  const cells: { x: number; z: number }[] = []
+  for (let k = prev[end]; k !== -1 && k !== start; k = prev[k])
+    cells.unshift(pos(k % nx, Math.floor(k / nx)))
+  // Keep only the turns: skip every waypoint the previous kept one can see past.
+  const pts: { x: number; z: number }[] = []
+  let at = from
+  const all = [...cells, to]
+  let i = 0
+  while (i < all.length - 1) {
+    let j = all.length - 1
+    while (j > i && !clearLine(at, all[j], layout, boxes)) j--
+    if (j === i) {
+      pts.push(all[i])
+      at = all[i]
+      i++
+    } else {
+      pts.push(all[j])
+      at = all[j]
+      i = j
+    }
+  }
+  if (pts[pts.length - 1] !== to) pts.push(to)
+  return pts
+}
+
 /**
  * The player: a kinematic capsule moved by Rapier's character controller, and its figure.
  * Joystick and keyboard steer it; a goal (equipment, character or floor point tapped, or an
@@ -322,6 +430,7 @@ function Player({
   model,
   pagne,
   goal,
+  boxes,
   onArrive,
   onStuck,
   onPosition,
@@ -334,6 +443,7 @@ function Player({
   model: string
   pagne?: string
   goal: MutableRefObject<Goal | null>
+  boxes: Box[]
   onArrive: (g: Goal) => void
   onStuck: (g: Goal) => void
   onPosition: (x: number, z: number) => void
@@ -348,6 +458,11 @@ function Player({
   const target = useRef(new THREE.Vector3(layout.spawn.x, 0, layout.spawn.z))
   const left = useRef(false)
   const progress = useRef({ best: Number.POSITIVE_INFINITY, since: 0 })
+  // Waypoints planned around the furniture for the current goal (recomputed when it changes).
+  const path = useRef<{ goal: Goal | null; pts: { x: number; z: number }[] }>({
+    goal: null,
+    pts: [],
+  })
   const [anim, setAnim] = useState<NpcAnim>('idle')
   const [ground, setGround] = useState(0)
   // The equipment in use is shown until the player walks away from it.
@@ -407,23 +522,33 @@ function Player({
       if (used) setAway(true)
     } else if (goal.current) {
       const g = goal.current
-      const dx = g.x - t.x
-      const dz = g.z - t.z
+      if (path.current.goal !== g)
+        path.current = { goal: g, pts: planPath({ x: t.x, z: t.z }, g, layout, boxes) }
+      const pts = path.current.pts
+      // Intermediate waypoints are passed within 0.2 u; the last one is the goal itself.
+      while (pts.length > 1 && Math.hypot(pts[0].x - t.x, pts[0].z - t.z) < 0.2) pts.shift()
+      const w = pts[0] ?? g
+      const dx = w.x - t.x
+      const dz = w.z - t.z
       const d = Math.hypot(dx, dz)
-      if (d < 0.1) {
+      // Distance left along the path: decides run or walk and the slow-down.
+      let remain = d
+      for (let k = 1; k < pts.length; k++)
+        remain += Math.hypot(pts[k].x - pts[k - 1].x, pts[k].z - pts[k - 1].z)
+      if (pts.length <= 1 && d < 0.1) {
         goal.current = null
         progress.current = { best: Number.POSITIVE_INFINITY, since: 0 }
         if (g.kind !== 'point') heading.current = g.face
         onArrive(g)
       } else {
         // Slow down on the last steps so the stop lands on the spot.
-        const speed = Math.min(d > 2.5 ? RUN : WALK, d / Math.max(dt, 1e-3))
-        running = d > 2.5
+        const speed = Math.min(remain > 2.5 ? RUN : WALK, remain / Math.max(dt, 1e-3))
+        running = remain > 2.5
         vx = (dx / d) * speed
         vz = (dz / d) * speed
         if (used) setAway(true)
         const pr = progress.current
-        if (d < pr.best - 0.04) progress.current = { best: d, since: 0 }
+        if (remain < pr.best - 0.04) progress.current = { best: remain, since: 0 }
         else pr.since += dt
         if (pr.since > STUCK_AFTER) {
           goal.current = null
@@ -748,6 +873,7 @@ function Room({
         model={playerModel}
         pagne={playerPagne}
         goal={goal}
+        boxes={boxes}
         onArrive={(g) => {
           // Reached and facing the target: the action runs now, once.
           if (g.kind === 'prop') onUse(g.prop)

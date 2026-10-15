@@ -50,14 +50,14 @@ async function enterGym(page: Page) {
 }
 
 /** Hold the joystick towards a screen direction (degrees, 0 = right, 90 = down). */
-async function hold(page: Page, angleDeg: number, ms: number) {
+async function hold(page: Page, angleDeg: number, ms: number, reach = 46) {
   const box = (await page.getByTestId('joystick').boundingBox())!
   const cx = box.x + box.width / 2
   const cy = box.y + box.height / 2
   const a = (angleDeg * Math.PI) / 180
   await page.mouse.move(cx, cy)
   await page.mouse.down()
-  await page.mouse.move(cx + Math.cos(a) * 46, cy + Math.sin(a) * 46, { steps: 4 })
+  await page.mouse.move(cx + Math.cos(a) * reach, cy + Math.sin(a) * reach, { steps: 4 })
   await page.waitForTimeout(ms)
   await page.mouse.up()
 }
@@ -107,8 +107,9 @@ test('R3F gym: walk, collide, use a treadmill, walk out', async ({ page }, testI
   await hold(page, 90, 600)
   await expect.poll(async () => (await inside(page))?.using ?? null).toBeNull()
 
-  // Walk out of an open side: the building is left and the PlayCanvas street is back.
-  for (let i = 0; i < 6 && (await live(page))?.inside; i++) await hold(page, 90, 2000)
+  // Run out of an open side (full stick: V3 walks at a realistic 1 u/s, running is 2 u/s):
+  // the building is left and the PlayCanvas street is back.
+  for (let i = 0; i < 6 && (await live(page))?.inside; i++) await hold(page, 90, 2000, 60)
   await expect.poll(async () => (await live(page))?.inside ?? null, { timeout: 20000 }).toBeNull()
   await expect.poll(async () => (await scene(page))?.engine).toBe('playcanvas')
   expect(errors).toEqual([])
