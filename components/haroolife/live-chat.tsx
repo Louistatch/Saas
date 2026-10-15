@@ -6,7 +6,7 @@
  * queue, report / block. Text is rendered as text (React escapes it): never as HTML.
  */
 import type { RealtimeClient, RealtimeSnapshot } from '@/lib/haroolife/realtime/client'
-import { LIMITS, type RoomId } from '@/lib/haroolife/realtime/protocol'
+import { LIMITS, type Peer, type RoomId, isDm } from '@/lib/haroolife/realtime/protocol'
 import { Send } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
@@ -15,7 +15,8 @@ const TIME = new Intl.DateTimeFormat('fr-FR', {
   minute: '2-digit',
   timeZone: 'Africa/Lome',
 })
-export function roomLabel(room: RoomId): string {
+export function roomLabel(room: RoomId, peers: Record<RoomId, Peer> = {}): string {
+  if (isDm(room)) return peers[room]?.name ?? 'Conversation privée'
   if (room === 'world:togo') return 'Togo'
   if (room === 'locality:lome') return 'Lomé'
   if (room === 'locality:kara') return 'Kara'
@@ -29,14 +30,20 @@ export default function LiveChat({
   state,
   locality,
   onChooseHome,
+  initialRoom,
 }: {
   client: RealtimeClient | null
   state: RealtimeSnapshot
   locality: 'lome' | 'kara'
   onChooseHome: () => void
+  /** Open on this room (a private conversation started from a player's sheet). */
+  initialRoom?: RoomId | null
 }) {
-  const rooms = state.me?.rooms ?? []
-  const [room, setRoom] = useState<RoomId>(`locality:${locality}`)
+  // Group rooms first, then private conversations (most recent first, as the database lists them).
+  const all = state.me?.rooms ?? []
+  const rooms = [...all.filter((r) => !isDm(r)), ...all.filter(isDm)]
+  const label = (r: RoomId) => roomLabel(r, state.peers)
+  const [room, setRoom] = useState<RoomId>(initialRoom ?? `locality:${locality}`)
   const active = rooms.includes(room) ? room : (rooms[0] ?? `locality:${locality}`)
   const [draft, setDraft] = useState('')
   const [menu, setMenu] = useState<string | null>(null)
@@ -123,7 +130,7 @@ export default function LiveChat({
                   : 'bg-white text-slate-700 ring-1 ring-slate-200'
               }`}
             >
-              {roomLabel(r)}
+              {isDm(r) ? `💬 ${label(r)}` : label(r)}
               {(state.unread[r] ?? 0) > 0 && r !== active && (
                 <span className="ml-1 rounded-full bg-rose-500 px-1.5 text-[10px] text-white">
                   {state.unread[r]}
@@ -137,7 +144,7 @@ export default function LiveChat({
         ref={list}
         role="log"
         aria-live="polite"
-        aria-label={`Messages · ${roomLabel(active)}`}
+        aria-label={`Messages · ${label(active)}`}
         className="max-h-[42vh] min-h-32 space-y-2 overflow-y-auto rounded-2xl bg-slate-50 p-3"
       >
         {messages.length >= 30 && (
@@ -315,7 +322,7 @@ export default function LiveChat({
               client?.typing(active)
             }}
             className="min-w-0 flex-1 rounded-2xl border border-slate-200 px-3 py-3 text-sm disabled:bg-slate-100"
-            placeholder={`Écrire à ${roomLabel(active)}…`}
+            placeholder={`Écrire à ${label(active)}…`}
           />
           <button
             type="submit"

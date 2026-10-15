@@ -19,7 +19,10 @@ async function main(url: string, anonKey: string) {
   const adapters = supabaseAdapters(url, anonKey)
   const local = env.HAROOLIFE_REALTIME_REPO === 'pglite'
   const chat = local
-    ? await pgliteChat(resolve('supabase/migrations/20261013_120000_haroolife_realtime_chat.sql'))
+    ? await pgliteChat([
+        resolve('supabase/migrations/20261013_120000_haroolife_realtime_chat.sql'),
+        resolve('supabase/migrations/20261015_120000_haroolife_chat_dm.sql'),
+      ])
     : adapters.chat
   const origins = (env.HAROOLIFE_REALTIME_ORIGINS ?? 'http://127.0.0.1:3000,http://localhost:3000')
     .split(',')

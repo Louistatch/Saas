@@ -99,9 +99,14 @@ export function appendModel(out: Geometry, m: Model, inst: Instance): void {
     const py = m.pos[i * 3 + 1] * sy
     const pz = m.pos[i * 3 + 2] * sz
     out.pos.push(px * c + pz * s + inst.x, py + inst.y, -px * s + pz * c + inst.z)
-    const nx = m.nrm[i * 3]
-    const ny = m.nrm[i * 3 + 1]
-    const nz = m.nrm[i * 3 + 2]
+    // Normals follow the inverse scale (a model drawn taller keeps correct shading).
+    let nx = m.nrm[i * 3] / sx
+    let ny = m.nrm[i * 3 + 1] / sy
+    let nz = m.nrm[i * 3 + 2] / sz
+    const nl = Math.hypot(nx, ny, nz) || 1
+    nx /= nl
+    ny /= nl
+    nz /= nl
     out.nrm.push(nx * c + nz * s, ny, -nx * s + nz * c)
     out.col.push(m.col[i * 3] * tr, m.col[i * 3 + 1] * tg, m.col[i * 3 + 2] * tb, 1)
   }

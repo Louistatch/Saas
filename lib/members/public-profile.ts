@@ -1,7 +1,7 @@
 /**
  * Public member profile — returns ONLY non-sensitive fields.
  * Used by the QR verification page and public supplier pages.
- * 
+ *
  * NEVER exposes: phone, email, address, card_number full, cotisation amounts.
  */
 
@@ -59,7 +59,9 @@ export async function getPublicMemberProfile(
   // Fetch parcelles for agriculture profile (all public fields)
   const { data: parcelles } = await supabase
     .from('parcelles')
-    .select('id, culture_principale, culture_name, superficie_ha, surface_ha, soil_type, irrigation_type, campaign_year')
+    .select(
+      'id, culture_principale, culture_name, superficie_ha, surface_ha, soil_type, irrigation_type, campaign_year',
+    )
     .eq('member_id', memberId)
 
   const parcelleList = (parcelles ?? []) as {
@@ -82,10 +84,23 @@ export async function getPublicMemberProfile(
   productionData = (prods ?? []) as { campaign_year: string | null }[]
 
   // Calculate agriculture profile
-  const cultures = [...new Set(parcelleList.map((p) => p.culture_principale ?? p.culture_name).filter((c): c is string => !!c))]
-  const superficie_totale = parcelleList.reduce((sum, p) => sum + (p.superficie_ha ?? p.surface_ha ?? 0), 0)
-  const seasons = [...new Set(productionData.map((p) => p.campaign_year).filter((s): s is string => !!s))]
-  const irrigated_count = parcelleList.filter(p => p.irrigation_type && p.irrigation_type.toLowerCase() !== 'non').length
+  const cultures = [
+    ...new Set(
+      parcelleList
+        .map((p) => p.culture_principale ?? p.culture_name)
+        .filter((c): c is string => !!c),
+    ),
+  ]
+  const superficie_totale = parcelleList.reduce(
+    (sum, p) => sum + (p.superficie_ha ?? p.surface_ha ?? 0),
+    0,
+  )
+  const seasons = [
+    ...new Set(productionData.map((p) => p.campaign_year).filter((s): s is string => !!s)),
+  ]
+  const irrigated_count = parcelleList.filter(
+    (p) => p.irrigation_type && p.irrigation_type.toLowerCase() !== 'non',
+  ).length
 
   // Calculate level (simplified — matches get_member_score logic)
   const { data: cotisations } = await supabase
@@ -95,19 +110,31 @@ export async function getPublicMemberProfile(
     .eq('status', 'paid')
 
   const paidCount = (cotisations ?? []).length
-  const consecutiveCampaigns = new Set((cotisations ?? []).map((c: { campaign: string }) => c.campaign).filter(Boolean)).size
+  const consecutiveCampaigns = new Set(
+    (cotisations ?? []).map((c: { campaign: string }) => c.campaign).filter(Boolean),
+  ).size
   const productionCount = productionData.length
 
   let level: 'Bronze' | 'Argent' | 'Or' | null = 'Bronze'
   if (paidCount >= 1 && parcelleList.length >= 1 && productionCount >= 1) {
     level = 'Argent'
   }
-  if (paidCount >= 1 && parcelleList.length >= 1 && productionCount >= 2 && consecutiveCampaigns >= 2) {
+  if (
+    paidCount >= 1 &&
+    parcelleList.length >= 1 &&
+    productionCount >= 2 &&
+    consecutiveCampaigns >= 2
+  ) {
     level = 'Or'
   }
 
   // Determine if certified supplier
-  const coop = (member.cooperatives as { name: string; faitiere_name: string | null; level: string | null }[] | null)?.[0] ?? null
+  const coop =
+    (
+      member.cooperatives as
+        | { name: string; faitiere_name: string | null; level: string | null }[]
+        | null
+    )?.[0] ?? null
   const isCertified = (level === 'Argent' || level === 'Or') && coop?.level === 'faitiere'
 
   return {

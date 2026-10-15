@@ -35,7 +35,9 @@ export function supabaseAdapters(
     if (error.code === '42501') throw new RepoError('forbidden', error.message)
     if (error.code === '22023')
       throw new RepoError(
-        /Trop de messages/.test(error.message) ? 'rate_limited' : 'invalid',
+        /Trop de (nouvelles conversations|messages)/.test(error.message)
+          ? 'rate_limited'
+          : 'invalid',
         error.message,
       )
     if (error.code === '23514') throw new RepoError('invalid', 'Salon inconnu.')
@@ -65,6 +67,12 @@ export function supabaseAdapters(
         await rpc(t, 'haroolife_chat_report', { p_id: id, p_reason: reason })
       },
       block: (t, id) => rpc<string>(t, 'haroolife_chat_block', { p_message: id }),
+      dmOpen: (t, key) => rpc(t, 'haroolife_dm_open', { p_key: key }),
+      dmPeers: (t) => rpc(t, 'haroolife_dm_peers', {}),
+      blockKey: (t, key) => rpc<string>(t, 'haroolife_chat_block_key', { p_key: key }),
+      reportUser: async (t, key, reason) => {
+        await rpc(t, 'haroolife_chat_report_user', { p_key: key, p_reason: reason })
+      },
     },
   }
 }

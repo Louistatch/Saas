@@ -1117,7 +1117,11 @@ export function MeteoInlineView({ cardNumber, onBack, onOpenAgriSmart }: Props) 
                   {seasonal.map((s) => {
                     // Lecture par rapport à la normale du mois (et non par seuils
                     // fixes en mm, qui classaient « sèche » un mois sec par nature).
-                    const outlook = seasonalOutlook(region ?? 'Maritime', s.month, s.precipitation_mm)
+                    const outlook = seasonalOutlook(
+                      region ?? 'Maritime',
+                      s.month,
+                      s.precipitation_mm,
+                    )
                     const precipTrend = {
                       label: outlook.label,
                       color:

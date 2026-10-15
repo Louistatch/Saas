@@ -21,11 +21,13 @@ import {
   type ChatMessage,
   type ClientToServer,
   type ErrorCode,
+  KEY_PATTERN,
   LIMITS,
   LOCALITIES,
   type Locality,
   type Me,
   PROTOCOL_VERSION,
+  type Peer,
   type Pose,
   type PresenceEntry,
   ROOM_PATTERN,
@@ -60,6 +62,10 @@ export interface ChatRepository {
   remove(token: string, id: string): Promise<ChatMessage>
   report(token: string, id: string, reason: string): Promise<void>
   block(token: string, id: string): Promise<string>
+  dmOpen(token: string, key: string): Promise<{ room: string; peer: Peer }>
+  dmPeers(token: string): Promise<Record<string, Peer>>
+  blockKey(token: string, key: string): Promise<string>
+  reportUser(token: string, key: string, reason: string): Promise<void>
 }
 /** Checks the access token with the identity provider (Supabase Auth). */
 export interface RealtimeAuth {
@@ -115,6 +121,8 @@ const schemas = {
   typing: z.object({ room }),
   resume: z.object({ cursors: z.record(room, z.number().int().nonnegative()) }),
   presence: z.object({ locality: z.enum(LOCALITIES) }),
+  key: z.object({ key: z.string().regex(KEY_PATTERN) }),
+  reportKey: z.object({ key: z.string().regex(KEY_PATTERN), reason: z.string().max(200) }),
   pose: z.object({
     x: z.number().finite().min(-10).max(400),
     z: z.number().finite().min(-10).max(400),
@@ -387,7 +395,76 @@ export function createRealtime(opts: RealtimeOptions) {
       try {
         const key = await opts.chat.block(s.data.token, p.data.id)
         if (!me.blocked.includes(key)) me.blocked.push(key)
+        // A block also closes any private conversation with that person.
+        const room = `dm:${[me.key, key].sort().join(':')}`
+        await revoke(me.key, room)
+        await revoke(key, room)
         ack({ ok: true, key })
+      } catch (e) {
+        ack(asFail(e))
+      }
+    })
+
+    // Private conversations: the database decides (consent, blocks, daily cap); the relay then
+    // joins both people's sockets (every tab) to the room and tells them.
+    const grant = async (key: string, room: string, peer: Peer) => {
+      for (const t of await io.in(`user:${key}`).fetchSockets()) {
+        if (!t.data.me.rooms.includes(room)) t.data.me.rooms.push(room)
+        t.join(room)
+        t.emit('dm:opened', { room, peer })
+      }
+    }
+    const revoke = async (key: string, room: string) => {
+      for (const t of await io.in(`user:${key}`).fetchSockets()) {
+        t.data.me.rooms = t.data.me.rooms.filter((r) => r !== room)
+        t.leave(room)
+        t.emit('dm:closed', { room })
+      }
+    }
+    s.on('dm:open', async (raw, ack) => {
+      if (typeof ack !== 'function') return
+      const p = schemas.key.safeParse(raw)
+      if (!p.success || p.data.key === me.key) return ack(fail('invalid', 'Joueur inconnu.'))
+      try {
+        const { room, peer } = await opts.chat.dmOpen(s.data.token, p.data.key)
+        await grant(me.key, room, peer)
+        await grant(peer.key, room, { key: me.key, name: me.name, pagne: me.pagne })
+        ack({ ok: true, room, peer })
+      } catch (e) {
+        reject(e instanceof RepoError ? e.code : 'unavailable')
+        ack(asFail(e))
+      }
+    })
+    s.on('dm:peers', async (_raw, ack) => {
+      if (typeof ack !== 'function') return
+      try {
+        ack({ ok: true, peers: await opts.chat.dmPeers(s.data.token) })
+      } catch (e) {
+        ack(asFail(e))
+      }
+    })
+    s.on('player:block', async (raw, ack) => {
+      if (typeof ack !== 'function') return
+      const p = schemas.key.safeParse(raw)
+      if (!p.success) return ack(fail('invalid', 'Joueur inconnu.'))
+      try {
+        const key = await opts.chat.blockKey(s.data.token, p.data.key)
+        if (!me.blocked.includes(key)) me.blocked.push(key)
+        const room = `dm:${[me.key, key].sort().join(':')}`
+        await revoke(me.key, room)
+        await revoke(key, room)
+        ack({ ok: true, key })
+      } catch (e) {
+        ack(asFail(e))
+      }
+    })
+    s.on('player:report', async (raw, ack) => {
+      if (typeof ack !== 'function') return
+      const p = schemas.reportKey.safeParse(raw)
+      if (!p.success) return ack(fail('invalid', 'Signalement invalide.'))
+      try {
+        await opts.chat.reportUser(s.data.token, p.data.key, p.data.reason)
+        ack({ ok: true })
       } catch (e) {
         ack(asFail(e))
       }

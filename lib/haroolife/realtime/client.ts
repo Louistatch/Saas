@@ -15,6 +15,7 @@ import {
   LIMITS,
   type Locality,
   type Me,
+  type Peer,
   type Pose,
   type PresenceEntry,
   type RoomId,
@@ -45,6 +46,8 @@ export interface RealtimeSnapshot {
   unread: Record<RoomId, number>
   typing: Record<RoomId, { key: string; name: string }[]>
   present: PresenceEntry[]
+  /** The other person of each private conversation (room → peer). */
+  peers: Record<RoomId, Peer>
   /** Last change, for cheap memo keys. */
   version: number
 }
@@ -73,6 +76,7 @@ export class RealtimeClient {
     unread: {},
     typing: {},
     present: [],
+    peers: {},
     version: 0,
   }
   private listeners = new Set<() => void>()
@@ -192,6 +196,21 @@ export class RealtimeClient {
         }, 4000),
       )
     })
+    socket.on('dm:opened', ({ room, peer }) => {
+      const me = this.state.me
+      if (!me) return
+      this.set({
+        me: me.rooms.includes(room) ? me : { ...me, rooms: [...me.rooms, room] },
+        peers: { ...this.state.peers, [room]: peer },
+      })
+    })
+    socket.on('dm:closed', ({ room }) => {
+      const me = this.state.me
+      if (!me) return
+      const { [room]: _gone, ...rooms } = this.state.rooms
+      const { [room]: _peer, ...peers } = this.state.peers
+      this.set({ me: { ...me, rooms: me.rooms.filter((r) => r !== room) }, rooms, peers })
+    })
     socket.on('presence:join', (e) => {
       this.presentMap.set(e.key, e)
       this.set({ present: [...this.presentMap.values()] })
@@ -234,6 +253,11 @@ export class RealtimeClient {
     const me = this.state.me
     if (!s || !me) return
     try {
+      // Who each private conversation is with (names for the phone).
+      if (me.rooms.some((r) => r.startsWith('dm:'))) {
+        const p = await s.timeout(LIMITS.ackTimeoutMs).emitWithAck('dm:peers', {})
+        if (p.ok) this.set({ peers: { ...this.state.peers, ...p.peers } })
+      }
       if (!this.loadedOnce) {
         for (const room of me.rooms) {
           const r = await s
@@ -414,6 +438,54 @@ export class RealtimeClient {
       this.set({ me: { ...me, blocked: [...me.blocked, r.key] }, rooms })
     }
     return null
+  }
+
+  /**
+   * A private conversation with a player met in the street (by their presence key). Returns the
+   * room, or an error message (blocked, cap reached, offline…).
+   */
+  async openDm(key: string): Promise<{ room: RoomId; peer: Peer } | { error: string }> {
+    const r = await this.socket
+      ?.timeout(LIMITS.ackTimeoutMs)
+      .emitWithAck('dm:open', { key })
+      .catch(() => null)
+    if (!r?.ok) return { error: r && !r.ok ? r.error : 'Hors connexion.' }
+    const me = this.state.me
+    if (me)
+      this.set({
+        me: me.rooms.includes(r.room) ? me : { ...me, rooms: [...me.rooms, r.room] },
+        peers: { ...this.state.peers, [r.room]: r.peer },
+      })
+    // Earlier messages of this conversation, if any.
+    const h = await this.socket
+      ?.timeout(LIMITS.ackTimeoutMs)
+      .emitWithAck('chat:history', { room: r.room, limit: 30 })
+      .catch(() => null)
+    if (h?.ok) this.receive(h.messages, false)
+    return { room: r.room, peer: r.peer }
+  }
+  /** From a player's sheet: block (their messages disappear, conversations close) or report. */
+  async blockPlayer(key: string) {
+    const r = await this.socket
+      ?.timeout(LIMITS.ackTimeoutMs)
+      .emitWithAck('player:block', { key })
+      .catch(() => null)
+    if (!r?.ok) return r && !r.ok ? r.error : 'Hors connexion.'
+    const me = this.state.me
+    if (me) {
+      const rooms: Record<RoomId, ChatMessage[]> = {}
+      for (const [k, v] of Object.entries(this.state.rooms))
+        rooms[k] = v.filter((m) => m.author.key !== key)
+      this.set({ me: { ...me, blocked: [...me.blocked, key] }, rooms })
+    }
+    return null
+  }
+  async reportPlayer(key: string, reason: string) {
+    const r = await this.socket
+      ?.timeout(LIMITS.ackTimeoutMs)
+      .emitWithAck('player:report', { key, reason })
+      .catch(() => null)
+    return r?.ok ? null : r && !r.ok ? r.error : 'Hors connexion.'
   }
 
   /** Where the player is (slow presence). Re-sent after each reconnection. */

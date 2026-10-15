@@ -58,7 +58,15 @@ export type AdvisorForecast =
   | { ok: false; reason: string }
 
 export type SeasonalOutlook =
-  | { ok: true; label: string; median: number; low: number; high: number; years: number[]; markets: number }
+  | {
+      ok: true
+      label: string
+      median: number
+      low: number
+      high: number
+      years: number[]
+      markets: number
+    }
   | { ok: false; reason: string }
 
 export interface AdvisorTip {
@@ -82,7 +90,8 @@ export interface Recommendation {
 }
 
 const fmt = (n: number) => Math.round(n).toLocaleString('fr-FR')
-const pct = (n: number) => `${n > 0 ? '+' : ''}${n.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %`
+const pct = (n: number) =>
+  `${n > 0 ? '+' : ''}${n.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %`
 
 // Les noms de la table `cultures` sont sans accents (« Mais », « Niebe ») : on
 // rétablit l'orthographe pour l'affichage, sans toucher aux données.
@@ -94,7 +103,11 @@ const DISPLAY_NAMES: Record<string, string> = {
   palmierahuile: 'Palmier à huile',
 }
 export function displayCulture(name: string): string {
-  const key = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]/g, '')
+  const key = name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z]/g, '')
   return DISPLAY_NAMES[key] ?? name
 }
 
@@ -121,14 +134,19 @@ export function marketFromPrice(p: MarketPrice, history: number[]): AdvisorMarke
 // biome-ignore lint/suspicious/noExplicitAny: réponse JSON d'AgriTogo, validée champ par champ ci-dessous
 export function forecastFromApi(raw: any): AdvisorForecast {
   if (!raw || raw.ok !== true || !Array.isArray(raw.previsions) || raw.previsions.length === 0) {
-    return { ok: false, reason: typeof raw?.reason === 'string' ? raw.reason : 'prévision indisponible' }
+    return {
+      ok: false,
+      reason: typeof raw?.reason === 'string' ? raw.reason : 'prévision indisponible',
+    }
   }
-  const points: ForecastPoint[] = raw.previsions.map((p: { semaine_du: string; prix: number; bas: number; haut: number }) => ({
-    weekStart: p.semaine_du,
-    price: Number(p.prix),
-    low: Number(p.bas),
-    high: Number(p.haut),
-  }))
+  const points: ForecastPoint[] = raw.previsions.map(
+    (p: { semaine_du: string; prix: number; bas: number; haut: number }) => ({
+      weekStart: p.semaine_du,
+      price: Number(p.prix),
+      low: Number(p.bas),
+      high: Number(p.haut),
+    }),
+  )
   const v = raw.validation ?? {}
   const conf = raw.confiance === 'élevée' || raw.confiance === 'moyenne' ? raw.confiance : 'faible'
   return {
@@ -166,21 +184,31 @@ export function seasonalFromApi(raw: any): SeasonalOutlook {
  * produit jamais un conseil tranché, et un conseil de stockage rappelle qu'il
  * dépend du besoin de liquidités et des conditions de stockage.
  */
-export function buildRecommendation(m: AdvisorMarket, f: AdvisorForecast, s: SeasonalOutlook): Recommendation {
+export function buildRecommendation(
+  m: AdvisorMarket,
+  f: AdvisorForecast,
+  s: SeasonalOutlook,
+): Recommendation {
   const reasons: AdvisorReason[] = []
   const c = m.commodity.toLowerCase()
 
   if (m.changePct !== null) {
     reasons.push({
       icon: 'trend',
-      title: m.trend === 'up' ? 'Prix en hausse' : m.trend === 'down' ? 'Prix en baisse' : 'Prix stable',
+      title:
+        m.trend === 'up' ? 'Prix en hausse' : m.trend === 'down' ? 'Prix en baisse' : 'Prix stable',
       text: `${pct(m.changePct)} sur les 3 dernières semaines (${fmt(m.currentPrice)} FCFA/kg, médiane de ${m.marketsCount} marché${m.marketsCount > 1 ? 's' : ''}).`,
     })
   }
   if (f.ok) {
     reasons.push({
       icon: 'forecast',
-      title: f.direction === 'baisse' ? 'Baisse probable' : f.direction === 'hausse' ? 'Hausse probable' : 'Peu de mouvement attendu',
+      title:
+        f.direction === 'baisse'
+          ? 'Baisse probable'
+          : f.direction === 'hausse'
+            ? 'Hausse probable'
+            : 'Peu de mouvement attendu',
       text: `Environ ${fmt(f.expectedPrice)} FCFA/kg dans 4 semaines (${pct(f.changePct)}). Confiance ${f.confidence}.`,
     })
   }
@@ -217,8 +245,16 @@ export function buildRecommendation(m: AdvisorMarket, f: AdvisorForecast, s: Sea
       explanation:
         'Les données ne donnent pas de signal fiable sur l’évolution du prix. Vendez la quantité dont vous avez besoin et comparez les marchés proches.',
       tips: [
-        { icon: 'compare', title: 'Comparez', text: 'Regardez le prix de chaque marché avant de vous déplacer.' },
-        { icon: 'cash', title: 'Besoin de liquidités ?', text: 'Vendez seulement la quantité nécessaire.' },
+        {
+          icon: 'compare',
+          title: 'Comparez',
+          text: 'Regardez le prix de chaque marché avant de vous déplacer.',
+        },
+        {
+          icon: 'cash',
+          title: 'Besoin de liquidités ?',
+          text: 'Vendez seulement la quantité nécessaire.',
+        },
         { icon: 'calendar', title: 'Revenez', text: 'Consultez de nouveau dans deux semaines.' },
       ],
       reasons,
@@ -229,10 +265,19 @@ export function buildRecommendation(m: AdvisorMarket, f: AdvisorForecast, s: Sea
     return {
       kind: 'hold-part',
       title: `Conserver une partie de votre ${c}`,
-      explanation: 'Si vous n’avez pas besoin immédiatement de liquidités, stocker une partie peut être intéressant : le prix devrait encore baisser à court terme, mais il a été plus élevé l’an passé en saison sèche (décembre – février). Ce n’est pas une certitude.',
+      explanation:
+        'Si vous n’avez pas besoin immédiatement de liquidités, stocker une partie peut être intéressant : le prix devrait encore baisser à court terme, mais il a été plus élevé l’an passé en saison sèche (décembre – février). Ce n’est pas une certitude.',
       tips: [
-        { icon: 'cash', title: 'Besoin de liquidités ?', text: 'Vendez seulement la quantité nécessaire.' },
-        { icon: 'storage', title: 'Stockage disponible ?', text: 'Conservez le reste dans de bonnes conditions (sec, ventilé).' },
+        {
+          icon: 'cash',
+          title: 'Besoin de liquidités ?',
+          text: 'Vendez seulement la quantité nécessaire.',
+        },
+        {
+          icon: 'storage',
+          title: 'Stockage disponible ?',
+          text: 'Conservez le reste dans de bonnes conditions (sec, ventilé).',
+        },
         { icon: 'calendar', title: 'Objectif', text: 'Réévaluez la situation en décembre.' },
       ],
       reasons,
@@ -245,7 +290,11 @@ export function buildRecommendation(m: AdvisorMarket, f: AdvisorForecast, s: Sea
       explanation:
         'Le prix devrait monter dans les prochaines semaines. Si vous pouvez attendre, vendre plus tard est probablement plus intéressant ; la prévision reste une estimation.',
       tips: [
-        { icon: 'cash', title: 'Besoin de liquidités ?', text: 'Vendez une petite partie maintenant.' },
+        {
+          icon: 'cash',
+          title: 'Besoin de liquidités ?',
+          text: 'Vendez une petite partie maintenant.',
+        },
         { icon: 'storage', title: 'Stockage disponible ?', text: 'Gardez le reste en bon état.' },
         { icon: 'calendar', title: 'Objectif', text: 'Revérifiez le prix dans 2 à 4 semaines.' },
       ],
@@ -260,8 +309,16 @@ export function buildRecommendation(m: AdvisorMarket, f: AdvisorForecast, s: Sea
         ? 'Le prix devrait baisser et l’an passé ne montre pas de reprise nette : attendre n’apporte probablement pas grand-chose. Comparez les marchés pour vendre au meilleur prix.'
         : 'Peu de mouvement attendu dans les 4 prochaines semaines. Le meilleur levier est de choisir le marché qui paie le mieux.',
     tips: [
-      { icon: 'compare', title: 'Comparez', text: 'Le marché le plus cher peut payer nettement plus.' },
-      { icon: 'cash', title: 'Besoin de liquidités ?', text: 'Vendre maintenant ne vous désavantage pas.' },
+      {
+        icon: 'compare',
+        title: 'Comparez',
+        text: 'Le marché le plus cher peut payer nettement plus.',
+      },
+      {
+        icon: 'cash',
+        title: 'Besoin de liquidités ?',
+        text: 'Vendre maintenant ne vous désavantage pas.',
+      },
       { icon: 'calendar', title: 'Objectif', text: 'Revenez dans deux semaines.' },
     ],
     reasons,

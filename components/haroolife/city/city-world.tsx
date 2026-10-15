@@ -95,6 +95,7 @@ export default function CityWorld({
   ride,
   onCell,
   onLotIcon,
+  onPlayer,
   filter,
   selectedLot,
   showNames = false,
@@ -142,6 +143,8 @@ export default function CityWorld({
   ride: { transport: Transport; rain: boolean } | null
   onCell: (cell: { x: number; y: number }) => void
   onLotIcon: (lot: Lot) => void
+  /** Another player was touched in the street (their presence key). */
+  onPlayer?: (key: string) => void
   filter: Category | 'all'
   selectedLot: Lot | null
   /** Map view: write every place's name (by priority, without overlaps); off by default. */
@@ -268,6 +271,7 @@ export default function CityWorld({
             }}
             onFrame={onFrame}
             onStats={onStats}
+            onPlayer={onPlayer}
             light={light}
           />
         </div>

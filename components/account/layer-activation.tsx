@@ -46,7 +46,11 @@ import { HAROO_TYPE_LABELS, type HarooType } from '@/types/domain'
 
 const HAROO_CHOICES: { value: HarooType; icon: LucideIcon; blurb: string }[] = [
   { value: 'ouvrier', icon: Sprout, blurb: "Offres d'emploi saisonnier près de chez vous" },
-  { value: 'acheteur', icon: TrendingUp, blurb: 'Préventes de production filtrées sur vos produits' },
+  {
+    value: 'acheteur',
+    icon: TrendingUp,
+    blurb: 'Préventes de production filtrées sur vos produits',
+  },
   { value: 'agronome', icon: BookOpen, blurb: 'Demandes de mission de conseil' },
 ]
 
@@ -132,9 +136,7 @@ export function ActivateHarooCard() {
                     onClick={() => setChoice(value)}
                     aria-pressed={selected}
                     className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-colors ${
-                      selected
-                        ? 'border-amber-500 bg-amber-50'
-                        : 'border-border hover:bg-muted/50'
+                      selected ? 'border-amber-500 bg-amber-50' : 'border-border hover:bg-muted/50'
                     }`}
                   >
                     <Icon
@@ -203,7 +205,7 @@ export function RequestOrgCard() {
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(body.error ?? 'Envoi impossible pour l\'instant.')
+        setError(body.error ?? "Envoi impossible pour l'instant.")
         setSubmitting(false)
         return
       }

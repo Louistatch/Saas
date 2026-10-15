@@ -57,7 +57,9 @@ export function ProductGrid({
           {isLoading ? (
             <span className="inline-block h-4 w-24 bg-secondary/40 rounded animate-pulse" />
           ) : (
-            <>{total.toLocaleString('fr-FR')} produit{total !== 1 ? 's' : ''}</>
+            <>
+              {total.toLocaleString('fr-FR')} produit{total !== 1 ? 's' : ''}
+            </>
           )}
         </p>
 
@@ -73,7 +75,9 @@ export function ProductGrid({
             }}
           >
             {SORT_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
             ))}
           </select>
         </div>

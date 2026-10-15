@@ -1,16 +1,16 @@
 // Orange Money West Africa payment initiation and callback handling
 
 export interface OrangeMoneyPaymentParams {
-  phone: string        // format: +228XXXXXXXX
-  amount: number       // in FCFA
-  reference: string    // unique payment reference
+  phone: string // format: +228XXXXXXXX
+  amount: number // in FCFA
+  reference: string // unique payment reference
   description?: string
   returnUrl?: string
 }
 
 export interface OrangeMoneyResult {
   success: boolean
-  paymentUrl?: string   // redirect URL for user to complete payment
+  paymentUrl?: string // redirect URL for user to complete payment
   txId?: string
   error?: string
 }

@@ -151,7 +151,9 @@ export function CardLoginPanel({ cardNumber, onConnected }: Props) {
             <Lock className="h-[18px] w-[18px] text-white/45" />
           </div>
           <div className="min-w-0">
-            <p className="text-white text-[13.5px] font-semibold leading-tight">Informations privées</p>
+            <p className="text-white text-[13.5px] font-semibold leading-tight">
+              Informations privées
+            </p>
             <p className="text-white/45 text-[12px] leading-snug">
               Entrez le PIN remis avec votre carte.
             </p>
@@ -183,7 +185,10 @@ export function CardLoginPanel({ cardNumber, onConnected }: Props) {
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Vérification…
             </p>
           ) : notice ? (
-            <p role="alert" className="text-[12.5px] leading-snug text-red-300 bg-red-500/10 rounded-xl px-3 py-2">
+            <p
+              role="alert"
+              className="text-[12.5px] leading-snug text-red-300 bg-red-500/10 rounded-xl px-3 py-2"
+            >
               {notice.text}
             </p>
           ) : null}
@@ -201,7 +206,10 @@ export function CardLoginPanel({ cardNumber, onConnected }: Props) {
             <MessageSquare className="h-4 w-4" aria-hidden="true" />
             PIN perdu ? Code par SMS
           </button>
-          <Link href={loginHref} className="min-h-[44px] inline-flex items-center px-2 text-[12.5px] text-white/50 underline underline-offset-2">
+          <Link
+            href={loginHref}
+            className="min-h-[44px] inline-flex items-center px-2 text-[12.5px] text-white/50 underline underline-offset-2"
+          >
             J’ai un compte
           </Link>
         </div>
@@ -213,7 +221,9 @@ export function CardLoginPanel({ cardNumber, onConnected }: Props) {
   return (
     <div id="card-login" className="vfp-card rounded-2xl p-4 space-y-3.5">
       <div>
-        <p className="text-white text-[14.5px] font-bold leading-tight">Entrez le code reçu par SMS</p>
+        <p className="text-white text-[14.5px] font-bold leading-tight">
+          Entrez le code reçu par SMS
+        </p>
         <p className="text-white/45 text-[12.5px] leading-snug mt-1">
           6 chiffres. Il est valable 10 minutes.
         </p>

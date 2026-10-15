@@ -239,10 +239,7 @@ export interface KoboSyncErrorEvent {
   message: string
 }
 
-export type KoboSyncSSEEvent =
-  | KoboSyncProgressEvent
-  | KoboSyncCompleteEvent
-  | KoboSyncErrorEvent
+export type KoboSyncSSEEvent = KoboSyncProgressEvent | KoboSyncCompleteEvent | KoboSyncErrorEvent
 
 // =========================================================
 // Webhook types

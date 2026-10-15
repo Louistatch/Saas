@@ -16,6 +16,14 @@ import * as THREE from 'three'
 
 const U = STREET_CELL
 const K = STREET_CELL / CELL
+/**
+ * Height of the buildings against the people. The catalogue fits a model's footprint to its lot
+ * (one cell is a few metres), which leaves Kenney's low houses about as tall as a person; the
+ * buildings are drawn taller (not wider, so they keep to their lots) so a house storey reads as
+ * about 1.7 figures and an apartment block as 3 to 5.
+ */
+export const BUILDING_HEIGHT = 1.8
+const HK = K * BUILDING_HEIGHT
 type RGB = [number, number, number]
 
 /** The player's own buildings (townsmen-engine types) → models of the same pack. */
@@ -80,36 +88,36 @@ function drawExtra(out: Geometry, e: Extra) {
       pushShape(
         out,
         new THREE.SphereGeometry(e.r * K, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2),
-        at(x, e.h * K, z),
+        at(x, e.h * HK, z),
         e.color,
       )
       return
     case 'minaret':
       pushShape(
         out,
-        new THREE.CylinderGeometry(e.r * K, e.r * K, e.h * K, 10),
-        at(x, (e.h * K) / 2, z),
+        new THREE.CylinderGeometry(e.r * K, e.r * K, e.h * HK, 10),
+        at(x, (e.h * HK) / 2, z),
         e.color,
       )
       pushShape(
         out,
         new THREE.ConeGeometry(e.r * K * 1.3, e.r * K * 2.4, 10),
-        at(x, e.h * K + e.r * K * 1.2, z),
+        at(x, e.h * HK + e.r * K * 1.2, z),
         e.color,
       )
       return
     case 'steeple':
-      box(out, x, 0, z, e.w * K, e.h * K, e.w * K, e.color)
+      box(out, x, 0, z, e.w * K, e.h * HK, e.w * K, e.color)
       pushShape(
         out,
         new THREE.ConeGeometry(e.w * K * 0.75, e.w * K * 1.6, 4),
-        at(x, e.h * K + e.w * K * 0.8, z, 1, 1, 1, Math.PI / 4),
+        at(x, e.h * HK + e.w * K * 0.8, z, 1, 1, 1, Math.PI / 4),
         e.color,
       )
       return
     case 'cross':
-      box(out, x, e.h * K, z, 0.08, 0.7, 0.08, e.color)
-      box(out, x, e.h * K + 0.4, z, 0.42, 0.08, 0.08, e.color)
+      box(out, x, e.h * HK, z, 0.08, 0.7, 0.08, e.color)
+      box(out, x, e.h * HK + 0.4, z, 0.42, 0.08, 0.08, e.color)
       return
     case 'canopy': {
       const w = e.w * U
@@ -162,7 +170,7 @@ function drawExtra(out: Geometry, e: Extra) {
       return
     }
     case 'sign':
-      box(out, x, e.h * K, z, e.w * K, 0.5, 0.08, e.color)
+      box(out, x, e.h * HK, z, e.w * K, 0.5, 0.08, e.color)
       return
     case 'bench':
       pushShape(
@@ -194,6 +202,7 @@ export function buildCityGeometry(
 ): THREE.BufferGeometry {
   const out: Geometry = { pos: [], nrm: [], col: [], idx: [] }
   const near = detail
+  // `tall`: a building (drawn taller); props (trees, benches, vehicles, fences) keep their size.
   const place = (
     key: string,
     cx: number,
@@ -202,13 +211,14 @@ export function buildCityGeometry(
     scale: number,
     lift = 0,
     tint?: RGB,
+    tall = false,
   ) =>
     appendModel(out, near ? bank.model(key) : bank.lowModel(key), {
       x: cx * U,
-      y: lift * K,
+      y: lift * (tall ? HK : K),
       z: cy * U,
       rot,
-      scale: scale * K,
+      scale: tall ? [scale * K, scale * HK, scale * K] : scale * K,
       tint,
     })
   for (const b of buildings) {
@@ -216,7 +226,7 @@ export function buildCityGeometry(
       const spec = buildingFor(b.lot, bank.sizes)
       for (const e of spec.extras) if (e.kind === 'ground' || e.kind === 'field') drawExtra(out, e)
       const m = spec.main
-      if (m) place(m.model, m.cx, m.cy, m.rot, m.scale, m.lift ?? 0, m.tint)
+      if (m) place(m.model, m.cx, m.cy, m.rot, m.scale, m.lift ?? 0, m.tint, true)
       if (near)
         for (const p of spec.props) place(p.model, p.cx, p.cy, p.rot, p.scale, p.lift ?? 0, p.tint)
       for (const e of spec.extras) if (e.kind !== 'ground' && e.kind !== 'field') drawExtra(out, e)
@@ -234,7 +244,8 @@ export function buildCityGeometry(
       (U * 0.9) / Math.max(0.01, model.size[0]),
       (U * 0.9) / Math.max(0.01, model.size[2]),
     )
-    appendModel(out, model, { x: b.x * U, y: 0, z: b.y * U, rot: 180, scale: fit })
+    const tall = key === 'bush' || key === 'tree' ? fit : fit * BUILDING_HEIGHT
+    appendModel(out, model, { x: b.x * U, y: 0, z: b.y * U, rot: 180, scale: [fit, tall, fit] })
   }
   const g = new THREE.BufferGeometry()
   g.setAttribute('position', new THREE.Float32BufferAttribute(out.pos, 3))

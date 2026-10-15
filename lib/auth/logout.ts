@@ -1,7 +1,7 @@
 /**
  * Enterprise-grade logout procedure.
  * Ensures COMPLETE session destruction with zero leaks.
- * 
+ *
  * Uses Facebook-style instant transition:
  * 1. Show transition overlay immediately (no white flash)
  * 2. Clear session in background
@@ -13,7 +13,7 @@ import { destroySession, broadcastLogout } from './session'
 
 /**
  * Full logout procedure — call this instead of supabase.auth.signOut() directly.
- * 
+ *
  * Critical: uses scope:'global' to revoke the refresh token server-side,
  * not just clear local state. Otherwise the user stays logged-in across tabs.
  */

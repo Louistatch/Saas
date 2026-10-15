@@ -59,7 +59,12 @@ import { DETAIL_CELLS, buildCityGeometry } from './city-models'
 import { createGltfLoader } from './gltf'
 import { PerfProbe } from './perf-probe'
 
-const FIGURE = 1.85
+/**
+ * Height of an adult (scene units; a cell is STREET_CELL). With the buildings drawn taller
+ * (`BUILDING_HEIGHT`), a person is about 1.75 m against houses of one or two storeys and cars of
+ * 4.5 m, instead of standing taller than the houses.
+ */
+const FIGURE = 1.15
 /** Background by day (the prototype's soft green) and at night. */
 const DAY_SKY = '#c6d9bd'
 const NIGHT_SKY = '#33456b'
@@ -81,7 +86,8 @@ const U = STREET_CELL
 /** The player's taxi (Kenney Car Kit, CC0): front along +Z, as the controller's heading 0. */
 const TAXI_URL = '/haroolife/vendor/kenney-3d/car-kit/taxi.glb'
 /** 1.5 × 2.7 units raw: brought next to the 1.85-unit adult avatar on a 2-unit road. */
-const TAXI_SCALE = 1.3
+/** Kenney's taxi is 2.75 units long: about 4.5 m against a 1.75 m figure. */
+const TAXI_SCALE = (4.5 / 1.75) * (FIGURE / 2.75)
 const WHEEL_RADIUS = 0.3 * TAXI_SCALE
 /** Front wheels at full steering (radians), drawn from the stick. */
 const MAX_STEER = 0.45
@@ -103,6 +109,8 @@ export interface StreetWorldEvents {
   onLot: (lotId: string) => void
   /** The street ground was touched: walk there. */
   onCell: (cell: { x: number; y: number }) => void
+  /** Another player was touched (their presence key): open their sheet. */
+  onPlayer?: (key: string) => void
   onReady?: () => void
   onError?: (message: string) => void
   onFrame?: (s: { drawCalls: number; fps: number }) => void
@@ -150,7 +158,8 @@ export interface StreetPoseFeed {
 /** Billboard yaw per face (degrees), as the PlayCanvas street: the poster looks at its road. */
 const BOARD_YAW = { N: 180, E: 90, S: 0, W: 270 } as const
 /** Billboards were drawn for 1.2-unit figures: scaled to the adult avatar. */
-const BOARD_SCALE = FIGURE / 1.2
+/** A roadside billboard: posts and a face about 5 m wide, whatever the figure. */
+const BOARD_SCALE = 1.54
 
 interface Board {
   placement: AdPlacement
@@ -166,6 +175,8 @@ interface Remote {
   name: string
   person: Person | null
   loading: boolean
+  /** Name tag over the head: touching it (or the player) opens their sheet. */
+  tag: HTMLButtonElement | null
 }
 
 interface Person {
@@ -264,6 +275,12 @@ export class StreetWorld {
     this.down = null
     if (!start || Math.hypot(e.clientX - start.x, e.clientY - start.y) > 12) return
     const r = this.canvas.getBoundingClientRect()
+    // Another player under the finger (their body, a generous 40 px): their sheet, not a walk.
+    const hitPlayer = this.playerAt(e.clientX - r.left, e.clientY - r.top)
+    if (hitPlayer) {
+      this.events.onPlayer?.(hitPlayer)
+      return
+    }
     this.raycaster.setFromCamera(
       new THREE.Vector2(
         ((e.clientX - r.left) / r.width) * 2 - 1,
@@ -395,7 +412,10 @@ export class StreetWorld {
     this.cityMaterial?.dispose()
     this.unsubscribe?.()
     this.unsubscribe = null
-    for (const r of this.remotes.values()) if (r.person) this.disposePerson(r.person)
+    for (const r of this.remotes.values()) {
+      if (r.person) this.disposePerson(r.person)
+      r.tag?.remove()
+    }
     this.remotes.clear()
     for (const w of this.walkers) this.disposePerson(w.person)
     this.walkers = []
@@ -809,8 +829,9 @@ export class StreetWorld {
     const c = this.controller.camera
     const aspect = this.width / this.height
     // The rig's distance (zoom buttons, pinch) sets the framing; 8 is the follow distance.
-    const zoom = this.width < 650 ? 1.12 : 1
-    const size = (Math.max(6, Math.min(40, 9 * (c.distance / 8))) * this.framing) / zoom
+    // Framed on the person (smaller than the buildings around): a narrower view than before.
+    const zoom = this.width < 650 ? 1.3 : 1
+    const size = (Math.max(4.5, Math.min(40, 7 * (c.distance / 8))) * this.framing) / zoom
     const half = Math.max(size, (size * 1.15) / aspect)
     this.camera.left = -half * aspect
     this.camera.right = half * aspect
@@ -904,6 +925,18 @@ export class StreetWorld {
       const near = Math.hypot(m.door.x - c.x, m.door.y - c.y) < 9
       m.el.style.visibility =
         near && p.z < 1 && x > 0 && x < this.width && y > 40 ? 'visible' : 'hidden'
+    }
+    // Other players' name tags, over their heads.
+    for (const r of this.remotes.values()) {
+      if (!r.tag || !r.person) continue
+      p.copy(r.person.root.position)
+      p.y += FIGURE + 0.25
+      p.project(this.camera)
+      const x = (p.x * 0.5 + 0.5) * this.width
+      const y = (-p.y * 0.5 + 0.5) * this.height
+      r.tag.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`
+      r.tag.style.visibility =
+        r.person.root.visible && p.z < 1 && x > 0 && x < this.width && y > 40 ? 'visible' : 'hidden'
     }
     this.renderer.render(this.scene, this.camera)
     this.frames++
@@ -1059,6 +1092,7 @@ export class StreetWorld {
     for (const [k, r] of this.remotes)
       if (!keys.has(k)) {
         if (r.person) this.disposePerson(r.person)
+        r.tag?.remove()
         this.remotes.delete(k)
       }
     for (const k of this.buffers.keys()) if (!keys.has(k)) this.buffers.delete(k)
@@ -1079,7 +1113,7 @@ export class StreetWorld {
   private spawnRemote(key: string): void {
     const who = this.present.find((p) => p.key === key)
     if (!who || this.remotes.size >= MAX_SHOWN) return
-    const r: Remote = { key, name: who.name, person: null, loading: true }
+    const r: Remote = { key, name: who.name, person: null, loading: true, tag: null }
     this.remotes.set(key, r)
     const spec = avatarSpec(remoteModel(key))
     void this.load(spec.url)
@@ -1089,6 +1123,20 @@ export class StreetWorld {
         r.person.root.name = `Joueur ${who.name}`
         this.scene.add(r.person.root)
         r.loading = false
+        const tag = document.createElement('button')
+        tag.type = 'button'
+        tag.dataset.player = key
+        tag.setAttribute('aria-label', `Joueur ${who.name}`)
+        tag.textContent = who.name
+        tag.className =
+          'pointer-events-auto absolute left-0 top-0 min-h-8 max-w-[160px] truncate rounded-full border-2 border-white bg-[#195f51] px-3 text-xs font-bold text-white shadow-md'
+        tag.style.visibility = 'hidden'
+        tag.addEventListener('click', (e) => {
+          e.stopPropagation()
+          this.events.onPlayer?.(key)
+        })
+        this.markersRoot.append(tag)
+        r.tag = tag
       })
       .catch(() => {
         r.loading = false
@@ -1142,6 +1190,21 @@ export class StreetWorld {
     })
   }
 
+  /** The visible remote player whose body is nearest a screen point (within 40 px). */
+  private playerAt(x: number, y: number): string | null {
+    let best: { key: string; d: number } | null = null
+    const v = new THREE.Vector3()
+    for (const r of this.remotes.values()) {
+      if (!r.person?.root.visible) continue
+      v.copy(r.person.root.position)
+      v.y += FIGURE / 2
+      v.project(this.camera)
+      const d = Math.hypot((v.x * 0.5 + 0.5) * this.width - x, (-v.y * 0.5 + 0.5) * this.height - y)
+      if (d < 40 && (!best || d < best.d)) best = { key: r.key, d }
+    }
+    return best?.key ?? null
+  }
+
   /** Test hooks: the same `__LOME_PLAYER` the PlayCanvas rig published, plus the street. */
   private publishProbe(): void {
     const ctl = this.controller
@@ -1155,6 +1218,11 @@ export class StreetWorld {
       rebuildMs: this.rebuildMs,
       tiles: this.tiles.size,
       tileMs: this.tileMs,
+      remotes: [...this.remotes.values()].map((r) => ({
+        key: r.key,
+        name: r.name,
+        shown: Boolean(r.person?.root.visible),
+      })),
     }
     w.__LOME_PLAYER = {
       x: ctl.pos.x,

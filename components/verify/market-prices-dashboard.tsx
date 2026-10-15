@@ -223,7 +223,11 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
     let cancelled = false
     setLoading(true)
     serviceRef.current
-      .getPrices(selectedRegion.id, selectedCantonId || undefined, selectedPrefectureId || undefined)
+      .getPrices(
+        selectedRegion.id,
+        selectedCantonId || undefined,
+        selectedPrefectureId || undefined,
+      )
       .then((list) => {
         if (!cancelled) setPrices(list)
       })
@@ -425,8 +429,10 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
             <AlertTriangle className="h-4 w-4 text-amber-300 shrink-0 mt-0.5" />
             <p className="text-amber-100/90 text-[12.5px] leading-snug">
               Ces prix datent de{' '}
-              <strong>{visiblePrices.reduce((a, p) => (p.ageDays < a.ageDays ? p : a)).freshnessLabel}</strong>.
-              Vérifiez sur votre marché avant de vendre.
+              <strong>
+                {visiblePrices.reduce((a, p) => (p.ageDays < a.ageDays ? p : a)).freshnessLabel}
+              </strong>
+              . Vérifiez sur votre marché avant de vendre.
             </p>
           </div>
         )}
@@ -451,7 +457,8 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
               </thead>
               <tbody>
                 {visiblePrices.map((p) => {
-                  const sparkValues = p.history.length >= 2 ? p.history : (pricesByCulture[p.cultureId] ?? [])
+                  const sparkValues =
+                    p.history.length >= 2 ? p.history : (pricesByCulture[p.cultureId] ?? [])
                   return (
                     <tr key={p.id} className="border-b border-white/[0.04] last:border-0">
                       <td className="px-2 sm:px-3 py-2.5">
@@ -475,7 +482,11 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
                           <p className="mt-0.5 pl-7 text-[10.5px] text-white/35 truncate">
                             {p.regionName}
                             {p.scopeName && p.scopeName !== p.regionName ? ` › ${p.scopeName}` : ''}
-                            {p.marketCount > 1 ? ` · ${p.marketCount} marchés` : p.marketName ? ` · ${p.marketName}` : ''}
+                            {p.marketCount > 1
+                              ? ` · ${p.marketCount} marchés`
+                              : p.marketName
+                                ? ` · ${p.marketName}`
+                                : ''}
                           </p>
                         )}
                       </td>
@@ -496,7 +507,9 @@ export function MarketPricesDashboard({ cardNumber, memberLocality }: Props) {
                               {p.changePct.toLocaleString('fr-FR')} %
                             </span>
                           ) : p.regionName ? (
-                            <span className="text-[10px] text-white/30">pas de base de comparaison</span>
+                            <span className="text-[10px] text-white/30">
+                              pas de base de comparaison
+                            </span>
                           ) : null}
                           {sparkValues.length >= 2 && (
                             <SVGSparkline values={sparkValues} trend={p.trend} />

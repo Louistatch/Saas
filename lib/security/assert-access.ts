@@ -1,7 +1,7 @@
 /**
  * Centralized server-side access control assertions.
  * Use these in API routes and Server Actions to enforce authorization.
- * 
+ *
  * These functions throw or return error responses — they are the LAST LINE
  * of defense after RLS. Use them for defense-in-depth.
  */
@@ -27,7 +27,9 @@ export interface AccessContext {
  */
 export async function getAccessContext(): Promise<AccessContext | null> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) return null
 
   // `profiles` est la seule source de vérité pour l'autorisation. Les claims
@@ -55,10 +57,7 @@ export async function getAccessContext(): Promise<AccessContext | null> {
   return {
     userId: user.id,
     role: profile.role as AccessContext['role'],
-    harooType: effectiveHarooType(
-      profile.role as UserRole,
-      profile.haroo_type as HarooType | null,
-    ),
+    harooType: effectiveHarooType(profile.role as UserRole, profile.haroo_type as HarooType | null),
     cooperativeId: profile.cooperative_id,
     cooperativeLevel,
     supabase,
@@ -71,7 +70,10 @@ export async function getAccessContext(): Promise<AccessContext | null> {
 export async function assertAuthenticated() {
   const ctx = await getAccessContext()
   if (!ctx) {
-    return { ok: false as const, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+    return {
+      ok: false as const,
+      response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+    }
   }
   return { ok: true as const, ctx }
 }
@@ -117,10 +119,20 @@ export async function assertRole(requiredRole: 'super_admin' | 'cooperative_admi
 
   const { ctx } = result
   if (requiredRole === 'super_admin' && ctx.role !== 'super_admin') {
-    return { ok: false as const, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
+    return {
+      ok: false as const,
+      response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
+    }
   }
-  if (requiredRole === 'cooperative_admin' && ctx.role !== 'super_admin' && ctx.role !== 'cooperative_admin') {
-    return { ok: false as const, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
+  if (
+    requiredRole === 'cooperative_admin' &&
+    ctx.role !== 'super_admin' &&
+    ctx.role !== 'cooperative_admin'
+  ) {
+    return {
+      ok: false as const,
+      response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
+    }
   }
   return { ok: true as const, ctx }
 }
@@ -143,7 +155,10 @@ export async function assertTenantAccess(cooperativeId: string) {
   const accessibleIds = (data as string[] | null) ?? []
 
   if (!accessibleIds.includes(cooperativeId)) {
-    return { ok: false as const, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
+    return {
+      ok: false as const,
+      response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
+    }
   }
 
   return { ok: true as const, ctx }
@@ -162,10 +177,13 @@ export async function assertFaitiereAccess() {
   }
 
   if (ctx.cooperativeLevel !== 'faitiere') {
-    return { ok: false as const, response: NextResponse.json(
-      { error: 'Seuls les administrateurs de faîtière peuvent effectuer cette action' },
-      { status: 403 },
-    )}
+    return {
+      ok: false as const,
+      response: NextResponse.json(
+        { error: 'Seuls les administrateurs de faîtière peuvent effectuer cette action' },
+        { status: 403 },
+      ),
+    }
   }
 
   return { ok: true as const, ctx }

@@ -48,7 +48,18 @@ export function guillocheRosette(opts: {
   /** Angular resolution in radians. Lower = smoother, heavier path. */
   step?: number
 }): string {
-  const { cx, cy, R, r, d, passes = 3, stroke, strokeWidth = 0.6, opacity = 0.5, step = 0.06 } = opts
+  const {
+    cx,
+    cy,
+    R,
+    r,
+    d,
+    passes = 3,
+    stroke,
+    strokeWidth = 0.6,
+    opacity = 0.5,
+    step = 0.06,
+  } = opts
 
   // The curve closes after r/gcd(R,r) revolutions and draws R/gcd(R,r) petals.
   // Pick R and r sharing a large common divisor: coprime values (e.g. 258/37)
@@ -96,7 +107,10 @@ function gcd(a: number, b: number): number {
  * a card must come out identical from the browser and from /api/cards.
  * useRosette therefore pre-divides the stroke width by the scale instead.
  */
-export function rosetteDef(id: string, opts?: { R?: number; r?: number; d?: number; passes?: number; step?: number }): string {
+export function rosetteDef(
+  id: string,
+  opts?: { R?: number; r?: number; d?: number; passes?: number; step?: number },
+): string {
   const { R = 100, r = 14, d = 38, passes = 2, step = 0.05 } = opts ?? {}
   const turns = r / gcd(Math.round(R), Math.round(r))
   const tMax = turns * 2 * Math.PI
@@ -165,7 +179,9 @@ export function guillocheBand(opts: {
         Math.sin(t * 2.33 + phase * 1.7) * amp * 0.3
       d += `${d ? 'L' : 'M'}${(x + px).toFixed(0)},${py.toFixed(1)}`
     }
-    out.push(`<path d="${d}" fill="none" stroke="${esc(stroke)}" stroke-width="${strokeWidth}" stroke-opacity="${opacity}"/>`)
+    out.push(
+      `<path d="${d}" fill="none" stroke="${esc(stroke)}" stroke-width="${strokeWidth}" stroke-opacity="${opacity}"/>`,
+    )
   }
   return out.join('')
 }
@@ -316,7 +332,12 @@ export function fitFontSize(
 }
 
 /** Split a name onto at most two lines, breaking on the last space that fits. */
-export function wrapToTwoLines(text: string, maxWidth: number, fontSize: number, bold = false): string[] {
+export function wrapToTwoLines(
+  text: string,
+  maxWidth: number,
+  fontSize: number,
+  bold = false,
+): string[] {
   if (estimateTextWidth(text, fontSize, bold) <= maxWidth) return [text]
   const words = text.split(' ')
   if (words.length < 2) return [text]
@@ -325,7 +346,10 @@ export function wrapToTwoLines(text: string, maxWidth: number, fontSize: number,
   for (let i = words.length - 1; i > 0; i--) {
     const a = words.slice(0, i).join(' ')
     const b = words.slice(i).join(' ')
-    if (estimateTextWidth(a, fontSize, bold) <= maxWidth && estimateTextWidth(b, fontSize, bold) <= maxWidth) {
+    if (
+      estimateTextWidth(a, fontSize, bold) <= maxWidth &&
+      estimateTextWidth(b, fontSize, bold) <= maxWidth
+    ) {
       best = [a, b]
       break
     }

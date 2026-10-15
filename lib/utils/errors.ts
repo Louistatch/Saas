@@ -18,7 +18,7 @@ const AUTH_ERROR_MAP: Record<string, string> = {
   'Email rate limit exceeded': 'Trop de tentatives. Réessayez dans quelques minutes.',
   'User already registered': 'Un compte existe déjà avec cet email.',
   'Signup requires a valid password': 'Le mot de passe est invalide.',
-  'User banned': 'Ce compte a été désactivé. Contactez l\'administrateur.',
+  'User banned': "Ce compte a été désactivé. Contactez l'administrateur.",
 }
 
 const FRIENDLY_BY_CODE: Record<string, string> = {

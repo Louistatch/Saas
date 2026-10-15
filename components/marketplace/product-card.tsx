@@ -38,9 +38,7 @@ export function ProductCard({ product, onClick }: ProductCardProps) {
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <span className="text-4xl opacity-60">
-              {CATEGORY_ICONS[product.category] ?? '🌿'}
-            </span>
+            <span className="text-4xl opacity-60">{CATEGORY_ICONS[product.category] ?? '🌿'}</span>
           </div>
         )}
 
@@ -71,9 +69,7 @@ export function ProductCard({ product, onClick }: ProductCardProps) {
 
         {/* Description */}
         {product.description && (
-          <p className="text-sm text-muted-foreground line-clamp-2">
-            {product.description}
-          </p>
+          <p className="text-sm text-muted-foreground line-clamp-2">{product.description}</p>
         )}
 
         {/* Culture + Location */}
@@ -97,7 +93,10 @@ export function ProductCard({ product, onClick }: ProductCardProps) {
           <div>
             {product.price != null ? (
               <span className="text-lg font-bold text-foreground">
-                {product.price.toLocaleString('fr-FR')} <span className="text-xs font-normal text-muted-foreground">{product.currency}/{product.unit}</span>
+                {product.price.toLocaleString('fr-FR')}{' '}
+                <span className="text-xs font-normal text-muted-foreground">
+                  {product.currency}/{product.unit}
+                </span>
               </span>
             ) : (
               <span className="text-sm text-muted-foreground italic">Prix sur demande</span>
@@ -111,9 +110,7 @@ export function ProductCard({ product, onClick }: ProductCardProps) {
 
         {/* Cooperative */}
         {product.cooperative_name && (
-          <p className="text-xs text-primary/80 font-medium truncate">
-            {product.cooperative_name}
-          </p>
+          <p className="text-xs text-primary/80 font-medium truncate">{product.cooperative_name}</p>
         )}
       </CardContent>
     </Card>

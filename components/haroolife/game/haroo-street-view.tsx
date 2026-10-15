@@ -32,6 +32,8 @@ export default function HarooStreetView(props: {
   onPlayerEvents: (events: ReturnType<PlayerController['drain']>, c: PlayerController) => void
   onLot: (lotId: string) => void
   onCell: (cell: { x: number; y: number }) => void
+  /** Another player was touched: their sheet (chat, block, report). */
+  onPlayer?: (key: string) => void
   onFrame?: (s: { drawCalls: number; fps: number }) => void
   onStats?: (s: StreetStats) => void
   /** Daylight of the game's hour (sun 0.65 at night to 1 at noon). */
@@ -67,6 +69,7 @@ export default function HarooStreetView(props: {
         onEvents: (events, ctl) => live.current.onPlayerEvents(events, ctl),
         onLot: (id) => live.current.onLot(id),
         onCell: (cell) => live.current.onCell(cell),
+        onPlayer: (key) => live.current.onPlayer?.(key),
         onReady: () => setState('ready'),
         onError: () => setState('error'),
         onFrame: (s) => live.current.onFrame?.(s),

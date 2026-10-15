@@ -107,9 +107,19 @@ function getLevelTheme(level?: string): {
     case 'or':
       return { label: 'NIVEAU OR', textColor: '#3d2c00', fill: 'url(#orGrad)', ring: '#e0a106' }
     case 'argent':
-      return { label: 'NIVEAU ARGENT', textColor: '#2a3540', fill: 'url(#silverGrad)', ring: '#9aa6b0' }
+      return {
+        label: 'NIVEAU ARGENT',
+        textColor: '#2a3540',
+        fill: 'url(#silverGrad)',
+        ring: '#9aa6b0',
+      }
     default:
-      return { label: 'NIVEAU BRONZE', textColor: '#3a1e08', fill: 'url(#bronzeGrad)', ring: '#9c6b3f' }
+      return {
+        label: 'NIVEAU BRONZE',
+        textColor: '#3a1e08',
+        fill: 'url(#bronzeGrad)',
+        ring: '#9c6b3f',
+      }
   }
 }
 
@@ -153,7 +163,15 @@ async function imageToDataUrl(url: string): Promise<string | null> {
 }
 
 /** One labelled field in the right-hand data panel. */
-function dataField(x: number, y: number, label: string, value: string, labelColor: string, valueColor: string, maxWidth: number): string {
+function dataField(
+  x: number,
+  y: number,
+  label: string,
+  value: string,
+  labelColor: string,
+  valueColor: string,
+  maxWidth: number,
+): string {
   const { size } = fitFontSize(value, maxWidth, 19, 12, true)
   return `<g transform="translate(${x} ${y})">
     <text x="0" y="0" font-family="${SANS}" font-weight="700" font-size="9" fill="${esc(labelColor)}" letter-spacing="1.3">${esc(label)}</text>
@@ -211,7 +229,9 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
         .toUpperCase()
     : '—'
 
-  const startYear = member.createdAt ? new Date(member.createdAt).getFullYear() : new Date().getFullYear()
+  const startYear = member.createdAt
+    ? new Date(member.createdAt).getFullYear()
+    : new Date().getFullYear()
   const endYear = member.expiryDate ? new Date(member.expiryDate).getFullYear() : startYear + 1
   const periodText = `${startYear} – ${endYear}`
 
@@ -227,10 +247,17 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
   const fullName = `${member.firstName} ${member.lastName.toUpperCase()}`.trim()
   const firstPass = fitFontSize(fullName, NAME_MAX_W, 52, 30, true)
   const nameLines = firstPass.fits ? [fullName] : wrapToTwoLines(fullName, NAME_MAX_W, 38, true)
-  const nameSize = firstPass.fits ? firstPass.size : fitFontSize(
-    nameLines.reduce((a, b) => (estimateTextWidth(a, 38, true) > estimateTextWidth(b, 38, true) ? a : b)),
-    NAME_MAX_W, 40, 26, true,
-  ).size
+  const nameSize = firstPass.fits
+    ? firstPass.size
+    : fitFontSize(
+        nameLines.reduce((a, b) =>
+          estimateTextWidth(a, 38, true) > estimateTextWidth(b, 38, true) ? a : b,
+        ),
+        NAME_MAX_W,
+        40,
+        26,
+        true,
+      ).size
 
   const photoSrc = photoDataUrl || member.photoUrl || ''
   const photoContent = photoSrc
@@ -277,11 +304,13 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
   // The organisation's name takes the wordmark instead; FaîtiereHub stays
   // present in the issuance line and the microtext at the foot of the card.
   const wordmarkName = issuerLogo
-    ? (issuerIsFaitiere ? branding.faitiereName : branding.cooperativeName)
+    ? issuerIsFaitiere
+      ? branding.faitiereName
+      : branding.cooperativeName
     : null
   const issuerWordmark = wordmarkName
     ? `<text x="56" y="19" font-family="${SANS}" font-weight="800" font-size="${fitFontSize(wordmarkName, 300, 21, 13, true).size}" fill="${esc(onDark)}" letter-spacing="-0.3">${esc(wordmarkName)}</text>
-      <text x="56" y="36" font-family="${SANS}" font-weight="600" font-size="9.5" fill="${esc(accentSoft)}" letter-spacing="2.2" opacity="0.8">${esc(truncate((issuerIsFaitiere ? 'FAÎTIÈRE' : 'COOPÉRATIVE'), 30))}</text>`
+      <text x="56" y="36" font-family="${SANS}" font-weight="600" font-size="9.5" fill="${esc(accentSoft)}" letter-spacing="2.2" opacity="0.8">${esc(truncate(issuerIsFaitiere ? 'FAÎTIÈRE' : 'COOPÉRATIVE', 30))}</text>`
     : `<text x="52" y="17" font-family="${SANS}" font-weight="800" font-size="22" fill="${esc(onDark)}" letter-spacing="-0.3">Faîtière</text>
       <text x="${52 + estimateTextWidth('Faîtière', 22, true) + 6}" y="17" font-family="${SANS}" font-weight="800" font-size="22" fill="${esc(accentSoft)}" letter-spacing="-0.3">Hub</text>
       <text x="52" y="34" font-family="${SANS}" font-weight="600" font-size="9.5" fill="${esc(accentSoft)}" letter-spacing="2.2" opacity="0.8">${esc(truncate(branding.faitiereName.toUpperCase(), 30))}</text>`
@@ -299,10 +328,12 @@ export function renderToSvgString(schema: CardSchema, photoDataUrl?: string | nu
       </g>`
     : ''
 
-  const bgStops = (schema.background.gradient ?? [
-    { offset: 0, color: lighten(accent, 0.1) },
-    { offset: 1, color: '#04140b' },
-  ])
+  const bgStops = (
+    schema.background.gradient ?? [
+      { offset: 0, color: lighten(accent, 0.1) },
+      { offset: 1, color: '#04140b' },
+    ]
+  )
     .map((s) => `<stop offset="${s.offset * 100}%" stop-color="${esc(s.color)}"/>`)
     .join('')
 

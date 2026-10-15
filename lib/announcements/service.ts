@@ -93,7 +93,9 @@ export class AnnouncementsService {
         return {
           ok: true,
           message: data.message ?? 'Annonce publiée !',
-          announcement: data.announcement ? new Announcement(data.announcement as AnnouncementRow) : undefined,
+          announcement: data.announcement
+            ? new Announcement(data.announcement as AnnouncementRow)
+            : undefined,
         }
       }
       return { ok: false, message: data.error ?? 'Erreur' }
@@ -136,7 +138,10 @@ export class AnnouncementsService {
         },
       )
       if (res.ok) {
-        return { ok: true, message: status === 'sold' ? 'Vente marquée comme vendue' : 'Vente retirée' }
+        return {
+          ok: true,
+          message: status === 'sold' ? 'Vente marquée comme vendue' : 'Vente retirée',
+        }
       }
       const data = (await res.json().catch(() => ({}))) as { error?: string }
       return { ok: false, message: data.error ?? 'Modification impossible' }

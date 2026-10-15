@@ -73,7 +73,9 @@ export function MarketMissions({ hasCard, onTaken }: { hasCard: boolean; onTaken
               {[a.culture, a.canton ?? a.prefecture ?? a.region].filter(Boolean).join(' · ')}
             </p>
             {!hasCard ? (
-              <p className="text-xs text-amber-800">Carte agronome requise pour prendre une mission.</p>
+              <p className="text-xs text-amber-800">
+                Carte agronome requise pour prendre une mission.
+              </p>
             ) : open === a.id ? (
               <form
                 className="flex flex-wrap items-center gap-2"

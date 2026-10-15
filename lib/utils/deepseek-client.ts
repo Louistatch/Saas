@@ -64,7 +64,10 @@ export function getDeepSeekKey(): string | null {
   let soonestTime = Number.POSITIVE_INFINITY
   for (let i = 0; i < keys.length; i++) {
     const until = exhaustedUntil.get(i) ?? 0
-    if (until < soonestTime) { soonestTime = until; soonestIdx = i }
+    if (until < soonestTime) {
+      soonestTime = until
+      soonestIdx = i
+    }
   }
   currentIndex = soonestIdx
   return keys[soonestIdx]
@@ -82,12 +85,17 @@ export function rotateDeepSeekKey(): string | null {
   currentIndex = (currentIndex + 1) % keys.length
   for (let i = 0; i < keys.length; i++) {
     const idx = (currentIndex + i) % keys.length
-    if (!isInCooldown(idx)) { currentIndex = idx; return keys[idx] }
+    if (!isInCooldown(idx)) {
+      currentIndex = idx
+      return keys[idx]
+    }
   }
   return keys[currentIndex]
 }
 
-export function getDeepSeekKeyCount(): number { return getAllKeys().length }
+export function getDeepSeekKeyCount(): number {
+  return getAllKeys().length
+}
 
 export function allDeepSeekKeysExhausted(): boolean {
   const keys = getAllKeys()

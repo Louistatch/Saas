@@ -59,33 +59,55 @@ export interface BulletinData {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const WMO_LABELS: Record<number, string> = {
-  0: 'Ciel dégagé', 1: 'Princ. dégagé', 2: 'Part. nuageux', 3: 'Nuageux',
-  45: 'Brouillard', 48: 'Brouillard givrant',
-  51: 'Bruine légère', 53: 'Bruine', 55: 'Bruine forte',
-  61: 'Pluie légère', 63: 'Pluie modérée', 65: 'Pluie forte',
-  80: 'Averses légères', 81: 'Averses', 82: 'Averses fortes',
-  95: 'Orage', 96: 'Orage + grêle', 99: 'Orage violent',
+  0: 'Ciel dégagé',
+  1: 'Princ. dégagé',
+  2: 'Part. nuageux',
+  3: 'Nuageux',
+  45: 'Brouillard',
+  48: 'Brouillard givrant',
+  51: 'Bruine légère',
+  53: 'Bruine',
+  55: 'Bruine forte',
+  61: 'Pluie légère',
+  63: 'Pluie modérée',
+  65: 'Pluie forte',
+  80: 'Averses légères',
+  81: 'Averses',
+  82: 'Averses fortes',
+  95: 'Orage',
+  96: 'Orage + grêle',
+  99: 'Orage violent',
 }
 function wmoLabel(code: number): string {
   const keys = Object.keys(WMO_LABELS).map(Number)
-  const nearest = keys.reduce((p, c) => Math.abs(c - code) < Math.abs(p - code) ? c : p)
+  const nearest = keys.reduce((p, c) => (Math.abs(c - code) < Math.abs(p - code) ? c : p))
   return WMO_LABELS[nearest] ?? `Code ${code}`
 }
 
 function frMonth(iso: string): string {
   try {
     return new Date(`${iso}-01`).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
-  } catch { return iso }
+  } catch {
+    return iso
+  }
 }
 
 function dayShort(iso: string): string {
   try {
     const today = new Date().toISOString().slice(0, 10)
     if (iso === today) return "Aujourd'hui"
-    const diff = Math.round((new Date(`${iso}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86400000)
+    const diff = Math.round(
+      (new Date(`${iso}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86400000,
+    )
     if (diff === 1) return 'Demain'
-    return new Date(`${iso}T00:00:00`).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
-  } catch { return iso }
+    return new Date(`${iso}T00:00:00`).toLocaleDateString('fr-FR', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    })
+  } catch {
+    return iso
+  }
 }
 
 function nowHourLagos(): string {
@@ -95,11 +117,11 @@ function nowHourLagos(): string {
 // ── Color helpers ─────────────────────────────────────────────────────────────
 
 function precipColor(mm: number): [number, number, number] {
-  if (mm > 10) return [30, 64, 175]   // dark blue
-  if (mm > 5)  return [59, 130, 246]  // blue
-  if (mm > 1)  return [96, 165, 250]  // light blue
-  if (mm > 0)  return [186, 230, 253] // very light blue
-  return [226, 232, 240]              // gray
+  if (mm > 10) return [30, 64, 175] // dark blue
+  if (mm > 5) return [59, 130, 246] // blue
+  if (mm > 1) return [96, 165, 250] // light blue
+  if (mm > 0) return [186, 230, 253] // very light blue
+  return [226, 232, 240] // gray
 }
 
 // ── Main generator ────────────────────────────────────────────────────────────
@@ -116,14 +138,14 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
   const CONTENT_W = PAGE_W - MARGIN * 2
 
   // ── Color palette ──
-  const BLUE_DARK  = [15, 23, 42]   as [number,number,number]
-  const BLUE_MED   = [30, 58, 138]  as [number,number,number]
-  const BLUE_LIGHT = [59, 130, 246] as [number,number,number]
-  const GREEN      = [21, 128, 61]  as [number,number,number]
-  const WHITE      = [255, 255, 255] as [number,number,number]
-  const GRAY_LIGHT = [248, 250, 252] as [number,number,number]
-  const GRAY_TEXT  = [100, 116, 139] as [number,number,number]
-  const TEXT_DARK  = [15, 23, 42]   as [number,number,number]
+  const BLUE_DARK = [15, 23, 42] as [number, number, number]
+  const BLUE_MED = [30, 58, 138] as [number, number, number]
+  const BLUE_LIGHT = [59, 130, 246] as [number, number, number]
+  const GREEN = [21, 128, 61] as [number, number, number]
+  const WHITE = [255, 255, 255] as [number, number, number]
+  const GRAY_LIGHT = [248, 250, 252] as [number, number, number]
+  const GRAY_TEXT = [100, 116, 139] as [number, number, number]
+  const TEXT_DARK = [15, 23, 42] as [number, number, number]
 
   let y = 0
   const nowStr = new Date().toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' })
@@ -151,15 +173,17 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
   doc.setTextColor(148, 163, 184)
   doc.text(`Généré le ${nowStr}`, MARGIN + 4, 33)
   doc.setFontSize(8)
-  doc.text('Sources : ECMWF IFS · GFS NOAA · ICON DWD  (ensemble 3 modèles)', PAGE_W - MARGIN, 33, { align: 'right' })
+  doc.text('Sources : ECMWF IFS · GFS NOAA · ICON DWD  (ensemble 3 modèles)', PAGE_W - MARGIN, 33, {
+    align: 'right',
+  })
 
   y = 50
 
   // ══════════════════════════ CURRENT CONDITIONS ════════════════════════════
 
-  const todayRow   = data.weather.find(d => d.date === todayStr)
-  const nowHour    = nowHourLagos()
-  const curSlot    = data.hourly.find(h => h.time.slice(0, 13) >= nowHour) ?? data.hourly[0]
+  const todayRow = data.weather.find((d) => d.date === todayStr)
+  const nowHour = nowHourLagos()
+  const curSlot = data.hourly.find((h) => h.time.slice(0, 13) >= nowHour) ?? data.hourly[0]
 
   doc.setFillColor(...GRAY_LIGHT)
   doc.roundedRect(MARGIN, y, CONTENT_W, 34, 3, 3, 'F')
@@ -191,11 +215,15 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
   doc.setFontSize(8)
   doc.setTextColor(...GRAY_TEXT)
   doc.text(`Ressenti ${feels != null ? Math.round(feels) : '—'}°C`, MARGIN + 4, row1y + 10)
-  doc.text(`Min ${todayRow?.temperature_min != null ? Math.round(todayRow.temperature_min) : '—'}° · Max ${todayRow?.temperature_max != null ? Math.round(todayRow.temperature_max) : '—'}°`, MARGIN + 4, row2y + 4)
+  doc.text(
+    `Min ${todayRow?.temperature_min != null ? Math.round(todayRow.temperature_min) : '—'}° · Max ${todayRow?.temperature_max != null ? Math.round(todayRow.temperature_max) : '—'}°`,
+    MARGIN + 4,
+    row2y + 4,
+  )
 
   // Col 2
   const precip = todayRow?.precipitation_mm ?? 0
-  const prob   = todayRow?.precipitation_probability ?? 0
+  const prob = todayRow?.precipitation_probability ?? 0
   doc.setFontSize(9)
   doc.setTextColor(...TEXT_DARK)
   doc.setFont('helvetica', 'bold')
@@ -207,27 +235,37 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
   doc.text(`Probabilité : ${Math.round(prob)}%`, MARGIN + colW + 4, row2y + 4)
 
   // Col 3
-  const hum  = todayRow?.humidity_pct ?? curSlot?.humidity_pct
+  const hum = todayRow?.humidity_pct ?? curSlot?.humidity_pct
   const wind = todayRow?.wind_speed_ms
-  const et0  = todayRow?.et0_mm
-  const wmo  = curSlot ? wmoLabel(curSlot.weather_code) : 'N/D'
+  const et0 = todayRow?.et0_mm
+  const wmo = curSlot ? wmoLabel(curSlot.weather_code) : 'N/D'
   doc.setFontSize(8)
   doc.setTextColor(...TEXT_DARK)
   doc.setFont('helvetica', 'bold')
   doc.text(wmo, MARGIN + colW * 2 + 4, row1y)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(...GRAY_TEXT)
-  doc.text(`Humidité : ${hum != null ? Math.round(hum) : '—'}%   Vent : ${wind != null ? wind.toFixed(1) : '—'} m/s`, MARGIN + colW * 2 + 4, row1y + 7)
-  doc.text(`ETo FAO-56 : ${et0 != null ? et0.toFixed(1) : '—'} mm/j`, MARGIN + colW * 2 + 4, row2y + 4)
+  doc.text(
+    `Humidité : ${hum != null ? Math.round(hum) : '—'}%   Vent : ${wind != null ? wind.toFixed(1) : '—'} m/s`,
+    MARGIN + colW * 2 + 4,
+    row1y + 7,
+  )
+  doc.text(
+    `ETo FAO-56 : ${et0 != null ? et0.toFixed(1) : '—'} mm/j`,
+    MARGIN + colW * 2 + 4,
+    row2y + 4,
+  )
 
   y += 42
 
   // ══════════════════════════ NOWCAST 6H ════════════════════════════════════
 
-  const futureNowcast = data.nowcast.filter(s => {
-    const slotMs = new Date(`${s.time}:00+01:00`).getTime()
-    return slotMs >= Date.now()
-  }).slice(0, 24)
+  const futureNowcast = data.nowcast
+    .filter((s) => {
+      const slotMs = new Date(`${s.time}:00+01:00`).getTime()
+      return slotMs >= Date.now()
+    })
+    .slice(0, 24)
 
   if (futureNowcast.length > 0) {
     y += 6
@@ -240,13 +278,26 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
     doc.text('NOWCASTING — PROCHAINES 6 HEURES (intervalles 15 min)', MARGIN + 4, y + 5.5)
     y += 10
 
-    const rows = futureNowcast.map(s => {
+    const rows = futureNowcast.map((s) => {
       const slotMs = new Date(`${s.time}:00+01:00`).getTime()
       const minFromNow = Math.round((slotMs - Date.now()) / 60000)
       const timeLabel = minFromNow <= 0 ? 'Maintenant' : `+${minFromNow} min`
       const hhmm = s.time.slice(11, 16)
-      const intensity = s.precipitation > 5 ? 'Forte' : s.precipitation > 1 ? 'Modérée' : s.precipitation > 0.05 ? 'Légère' : '—'
-      return [hhmm, timeLabel, `${s.precipitation.toFixed(2)} mm`, intensity, `${Math.round(s.temperature)}°C`]
+      const intensity =
+        s.precipitation > 5
+          ? 'Forte'
+          : s.precipitation > 1
+            ? 'Modérée'
+            : s.precipitation > 0.05
+              ? 'Légère'
+              : '—'
+      return [
+        hhmm,
+        timeLabel,
+        `${s.precipitation.toFixed(2)} mm`,
+        intensity,
+        `${Math.round(s.temperature)}°C`,
+      ]
     })
 
     autoTable(doc, {
@@ -264,7 +315,11 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
         3: { halign: 'left' },
         4: { halign: 'center', cellWidth: 18 },
       },
-      willDrawCell: (hookData: { section: string; row: { raw: unknown }; column: { index: number } }) => {
+      willDrawCell: (hookData: {
+        section: string
+        row: { raw: unknown }
+        column: { index: number }
+      }) => {
         if (hookData.section === 'body' && hookData.column.index === 2) {
           const raw = hookData.row.raw
           const mm = Number.parseFloat(String(Array.isArray(raw) ? raw[2] : 0))
@@ -290,12 +345,12 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
   doc.text('PRÉVISIONS 7 JOURS', MARGIN + 4, y + 5.5)
   y += 10
 
-  const futureDays = data.weather.filter(d => d.date >= todayStr).slice(0, 7)
+  const futureDays = data.weather.filter((d) => d.date >= todayStr).slice(0, 7)
 
   autoTable(doc, {
     startY: y,
     head: [['Jour', 'Min', 'Max', 'Pluie', 'Probabilité', 'Vent', 'ETo', 'Conditions']],
-    body: futureDays.map(d => [
+    body: futureDays.map((d) => [
       dayShort(d.date),
       `${d.temperature_min != null ? Math.round(d.temperature_min) : '—'}°C`,
       `${d.temperature_max != null ? Math.round(d.temperature_max) : '—'}°C`,
@@ -303,10 +358,13 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
       `${d.precipitation_probability != null ? Math.round(d.precipitation_probability) : '—'}%`,
       `${d.wind_speed_ms != null ? d.wind_speed_ms.toFixed(1) : '—'} m/s`,
       `${d.et0_mm != null ? d.et0_mm.toFixed(1) : '—'} mm`,
-      d.precipitation_mm != null && d.precipitation_mm > 10 ? 'Pluie importante'
-        : d.precipitation_mm != null && d.precipitation_mm > 2 ? 'Pluie légère'
-        : d.temperature_max != null && d.temperature_max > 35 ? 'Chaleur forte'
-        : 'Sec / nuageux',
+      d.precipitation_mm != null && d.precipitation_mm > 10
+        ? 'Pluie importante'
+        : d.precipitation_mm != null && d.precipitation_mm > 2
+          ? 'Pluie légère'
+          : d.temperature_max != null && d.temperature_max > 35
+            ? 'Chaleur forte'
+            : 'Sec / nuageux',
     ]),
     margin: { left: MARGIN, right: MARGIN },
     styles: { fontSize: 7.5, cellPadding: 2, textColor: TEXT_DARK },
@@ -314,8 +372,8 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
     alternateRowStyles: { fillColor: GRAY_LIGHT },
     columnStyles: {
       0: { fontStyle: 'bold' },
-      1: { halign: 'center', textColor: [59, 130, 246] as [number,number,number] },
-      2: { halign: 'center', textColor: [234, 88, 12] as [number,number,number] },
+      1: { halign: 'center', textColor: [59, 130, 246] as [number, number, number] },
+      2: { halign: 'center', textColor: [234, 88, 12] as [number, number, number] },
       3: { halign: 'center' },
       4: { halign: 'center' },
       5: { halign: 'center' },
@@ -329,7 +387,10 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
   const ins = data.agro_insights
   if (ins) {
     // Check if we need a new page
-    if (y > 230) { doc.addPage(); y = 20 }
+    if (y > 230) {
+      doc.addPage()
+      y = 20
+    }
 
     y += 6
     doc.setFillColor(...BLUE_MED)
@@ -341,17 +402,55 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
     doc.text('ALERTES AGRONOMIQUES', MARGIN + 4, y + 5.5)
     y += 12
 
-    const alerts: { icon: string; label: string; text: string; color: [number,number,number] }[] = []
+    const alerts: { icon: string; label: string; text: string; color: [number, number, number] }[] =
+      []
 
-    if (ins.drought_risk === 'critical') alerts.push({ icon: '⚠', label: 'CRITIQUE', text: 'Sécheresse critique — Irriguer immédiatement', color: [220, 38, 38] })
-    else if (ins.drought_risk === 'high') alerts.push({ icon: '!', label: 'ÉLEVÉ', text: 'Risque élevé de sécheresse — Irriguer sous 48h', color: [234, 88, 12] })
-    else if (ins.drought_risk === 'moderate') alerts.push({ icon: '~', label: 'MODÉRÉ', text: "Risque modéré de sécheresse — Surveiller l'humidité", color: [202, 138, 4] })
+    if (ins.drought_risk === 'critical')
+      alerts.push({
+        icon: '⚠',
+        label: 'CRITIQUE',
+        text: 'Sécheresse critique — Irriguer immédiatement',
+        color: [220, 38, 38],
+      })
+    else if (ins.drought_risk === 'high')
+      alerts.push({
+        icon: '!',
+        label: 'ÉLEVÉ',
+        text: 'Risque élevé de sécheresse — Irriguer sous 48h',
+        color: [234, 88, 12],
+      })
+    else if (ins.drought_risk === 'moderate')
+      alerts.push({
+        icon: '~',
+        label: 'MODÉRÉ',
+        text: "Risque modéré de sécheresse — Surveiller l'humidité",
+        color: [202, 138, 4],
+      })
     else alerts.push({ icon: '✓', label: 'BON', text: 'Risque de sécheresse faible', color: GREEN })
 
-    if (ins.spray_window) alerts.push({ icon: '✓', label: 'TRAITEMENT', text: `Fenêtre favorable : ${ins.spray_window} — Vent faible, conditions idéales`, color: GREEN })
-    if (ins.planting_window) alerts.push({ icon: '✓', label: 'SEMIS', text: `${ins.planting_window}`, color: GREEN })
-    if ((ins.heat_stress_days ?? 0) > 2) alerts.push({ icon: '!', label: 'CHALEUR', text: `Stress thermique prévu ${ins.heat_stress_days} jours (>36°C) — Protégez les cultures`, color: [234, 88, 12] })
-    if ((ins.water_stress_days ?? 0) > 3) alerts.push({ icon: '!', label: 'STRESS HYDRIQUE', text: `${ins.water_stress_days} jours avec ETo > précipitations — Planifiez l'irrigation`, color: [202, 138, 4] })
+    if (ins.spray_window)
+      alerts.push({
+        icon: '✓',
+        label: 'TRAITEMENT',
+        text: `Fenêtre favorable : ${ins.spray_window} — Vent faible, conditions idéales`,
+        color: GREEN,
+      })
+    if (ins.planting_window)
+      alerts.push({ icon: '✓', label: 'SEMIS', text: `${ins.planting_window}`, color: GREEN })
+    if ((ins.heat_stress_days ?? 0) > 2)
+      alerts.push({
+        icon: '!',
+        label: 'CHALEUR',
+        text: `Stress thermique prévu ${ins.heat_stress_days} jours (>36°C) — Protégez les cultures`,
+        color: [234, 88, 12],
+      })
+    if ((ins.water_stress_days ?? 0) > 3)
+      alerts.push({
+        icon: '!',
+        label: 'STRESS HYDRIQUE',
+        text: `${ins.water_stress_days} jours avec ETo > précipitations — Planifiez l'irrigation`,
+        color: [202, 138, 4],
+      })
 
     for (const alert of alerts) {
       doc.setFillColor(alert.color[0], alert.color[1], alert.color[2])
@@ -371,7 +470,10 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
 
   // ══════════════════════════ PRACTICAL ADVICE ══════════════════════════════
 
-  if (y > 220) { doc.addPage(); y = 20 }
+  if (y > 220) {
+    doc.addPage()
+    y = 20
+  }
 
   y += 6
   doc.setFillColor(...BLUE_MED)
@@ -386,8 +488,10 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
   const et0Today = todayRow?.et0_mm ?? 0
   const precipToday = todayRow?.precipitation_mm ?? 0
   const irrigNeeded = Math.max(0, et0Today - precipToday)
-  const nextRainDay = futureDays.find(d => d.date > todayStr && (d.precipitation_mm ?? 0) > 2)
-  const dryDays = futureDays.filter(d => d.date > todayStr && (d.precipitation_mm ?? 0) < 1).length
+  const nextRainDay = futureDays.find((d) => d.date > todayStr && (d.precipitation_mm ?? 0) > 2)
+  const dryDays = futureDays.filter(
+    (d) => d.date > todayStr && (d.precipitation_mm ?? 0) < 1,
+  ).length
 
   const advice: { section: string; lines: string[] }[] = [
     {
@@ -400,8 +504,8 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
         nextRainDay
           ? `→ Prochaine pluie prévue : ${dayShort(nextRainDay.date)} (${(nextRainDay.precipitation_mm ?? 0).toFixed(1)} mm)`
           : dryDays >= 5
-          ? `→ ${dryDays} jours secs à venir — prévoir un plan d'irrigation`
-          : `→ Conditions d'humidité acceptables cette semaine`,
+            ? `→ ${dryDays} jours secs à venir — prévoir un plan d'irrigation`
+            : `→ Conditions d'humidité acceptables cette semaine`,
       ],
     },
     {
@@ -421,7 +525,7 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
           ? '→ Fenêtre de semis favorable les prochains jours'
           : '→ Vérifier les températures sol (optimal : 20-32°C pour la plupart des cultures)',
         '→ Récolte : éviter les jours pluvieux — qualité du grain compromise',
-        futureDays.some(d => (d.precipitation_mm ?? 0) > 15)
+        futureDays.some((d) => (d.precipitation_mm ?? 0) > 15)
           ? '→ Fortes pluies prévues : sécuriser les stocks et vérifier le drainage'
           : '→ Pas de risque de fortes pluies dans les 7 prochains jours',
       ],
@@ -450,7 +554,10 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
   // ══════════════════════════ SEASONAL OUTLOOK ══════════════════════════════
 
   if (data.seasonal.length > 0) {
-    if (y > 220) { doc.addPage(); y = 20 }
+    if (y > 220) {
+      doc.addPage()
+      y = 20
+    }
 
     y += 4
     doc.setFillColor(...BLUE_MED)
@@ -465,9 +572,15 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
     autoTable(doc, {
       startY: y,
       head: [['Mois', 'Temp. Moy.', 'Précipitations', 'Tendance']],
-      body: data.seasonal.map(s => {
-        const tempTrend = s.temperature_mean > 30 ? 'Chaud' : s.temperature_mean > 27 ? 'Normal' : 'Frais'
-        const precipTrend = s.precipitation_mm > 150 ? 'Bonne pluviométrie' : s.precipitation_mm > 80 ? 'Normale' : 'Sèche'
+      body: data.seasonal.map((s) => {
+        const tempTrend =
+          s.temperature_mean > 30 ? 'Chaud' : s.temperature_mean > 27 ? 'Normal' : 'Frais'
+        const precipTrend =
+          s.precipitation_mm > 150
+            ? 'Bonne pluviométrie'
+            : s.precipitation_mm > 80
+              ? 'Normale'
+              : 'Sèche'
         return [
           frMonth(s.month),
           `${s.temperature_mean.toFixed(1)}°C`,
@@ -481,8 +594,8 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
       alternateRowStyles: { fillColor: GRAY_LIGHT },
       columnStyles: {
         0: { fontStyle: 'bold' },
-        1: { halign: 'center', textColor: [234, 88, 12] as [number,number,number] },
-        2: { halign: 'center', textColor: [59, 130, 246] as [number,number,number] },
+        1: { halign: 'center', textColor: [234, 88, 12] as [number, number, number] },
+        2: { halign: 'center', textColor: [59, 130, 246] as [number, number, number] },
         3: { fontStyle: 'italic' },
       },
     })
@@ -507,14 +620,16 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
   doc.text(
     'Sources : ECMWF IFS 0.25° · GFS NOAA Seamless · ICON DWD Seamless · Nowcast Open-Meteo · FAO-56 Penman-Monteith',
     MARGIN + 4,
-    PAGE_H - 5
+    PAGE_H - 5,
   )
   doc.setTextColor(148, 163, 184)
   doc.text(`Bulletin généré le ${nowStr}`, PAGE_W - MARGIN, PAGE_H - 5, { align: 'right' })
 
   // ══════════════════════════ PAGE NUMBERS ══════════════════════════════════
 
-  const totalPages = (doc as unknown as { internal: { getNumberOfPages: () => number } }).internal.getNumberOfPages()
+  const totalPages = (
+    doc as unknown as { internal: { getNumberOfPages: () => number } }
+  ).internal.getNumberOfPages()
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i)
     if (i > 1) {
@@ -536,7 +651,11 @@ export async function generateMeteoBulletin(data: BulletinData): Promise<void> {
   const blob = doc.output('blob')
   const file = new File([blob], filename, { type: 'application/pdf' })
 
-  if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare?.({ files: [file] })) {
+  if (
+    typeof navigator !== 'undefined' &&
+    navigator.share &&
+    navigator.canShare?.({ files: [file] })
+  ) {
     try {
       await navigator.share({
         title: `Bulletin Météo Agricole — ${data.city}`,

@@ -15,7 +15,7 @@ export const SECURITY_HEADERS = {
 
 /**
  * Content Security Policy — strict but functional.
- * 
+ *
  * NOTE: 'unsafe-inline' for scripts is required by Next.js for inline scripts.
  * When strict-dynamic is present, unsafe-inline is ignored by modern browsers
  * but serves as a fallback for older ones.
@@ -30,5 +30,5 @@ export const CSP_DIRECTIVES = [
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
-  "upgrade-insecure-requests",
+  'upgrade-insecure-requests',
 ].join('; ')

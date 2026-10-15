@@ -196,6 +196,7 @@ type Sheet =
   | 'market'
   | 'residence'
   | 'avatar'
+  | 'player'
   | null
 type Mode = 'walk' | 'build' | 'demolish'
 /** The module a HarooLife address opens inside the single 3D world. */
@@ -467,6 +468,10 @@ export function LomeLifeImmersive() {
   const [loaded, setLoaded] = useState(false)
   const [webgl, setWebgl] = useState<boolean | null>(null)
   const [panel, setPanel] = useState<Sheet>(null)
+  // A player touched in the street (presence key), and the conversation to open in the phone.
+  const [playerKey, setPlayerKey] = useState<string | null>(null)
+  const [playerNote, setPlayerNote] = useState('')
+  const [chatRoom, setChatRoom] = useState<string | null>(null)
   const [mode, setMode] = useState<Mode>('walk')
   const [building, setBuilding] = useState<BuildType>('house')
   const [selection, setSelection] = useState<{ x: number; y: number } | null>(null)
@@ -549,9 +554,11 @@ export function LomeLifeImmersive() {
                                 ? 'Coopérative'
                                 : panel === 'avatar'
                                   ? 'Mon apparence'
-                                  : panel === 'market'
-                                    ? 'Marché'
-                                    : ''
+                                  : panel === 'player'
+                                    ? 'Joueur'
+                                    : panel === 'market'
+                                      ? 'Marché'
+                                      : ''
   const needs = life.needs
   const wellbeing = Math.round(NEED_KEYS.reduce((sum, k) => sum + needs[k], 0) / NEED_KEYS.length)
   const pending = eventById(life.pendingEvent)
@@ -599,7 +606,12 @@ export function LomeLifeImmersive() {
     ;(window as unknown as { __LOME_REALTIME?: unknown }).__LOME_REALTIME = {
       status: realtime.state.status,
       me: realtime.state.me?.name ?? null,
-      rooms: realtime.state.me?.rooms.length ?? 0,
+      // Group rooms; private conversations counted apart (they accumulate over a session).
+      rooms: realtime.state.me?.rooms.filter((r) => !r.startsWith('dm:')).length ?? 0,
+      dms: realtime.state.me?.rooms.filter((r) => r.startsWith('dm:')).length ?? 0,
+      loaded: Object.fromEntries(
+        Object.entries(realtime.state.rooms).map(([r, list]) => [r, list.length]),
+      ),
       present: realtime.state.present.map((p) => p.name),
       unread: unreadTotal,
       outbox: realtime.state.outbox.map((o) => o.state),
@@ -1072,6 +1084,7 @@ export function LomeLifeImmersive() {
   function open(id: Exclude<Sheet, null>) {
     setPanel((cur) => (cur === id ? null : id))
     setNotice(null)
+    setChatRoom(null)
   }
   // Starting a walk or a ride from a sheet closes the map in the same action, so nothing on
   // the map bar is left under the finger for a frame.
@@ -1398,6 +1411,11 @@ export function LomeLifeImmersive() {
             onLotIcon={(lot) => {
               setSelectedLot(lot)
               setPanel('lot')
+            }}
+            onPlayer={(key) => {
+              setPlayerKey(key)
+              setPlayerNote('')
+              setPanel('player')
             }}
             filter={cityFilter}
             selectedLot={selectedLot}
@@ -2355,6 +2373,8 @@ export function LomeLifeImmersive() {
                 )}
                 {panel === 'messages' && realtime.state.status !== 'disabled' && (
                   <LiveChat
+                    key={chatRoom ?? 'rooms'}
+                    initialRoom={chatRoom}
                     client={realtime.client}
                     state={realtime.state}
                     locality={cityLife.locality === 'kara' ? 'kara' : 'lome'}
@@ -2574,6 +2594,93 @@ export function LomeLifeImmersive() {
                     </div>
                   </>
                 )}
+                {panel === 'player' &&
+                  playerKey &&
+                  (() => {
+                    const who = realtime.state.present.find((p) => p.key === playerKey)
+                    const name = who?.name ?? 'Joueur'
+                    const blocked = realtime.state.me?.blocked.includes(playerKey) ?? false
+                    const offline = !realtime.client || realtime.state.status !== 'online'
+                    return (
+                      <div className="space-y-3" data-testid="player-sheet">
+                        <div className="flex items-center gap-3">
+                          <span
+                            aria-hidden
+                            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#195f51] text-xl font-black text-white"
+                          >
+                            {name.slice(0, 1).toUpperCase()}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-lg font-black">{name}</p>
+                            <p className="text-sm text-slate-500">
+                              {who
+                                ? `Joueur réel · en ligne à ${who.locality ? LOCALITIES[who.locality].name : 'HarooLife'}`
+                                : 'Joueur réel · vient de partir'}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={offline || blocked}
+                          onClick={async () => {
+                            const c = realtime.client
+                            if (!c) return
+                            setPlayerNote('')
+                            const r = await c.openDm(playerKey)
+                            if ('error' in r) setPlayerNote(r.error)
+                            else {
+                              setChatRoom(r.room)
+                              setPanel('messages')
+                            }
+                          }}
+                          className="block w-full rounded-2xl bg-emerald-600 px-4 py-4 text-base font-black text-white shadow disabled:opacity-50"
+                        >
+                          💬 Discuter avec {name}
+                        </button>
+                        <p className="text-xs text-slate-500">
+                          {offline
+                            ? 'La discussion en direct n’est pas disponible pour le moment.'
+                            : blocked
+                              ? 'Tu as bloqué ce joueur : vous ne pouvez plus vous écrire.'
+                              : 'Conversation privée : vous seuls la lisez. Bloquer la ferme aussitôt, des deux côtés.'}
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={offline || blocked}
+                            onClick={async () => {
+                              const e = await realtime.client?.blockPlayer(playerKey)
+                              setPlayerNote(
+                                e ?? `${name} est bloqué : vous ne pouvez plus vous écrire.`,
+                              )
+                            }}
+                            className="flex-1 rounded-xl bg-slate-100 px-3 py-3 text-sm font-bold text-slate-800 disabled:opacity-50"
+                          >
+                            🚫 Bloquer
+                          </button>
+                          <button
+                            type="button"
+                            disabled={offline}
+                            onClick={async () => {
+                              const e = await realtime.client?.reportPlayer(
+                                playerKey,
+                                'Signalé depuis sa fiche dans la rue',
+                              )
+                              setPlayerNote(e ?? 'Joueur signalé à l’équipe. Merci.')
+                            }}
+                            className="flex-1 rounded-xl bg-slate-100 px-3 py-3 text-sm font-bold text-slate-800 disabled:opacity-50"
+                          >
+                            🚩 Signaler
+                          </button>
+                        </div>
+                        {playerNote && (
+                          <output className="block rounded-xl bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+                            {playerNote}
+                          </output>
+                        )}
+                      </div>
+                    )
+                  })()}
                 {panel === 'lot' &&
                   selectedLot &&
                   (() => {

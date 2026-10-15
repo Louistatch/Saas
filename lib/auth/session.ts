@@ -57,25 +57,29 @@ export function getUserId(): string | null {
 export function destroySession() {
   // Clear sessionStorage (tab-specific)
   sessionStorage.clear()
-  
+
   // Clear localStorage (shared across tabs)
   const keysToRemove: string[] = []
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i)
-    if (key && (
-      key.startsWith('sb-') || // Supabase keys
-      key.startsWith('fh_') || // Our keys
-      key.startsWith('supabase') ||
-      key === 'current_coop_id'
-    )) {
+    if (
+      key &&
+      (key.startsWith('sb-') || // Supabase keys
+        key.startsWith('fh_') || // Our keys
+        key.startsWith('supabase') ||
+        key === 'current_coop_id')
+    ) {
       keysToRemove.push(key)
     }
   }
-  keysToRemove.forEach(k => localStorage.removeItem(k))
-  
+  keysToRemove.forEach((k) => localStorage.removeItem(k))
+
   // Clear all cookies (best-effort — httpOnly cookies CAN'T be cleared from JS,
   // they must be cleared by the server via /api/auth/logout)
-  const cookieNames = document.cookie.split(';').map((c) => c.trim().split('=')[0]).filter(Boolean)
+  const cookieNames = document.cookie
+    .split(';')
+    .map((c) => c.trim().split('=')[0])
+    .filter(Boolean)
   // Also try common Supabase cookie names that may not appear in document.cookie if httpOnly
   const supabaseCookieNames = cookieNames.filter((n) => n.startsWith('sb-'))
   const allNames = [...new Set([...cookieNames, ...supabaseCookieNames])]

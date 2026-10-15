@@ -54,7 +54,7 @@ const subOf = (token: string): string | null => {
   }
 }
 
-export async function pgliteChat(migrationPath: string): Promise<ChatRepository> {
+export async function pgliteChat(migrationPaths: string | string[]): Promise<ChatRepository> {
   if (process.env.NODE_ENV === 'production' && process.env.HAROOLIFE_REALTIME_ALLOW_PGLITE !== '1')
     throw new Error('PGlite repository is for local development and tests only.')
   const db = new PGlite()
@@ -76,7 +76,7 @@ export async function pgliteChat(migrationPath: string): Promise<ChatRepository>
       .map((a) => `('${a.id}','${LOCAL_CANTONS[a.canton]}','${a.name}',${a.pagne},true)`)
       .join(',')};
   `)
-  await db.exec(readFileSync(migrationPath, 'utf8'))
+  for (const path of [migrationPaths].flat()) await db.exec(readFileSync(path, 'utf8'))
   await db.exec('SET ROLE authenticated')
   // One connection: run each call alone (set the subject, then the function).
   let queue: Promise<unknown> = Promise.resolve()
@@ -96,7 +96,8 @@ export async function pgliteChat(migrationPath: string): Promise<ChatRepository>
           /non autorisé|Connexion requise|introuvable|Compte inconnu/.test(msg)
         )
           throw new RepoError('forbidden', msg)
-        if (/Trop de messages/.test(msg)) throw new RepoError('rate_limited', msg)
+        if (/Trop de (nouvelles conversations|messages)/.test(msg))
+          throw new RepoError('rate_limited', msg)
         if (code === '22023' || code === '23514') throw new RepoError('invalid', msg)
         throw new RepoError('unavailable', 'Base locale indisponible.')
       }
@@ -121,5 +122,11 @@ export async function pgliteChat(migrationPath: string): Promise<ChatRepository>
       await run(t, 'SELECT haroolife_chat_report($1,$2)', [id, reason])
     },
     block: (t, id) => run<string>(t, 'SELECT haroolife_chat_block($1)', [id]),
+    dmOpen: (t, key) => run(t, 'SELECT haroolife_dm_open($1)', [key]),
+    dmPeers: (t) => run(t, 'SELECT haroolife_dm_peers()', []),
+    blockKey: (t, key) => run<string>(t, 'SELECT haroolife_chat_block_key($1)', [key]),
+    reportUser: async (t, key, reason) => {
+      await run(t, 'SELECT haroolife_chat_report_user($1,$2)', [key, reason])
+    },
   }
 }

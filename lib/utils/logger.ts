@@ -6,8 +6,7 @@
 type Level = 'debug' | 'info' | 'warn' | 'error'
 
 const isProd = process.env.NODE_ENV === 'production'
-const isDebug =
-  typeof process !== 'undefined' && process.env.NEXT_PUBLIC_DEBUG === '1'
+const isDebug = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_DEBUG === '1'
 
 function emit(level: Level, scope: string, args: unknown[]) {
   if (isProd && level !== 'error' && !isDebug) return

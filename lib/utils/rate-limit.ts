@@ -18,11 +18,7 @@ export interface RateLimitResult {
   resetAt: number
 }
 
-export function rateLimit(
-  key: string,
-  limit: number,
-  windowMs: number,
-): RateLimitResult {
+export function rateLimit(key: string, limit: number, windowMs: number): RateLimitResult {
   const now = Date.now()
   const bucket = buckets.get(key)
   if (!bucket || bucket.resetAt < now) {
@@ -37,17 +33,12 @@ export function rateLimit(
   return { ok: true, remaining: bucket.tokens, resetAt: bucket.resetAt }
 }
 
-const UUID_RE =
-  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
 
 export function isUuid(value: string | null): value is string {
   return !!value && UUID_RE.test(value)
 }
 
 export function clientKeyFromHeaders(headers: Headers): string {
-  return (
-    headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    headers.get('x-real-ip') ||
-    'anon'
-  )
+  return headers.get('x-forwarded-for')?.split(',')[0]?.trim() || headers.get('x-real-ip') || 'anon'
 }

@@ -74,10 +74,7 @@ export function scoreListingForRequest(
   return { listing_id: listing.id, score, reasons }
 }
 
-export function rankListings(
-  listings: ListingSummary[],
-  request: BuyerRequest,
-): MatchResult[] {
+export function rankListings(listings: ListingSummary[], request: BuyerRequest): MatchResult[] {
   return listings
     .map((listing) => scoreListingForRequest(listing, request))
     .filter((result) => result.score >= 40)

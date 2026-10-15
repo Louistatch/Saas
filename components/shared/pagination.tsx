@@ -29,8 +29,11 @@ export function PaginationBar({
       className={`flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-t border-border pt-4 mt-2 ${className ?? ''}`}
     >
       <p className="text-xs text-muted-foreground">
-        Affichage de <strong className="text-foreground">{start}-{end}</strong> sur{' '}
-        <strong className="text-foreground">{total}</strong>
+        Affichage de{' '}
+        <strong className="text-foreground">
+          {start}-{end}
+        </strong>{' '}
+        sur <strong className="text-foreground">{total}</strong>
       </p>
       <div className="flex items-center gap-2">
         <Button

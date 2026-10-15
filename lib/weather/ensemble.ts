@@ -29,7 +29,9 @@ export interface RainProbability {
 
 const cache = new Map<string, { at: number; data: RainProbability }>()
 
-export async function fetchEnsembleRainProbability(region: string): Promise<RainProbability | null> {
+export async function fetchEnsembleRainProbability(
+  region: string,
+): Promise<RainProbability | null> {
   const hit = cache.get(region)
   if (hit && Date.now() - hit.at < TTL_MS) return hit.data
   const coords = getRegionCoords(region)
@@ -97,7 +99,10 @@ export function membersToProbability(hourly: Record<string, unknown>): RainProba
   for (const [day, sums] of daySums) {
     const valid = sums.filter((x) => Number.isFinite(x))
     if (valid.length) {
-      daily.set(day, Math.round((valid.filter((x) => x >= DAY_THRESHOLD_MM).length / valid.length) * 100))
+      daily.set(
+        day,
+        Math.round((valid.filter((x) => x >= DAY_THRESHOLD_MM).length / valid.length) * 100),
+      )
     }
   }
   return { daily, hourly: hourly_, members: series.length }

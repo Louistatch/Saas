@@ -78,23 +78,44 @@ export function CardSvgPreview({
 
   useEffect(() => {
     let cancelled = false
-    if (!photoUrl) { setPhotoDataUrl(null); return }
-    urlToDataUrl(photoUrl).then((v) => { if (!cancelled) setPhotoDataUrl(v) })
-    return () => { cancelled = true }
+    if (!photoUrl) {
+      setPhotoDataUrl(null)
+      return
+    }
+    urlToDataUrl(photoUrl).then((v) => {
+      if (!cancelled) setPhotoDataUrl(v)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [photoUrl])
 
   useEffect(() => {
     let cancelled = false
-    if (!cooperativeLogoUrl) { setCoopLogoData(null); return }
-    urlToDataUrl(cooperativeLogoUrl).then((v) => { if (!cancelled) setCoopLogoData(v) })
-    return () => { cancelled = true }
+    if (!cooperativeLogoUrl) {
+      setCoopLogoData(null)
+      return
+    }
+    urlToDataUrl(cooperativeLogoUrl).then((v) => {
+      if (!cancelled) setCoopLogoData(v)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [cooperativeLogoUrl])
 
   useEffect(() => {
     let cancelled = false
-    if (!faitiereLogoUrl) { setFaitiereLogoData(null); return }
-    urlToDataUrl(faitiereLogoUrl).then((v) => { if (!cancelled) setFaitiereLogoData(v) })
-    return () => { cancelled = true }
+    if (!faitiereLogoUrl) {
+      setFaitiereLogoData(null)
+      return
+    }
+    urlToDataUrl(faitiereLogoUrl).then((v) => {
+      if (!cancelled) setFaitiereLogoData(v)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [faitiereLogoUrl])
 
   const svgString = useMemo(() => {
@@ -121,7 +142,26 @@ export function CardSvgPreview({
       template,
     })
     return renderToSvgString(schema, photoDataUrl)
-  }, [firstName, lastName, phone, photoUrl, photoDataUrl, village, canton, prefecture, region, cardNumber, expiryDate, createdAt, cooperativeName, faitiereName, coopLogoData, faitiereLogoData, level, template])
+  }, [
+    firstName,
+    lastName,
+    phone,
+    photoUrl,
+    photoDataUrl,
+    village,
+    canton,
+    prefecture,
+    region,
+    cardNumber,
+    expiryDate,
+    createdAt,
+    cooperativeName,
+    faitiereName,
+    coopLogoData,
+    faitiereLogoData,
+    level,
+    template,
+  ])
 
   return (
     <div

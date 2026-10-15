@@ -10,10 +10,16 @@ export const PROTOCOL_VERSION = 1
 export const LOCALITIES = ['lome', 'kara'] as const
 export type Locality = (typeof LOCALITIES)[number]
 
-/** world:togo · locality:lome · canton:<uuid> · coop:<uuid> (dm: absent until a consent policy exists). */
+/**
+ * world:togo · locality:lome · canton:<uuid> · coop:<uuid> · dm:<key>:<key> (a private
+ * conversation between two players met in the street, keys sorted; consent rules in Postgres:
+ * either side's block closes it, at most 20 new conversations a day).
+ */
 export type RoomId = string
 export const ROOM_PATTERN =
-  /^(world:togo|locality:(lome|kara)|canton:[0-9a-f-]{36}|coop:[0-9a-f-]{36})$/
+  /^(world:togo|locality:(lome|kara)|canton:[0-9a-f-]{36}|coop:[0-9a-f-]{36}|dm:[0-9a-f]{16}:[0-9a-f]{16})$/
+export const KEY_PATTERN = /^[0-9a-f]{16}$/
+export const isDm = (room: RoomId) => room.startsWith('dm:')
 
 export const LIMITS = {
   body: 500,
@@ -50,6 +56,8 @@ export interface Me extends Author {
   rooms: RoomId[]
   blocked: string[]
 }
+/** The other person of a private conversation. */
+export type Peer = Author
 export interface PresenceEntry extends Author {
   locality: Locality | null
 }
@@ -98,6 +106,13 @@ export interface ClientToServer {
     ack: (r: Ack<{ present: PresenceEntry[] }>) => void,
   ) => void
   'player:pose': (p: Pose) => void
+  /** Open (or find) the private conversation with a player met in the street, by their key. */
+  'dm:open': (p: { key: string }, ack: (r: Ack<{ room: RoomId; peer: Peer }>) => void) => void
+  /** Names of the people of my private conversations (room → peer). */
+  'dm:peers': (p: object, ack: (r: Ack<{ peers: Record<RoomId, Peer> }>) => void) => void
+  /** From a player's sheet: block them (closes any private conversation) or report them. */
+  'player:block': (p: { key: string }, ack: (r: Ack<{ key: string }>) => void) => void
+  'player:report': (p: { key: string; reason: string }, ack: (r: Ack<object>) => void) => void
 }
 export interface ServerToClient {
   'chat:new': (m: ChatMessage) => void
@@ -109,4 +124,8 @@ export interface ServerToClient {
   'player:snapshot': (p: { key: string; pose: Pose; t: number }) => void
   'system:error': (p: { code: ErrorCode; error: string }) => void
   'system:hello': (p: { v: number; me: Me }) => void
+  /** A private conversation is now open to me (I opened it, or someone met me and did). */
+  'dm:opened': (p: { room: RoomId; peer: Peer }) => void
+  /** A private conversation was closed (a block, on either side). */
+  'dm:closed': (p: { room: RoomId }) => void
 }

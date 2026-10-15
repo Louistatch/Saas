@@ -51,10 +51,11 @@ export async function tryDirectAction(parsed: ParsedQuery): Promise<ActionResult
 
 async function handleSalutation(_parsed: ParsedQuery): Promise<ActionResult> {
   return {
-    response: 'Bonjour ! Je suis AgriTogo, votre assistant agricole. '
-      + 'Je peux vous renseigner sur les prix du marché, les tendances, '
-      + 'les prévisions de rendement, et vous conseiller pour vos décisions. '
-      + 'Posez-moi votre question !',
+    response:
+      'Bonjour ! Je suis AgriTogo, votre assistant agricole. ' +
+      'Je peux vous renseigner sur les prix du marché, les tendances, ' +
+      'les prévisions de rendement, et vous conseiller pour vos décisions. ' +
+      'Posez-moi votre question !',
     engine: 'direct-data',
   }
 }
@@ -64,8 +65,9 @@ async function handleSalutation(_parsed: ParsedQuery): Promise<ActionResult> {
 async function handlePrix(parsed: ParsedQuery): Promise<ActionResult | null> {
   if (!parsed.produit) {
     return {
-      response: 'De quel produit voulez-vous connaître le prix ? '
-        + 'Par exemple : maïs, riz, soja, igname, tomate, arachide...',
+      response:
+        'De quel produit voulez-vous connaître le prix ? ' +
+        'Par exemple : maïs, riz, soja, igname, tomate, arachide...',
       engine: 'direct-data',
     }
   }
@@ -147,7 +149,13 @@ async function handlePrix(parsed: ParsedQuery): Promise<ActionResult | null> {
   // relevé périmé doit être annoncé comme tel — un producteur peut brader sa
   // récolte sur un chiffre de quatre mois.
   const ageLabel = (d: number) =>
-    d <= 0 ? "aujourd'hui" : d === 1 ? 'hier' : d < 31 ? `il y a ${d} jours` : `il y a ${Math.floor(d / 30)} mois`
+    d <= 0
+      ? "aujourd'hui"
+      : d === 1
+        ? 'hier'
+        : d < 31
+          ? `il y a ${d} jours`
+          : `il y a ${Math.floor(d / 30)} mois`
   const freshest = Math.min(...[...byMarket.values()].map((v) => v.ageDays))
   const staleWarning =
     freshest > 14
@@ -155,7 +163,7 @@ async function handlePrix(parsed: ParsedQuery): Promise<ActionResult | null> {
       : ''
 
   // Calculate average
-  const allPrices = prices.map(p => Number(p.price))
+  const allPrices = prices.map((p) => Number(p.price))
   const avg = Math.round(allPrices.reduce((a, b) => a + b, 0) / allPrices.length)
   const min = Math.min(...allPrices)
   const max = Math.max(...allPrices)
@@ -185,8 +193,9 @@ async function handlePrix(parsed: ParsedQuery): Promise<ActionResult | null> {
 async function handleTendance(parsed: ParsedQuery): Promise<ActionResult | null> {
   if (!parsed.produit) {
     return {
-      response: 'Pour quel produit voulez-vous connaître la tendance ? '
-        + 'Exemples : maïs, riz, soja, igname...',
+      response:
+        'Pour quel produit voulez-vous connaître la tendance ? ' +
+        'Exemples : maïs, riz, soja, igname...',
       engine: 'direct-data',
     }
   }
@@ -224,7 +233,7 @@ async function handleTendance(parsed: ParsedQuery): Promise<ActionResult | null>
     }
   }
 
-  const prixList = prices.map(p => Number(p.price))
+  const prixList = prices.map((p) => Number(p.price))
   const recent = prixList.slice(0, Math.min(3, prixList.length))
   const ancien = prixList.slice(-Math.min(3, prixList.length))
 
@@ -238,15 +247,23 @@ async function handleTendance(parsed: ParsedQuery): Promise<ActionResult | null>
 
   let emoji: string
   let label: string
-  if (variation > 5) { emoji = '📈'; label = 'HAUSSE' }
-  else if (variation < -5) { emoji = '📉'; label = 'BAISSE' }
-  else { emoji = '➡️'; label = 'STABLE' }
+  if (variation > 5) {
+    emoji = '📈'
+    label = 'HAUSSE'
+  } else if (variation < -5) {
+    emoji = '📉'
+    label = 'BAISSE'
+  } else {
+    emoji = '➡️'
+    label = 'STABLE'
+  }
 
   const suffix = parsed.marche ? ` à ${parsed.marche}` : ''
-  const response = `${emoji} **${culture.name}${suffix}** : tendance **${label}** (${variation > 0 ? '+' : ''}${variation.toFixed(1)}%)\n\n`
-    + `• Prix moyen : ${avg} FCFA/kg\n`
-    + `• Min : ${min} FCFA/kg | Max : ${max} FCFA/kg\n`
-    + `• Basé sur ${prixList.length} observations`
+  const response =
+    `${emoji} **${culture.name}${suffix}** : tendance **${label}** (${variation > 0 ? '+' : ''}${variation.toFixed(1)}%)\n\n` +
+    `• Prix moyen : ${avg} FCFA/kg\n` +
+    `• Min : ${min} FCFA/kg | Max : ${max} FCFA/kg\n` +
+    `• Basé sur ${prixList.length} observations`
 
   return { response, engine: 'direct-data' }
 }
@@ -256,7 +273,7 @@ async function handleTendance(parsed: ParsedQuery): Promise<ActionResult | null>
 async function handleListeProduits(): Promise<ActionResult> {
   const supabase = await createClient()
   const { data } = await supabase.from('cultures').select('name, category').order('name')
-  const produits = (data ?? []).map(p => p.name).join(', ')
+  const produits = (data ?? []).map((p) => p.name).join(', ')
   return {
     response: `📋 **Produits disponibles** (${data?.length ?? 0}) :\n${produits}`,
     engine: 'direct-data',
@@ -272,7 +289,7 @@ async function handleListeMarches(): Promise<ActionResult> {
     .order('market_name')
     .limit(200)
 
-  const marches = [...new Set((data ?? []).map(m => m.market_name))].sort()
+  const marches = [...new Set((data ?? []).map((m) => m.market_name))].sort()
   return {
     response: `📍 **Marchés disponibles** (${marches.length}) :\n${marches.join(', ')}`,
     engine: 'direct-data',
@@ -286,16 +303,22 @@ async function handleMLProxy(parsed: ParsedQuery, module: string): Promise<Actio
   if (!agritogoUrl) return null // Fallback to LLM if AgriTogo not configured
 
   try {
-    const endpoint = module === 'kpi' ? '/api/v1/kpi' :
-      module === 'crop-yield' ? '/api/v1/forecast' :
-      `/api/v1/${module === 'garch' ? 'forecast' : module}`
+    const endpoint =
+      module === 'kpi'
+        ? '/api/v1/kpi'
+        : module === 'crop-yield'
+          ? '/api/v1/forecast'
+          : `/api/v1/${module === 'garch' ? 'forecast' : module}`
 
     const method = module === 'kpi' ? 'GET' : 'POST'
-    const body = method === 'POST' ? JSON.stringify({
-      produit: parsed.produit ?? 'Maïs',
-      periods: 30,
-      n_clusters: 4,
-    }) : undefined
+    const body =
+      method === 'POST'
+        ? JSON.stringify({
+            produit: parsed.produit ?? 'Maïs',
+            periods: 30,
+            n_clusters: 4,
+          })
+        : undefined
 
     const res = await fetch(`${agritogoUrl}${endpoint}`, {
       method,
@@ -316,7 +339,11 @@ async function handleMLProxy(parsed: ParsedQuery, module: string): Promise<Actio
   }
 }
 
-function formatMLResult(module: string, data: Record<string, unknown>, produit: string | null): string {
+function formatMLResult(
+  module: string,
+  data: Record<string, unknown>,
+  produit: string | null,
+): string {
   switch (module) {
     case 'crop-yield':
     case 'garch': {
@@ -324,10 +351,12 @@ function formatMLResult(module: string, data: Record<string, unknown>, produit: 
       const product = (d.product as string) ?? produit ?? 'Maïs'
       const lastPrice = d.last_price_fcfa ?? '?'
       const vol = (d.historical_volatility_stats as Record<string, unknown>)?.current ?? '?'
-      return `📈 **Prévision ${product}** :\n`
-        + `• Dernier prix : ${lastPrice} FCFA/kg\n`
-        + `• Volatilité actuelle : ${vol}\n`
-        + `• ${(d.summary as string) ?? 'Analyse en cours...'}`
+      return (
+        `📈 **Prévision ${product}** :\n` +
+        `• Dernier prix : ${lastPrice} FCFA/kg\n` +
+        `• Volatilité actuelle : ${vol}\n` +
+        `• ${(d.summary as string) ?? 'Analyse en cours...'}`
+      )
     }
     case 'risk': {
       const d = data as Record<string, unknown>

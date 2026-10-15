@@ -74,7 +74,10 @@ const send = (c: C, room: string, body: string, clientId = crypto.randomUUID()) 
 
 describe('HarooLife Socket.IO relay', () => {
   before(async () => {
-    const chat = await pgliteChat('supabase/migrations/20261013_120000_haroolife_realtime_chat.sql')
+    const chat = await pgliteChat([
+      'supabase/migrations/20261013_120000_haroolife_realtime_chat.sql',
+      'supabase/migrations/20261015_120000_haroolife_chat_dm.sql',
+    ])
     relay = createRealtime({
       auth,
       chat,
@@ -290,5 +293,67 @@ describe('HarooLife Socket.IO relay', () => {
     )
     assert.equal(err.data?.code, 'disabled')
     disabled = false
+  })
+  it('private conversation: opened by key, joined live on both sides, closed by a block', async () => {
+    const ama = connect('ama')
+    const yawa = connect('yawa')
+    const kofi = connect('kofi')
+    const hello = await Promise.all([
+      next(ama, 'system:hello'),
+      next(yawa, 'system:hello'),
+      next(kofi, 'system:hello'),
+    ])
+    const [amaKey, yawaKey] = [hello[0].me.key, hello[1].me.key]
+    // Ama met Yawa in the street (her key comes from presence) and opens a conversation.
+    const yawaTold = next(yawa, 'dm:opened')
+    const opened = await ama.timeout(4000).emitWithAck('dm:open', { key: yawaKey })
+    assert.equal(opened.ok, true)
+    if (!opened.ok) return
+    const room = opened.room
+    assert.equal(room, `dm:${[amaKey, yawaKey].sort().join(':')}`)
+    assert.equal(opened.peer.name, 'Yawa (test)')
+    // Yawa is joined at once (no reconnection) and learns who wrote.
+    const told = await yawaTold
+    assert.equal(told.room, room)
+    assert.equal(told.peer.name, 'Ama (test)')
+
+    const yawaGets = next(yawa, 'chat:new')
+    const kofiSilent = silent(kofi, 'chat:new')
+    const sent = await send(ama, room, 'On se voit au marché ?')
+    assert.equal(sent.ok, true)
+    assert.equal((await yawaGets).body, 'On se voit au marché ?')
+    assert.equal(await kofiSilent, true, 'a third person never receives a private message')
+    assert.equal((await send(yawa, room, 'Oui, à 16 h')).ok, true)
+    // Kofi can neither write nor read it.
+    const intrus = await send(kofi, room, 'je m’invite')
+    assert.equal(intrus.ok, false)
+    const peek = await kofi.timeout(3000).emitWithAck('chat:history', { room })
+    assert.equal(peek.ok, false)
+    // Names of the conversations, for the phone.
+    const peers = await yawa.timeout(3000).emitWithAck('dm:peers', {})
+    assert.equal(peers.ok && peers.peers[room]?.name, 'Ama (test)')
+    // A reconnection finds the conversation in the granted rooms.
+    yawa.disconnect()
+    const again = connect('yawa')
+    assert.ok((await next(again, 'system:hello')).me.rooms.includes(room))
+
+    // Yawa blocks Ama from her sheet: the room closes on both sides, writing is refused.
+    const amaClosed = next(ama, 'dm:closed')
+    const blocked = await again.timeout(4000).emitWithAck('player:block', { key: amaKey })
+    assert.equal(blocked.ok, true)
+    assert.equal((await amaClosed).room, room)
+    const after = await send(ama, room, 'tu es là ?')
+    assert.equal(after.ok, false)
+    const reopen = await ama.timeout(4000).emitWithAck('dm:open', { key: yawaKey })
+    assert.equal(reopen.ok, false)
+    // Reporting a player from the sheet; an invalid key is refused before the database.
+    assert.equal(
+      (await kofi.timeout(3000).emitWithAck('player:report', { key: amaKey, reason: 'Insistant' }))
+        .ok,
+      true,
+    )
+    const bad = await kofi.timeout(3000).emitWithAck('dm:open', { key: "x' OR 1=1" })
+    assert.equal(bad.ok, false)
+    for (const c of [ama, again, kofi]) c.disconnect()
   })
 })

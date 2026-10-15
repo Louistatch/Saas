@@ -101,9 +101,7 @@ export function parseCsvWithHeaders<T extends Record<string, string | undefined>
   const grid = parseCsv(text)
   if (grid.length === 0) return { rows: [], missing: [...expected] }
   const headers = grid[0].map((h) => h.trim().toLowerCase())
-  const missing = expected.filter(
-    (e) => !headers.includes(e.toLowerCase()),
-  )
+  const missing = expected.filter((e) => !headers.includes(e.toLowerCase()))
   const rows: T[] = []
   for (let i = 1; i < grid.length; i++) {
     const obj: Record<string, string | undefined> = {}
@@ -119,10 +117,7 @@ export function parseCsvWithHeaders<T extends Record<string, string | undefined>
 /**
  * Convert an array of objects into a CSV string.
  */
-export function toCsv<T extends Record<string, unknown>>(
-  rows: T[],
-  columns: (keyof T)[],
-): string {
+export function toCsv<T extends Record<string, unknown>>(rows: T[], columns: (keyof T)[]): string {
   const escapeCell = (v: unknown) => {
     const s = v == null ? '' : String(v)
     if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`

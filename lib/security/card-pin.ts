@@ -53,7 +53,9 @@ export function isWeakPin(pin: string): boolean {
 
 export function generatePin(): string {
   for (;;) {
-    const pin = randomInt(0, 10 ** PIN_LENGTH).toString().padStart(PIN_LENGTH, '0')
+    const pin = randomInt(0, 10 ** PIN_LENGTH)
+      .toString()
+      .padStart(PIN_LENGTH, '0')
     if (!isWeakPin(pin)) return pin
   }
 }
@@ -134,7 +136,10 @@ interface PinRow {
   locked_until: string | null
 }
 
-export async function loginWithCardPin(rawCardNumber: string, rawPin: string): Promise<PinLoginResult> {
+export async function loginWithCardPin(
+  rawCardNumber: string,
+  rawPin: string,
+): Promise<PinLoginResult> {
   if (!isCardAuthConfigured()) return { ok: false, reason: 'not_configured' }
   const cardNumber = normalizedCardNumber(rawCardNumber)
   const pin = rawPin.trim()
@@ -166,8 +171,7 @@ export async function loginWithCardPin(rawCardNumber: string, rawPin: string): P
     const next = row.failed_attempts + 1
     // Dès le 5e échec d'un bloc, on ferme la carte avant même de répondre.
     const blocks = Math.floor(next / BLOCK)
-    const lockMs =
-      next % BLOCK === 0 ? Math.min(BASE_LOCK_MS * 2 ** (blocks - 1), MAX_LOCK_MS) : 0
+    const lockMs = next % BLOCK === 0 ? Math.min(BASE_LOCK_MS * 2 ** (blocks - 1), MAX_LOCK_MS) : 0
     const { data } = await supabase
       .from('card_pins')
       .update({

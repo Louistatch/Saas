@@ -22,6 +22,7 @@ type Live = {
   status: string
   me: string | null
   rooms: number
+  dms: number
   present: string[]
   unread: number
   outbox: string[]
@@ -73,14 +74,19 @@ async function player(browser: Browser, who: 'ama' | 'yawa', device: object) {
   await expect.poll(async () => (await rt(page))?.status, { timeout: 30000 }).toBe('online')
   return { context, page, errors }
 }
-async function openChat(page: Page, room: string) {
+async function openChat(page: Page, room: string | RegExp) {
+  // Already in the discussions (a private conversation was open): switch room in place.
+  if (await page.getByRole('region', { name: 'Discussions en direct' }).isVisible()) {
+    await page.getByRole('button', { name: room, exact: typeof room === 'string' }).click()
+    return
+  }
   await page
     .getByRole('navigation', { name: 'Navigation du jeu' })
     .getByRole('button', { name: 'Téléphone' })
     .click()
   await page.getByRole('button', { name: /Messages$/ }).click()
   await expect(page.getByRole('region', { name: 'Discussions en direct' })).toBeVisible()
-  await page.getByRole('button', { name: room, exact: true }).click()
+  await page.getByRole('button', { name: room, exact: typeof room === 'string' }).click()
 }
 const log = (page: Page) => page.getByRole('log')
 
@@ -126,6 +132,7 @@ test('two people chat in real time, survive a network cut and a reload, and see 
     })
   await ama.page.bringToFront()
   await ama.page.keyboard.down('ArrowRight')
+  const walkedFrom = Date.now()
   await expect.poll(remote, { timeout: 15000 }).not.toBeNull()
   await expect
     .poll(() =>
@@ -162,6 +169,7 @@ test('two people chat in real time, survive a network cut and a reload, and see 
       }),
   )
   await ama.page.keyboard.up('ArrowRight')
+  const walkedMs = Date.now() - walkedFrom
   const span = (frames[frames.length - 1].t - frames[0].t) / 1000
   const fps = (frames.length - 1) / span
   const dist = Math.hypot(
@@ -199,6 +207,39 @@ test('two people chat in real time, survive a network cut and a reload, and see 
   // HarooLife street: 2 units per cell (the limit was 14 at the former 1.35 units per cell).
   expect(Math.max(...steps), 'no jump').toBeLessThan((14 * 2) / 1.35)
   await yawa.page.screenshot({ path: testInfo.outputPath('realtime-remote-avatar.png') })
+
+  // 2b. Ama touches Yawa's name tag in the street: her sheet, then a private conversation that
+  //     only the two of them read (Kofi's client never receives it).
+  await ama.page.bringToFront()
+  const tag = ama.page.getByRole('button', { name: 'Joueur Yawa (test)', exact: true })
+  // Ama walked right; she walks back as long, then step by step until Yawa is on her screen.
+  await ama.page.keyboard.down('ArrowLeft')
+  await ama.page.waitForTimeout(walkedMs)
+  await ama.page.keyboard.up('ArrowLeft')
+  for (let i = 0; i < 10 && !(await tag.isVisible().catch(() => false)); i++) {
+    await ama.page.keyboard.down('ArrowLeft')
+    await ama.page.waitForTimeout(250)
+    await ama.page.keyboard.up('ArrowLeft')
+  }
+  await expect(tag).toBeVisible({ timeout: 10000 })
+  await tag.click()
+  const sheet = ama.page.getByTestId('player-sheet')
+  await expect(sheet).toContainText('Yawa (test)')
+  await ama.page.screenshot({ path: testInfo.outputPath('realtime-player-sheet.png') })
+  await sheet.getByRole('button', { name: /Discuter avec Yawa/ }).click()
+  await expect(log(ama.page)).toHaveAttribute('aria-label', 'Messages · Yawa (test)')
+  const secret = `Rendez-vous à 16 h, juste nous deux ${run}`
+  await ama.page.getByLabel('Écrire dans la discussion').fill(secret)
+  await ama.page.getByRole('button', { name: 'Envoyer le message', exact: true }).click()
+  await expect(log(ama.page)).toContainText(secret)
+  // On Yawa's phone the conversation appears by itself, named after Ama.
+  // The chip carries the unread count too.
+  await openChat(yawa.page, /^💬 Ama \(test\)/)
+  await expect(log(yawa.page)).toContainText(secret, { timeout: 5000 })
+  await yawa.page.getByLabel('Écrire dans la discussion').fill(`D’accord, à tout à l’heure ${run}`)
+  await yawa.page.getByRole('button', { name: 'Envoyer le message', exact: true }).click()
+  await expect(log(ama.page)).toContainText(`D’accord, à tout à l’heure ${run}`, { timeout: 5000 })
+  await yawa.page.screenshot({ path: testInfo.outputPath('realtime-private-android.png') })
 
   // 3. Canton chat: Ama writes, Yawa sees it without refreshing; Kofi (Kara) never does.
   await openChat(yawa.page, 'Mon canton')
@@ -263,6 +304,16 @@ test('two people chat in real time, survive a network cut and a reload, and see 
   // 7. Reload the phone: the conversation is still there (stored, not just broadcast).
   await yawa.page.reload({ waitUntil: 'domcontentloaded' })
   await expect.poll(async () => (await rt(yawa.page))?.status, { timeout: 30000 }).toBe('online')
+  // History is loaded room by room after the connection: wait for Lomé's, then read it.
+  await expect
+    .poll(() =>
+      yawa.page.evaluate(
+        () =>
+          (window as unknown as { __LOME_REALTIME?: { loaded: Record<string, number> } })
+            .__LOME_REALTIME?.loaded['locality:lome'] ?? 0,
+      ),
+    )
+    .toBeGreaterThan(0)
   await openChat(yawa.page, 'Lomé')
   await expect(log(yawa.page)).toContainText(`Pendant ta coupure ${run}`)
   await expect(log(yawa.page)).toContainText(`Je suis dans le taxi, j’arrive ${run}`)
@@ -270,6 +321,8 @@ test('two people chat in real time, survive a network cut and a reload, and see 
   // Kofi heard Lomé (city room he may read) but never the Bè canton.
   expect(kofiHeard).toContain(`Qui vient au stade ? ${run}`)
   expect(kofiHeard).not.toContain(text)
+  // … nor any private message between Ama and Yawa.
+  expect(kofiHeard.some((b) => b.includes('juste nous deux'))).toBe(false)
   kofi.disconnect()
 
   const after = await (await fetch(`${RELAY}/health`)).json()

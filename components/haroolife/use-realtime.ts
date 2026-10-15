@@ -19,6 +19,7 @@ const DISABLED: RealtimeSnapshot = {
   unread: {},
   typing: {},
   present: [],
+  peers: {},
   version: 0,
 }
 const noop = () => () => {}
