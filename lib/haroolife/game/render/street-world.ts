@@ -347,7 +347,9 @@ export class StreetWorld {
         g.add(plot)
         continue
       }
-      const height = 1.6 + b.floors * 1.5
+      // Low-rise, as in the prototype: the street stays readable from the game camera.
+      const floors = Math.min(4, b.floors)
+      const height = 1.4 + floors * 1.15
       const body = new THREE.Mesh(this.unitBox, this.mat(b.color))
       body.scale.set(b.w * U - 0.5, height, b.h * U - 0.5)
       body.position.set(x, height / 2, z)
@@ -361,10 +363,10 @@ export class StreetWorld {
       roof.castShadow = true
       g.add(roof)
       // A darker band of windows on each floor (reads as a building, not a block).
-      for (let f = 0; f < b.floors; f++) {
+      for (let f = 0; f < floors; f++) {
         const band = new THREE.Mesh(this.unitBox, this.mat('#5f7a86'))
-        band.scale.set(b.w * U - 0.45, 0.45, b.h * U - 0.45)
-        band.position.set(x, 1.3 + f * 1.5, z)
+        band.scale.set(b.w * U - 0.45, 0.4, b.h * U - 0.45)
+        band.position.set(x, 1.2 + f * 1.15, z)
         g.add(band)
       }
     }
@@ -531,7 +533,7 @@ export class StreetWorld {
     const aspect = this.width / this.height
     // The rig's distance (zoom buttons, pinch) sets the framing; 8 is the follow distance.
     const zoom = this.width < 650 ? 1.12 : 1
-    const size = Math.max(5.5, Math.min(40, 7.2 * (c.distance / 8))) / zoom
+    const size = Math.max(6, Math.min(40, 9 * (c.distance / 8))) / zoom
     const half = Math.max(size, (size * 1.15) / aspect)
     this.camera.left = -half * aspect
     this.camera.right = half * aspect

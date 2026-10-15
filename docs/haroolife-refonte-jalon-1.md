@@ -108,3 +108,46 @@ Ces étapes demandent de remplacer la ville PlayCanvas, qui porte aujourd'hui la
 - la rue courte avec commerces et piétons ;
 - la carte stylisée par quartiers ;
 - les transports.
+
+---
+
+# Jalon 2 (deuxième partie) : la rue et la carte claire (`?street=haroo`)
+
+## Ce qui change
+
+**La rue.** Le moteur `StreetWorld` (`lib/haroolife/game/render/street-world.ts`) dessine le quartier autour du joueur. Les données viennent de la ville du Saas (`core/street.ts`) : terrain, routes, lots et leurs portes, domaine du joueur. Il ajoute 6 piétons, qui sont des personnages du jeu (PNJ), et le taxi.
+
+**Les règles de marche ne sont pas dupliquées.** `StreetWorld` fait avancer le `PlayerController` existant (collisions, routes, portes, taxi) et renvoie ses événements au jeu, comme le faisait PlayCanvas. Les sauvegardes et les positions restent les mêmes : rechargement vérifié, (48, 30) → (48, 30), dans les deux moteurs.
+
+**Les marqueurs de porte.** Les lieux nommés ont un marqueur à leur porte. Le toucher ouvre la fiche existante.
+
+**Correspondance des coordonnées.** Cellule × `STREET_CELL` (2) = coordonnées de la scène. Les identifiants des lots ne changent pas.
+
+**La carte claire.** `components/haroolife/game/city-map.tsx` est une carte SVG, sans contexte WebGL. Elle montre les quartiers nommés, l'eau, des routes continues, le domaine (« Mon domaine ») et le joueur (« Vous »).
+- De loin, elle montre les destinations principales. En zoomant, elle montre tous les lieux nommés du filtre actif.
+- Les noms s'affichent à la sélection, avec le bouton « Noms » ou de près.
+- Aucun marqueur ne se chevauche : ils sont placés par priorité, le lieu sélectionné d'abord.
+- Le toucher d'un lieu ouvre la fiche existante (nom, quartier, personnages, À pied / Zémidjan / Taxi avec coût et durée).
+- « À pied » lance la vraie route et ferme la carte.
+
+**La bascule.**
+- `?street=haroo` active la rue et la carte claire ; ce choix est retenu sur l'appareil.
+- `?street=playcanvas` revient à la rue PlayCanvas.
+- PlayCanvas reste la rue par défaut jusqu'à la parité. Il manque encore à la nouvelle rue : les panneaux publicitaires, la présence d'autres joueurs, le modèle du taxi et la conduite.
+
+## Vérifications (SwiftShader)
+
+| Rue et carte | 412 × 915 | 1440 × 900 |
+|---|---|---|
+| Quartier dessiné | 154 bâtiments, 8 portes nommées, 6 piétons | idem |
+| 4 directions (alignement, regard) | ≥ 0,92, ≥ 0,90 (glissement le long d'un bâtiment) | idem |
+| Carte : lieux affichés, chevauchements | 14, 0 | 26, 0 |
+| Fiche lieu, puis « À pied » | route de 9 à 10 cellules, carte fermée | idem |
+| Erreurs de page | aucune | aucune |
+
+Les tests de bout en bout de la suite complète sont à 44 réussis et 3 ignorés (comme en CI), plus la spécification HarooLife, 4 sur 4.
+
+## Limites connues
+
+- Dans la rue, le clavier fait courir. C'est la règle actuelle du `PlayerController` du Saas, qui court au-delà de 0,92 de déflexion, et la rue PlayCanvas fait pareil. À aligner sur la maison (Shift pour courir) dans une étape dédiée, car les tests du joueur existant en dépendent.
+- Les bâtiments sont des volumes stylisés : ce ne sont pas encore les modèles Kenney de la ville.

@@ -125,6 +125,7 @@ export class RoomWorld {
   private speed = 0
   private frames = 0
   private statsAt = 0
+  private probed = false
   private down: { x: number; y: number } | null = null
   private readonly onPointerDown = (e: PointerEvent) => {
     this.down = { x: e.clientX, y: e.clientY }
@@ -223,7 +224,7 @@ export class RoomWorld {
     this.player.root.rotation.y = this.def.spawnHeading
     this.stage.add(this.player.root)
     this.updateCamera(true)
-    this.publishProbes()
+    this.publishInterior()
     this.last = performance.now()
     this.raf = requestAnimationFrame(this.frame)
     this.events.onReady?.()
@@ -829,7 +830,11 @@ export class RoomWorld {
       m.el.style.visibility = inside && this.markerShown(m.hotspot) ? 'visible' : 'hidden'
     }
     this.renderer.render(this.scene, this.camera)
-    this.publishInterior()
+    // The scene probe appears once the first frame is drawn (its GPU counters are then real).
+    if (!this.probed) {
+      this.probed = true
+      this.publishProbes()
+    } else this.publishInterior()
     this.frames++
     if (now - this.statsAt >= 500) {
       const fps = (this.frames * 1000) / Math.max(1, now - this.statsAt)

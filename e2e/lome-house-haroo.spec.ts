@@ -129,6 +129,9 @@ test('HarooLife house: walk, eat, sleep, save, leave and come back', async ({ pa
       .poll(async () => (await interior(page))?.anim, { message: `stick (${x}, ${y}): walk clip` })
       .toBe('Walk')
     await page.waitForTimeout(400)
+    // Facing is read while the stick is held: keys are released one after the other, and in
+    // between the player rightly turns towards the one still pressed.
+    const held = (await interior(page)) as Interior
     await release()
     const b = (await interior(page)) as Interior
     const want = { x: RIGHT.x * x + FWD.x * y, z: RIGHT.z * x + FWD.z * y }
@@ -142,7 +145,7 @@ test('HarooLife house: walk, eat, sleep, save, leave and come back', async ({ pa
       (dx * want.x + dz * want.z) / (d * wl),
       `${label}: the way the stick points`,
     ).toBeGreaterThan(0.95)
-    const facing = (Math.sin(b.heading) * want.x + Math.cos(b.heading) * want.z) / wl
+    const facing = (Math.sin(held.heading) * want.x + Math.cos(held.heading) * want.z) / wl
     expect(facing, `${label}: facing forward, no moonwalk`).toBeGreaterThan(0.95)
     await page.waitForTimeout(250)
   }
@@ -270,6 +273,7 @@ test('HarooLife market: travel, buy a meal once, talk to the seller, leave', asy
   await page.locator('[data-hotspot="npc:seller"]').click()
   await expect(page.getByLabel('Conversation')).toBeVisible({ timeout: 30000 })
   await expect(page.getByLabel('Conversation')).toContainText('PNJ')
+  await page.getByLabel('Conversation').getByRole('button', { name: 'Fermer' }).click()
 
   await page.getByRole('button', { name: 'Entrer ou sortir' }).click()
   await expect.poll(async () => (await live(page))?.inside ?? null).toBeNull()

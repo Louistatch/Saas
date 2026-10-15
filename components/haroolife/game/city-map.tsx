@@ -79,7 +79,7 @@ export default function CityMap({
   const box = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ w: 400, h: 800 })
   // View: zoom factor and the cell at the centre of the screen.
-  const [view, setView] = useState({ k: 1.6, cx: player.x, cy: player.y })
+  const [view, setView] = useState({ k: 1.15, cx: player.x, cy: player.y })
   const drag = useRef<{ x: number; y: number; cx: number; cy: number; moved: boolean } | null>(null)
   const pinch = useRef<{ d: number; k: number } | null>(null)
   const pointers = useRef(new Map<number, { x: number; y: number }>())
@@ -149,6 +149,8 @@ export default function CityMap({
       data-testid="city-map"
       onWheel={(e) => zoomBy(e.deltaY < 0 ? 1.15 : 1 / 1.15)}
       onPointerDown={(e) => {
+        // A place or a button: let its click through (no pan, no pointer capture).
+        if ((e.target as HTMLElement).closest('button')) return
         pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
         ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
         if (pointers.current.size === 2) {
@@ -220,12 +222,12 @@ export default function CityMap({
           {ground.roads.map((r) => (
             <rect
               key={`r${r.x}:${r.y}`}
-              x={r.x + 0.12}
-              y={r.y + 0.12}
-              width={r.w - 0.24}
-              height={0.76}
+              x={r.x}
+              y={r.y}
+              width={r.w}
+              height={1.02}
               fill="#f7f8f1"
-              opacity={0.9}
+              opacity={0.92}
             />
           ))}
           {ground.districts.map((d) => (
@@ -257,6 +259,23 @@ export default function CityMap({
           </span>
         )
       })}
+      {ground.estate.length > 0 &&
+        (() => {
+          const xs = ground.estate.map((r) => r.x)
+          const ys = ground.estate.map((r) => r.y)
+          const p = toScreen(
+            (Math.min(...xs) + Math.max(...ground.estate.map((r) => r.x + r.w))) / 2,
+            (Math.min(...ys) + Math.max(...ys) + 1) / 2,
+          )
+          return (
+            <span
+              className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-[#f7f8f1]/85 px-2 py-0.5 text-xs font-bold text-[#195f51]"
+              style={{ left: p.x, top: p.y + 22 }}
+            >
+              Mon domaine
+            </span>
+          )
+        })()}
       {markers.map(({ lot, x, y }) => {
         const selected = lot.id === selectedLot?.id
         return (
