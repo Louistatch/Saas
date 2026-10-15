@@ -12,7 +12,9 @@ const ALGO = 'aes-256-gcm'
 function getKey(): Buffer {
   const raw = process.env.INTEGRATION_SECRET_KEY
   if (!raw) {
-    throw new Error('INTEGRATION_SECRET_KEY is not set. Generate with `openssl rand -base64 32`.')
+    throw new Error(
+      'INTEGRATION_SECRET_KEY is not set. Generate with `openssl rand -base64 32`.',
+    )
   }
   const buf = Buffer.from(raw, 'base64')
   if (buf.length !== 32) {

@@ -1,9 +1,9 @@
 /**
  * Card Image Utilities — Bridge to Card Engine
- *
+ * 
  * This file maintains backward compatibility with existing code
  * that imports from '@/lib/utils/card-image'.
- *
+ * 
  * Internally delegates to the new Card Engine (lib/card-engine/).
  */
 

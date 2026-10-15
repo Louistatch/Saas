@@ -20,28 +20,10 @@ export const CULTURES_DATA = [
 ] as const
 
 const FALLBACK_CULTURE_EMOJIS: Array<[string, string]> = [
-  ['gari', '🥣'],
-  ['haricot', '🫘'],
-  ['sorgho', '🌾'],
-  ['mil', '🌾'],
-  ['maïs', '🌽'],
-  ['mais', '🌽'],
-  ['riz', '🌾'],
-  ['manioc', '🥔'],
-  ['igname', '🍠'],
-  ['soja', '🫘'],
-  ['arachide', '🥜'],
-  ['coton', '🌿'],
-  ['cacao', '🍫'],
-  ['café', '☕'],
-  ['cafe', '☕'],
-  ['banane', '🍌'],
-  ['ananas', '🍍'],
-  ['papaye', '🍈'],
-  ['piment', '🌶️'],
-  ['tomate', '🍅'],
-  ['oignon', '🧅'],
-  ['gombo', '🥒'],
+  ['gari', '🥣'], ['haricot', '🫘'], ['sorgho', '🌾'], ['mil', '🌾'], ['maïs', '🌽'], ['mais', '🌽'], ['riz', '🌾'], ['manioc', '🥔'], ['igname', '🍠'],
+  ['soja', '🫘'], ['arachide', '🥜'], ['coton', '🌿'], ['cacao', '🍫'],
+  ['café', '☕'], ['cafe', '☕'], ['banane', '🍌'], ['ananas', '🍍'],
+  ['papaye', '🍈'], ['piment', '🌶️'], ['tomate', '🍅'], ['oignon', '🧅'], ['gombo', '🥒'],
 ]
 
 export class Region {
@@ -161,9 +143,7 @@ export class MarketPrice {
   }
 
   get cultureEmoji(): string {
-    return (
-      Culture.findById(this.row.culture_id)?.emoji ?? Culture.emojiForName(this.row.cultures?.name)
-    )
+    return Culture.findById(this.row.culture_id)?.emoji ?? Culture.emojiForName(this.row.cultures?.name)
   }
 
   get marketName(): string {

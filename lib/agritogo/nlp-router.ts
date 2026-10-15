@@ -36,60 +36,33 @@ export interface ParsedQuery {
 
 // ─── Product names (normalized) ──────────────────────────────────
 const PRODUITS: Record<string, string> = {
-  mais: 'Maïs',
-  maïs: 'Maïs',
-  maize: 'Maïs',
-  corn: 'Maïs',
-  riz: 'Riz',
-  rice: 'Riz',
-  'riz local': 'Riz',
-  sorgho: 'Sorgho',
-  sorghum: 'Sorgho',
-  mil: 'Mil',
-  millet: 'Mil',
-  haricot: 'Haricot',
-  bean: 'Haricot',
-  beans: 'Haricot',
-  soja: 'Soja',
-  soy: 'Soja',
-  soybean: 'Soja',
-  arachide: 'Arachide',
-  peanut: 'Arachide',
-  cacahuète: 'Arachide',
-  igname: 'Igname',
-  yam: 'Igname',
-  manioc: 'Manioc',
-  cassava: 'Manioc',
-  tomate: 'Tomate',
-  tomato: 'Tomate',
-  piment: 'Piment',
-  pepper: 'Piment',
-  chili: 'Piment',
-  oignon: 'Oignon',
-  onion: 'Oignon',
-  gombo: 'Gombo',
-  okra: 'Gombo',
+  'mais': 'Maïs', 'maïs': 'Maïs', 'maize': 'Maïs', 'corn': 'Maïs',
+  'riz': 'Riz', 'rice': 'Riz', 'riz local': 'Riz',
+  'sorgho': 'Sorgho', 'sorghum': 'Sorgho',
+  'mil': 'Mil', 'millet': 'Mil',
+  'haricot': 'Haricot', 'bean': 'Haricot', 'beans': 'Haricot',
+  'soja': 'Soja', 'soy': 'Soja', 'soybean': 'Soja',
+  'arachide': 'Arachide', 'peanut': 'Arachide', 'cacahuète': 'Arachide',
+  'igname': 'Igname', 'yam': 'Igname',
+  'manioc': 'Manioc', 'cassava': 'Manioc',
+  'tomate': 'Tomate', 'tomato': 'Tomate',
+  'piment': 'Piment', 'pepper': 'Piment', 'chili': 'Piment',
+  'oignon': 'Oignon', 'onion': 'Oignon',
+  'gombo': 'Gombo', 'okra': 'Gombo',
 }
 
 // ─── Market names (normalized) ───────────────────────────────────
 const MARCHES: Record<string, string> = {
-  lomé: 'Lomé-Adawlato',
-  lome: 'Lomé-Adawlato',
-  adawlato: 'Lomé-Adawlato',
-  kara: 'Kara',
-  sokodé: 'Sokodé',
-  sokode: 'Sokodé',
-  atakpamé: 'Atakpamé',
-  atakpame: 'Atakpamé',
-  dapaong: 'Dapaong',
-  kpalimé: 'Kpalimé',
-  kpalime: 'Kpalimé',
-  tsévié: 'Tsévié',
-  tsevie: 'Tsévié',
-  bassar: 'Bassar',
-  mango: 'Mango',
-  notsé: 'Notsé',
-  notse: 'Notsé',
+  'lomé': 'Lomé-Adawlato', 'lome': 'Lomé-Adawlato', 'adawlato': 'Lomé-Adawlato',
+  'kara': 'Kara',
+  'sokodé': 'Sokodé', 'sokode': 'Sokodé',
+  'atakpamé': 'Atakpamé', 'atakpame': 'Atakpamé',
+  'dapaong': 'Dapaong',
+  'kpalimé': 'Kpalimé', 'kpalime': 'Kpalimé',
+  'tsévié': 'Tsévié', 'tsevie': 'Tsévié',
+  'bassar': 'Bassar',
+  'mango': 'Mango',
+  'notsé': 'Notsé', 'notse': 'Notsé',
 }
 
 // ─── Conversational markers → ALWAYS needs LLM ──────────────────
@@ -97,53 +70,16 @@ const MARCHES: Record<string, string> = {
 // (accents via NFD + apostrophe variants ' → ') so "j'aimerais" (straight quote)
 // and "j'aimerais" (typographic quote) both match "j'aimerais" in the list.
 const LLM_MARKERS = [
-  'comment',
-  'pourquoi',
-  'explique',
-  'aide',
-  'conseil',
-  'devrais',
-  'faut-il',
-  'est-ce que',
-  "est-ce qu'",
-  'penses',
-  'pense',
-  'crois',
-  'recommande',
-  'suggère',
-  'suggere',
-  'que faire',
-  'quoi faire',
-  'mieux',
-  'meilleur',
-  'améliorer',
-  'ameliorer',
-  'optimiser',
-  'stratégie',
-  'strategie',
-  'avenir',
-  'futur',
-  'prochaine',
-  'saison',
-  'problème',
-  'probleme',
-  'difficulté',
-  'difficile',
-  'merci',
-  'ok',
-  'oui',
-  'non',
-  "d'accord",
-  'compris',
-  'je veux',
-  'je souhaite',
-  "j'aimerais",
-  "j'ai",
-  'mon',
-  'ma',
-  'mes',
-  'notre',
-  'nos', // possessifs = contexte personnel → LLM
+  'comment', 'pourquoi', 'explique', 'aide', 'conseil',
+  'devrais', 'faut-il', 'est-ce que', 'est-ce qu\'',
+  'penses', 'pense', 'crois', 'recommande', 'suggère', 'suggere',
+  'que faire', 'quoi faire', 'mieux', 'meilleur',
+  'améliorer', 'ameliorer', 'optimiser', 'stratégie', 'strategie',
+  'avenir', 'futur', 'prochaine', 'saison',
+  'problème', 'probleme', 'difficulté', 'difficile',
+  'merci', 'ok', 'oui', 'non', 'd\'accord', 'compris',
+  'je veux', 'je souhaite', 'j\'aimerais', 'j\'ai',
+  'mon', 'ma', 'mes', 'notre', 'nos', // possessifs = contexte personnel → LLM
 ]
 
 /** Normalize a string for matching: remove accents + unify apostrophe variants. */
@@ -157,71 +93,39 @@ function normalizeForMatch(s: string): string {
 // ─── Intent rules (only SHORT factual queries are direct) ────────
 const INTENT_RULES: { keywords: string[]; intent: Intent; needsLLM: boolean }[] = [
   // Salutations — direct, no LLM needed
-  {
-    keywords: ['bonjour', 'salut', 'bonsoir', 'hello', 'coucou', 'hey'],
-    intent: 'salutation',
-    needsLLM: false,
-  },
+  { keywords: ['bonjour', 'salut', 'bonsoir', 'hello', 'coucou', 'hey'],
+    intent: 'salutation', needsLLM: false },
 
   // ONLY these very specific patterns go direct (must also pass the guards below):
   // "prix du maïs", "combien coûte le riz", "tarif igname"
-  {
-    keywords: ['prix', 'coûte', 'coute', 'combien', 'tarif'],
-    intent: 'prix_simple',
-    needsLLM: false,
-  },
+  { keywords: ['prix', 'coûte', 'coute', 'combien', 'tarif'],
+    intent: 'prix_simple', needsLLM: false },
 
   // "tendance maïs", "le riz monte ?"
-  { keywords: ['tendance'], intent: 'tendance', needsLLM: false },
+  { keywords: ['tendance'],
+    intent: 'tendance', needsLLM: false },
 
   // "liste des produits", "quels produits"
-  {
-    keywords: ['quels produits', 'liste produits', 'produits disponibles'],
-    intent: 'liste_produits',
-    needsLLM: false,
-  },
-  {
-    keywords: ['quels marchés', 'liste marchés', 'marchés disponibles'],
-    intent: 'liste_marches',
-    needsLLM: false,
-  },
+  { keywords: ['quels produits', 'liste produits', 'produits disponibles'],
+    intent: 'liste_produits', needsLLM: false },
+  { keywords: ['quels marchés', 'liste marchés', 'marchés disponibles'],
+    intent: 'liste_marches', needsLLM: false },
 
   // Everything else → LLM (agent handles it with full context)
-  {
-    keywords: ['rendement', 'récolte', 'recolte', 'production', 'yield'],
-    intent: 'prediction_rendement',
-    needsLLM: true,
-  },
-  {
-    keywords: ['volatilité', 'volatilite', 'fluctuation', 'garch'],
-    intent: 'volatilite',
-    needsLLM: true,
-  },
-  {
-    keywords: ['risque', 'crédit', 'credit', 'emprunt', 'prêt', 'pret'],
-    intent: 'risque_financier',
-    needsLLM: true,
-  },
-  {
-    keywords: ['segmentation', 'type agriculteur', 'profil', 'catégorie'],
-    intent: 'segmentation',
-    needsLLM: true,
-  },
-  {
-    keywords: ['kpi', 'indicateur', 'performance', 'bilan', 'dashboard'],
-    intent: 'kpi',
-    needsLLM: true,
-  },
-  {
-    keywords: ['vendre', 'acheter', 'stocker', 'investir', 'décision'],
-    intent: 'conseil_decision',
-    needsLLM: true,
-  },
-  {
-    keywords: ['monte', 'descend', 'baisse', 'hausse', 'augmente', 'diminue', 'stable'],
-    intent: 'tendance',
-    needsLLM: true,
-  },
+  { keywords: ['rendement', 'récolte', 'recolte', 'production', 'yield'],
+    intent: 'prediction_rendement', needsLLM: true },
+  { keywords: ['volatilité', 'volatilite', 'fluctuation', 'garch'],
+    intent: 'volatilite', needsLLM: true },
+  { keywords: ['risque', 'crédit', 'credit', 'emprunt', 'prêt', 'pret'],
+    intent: 'risque_financier', needsLLM: true },
+  { keywords: ['segmentation', 'type agriculteur', 'profil', 'catégorie'],
+    intent: 'segmentation', needsLLM: true },
+  { keywords: ['kpi', 'indicateur', 'performance', 'bilan', 'dashboard'],
+    intent: 'kpi', needsLLM: true },
+  { keywords: ['vendre', 'acheter', 'stocker', 'investir', 'décision'],
+    intent: 'conseil_decision', needsLLM: true },
+  { keywords: ['monte', 'descend', 'baisse', 'hausse', 'augmente', 'diminue', 'stable'],
+    intent: 'tendance', needsLLM: true },
 ]
 
 /**
@@ -266,8 +170,8 @@ export function parseQuery(message: string): ParsedQuery {
   }
 
   // ─── GUARD 1: Conversational markers → ALWAYS LLM ─────────────
-  const hasConversationalMarker = LLM_MARKERS.some((marker) =>
-    q.includes(normalizeForMatch(marker)),
+  const hasConversationalMarker = LLM_MARKERS.some(marker =>
+    q.includes(normalizeForMatch(marker))
   )
 
   // ─── GUARD 2: Long messages (>10 words) → ALWAYS LLM ──────────
@@ -280,7 +184,7 @@ export function parseQuery(message: string): ParsedQuery {
   let confidence = 0.3
 
   for (const rule of INTENT_RULES) {
-    const matched = rule.keywords.some((kw) => q.includes(normalizeForMatch(kw)))
+    const matched = rule.keywords.some(kw => q.includes(normalizeForMatch(kw)))
     if (matched) {
       intent = rule.intent
       needsLLM = rule.needsLLM

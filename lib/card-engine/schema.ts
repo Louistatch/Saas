@@ -1,6 +1,6 @@
 /**
  * Card Schema — Single Source of Truth
- *
+ * 
  * Every card is defined by this JSON schema.
  * The renderer reads ONLY this schema to produce the output.
  * Preview === Export === Print (pixel-perfect).
@@ -122,9 +122,7 @@ export function buildCardSchema(opts: {
     opts.member.canton,
     opts.member.prefecture,
     opts.member.region,
-  ]
-    .filter(Boolean)
-    .join(', ')
+  ].filter(Boolean).join(', ')
 
   // Derive the gradient from the template background color so editing it has
   // a real visual effect, while keeping a tasteful 3-stop depth.
@@ -175,13 +173,7 @@ function clamp(n: number): number {
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const h = hex.replace('#', '')
-  const full =
-    h.length === 3
-      ? h
-          .split('')
-          .map((c) => c + c)
-          .join('')
-      : h
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h
   return {
     r: Number.parseInt(full.slice(0, 2), 16),
     g: Number.parseInt(full.slice(2, 4), 16),

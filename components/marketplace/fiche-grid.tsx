@@ -18,7 +18,10 @@ interface FicheGridProps {
   error: string | null
   filters: MarketplaceFilters
   cultures: { id: string; name: string; icon: string | null }[]
-  setFilter: <K extends keyof MarketplaceFilters>(key: K, value: MarketplaceFilters[K]) => void
+  setFilter: <K extends keyof MarketplaceFilters>(
+    key: K,
+    value: MarketplaceFilters[K],
+  ) => void
 }
 
 const PAGE_SIZE = 20
@@ -52,7 +55,9 @@ export function FicheGrid({
       <div className="flex items-start gap-3 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
         <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
         <div>
-          <p className="text-sm font-medium text-destructive">Erreur lors du chargement</p>
+          <p className="text-sm font-medium text-destructive">
+            Erreur lors du chargement
+          </p>
           <p className="text-xs text-destructive/80 mt-0.5">{error}</p>
         </div>
       </div>
@@ -78,7 +83,7 @@ export function FicheGrid({
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           <span className="font-semibold text-foreground">{total}</span>{' '}
-          {total === 1 ? "compte d'exploitation" : "comptes d'exploitation"}
+          {total === 1 ? 'compte d\'exploitation' : 'comptes d\'exploitation'}
         </p>
       </div>
 
@@ -102,7 +107,11 @@ export function FicheGrid({
         />
       ) : null}
 
-      <FicheAccessDialog fiche={selectedFiche} open={dialogOpen} onOpenChange={setDialogOpen} />
+      <FicheAccessDialog
+        fiche={selectedFiche}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+      />
     </div>
   )
 }

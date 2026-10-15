@@ -59,7 +59,9 @@ export function KoboSyncPanel({
   onRetry,
   onRefreshStats,
 }: KoboSyncPanelProps) {
-  const matchRate = stats && stats.total > 0 ? Math.round((stats.matched / stats.total) * 100) : 0
+  const matchRate = stats && stats.total > 0
+    ? Math.round((stats.matched / stats.total) * 100)
+    : 0
 
   return (
     <div className="space-y-6">
@@ -72,9 +74,16 @@ export function KoboSyncPanel({
                 <Activity className="h-4 w-4" />
                 Statistiques de synchronisation
               </CardTitle>
-              <CardDescription>Mise à jour automatique toutes les 30 secondes</CardDescription>
+              <CardDescription>
+                Mise à jour automatique toutes les 30 secondes
+              </CardDescription>
             </div>
-            <Button variant="ghost" size="sm" onClick={onRefreshStats} disabled={statsLoading}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onRefreshStats}
+              disabled={statsLoading}
+            >
               <RefreshCw className={`h-4 w-4 ${statsLoading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
@@ -85,7 +94,9 @@ export function KoboSyncPanel({
               {/* Progress bar: matched/total */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-foreground">Taux de matching</span>
+                  <span className="text-sm font-medium text-foreground">
+                    Taux de matching
+                  </span>
                   <span className="text-sm text-muted-foreground">
                     {stats.matched}/{stats.total} ({matchRate}%)
                   </span>
@@ -95,7 +106,11 @@ export function KoboSyncPanel({
 
               {/* Stats grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatItem icon={Database} label="Total reçues" value={stats.total} />
+                <StatItem
+                  icon={Database}
+                  label="Total reçues"
+                  value={stats.total}
+                />
                 <StatItem
                   icon={CheckCircle2}
                   label="Matchées"
@@ -174,8 +189,15 @@ export function KoboSyncPanel({
           <div className="flex flex-col sm:flex-row gap-3">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button className="flex-1 gap-2" disabled={isSyncing}>
-                  {isSyncing ? <Spinner className="h-4 w-4" /> : <Download className="h-4 w-4" />}
+                <Button
+                  className="flex-1 gap-2"
+                  disabled={isSyncing}
+                >
+                  {isSyncing ? (
+                    <Spinner className="h-4 w-4" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
                   {isSyncing ? 'Synchronisation en cours...' : 'Synchroniser maintenant'}
                   <ChevronDown className="h-3.5 w-3.5 ml-1" />
                 </Button>
@@ -247,16 +269,14 @@ export function KoboSyncPanel({
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-3">
                 <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
-                <span className="text-sm font-medium text-green-800">Synchronisation terminée</span>
+                <span className="text-sm font-medium text-green-800">
+                  Synchronisation terminée
+                </span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <ResultStat label="Reçues" value={result.received} />
                 <ResultStat label="Matchées" value={result.matched} className="text-green-700" />
-                <ResultStat
-                  label="Non matchées"
-                  value={result.unmatched}
-                  className="text-orange-600"
-                />
+                <ResultStat label="Non matchées" value={result.unmatched} className="text-orange-600" />
                 <ResultStat label="Erreurs" value={result.errors} className="text-red-600" />
               </div>
               {result.duration > 0 && (
@@ -334,7 +354,9 @@ function ResultStat({
 }) {
   return (
     <div className="text-center">
-      <p className={`text-lg font-semibold ${className || 'text-foreground'}`}>{value}</p>
+      <p className={`text-lg font-semibold ${className || 'text-foreground'}`}>
+        {value}
+      </p>
       <p className="text-xs text-muted-foreground">{label}</p>
     </div>
   )

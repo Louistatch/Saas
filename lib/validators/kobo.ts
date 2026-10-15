@@ -10,7 +10,8 @@ import { z } from 'zod'
 // Shared primitives
 // =========================================================
 
-const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
+const UUID_RE =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
 
 export const uuidParam = z.string().regex(UUID_RE, 'Invalid UUID format')
 
@@ -177,9 +178,10 @@ export const koboWebhookHeadersSchema = z.object({
   'x-kobotoolbox-signature': z.string().min(1).optional(),
   'x-kobo-secret': z.string().min(1).optional(),
   authorization: z.string().min(1).optional(),
-  'content-type': z
-    .string()
-    .refine((ct) => ct.includes('application/json'), 'Content-Type must be application/json'),
+  'content-type': z.string().refine(
+    (ct) => ct.includes('application/json'),
+    'Content-Type must be application/json',
+  ),
   'content-length': z
     .string()
     .transform((v) => Number.parseInt(v, 10))

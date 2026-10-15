@@ -6,24 +6,9 @@
 
 export type AnnouncementType = 'job' | 'prevente' | 'autre'
 
-export const ANNOUNCEMENT_TYPES: Array<{
-  id: AnnouncementType
-  label: string
-  emoji: string
-  description: string
-}> = [
-  {
-    id: 'job',
-    label: "Offre d'emploi",
-    emoji: '👷',
-    description: 'Recruter pour vos travaux agricoles',
-  },
-  {
-    id: 'prevente',
-    label: 'Vente / prévente',
-    emoji: '🌾',
-    description: 'Récolte à vendre, ou à venir avant maturité',
-  },
+export const ANNOUNCEMENT_TYPES: Array<{ id: AnnouncementType; label: string; emoji: string; description: string }> = [
+  { id: 'job', label: "Offre d'emploi", emoji: '👷', description: 'Recruter pour vos travaux agricoles' },
+  { id: 'prevente', label: 'Vente / prévente', emoji: '🌾', description: 'Récolte à vendre, ou à venir avant maturité' },
   { id: 'autre', label: 'Autre annonce', emoji: '📣', description: 'Tout autre besoin' },
 ]
 
@@ -115,9 +100,7 @@ export class Announcement {
   }
 
   get formattedQuantity(): string | null {
-    return this.row.quantity_kg != null
-      ? `${this.row.quantity_kg.toLocaleString('fr-FR')} kg`
-      : null
+    return this.row.quantity_kg != null ? `${this.row.quantity_kg.toLocaleString('fr-FR')} kg` : null
   }
 
   get formattedPrice(): string | null {

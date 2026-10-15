@@ -25,7 +25,10 @@ interface FicheFilterBarProps {
   filters: MarketplaceFilters
   localSearch: string
   setLocalSearch: (v: string) => void
-  setFilter: <K extends keyof MarketplaceFilters>(key: K, value: MarketplaceFilters[K]) => void
+  setFilter: <K extends keyof MarketplaceFilters>(
+    key: K,
+    value: MarketplaceFilters[K],
+  ) => void
   resetFilters: () => void
   activeFilterCount: number
   referenceData: {
@@ -197,7 +200,11 @@ export function FicheFilterBar({
 
         {/* Reset */}
         {activeFilterCount > 0 ? (
-          <Button variant="outline" className="w-full gap-2" onClick={resetFilters}>
+          <Button
+            variant="outline"
+            className="w-full gap-2"
+            onClick={resetFilters}
+          >
             <X className="h-4 w-4" />
             Effacer les filtres ({activeFilterCount})
           </Button>

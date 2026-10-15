@@ -1,6 +1,6 @@
 /**
  * Member Score — calculates Bronze/Argent/Or level on-the-fly.
- *
+ * 
  * Uses the SQL function `get_member_score` which respects RLS.
  * No stored column — always fresh data.
  */
@@ -55,14 +55,10 @@ export async function getMemberScore(memberId: string): Promise<MemberScore> {
  */
 export function getLevelColor(level: MemberLevel | null): string {
   switch (level) {
-    case 'Or':
-      return 'var(--level-or, #FFD700)'
-    case 'Argent':
-      return 'var(--level-argent, #A8A9AD)'
-    case 'Bronze':
-      return 'var(--level-bronze, #CD7F32)'
-    default:
-      return 'var(--muted-foreground, #6b7280)'
+    case 'Or': return 'var(--level-or, #FFD700)'
+    case 'Argent': return 'var(--level-argent, #A8A9AD)'
+    case 'Bronze': return 'var(--level-bronze, #CD7F32)'
+    default: return 'var(--muted-foreground, #6b7280)'
   }
 }
 
@@ -71,13 +67,9 @@ export function getLevelColor(level: MemberLevel | null): string {
  */
 export function getLevelLabel(level: MemberLevel | null): string {
   switch (level) {
-    case 'Or':
-      return 'Membre Or'
-    case 'Argent':
-      return 'Membre Argent'
-    case 'Bronze':
-      return 'Membre Bronze'
-    default:
-      return 'Non classé'
+    case 'Or': return 'Membre Or'
+    case 'Argent': return 'Membre Argent'
+    case 'Bronze': return 'Membre Bronze'
+    default: return 'Non classé'
   }
 }

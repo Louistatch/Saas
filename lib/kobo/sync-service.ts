@@ -18,7 +18,10 @@ import { createClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/utils/logger'
 import { decryptSecret } from '@/lib/utils/crypto'
 import { isAllowedKoboAttachmentUrl } from '@/lib/kobo/attachment-url'
-import { enrollNewMemberFromSubmission, processCooperativeRegistration } from './enrollment'
+import {
+  enrollNewMemberFromSubmission,
+  processCooperativeRegistration,
+} from './enrollment'
 import type {
   KoboApiSubmission,
   KoboApiDataResponse,
@@ -105,7 +108,10 @@ export class KoboSyncService {
       }
 
       // Get field mappings for this cooperative/form
-      const mappings = await this.getFieldMappings(options.cooperativeId, options.formId)
+      const mappings = await this.getFieldMappings(
+        options.cooperativeId,
+        options.formId,
+      )
 
       // Resolve form type from integration config (determines enrollment vs update routing)
       const formType = await this.getFormType(options.cooperativeId)
@@ -129,7 +135,10 @@ export class KoboSyncService {
         result.unmatched += batchResults.unmatched
         result.errors += batchResults.errors
         if (batchResults.errorDetails) {
-          result.errorDetails = [...(result.errorDetails ?? []), ...batchResults.errorDetails]
+          result.errorDetails = [
+            ...(result.errorDetails ?? []),
+            ...batchResults.errorDetails,
+          ]
         }
 
         processedCount += batch.length
@@ -201,11 +210,7 @@ export class KoboSyncService {
    * Reprocess exactly one submission — used by the per-row "Retenter" action
    * in the submissions table, instead of triggering a full cooperative sync.
    */
-  async retrySingleSubmission(
-    cooperativeId: string,
-    submissionId: string,
-    apiToken?: string,
-  ): Promise<RetryResult> {
+  async retrySingleSubmission(cooperativeId: string, submissionId: string, apiToken?: string): Promise<RetryResult> {
     const supabase = await this.getSupabase()
 
     const { data: submission } = await supabase
@@ -216,13 +221,7 @@ export class KoboSyncService {
       .maybeSingle()
 
     if (!submission) {
-      return {
-        total: 0,
-        retried: 0,
-        succeeded: 0,
-        failed: 0,
-        errors: [{ instanceId: 'unknown', error: 'Submission introuvable' }],
-      }
+      return { total: 0, retried: 0, succeeded: 0, failed: 0, errors: [{ instanceId: 'unknown', error: 'Submission introuvable' }] }
     }
 
     const formType = await this.getFormType(cooperativeId)
@@ -239,13 +238,7 @@ export class KoboSyncService {
 
   /** Routes a single submission through the matching/processing path appropriate for its form type. */
   private async retrySubmission(
-    submission: Record<string, unknown> & {
-      id: string
-      kobo_instance_id: string
-      member_id: string | null
-      member_card_number: string | null
-      raw_payload: unknown
-    },
+    submission: Record<string, unknown> & { id: string; kobo_instance_id: string; member_id: string | null; member_card_number: string | null; raw_payload: unknown },
     cooperativeId: string,
     formType: string | null,
     apiToken?: string,
@@ -264,17 +257,13 @@ export class KoboSyncService {
         // These form types are processed directly from raw_payload (member
         // matched via card number embedded in the payload), never through the
         // member-enrollment path — routing them there would create bogus members.
-        const { data: updated } = await supabase
-          .rpc('match_kobo_submission_to_member', {
-            p_submission_id: submission.id,
-          })
-          .then(() =>
-            supabase
-              .from('kobo_submissions')
-              .select('status, member_id')
-              .eq('id', submission.id)
-              .single(),
-          )
+        const { data: updated } = await supabase.rpc('match_kobo_submission_to_member', {
+          p_submission_id: submission.id,
+        }).then(() => supabase
+          .from('kobo_submissions')
+          .select('status, member_id')
+          .eq('id', submission.id)
+          .single())
 
         if (updated?.status === 'matched' && updated.member_id) {
           await supabase.rpc('process_kobo_submission', { p_submission_id: submission.id })
@@ -322,7 +311,10 @@ export class KoboSyncService {
   // -----------------------------------------------------------
   // Test connection to KoboToolbox
   // -----------------------------------------------------------
-  async testConnection(apiToken: string, formId: string): Promise<TestConnectionResult> {
+  async testConnection(
+    apiToken: string,
+    formId: string,
+  ): Promise<TestConnectionResult> {
     try {
       const response = await this.fetchWithRetry(
         `${KOBO_API_BASE}/assets/${encodeURIComponent(formId)}/`,
@@ -359,7 +351,10 @@ export class KoboSyncService {
   // -----------------------------------------------------------
   // Get form structure (for field mapping UI)
   // -----------------------------------------------------------
-  async getFormStructure(apiToken: string, formId: string): Promise<KoboFormStructure> {
+  async getFormStructure(
+    apiToken: string,
+    formId: string,
+  ): Promise<KoboFormStructure> {
     const response = await this.fetchWithRetry(
       `${KOBO_API_BASE}/assets/${encodeURIComponent(formId)}/`,
       apiToken,
@@ -431,7 +426,9 @@ export class KoboSyncService {
     let hasMore = true
 
     while (hasMore) {
-      const url = new URL(`${KOBO_API_BASE}/assets/${encodeURIComponent(formId)}/data/`)
+      const url = new URL(
+        `${KOBO_API_BASE}/assets/${encodeURIComponent(formId)}/data/`,
+      )
       url.searchParams.set('format', 'json')
       url.searchParams.set('limit', String(PAGE_SIZE))
       url.searchParams.set('start', String(offset))
@@ -449,7 +446,9 @@ export class KoboSyncService {
 
       if (!response.ok) {
         const text = await response.text().catch(() => '')
-        throw new Error(`KoboToolbox API error ${response.status}: ${text.slice(0, 200)}`)
+        throw new Error(
+          `KoboToolbox API error ${response.status}: ${text.slice(0, 200)}`,
+        )
       }
 
       const data = (await response.json()) as KoboApiDataResponse | KoboApiSubmission[]
@@ -649,7 +648,10 @@ export class KoboSyncService {
   // -----------------------------------------------------------
   // Private: Get nested value from submission (supports "group/field" paths)
   // -----------------------------------------------------------
-  private getNestedValue(obj: Record<string, unknown>, path: string): unknown {
+  private getNestedValue(
+    obj: Record<string, unknown>,
+    path: string,
+  ): unknown {
     // Try direct key first
     if (path in obj) return obj[path]
 
@@ -697,7 +699,7 @@ export class KoboSyncService {
       .eq('status', 'connected')
       .limit(1)
       .maybeSingle()
-    return ((data?.config as Record<string, unknown>)?.form_type as string | null) ?? null
+    return (data?.config as Record<string, unknown>)?.form_type as string | null ?? null
   }
 
   // -----------------------------------------------------------
@@ -760,7 +762,11 @@ export class KoboSyncService {
   // -----------------------------------------------------------
   // Private: Fetch with retry (exponential backoff)
   // -----------------------------------------------------------
-  private async fetchWithRetry(url: string, apiToken: string, attempt = 0): Promise<Response> {
+  private async fetchWithRetry(
+    url: string,
+    apiToken: string,
+    attempt = 0,
+  ): Promise<Response> {
     try {
       const response = await fetch(url, {
         headers: {
@@ -771,7 +777,10 @@ export class KoboSyncService {
       })
 
       // Retry on 5xx or 429
-      if ((response.status >= 500 || response.status === 429) && attempt < MAX_RETRIES) {
+      if (
+        (response.status >= 500 || response.status === 429) &&
+        attempt < MAX_RETRIES
+      ) {
         const delay = Math.min(30_000, 1000 * 2 ** attempt)
         await this.sleep(delay)
         return this.fetchWithRetry(url, apiToken, attempt + 1)
@@ -822,22 +831,17 @@ export class KoboSyncService {
         return null
       }
       try {
-        const resp = await fetch(att.download_url, {
-          headers: { Authorization: `Token ${apiToken}` },
-        })
+        const resp = await fetch(att.download_url, { headers: { Authorization: `Token ${apiToken}` } })
         if (!resp.ok) return null
         const buf = Buffer.from(await resp.arrayBuffer())
         const ext = field.split('.').pop() ?? 'png'
         const path = `${prefix}/${Date.now()}_${field.split('/').pop()}`
         const { error } = await supabase.storage.from(bucket).upload(path, buf, {
-          contentType: `image/${ext}`,
-          upsert: true,
+          contentType: `image/${ext}`, upsert: true,
         })
         if (error) return null
         return supabase.storage.from(bucket).getPublicUrl(path).data?.publicUrl ?? null
-      } catch {
-        return null
-      }
+      } catch { return null }
     }
 
     const getField = (keys: string[]): string | null => {

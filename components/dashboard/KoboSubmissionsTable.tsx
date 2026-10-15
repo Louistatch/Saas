@@ -29,7 +29,15 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
-import { Search, ChevronLeft, ChevronRight, RefreshCw, RotateCcw, Eye, Filter } from 'lucide-react'
+import {
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
+  RotateCcw,
+  Eye,
+  Filter,
+} from 'lucide-react'
 import { useKoboSubmissions, useKoboSubmissionDetail } from '@/hooks/use-kobo-submissions'
 import { useToast } from '@/hooks/use-toast'
 import { Spinner } from '@/components/shared/loading'
@@ -186,7 +194,9 @@ export function KoboSubmissionsTable({ cooperativeId }: KoboSubmissionsTableProp
 
       <CardContent>
         {/* Error state */}
-        {error && <div className="text-center py-8 text-red-500 text-sm">{error}</div>}
+        {error && (
+          <div className="text-center py-8 text-red-500 text-sm">{error}</div>
+        )}
 
         {/* Loading state */}
         {isLoading && !submissions.length && (
@@ -326,7 +336,9 @@ function SubmissionRow({
   return (
     <tr className="border-b hover:bg-muted/50 transition-colors">
       <td className="px-6 py-3 whitespace-nowrap">
-        <span className="text-foreground">{formatDate(submission.submitted_at)}</span>
+        <span className="text-foreground">
+          {formatDate(submission.submitted_at)}
+        </span>
       </td>
       <td className="px-6 py-3">
         <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">
@@ -352,13 +364,7 @@ function SubmissionRow({
       </td>
       <td className="px-6 py-3 text-right">
         <div className="flex items-center justify-end gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0"
-            onClick={onView}
-            title="Voir le détail"
-          >
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onView} title="Voir le détail">
             <Eye className="h-3.5 w-3.5" />
           </Button>
           {(submission.status === 'error' || submission.status === 'pending') && (

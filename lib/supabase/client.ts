@@ -5,7 +5,7 @@ let browserClient: SupabaseClient | null = null
 
 /**
  * Returns a singleton Supabase browser client.
- *
+ * 
  * IMPORTANT: We use a module-level singleton (not per-component) so that:
  * - The auth state is shared across ALL components (login form, AuthProvider, etc.)
  * - signInWithPassword in one place triggers onAuthStateChange in another

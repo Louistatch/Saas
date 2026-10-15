@@ -1,9 +1,9 @@
 const REGION_COORDS: Record<string, { lat: number; lon: number; city: string }> = {
-  Maritime: { lat: 6.137, lon: 1.212, city: 'Lomé' },
-  Plateaux: { lat: 7.53, lon: 1.15, city: 'Atakpamé' },
-  Centrale: { lat: 8.98, lon: 1.095, city: 'Sokodé' },
-  Kara: { lat: 9.551, lon: 1.186, city: 'Kara' },
-  Savanes: { lat: 10.863, lon: 0.207, city: 'Dapaong' },
+  'Maritime':  { lat: 6.137,  lon: 1.212,  city: 'Lomé' },
+  'Plateaux':  { lat: 7.530,  lon: 1.150,  city: 'Atakpamé' },
+  'Centrale':  { lat: 8.980,  lon: 1.095,  city: 'Sokodé' },
+  'Kara':      { lat: 9.551,  lon: 1.186,  city: 'Kara' },
+  'Savanes':   { lat: 10.863, lon: 0.207,  city: 'Dapaong' },
 }
 
 // ── Poids de l'ensemble multi-modèles ─────────────────────────────────────────
@@ -12,8 +12,8 @@ const REGION_COORDS: Record<string, { lat: number; lon: number; city: string }> 
 // la littérature recommande des poids ÉGAUX. À ajuster seulement après
 // vérification des erreurs de chaque modèle sur des observations togolaises.
 const W_ECMWF = 1 / 3
-const W_GFS = 1 / 3
-const W_ICON = 1 / 3
+const W_GFS   = 1 / 3
+const W_ICON  = 1 / 3
 
 /** Valeur absente de l'API : NaN (jamais 0, qui fausserait les moyennes). */
 const val = (x: number | null | undefined): number => (x == null ? Number.NaN : x)
@@ -26,21 +26,21 @@ function finiteMean(items: { v: number; w: number }[]): number {
 const or0 = (x: number): number => (Number.isFinite(x) ? x : 0)
 
 // ── In-memory caches (per region) ────────────────────────────────────────────
-const TTL_DAILY_MS = 30 * 60_000
+const TTL_DAILY_MS   = 30 * 60_000
 const TTL_SEASONAL_MS = 6 * 60 * 60_000
-const TTL_HOURLY_MS = 15 * 60_000
-const TTL_NOWCAST_MS = 5 * 60_000
+const TTL_HOURLY_MS  = 15 * 60_000
+const TTL_NOWCAST_MS =  5 * 60_000
 
 type CE<T> = { data: T; ts: number }
 const caches = {
-  dailyECMWF: new Map<string, CE<WeatherDayLive[]>>(),
-  dailyGFS: new Map<string, CE<WeatherDayLive[]>>(),
-  dailyICON: new Map<string, CE<WeatherDayLive[]>>(),
+  dailyECMWF:  new Map<string, CE<WeatherDayLive[]>>(),
+  dailyGFS:    new Map<string, CE<WeatherDayLive[]>>(),
+  dailyICON:   new Map<string, CE<WeatherDayLive[]>>(),
   hourlyECMWF: new Map<string, CE<WeatherHour[]>>(),
-  hourlyGFS: new Map<string, CE<WeatherHour[]>>(),
-  hourlyICON: new Map<string, CE<WeatherHour[]>>(),
-  nowcast: new Map<string, CE<WeatherMinutely15[]>>(),
-  seasonal: new Map<string, CE<WeatherSeasonal[]>>(),
+  hourlyGFS:   new Map<string, CE<WeatherHour[]>>(),
+  hourlyICON:  new Map<string, CE<WeatherHour[]>>(),
+  nowcast:     new Map<string, CE<WeatherMinutely15[]>>(),
+  seasonal:    new Map<string, CE<WeatherSeasonal[]>>(),
 }
 
 function fromCache<T>(map: Map<string, CE<T>>, key: string, ttl: number): T | null {
@@ -81,7 +81,7 @@ export interface WeatherHour {
 }
 
 export interface WeatherMinutely15 {
-  time: string // "YYYY-MM-DDTHH:MM" in Africa/Lagos (UTC+1)
+  time: string        // "YYYY-MM-DDTHH:MM" in Africa/Lagos (UTC+1)
   precipitation: number
   rain: number
   weather_code: number
@@ -98,7 +98,7 @@ export interface WeatherSeasonal {
 
 export function getRegionCoords(region: string): { lat: number; lon: number; city: string } | null {
   const key = Object.keys(REGION_COORDS).find(
-    (k) => k.toLowerCase() === region.trim().toLowerCase(),
+    k => k.toLowerCase() === region.trim().toLowerCase()
   )
   return key ? REGION_COORDS[key] : null
 }
@@ -108,7 +108,7 @@ export function getRegionCoords(region: string): { lat: number; lon: number; cit
 async function _fetchDailyModel(
   region: string,
   model: string | null,
-  cacheMap: Map<string, CE<WeatherDayLive[]>>,
+  cacheMap: Map<string, CE<WeatherDayLive[]>>
 ): Promise<WeatherDayLive[]> {
   const hit = fromCache(cacheMap, region, TTL_DAILY_MS)
   if (hit) return hit
@@ -138,11 +138,11 @@ async function _fetchDailyModel(
   try {
     const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
       signal: AbortSignal.timeout(8000),
-      headers: { Accept: 'application/json' },
+      headers: { 'Accept': 'application/json' },
     })
     if (!res.ok) return []
 
-    const json = (await res.json()) as {
+    const json = await res.json() as {
       daily: {
         time: string[]
         temperature_2m_max: (number | null)[]
@@ -181,7 +181,7 @@ async function _fetchDailyModel(
 async function _fetchHourlyModel(
   region: string,
   model: string | null,
-  cacheMap: Map<string, CE<WeatherHour[]>>,
+  cacheMap: Map<string, CE<WeatherHour[]>>
 ): Promise<WeatherHour[]> {
   const hit = fromCache(cacheMap, region, TTL_HOURLY_MS)
   if (hit) return hit
@@ -210,11 +210,11 @@ async function _fetchHourlyModel(
   try {
     const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
       signal: AbortSignal.timeout(8000),
-      headers: { Accept: 'application/json' },
+      headers: { 'Accept': 'application/json' },
     })
     if (!res.ok) return []
 
-    const json = (await res.json()) as {
+    const json = await res.json() as {
       hourly: {
         time: string[]
         temperature_2m: (number | null)[]
@@ -298,11 +298,11 @@ export async function fetchMinutely15ForRegion(region: string): Promise<WeatherM
   try {
     const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
       signal: AbortSignal.timeout(8000),
-      headers: { Accept: 'application/json' },
+      headers: { 'Accept': 'application/json' },
     })
     if (!res.ok) return []
 
-    const json = (await res.json()) as {
+    const json = await res.json() as {
       minutely_15: {
         time: string[]
         precipitation: (number | null)[]
@@ -339,13 +339,13 @@ export async function fetchMinutely15ForRegion(region: string): Promise<WeatherM
 export function mergeWeatherModels(
   ecmwf: WeatherDayLive[],
   gfs: WeatherDayLive[],
-  icon: WeatherDayLive[],
+  icon: WeatherDayLive[]
 ): WeatherDayLive[] {
   const sources = [
     { data: ecmwf, w: W_ECMWF, ecmwf: true },
-    { data: gfs, w: W_GFS, ecmwf: false },
-    { data: icon, w: W_ICON, ecmwf: false },
-  ].filter((s) => s.data.length > 0)
+    { data: gfs,   w: W_GFS,   ecmwf: false },
+    { data: icon,  w: W_ICON,  ecmwf: false },
+  ].filter(s => s.data.length > 0)
 
   if (sources.length === 0) return []
 
@@ -369,9 +369,7 @@ export function mergeWeatherModels(
     let prob = mean('precipitation_probability')
     if (!Number.isFinite(prob)) {
       const amounts = models.map((m) => m.day.precipitation_mm).filter(Number.isFinite)
-      prob = amounts.length
-        ? (amounts.filter((x) => x >= 1).length / amounts.length) * 100
-        : Number.NaN
+      prob = amounts.length ? (amounts.filter((x) => x >= 1).length / amounts.length) * 100 : Number.NaN
     }
 
     // ET0 FAO-56 : ECMWF en priorité quand il est fourni.
@@ -380,19 +378,19 @@ export function mergeWeatherModels(
 
     result.push({
       date,
-      temperature_max: round1(mean('temperature_max')),
-      temperature_min: round1(mean('temperature_min')),
+      temperature_max:  round1(mean('temperature_max')),
+      temperature_min:  round1(mean('temperature_min')),
       temperature_mean: round1(mean('temperature_mean')),
       // Quantité : moyenne des modèles (l'ancien mélange 70 % moyenne + 30 %
       // maximum biaisait la pluie vers le haut sans fondement de vérification).
       precipitation_mm: round1(mean('precipitation_mm')),
       precipitation_probability: Math.round(Math.min(100, or0(prob))),
-      wind_speed_ms: round1(mean('wind_speed_ms')),
-      humidity_pct: Math.round(or0(mean('humidity_pct'))),
-      et0_mm: round1(et0),
+      wind_speed_ms:    round1(mean('wind_speed_ms')),
+      humidity_pct:     Math.round(or0(mean('humidity_pct'))),
+      et0_mm:           round1(et0),
       source: 'open_meteo' as const,
       region: models[0].day.region,
-      city: models[0].day.city,
+      city:   models[0].day.city,
     })
   }
 
@@ -409,13 +407,13 @@ export function mergeWeatherModels(
 export function mergeHourlyModels(
   ecmwf: WeatherHour[],
   gfs: WeatherHour[],
-  icon: WeatherHour[],
+  icon: WeatherHour[]
 ): WeatherHour[] {
   const sources = [
     { data: ecmwf, w: W_ECMWF },
-    { data: gfs, w: W_GFS },
-    { data: icon, w: W_ICON },
-  ].filter((s) => s.data.length > 0)
+    { data: gfs,   w: W_GFS },
+    { data: icon,  w: W_ICON },
+  ].filter(s => s.data.length > 0)
 
   if (sources.length === 0) return []
 
@@ -440,14 +438,14 @@ export function mergeHourlyModels(
 
     result.push({
       time,
-      temperature: Math.round(wAvg('temperature') * 10) / 10,
-      apparent_temperature: Math.round(wAvg('apparent_temperature') * 10) / 10,
+      temperature:              Math.round(wAvg('temperature')             * 10) / 10,
+      apparent_temperature:     Math.round(wAvg('apparent_temperature')    * 10) / 10,
       precipitation_probability: Math.round(Math.min(100, wAvg('precipitation_probability'))),
-      weather_code: primary.weather_code,
-      wind_speed_ms: Math.round(wAvg('wind_speed_ms') * 10) / 10,
-      humidity_pct: Math.round(wAvg('humidity_pct')),
-      uv_index: Math.round(wAvg('uv_index') * 10) / 10,
-      is_day: primary.is_day,
+      weather_code:   primary.weather_code,
+      wind_speed_ms:  Math.round(wAvg('wind_speed_ms') * 10) / 10,
+      humidity_pct:   Math.round(wAvg('humidity_pct')),
+      uv_index:       Math.round(wAvg('uv_index')      * 10) / 10,
+      is_day:         primary.is_day,
     })
   }
 
@@ -469,22 +467,22 @@ export async function fetchSeasonalForRegion(region: string): Promise<WeatherSea
   if (!coords) return []
 
   const params = new URLSearchParams({
-    latitude: String(coords.lat),
-    longitude: String(coords.lon),
-    monthly: 'temperature_2m_mean,precipitation_sum',
+    latitude:       String(coords.lat),
+    longitude:      String(coords.lon),
+    monthly:        'temperature_2m_mean,precipitation_sum',
     forecast_months: '3',
-    timezone: 'Africa/Lagos',
-    models: 'cfs_v2',
+    timezone:       'Africa/Lagos',
+    models:         'cfs_v2',
   })
 
   try {
     const res = await fetch(`https://seasonal-api.open-meteo.com/v1/seasonal?${params}`, {
       signal: AbortSignal.timeout(8000),
-      headers: { Accept: 'application/json' },
+      headers: { 'Accept': 'application/json' },
     })
     if (!res.ok) return []
 
-    const json = (await res.json()) as {
+    const json = await res.json() as {
       monthly: {
         time: string[]
         temperature_2m_mean: (number | null)[]

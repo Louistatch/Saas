@@ -101,10 +101,9 @@ export function KoboConfigForm({ cooperativeId, onSaved }: KoboConfigFormProps) 
   const [copied, setCopied] = useState(false)
 
   // Webhook URL
-  const webhookUrl =
-    typeof window !== 'undefined'
-      ? `${window.location.origin}/api/webhooks/kobo`
-      : 'https://www.faitierehub.com/api/webhooks/kobo'
+  const webhookUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/api/webhooks/kobo`
+    : 'https://www.faitierehub.com/api/webhooks/kobo'
 
   // Load existing config
   const loadConfig = useCallback(async () => {
@@ -299,7 +298,9 @@ export function KoboConfigForm({ cooperativeId, onSaved }: KoboConfigFormProps) 
 
   // Update mapping row
   const updateMapping = (id: string, field: Partial<FieldMappingEntry>) => {
-    setMappings((prev) => prev.map((m) => (m.id === id ? { ...m, ...field } : m)))
+    setMappings((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, ...field } : m)),
+    )
   }
 
   if (loading) {
@@ -372,8 +373,14 @@ export function KoboConfigForm({ cooperativeId, onSaved }: KoboConfigFormProps) 
 
           {/* Test connection button + result */}
           <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={handleTestConnection} disabled={testing || !formId}>
-              {testing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            <Button
+              variant="outline"
+              onClick={handleTestConnection}
+              disabled={testing || (!formId)}
+            >
+              {testing ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
               Tester la connexion
             </Button>
 
@@ -383,8 +390,7 @@ export function KoboConfigForm({ cooperativeId, onSaved }: KoboConfigFormProps) 
                   <>
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
                     <span className="text-sm text-green-600">
-                      {testResult.formTitle ?? 'Connecté'} ({testResult.submissionCount ?? 0}{' '}
-                      soumissions)
+                      {testResult.formTitle ?? 'Connecté'} ({testResult.submissionCount ?? 0} soumissions)
                     </span>
                   </>
                 ) : (
@@ -411,9 +417,7 @@ export function KoboConfigForm({ cooperativeId, onSaved }: KoboConfigFormProps) 
           {/* Webhook URL */}
           {webhookEnabled && (
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">
-                URL du webhook (à configurer dans KoboToolbox)
-              </Label>
+              <Label className="text-xs text-muted-foreground">URL du webhook (à configurer dans KoboToolbox)</Label>
               <div className="flex items-center gap-2">
                 <code className="flex-1 text-xs bg-muted px-3 py-2 rounded break-all">
                   {webhookUrl}
@@ -427,7 +431,11 @@ export function KoboConfigForm({ cooperativeId, onSaved }: KoboConfigFormProps) 
 
           {/* Save button */}
           <div className="flex gap-2 pt-3">
-            <Button className="flex-1" onClick={handleSave} disabled={saving || !formId}>
+            <Button
+              className="flex-1"
+              onClick={handleSave}
+              disabled={saving || !formId}
+            >
               {saving ? <Spinner className="h-4 w-4 mr-2" /> : null}
               {status === 'connected' ? 'Mettre à jour' : 'Connecter & Sauvegarder'}
             </Button>
@@ -475,7 +483,9 @@ export function KoboConfigForm({ cooperativeId, onSaved }: KoboConfigFormProps) 
                     <Input
                       placeholder="S1/member_card_number"
                       value={mapping.koboField}
-                      onChange={(e) => updateMapping(mapping.id, { koboField: e.target.value })}
+                      onChange={(e) =>
+                        updateMapping(mapping.id, { koboField: e.target.value })
+                      }
                       className="text-xs h-8"
                     />
                   </div>
@@ -502,7 +512,9 @@ export function KoboConfigForm({ cooperativeId, onSaved }: KoboConfigFormProps) 
                     <Input
                       placeholder="card_number"
                       value={mapping.targetColumn}
-                      onChange={(e) => updateMapping(mapping.id, { targetColumn: e.target.value })}
+                      onChange={(e) =>
+                        updateMapping(mapping.id, { targetColumn: e.target.value })
+                      }
                       className="text-xs h-8"
                     />
                   </div>
@@ -532,7 +544,9 @@ export function KoboConfigForm({ cooperativeId, onSaved }: KoboConfigFormProps) 
                     <input
                       type="checkbox"
                       checked={mapping.isKeyField}
-                      onChange={(e) => updateMapping(mapping.id, { isKeyField: e.target.checked })}
+                      onChange={(e) =>
+                        updateMapping(mapping.id, { isKeyField: e.target.checked })
+                      }
                       className="h-4 w-4 rounded"
                       title="Champ clé pour le matching membre"
                     />

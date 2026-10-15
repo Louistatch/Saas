@@ -62,11 +62,7 @@ async function loadCardForSession(
     .maybeSingle<PrivateCardRow & { card_type: string }>()
   if (!data || data.card_type !== 'FAITIERE' || data.member_id !== memberId) return null
   if (data.expiry_date && data.expiry_date < todayIso()) return null
-  return {
-    member_id: data.member_id,
-    cooperative_id: data.cooperative_id,
-    expiry_date: data.expiry_date,
-  }
+  return { member_id: data.member_id, cooperative_id: data.cooperative_id, expiry_date: data.expiry_date }
 }
 
 /**

@@ -42,18 +42,9 @@ export function SupplierCard({ supplier }: SupplierCardProps) {
         <div className="flex items-start gap-4">
           {/* Photo */}
           <div className="shrink-0">
-            <div
-              className="w-14 h-14 rounded-full overflow-hidden border-2 bg-secondary/30"
-              style={{ borderColor: config.color }}
-            >
+            <div className="w-14 h-14 rounded-full overflow-hidden border-2 bg-secondary/30" style={{ borderColor: config.color }}>
               {supplier.photo_url ? (
-                <Image
-                  src={supplier.photo_url}
-                  alt=""
-                  width={56}
-                  height={56}
-                  className="w-full h-full object-cover"
-                />
+                <Image src={supplier.photo_url} alt="" width={56} height={56} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <User className="h-6 w-6 text-muted-foreground" />
@@ -96,11 +87,7 @@ export function SupplierCard({ supplier }: SupplierCardProps) {
             {supplier.cultures.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {supplier.cultures.slice(0, 4).map((culture) => (
-                  <Badge
-                    key={culture}
-                    variant="secondary"
-                    className="text-[10px] gap-1 px-2 py-0.5"
-                  >
+                  <Badge key={culture} variant="secondary" className="text-[10px] gap-1 px-2 py-0.5">
                     <Leaf className="h-2.5 w-2.5" />
                     {culture}
                   </Badge>

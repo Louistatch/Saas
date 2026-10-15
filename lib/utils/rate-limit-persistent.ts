@@ -10,11 +10,14 @@ import { rateLimit } from './rate-limit'
 
 // Vérifier si Upstash est configuré
 const isUpstashConfigured = !!(
-  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+  process.env.UPSTASH_REDIS_REST_URL &&
+  process.env.UPSTASH_REDIS_REST_TOKEN
 )
 
 // Initialisation unique (singleton côté module)
-const redis = isUpstashConfigured ? Redis.fromEnv() : null
+const redis = isUpstashConfigured
+  ? Redis.fromEnv()
+  : null
 
 // Plusieurs limiteurs selon le contexte
 export const rateLimiters = redis
@@ -124,12 +127,11 @@ const PER_MINUTE: Record<LimiterName, number> = {
 
 export async function applyRateLimit(
   request: NextRequest,
-  limiter: LimiterName,
+  limiter: LimiterName
 ): Promise<NextResponse | null> {
-  const ip =
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    request.headers.get('x-real-ip') ??
-    'unknown'
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    ?? request.headers.get('x-real-ip')
+    ?? 'unknown'
 
   if (!rateLimiters) {
     // Upstash not configured: an in-memory budget per instance instead of no limit at all
@@ -140,9 +142,7 @@ export async function applyRateLimit(
       { error: 'Trop de requêtes. Réessayez dans quelques instants.' },
       {
         status: 429,
-        headers: {
-          'Retry-After': String(Math.max(1, Math.ceil((mem.resetAt - Date.now()) / 1000))),
-        },
+        headers: { 'Retry-After': String(Math.max(1, Math.ceil((mem.resetAt - Date.now()) / 1000))) },
       },
     )
   }
@@ -160,7 +160,7 @@ export async function applyRateLimit(
           'X-RateLimit-Reset': String(reset),
           'Retry-After': String(Math.ceil((reset - Date.now()) / 1000)),
         },
-      },
+      }
     )
   }
 

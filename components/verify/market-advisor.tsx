@@ -74,10 +74,8 @@ const C = {
 const fmt = (n: number) => Math.round(n).toLocaleString('fr-FR')
 const pctTxt = (n: number) =>
   `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %`
-const dateFr = (
-  iso: string,
-  opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' },
-) => new Date(iso).toLocaleDateString('fr-FR', opts)
+const dateFr = (iso: string, opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }) =>
+  new Date(iso).toLocaleDateString('fr-FR', opts)
 
 // ─── Chargement des données ──────────────────────────────────────────────────
 
@@ -125,17 +123,13 @@ function useForecast(culture: string | undefined, zone: string | undefined) {
     if (!culture || !zone) return
     const ctrl = new AbortController()
     setF({ state: 'loading' })
-    fetch(
-      `/api/market-prices/forecast?produit=${encodeURIComponent(culture)}&zone=${encodeURIComponent(zone)}`,
-      {
-        signal: ctrl.signal,
-      },
-    )
+    fetch(`/api/market-prices/forecast?produit=${encodeURIComponent(culture)}&zone=${encodeURIComponent(zone)}`, {
+      signal: ctrl.signal,
+    })
       .then((r) => r.json())
       .then((d) => setF({ state: 'ready', value: forecastFromApi(d) }))
       .catch((e) => {
-        if ((e as Error).name !== 'AbortError')
-          setF({ state: 'ready', value: { ok: false, reason: 'prévision indisponible' } })
+        if ((e as Error).name !== 'AbortError') setF({ state: 'ready', value: { ok: false, reason: 'prévision indisponible' } })
       })
     return () => ctrl.abort()
   }, [culture, zone])
@@ -148,9 +142,7 @@ function useSeasonal(cultureId: string | undefined, regionId: string | undefined
     if (!cultureId || !regionId) return
     const ctrl = new AbortController()
     setS(null)
-    fetch(`/api/market-prices/seasonal?culture_id=${cultureId}&region_id=${regionId}`, {
-      signal: ctrl.signal,
-    })
+    fetch(`/api/market-prices/seasonal?culture_id=${cultureId}&region_id=${regionId}`, { signal: ctrl.signal })
       .then((r) => r.json())
       .then((d) => setS(seasonalFromApi(d)))
       .catch((e) => {
@@ -180,9 +172,7 @@ function useOnline() {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export function MarketAdvisor({ cardNumber, memberName, regionName, onOpenPrices }: Props) {
-  const [region, setRegion] = useState<Region | undefined>(
-    () => Region.findByName(regionName) ?? Region.all()[0],
-  )
+  const [region, setRegion] = useState<Region | undefined>(() => Region.findByName(regionName) ?? Region.all()[0])
   const { prices, ownCultures } = useAdvisorData(cardNumber, region?.id)
   const [cultureId, setCultureId] = useState<string | null>(null)
   const [question, setQuestion] = useState<{ id: number; text: string } | null>(null)
@@ -202,9 +192,7 @@ export function MarketAdvisor({ cardNumber, memberName, regionName, onOpenPrices
     if (!available.length) return
     if (cultureId && available.some((p) => p.cultureId === cultureId)) return
     const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
-    const own = available.find((p) =>
-      ownCultures.some((c) => norm(c).startsWith(norm(p.cultureName))),
-    )
+    const own = available.find((p) => ownCultures.some((c) => norm(c).startsWith(norm(p.cultureName))))
     setCultureId((own ?? available[0]).cultureId)
   }, [available, ownCultures, cultureId])
 
@@ -213,19 +201,11 @@ export function MarketAdvisor({ cardNumber, memberName, regionName, onOpenPrices
   const forecast = useForecast(market?.commodity, region?.name)
   const seasonal = useSeasonal(market?.commodityId, region?.id)
   const recommendation =
-    market && forecast.state === 'ready' && seasonal
-      ? buildRecommendation(market, forecast.value, seasonal)
-      : null
+    market && forecast.state === 'ready' && seasonal ? buildRecommendation(market, forecast.value, seasonal) : null
 
   const ask = useCallback((text: string) => {
     setQuestion({ id: Date.now(), text })
-    setTimeout(
-      () =>
-        document
-          .getElementById('advisor-chat')
-          ?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
-      50,
-    )
+    setTimeout(() => document.getElementById('advisor-chat')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
   }, [])
 
   const historyCount = useMemo(() => {
@@ -252,18 +232,12 @@ export function MarketAdvisor({ cardNumber, memberName, regionName, onOpenPrices
         </div>
         <button
           type="button"
-          onClick={() =>
-            document
-              .getElementById('advisor-chat')
-              ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          }
+          onClick={() => document.getElementById('advisor-chat')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
           className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-white/[0.12] px-3 min-h-[40px] text-[12.5px] font-medium text-white/80 active:scale-95"
         >
           <History className="h-4 w-4" />
           <span className="hidden min-[380px]:inline">Historique</span>
-          {historyCount > 0 && (
-            <span className="text-white/45">{Math.floor(historyCount / 2) || ''}</span>
-          )}
+          {historyCount > 0 && <span className="text-white/45">{Math.floor(historyCount / 2) || ''}</span>}
         </button>
       </div>
 
@@ -280,10 +254,7 @@ export function MarketAdvisor({ cardNumber, memberName, regionName, onOpenPrices
           label="Culture"
           value={cultureId ?? ''}
           onChange={setCultureId}
-          options={available.map((p) => ({
-            value: p.cultureId,
-            label: displayCulture(p.cultureName),
-          }))}
+          options={available.map((p) => ({ value: p.cultureId, label: displayCulture(p.cultureName) }))}
           placeholder={prices.state === 'loading' ? 'Chargement…' : 'Aucune culture'}
         />
         <FilterSelect
@@ -323,11 +294,7 @@ export function MarketAdvisor({ cardNumber, memberName, regionName, onOpenPrices
           </div>
 
           {recommendation ? (
-            <RecommendationCard
-              title={recommendation.title}
-              explanation={recommendation.explanation}
-              tips={recommendation.tips}
-            />
+            <RecommendationCard title={recommendation.title} explanation={recommendation.explanation} tips={recommendation.tips} />
           ) : (
             <LoadingBlock label="Préparation de la recommandation…" />
           )}
@@ -336,20 +303,11 @@ export function MarketAdvisor({ cardNumber, memberName, regionName, onOpenPrices
             onSimulate={() => setShowSim((v) => !v)}
             simOpen={showSim}
             onCompare={onOpenPrices}
-            onWhen={() =>
-              ask(`Quand vendre mon ${market.commodity.toLowerCase()} à ${market.location} ?`)
-            }
+            onWhen={() => ask(`Quand vendre mon ${market.commodity.toLowerCase()} à ${market.location} ?`)}
           />
-          {showSim && (
-            <SaleSimulator
-              market={market}
-              forecast={forecast.state === 'ready' ? forecast.value : null}
-            />
-          )}
+          {showSim && <SaleSimulator market={market} forecast={forecast.state === 'ready' ? forecast.value : null} />}
 
-          {recommendation && recommendation.reasons.length > 0 && (
-            <RecommendationReasons reasons={recommendation.reasons} />
-          )}
+          {recommendation && recommendation.reasons.length > 0 && <RecommendationReasons reasons={recommendation.reasons} />}
         </>
       )}
 
@@ -417,10 +375,7 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
   )
 }
 
-function TrendPill({
-  trend,
-  changePct,
-}: { trend: AdvisorMarket['trend']; changePct: number | null }) {
+function TrendPill({ trend, changePct }: { trend: AdvisorMarket['trend']; changePct: number | null }) {
   const color = trend === 'up' ? C.up : trend === 'down' ? C.down : C.inkSoft
   const Icon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : ArrowLeftRight
   const label =
@@ -488,13 +443,7 @@ function CurrentPriceCard({ market, onDetail }: { market: AdvisorMarket; onDetai
                 formatter={(v) => [`${fmt(Number(v))} FCFA/kg`, 'Médiane']}
                 contentStyle={{ borderRadius: 10, border: 'none', fontSize: 12 }}
               />
-              <Area
-                type="monotone"
-                dataKey="price"
-                stroke={C.accent}
-                strokeWidth={2}
-                fill="url(#advisorPrice)"
-              />
+              <Area type="monotone" dataKey="price" stroke={C.accent} strokeWidth={2} fill="url(#advisorPrice)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -503,17 +452,10 @@ function CurrentPriceCard({ market, onDetail }: { market: AdvisorMarket; onDetai
           Pas encore d’historique sur plusieurs semaines.
         </p>
       )}
-      <div
-        className="mt-3 pt-3 flex items-center justify-between gap-2 border-t"
-        style={{ borderColor: C.line }}
-      >
-        <span
-          className="inline-flex items-center gap-1.5 text-[12.5px]"
-          style={{ color: C.inkSoft }}
-        >
+      <div className="mt-3 pt-3 flex items-center justify-between gap-2 border-t" style={{ borderColor: C.line }}>
+        <span className="inline-flex items-center gap-1.5 text-[12.5px]" style={{ color: C.inkSoft }}>
           <Database className="h-4 w-4" />
-          {market.marketsCount} marché{market.marketsCount > 1 ? 's' : ''} suivi
-          {market.marketsCount > 1 ? 's' : ''}
+          {market.marketsCount} marché{market.marketsCount > 1 ? 's' : ''} suivi{market.marketsCount > 1 ? 's' : ''}
         </span>
         <button
           type="button"
@@ -533,11 +475,7 @@ function ConfidenceBars({ level }: { level: 'faible' | 'moyenne' | 'élevée' })
   return (
     <span className="inline-flex gap-1" aria-hidden="true">
       {[0, 1, 2].map((i) => (
-        <span
-          key={i}
-          className="h-2 w-5 rounded-sm"
-          style={{ background: i < n ? C.accent : C.line }}
-        />
+        <span key={i} className="h-2 w-5 rounded-sm" style={{ background: i < n ? C.accent : C.line }} />
       ))}
     </span>
   )
@@ -573,8 +511,8 @@ function ForecastCard({
         </p>
         <p className="mt-2 text-[15px] font-semibold">Prévision indisponible</p>
         <p className="mt-1 text-[12.5px]" style={{ color: C.inkSoft }}>
-          {f && !f.ok ? f.reason : 'Le service de prévision ne répond pas.'} Le prix actuel et la
-          tendance restent valables.
+          {f && !f.ok ? f.reason : 'Le service de prévision ne répond pas.'} Le prix actuel et la tendance restent
+          valables.
         </p>
       </Card>
     )
@@ -594,46 +532,29 @@ function ForecastCard({
           className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12.5px] font-semibold"
           style={{ color, background: `${color}14` }}
         >
-          {down ? <TrendingDown className="h-3.5 w-3.5" /> : <TrendingUp className="h-3.5 w-3.5" />}{' '}
-          {pctTxt(f.changePct)}
+          {down ? <TrendingDown className="h-3.5 w-3.5" /> : <TrendingUp className="h-3.5 w-3.5" />} {pctTxt(f.changePct)}
         </span>
       </div>
       <div className="mt-2 flex items-center gap-2 text-[12.5px]" style={{ color: C.inkSoft }}>
-        Confiance :{' '}
-        <strong style={{ color: C.ink }}>
-          {f.confidence[0].toUpperCase() + f.confidence.slice(1)}
-        </strong>
+        Confiance : <strong style={{ color: C.ink }}>{f.confidence[0].toUpperCase() + f.confidence.slice(1)}</strong>
         <ConfidenceBars level={f.confidence} />
       </div>
-      <p
-        className="mt-2.5 rounded-xl px-3 py-2 text-[12.5px] leading-snug"
-        style={{ background: `${C.ink}08`, color: C.inkSoft }}
-      >
+      <p className="mt-2.5 rounded-xl px-3 py-2 text-[12.5px] leading-snug" style={{ background: `${C.ink}08`, color: C.inkSoft }}>
         <Info className="inline h-3.5 w-3.5 -mt-0.5 mr-1" />
-        Fourchette probable {fmt(end.low)}–{fmt(end.high)} FCFA/kg, d’après {f.weeksObserved}{' '}
-        semaines de relevés.
+        Fourchette probable {fmt(end.low)}–{fmt(end.high)} FCFA/kg, d’après {f.weeksObserved} semaines de relevés.
         {f.mape !== null && f.mapeNaive !== null
           ? ` Erreur mesurée ${f.mape.toLocaleString('fr-FR')} % (contre ${f.mapeNaive.toLocaleString('fr-FR')} % si l’on suppose un prix inchangé).`
           : ''}
-        {f.confidence === 'faible'
-          ? ' Sur cette zone, la prévision n’est pas plus fiable qu’un prix inchangé.'
-          : ''}
+        {f.confidence === 'faible' ? ' Sur cette zone, la prévision n’est pas plus fiable qu’un prix inchangé.' : ''}
       </p>
       <p className="mt-3 text-[12.5px] font-medium" style={{ color: C.inkSoft }}>
         Évolution attendue
       </p>
       <ol className="mt-1.5 grid grid-cols-3 gap-1.5 text-center">
         <TimelineStep label="Aujourd’hui" value={fmt(market.currentPrice)} />
-        <TimelineStep
-          label={`Vers le ${dateFr(end.weekStart)}`}
-          value={`≈ ${fmt(f.expectedPrice)}`}
-          tone={color}
-        />
+        <TimelineStep label={`Vers le ${dateFr(end.weekStart)}`} value={`≈ ${fmt(f.expectedPrice)}`} tone={color} />
         {seasonal?.ok ? (
-          <TimelineStep
-            label={`${seasonal.label} (l’an passé)`}
-            value={`${fmt(seasonal.low)}–${fmt(seasonal.high)}`}
-          />
+          <TimelineStep label={`${seasonal.label} (l’an passé)`} value={`${fmt(seasonal.low)}–${fmt(seasonal.high)}`} />
         ) : (
           <TimelineStep label="Déc. – févr." value="pas d’historique" muted />
         )}
@@ -642,21 +563,13 @@ function ForecastCard({
   )
 }
 
-function TimelineStep({
-  label,
-  value,
-  tone,
-  muted,
-}: { label: string; value: string; tone?: string; muted?: boolean }) {
+function TimelineStep({ label, value, tone, muted }: { label: string; value: string; tone?: string; muted?: boolean }) {
   return (
     <li className="rounded-xl px-1.5 py-2" style={{ background: `${C.ink}08` }}>
       <p className="text-[10.5px] leading-tight" style={{ color: C.inkSoft }}>
         {label}
       </p>
-      <p
-        className={`mt-0.5 font-bold ${muted ? 'text-[11.5px] font-medium' : 'text-[15px]'}`}
-        style={{ color: muted ? C.inkSoft : (tone ?? C.ink) }}
-      >
+      <p className={`mt-0.5 font-bold ${muted ? 'text-[11.5px] font-medium' : 'text-[15px]'}`} style={{ color: muted ? C.inkSoft : (tone ?? C.ink) }}>
         {value}
       </p>
     </li>
@@ -670,16 +583,9 @@ const TIP_ICONS: Record<AdvisorTip['icon'], typeof Wallet> = {
   compare: Scale,
 }
 
-function RecommendationCard({
-  title,
-  explanation,
-  tips,
-}: { title: string; explanation: string; tips: AdvisorTip[] }) {
+function RecommendationCard({ title, explanation, tips }: { title: string; explanation: string; tips: AdvisorTip[] }) {
   return (
-    <div
-      className="rounded-[20px] p-4 ring-1 ring-[var(--vfp-accent)]/30"
-      style={{ background: C.forest }}
-    >
+    <div className="rounded-[20px] p-4 ring-1 ring-[var(--vfp-accent)]/30" style={{ background: C.forest }}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-white/65 text-[13px] font-medium">Notre recommandation</p>
         <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[11.5px] font-medium text-white/85">
@@ -716,19 +622,8 @@ function AdvisorActions({
   onWhen: () => void
 }) {
   const items = [
-    {
-      icon: Calculator,
-      title: 'Simuler ma vente',
-      sub: 'Estimer mes revenus',
-      onClick: onSimulate,
-      active: simOpen,
-    },
-    {
-      icon: BarChart3,
-      title: 'Comparer les marchés',
-      sub: 'Voir les prix par localité',
-      onClick: onCompare,
-    },
+    { icon: Calculator, title: 'Simuler ma vente', sub: 'Estimer mes revenus', onClick: onSimulate, active: simOpen },
+    { icon: BarChart3, title: 'Comparer les marchés', sub: 'Voir les prix par localité', onClick: onCompare },
     { icon: Clock, title: 'Quand vendre ?', sub: 'Demander au conseiller', onClick: onWhen },
   ]
   return (
@@ -743,9 +638,7 @@ function AdvisorActions({
         >
           <it.icon className="h-5 w-5 shrink-0 text-[var(--vfp-accent)]" />
           <span className="min-w-0">
-            <span className="block text-white text-[13.5px] font-semibold leading-tight">
-              {it.title}
-            </span>
+            <span className="block text-white text-[13.5px] font-semibold leading-tight">{it.title}</span>
             <span className="block text-white/55 text-[12px] leading-snug mt-0.5">{it.sub}</span>
           </span>
         </button>
@@ -756,22 +649,15 @@ function AdvisorActions({
       >
         <Handshake className="h-5 w-5 shrink-0 text-[var(--vfp-accent)]" />
         <span className="min-w-0">
-          <span className="block text-white text-[13.5px] font-semibold leading-tight">
-            Trouver un acheteur
-          </span>
-          <span className="block text-white/55 text-[12px] leading-snug mt-0.5">
-            Annonces et préventes
-          </span>
+          <span className="block text-white text-[13.5px] font-semibold leading-tight">Trouver un acheteur</span>
+          <span className="block text-white/55 text-[12px] leading-snug mt-0.5">Annonces et préventes</span>
         </span>
       </a>
     </div>
   )
 }
 
-function SaleSimulator({
-  market,
-  forecast,
-}: { market: AdvisorMarket; forecast: AdvisorForecast | null }) {
+function SaleSimulator({ market, forecast }: { market: AdvisorMarket; forecast: AdvisorForecast | null }) {
   const [kg, setKg] = useState('500')
   const q = Math.max(0, Number.parseFloat(kg.replace(',', '.')) || 0)
   const end = forecast?.ok ? forecast.points[forecast.points.length - 1] : null
@@ -789,9 +675,7 @@ function SaleSimulator({
       <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-2 text-[13px]">
         <div className="rounded-xl bg-white/[0.05] p-3">
           <p className="text-white/55">Au prix d’aujourd’hui</p>
-          <p className="text-white text-[17px] font-semibold mt-0.5">
-            {fmt(q * market.currentPrice)} FCFA
-          </p>
+          <p className="text-white text-[17px] font-semibold mt-0.5">{fmt(q * market.currentPrice)} FCFA</p>
           {market.minPrice !== null && market.maxPrice !== null && (
             <p className="text-white/50 text-[12px] mt-0.5">
               selon le marché : {fmt(q * market.minPrice)} – {fmt(q * market.maxPrice)}
@@ -802,9 +686,7 @@ function SaleSimulator({
           <p className="text-white/55">Dans 4 semaines (prévision)</p>
           {end ? (
             <>
-              <p className="text-white text-[17px] font-semibold mt-0.5">
-                ≈ {fmt(q * end.price)} FCFA
-              </p>
+              <p className="text-white text-[17px] font-semibold mt-0.5">≈ {fmt(q * end.price)} FCFA</p>
               <p className="text-white/50 text-[12px] mt-0.5">
                 probablement {fmt(q * end.low)} – {fmt(q * end.high)}
               </p>
@@ -833,9 +715,7 @@ function RecommendationReasons({ reasons }: { reasons: AdvisorReason[] }) {
   return (
     <details open className="vfp-card rounded-2xl group">
       <summary className="flex items-center justify-between gap-2 px-4 py-3.5 cursor-pointer list-none min-h-[52px]">
-        <span className="text-white text-[14.5px] font-semibold">
-          Pourquoi cette recommandation ?
-        </span>
+        <span className="text-white text-[14.5px] font-semibold">Pourquoi cette recommandation ?</span>
         <ChevronRight className="h-4 w-4 text-white/45 transition-transform group-open:rotate-90" />
       </summary>
       <ul className="px-4 pb-4 space-y-3">

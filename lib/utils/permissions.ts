@@ -1,36 +1,36 @@
 /**
  * RBAC Permission System — FaîtiereHub
- *
+ * 
  * Hierarchy (strict, inviolable):
- *
+ * 
  *   SUPER_ADMIN (platform owner)
  *     └── Full control over everything
- *
+ * 
  *   FAITIERE_ADMIN (cooperative_admin + cooperative.level = 'faitiere')
  *     ├── Can create/manage child cooperatives (unions + cooperatives)
  *     ├── Can generate cards for members of child cooperatives
  *     ├── Can view all data across child hierarchy
  *     └── Cannot access other faîtières' data
- *
+ * 
  *   UNION_ADMIN (cooperative_admin + cooperative.level = 'union')
  *     ├── Can manage child cooperatives under their union
  *     ├── Can generate cards for members of child cooperatives
  *     └── Cannot create faîtières or other unions
- *
+ * 
  *   COOPERATIVE_ADMIN (cooperative_admin + cooperative.level = 'cooperative')
  *     ├── Can manage members of their cooperative only
  *     ├── Can generate cards for their members only
  *     ├── Cannot create cooperatives
  *     └── Cannot see other cooperatives' data
- *
+ * 
  *   MEMBER (role = 'member')
  *     ├── Can view own profile and card
  *     ├── Can access marketplace (free with card)
  *     └── No administrative access
- *
+ * 
  *   GUEST (role = 'guest')
  *     └── Public marketplace only (paid access)
- *
+ * 
  * RULES:
  * - A cooperative CANNOT exist without a parent (faîtière or union)
  * - A member CANNOT exist without a cooperative
@@ -42,12 +42,12 @@ import type { UserRole, HarooType } from '@/types/domain'
 
 // ─── Effective Role Resolution ───────────────────────────────────────────────
 
-export type EffectiveRole =
-  | 'super_admin'
-  | 'faitiere_admin'
-  | 'union_admin'
-  | 'cooperative_admin'
-  | 'member'
+export type EffectiveRole = 
+  | 'super_admin' 
+  | 'faitiere_admin' 
+  | 'union_admin' 
+  | 'cooperative_admin' 
+  | 'member' 
   | 'guest'
 
 /**
@@ -62,19 +62,16 @@ export function resolveEffectiveRole(
   if (role === 'super_admin') return 'super_admin'
   if (role === 'member') return 'member'
   if (role === 'guest') return 'guest'
-
+  
   // cooperative_admin — differentiate by cooperative level
   if (role === 'cooperative_admin') {
     switch (cooperativeLevel) {
-      case 'faitiere':
-        return 'faitiere_admin'
-      case 'union':
-        return 'union_admin'
-      default:
-        return 'cooperative_admin'
+      case 'faitiere': return 'faitiere_admin'
+      case 'union': return 'union_admin'
+      default: return 'cooperative_admin'
     }
   }
-
+  
   return 'guest'
 }
 
@@ -163,39 +160,25 @@ export function canCreateCooperatives(
 
 export function roleLabel(role: UserRole): string {
   switch (role) {
-    case 'super_admin':
-      return 'Super Admin'
-    case 'cooperative_admin':
-      return 'Administrateur'
-    case 'member':
-      return 'Membre'
-    case 'guest':
-      return 'Invité'
-    case 'none':
-      return 'Sans organisation'
-    case 'ouvrier':
-      return 'Ouvrier Haroo'
-    case 'acheteur':
-      return 'Acheteur Haroo'
-    case 'agronome':
-      return 'Agronome Haroo'
+    case 'super_admin': return 'Super Admin'
+    case 'cooperative_admin': return 'Administrateur'
+    case 'member': return 'Membre'
+    case 'guest': return 'Invité'
+    case 'none': return 'Sans organisation'
+    case 'ouvrier': return 'Ouvrier Haroo'
+    case 'acheteur': return 'Acheteur Haroo'
+    case 'agronome': return 'Agronome Haroo'
   }
 }
 
 export function effectiveRoleLabel(effectiveRole: EffectiveRole): string {
   switch (effectiveRole) {
-    case 'super_admin':
-      return 'Super Admin (Plateforme)'
-    case 'faitiere_admin':
-      return 'Admin Faîtière'
-    case 'union_admin':
-      return 'Admin Union Régionale'
-    case 'cooperative_admin':
-      return 'Admin Coopérative'
-    case 'member':
-      return 'Membre'
-    case 'guest':
-      return 'Invité'
+    case 'super_admin': return 'Super Admin (Plateforme)'
+    case 'faitiere_admin': return 'Admin Faîtière'
+    case 'union_admin': return 'Admin Union Régionale'
+    case 'cooperative_admin': return 'Admin Coopérative'
+    case 'member': return 'Membre'
+    case 'guest': return 'Invité'
   }
 }
 
@@ -203,7 +186,7 @@ export function effectiveRoleLabel(effectiveRole: EffectiveRole): string {
 
 /**
  * Validate that a cooperative can be created at the given level under the given parent.
- *
+ * 
  * Rules:
  * - faitiere: can only be created by super_admin (no parent required)
  * - union: must have a faitiere as parent
@@ -235,11 +218,7 @@ export function validateCooperativeCreation(
 
   // Cooperatives must be under a union or faîtière
   if (level === 'cooperative') {
-    if (
-      creatorRole !== 'super_admin' &&
-      creatorRole !== 'faitiere_admin' &&
-      creatorRole !== 'union_admin'
-    ) {
+    if (creatorRole !== 'super_admin' && creatorRole !== 'faitiere_admin' && creatorRole !== 'union_admin') {
       return { valid: false, error: 'Seul un admin faîtière ou union peut créer une coopérative' }
     }
     if (parentLevel !== 'faitiere' && parentLevel !== 'union') {

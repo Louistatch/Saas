@@ -13,7 +13,7 @@ import {
 
 const CARD_TYPE_LABELS: Record<string, string> = {
   FAITIERE: 'Carte Producteur',
-  OUVRIER: 'Carte Ouvrier',
+  OUVRIER:  'Carte Ouvrier',
   ACHETEUR: 'Carte Acheteur',
   AGRONOME: 'Carte Agronome',
 }
@@ -72,8 +72,7 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
 
   const fullName = memberFullName(member)
   const nameLen = fullName.length
-  const nameSize =
-    nameLen > 28 ? '1.1rem' : nameLen > 22 ? '1.35rem' : nameLen > 16 ? '1.75rem' : '2.1rem'
+  const nameSize = nameLen > 28 ? '1.1rem' : nameLen > 22 ? '1.35rem' : nameLen > 16 ? '1.75rem' : '2.1rem'
 
   return (
     <div className="card3d-scene">
@@ -155,10 +154,7 @@ export function Card3D({ member, card, cooperative }: Card3DProps) {
           {/* Embossed chip + card meta */}
           <footer className="card3d-bottom">
             <div className="card3d-chip" aria-hidden>
-              <span />
-              <span />
-              <span />
-              <span />
+              <span /><span /><span /><span />
             </div>
             <div className="card3d-meta">
               <div>

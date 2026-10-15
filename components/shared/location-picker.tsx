@@ -3,7 +3,10 @@
 import { useEffect, useRef } from 'react'
 import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/shared/loading'
-import { useCascadingLocations, type CascadingLocationLevel } from '@/hooks/use-cascading-locations'
+import {
+  useCascadingLocations,
+  type CascadingLocationLevel,
+} from '@/hooks/use-cascading-locations'
 
 interface LocationValue {
   region_id?: string
@@ -55,13 +58,7 @@ export function LocationPicker({ value, onChange, disabled, compact }: LocationP
   // from the outside (e.g. loading an existing record).
   const lastExternalIds = useRef('')
   useEffect(() => {
-    const ids = [
-      value.region_id,
-      value.prefecture_id,
-      value.commune_id,
-      value.canton_id,
-      value.village_id,
-    ]
+    const ids = [value.region_id, value.prefecture_id, value.commune_id, value.canton_id, value.village_id]
       .map((v) => v ?? '')
       .join('|')
     if (ids === lastExternalIds.current) return
@@ -73,14 +70,7 @@ export function LocationPicker({ value, onChange, disabled, compact }: LocationP
       canton_id: value.canton_id ?? '',
       village_id: value.village_id ?? '',
     })
-  }, [
-    value.region_id,
-    value.prefecture_id,
-    value.commune_id,
-    value.canton_id,
-    value.village_id,
-    setSelection,
-  ])
+  }, [value.region_id, value.prefecture_id, value.commune_id, value.canton_id, value.village_id, setSelection])
 
   const handleChange = (level: CascadingLocationLevel, id: string, name: string) => {
     setLevel(level, id)
@@ -156,9 +146,7 @@ export function LocationPicker({ value, onChange, disabled, compact }: LocationP
         >
           <option value="">— Sélectionner —</option>
           {regions.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name}
-            </option>
+            <option key={r.id} value={r.id}>{r.name}</option>
           ))}
         </select>
       </div>
@@ -179,9 +167,7 @@ export function LocationPicker({ value, onChange, disabled, compact }: LocationP
         >
           <option value="">— Sélectionner —</option>
           {prefectures.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name}
-            </option>
+            <option key={r.id} value={r.id}>{r.name}</option>
           ))}
         </select>
       </div>
@@ -200,9 +186,7 @@ export function LocationPicker({ value, onChange, disabled, compact }: LocationP
           >
             <option value="">— Sélectionner —</option>
             {communes.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
+              <option key={r.id} value={r.id}>{r.name}</option>
             ))}
           </select>
         </div>
@@ -225,9 +209,7 @@ export function LocationPicker({ value, onChange, disabled, compact }: LocationP
           >
             <option value="">— Sélectionner —</option>
             {cantons.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
+              <option key={r.id} value={r.id}>{r.name}</option>
             ))}
           </select>
         </div>
@@ -250,9 +232,7 @@ export function LocationPicker({ value, onChange, disabled, compact }: LocationP
           >
             <option value="">— Sélectionner —</option>
             {villages.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
+              <option key={r.id} value={r.id}>{r.name}</option>
             ))}
           </select>
         </div>

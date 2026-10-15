@@ -114,6 +114,7 @@ function TypingDots() {
   )
 }
 
+
 // ─── Voice mode overlay ───────────────────────────────────────────────────────
 
 function VoiceModeOverlay({
@@ -346,7 +347,7 @@ export function AiChat({
             role: 'assistant',
             content: offline
               ? "Vous n'avez pas de réseau. Votre question sera à reposer une fois le réseau revenu."
-              : 'La connexion a échoué. Réessayez dans un instant.',
+              : "La connexion a échoué. Réessayez dans un instant.",
           },
         ])
       } finally {
@@ -641,9 +642,7 @@ export function AiChat({
           ? 'relative flex flex-col'
           : 'relative flex flex-col h-full min-h-[420px] max-h-[calc(100dvh-120px)] rounded-[20px] overflow-hidden'
       }
-      style={
-        embedded ? undefined : { background: '#06150e', border: '1px solid rgba(255,255,255,.07)' }
-      }
+      style={embedded ? undefined : { background: '#06150e', border: '1px solid rgba(255,255,255,.07)' }}
     >
       {/* ── VOICE MODE OVERLAY ─────────────────────────────────────── */}
       {voiceMode && (
@@ -657,66 +656,58 @@ export function AiChat({
 
       {!embedded && (
         <>
-          {/* ── HEADER ─────────────────────────────────────────────────── */}
-          <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.06]">
-            <button
-              type="button"
-              onClick={onBack}
-              className="text-white/60 -ml-1 p-1 hover:text-white transition-colors flex-shrink-0"
-              aria-label="Retour"
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-white text-[17px] leading-tight">Conseiller</p>
-              <p className="text-white/50 text-[12.5px] leading-tight mt-0.5 truncate">
-                {headerSub}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setVoiceMode((v) => !v)}
-              className={`w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-full transition-colors ${
-                voiceMode ? 'text-emerald-300 bg-emerald-500/15' : 'text-white/45 hover:text-white'
-              }`}
-              title={voiceMode ? 'Désactiver la conversation vocale' : 'Conversation vocale'}
-              aria-label="Conversation vocale"
-              aria-pressed={voiceMode}
-            >
-              {voiceMode ? <Volume2 size={18} /> : <VolumeX size={18} />}
-            </button>
-            {messages.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setMessages([])
-                  try {
-                    sessionStorage.removeItem(storageKey)
-                  } catch {}
-                }}
-                className="text-white/45 text-[12.5px] hover:text-white transition-colors flex-shrink-0"
-              >
-                Effacer
-              </button>
-            )}
-          </div>
+      {/* ── HEADER ─────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.06]">
+        <button
+          type="button"
+          onClick={onBack}
+          className="text-white/60 -ml-1 p-1 hover:text-white transition-colors flex-shrink-0"
+          aria-label="Retour"
+        >
+          <ArrowLeft size={20} />
+        </button>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-white text-[17px] leading-tight">Conseiller</p>
+          <p className="text-white/50 text-[12.5px] leading-tight mt-0.5 truncate">{headerSub}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setVoiceMode((v) => !v)}
+          className={`w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-full transition-colors ${
+            voiceMode ? 'text-emerald-300 bg-emerald-500/15' : 'text-white/45 hover:text-white'
+          }`}
+          title={voiceMode ? 'Désactiver la conversation vocale' : 'Conversation vocale'}
+          aria-label="Conversation vocale"
+          aria-pressed={voiceMode}
+        >
+          {voiceMode ? <Volume2 size={18} /> : <VolumeX size={18} />}
+        </button>
+        {messages.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setMessages([])
+              try {
+                sessionStorage.removeItem(storageKey)
+              } catch {}
+            }}
+            className="text-white/45 text-[12.5px] hover:text-white transition-colors flex-shrink-0"
+          >
+            Effacer
+          </button>
+        )}
+      </div>
+
         </>
       )}
 
       {/* ── MESSAGES AREA ──────────────────────────────────────────── */}
       <div
-        className={
-          embedded
-            ? 'flex flex-col gap-4 py-2'
-            : 'flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3'
-        }
+        className={embedded ? 'flex flex-col gap-4 py-2' : 'flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3'}
         ref={scrollRef}
       >
         {!embedded && messages.length === 0 && (
-          <div
-            className="flex flex-col gap-6 pt-2"
-            style={{ animation: 'chat-fade-up 0.3s ease both' }}
-          >
+          <div className="flex flex-col gap-6 pt-2" style={{ animation: 'chat-fade-up 0.3s ease both' }}>
             <div>
               <p className="text-[26px] font-semibold text-white leading-tight">
                 Bonjour{firstName ? ` ${firstName}` : ''}
@@ -729,25 +720,14 @@ export function AiChat({
             {regionPrices.length > 0 && (
               <div className="rounded-2xl border border-white/[0.08] bg-white/[0.045] px-4 pt-3.5 pb-1.5">
                 <div className="flex items-center justify-between pb-1">
-                  <p className="text-white/55 text-[13px] font-medium">
-                    Prix à {regionName} cette semaine
-                  </p>
+                  <p className="text-white/55 text-[13px] font-medium">Prix à {regionName} cette semaine</p>
                   <p className="text-white/45 text-[12px]">21 jours</p>
                 </div>
                 {regionPrices.map((p) => {
                   const pct = p.changePct
                   const tone =
-                    p.trend === 'up'
-                      ? 'text-emerald-300'
-                      : p.trend === 'down'
-                        ? 'text-orange-300'
-                        : 'text-white/50'
-                  const TrendIcon =
-                    p.trend === 'up'
-                      ? ArrowUpRight
-                      : p.trend === 'down'
-                        ? ArrowDownRight
-                        : ArrowRight
+                    p.trend === 'up' ? 'text-emerald-300' : p.trend === 'down' ? 'text-orange-300' : 'text-white/50'
+                  const TrendIcon = p.trend === 'up' ? ArrowUpRight : p.trend === 'down' ? ArrowDownRight : ArrowRight
                   return (
                     <div key={p.id} className="flex items-center gap-3 py-2.5">
                       <div className="flex-1 min-w-0">
@@ -759,13 +739,9 @@ export function AiChat({
                       <div className="text-right">
                         <p className="text-white text-[15px] font-semibold">{p.formattedPrice}</p>
                         {pct !== null && (
-                          <p
-                            className={`text-[12px] font-medium inline-flex items-center gap-0.5 ${tone}`}
-                          >
+                          <p className={`text-[12px] font-medium inline-flex items-center gap-0.5 ${tone}`}>
                             <TrendIcon size={13} />
-                            {pct === 0
-                              ? 'stable'
-                              : `${pct > 0 ? '+' : ''}${pct.toLocaleString('fr-FR')} %`}
+                            {pct === 0 ? 'stable' : `${pct > 0 ? '+' : ''}${pct.toLocaleString('fr-FR')} %`}
                           </p>
                         )}
                       </div>
@@ -802,10 +778,7 @@ export function AiChat({
             // biome-ignore lint/suspicious/noArrayIndexKey: fragments de rendu Markdown d'un même message, régénérés ensemble à chaque rendu
             <div key={i}>
               {isUser ? (
-                <div
-                  className="flex justify-end"
-                  style={{ animation: 'chat-fade-up 0.2s ease both' }}
-                >
+                <div className="flex justify-end" style={{ animation: 'chat-fade-up 0.2s ease both' }}>
                   <div className="max-w-[80%] rounded-[20px] bg-emerald-500/[0.18] px-4 py-2.5 text-[15px] leading-[21px] text-white">
                     {m.content}
                   </div>
@@ -873,9 +846,7 @@ export function AiChat({
             type="text"
             // 16px minimum : en dessous, Safari iOS zoome la page au focus.
             className="flex-1 min-w-0 bg-transparent py-3 text-base text-white placeholder:text-white/40 focus:outline-none"
-            placeholder={
-              isListening ? 'Je vous écoute…' : (placeholder ?? 'Écrivez votre question…')
-            }
+            placeholder={isListening ? 'Je vous écoute…' : (placeholder ?? 'Écrivez votre question…')}
             onFocus={(e) => {
               // Clavier Android : on garde le champ visible une fois le clavier ouvert.
               if (embedded) {
@@ -901,9 +872,7 @@ export function AiChat({
           <button
             type="button"
             className={`w-9 h-9 flex items-center justify-center rounded-full disabled:opacity-40 ${
-              isListening
-                ? 'text-red-300 bg-red-500/15 animate-pulse'
-                : 'text-white/55 hover:text-white'
+              isListening ? 'text-red-300 bg-red-500/15 animate-pulse' : 'text-white/55 hover:text-white'
             }`}
             onClick={toggleVoice}
             disabled={loading || photoLoading}
@@ -1074,8 +1043,7 @@ export function parseMd(text: string): MdBlock[] {
 
 function renderInline(src: string, keyPrefix: string): React.ReactNode[] {
   const parts: React.ReactNode[] = []
-  const regex =
-    /(\*\*(.+?)\*\*|__(.+?)__|\*(?!\s)(.+?)\*|`(.+?)`|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\))/g
+  const regex = /(\*\*(.+?)\*\*|__(.+?)__|\*(?!\s)(.+?)\*|`(.+?)`|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\))/g
   let last = 0
   let key = 0
   let match = regex.exec(src)
@@ -1097,13 +1065,7 @@ function renderInline(src: string, keyPrefix: string): React.ReactNode[] {
       )
     else if (match[6] && match[7])
       parts.push(
-        <a
-          key={k}
-          href={match[7]}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline underline-offset-2 text-emerald-300"
-        >
+        <a key={k} href={match[7]} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 text-emerald-300">
           {match[6]}
         </a>,
       )
@@ -1124,10 +1086,7 @@ function renderMd(text: string) {
         switch (b.kind) {
           case 'heading':
             return (
-              <p
-                key={k}
-                className="text-white font-semibold text-[15.5px] leading-snug mt-1.5 first:mt-0"
-              >
+              <p key={k} className="text-white font-semibold text-[15.5px] leading-snug mt-1.5 first:mt-0">
                 {renderInline(b.text, k)}
               </p>
             )
@@ -1144,10 +1103,7 @@ function renderMd(text: string) {
           case 'list': {
             const Tag = b.ordered ? 'ol' : 'ul'
             return (
-              <Tag
-                key={k}
-                className={`${b.ordered ? 'list-decimal' : 'list-disc'} pl-5 flex flex-col gap-1.5 marker:text-white/40`}
-              >
+              <Tag key={k} className={`${b.ordered ? 'list-decimal' : 'list-disc'} pl-5 flex flex-col gap-1.5 marker:text-white/40`}>
                 {b.items.map((it, j) => (
                   // biome-ignore lint/suspicious/noArrayIndexKey: éléments d'une liste figée, régénérés ensemble
                   <li key={j}>{renderInline(it, `${k}-${j}`)}</li>
@@ -1157,10 +1113,7 @@ function renderMd(text: string) {
           }
           case 'table':
             return (
-              <div
-                key={k}
-                className="overflow-x-auto rounded-2xl border border-white/[0.08] bg-white/[0.045]"
-              >
+              <div key={k} className="overflow-x-auto rounded-2xl border border-white/[0.08] bg-white/[0.045]">
                 <table className="w-full text-[13.5px] leading-snug">
                   <thead>
                     <tr className="text-left text-white/50">
@@ -1178,10 +1131,7 @@ function renderMd(text: string) {
                       <tr key={j} className="border-t border-white/[0.06]">
                         {r.map((c, x) => (
                           // biome-ignore lint/suspicious/noArrayIndexKey: cellules d'un tableau figé
-                          <td
-                            key={x}
-                            className={`px-3 py-2 ${x === 0 ? 'text-white' : 'text-white/80'} whitespace-nowrap`}
-                          >
+                          <td key={x} className={`px-3 py-2 ${x === 0 ? 'text-white' : 'text-white/80'} whitespace-nowrap`}>
                             {renderInline(c, `${k}-${j}-${x}`)}
                           </td>
                         ))}
