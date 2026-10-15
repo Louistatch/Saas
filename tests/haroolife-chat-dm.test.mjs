@@ -54,7 +54,7 @@ test('messages privés : ouverture, consentement, vie privée, plafond, signalem
   await as(1)
   await send('locality:lome', 'avant')
   await sql('RESET ROLE')
-  await sql(readFileSync('supabase/migrations/20261015_120000_haroolife_chat_dm.sql', 'utf8'))
+  await sql(readFileSync('supabase/migrations/20261015_130000_haroolife_chat_dm.sql', 'utf8'))
 
   // Ama ouvre une conversation avec Yawa, croisée dans la rue (sa clé vient de la présence).
   await as(1)

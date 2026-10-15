@@ -76,7 +76,7 @@ describe('HarooLife Socket.IO relay', () => {
   before(async () => {
     const chat = await pgliteChat([
       'supabase/migrations/20261013_120000_haroolife_realtime_chat.sql',
-      'supabase/migrations/20261015_120000_haroolife_chat_dm.sql',
+      'supabase/migrations/20261015_130000_haroolife_chat_dm.sql',
     ])
     relay = createRealtime({
       auth,

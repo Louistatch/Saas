@@ -11,7 +11,7 @@
 -- touchée) ; les fonctions haroolife_chat_allowed et haroolife_chat_me sont remplacées par des
 -- versions qui gardent les règles existantes et ajoutent les salons privés.
 -- NON APPLIQUÉE en production tant que le fondateur ne l'a pas validée.
--- Retour arrière : supabase/rollbacks/20261015_120000_haroolife_chat_dm.rollback.sql
+-- Retour arrière : supabase/rollbacks/20261015_130000_haroolife_chat_dm.rollback.sql
 
 -- 1. Format des salons : + dm:<clé>:<clé> (clés de 16 caractères hexadécimaux, triées).
 ALTER TABLE public.haroolife_chat_messages DROP CONSTRAINT IF EXISTS haroolife_chat_messages_room_check;

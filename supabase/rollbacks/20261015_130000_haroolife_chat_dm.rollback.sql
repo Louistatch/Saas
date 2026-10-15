@@ -1,4 +1,4 @@
--- Retour arrière de 20261015_120000_haroolife_chat_dm.sql (messages privés HarooLife).
+-- Retour arrière de 20261015_130000_haroolife_chat_dm.sql (messages privés HarooLife).
 -- Les conversations privées (salons dm:) sont SUPPRIMÉES : exporter avant si besoin.
 -- Les fonctions remplacées reprennent leur définition de 20261013_120000_haroolife_realtime_chat.sql.
 DROP FUNCTION IF EXISTS public.haroolife_chat_report_user(text, text);

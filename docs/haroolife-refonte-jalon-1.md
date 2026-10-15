@@ -286,7 +286,7 @@ Avant, un personnage (1,85 unité) était plus grand qu'une maison Kenney : 0,7 
 - **« Discuter » :** ouvre une conversation privée `dm:<clé>:<clé>` dans le téléphone, nommée d'après la personne.
   - Le relais y fait entrer aussitôt les deux personnes, sur tous leurs onglets.
   - Le correspondant voit la conversation apparaître avec un compteur de non-lus.
-- **Règles en base** (migration additive `20261015_120000_haroolife_chat_dm.sql`, avec son retour arrière) :
+- **Règles en base** (migration additive `20261015_130000_haroolife_chat_dm.sql`, avec son retour arrière) :
   - seuls les habitants peuvent écrire ;
   - un blocage, dans un sens ou dans l'autre, ferme la conversation, en lecture comme en écriture ;
   - au plus 20 nouvelles conversations par personne et par 24 h ;
