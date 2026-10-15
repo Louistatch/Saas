@@ -50,8 +50,16 @@ const houseReady = (page: Page) =>
     )
     .toBe(true)
 
-/** Holds a direction (screen axes, x right, y up): touch joystick on Android, keys on desktop. */
-async function hold(page: Page, mobile: boolean, x: number, y: number, ms: number) {
+/**
+ * Pushes the stick in a direction (screen axes, x right, y up): touch joystick on Android, keys
+ * on desktop. Resolves once the stick is held; call the returned function to release it.
+ */
+async function press(
+  page: Page,
+  mobile: boolean,
+  x: number,
+  y: number,
+): Promise<() => Promise<void>> {
   if (mobile) {
     const box = await page.getByTestId('joystick').boundingBox()
     if (!box) throw new Error('no joystick')
@@ -69,18 +77,19 @@ async function hold(page: Page, mobile: boolean, x: number, y: number, ms: numbe
     await touch('touchStart', cx, cy)
     for (let i = 1; i <= 4; i++)
       await touch('touchMove', cx + ((x / n) * r * i) / 4, cy - ((y / n) * r * i) / 4)
-    await page.waitForTimeout(ms)
-    await touch('touchEnd', cx, cy)
-    await cdp.detach()
-    return
+    return async () => {
+      await touch('touchEnd', cx, cy)
+      await cdp.detach()
+    }
   }
   const keys = [
     ...(y > 0 ? ['ArrowUp'] : y < 0 ? ['ArrowDown'] : []),
     ...(x > 0 ? ['ArrowRight'] : x < 0 ? ['ArrowLeft'] : []),
   ]
   for (const k of keys) await page.keyboard.down(k)
-  await page.waitForTimeout(ms)
-  for (const k of keys) await page.keyboard.up(k)
+  return async () => {
+    for (const k of keys) await page.keyboard.up(k)
+  }
 }
 
 test('HarooLife house: walk, eat, sleep, save, leave and come back', async ({ page }, testInfo) => {
@@ -114,10 +123,13 @@ test('HarooLife house: walk, eat, sleep, save, leave and come back', async ({ pa
   ]
   for (const [x, y] of dirs) {
     const a = (await interior(page)) as Interior
-    const sample = hold(page, mobile, x, y, 700)
-    await page.waitForTimeout(450)
-    const mid = (await interior(page)) as Interior
-    await sample
+    const release = await press(page, mobile, x, y)
+    // The walk clip while the stick is held (sampled once it is pushed, not while pushing).
+    await expect
+      .poll(async () => (await interior(page))?.anim, { message: `stick (${x}, ${y}): walk clip` })
+      .toBe('Walk')
+    await page.waitForTimeout(400)
+    await release()
     const b = (await interior(page)) as Interior
     const want = { x: RIGHT.x * x + FWD.x * y, z: RIGHT.z * x + FWD.z * y }
     const wl = Math.hypot(want.x, want.z)
@@ -132,7 +144,6 @@ test('HarooLife house: walk, eat, sleep, save, leave and come back', async ({ pa
     ).toBeGreaterThan(0.95)
     const facing = (Math.sin(b.heading) * want.x + Math.cos(b.heading) * want.z) / wl
     expect(facing, `${label}: facing forward, no moonwalk`).toBeGreaterThan(0.95)
-    expect(mid.anim, `${label}: walk clip while walking`).toBe('Walk')
     await page.waitForTimeout(250)
   }
 
