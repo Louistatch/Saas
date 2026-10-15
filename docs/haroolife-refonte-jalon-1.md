@@ -251,3 +251,18 @@ La rue, sa carte et la scène de trajet ne chargent plus PlayCanvas. Chaque scè
 - **Panneaux.** Les poteaux et le cadre d'un panneau sont fusionnés en un seul maillage : 2 objets par support au lieu de 4.
 
 Les tests qui mesuraient la ville aérienne PlayCanvas mesurent maintenant le quartier autour du joueur. Au départ (cellule 48, 34), on compte 16 tuiles et 211 bâtiments, contre ≥ 20 chunks et ≥ 250 bâtiments avant. Les gestes de caméra (glisser, pincer, boutons de zoom) sont testés sur la carte SVG.
+
+## Mesures (Chromium headless, SwiftShader : rendu logiciel, pas un vrai appareil)
+
+| Scénario | Ordinateur (1440 × 900) | Android émulé (412 × 915) |
+|---|---|---|
+| Ouverture à froid : canvas visible | 2 995 ms | 3 144 ms |
+| Rue détaillée (tuiles Kenney) | 3 017 ms | 3 170 ms |
+| Rue à l'arrêt : appels de dessin / triangles (ombres comprises) | 173 / 293 k | 173 / 295 k |
+| Marche dans la rue : images p50 | 415 ms | 306 ms |
+| Retour de la carte vers la rue | 173 appels de dessin | 173 appels de dessin |
+| Transfert à froid | 23,9 Mo en 79 requêtes | 23,9 Mo en 79 requêtes |
+
+- Ces chiffres valent pour la comparaison entre versions, pas comme fluidité réelle : SwiftShader dessine sur le processeur.
+- La ligne « salle » du rapport de perf n'est pas une mesure : `RoomWorld` ne publie pas encore `__LOME_PERF`, le rapport relit le dernier relevé de la rue.
+- Le test de la rue vérifie qu'aucun script téléchargé ne contient le moteur PlayCanvas.
