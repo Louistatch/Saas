@@ -68,9 +68,14 @@ export interface PlayerConfig {
     exitSpeed: number
   }
 }
+/**
+ * Speeds in cells/s (× CELL = render units/s). V3: chosen with the figure size (STREET_SCALE,
+ * about 1.2 units tall) so the walk and run clips play near their natural rate (≈ 2× at
+ * most) instead of gliding: the former 2.6 / 5 cells/s were 4–7× faster than the feet.
+ */
 export const DEFAULT_CONFIG: PlayerConfig = {
-  walkSpeed: 2.6,
-  runSpeed: 5,
+  walkSpeed: 0.9,
+  runSpeed: 2,
   accel: 16,
   decel: 24,
   turnRate: 600,
@@ -253,7 +258,8 @@ export class PlayerController {
         this.events.push({ type: 'reached', x: next.x, y: next.z })
         if (!this.route.length) this.vel = { x: 0, z: 0 }
       } else {
-        const speed = Math.min(cfg.walkSpeed * 1.15, d / dt)
+        // Guided routes jog (run pace): long enough trips stay short, feet still match.
+        const speed = Math.min(cfg.runSpeed, d / dt)
         want = { x: (dx / d) * speed, z: (dz / d) * speed }
       }
     }

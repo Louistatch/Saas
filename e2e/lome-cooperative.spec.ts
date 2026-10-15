@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { expect, test } from './lome-test'
+import { expect, openPlaces, test } from './lome-test'
 
 // Signed-in administrator against the mock Supabase (e2e/fixtures/mock-supabase.mjs): the
 // account is member of COOMARA-Kpalimé (120 members, 40 parcelles) and administers its tree.
@@ -178,8 +178,7 @@ test('the market shows real presales and announcements, never a phone number', a
   ])
   await page.goto('/haroolife/territoire/lome', { waitUntil: 'domcontentloaded' })
   await expect(page.locator('canvas').first()).toBeVisible({ timeout: 30000 })
-  const navigation = page.getByRole('navigation', { name: 'Navigation du jeu' })
-  await navigation.getByRole('button', { name: 'Carte' }).click()
+  await openPlaces(page)
   await page.getByRole('button', { name: /Grand marché d’Assigamé/ }).click()
   const lotSheet = page.getByRole('dialog', { name: 'Lieu' })
   await lotSheet.getByRole('button', { name: /Taxi/ }).click()

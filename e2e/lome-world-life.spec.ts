@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { expect, test } from './lome-test'
+import { expect, openPlaces, test } from './lome-test'
 
 /**
  * Phase 2 — the living world. One complete outing, end to end, on desktop and Android:
@@ -69,7 +69,11 @@ test('a day in Lomé: from home to the gym, a workout on real equipment, and bac
   )
   expect(stepB, 'traffic step advances without input').toBeGreaterThan(stepA)
 
-  // Category chips over the city filter the place labels.
+  // Category chips over the map view (V3: filters live on the map, not in the game view)
+  // filter the place labels.
+  const navigation = page.getByRole('navigation', { name: 'Navigation du jeu' })
+  await expect(page.getByRole('group', { name: 'Catégories de lieux' })).toHaveCount(0)
+  await navigation.getByRole('button', { name: 'Carte' }).click()
   const chips = page.getByRole('group', { name: 'Catégories de lieux' })
   await chips.getByRole('button', { name: 'Loisirs' }).click()
   // Labels off-screen are kept in the DOM but hidden, so count by title rather than by role.
@@ -78,9 +82,8 @@ test('a day in Lomé: from home to the gym, a workout on real equipment, and bac
   await chips.getByRole('button', { name: 'Tous' }).click()
   await expect(page.locator('button[title="Marché de Tokoin"]')).toHaveCount(1)
 
-  // 2–3. Open the map and select the gym.
-  const navigation = page.getByRole('navigation', { name: 'Navigation du jeu' })
-  await navigation.getByRole('button', { name: 'Carte' }).click()
+  // 2–3. Open the list of places and select the gym.
+  await openPlaces(page)
   await page
     .getByRole('group', { name: 'Filtrer la ville' })
     .getByRole('button', { name: 'Loisirs' })
@@ -120,14 +123,25 @@ test('a day in Lomé: from home to the gym, a workout on real equipment, and bac
   await page.waitForTimeout(3500) // characters and furniture load
   await shot('04-gym-inside')
 
-  // 8–10. Pick the treadmill from the activities: the run animation starts, energy drops,
-  // fitness rises, the fee is paid.
+  // 8–10. Pick the treadmill from the activities: the player first walks up to the machine
+  // (V3: touch → approach → activity), nothing applied on the way; on arrival the run
+  // animation starts, energy drops, fitness rises, the fee is paid.
   const before = (await stats(page))!
   await page.getByRole('button', { name: /Activités du lieu|Activités · / }).click()
   await page
     .getByRole('dialog', { name: 'Lieu' })
     .getByRole('button', { name: 'Tapis de course' })
     .click()
+  const interior = () =>
+    page.evaluate(
+      () =>
+        (window as unknown as { __LOME_INTERIOR?: { goal: string | null; using: string | null } })
+          .__LOME_INTERIOR ?? null,
+    )
+  // The walk to the machine crosses the room at running pace (2 u/s): up to ~10 u.
+  await expect
+    .poll(async () => (await interior())?.using ?? null, { timeout: 15000 })
+    .toMatch(/treadmill/)
   await expect
     .poll(() => stats(page).then((s) => s?.activity?.anim ?? null), { timeout: 5000 })
     .toBe('run')

@@ -6,7 +6,7 @@
  * loads as is and a new one never resets any progress.
  */
 import { PAGNES } from '@/components/haroolife/pagnes'
-import { AVATAR_SPECS } from './avatar-catalogue'
+import { AVATAR_SPECS, adultFor, isMiniModel } from './avatar-catalogue'
 
 export const AVATAR_MODELS = AVATAR_SPECS.map((s) => ({
   id: s.id,
@@ -20,6 +20,12 @@ export interface Avatar {
   model: AvatarModel
   /** 1–8, index into the pagne palette. */
   pagne: number
+  /**
+   * Set when the player explicitly picked a classic mini character (V3 and later). Without it
+   * an old save's mini character is shown as its dressed adult counterpart; the stored model
+   * is never rewritten, so the historic look stays available.
+   */
+  classic?: true
 }
 /** New game: the first adult character. Old saves keep their own model. */
 export const DEFAULT_AVATAR: Avatar = { v: 1, model: 'afi', pagne: 1 }
@@ -35,8 +41,17 @@ export function decodeAvatar(value: unknown): Avatar | null {
   if (v.v !== 1 || !isAvatarModel(v.model)) return null
   const pagne =
     Number.isInteger(v.pagne) && v.pagne! >= 1 && v.pagne! <= PAGNES.length ? v.pagne! : 1
-  return { v: 1, model: v.model, pagne }
+  return v.classic === true
+    ? { v: 1, model: v.model, pagne, classic: true }
+    : { v: 1, model: v.model, pagne }
 }
+/**
+ * The model drawn for this avatar: an old save's mini character becomes its dressed adult
+ * (female-a → afi, female-b → abra, female-c → afi, male-a → kossi, male-b → koffi,
+ * male-c → kossi) unless the player chose the classic look on purpose.
+ */
+export const shownModel = (a: Avatar): AvatarModel =>
+  isMiniModel(a.model) && !a.classic ? adultFor(a.model) : a.model
 export const pagneColor = (pagne: number) => PAGNES[(pagne - 1) % PAGNES.length] ?? PAGNES[0]
 export function loadAvatar(storage: { getItem(k: string): string | null }): Avatar {
   try {

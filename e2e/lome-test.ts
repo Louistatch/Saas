@@ -34,3 +34,23 @@ export const test = base.extend<{ cpuThrottle: void; returningPlayer: void }>({
   ],
 })
 export { expect } from '@playwright/test'
+
+/**
+ * Opens the list of places and towns (sheet « Explorer … »). Since V3 the « Carte » tab first
+ * shows the aerial map view; its « Lieux et villes » button opens the list. Inside a building
+ * the tab opens the list directly. Does nothing when the list is already open.
+ */
+export async function openPlaces(page: import('@playwright/test').Page) {
+  const sheet = page.getByRole('dialog', { name: /^Explorer/ })
+  if (await sheet.isVisible().catch(() => false)) return
+  const list = page.getByRole('button', { name: 'Lieux et villes' })
+  if (!(await list.isVisible().catch(() => false))) {
+    await page
+      .getByRole('navigation', { name: 'Navigation du jeu' })
+      .getByRole('button', { name: 'Carte' })
+      .click()
+    if (await sheet.isVisible().catch(() => false)) return
+  }
+  await list.click()
+  await sheet.waitFor()
+}

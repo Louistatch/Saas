@@ -2,9 +2,9 @@
 
 import type { AdCampaign, AdPlacement } from '@/lib/haroolife/ads/campaigns'
 import type { ExposureTracker } from '@/lib/haroolife/ads/exposure'
-import { adultFor } from '@/lib/haroolife/city/avatar-catalogue'
+import { STREET_SCALE, adultFor } from '@/lib/haroolife/city/avatar-catalogue'
 import { releaseEntity } from '@/lib/haroolife/city/gpu'
-import { type NpcAnim, type Prop, layoutFor } from '@/lib/haroolife/city/interiors'
+import { type Npc, type NpcAnim, type Prop, layoutFor } from '@/lib/haroolife/city/interiors'
 import type { Interior } from '@/lib/haroolife/city/life'
 import { LOCALITIES, type LocalityId } from '@/lib/haroolife/city/locality'
 import {
@@ -22,7 +22,7 @@ import {
   type PlayerController,
 } from '@/lib/haroolife/city/player'
 import { PRESETS, type Quality, renderPixelRatio } from '@/lib/haroolife/city/quality'
-import { type Agent, agentsNear } from '@/lib/haroolife/city/traffic'
+import { type Agent, TRAFFIC_STEP_MS, agentsNear } from '@/lib/haroolife/city/traffic'
 import {
   CATEGORY_OF,
   CELL,
@@ -198,10 +198,12 @@ const Agents = memo(function Agents({
     return fn
   }
   useAppEvent('update', () => {
-    const p = Math.min(1, (performance.now() - last.current.at) / 700)
+    const k = Math.min(1, (performance.now() - last.current.at) / TRAFFIC_STEP_MS)
     for (const [id, e] of entities.current) {
       const a = byId.current.get(id)
       if (!a) continue
+      // Walkers spread one cell over `steps` traffic steps.
+      const p = a.steps ? (Math.min(a.sub ?? 0, a.steps - 1) + k) / a.steps : k
       const pos = worldPos(a.x + a.fx * p, a.y + a.fy * p)
       const off = agentOffset(a)
       e.setLocalPosition(pos[0] + off[0], off[1], pos[2] + off[2])
@@ -222,7 +224,8 @@ const Agents = memo(function Agents({
               position={pos}
               rotation={a.heading}
               anim={a.activity === 'run' ? 'run' : 'walk'}
-              scale={0.95}
+              scale={STREET_SCALE}
+              groundSpeed={(CELL * 1000) / (TRAFFIC_STEP_MS * (a.steps ?? 1))}
               onEntity={register(a.id)}
             />
           ) : (
@@ -232,7 +235,8 @@ const Agents = memo(function Agents({
               model={NPC_STATIC[a.id % NPC_STATIC.length]}
               position={pos}
               rotation={a.heading}
-              scale={0.95}
+              // Baked mini figures (raw height FIGURE_HEIGHT): the same height as the adults.
+              scale={STREET_SCALE * 1.2}
               onEntity={register(a.id)}
             />
           )
@@ -468,7 +472,8 @@ function Picker({
 function LabelProjector({
   overlay,
   lots,
-}: { overlay: React.RefObject<HTMLDivElement | null>; lots: Lot[] }) {
+  names,
+}: { overlay: React.RefObject<HTMLDivElement | null>; lots: Lot[]; names: boolean }) {
   const app = useApp()
   const tmp = useRef(new pc.Vec3())
   const at = useRef(new pc.Vec3())
@@ -476,6 +481,12 @@ function LabelProjector({
   // the canvas rectangle is re-read on resize, not with a forced layout every frame.
   const cam = useRef<pc.Entity | null>(null)
   const rect = useRef<DOMRect | null>(null)
+  // Measured label sizes (they change only with the names switch).
+  const sizes = useRef(new WeakMap<HTMLElement, { w: number; h: number }>())
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new names state = new sizes
+  useEffect(() => {
+    sizes.current = new WeakMap()
+  }, [names])
   useEffect(() => {
     const drop = () => {
       rect.current = null
@@ -499,6 +510,10 @@ function LabelProjector({
     const kx = r.width / canvas.width
     const ky = r.height / canvas.height
     const children = overlay.current.children
+    // Project every label, then place them by priority (the selected place first, then the
+    // nearest to the screen centre): a label that would overlap one already placed is hidden.
+    // A higher z-index does not solve a collision; hiding does. Names are capped at eight.
+    const items: { el: HTMLElement; x: number; y: number; pri: number }[] = []
     for (let i = 0; i < children.length; i++) {
       const el = children[i] as HTMLElement
       const lot = lots[i]
@@ -506,11 +521,45 @@ function LabelProjector({
       const [px, , pz] = worldPos(lot.x + (lot.w - 1) / 2, lot.y + (lot.h - 1) / 2)
       const h = 0.6 + lot.floors * 0.5 + 0.9
       const p = cc.worldToScreen(at.current.set(px, h, pz), tmp.current)
-      const visible =
-        p.z > 0 && p.x >= -60 && p.y >= -40 && p.x * kx <= r.width + 60 && p.y * ky <= r.height + 40
-      el.style.display = visible ? '' : 'none'
-      if (visible)
-        el.style.transform = `translate(${Math.round(p.x * kx)}px, ${Math.round(p.y * ky)}px) translate(-50%, -100%)`
+      const x = p.x * kx
+      const y = p.y * ky
+      // Inside the map area: below the top bars, above the bottom navigation, off the edges.
+      const visible = p.z > 0 && x >= 24 && y >= 200 && x <= r.width - 24 && y <= r.height - 110
+      if (!visible) {
+        el.style.display = 'none'
+        continue
+      }
+      const d = Math.hypot(x - r.width / 2, y - r.height / 2)
+      items.push({ el, x, y, pri: (el.dataset.priority === '1' ? -1e6 : 0) + d })
+    }
+    items.sort((a, b) => a.pri - b.pri)
+    const placed: [number, number, number, number][] = []
+    let shownNames = 0
+    for (const it of items) {
+      let size = sizes.current.get(it.el)
+      if (!size) {
+        it.el.style.display = ''
+        size = { w: it.el.offsetWidth || 44, h: it.el.offsetHeight || 44 }
+        sizes.current.set(it.el, size)
+      }
+      const box: [number, number, number, number] = [
+        it.x - size.w / 2,
+        it.y - size.h,
+        it.x + size.w / 2,
+        it.y,
+      ]
+      const hit = placed.some(
+        (b) => box[0] < b[2] - 4 && box[2] > b[0] + 4 && box[1] < b[3] - 4 && box[3] > b[1] + 4,
+      )
+      const tooManyNames = names && it.el.dataset.priority !== '1' && shownNames >= 8
+      if (hit || tooManyNames) {
+        it.el.style.display = 'none'
+        continue
+      }
+      placed.push(box)
+      if (names) shownNames++
+      it.el.style.display = ''
+      it.el.style.transform = `translate(${Math.round(it.x)}px, ${Math.round(it.y)}px) translate(-50%, -100%)`
     }
   })
   return null
@@ -660,6 +709,9 @@ export default function CityWorld({
   interiorTitle,
   activity,
   onUseProp,
+  approach,
+  onTalk,
+  onNotice,
   ride,
   visitors,
   onBillboard,
@@ -668,6 +720,7 @@ export default function CityWorld({
   filter,
   selectedLot,
   labelsHidden,
+  showNames = false,
   onStats,
   onFrame,
   quality = 'balanced',
@@ -710,6 +763,10 @@ export default function CityWorld({
   interiorTitle: string
   activity: { prop: string; anim: NpcAnim } | null
   onUseProp: (p: Prop) => void
+  /** HUD activity button: walk to that equipment, then use it (Three interiors). */
+  approach?: { prop: string; n: number } | null
+  onTalk?: (npc: Npc) => void
+  onNotice?: (message: string) => void
   ride: { transport: Transport; rain: boolean } | null
   visitors: PlacedResident[]
   onBillboard: (id: string) => void
@@ -718,6 +775,8 @@ export default function CityWorld({
   filter: Category | 'all'
   selectedLot: Lot | null
   labelsHidden: boolean
+  /** Map view: write every place's name (by priority, without overlaps); off by default. */
+  showNames?: boolean
   onStats?: (s: ChunkStats) => void
   onFrame?: (s: { drawCalls: number; fps: number }) => void
   quality?: Quality
@@ -763,9 +822,15 @@ export default function CityWorld({
   const labels = useMemo(() => {
     const all = landmarks().filter((l) => filter === 'all' || CATEGORY_OF[l.type] === filter)
     const radius = camera.distance < 40 ? 20 : 34
+    // The nearest places first: the projector then keeps those that fit on screen.
     return all
       .filter(
         (l) => Math.abs(l.x - centerCell.x) < radius && Math.abs(l.y - centerCell.y) < radius * 0.8,
+      )
+      .sort(
+        (a, b) =>
+          Math.hypot(a.x - centerCell.x, a.y - centerCell.y) -
+          Math.hypot(b.x - centerCell.x, b.y - centerCell.y),
       )
       .slice(0, 28)
     // biome-ignore lint/correctness/useExhaustiveDependencies: landmarks() reads the active locality
@@ -954,7 +1019,7 @@ export default function CityWorld({
               />
             )}
             <Picker camera={camera} onPan={onPan} onOrbit={onOrbit} onZoom={onZoom} onTap={onTap} />
-            <LabelProjector overlay={overlay} lots={labels} />
+            <LabelProjector overlay={overlay} lots={labels} names={showNames} />
           </>
         )}
       </Application>
@@ -968,6 +1033,9 @@ export default function CityWorld({
             playerModel={avatarModel}
             playerPagne={avatarPagne}
             onUse={onUseProp}
+            approach={approach}
+            onTalk={onTalk}
+            onNotice={onNotice}
             input={input}
             onLeave={onLeave ?? (() => {})}
             onFrame={onFrame}
@@ -982,24 +1050,37 @@ export default function CityWorld({
           aria-hidden={labelsHidden ? 'true' : undefined}
           style={{ visibility: labelsHidden ? 'hidden' : 'visible' }}
         >
-          {labels.map((lot) => (
-            <button
-              type="button"
-              key={lot.id}
-              onClick={() => onLotIcon(lot)}
-              tabIndex={labelsHidden ? -1 : 0}
-              className={`pointer-events-auto absolute left-0 top-0 flex max-w-[170px] items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-bold shadow-md ${
-                selectedLot?.id === lot.id
-                  ? 'border-emerald-700 bg-emerald-700 text-white'
-                  : 'border-white bg-white/95 text-slate-900'
-              }`}
-              title={lot.name ?? ''}
-              style={{ display: 'none' }}
-            >
-              <span className="text-sm leading-none">{TYPE_ICONS[lot.type]}</span>
-              <span className="truncate">{lot.name}</span>
-            </button>
-          ))}
+          {labels.map((lot) => {
+            const named = showNames || selectedLot?.id === lot.id
+            return (
+              <button
+                type="button"
+                key={lot.id}
+                data-lot={lot.id}
+                data-priority={selectedLot?.id === lot.id ? 1 : 0}
+                onClick={() => onLotIcon(lot)}
+                tabIndex={labelsHidden ? -1 : 0}
+                aria-label={lot.name ?? TYPE_ICONS[lot.type]}
+                // 44 px touch target around a 32 px round icon; the name only when asked.
+                className={`pointer-events-auto absolute left-0 top-0 flex min-h-11 min-w-11 items-center justify-center gap-1 ${
+                  named ? 'max-w-[170px]' : ''
+                }`}
+                title={lot.name ?? ''}
+                style={{ display: 'none' }}
+              >
+                <span
+                  className={`flex h-8 items-center gap-1.5 rounded-full border-2 px-1.5 text-[11px] font-bold shadow-md ${
+                    selectedLot?.id === lot.id
+                      ? 'border-emerald-800 bg-emerald-700 text-white'
+                      : 'border-white bg-white/95 text-slate-900'
+                  } ${named ? 'pr-2.5' : 'w-8 justify-center'}`}
+                >
+                  <span className="text-sm leading-none">{TYPE_ICONS[lot.type]}</span>
+                  {named && <span className="truncate">{lot.name}</span>}
+                </span>
+              </button>
+            )
+          })}
         </div>
       )}
       <div className="absolute right-3 top-[33%] flex flex-col gap-2">

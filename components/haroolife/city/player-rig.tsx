@@ -1,5 +1,6 @@
 'use client'
 
+import { STREET_SCALE } from '@/lib/haroolife/city/avatar-catalogue'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 /**
  * Steps the player controller once per rendered frame and writes the result straight
@@ -13,11 +14,51 @@ import {
   type PlayerController,
   cameraPitch,
 } from '@/lib/haroolife/city/player'
+import { CELL } from '@/lib/haroolife/city/world'
 import { useApp, useAppEvent } from '@playcanvas/react/hooks'
 import type * as pc from 'playcanvas'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Character } from './character'
 import { worldPos } from './city-chunks'
+
+/**
+ * Height of an estate plot's model, measured once its meshes exist (null while loading).
+ * Only tall objects (houses, trees, halls) can hide the player; roads and fields never do.
+ */
+const plotHeights = new WeakMap<pc.Entity, number>()
+function plotHeight(e: pc.Entity): number | null {
+  const known = plotHeights.get(e)
+  if (known !== undefined) return known
+  let top = Number.NEGATIVE_INFINITY
+  for (const r of e.findComponents('render') as pc.RenderComponent[])
+    for (const mi of r.meshInstances ?? []) top = Math.max(top, mi.aabb.getMax().y)
+  if (!Number.isFinite(top)) return null
+  const h = top - e.getPosition().y
+  plotHeights.set(e, h)
+  return h
+}
+
+/**
+ * Estate objects standing between the camera and the player on foot: within 1 u of the line
+ * of sight, in its middle part, and tall enough to cover a figure. Pure geometry on the
+ * ground plane so it is cheap at 6–7 checks per second.
+ */
+export function occludes(
+  cam: { x: number; z: number },
+  player: { x: number; z: number },
+  obj: { x: number; z: number },
+  reach = 1,
+): boolean {
+  const dx = player.x - cam.x
+  const dz = player.z - cam.z
+  const len2 = dx * dx + dz * dz
+  if (len2 < 1e-6) return false
+  const t = ((obj.x - cam.x) * dx + (obj.z - cam.z) * dz) / len2
+  if (t < 0.15 || t > 0.97) return false
+  const px = cam.x + dx * t - obj.x
+  const pz = cam.z + dz * t - obj.z
+  return px * px + pz * pz < reach * reach
+}
 
 export interface PlayerDebug {
   x: number
@@ -67,13 +108,25 @@ export default function PlayerRig({
   const avatar = useRef<pc.Entity | null>(null)
   const cameraEntity = useRef<pc.Entity | null>(null)
   const [anim, setAnim] = useState<NpcAnim>('idle')
-  const [clipSpeed, setClipSpeed] = useState(1)
+  // Ground speed really achieved (render units/s, after collisions) drives the walk cycle.
+  const [groundSpeed, setGroundSpeed] = useState(0)
   const lastMode = useRef<Mode>(controller.mode)
   /** While the step-out clip plays, locomotion clips wait. */
   const exitUntil = useRef(0)
   const lastSpeedSync = useRef(0)
   const lastSync = useRef({ at: 0, tx: Number.NaN, tz: Number.NaN, d: Number.NaN, a: Number.NaN })
   const lastDebug = useRef(0)
+  // Cut-away: estate objects hiding the player are disabled, then restored (V3).
+  const hidden = useRef(new Set<pc.Entity>())
+  const plots = useRef<{ at: number; list: pc.Entity[] }>({ at: 0, list: [] })
+  const lastOcclusion = useRef(0)
+  useEffect(
+    () => () => {
+      for (const e of hidden.current) e.enabled = true
+      hidden.current.clear()
+    },
+    [],
+  )
   const onAvatar = useCallback((e: pc.Entity | null) => {
     avatar.current = e
   }, [])
@@ -122,14 +175,10 @@ export default function PlayerRig({
     if (now - lastSpeedSync.current > 150) {
       lastSpeedSync.current = now
       const m = controller.mode
-      const rate =
-        m === 'walk'
-          ? Math.min(1.5, Math.max(0.6, controller.speed / controller.config.walkSpeed))
-          : m === 'run'
-            ? Math.min(1.4, Math.max(0.8, controller.speed / controller.config.runSpeed))
-            : 1
-      const rounded = Math.round(rate * 10) / 10
-      setClipSpeed((cur) => (cur === rounded ? cur : rounded))
+      // Controller speeds are in cells/s; the figure moves in render units (worldPos × CELL).
+      const v = m === 'walk' || m === 'run' ? controller.speed * CELL : 0
+      const rounded = Math.round(v * 10) / 10
+      setGroundSpeed((cur) => (cur === rounded ? cur : rounded))
     }
     // Camera: position and pitch from the rig every frame.
     if (!cameraEntity.current)
@@ -148,6 +197,31 @@ export default function PlayerRig({
         tz + Math.cos(az) * horiz,
       )
       cam.setLocalEulerAngles(pitch, c.angle, 0)
+    }
+    // Cut-away of the estate objects between the camera and the player (a tree or a hall in
+    // front of the door used to hide the figure completely when stepping out).
+    if (cam && a && now - lastOcclusion.current > 150) {
+      lastOcclusion.current = now
+      if (now - plots.current.at > 2000)
+        plots.current = {
+          at: now,
+          list: app.root.find((e) => e.name.startsWith('Plot ')) as pc.Entity[],
+        }
+      const next = new Set<pc.Entity>()
+      if (a.enabled) {
+        const cp = cam.getPosition()
+        const pp = a.getPosition()
+        for (const e of plots.current.list) {
+          const h = plotHeight(e)
+          if (h === null || h < 0.6) continue
+          const op = e.getPosition()
+          if (occludes({ x: cp.x, z: cp.z }, { x: pp.x, z: pp.z }, { x: op.x, z: op.z }))
+            next.add(e)
+        }
+      }
+      for (const e of hidden.current) if (!next.has(e)) e.enabled = true
+      for (const e of next) if (e.enabled) e.enabled = false
+      hidden.current = next
     }
     // Low-rate reports.
     const events = controller.drain()
@@ -189,9 +263,9 @@ export default function PlayerRig({
       position={[sx, 0.05, sz]}
       rotation={controller.heading}
       anim={anim}
-      speed={clipSpeed}
+      groundSpeed={groundSpeed}
       pagne={pagne}
-      scale={1.15}
+      scale={STREET_SCALE}
       imperative
       onEntity={onAvatar}
     />

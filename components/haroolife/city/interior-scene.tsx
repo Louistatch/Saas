@@ -1,6 +1,6 @@
 'use client'
 
-import { adultFor } from '@/lib/haroolife/city/avatar-catalogue'
+import { INTERIOR_SCALE, adultFor } from '@/lib/haroolife/city/avatar-catalogue'
 import type { Layout, Npc, NpcAnim, Prop, PropKind } from '@/lib/haroolife/city/interiors'
 import { SHAPE_MATERIALS, type ShapeMaterial, shapeOf } from '@/lib/haroolife/city/prop-shapes'
 /**
@@ -168,7 +168,12 @@ function Mover({ npc }: { npc: Npc }) {
       position={[x, 0, z]}
       rotation={rot}
       anim={npc.anim}
-      scale={1.3}
+      groundSpeed={
+        npc.anim === 'walk' || npc.anim === 'run'
+          ? Math.hypot(to.x - npc.x, to.z - npc.z) / 3
+          : undefined
+      }
+      scale={INTERIOR_SCALE}
     />
   )
 }
@@ -271,7 +276,7 @@ export default function InteriorScene({
             position={[n.x, 0, n.z]}
             rotation={n.rot ?? 0}
             anim={n.anim}
-            scale={1.3}
+            scale={INTERIOR_SCALE}
           />
         ),
       )}
@@ -282,7 +287,7 @@ export default function InteriorScene({
         rotation={player.rot}
         anim={player.anim}
         pagne={playerPagne}
-        scale={1.35}
+        scale={INTERIOR_SCALE}
       />
       <Entity name={`Intérieur ${title}`} position={[0, 3.9, 0]} />
     </>

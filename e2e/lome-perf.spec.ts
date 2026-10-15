@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { expect, test } from './lome-test'
+import { expect, openPlaces, test } from './lome-test'
 
 /**
  * Performance scenarios A–F on the 3D city, measured in the real browser build. Figures come
@@ -146,8 +146,7 @@ test('performance scenarios A–F', async ({ page, browserName }, testInfo) => {
   await page.getByRole('button', { name: 'Recentrer sur moi' }).click()
 
   // E. Open the gym (ride there, enter) and measure inside.
-  const navigation = page.getByRole('navigation', { name: 'Navigation du jeu' })
-  await navigation.getByRole('button', { name: 'Carte' }).click()
+  await openPlaces(page)
   await page
     .getByRole('group', { name: 'Filtrer la ville' })
     .getByRole('button', { name: 'Loisirs' })

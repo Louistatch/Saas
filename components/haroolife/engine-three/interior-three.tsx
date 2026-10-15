@@ -1,6 +1,6 @@
 'use client'
 
-import { adultFor } from '@/lib/haroolife/city/avatar-catalogue'
+import { INTERIOR_SCALE, adultFor } from '@/lib/haroolife/city/avatar-catalogue'
 import type { Layout, Npc, NpcAnim, Prop } from '@/lib/haroolife/city/interiors'
 import type { InputState } from '@/lib/haroolife/city/player'
 import {
@@ -32,18 +32,26 @@ import {
   RigidBody,
   useRapier,
 } from '@react-three/rapier'
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { type MutableRefObject, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { Character } from './character'
 import { ThreeProbe } from './probe'
 
 const FURNITURE = '/haroolife/vendor/kenney-3d/furniture-kit/'
-/** Walking and running speeds indoors (scene units per second). */
-const WALK = 1.9
-const RUN = 3.4
-const PLAYER_SCALE = 1.35
-const NPC_SCALE = 1.3
+/**
+ * Walking and running speeds indoors (scene units per second). V3: matched to the figure size
+ * (INTERIOR_SCALE, about 1.07 units tall) so the walk and run clips play near their natural
+ * rate; the former 1.9 / 3.4 made the feet glide.
+ */
+const WALK = 1
+const RUN = 2
+const PLAYER_SCALE = INTERIOR_SCALE
+const NPC_SCALE = INTERIOR_SCALE
+/** Equipment the figure stands on (gym machines); for everything else it stands beside it. */
+const ON_DEVICE = new Set(['treadmill', 'bike', 'bench-press', 'mat'])
+/** Seconds without getting closer before an approach gives up. */
+const STUCK_AFTER = 1.6
 /** Player capsule: radius and half height of the straight part; its centre sits at CENTER. */
 const RADIUS = 0.24
 const HALF = 0.3
@@ -245,7 +253,175 @@ function useRoom(layout: Layout) {
   return room
 }
 
-/** The player: a kinematic capsule moved by Rapier's character controller, and its figure. */
+/** Where the player is heading: equipment, a character, or a point of the floor. */
+type Goal =
+  | { kind: 'prop'; prop: Prop; x: number; z: number; face: number }
+  | { kind: 'npc'; npc: Npc; x: number; z: number; face: number }
+  | { kind: 'point'; x: number; z: number }
+
+/** True when a capsule standing at (x, z) touches no collider and stays inside the room. */
+function freeAt(x: number, z: number, layout: Layout, boxes: Box[]): boolean {
+  if (Math.abs(x) > layout.w / 2 - RADIUS - 0.05 || z < -layout.d / 2 + RADIUS + 0.05) return false
+  if (z > layout.d / 2 - 0.1) return false
+  for (const b of boxes) {
+    const a = -deg(b.rotY)
+    const dx = x - b.center[0]
+    const dz = z - b.center[2]
+    const lx = dx * Math.cos(a) + dz * Math.sin(a)
+    const lz = -dx * Math.sin(a) + dz * Math.cos(a)
+    if (Math.abs(lx) < b.half[0] + RADIUS && Math.abs(lz) < b.half[2] + RADIUS) return false
+  }
+  return true
+}
+
+/**
+ * A free spot just outside a target's footprint, front first (the side it faces), then the
+ * other sides, nearest to the player among the free ones of equal rank. Null when none.
+ */
+function approachPoint(
+  target: { x: number; z: number; rot: number; half: [number, number] },
+  layout: Layout,
+  boxes: Box[],
+  from: { x: number; z: number },
+): { x: number; z: number; face: number } | null {
+  const r = deg(target.rot)
+  for (const sides of [[0], [90, -90], [180]]) {
+    const spots = sides
+      .map((side) => {
+        const a = r + deg(side)
+        const dx = Math.sin(a)
+        const dz = Math.cos(a)
+        // Extent of the (rotated) footprint along this direction.
+        const ext =
+          Math.abs(dx * Math.cos(r) - dz * Math.sin(r)) * target.half[0] +
+          Math.abs(dx * Math.sin(r) + dz * Math.cos(r)) * target.half[1]
+        const d = ext + RADIUS + 0.12
+        return { x: target.x + dx * d, z: target.z + dz * d }
+      })
+      .filter((p) => freeAt(p.x, p.z, layout, boxes))
+      .sort(
+        (a, b) => Math.hypot(a.x - from.x, a.z - from.z) - Math.hypot(b.x - from.x, b.z - from.z),
+      )
+    const p = spots[0]
+    if (p) return { ...p, face: Math.atan2(target.x - p.x, target.z - p.z) }
+  }
+  return null
+}
+
+/** True when the straight walk from a to b stays on free floor (sampled every 0.1 u). */
+function clearLine(
+  a: { x: number; z: number },
+  b: { x: number; z: number },
+  layout: Layout,
+  boxes: Box[],
+): boolean {
+  const n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.1)
+  for (let i = 1; i <= n; i++) {
+    const t = i / n
+    if (!freeAt(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t, layout, boxes)) return false
+  }
+  return true
+}
+
+/**
+ * Waypoints from the player to a goal around the furniture: A* on a 0.25 u grid of free floor
+ * (8 neighbours), then shortened to the turns that are really needed. A straight line when it
+ * is already clear; the goal alone when no path exists (the stuck check then reports it).
+ */
+export function planPath(
+  from: { x: number; z: number },
+  to: { x: number; z: number },
+  layout: Layout,
+  boxes: Box[],
+): { x: number; z: number }[] {
+  if (clearLine(from, to, layout, boxes)) return [to]
+  const S = 0.25
+  const nx = Math.floor(layout.w / S) + 1
+  const nz = Math.floor(layout.d / S) + 1
+  const x0 = -layout.w / 2
+  const z0 = -layout.d / 2
+  const cell = (p: { x: number; z: number }) => [
+    Math.max(0, Math.min(nx - 1, Math.round((p.x - x0) / S))),
+    Math.max(0, Math.min(nz - 1, Math.round((p.z - z0) / S))),
+  ]
+  const pos = (i: number, j: number) => ({ x: x0 + i * S, z: z0 + j * S })
+  const free = new Uint8Array(nx * nz)
+  for (let i = 0; i < nx; i++)
+    for (let j = 0; j < nz; j++) {
+      const q = pos(i, j)
+      free[j * nx + i] = freeAt(q.x, q.z, layout, boxes) ? 1 : 0
+    }
+  const [si, sj] = cell(from)
+  const [gi, gj] = cell(to)
+  const start = sj * nx + si
+  const end = gj * nx + gi
+  free[start] = 1
+  free[end] = 1
+  const g = new Float32Array(nx * nz).fill(Number.POSITIVE_INFINITY)
+  const prev = new Int32Array(nx * nz).fill(-1)
+  const closed = new Uint8Array(nx * nz)
+  const h = (k: number) => Math.hypot((k % nx) - gi, Math.floor(k / nx) - gj)
+  const open: number[] = [start]
+  g[start] = 0
+  while (open.length > 0) {
+    let best = 0
+    for (let k = 1; k < open.length; k++)
+      if (g[open[k]] + h(open[k]) < g[open[best]] + h(open[best])) best = k
+    const cur = open.splice(best, 1)[0]
+    if (cur === end) break
+    if (closed[cur]) continue
+    closed[cur] = 1
+    const ci = cur % nx
+    const cj = Math.floor(cur / nx)
+    for (let di = -1; di <= 1; di++)
+      for (let dj = -1; dj <= 1; dj++) {
+        const ni = ci + di
+        const njj = cj + dj
+        if ((di === 0 && dj === 0) || ni < 0 || njj < 0 || ni >= nx || njj >= nz) continue
+        const k = njj * nx + ni
+        // No corner cutting: a diagonal step needs both side cells free.
+        if (!free[k] || closed[k]) continue
+        if (di !== 0 && dj !== 0 && (!free[cj * nx + ni] || !free[njj * nx + ci])) continue
+        const cost = g[cur] + (di !== 0 && dj !== 0 ? Math.SQRT2 : 1)
+        if (cost < g[k]) {
+          g[k] = cost
+          prev[k] = cur
+          open.push(k)
+        }
+      }
+  }
+  if (prev[end] === -1) return [to]
+  const cells: { x: number; z: number }[] = []
+  for (let k = prev[end]; k !== -1 && k !== start; k = prev[k])
+    cells.unshift(pos(k % nx, Math.floor(k / nx)))
+  // Keep only the turns: skip every waypoint the previous kept one can see past.
+  const pts: { x: number; z: number }[] = []
+  let at = from
+  const all = [...cells, to]
+  let i = 0
+  while (i < all.length - 1) {
+    let j = all.length - 1
+    while (j > i && !clearLine(at, all[j], layout, boxes)) j--
+    if (j === i) {
+      pts.push(all[i])
+      at = all[i]
+      i++
+    } else {
+      pts.push(all[j])
+      at = all[j]
+      i = j
+    }
+  }
+  if (pts[pts.length - 1] !== to) pts.push(to)
+  return pts
+}
+
+/**
+ * The player: a kinematic capsule moved by Rapier's character controller, and its figure.
+ * Joystick and keyboard steer it; a goal (equipment, character or floor point tapped, or an
+ * activity button of the HUD) makes it walk there itself, turn to the target and only then
+ * report the arrival. A goal that stops getting closer is abandoned and reported.
+ */
 function Player({
   layout,
   input,
@@ -253,6 +429,11 @@ function Player({
   activity,
   model,
   pagne,
+  goal,
+  boxes,
+  onArrive,
+  onStuck,
+  onPosition,
   onLeave,
 }: {
   layout: Layout
@@ -261,6 +442,11 @@ function Player({
   activity: { prop: string; anim: NpcAnim } | null
   model: string
   pagne?: string
+  goal: MutableRefObject<Goal | null>
+  boxes: Box[]
+  onArrive: (g: Goal) => void
+  onStuck: (g: Goal) => void
+  onPosition: (x: number, z: number) => void
   onLeave: () => void
 }) {
   const { world } = useRapier()
@@ -271,8 +457,14 @@ function Player({
   const heading = useRef(Math.PI)
   const target = useRef(new THREE.Vector3(layout.spawn.x, 0, layout.spawn.z))
   const left = useRef(false)
+  const progress = useRef({ best: Number.POSITIVE_INFINITY, since: 0 })
+  // Waypoints planned around the furniture for the current goal (recomputed when it changes).
+  const path = useRef<{ goal: Goal | null; pts: { x: number; z: number }[] }>({
+    goal: null,
+    pts: [],
+  })
   const [anim, setAnim] = useState<NpcAnim>('idle')
-  const [speedRate, setSpeedRate] = useState(1)
+  const [ground, setGround] = useState(0)
   // The equipment in use is shown until the player walks away from it.
   const [away, setAway] = useState(false)
   const used = activity && !away ? layout.props.find((p) => p.id === activity.prop) : undefined
@@ -286,14 +478,14 @@ function Player({
   }, [world])
   useEffect(() => () => world.removeCharacterController(controller), [world, controller])
 
-  // Starting an activity: the body steps in front of the equipment (free floor), the figure
-  // takes the activity pose on it.
+  // Starting an activity on a machine one stands on (treadmill, bike…): the body steps onto
+  // its free front. Beside any other equipment the player is already where it walked to.
   useEffect(() => {
     setAway(false)
     if (!activity) return
     const prop = layout.props.find((p) => p.id === activity.prop)
     const b = body.current
-    if (!prop || !b) return
+    if (!prop || !b || !ON_DEVICE.has(prop.kind)) return
     const front = new THREE.Vector3(0, 0, 0.95)
       .applyAxisAngle(new THREE.Vector3(0, 1, 0), deg(prop.rot ?? 0))
       .add(new THREE.Vector3(prop.x, CENTER, prop.z))
@@ -315,22 +507,62 @@ function Player({
     const rx = Math.cos(a)
     const rz = -Math.sin(a)
     const mag = Math.hypot(input.x, input.y)
+    const t = b.translation()
     let vx = 0
     let vz = 0
     let running = false
     if (mag > 0.12) {
+      // The stick always wins: it cancels any walk towards a target.
+      goal.current = null
       const m = Math.min(1, mag)
       running = input.run || m >= 0.92
       const speed = (running ? RUN : WALK) * m
       vx = ((rx * input.x + fx * input.y) / mag) * speed
       vz = ((rz * input.x + fz * input.y) / mag) * speed
       if (used) setAway(true)
+    } else if (goal.current) {
+      const g = goal.current
+      if (path.current.goal !== g)
+        path.current = { goal: g, pts: planPath({ x: t.x, z: t.z }, g, layout, boxes) }
+      const pts = path.current.pts
+      // Intermediate waypoints are passed within 0.2 u; the last one is the goal itself.
+      while (pts.length > 1 && Math.hypot(pts[0].x - t.x, pts[0].z - t.z) < 0.2) pts.shift()
+      const w = pts[0] ?? g
+      const dx = w.x - t.x
+      const dz = w.z - t.z
+      const d = Math.hypot(dx, dz)
+      // Distance left along the path: decides run or walk and the slow-down.
+      let remain = d
+      for (let k = 1; k < pts.length; k++)
+        remain += Math.hypot(pts[k].x - pts[k - 1].x, pts[k].z - pts[k - 1].z)
+      if (pts.length <= 1 && d < 0.1) {
+        goal.current = null
+        progress.current = { best: Number.POSITIVE_INFINITY, since: 0 }
+        if (g.kind !== 'point') heading.current = g.face
+        onArrive(g)
+      } else {
+        // Slow down on the last steps so the stop lands on the spot.
+        const speed = Math.min(remain > 2.5 ? RUN : WALK, remain / Math.max(dt, 1e-3))
+        running = remain > 2.5
+        vx = (dx / d) * speed
+        vz = (dz / d) * speed
+        if (used) setAway(true)
+        const pr = progress.current
+        if (remain < pr.best - 0.04) progress.current = { best: remain, since: 0 }
+        else pr.since += dt
+        if (pr.since > STUCK_AFTER) {
+          goal.current = null
+          progress.current = { best: Number.POSITIVE_INFINITY, since: 0 }
+          onStuck(g)
+        }
+      }
     }
     controller.computeColliderMovement(col, { x: vx * dt, y: -2 * dt, z: vz * dt })
     const mv = controller.computedMovement()
-    const t = b.translation()
     const next = { x: t.x + mv.x, y: Math.max(CENTER, t.y + mv.y), z: t.z + mv.z }
     b.setNextKinematicTranslation(next)
+    onPosition(next.x, next.z)
+    // Speed really achieved (after collisions): it alone decides walk, run or idle.
     const moved = Math.hypot(mv.x, mv.z) / Math.max(dt, 1e-3)
     if (moved > 0.05) {
       const want = Math.atan2(mv.x, mv.z)
@@ -340,22 +572,28 @@ function Player({
     }
 
     let nextAnim: NpcAnim
-    if (used) {
+    if (used && ON_DEVICE.has(used.kind)) {
       const off = used.kind === 'treadmill' ? 0.15 : used.kind === 'bench-press' ? 0.35 : 0.3
       const p = new THREE.Vector3(0, 0, off)
         .applyAxisAngle(new THREE.Vector3(0, 1, 0), deg(used.rot ?? 0))
         .add(new THREE.Vector3(used.x, 0, used.z))
       fig.position.copy(p)
-      fig.rotation.y = deg((used.rot ?? 0) + 180)
+      fig.rotation.y = deg(used.rot ?? 0)
+      nextAnim = activity?.anim ?? 'idle'
+    } else if (used) {
+      // Beside the equipment, facing it (no clip of the pack lies on a bed or sits on a sofa:
+      // the figure stays on its feet next to it rather than sinking through it).
+      fig.position.set(next.x, next.y - CENTER, next.z)
+      fig.rotation.y = Math.atan2(used.x - next.x, used.z - next.z)
       nextAnim = activity?.anim ?? 'idle'
     } else {
       fig.position.set(next.x, next.y - CENTER, next.z)
       fig.rotation.y = heading.current
-      nextAnim = moved > 0.15 ? (running ? 'run' : 'walk') : 'idle'
+      nextAnim = moved > 0.15 ? (running && moved > WALK + 0.2 ? 'run' : 'walk') : 'idle'
     }
     if (nextAnim !== anim) setAnim(nextAnim)
-    const rate = nextAnim === 'walk' ? Math.min(1.5, Math.max(0.6, moved / WALK)) : 1
-    if (Math.abs(rate - speedRate) > 0.1) setSpeedRate(rate)
+    const g = nextAnim === 'walk' || nextAnim === 'run' ? Math.round(moved * 10) / 10 : 0
+    if (Math.abs(g - ground) > 0.09) setGround(g)
 
     // Walking out of an open side leaves the building (once).
     if (!left.current && (next.z > layout.d / 2 + 0.25 || next.x > layout.w / 2 + 0.25)) {
@@ -381,6 +619,15 @@ function Player({
       anim: nextAnim,
       using: used?.id ?? null,
       left: left.current,
+      goal: goal.current
+        ? goal.current.kind === 'prop'
+          ? goal.current.prop.id
+          : goal.current.kind
+        : null,
+      // Forward of the rendered figure (+Z of the model after every rotation) and speed: the
+      // walk proof compares them with the displacement.
+      facing: { x: Math.sin(fig.rotation.y), z: Math.cos(fig.rotation.y) },
+      speed: moved,
     }
   })
   useEffect(
@@ -406,7 +653,7 @@ function Player({
         name="Joueur"
         model={model}
         anim={anim}
-        speed={speedRate}
+        groundSpeed={ground}
         pagne={pagne}
         scale={PLAYER_SCALE}
       />
@@ -429,12 +676,16 @@ function Mover({ npc }: { npc: Npc }) {
     const dir = u < 0.5 ? 1 : -1
     g.rotation.y = Math.atan2((to.x - npc.x) * dir, (to.z - npc.z) * dir)
   })
+  // One leg of the trip every 3 s: its ground speed sets the walk cadence.
+  const to = npc.to ?? { x: npc.x, z: npc.z }
+  const ground = Math.hypot(to.x - npc.x, to.z - npc.z) / 3
   return (
     <Character
       ref={ref}
       name={`npc:${npc.id}`}
       model={adultFor(npc.model)}
       anim={npc.anim}
+      groundSpeed={npc.anim === 'walk' || npc.anim === 'run' ? ground : undefined}
       scale={NPC_SCALE}
     />
   )
@@ -450,8 +701,48 @@ function Room({
   onUse,
   input,
   onLeave,
+  approach,
+  onTalk,
+  onNotice,
 }: InteriorViewProps) {
   const room = useRoom(layout)
+  const goal = useRef<Goal | null>(null)
+  const playerAt = useRef({ x: layout.spawn.x, z: layout.spawn.z })
+  const boxes = useMemo(() => [...room.colliders], [room])
+  /** Sets a goal next to a piece of equipment; refuses to act from afar when none is free. */
+  const goToProp = (prop: Prop) => {
+    if (
+      activity?.prop === prop.id ||
+      (goal.current?.kind === 'prop' && goal.current.prop.id === prop.id)
+    )
+      return
+    const t = room.targets.find((x) => x.prop.id === prop.id)
+    const box = t?.box
+    const spot = approachPoint(
+      {
+        x: box ? box.center[0] : prop.x,
+        z: box ? box.center[2] : prop.z,
+        rot: box ? box.rotY : (prop.rot ?? 0),
+        half: box ? [box.half[0], box.half[2]] : [0.4, 0.4],
+      },
+      layout,
+      boxes,
+      playerAt.current,
+    )
+    if (!spot) {
+      onNotice?.(`Impossible d’atteindre : ${prop.label ?? 'cet équipement'}.`)
+      return
+    }
+    goal.current = { kind: 'prop', prop, ...spot }
+  }
+  const lastRequest = useRef(0)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one goal per request number
+  useEffect(() => {
+    if (!approach || approach.n === lastRequest.current) return
+    lastRequest.current = approach.n
+    const prop = layout.props.find((p) => p.id === approach.prop)
+    if (prop) goToProp(prop)
+  }, [approach])
   const W = layout.w
   const D = layout.d
   const highlight = useMemo(() => new THREE.MeshBasicMaterial({ color: '#f4c84a' }), [])
@@ -490,12 +781,56 @@ function Room({
           material={invisible}
           onClick={(e) => {
             e.stopPropagation()
-            onUse(prop)
+            goToProp(prop)
           }}
         >
           <boxGeometry />
         </mesh>
       ))}
+      {/* Touching the floor walks there (inside the room). */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: a 3D mesh; the joystick and keyboard also move the player. */}
+      <mesh
+        name="sol"
+        position={[0, 0.005, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        material={invisible}
+        onClick={(e) => {
+          e.stopPropagation()
+          const x = Math.max(-W / 2 + 0.4, Math.min(W / 2 - 0.4, e.point.x))
+          const z = Math.max(-D / 2 + 0.4, Math.min(D / 2 - 0.3, e.point.z))
+          goal.current = { kind: 'point', x, z }
+        }}
+      >
+        <planeGeometry args={[W, D]} />
+      </mesh>
+      {/* Touching a resident walks up to them, then opens the conversation. */}
+      {layout.npcs
+        .filter((n) => !n.to)
+        .map((n) => (
+          // biome-ignore lint/a11y/useKeyWithClickEvents: a 3D mesh; residents are also listed in the HUD.
+          <mesh
+            key={`hit-${n.id}`}
+            name={`npc-hit:${n.id}`}
+            position={[n.x, 0.6, n.z]}
+            material={invisible}
+            onClick={(e) => {
+              e.stopPropagation()
+              const spot = approachPoint(
+                { x: n.x, z: n.z, rot: n.rot ?? 0, half: [0.25, 0.25] },
+                layout,
+                boxes,
+                playerAt.current,
+              )
+              if (!spot) {
+                onNotice?.('Impossible de rejoindre cette personne.')
+                return
+              }
+              goal.current = { kind: 'npc', npc: n, ...spot }
+            }}
+          >
+            <cylinderGeometry args={[0.35, 0.35, 1.2, 10]} />
+          </mesh>
+        ))}
       {/* Solid world: the floor and the two walls drawn. The two cut-away sides, facing the
           camera, are the way out: walking past either leaves the building. */}
       <RigidBody type="fixed" colliders={false}>
@@ -537,6 +872,25 @@ function Room({
         activity={activity}
         model={playerModel}
         pagne={playerPagne}
+        goal={goal}
+        boxes={boxes}
+        onArrive={(g) => {
+          // Reached and facing the target: the action runs now, once.
+          if (g.kind === 'prop') onUse(g.prop)
+          else if (g.kind === 'npc') onTalk?.(g.npc)
+        }}
+        onStuck={(g) =>
+          onNotice?.(
+            g.kind === 'prop'
+              ? `Le chemin vers « ${g.prop.label ?? 'l’équipement'} » est bloqué : rien n’a été fait.`
+              : g.kind === 'npc'
+                ? 'Le chemin vers cette personne est bloqué.'
+                : 'On ne peut pas aller plus loin par là.',
+          )
+        }
+        onPosition={(x, z) => {
+          playerAt.current = { x, z }
+        }}
         onLeave={onLeave}
       />
       <group name={`Intérieur ${title}`} position={[0, 3.9, 0]} />

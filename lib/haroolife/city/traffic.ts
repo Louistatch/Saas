@@ -18,6 +18,9 @@ export type VehicleKind =
   | 'truck'
   | 'police'
   | 'zem'
+/** Real-time length of one traffic step (the street clock of HarooLife). */
+export const TRAFFIC_STEP_MS = 700
+
 export interface Agent {
   id: number
   kind: VehicleKind | 'walker'
@@ -31,6 +34,12 @@ export interface Agent {
   model?: string
   /** What the pedestrian is doing. */
   activity?: 'walk' | 'run'
+  /**
+   * Traffic steps one cell takes (walkers: 2 when walking, 1 when running) and how many of
+   * them have already elapsed: the renderer interpolates over the whole cell, not per step.
+   */
+  steps?: number
+  sub?: number
 }
 
 const loops = new Map<LocalityId, { x: number; y: number }[]>()
@@ -204,9 +213,11 @@ export function walkersNear(
       continue
     const n = r.path.length
     const run = hash(i, 3, 103) < 0.15
-    const speed = run ? 2 : 1
+    // One cell per step when running, one per two steps when walking (V3: about 1 render
+    // unit/s, the pace at which the walk clip's feet match the ground).
+    const steps = run ? 1 : 2
     const period = 2 * (n - 1)
-    const t = (step * speed + Math.floor(hash(i, 4, 104) * period)) % period
+    const t = (Math.floor(step / steps) + Math.floor(hash(i, 4, 104) * period)) % period
     const idx = t < n ? t : period - t
     const here = r.path[idx]
     if (Math.abs(here.x - cx) > radius || Math.abs(here.y - cy) > radius) continue
@@ -222,6 +233,8 @@ export function walkersNear(
       heading: heading(here, next),
       model: CH[i % CH.length],
       activity: run ? 'run' : 'walk',
+      steps,
+      sub: step % steps,
     })
   }
   return out

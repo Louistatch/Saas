@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { expect, test } from './lome-test'
+import { expect, openPlaces, test } from './lome-test'
 
 // Signed-in session against the mock Supabase used by the HarooLife SVG village tests.
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url')
@@ -42,7 +42,7 @@ test('signed-in players see real residents of their canton and can speak on the 
   })
 
   // Walk to the market (two buyers stand there in the fixture) and go in: "Ici maintenant" lists them.
-  await navigation.getByRole('button', { name: 'Carte' }).click()
+  await openPlaces(page)
   await page.getByRole('button', { name: /Marché de quartier/ }).click()
   await expect
     .poll(
