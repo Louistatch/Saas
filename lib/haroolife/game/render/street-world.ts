@@ -82,10 +82,11 @@ const PEDESTRIAN_MODELS = [
   'character-female-c',
   'character-male-a',
 ]
+/** First names of the passers-by (game characters, never real people), one per model. */
+const PEDESTRIAN_NAMES = ['Abla', 'Kossi', 'Enyonam', 'Komi', 'Akossiwa', 'Yao']
 const U = STREET_CELL
 /** The player's taxi (Kenney Car Kit, CC0): front along +Z, as the controller's heading 0. */
 const TAXI_URL = '/haroolife/vendor/kenney-3d/car-kit/taxi.glb'
-/** 1.5 × 2.7 units raw: brought next to the 1.85-unit adult avatar on a 2-unit road. */
 /** Kenney's taxi is 2.75 units long: about 4.5 m against a 1.75 m figure. */
 const TAXI_SCALE = (4.5 / 1.75) * (FIGURE / 2.75)
 const WHEEL_RADIUS = 0.3 * TAXI_SCALE
@@ -194,6 +195,9 @@ interface Walker {
   from: { x: number; y: number }
   to: { x: number; y: number }
   t: number
+  /** A passer-by of the game (not a connected player): their name and tag (shown when near). */
+  name: string
+  tag: HTMLButtonElement
 }
 
 export class StreetWorld {
@@ -361,7 +365,28 @@ export class StreetWorld {
       person.root.name = `Piéton ${i + 1}`
       this.scene.add(person.root)
       const start = this.randomRoad()
-      this.walkers.push({ person, from: start, to: this.nextRoad(start, start), t: Math.random() })
+      const name = PEDESTRIAN_NAMES[i % PEDESTRIAN_NAMES.length]
+      const tag = document.createElement('button')
+      tag.type = 'button'
+      tag.dataset.pedestrian = name
+      tag.setAttribute('aria-label', `Habitant ${name}`)
+      tag.textContent = name
+      tag.className =
+        'pointer-events-auto absolute left-0 top-0 min-h-8 rounded-full border border-white/80 bg-white/85 px-3 text-xs font-semibold text-slate-700 shadow'
+      tag.style.visibility = 'hidden'
+      tag.addEventListener('click', (e) => {
+        e.stopPropagation()
+        this.events.onPlayer?.(`npc:${name}`)
+      })
+      this.markersRoot.append(tag)
+      this.walkers.push({
+        person,
+        from: start,
+        to: this.nextRoad(start, start),
+        t: Math.random(),
+        name,
+        tag,
+      })
       this.play(person, clipFor(person.spec, 'walk'))
       person.actions.get(person.current)?.setEffectiveTimeScale(1)
     }
@@ -417,7 +442,10 @@ export class StreetWorld {
       r.tag?.remove()
     }
     this.remotes.clear()
-    for (const w of this.walkers) this.disposePerson(w.person)
+    for (const w of this.walkers) {
+      this.disposePerson(w.person)
+      w.tag.remove()
+    }
     this.walkers = []
     if (this.player) this.disposePerson(this.player)
     this.player = null
@@ -926,6 +954,18 @@ export class StreetWorld {
       m.el.style.visibility =
         near && p.z < 1 && x > 0 && x < this.width && y > 40 ? 'visible' : 'hidden'
     }
+    // Passers-by: their first name when they are near the player (touch to talk).
+    for (const w of this.walkers) {
+      p.copy(w.person.root.position)
+      const near = Math.hypot(p.x / U - c.x, p.z / U - c.y) < 5
+      p.y += FIGURE + 0.2
+      p.project(this.camera)
+      const x = (p.x * 0.5 + 0.5) * this.width
+      const y = (-p.y * 0.5 + 0.5) * this.height
+      w.tag.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`
+      w.tag.style.visibility =
+        near && p.z < 1 && x > 0 && x < this.width && y > 40 ? 'visible' : 'hidden'
+    }
     // Other players' name tags, over their heads.
     for (const r of this.remotes.values()) {
       if (!r.tag || !r.person) continue
@@ -1202,6 +1242,18 @@ export class StreetWorld {
       const d = Math.hypot((v.x * 0.5 + 0.5) * this.width - x, (-v.y * 0.5 + 0.5) * this.height - y)
       if (d < 40 && (!best || d < best.d)) best = { key: r.key, d }
     }
+    // Then the passers-by of the game (a real player under the finger wins).
+    if (!best)
+      for (const w of this.walkers) {
+        v.copy(w.person.root.position)
+        v.y += FIGURE / 2
+        v.project(this.camera)
+        const d = Math.hypot(
+          (v.x * 0.5 + 0.5) * this.width - x,
+          (-v.y * 0.5 + 0.5) * this.height - y,
+        )
+        if (d < 40 && (!best || d < best.d)) best = { key: `npc:${w.name}`, d }
+      }
     return best?.key ?? null
   }
 

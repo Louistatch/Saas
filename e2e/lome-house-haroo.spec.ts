@@ -353,6 +353,36 @@ test('HarooLife street and clear map: walk, places without overlap, sheet, route
   const h = (held.heading * Math.PI) / 180
   expect(Math.sin(h) * fwd.x + Math.cos(h) * fwd.z).toBeGreaterThan(0.85)
 
+  // A passer-by of the game can be talked to: they answer they are not a connected player.
+  // The first passer-by whose tag is on top (not under the joystick or a card); they keep
+  // walking, so the tap lands where the tag is at that instant.
+  const tapPoint = () =>
+    page.evaluate(() => {
+      for (const el of document.querySelectorAll<HTMLElement>('button[data-pedestrian]')) {
+        if (el.style.visibility === 'hidden') continue
+        const r = el.getBoundingClientRect()
+        const x = r.x + r.width / 2
+        const y = r.y + r.height / 2
+        if (document.elementFromPoint(x, y) === el) return { x, y }
+      }
+      return null
+    })
+  await expect.poll(tapPoint, { timeout: 20000 }).not.toBeNull()
+  const at = (await tapPoint()) as { x: number; y: number }
+  await page.mouse.click(at.x, at.y)
+  const npc = page.getByTestId('npc-sheet')
+  await expect(npc).toBeVisible()
+  await expect(npc).toContainText('pas connecté')
+  const field = npc.getByRole('textbox', { name: /^Écrire à / })
+  await field.fill('Bonjour, ça va ?')
+  await npc.getByRole('button', { name: 'Envoyer' }).click()
+  const log = npc.getByRole('log')
+  await expect(log).toContainText('Bonjour, ça va ?')
+  await expect(log).toContainText('Je ne suis pas connecté')
+  await expect(field).toHaveValue('')
+  await page.keyboard.press('Escape')
+  await expect(npc).toBeHidden()
+
   // The clear map: districts, places that never overlap, a sheet with the trip.
   await page
     .getByRole('navigation', { name: 'Navigation du jeu' })

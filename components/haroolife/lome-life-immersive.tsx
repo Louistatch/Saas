@@ -473,6 +473,9 @@ export function LomeLifeImmersive() {
   const [playerKey, setPlayerKey] = useState<string | null>(null)
   const [playerNote, setPlayerNote] = useState('')
   const [chatRoom, setChatRoom] = useState<string | null>(null)
+  // A conversation with a passer-by of the game (never stored, never sent anywhere).
+  const [npcTalk, setNpcTalk] = useState<{ from: 'me' | 'npc'; text: string }[]>([])
+  const [npcDraft, setNpcDraft] = useState('')
   // The journey between two towns, shown full screen while the arrival town loads.
   const [journey, setJourney] = useState<{
     from: LocalityId
@@ -563,7 +566,9 @@ export function LomeLifeImmersive() {
                                 : panel === 'avatar'
                                   ? 'Mon apparence'
                                   : panel === 'player'
-                                    ? 'Joueur'
+                                    ? playerKey?.startsWith('npc:')
+                                      ? 'Habitant'
+                                      : 'Joueur'
                                     : panel === 'market'
                                       ? 'Marché'
                                       : ''
@@ -1426,6 +1431,8 @@ export function LomeLifeImmersive() {
             onPlayer={(key) => {
               setPlayerKey(key)
               setPlayerNote('')
+              setNpcTalk([])
+              setNpcDraft('')
               setPanel('player')
             }}
             filter={cityFilter}
@@ -2615,7 +2622,88 @@ export function LomeLifeImmersive() {
                   </>
                 )}
                 {panel === 'player' &&
+                  playerKey?.startsWith('npc:') &&
+                  (() => {
+                    const name = playerKey.slice(4)
+                    const reply = `Je ne suis pas connecté. Je suis ${name}, un habitant du jeu, pas un vrai joueur : je ne peux pas te répondre. Les vrais joueurs portent une étiquette verte à leur nom.`
+                    return (
+                      <div className="space-y-3" data-testid="npc-sheet">
+                        <div className="flex items-center gap-3">
+                          <span
+                            aria-hidden
+                            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xl font-black text-slate-700"
+                          >
+                            {name.slice(0, 1)}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-lg font-black">{name}</p>
+                            <p className="text-sm text-slate-500">Habitant du jeu · pas connecté</p>
+                          </div>
+                        </div>
+                        <div
+                          role="log"
+                          aria-label={`Discussion avec ${name}`}
+                          className="max-h-[32vh] min-h-20 space-y-2 overflow-y-auto rounded-2xl bg-slate-50 p-3"
+                        >
+                          {npcTalk.length === 0 && (
+                            <p className="py-3 text-center text-xs text-slate-500">
+                              Dis bonjour à {name}.
+                            </p>
+                          )}
+                          {npcTalk.map((m, i) => (
+                            <div
+                              // biome-ignore lint/suspicious/noArrayIndexKey: an append-only local list
+                              key={i}
+                              className={`flex ${m.from === 'me' ? 'justify-end' : 'justify-start'}`}
+                            >
+                              <p
+                                className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
+                                  m.from === 'me'
+                                    ? 'bg-emerald-600 text-white'
+                                    : 'bg-white text-slate-800 shadow-sm'
+                                }`}
+                              >
+                                {m.text}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                        <form
+                          className="flex gap-2"
+                          onSubmit={(e) => {
+                            e.preventDefault()
+                            const text = npcDraft.trim().slice(0, 200)
+                            if (!text) return
+                            setNpcTalk((old) => [
+                              ...old,
+                              { from: 'me', text },
+                              { from: 'npc', text: reply },
+                            ])
+                            setNpcDraft('')
+                          }}
+                        >
+                          <input
+                            aria-label={`Écrire à ${name}`}
+                            value={npcDraft}
+                            maxLength={200}
+                            onChange={(e) => setNpcDraft(e.target.value)}
+                            placeholder={`Écrire à ${name}…`}
+                            className="min-w-0 flex-1 rounded-2xl border border-slate-200 px-3 py-3 text-sm"
+                          />
+                          <button
+                            type="submit"
+                            disabled={!npcDraft.trim()}
+                            className="rounded-2xl bg-emerald-600 px-4 text-sm font-bold text-white disabled:opacity-50"
+                          >
+                            Envoyer
+                          </button>
+                        </form>
+                      </div>
+                    )
+                  })()}
+                {panel === 'player' &&
                   playerKey &&
+                  !playerKey.startsWith('npc:') &&
                   (() => {
                     const who = realtime.state.present.find((p) => p.key === playerKey)
                     const name = who?.name ?? 'Joueur'
