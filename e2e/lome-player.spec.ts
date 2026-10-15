@@ -97,7 +97,8 @@ test('avatar, joystick, collisions, camera and taxi in the single 3D world', asy
     })
     .toBe(true)
 
-  // 2. Run with a full stick for 3 s: faster than walking.
+  // 2. Run with a full stick for 3 s: faster than walking (V3: walk 0.9, run 2 cells/s, the
+  // pace at which the run clip's feet stay planted).
   let topSpeed = 0
   await hold(270, 400, 52)
   for (let i = 0; i < 8; i++) {
@@ -116,7 +117,7 @@ test('avatar, joystick, collisions, camera and taxi in the single 3D world', asy
   expect(
     topSpeed,
     `runs with a full deflection (under the finger: ${underFinger})`,
-  ).toBeGreaterThan(3)
+  ).toBeGreaterThan(1.6)
 
   // 2b. Leaving the app (window blur) with the stick held: the avatar stops, no ghost walk.
   await hold(0, 600, 52)
