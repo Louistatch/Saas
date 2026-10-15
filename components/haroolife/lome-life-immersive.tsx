@@ -95,7 +95,7 @@ import { type Actor, type OrgRef, primaryOrganization } from '@/lib/haroolife/do
 import { createInteractionEngine } from '@/lib/haroolife/domain/engine'
 import { HttpAggregationService, HttpIdentityAdapter } from '@/lib/haroolife/domain/http'
 import { GameWorldAdapter } from '@/lib/haroolife/domain/services'
-import { type StreetEngine, currentRenderer, currentStreet } from '@/lib/haroolife/engine/select'
+import { DEFAULT_RENDERER, currentRenderer } from '@/lib/haroolife/engine/select'
 import type { RendererId } from '@/lib/haroolife/engine/types'
 import {
   CITIES,
@@ -318,12 +318,10 @@ export function LomeLifeImmersive() {
   const estateRoadsRef = useRef(estateRoads)
   estateRoadsRef.current = estateRoads
   const input = useRef<InputState>({ x: 0, y: 0, run: false }).current
-  // Renderer for the scenes it supports (?engine=three), read once on the client.
-  const [renderer, setRenderer] = useState<RendererId>('playcanvas')
+  // Renderer of the interiors (?engine=three or playcanvas), read once on the client; the
+  // default until then, so the PlayCanvas chunk is never fetched unless it was asked for.
+  const [renderer, setRenderer] = useState<RendererId>(DEFAULT_RENDERER)
   useEffect(() => setRenderer(currentRenderer()), [])
-  // The street and its map: the HarooLife engine by default, PlayCanvas with ?street=playcanvas.
-  const [street, setStreet] = useState<StreetEngine>('haroo')
-  useEffect(() => setStreet(currentStreet()), [])
   const controller = useMemo(() => {
     const c = new PlayerController(
       {
@@ -945,14 +943,6 @@ export function LomeLifeImmersive() {
     },
     [],
   )
-  const onCameraSync = useCallback((cam: CameraRig) => {
-    const [tx, , tz] = worldPos(cam.tx, cam.tz)
-    setCamera((c) =>
-      c.tx === tx && c.tz === tz && c.distance === cam.distance && c.angle === cam.angle
-        ? c
-        : { tx, tz, distance: cam.distance, angle: cam.angle },
-    )
-  }, [])
   const onJoystickActive = useCallback(() => {
     controller.camera.follow = true
     if (cityLifeRef.current.route.length)
@@ -1369,21 +1359,15 @@ export function LomeLifeImmersive() {
         ) : (
           <CityWorld
             city={life.city}
-            tool={mode === 'walk' ? 'inspect' : mode === 'demolish' ? 'demolish' : building}
-            selected={selection}
             onTile={tile}
             controller={controller}
             onPlayerEvents={onPlayerEvents}
             remoteFeed={realtime.client ?? undefined}
             remotePresent={realtime.state.present}
             ads={adsProp}
-            onCameraSync={onCameraSync}
-            hasVehicle={cityLife.locality === 'lome' && Boolean(cityLife.vehicle)}
             avatarModel={shownModel(avatar)}
             avatarPagne={pagneColor(avatar.pagne)}
             camera={camera}
-            onCamera={setCamera}
-            step={life.trafficStep}
             hour={life.hour}
             interior={interior}
             interiorTitle={
@@ -1401,11 +1385,6 @@ export function LomeLifeImmersive() {
             }}
             onNotice={setNotice}
             ride={riding && cityLife.route.length > 0 && !insideAny ? { transport, rain } : null}
-            visitors={visitors}
-            onBillboard={(id) => {
-              setBillboard(id)
-              setPanel('billboard')
-            }}
             onCell={(cell) => {
               const lot = lotAtCell(cell.x, cell.y)
               if (lot) {
@@ -1422,17 +1401,8 @@ export function LomeLifeImmersive() {
             }}
             filter={cityFilter}
             selectedLot={selectedLot}
-            labelsHidden={panel !== null || !mapView}
             showNames={showNames}
             mapView={mapView}
-            onOverview={() => {
-              if (!mapView) enterMap()
-              else {
-                controller.camera.distance = 100
-                setCamera((c) => ({ ...c, distance: 100 }))
-              }
-            }}
-            onFollow={exitMap}
             onStats={(s) =>
               setChunkStats((old) =>
                 old.chunks === s.chunks &&
@@ -1449,7 +1419,6 @@ export function LomeLifeImmersive() {
             quality={quality}
             locality={cityLife.locality}
             renderer={renderer}
-            street={street}
             input={input}
             onLeave={() => action('leave')}
           />

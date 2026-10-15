@@ -3,7 +3,7 @@ import { expect, test } from './lome-test'
 /**
  * GPU lifecycle regression: the production crash `Cannot read properties of null (reading
  * 'deleteBuffer')` appeared on Android after repeated navigations between the 3D experiences.
- * Since the unification the HarooLife layout mounts a single PlayCanvas application and the
+ * The HarooLife layout mounts a single 3D street (the HarooLife engine) and the
  * addresses (/haroolife, /haroolife/territoire, /haroolife/territoire/lome) are modules of
  * that one world: a client-side transition must keep the same canvas alive, a full reload or
  * a dead WebGL context must release GPU resources without touching a dead device.

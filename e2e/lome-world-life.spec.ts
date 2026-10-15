@@ -48,15 +48,16 @@ test('a day in Lomé: from home to the gym, a workout on real equipment, and bac
     .poll(() => stats(page).then((s) => s?.at ?? null), { timeout: 30000 })
     .toEqual({ x: 48, y: 34 })
   await expect
-    .poll(() => stats(page).then((s) => (s?.detailed && s.chunks >= 20 ? s.buildings : 0)), {
+    .poll(() => stats(page).then((s) => (s?.detailed && s.chunks >= 9 ? s.buildings : 0)), {
       timeout: 60000,
     })
-    .toBeGreaterThanOrEqual(250)
-  await page.waitForTimeout(3500) // let near chunks finish and characters load
+    .toBeGreaterThanOrEqual(150)
+  await page.waitForTimeout(3500) // let near tiles finish and characters load
   const city = (await stats(page))!
   testInfo.annotations.push({ type: 'city', description: JSON.stringify(city) })
-  expect(city.tris, 'near chunks carry real baked models').toBeGreaterThan(150000)
-  expect(city.drawCalls, 'merged chunks keep draw calls low').toBeLessThan(400)
+  // The building tiles carry the baked Kenney models (fallback boxes would be a few thousand).
+  expect(city.tris, 'near tiles carry real baked models').toBeGreaterThan(60000)
+  expect(city.drawCalls, 'merged tiles keep draw calls low').toBeLessThan(400)
   await shot('01-home-tokoin')
 
   // The city moves on its own: traffic advances while the player stands still.

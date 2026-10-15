@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test'
 import { expect, openPlaces, test } from './lome-test'
 
 /**
- * M4 (D4+): endurance of the single PlayCanvas application. 20 house entries and exits, then 10
+ * M4 (D4+): endurance of the 3D engines. 20 house entries and exits, then 10
  * locality changes (Lomé ⇄ Kara), with no page error, no WebGL error, one canvas, and GPU objects
  * (textures, buffers) and scene entities that return to their level instead of growing.
  * The fictitious wallet is raised in the player's own local save so ten bus fares fit.

@@ -17,6 +17,14 @@ const snapshot = (page: import('@playwright/test').Page) =>
       ).__LOME_CITY,
   )
 
+/** Zoom factor of the clear map (scale of its ground group). */
+const mapScale = (page: import('@playwright/test').Page) =>
+  page
+    .getByRole('img', { name: 'Carte de la ville par quartiers' })
+    .locator('g')
+    .first()
+    .evaluate((g) => Number(/scale\(([\d.]+)\)/.exec(g.getAttribute('transform') ?? '')?.[1] ?? 0))
+
 test('map gestures, HUD taps and cancellation never move the avatar', async ({ page }, info) => {
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(e.message))
@@ -26,104 +34,79 @@ test('map gestures, HUD taps and cancellation never move the avatar', async ({ p
     .getByRole('navigation', { name: 'Navigation du jeu' })
     .getByRole('button', { name: 'Carte' })
     .click()
+  const map = page.getByTestId('city-map')
+  await expect(map).toBeVisible()
   await expect(page.getByRole('group', { name: 'Catégories de lieux' })).toBeVisible()
   await expect(page.getByRole('application', { name: 'Joystick de déplacement' })).toBeHidden()
-  await expect.poll(() => page.locator('button[data-lot]:visible').count()).toBeGreaterThan(2)
+  await expect.poll(() => page.locator('[data-place]:visible').count()).toBeGreaterThan(2)
   await page
     .getByRole('group', { name: 'Catégories de lieux' })
-    .getByRole('button', { name: 'Maisons', exact: true })
+    .getByRole('button', { name: 'Santé', exact: true })
     .click()
-  await expect.poll(() => page.locator('button[data-lot^="l-"]:visible').count()).toBeGreaterThan(0)
+  await expect.poll(() => page.locator('[data-place]:visible').count()).toBeGreaterThan(0)
   await page
     .getByRole('group', { name: 'Catégories de lieux' })
     .getByRole('button', { name: 'Tous', exact: true })
     .click()
   const original = await snapshot(page)
-  const canvas = page.locator('canvas').first()
-  await canvas.dispatchEvent('pointerdown', {
+  // A drag cancelled half-way (a system gesture took the pointer).
+  await map.dispatchEvent('pointerdown', {
     pointerId: 501,
     pointerType: 'touch',
     clientX: 175,
     clientY: 400,
   })
-  await page.evaluate(() =>
-    window.dispatchEvent(
-      new PointerEvent('pointermove', {
-        pointerId: 501,
-        pointerType: 'touch',
-        clientX: 235,
-        clientY: 425,
-      }),
-    ),
-  )
-  await page.waitForTimeout(250)
-  await page.evaluate(() =>
-    window.dispatchEvent(
-      new PointerEvent('pointercancel', {
-        pointerId: 501,
-        pointerType: 'touch',
-        clientX: 235,
-        clientY: 425,
-      }),
-    ),
-  )
-  const beforePinch = (await snapshot(page)).camera.distance
-  await canvas.dispatchEvent('pointerdown', {
+  await map.dispatchEvent('pointermove', {
+    pointerId: 501,
+    pointerType: 'touch',
+    clientX: 235,
+    clientY: 425,
+  })
+  await map.dispatchEvent('pointercancel', {
+    pointerId: 501,
+    pointerType: 'touch',
+    clientX: 235,
+    clientY: 425,
+  })
+  // Pinch apart: the map zooms in.
+  const beforePinch = await mapScale(page)
+  await map.dispatchEvent('pointerdown', {
     pointerId: 601,
     pointerType: 'touch',
     clientX: 140,
     clientY: 410,
   })
-  await canvas.dispatchEvent('pointerdown', {
+  await map.dispatchEvent('pointerdown', {
     pointerId: 602,
     pointerType: 'touch',
     clientX: 240,
     clientY: 410,
   })
-  await page.evaluate(() => {
-    window.dispatchEvent(
-      new PointerEvent('pointermove', {
-        pointerId: 602,
-        pointerType: 'touch',
-        clientX: 310,
-        clientY: 410,
-      }),
-    )
-    window.dispatchEvent(
-      new PointerEvent('pointerup', {
-        pointerId: 602,
-        pointerType: 'touch',
-        clientX: 310,
-        clientY: 410,
-      }),
-    )
-    window.dispatchEvent(
-      new PointerEvent('pointerup', {
-        pointerId: 601,
-        pointerType: 'touch',
-        clientX: 140,
-        clientY: 410,
-      }),
-    )
+  await map.dispatchEvent('pointermove', {
+    pointerId: 602,
+    pointerType: 'touch',
+    clientX: 310,
+    clientY: 410,
   })
-  await expect.poll(async () => (await snapshot(page)).camera.distance).toBeLessThan(beforePinch)
+  await map.dispatchEvent('pointerup', { pointerId: 602, pointerType: 'touch' })
+  await map.dispatchEvent('pointerup', { pointerId: 601, pointerType: 'touch' })
+  await expect.poll(() => mapScale(page)).toBeGreaterThan(beforePinch)
   await page.getByRole('button', { name: 'Noms', exact: false }).click()
-  await page.getByRole('button', { name: 'Zoom arrière' }).click()
+  await page.getByRole('button', { name: 'Zoom arrière sur la carte' }).click()
   await expect.poll(async () => (await snapshot(page)).route).toBe(0)
   expect((await snapshot(page)).at).toEqual(original.at)
   await expect(page.getByRole('dialog')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Vue de la ville' }).click()
   await expect(page.getByRole('application', { name: 'Joystick de déplacement' })).toBeHidden()
-  for (const marker of await page.locator('button[data-lot]:visible').all()) {
+  for (const marker of await page.locator('[data-place]:visible').all()) {
     const box = await marker.boundingBox()
     expect(box).not.toBeNull()
     if (box) {
-      expect(box.x).toBeGreaterThanOrEqual(0)
-      expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width)
+      expect(box.x + box.width / 2).toBeGreaterThanOrEqual(0)
+      expect(box.x + box.width / 2).toBeLessThanOrEqual(page.viewportSize()!.width)
     }
   }
   await page.screenshot({ path: info.outputPath('map-mobile-or-desktop.png') })
-  await page.getByRole('button', { name: 'Recentrer sur moi' }).click()
+  await page.getByRole('button', { name: 'Retour au jeu' }).click()
   await expect(page.getByRole('application', { name: 'Joystick de déplacement' })).toBeVisible()
   await expect(page.getByRole('group', { name: 'Catégories de lieux' })).toHaveCount(0)
   expect(errors).toEqual([])

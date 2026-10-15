@@ -9,6 +9,7 @@ import type { PlayerController } from '@/lib/haroolife/city/player'
 import {
   type StreetAds,
   type StreetPoseFeed,
+  type StreetStats,
   StreetWorld,
 } from '@/lib/haroolife/game/render/street-world'
 import type { PresenceEntry } from '@/lib/haroolife/realtime/protocol'
@@ -32,6 +33,9 @@ export default function HarooStreetView(props: {
   onLot: (lotId: string) => void
   onCell: (cell: { x: number; y: number }) => void
   onFrame?: (s: { drawCalls: number; fps: number }) => void
+  onStats?: (s: StreetStats) => void
+  /** Daylight of the game's hour (sun 0.65 at night to 1 at noon). */
+  light?: { sun: number; sunColor: string }
 }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const markers = useRef<HTMLDivElement>(null)
@@ -41,7 +45,7 @@ export default function HarooStreetView(props: {
   live.current = props
 
   const { controller, avatarModel, avatarPagne, pixelRatio, estate, locality, remoteFeed } = props
-  const { ads, remotePresent } = props
+  const { ads, remotePresent, light } = props
   // biome-ignore lint/correctness/useExhaustiveDependencies: the estate is pushed below without remounting
   useEffect(() => {
     const c = canvas.current
@@ -66,9 +70,11 @@ export default function HarooStreetView(props: {
         onReady: () => setState('ready'),
         onError: () => setState('error'),
         onFrame: (s) => live.current.onFrame?.(s),
+        onStats: (s) => live.current.onStats?.(s),
       },
     })
     world.current = w
+    if (live.current.light) w.setDaylight(live.current.light)
     w.init().catch(() => setState('error'))
     return () => {
       world.current = null
@@ -78,6 +84,9 @@ export default function HarooStreetView(props: {
   useEffect(() => {
     if (state === 'ready') world.current?.setEstate(estate)
   }, [estate, state])
+  useEffect(() => {
+    if (light) world.current?.setDaylight(light)
+  }, [light])
   // Campaigns and presence change without rebuilding the street.
   useEffect(() => {
     if (state === 'ready') world.current?.setAds(ads ?? null)

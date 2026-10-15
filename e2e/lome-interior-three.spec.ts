@@ -5,7 +5,7 @@ import { expect, openPlaces, test } from './lome-test'
 /**
  * Jalon J1: the gym drawn by React Three Fiber (`?engine=three`) with Rapier collisions.
  * The player walks inside under the joystick, cannot cross walls or equipment, uses a
- * treadmill, walks out of the open front, and the PlayCanvas street comes back. A second run
+ * treadmill, walks out of the open front, and the HarooLife street comes back. A second run
  * checks that repeated visits do not accumulate GPU resources, and that `?engine=playcanvas`
  * remains the way back to the PlayCanvas interiors (the default is now Three).
  */
@@ -75,7 +75,7 @@ test('R3F gym: walk, collide, use a treadmill, walk out', async ({ page }, testI
   await expect
     .poll(async () => (await live(page))?.chunks ?? 0, { timeout: 60000 })
     .toBeGreaterThan(0)
-  expect((await scene(page))?.engine, 'the street stays on PlayCanvas').toBe('playcanvas')
+  expect((await scene(page))?.engine, 'the street is the HarooLife engine').toBe('haroo')
   await enterGym(page)
 
   const s = await scene(page)
@@ -109,10 +109,10 @@ test('R3F gym: walk, collide, use a treadmill, walk out', async ({ page }, testI
   await expect.poll(async () => (await inside(page))?.using ?? null).toBeNull()
 
   // Run out of an open side (full stick: V3 walks at a realistic 1 u/s, running is 2 u/s):
-  // the building is left and the PlayCanvas street is back.
+  // the building is left and the street is back.
   for (let i = 0; i < 6 && (await live(page))?.inside; i++) await hold(page, 90, 2000, 60)
   await expect.poll(async () => (await live(page))?.inside ?? null, { timeout: 20000 }).toBeNull()
-  await expect.poll(async () => (await scene(page))?.engine).toBe('playcanvas')
+  await expect.poll(async () => (await scene(page))?.engine).toBe('haroo')
   expect(errors).toEqual([])
 })
 
@@ -131,7 +131,7 @@ test('R3F interior: repeated visits keep GPU resources flat; ?engine=playcanvas 
     const g = (await scene(page))!.gpu
     counts.push({ textures: g.textures, buffers: g.buffers })
     await page.getByRole('button', { name: 'Entrer ou sortir' }).click()
-    await expect.poll(async () => (await scene(page))?.engine).toBe('playcanvas')
+    await expect.poll(async () => (await scene(page))?.engine).toBe('haroo')
     await page.getByRole('button', { name: 'Entrer ou sortir' }).click()
     await expect.poll(async () => (await scene(page))?.engine, { timeout: 30000 }).toBe('three')
   }

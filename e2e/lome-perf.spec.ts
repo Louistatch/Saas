@@ -85,7 +85,7 @@ test('performance scenarios A–F', async ({ page, browserName }, testInfo) => {
   await expect(page.locator('canvas').first()).toBeVisible({ timeout: 30000 })
   const canvasAt = Date.now() - t0
   await expect
-    .poll(() => city(page).then((c) => (c?.detailed && c.chunks >= 20 ? c.buildings : 0)), {
+    .poll(() => city(page).then((c) => (c?.detailed && c.chunks >= 9 ? c.buildings : 0)), {
       timeout: 60000,
     })
     .toBeGreaterThan(0)
@@ -114,36 +114,30 @@ test('performance scenarios A–F', async ({ page, browserName }, testInfo) => {
     city: await city(page),
   }
 
-  // B. Tokoin from the air (home camera, idle).
-  report.B_tokoin_aerial = { perf: await sample(page, 4000) }
+  // B. Tokoin street at home (follow camera, idle).
+  report.B_tokoin_street = { perf: await sample(page, 4000) }
 
-  // C. Maximum zoom in a dense district.
-  for (let i = 0; i < 5; i++) await page.getByRole('button', { name: 'Zoom avant' }).click()
-  await page.waitForTimeout(1500)
-  report.C_zoom_max = { perf: await sample(page, 4000) }
-  for (let i = 0; i < 5; i++) await page.getByRole('button', { name: 'Zoom arrière' }).click()
-
-  // D. Continuous camera movement (drag across the city).
-  const canvas = page.locator('canvas').first()
-  const box = (await canvas.boundingBox())!
+  // C. Walking down the street: the camera follows, building tiles stream in.
   await page.evaluate(() =>
     (window as unknown as { __LOME_PERF_RESET?: () => void }).__LOME_PERF_RESET?.(),
   )
-  // Two drags of 8 steps: each pointer event waits for the busy main thread, so 100 events
-  // at one frame per second would cost the whole scenario budget on a software renderer.
-  for (let k = 0; k < 2; k++) {
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-    await page.mouse.down()
-    await page.mouse.move(
-      box.x + box.width / 2 + (k % 2 ? 220 : -220),
-      box.y + box.height / 2 + 120,
-      { steps: 8 },
-    )
-    await page.mouse.up()
-  }
-  await page.waitForTimeout(500)
-  report.D_camera_move = { perf: await perf(page) }
-  await page.getByRole('button', { name: 'Recentrer sur moi' }).click()
+  await page.keyboard.down('ArrowUp')
+  await page.waitForTimeout(3000)
+  report.C_walk = { perf: await perf(page) }
+  await page.keyboard.up('ArrowUp')
+
+  // D. The city map (SVG, no 3D scene behind it) and back to the street.
+  await page
+    .getByRole('navigation', { name: 'Navigation du jeu' })
+    .getByRole('button', { name: 'Carte' })
+    .click()
+  await expect(page.getByTestId('city-map')).toBeVisible()
+  const tD = Date.now()
+  await page.getByRole('button', { name: 'Retour au jeu' }).click()
+  await expect
+    .poll(() => city(page).then((c) => c?.chunks ?? 0), { timeout: 30000 })
+    .toBeGreaterThanOrEqual(9)
+  report.D_map_back_to_street = { backMs: Date.now() - tD, perf: await sample(page, 3000) }
 
   // E. Open the gym (ride there, enter) and measure inside.
   await openPlaces(page)
@@ -178,7 +172,7 @@ test('performance scenarios A–F', async ({ page, browserName }, testInfo) => {
   await expect.poll(() => city(page).then((c) => c?.inside ?? null)).toBeNull()
   await expect
     .poll(() => city(page).then((c) => c?.chunks ?? 0), { timeout: 30000 })
-    .toBeGreaterThanOrEqual(20)
+    .toBeGreaterThanOrEqual(9)
   const backAt = Date.now() - tF
   report.F_back_to_city = { backMs: backAt, perf: await sample(page, 3000) }
   report.G_cooperative = 'non mesuré : jalon 2'
@@ -202,9 +196,9 @@ test('performance scenarios A–F', async ({ page, browserName }, testInfo) => {
     '|---|---|---|---|---|---|---|---|---|---|---|',
     ...[
       'A_cold_open',
-      'B_tokoin_aerial',
-      'C_zoom_max',
-      'D_camera_move',
+      'B_tokoin_street',
+      'C_walk',
+      'D_map_back_to_street',
       'E_gym',
       'F_back_to_city',
     ].map((k) => row(k, report[k])),

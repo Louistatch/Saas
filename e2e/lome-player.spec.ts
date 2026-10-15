@@ -1,7 +1,7 @@
 import { expect, test } from './lome-test'
 
 /**
- * The playable slice (Jalon D1/D3): one PlayCanvas scene, a visible avatar that walks
+ * The playable slice (Jalon D1/D3): one 3D scene, a visible avatar that walks
  * continuously under an analogue joystick, turns its body, slides along obstacles, stops
  * when the finger lifts, keeps the camera on it; then the taxi: get in, drive, brake, get out.
  */
@@ -36,7 +36,7 @@ test('avatar, joystick, collisions, camera and taxi in the single 3D world', asy
 
   await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
   await expect(page.locator('canvas').first()).toBeVisible({ timeout: 30000 })
-  expect(await page.locator('canvas').count(), 'one PlayCanvas scene').toBe(1)
+  expect(await page.locator('canvas').count(), 'one 3D scene').toBe(1)
   await expect.poll(async () => (await live())?.chunks ?? 0, { timeout: 30000 }).toBeGreaterThan(0)
   await expect.poll(async () => (await player())?.mode ?? null).toBe('idle')
   const start = (await player()) as Player

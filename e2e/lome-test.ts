@@ -8,27 +8,7 @@ import { test as base } from '@playwright/test'
 export const test = base.extend<{
   cpuThrottle: void
   returningPlayer: void
-  street: 'haroo' | 'playcanvas'
-  streetEngine: void
 }>({
-  // Engine of the street. The HarooLife engine is the default in the game; the specs written
-  // for the PlayCanvas city (billboards, other players, taxi, chunk density) keep testing it
-  // through the remembered `?street=playcanvas` choice, which stays the way back.
-  street: ['playcanvas', { option: true }],
-  streetEngine: [
-    // On the context: pages a spec opens itself (context.newPage()) get the same street.
-    async ({ context, street }, use) => {
-      await context.addInitScript((engine) => {
-        try {
-          localStorage.setItem('haroolife.street', engine)
-        } catch {
-          /* blocked storage */
-        }
-      }, street)
-      await use()
-    },
-    { auto: true },
-  ],
   // Every scenario plays as someone who already chose a look: the new-game appearance sheet
   // (opened on a device with no choice yet) is covered by lome-avatar.spec.ts, which clears it.
   returningPlayer: [

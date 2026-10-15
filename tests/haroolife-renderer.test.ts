@@ -3,7 +3,7 @@ import { describe, it } from 'node:test'
 import { layoutFor } from '../lib/haroolife/city/interiors'
 import type { Interior } from '../lib/haroolife/city/life'
 import { SHAPE_MATERIALS, footprintOf, shapeOf } from '../lib/haroolife/city/prop-shapes'
-import { resolveRenderer, resolveStreet } from '../lib/haroolife/engine/select'
+import { resolveRenderer } from '../lib/haroolife/engine/select'
 
 describe('renderer selection', () => {
   it('defaults to the HarooLife engine (house), React Three Fiber for the other interiors', () => {
@@ -84,21 +84,5 @@ describe('shared prop shapes', () => {
     const bells = shapeOf('dumbbell-rack').filter((p) => p.t === 'cyl')
     assert.equal(bells.length, 15)
     assert.ok(bells.every((b) => b.t === 'cyl' && b.p[1] > 0.3))
-  })
-})
-
-describe('street engine selection', () => {
-  it('defaults to the HarooLife street; ?street=playcanvas is the remembered way back', () => {
-    assert.deepEqual(resolveStreet('', null), { street: 'haroo', remember: null })
-    assert.deepEqual(resolveStreet('?street=playcanvas', null), {
-      street: 'playcanvas',
-      remember: 'playcanvas',
-    })
-    assert.equal(resolveStreet('', 'playcanvas').street, 'playcanvas')
-    assert.deepEqual(resolveStreet('?street=haroo', 'playcanvas'), {
-      street: 'haroo',
-      remember: 'haroo',
-    })
-    assert.equal(resolveStreet('?street=x', 'y').street, 'haroo')
   })
 })

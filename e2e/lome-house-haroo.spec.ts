@@ -1,9 +1,6 @@
 import type { Page } from '@playwright/test'
 import { expect, openPlaces, test } from './lome-test'
 
-// The game as players get it now: the HarooLife street and its clear map.
-test.use({ street: 'haroo' })
-
 /**
  * Refonte, jalon 1: the house drawn by the HarooLife engine (imperative Three.js) on the normal
  * /haroolife. A clothed avatar walks the way the stick points (four directions and the
@@ -188,7 +185,7 @@ test('HarooLife house: walk, eat, sleep, save, leave and come back', async ({ pa
     await expect(page.locator('[data-hotspot]')).toHaveCount(0)
     await page.getByRole('button', { name: 'Entrer ou sortir' }).click()
     await houseReady(page)
-    expect(await page.locator('canvas').count(), 'street engine (paused) + house engine').toBe(2)
+    expect(await page.locator('canvas').count(), 'one engine at a time: the house only').toBe(1)
     await expect(page.locator('[data-hotspot]')).toHaveCount(7)
     gpu.push(
       await page.evaluate(() =>
@@ -304,8 +301,8 @@ test('HarooLife street and clear map: walk, places without overlap, sheet, route
       { timeout: 60000 },
     )
     .toMatchObject({ engine: 'haroo' })
-  // One engine draws the street: PlayCanvas is paused, no third canvas.
-  expect(await page.locator('canvas').count()).toBeLessThanOrEqual(2)
+  // One engine draws the street: one canvas.
+  expect(await page.locator('canvas').count()).toBe(1)
 
   // Screen up walks away from the camera, facing forward.
   const a = (await player()) as Player
@@ -514,7 +511,7 @@ test('HarooLife street taxi: walk to it, get in, drive, brake, get out', async (
   await expect
     .poll(async () => (await me())?.vehicle?.speed ?? 0, { timeout: 8000 })
     .toBeGreaterThan(2)
-  // Keep the throttle a moment at speed (as the PlayCanvas taxi spec, 2.5 s in all).
+  // Keep the throttle a moment at speed (2.5 s in all).
   await page.waitForTimeout(1200)
   await page.screenshot({ path: testInfo.outputPath('haroo-taxi-driving.png') })
   await page.keyboard.up('ArrowUp')

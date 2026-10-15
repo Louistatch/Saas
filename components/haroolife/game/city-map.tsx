@@ -152,7 +152,11 @@ export default function CityMap({
         // A place or a button: let its click through (no pan, no pointer capture).
         if ((e.target as HTMLElement).closest('button')) return
         pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
-        ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+        try {
+          ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+        } catch {
+          /* a pointer the browser no longer tracks: the gesture still works without capture */
+        }
         if (pointers.current.size === 2) {
           const [a, b] = [...pointers.current.values()]
           pinch.current = { d: Math.hypot(a.x - b.x, a.y - b.y), k: view.k }

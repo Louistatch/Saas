@@ -225,3 +225,29 @@ La nouvelle rue couvre maintenant ce que l'ancienne faisait : les panneaux, les 
 La ville PlayCanvas se fixe 160 000 triangles au niveau de qualité le plus bas (téléphones) : la rue reste en dessous.
 
 Les volumes stylisés restent le repli honnête si le pack ne se charge pas.
+
+---
+
+# PlayCanvas retiré de la rue
+
+La rue, sa carte et la scène de trajet ne chargent plus PlayCanvas. Chaque scène a son propre moteur HarooLife (Three.js impératif), son propre canvas, et une seule est montée à la fois.
+
+| Scène | Avant | Maintenant |
+|---|---|---|
+| Rue | `StreetWorld`, avec l'application PlayCanvas en pause et masquée derrière (2 canvas) | `StreetWorld` seul (1 canvas) |
+| Carte | Carte SVG, avec l'application PlayCanvas en pause derrière | Carte SVG seule, sans scène 3D |
+| Trajet (« Trajet en cours ») | `Ride` dessiné par PlayCanvas | `RideWorld` (`lib/haroolife/game/render/ride-world.ts`) : boulevard, lampadaires, enclos, circulation dépassée, pluie réelle |
+| Intérieurs | Moteur HarooLife (défaut) ou R3F (`?engine=three`) | Inchangé |
+| Intérieurs `?engine=playcanvas` | Dans l'application de la rue | Module à part (`components/haroolife/city/playcanvas-interior.tsx`), chargé seulement sur ce choix |
+
+- **Moteur PlayCanvas.** Son fragment (environ 2,1 Mo) n'est téléchargé que pour les intérieurs `?engine=playcanvas`.
+- **Commutateur retiré.** `?street=` et le stockage `haroolife.street` n'existent plus : il n'y a qu'une rue.
+- **Code PlayCanvas propre à la rue supprimé** : `player-rig.tsx`, `billboards-3d.tsx`, `remote-players.tsx`, ainsi que les morceaux internes de `city-world.tsx` (chunks, piétons, étiquettes projetées, colonne de zoom, gestes sur le canvas, taxi PlayCanvas).
+  - Les fichiers encore importés par l'ancienne page `lome-life.tsx` (`city-chunks.tsx`, `city-world-3d.tsx`, `travel-scene-3d.tsx` pour `RideOverlay`) restent en place.
+- **Sondes conservées pour les tests et le diagnostic.**
+  - `StreetWorld` publie `__LOME_PERF` / `__LOME_PERF_RESET` (images, appels de dessin, triangles, tâches longues, mémoire).
+  - `__LOME_CITY.chunks / buildings / tris / detailed` proviennent maintenant des tuiles de bâtiments : `chunks` = tuiles chargées, `tris` = triangles de ces tuiles.
+- **Jour et nuit.** La rue suit à nouveau l'heure du jeu (`daylight`), comme la ville PlayCanvas : fond et lumières baissent la nuit, la palette du prototype reste le jour.
+- **Panneaux.** Les poteaux et le cadre d'un panneau sont fusionnés en un seul maillage : 2 objets par support au lieu de 4.
+
+Les tests qui mesuraient la ville aérienne PlayCanvas mesurent maintenant le quartier autour du joueur. Au départ (cellule 48, 34), on compte 16 tuiles et 211 bâtiments, contre ≥ 20 chunks et ≥ 250 bâtiments avant. Les gestes de caméra (glisser, pincer, boutons de zoom) sont testés sur la carte SVG.

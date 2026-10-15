@@ -2,303 +2,40 @@
 
 import type { AdCampaign, AdPlacement } from '@/lib/haroolife/ads/campaigns'
 import type { ExposureTracker } from '@/lib/haroolife/ads/exposure'
-import { STREET_SCALE, adultFor } from '@/lib/haroolife/city/avatar-catalogue'
-import { releaseEntity } from '@/lib/haroolife/city/gpu'
 import { type Npc, type NpcAnim, type Prop, layoutFor } from '@/lib/haroolife/city/interiors'
 import type { Interior } from '@/lib/haroolife/city/life'
 import { LOCALITIES, type LocalityId } from '@/lib/haroolife/city/locality'
-import {
-  FrameRing,
-  type PerfSnapshot,
-  bump,
-  renders,
-  watchLongTasks,
-} from '@/lib/haroolife/city/perf'
-import {
-  type CameraRig,
-  FOLLOW_DISTANCE,
-  type InputState,
-  MAP_DISTANCE,
-  type PlayerController,
-} from '@/lib/haroolife/city/player'
-import { PRESETS, type Quality, renderPixelRatio } from '@/lib/haroolife/city/quality'
-import { type Agent, TRAFFIC_STEP_MS, agentsNear } from '@/lib/haroolife/city/traffic'
-import {
-  CATEGORY_OF,
-  CELL,
-  type Category,
-  ESTATE,
-  type Lot,
-  SIZE_HINT,
-  TYPE_ICONS,
-  WORLD_H,
-  WORLD_W,
-  inEstate,
-  landmarks,
-  lotById,
-  worldLots,
-} from '@/lib/haroolife/city/world'
-import type { StreetEngine } from '@/lib/haroolife/engine/select'
+import { bump } from '@/lib/haroolife/city/perf'
+import type { InputState, PlayerController } from '@/lib/haroolife/city/player'
+import { type Quality, renderPixelRatio } from '@/lib/haroolife/city/quality'
+import { type Category, ESTATE, type Lot, inEstate, lotById } from '@/lib/haroolife/city/world'
 import type { RendererId } from '@/lib/haroolife/engine/types'
+import type { StreetPoseFeed, StreetStats } from '@/lib/haroolife/game/render/street-world'
 import type { Transport } from '@/lib/haroolife/lome-life-engine'
-import type { PlacedResident } from '@/lib/haroolife/lome-presence'
 import type { PresenceEntry } from '@/lib/haroolife/realtime/protocol'
-import type { BuildType, City } from '@/lib/haroolife/townsmen-engine'
+import type { City } from '@/lib/haroolife/townsmen-engine'
 /**
- * The city of Lomé in 3D: streamed chunks of real buildings, the player's estate embedded
- * at its world offset, vehicles and pedestrians on real routes, day and night, the player,
- * a free aerial camera (drag to pan, pinch or buttons to zoom, Q/E or button to rotate),
- * ground picking, the selected place highlighted on the ground, and named place labels
- * projected over the canvas. Interiors and rides replace the city view in the same
- * PlayCanvas application.
+ * The game's scene, by situation: the street around the player, the clear map, a trip, or an
+ * interior. Every one is drawn by the HarooLife engine (imperative Three.js), each in its own
+ * chunk and canvas, one at a time. PlayCanvas is only kept as the way back for interiors
+ * (`?engine=playcanvas`), in its own chunk: the street and its map never load it.
  */
-import { Application, Entity, Gltf } from '@playcanvas/react'
-import { Camera, Light, Render } from '@playcanvas/react/components'
-import { useApp, useAppEvent, useModel } from '@playcanvas/react/hooks'
-import { Compass, Maximize2, Minus, Plus, RotateCcw } from 'lucide-react'
 import dynamic from 'next/dynamic'
-import * as pc from 'playcanvas'
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ESTATE_ASSETS, EstateTiles } from '../city-world-3d'
-import { Ride } from '../travel-scene-3d'
-import Billboards from './billboards-3d'
-import { Character } from './character'
-import CityChunks, { type ChunkStats, cellOf, worldPos } from './city-chunks'
-import InteriorScene from './interior-scene'
-import { type Bank, bakedMaterial, loadBank, meshFor } from './model-bank'
-import PlayerRig from './player-rig'
-import RemotePlayers, { type PoseFeed } from './remote-players'
-import { playCanvasProbe } from './scene-probe'
-import { useMaterial } from './use-material'
+import { useMemo } from 'react'
 
 export { CAMERA_HOME, type CameraState } from '@/lib/haroolife/city/geometry'
 import type { CameraState } from '@/lib/haroolife/city/geometry'
-/** The camera entity's initial transform; the player rig moves it every frame afterwards. */
-const CAMERA_START: [number, number, number] = [0, 20, 20]
-const CAMERA_START_ROT: [number, number, number] = [-45, 0, 0]
-type EditTool = BuildType | 'inspect' | 'demolish'
-/** The player's own look (a Kenney Mini Character). */
-// React Three Fiber interior (behind ?engine=three): its own chunk, never downloaded otherwise.
+
+// Each renderer is its own chunk, downloaded when its scene is first shown.
 const InteriorThree = dynamic(() => import('../engine-three/interior-three'), { ssr: false })
+const PlayCanvasInterior = dynamic(() => import('./playcanvas-interior'), { ssr: false })
 const HarooRoomView = dynamic(() => import('../game/haroo-room-view'), { ssr: false })
 const HarooStreetView = dynamic(() => import('../game/haroo-street-view'), { ssr: false })
+const HarooRideView = dynamic(() => import('../game/haroo-ride-view'), { ssr: false })
 const CityMap = dynamic(() => import('../game/city-map'), { ssr: false })
 
+/** The player's own look (a Kenney Mini Character). */
 export const PLAYER_MODEL = 'afi'
-
-function Model({
-  url,
-  position,
-  scale = 1,
-  rotation = 0,
-}: {
-  url: string
-  position: [number, number, number]
-  scale?: number
-  rotation?: number
-}) {
-  const { asset } = useModel(url)
-  if (!asset) return null
-  return (
-    <Entity position={position} rotation={[0, rotation, 0]} scale={[scale, scale, scale]}>
-      <Gltf asset={asset} />
-    </Entity>
-  )
-}
-
-function useBank(): Bank | null {
-  const [bank, setBank] = useState<Bank | null>(null)
-  useEffect(() => {
-    let alive = true
-    loadBank()
-      .then((b) => alive && setBank(b))
-      .catch(() => undefined)
-    return () => {
-      alive = false
-    }
-  }, [])
-  return bank
-}
-
-/** One baked model as its own entity (vehicles): shares the pack's GPU mesh. */
-function Baked({
-  model,
-  position,
-  rotation = 0,
-  scale = 1,
-  name,
-  onEntity,
-}: {
-  model: string
-  position: [number, number, number]
-  rotation?: number
-  scale?: number
-  name?: string
-  onEntity?: (e: pc.Entity | null) => void
-}) {
-  const app = useApp()
-  const bank = useBank()
-  const ref = useRef<pc.Entity | null>(null)
-  useEffect(() => {
-    if (!app || !bank) return
-    const e = new pc.Entity(name ?? model)
-    e.addComponent('render', {
-      meshInstances: [
-        new pc.MeshInstance(meshFor(app.graphicsDevice, bank, model), bakedMaterial()),
-      ],
-    })
-    app.root.addChild(e)
-    ref.current = e
-    onEntity?.(e)
-    return () => {
-      onEntity?.(null)
-      releaseEntity(e)
-      ref.current = null
-    }
-  }, [app, bank, model, name, onEntity])
-  useEffect(() => {
-    const e = ref.current
-    if (!e) return
-    e.setLocalPosition(position[0], position[1], position[2])
-    e.setLocalEulerAngles(0, rotation, 0)
-    e.setLocalScale(scale, scale, scale)
-  })
-  return null
-}
-
-/** Where an agent's figure sits relative to its road cell (lane side, kerb). */
-function agentOffset(a: Agent): [number, number, number] {
-  if (a.kind === 'walker') return [0.42, 0.04, 0.42]
-  if (a.kind === 'zem') return [-0.25, 0.05, 0]
-  return a.fx !== 0 ? [0, 0.02, 0.26 * Math.sign(a.fx)] : [-0.26 * Math.sign(a.fy || 1), 0.02, 0]
-}
-
-/**
- * Vehicles and pedestrians. React only decides who exists (once per traffic step); the
- * smooth motion between steps is applied imperatively to the entities every frame, so no
- * component re-renders per frame. Only the nearest pedestrians are skinned and animated;
- * the others are static baked figures.
- */
-const Agents = memo(function Agents({
-  agents,
-  step,
-  animated,
-}: { agents: Agent[]; step: number; animated: Set<number> }) {
-  bump('agents')
-  const last = useRef({ step, at: performance.now() })
-  if (last.current.step !== step) last.current = { step, at: performance.now() }
-  const entities = useRef(new Map<number, pc.Entity>())
-  const byId = useRef(new Map<number, Agent>())
-  byId.current = new Map(agents.map((a) => [a.id, a]))
-  const registrars = useRef(new Map<number, (e: pc.Entity | null) => void>())
-  const register = (id: number) => {
-    let fn = registrars.current.get(id)
-    if (!fn) {
-      fn = (e: pc.Entity | null) => {
-        if (e) entities.current.set(id, e)
-        else entities.current.delete(id)
-      }
-      registrars.current.set(id, fn)
-    }
-    return fn
-  }
-  useAppEvent('update', () => {
-    const k = Math.min(1, (performance.now() - last.current.at) / TRAFFIC_STEP_MS)
-    for (const [id, e] of entities.current) {
-      const a = byId.current.get(id)
-      if (!a) continue
-      // Walkers spread one cell over `steps` traffic steps.
-      const p = a.steps ? (Math.min(a.sub ?? 0, a.steps - 1) + k) / a.steps : k
-      const pos = worldPos(a.x + a.fx * p, a.y + a.fy * p)
-      const off = agentOffset(a)
-      e.setLocalPosition(pos[0] + off[0], off[1], pos[2] + off[2])
-    }
-  })
-  return (
-    <>
-      {agents.map((a) => {
-        const base = worldPos(a.x, a.y)
-        const off = agentOffset(a)
-        const pos: [number, number, number] = [base[0] + off[0], off[1], base[2] + off[2]]
-        if (a.kind === 'walker')
-          return (
-            <Character
-              key={a.id}
-              name={`piéton ${a.id}`}
-              model={adultFor(a.model ?? 'character-male-a')}
-              position={pos}
-              rotation={a.heading}
-              anim={animated.has(a.id) ? (a.activity === 'run' ? 'run' : 'walk') : 'rest'}
-              active={animated.has(a.id)}
-              scale={STREET_SCALE}
-              groundSpeed={
-                animated.has(a.id) ? (CELL * 1000) / (TRAFFIC_STEP_MS * (a.steps ?? 1)) : undefined
-              }
-              onEntity={register(a.id)}
-            />
-          )
-        if (a.kind === 'zem')
-          return (
-            <Character
-              key={a.id}
-              name={`zémidjan ${a.id}`}
-              model={adultFor('character-male-b')}
-              position={pos}
-              rotation={a.heading}
-              anim="rest"
-              scale={STREET_SCALE}
-              active={animated.has(a.id)}
-              onEntity={register(a.id)}
-            />
-          )
-        return (
-          <Baked
-            key={a.id}
-            name={`véhicule ${a.kind}`}
-            model={a.kind}
-            position={pos}
-            rotation={a.heading + 180}
-            scale={0.36}
-            onEntity={register(a.id)}
-          />
-        )
-      })}
-    </>
-  )
-})
-
-/** Applies the quality preset's render resolution to the device. */
-function QualityController({ quality }: { quality: Quality }) {
-  const app = useApp()
-  useEffect(() => {
-    if (!app) return
-    app.graphicsDevice.maxPixelRatio = renderPixelRatio(quality)
-    // Never app.resizeCanvas() here: this child effect runs before the wrapper sets the fill
-    // mode, and the engine's default (keep aspect of the 300×150 canvas) would pin the inline
-    // style to a 2:1 strip. The CSS size stays 100 %, only the backbuffer follows the preset.
-    const canvas = app.graphicsDevice.canvas
-    canvas.style.width = '100%'
-    canvas.style.height = '100%'
-    app.updateCanvasSize()
-  }, [app, quality])
-  return null
-}
-
-const EstateTilesMemo = memo(EstateTiles)
-
-/** A glowing plate under the selected place. */
-function SelectionRing({
-  position,
-  w,
-  d,
-}: { position: [number, number, number]; w: number; d: number }) {
-  const ring = useMaterial({ diffuse: '#34d399', emissive: '#10b981', gloss: 0.4 })
-  return (
-    <Entity name="Sélection" position={position} scale={[w, 0.02, d]}>
-      <Render type="box" material={ring} />
-    </Entity>
-  )
-}
 
 /** Sun, sky and ambient light for an hour of the day. */
 export function daylight(hour: number) {
@@ -339,394 +76,14 @@ export function daylight(hour: number) {
 }
 type double = number
 
-function Ambient({ color }: { color: string }) {
-  const app = useApp()
-  useEffect(() => {
-    if (!app) return
-    app.scene.ambientLight = new pc.Color().fromString(color)
-  }, [app, color])
-  return null
-}
-
-/** Pointer handling on the canvas: drag pans, pinch zooms, tap picks a world cell. */
-function Picker({
-  camera,
-  onPan,
-  onOrbit,
-  onZoom,
-  onTap,
-}: {
-  camera: CameraState
-  onPan: (dx: number, dz: number) => void
-  /** Single-finger drag while following the player: rotates the camera, vertical zooms. Returns false to pan instead. */
-  onOrbit: (dxPixels: number, dyPixels: number) => boolean
-  onZoom: (factor: number) => void
-  onTap: (cell: { x: number; y: number }) => void
-}) {
-  const app = useApp()
-  const cam = useRef(camera)
-  cam.current = camera
-  // Camera sync happens while dragging. Keep the listeners and the active pointer gesture
-  // alive across those renders; only their callbacks change.
-  const actions = useRef({ onPan, onOrbit, onZoom, onTap })
-  actions.current = { onPan, onOrbit, onZoom, onTap }
-  // Pending pan since the last React commit: applied to the camera entity every frame,
-  // handed to React at most every 120 ms (and when the finger lifts).
-  const pending = useRef({ dx: 0, dz: 0, since: 0 })
-  const flush = useCallback(() => {
-    const p = pending.current
-    if (p.dx === 0 && p.dz === 0) return
-    pending.current = { dx: 0, dz: 0, since: 0 }
-    actions.current.onPan(p.dx, p.dz)
-  }, [])
-  useAppEvent('update', () => {
-    const p = pending.current
-    if (!app || (p.dx === 0 && p.dz === 0)) return
-    if (performance.now() - p.since > 60) flush()
-  })
-  useEffect(() => {
-    if (!app) return
-    const canvas = app.graphicsDevice.canvas as HTMLCanvasElement
-    const pointers = new Map<number, { x: number; y: number }>()
-    let moved = false
-    let startDist = 0
-    let last: { x: number; y: number } | null = null
-    const down = (e: PointerEvent) => {
-      if (e.pointerType === 'mouse' && e.button !== 0) return
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
-      if (pointers.size === 1) {
-        moved = false
-        last = { x: e.clientX, y: e.clientY }
-      } else if (pointers.size === 2) {
-        const [a, b] = [...pointers.values()]
-        startDist = Math.hypot(a.x - b.x, a.y - b.y)
-        moved = true
-      }
-    }
-    const move = (e: PointerEvent) => {
-      if (!pointers.has(e.pointerId)) return
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
-      if (pointers.size === 2) {
-        const [a, b] = [...pointers.values()]
-        const d = Math.hypot(a.x - b.x, a.y - b.y)
-        if (startDist > 0 && Math.abs(d - startDist) > 6) {
-          actions.current.onZoom(startDist / d)
-          startDist = d
-        }
-        moved = true
-        return
-      }
-      if (!last) return
-      const dx = e.clientX - last.x
-      const dy = e.clientY - last.y
-      if (!moved && Math.hypot(dx, dy) < 7) return
-      moved = true
-      last = { x: e.clientX, y: e.clientY }
-      if (actions.current.onOrbit(dx, dy)) return
-      // Screen drag → ground drag, rotated by the camera azimuth and scaled with distance.
-      const k = cam.current.distance / 520
-      const a = (cam.current.angle * Math.PI) / 180
-      const gx = -(dx * Math.cos(a) - dy * Math.sin(a)) * k
-      const gz = -(dx * Math.sin(a) + dy * Math.cos(a)) * k
-      const p = pending.current
-      if (p.dx === 0 && p.dz === 0) p.since = performance.now()
-      p.dx += gx
-      p.dz += gz
-    }
-    const up = (e: PointerEvent) => {
-      // A tap on a place icon, drawer or joystick never started on this canvas.
-      if (!pointers.has(e.pointerId)) return
-      const wasSingle = pointers.size === 1
-      pointers.delete(e.pointerId)
-      flush()
-      if (!wasSingle || moved) {
-        last = pointers.size === 1 ? [...pointers.values()][0] : null
-        return
-      }
-      last = null
-      const camEntity = app.root.findByName('CityCamera') as pc.Entity | null
-      const cc = camEntity?.camera
-      if (!cc) return
-      const rect = canvas.getBoundingClientRect()
-      // CameraComponent uses CSS pixels (device.clientRect), not the render backbuffer.
-      const sx = e.clientX - rect.left
-      const sy = e.clientY - rect.top
-      const from = cc.screenToWorld(sx, sy, cc.nearClip)
-      const to = cc.screenToWorld(sx, sy, cc.farClip)
-      const dir = new pc.Vec3().sub2(to, from)
-      if (Math.abs(dir.y) < 1e-6) return
-      const t = -from.y / dir.y
-      if (t < 0) return
-      const hit = new pc.Vec3().copy(dir).mulScalar(t).add(from)
-      actions.current.onTap(cellOf(hit.x, hit.z))
-    }
-    const cancel = (e: PointerEvent) => {
-      if (!pointers.has(e.pointerId)) return
-      pointers.delete(e.pointerId)
-      moved = true
-      last = pointers.size === 1 ? [...pointers.values()][0] : null
-      flush()
-    }
-    const wheel = (e: WheelEvent) => {
-      e.preventDefault()
-      actions.current.onZoom(Math.exp(Math.max(-0.2, Math.min(0.2, e.deltaY * 0.001))))
-    }
-    canvas.addEventListener('pointerdown', down)
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
-    window.addEventListener('pointercancel', cancel)
-    canvas.addEventListener('wheel', wheel, { passive: false })
-    return () => {
-      canvas.removeEventListener('pointerdown', down)
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-      window.removeEventListener('pointercancel', cancel)
-      canvas.removeEventListener('wheel', wheel)
-    }
-  }, [app, flush])
-  return null
-}
-
-/** Projects place labels onto the overlay each frame, without React re-renders. */
-function LabelProjector({
-  overlay,
-  lots,
-  names,
-}: { overlay: React.RefObject<HTMLDivElement | null>; lots: Lot[]; names: boolean }) {
-  const app = useApp()
-  const tmp = useRef(new pc.Vec3())
-  const at = useRef(new pc.Vec3())
-  // Per-frame work stays cheap: the camera is looked up once (again only if it left the scene) and
-  // the canvas rectangle is re-read on resize, not with a forced layout every frame.
-  const cam = useRef<pc.Entity | null>(null)
-  const rect = useRef<DOMRect | null>(null)
-  // Measured label sizes (they change only with the names switch).
-  const sizes = useRef(new WeakMap<HTMLElement, { w: number; h: number }>())
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a new names state = new sizes
-  useEffect(() => {
-    sizes.current = new WeakMap()
-  }, [names, lots])
-  useEffect(() => {
-    const drop = () => {
-      rect.current = null
-    }
-    window.addEventListener('resize', drop)
-    window.addEventListener('orientationchange', drop)
-    return () => {
-      window.removeEventListener('resize', drop)
-      window.removeEventListener('orientationchange', drop)
-    }
-  }, [])
-  useAppEvent('update', () => {
-    if (!app || !overlay.current) return
-    if (!cam.current?.camera || !cam.current.parent)
-      cam.current = app.root.findByName('CityCamera') as pc.Entity | null
-    const cc = cam.current?.camera
-    if (!cc) return
-    const canvas = app.graphicsDevice.canvas as HTMLCanvasElement
-    if (!rect.current || rect.current.width === 0) rect.current = canvas.getBoundingClientRect()
-    const r = rect.current
-    const children = overlay.current.children
-    // Project every label, then place them by priority (the selected place first, then the
-    // nearest to the screen centre): a label that would overlap one already placed is hidden.
-    // A higher z-index does not solve a collision; hiding does. Names are capped at eight.
-    const items: { el: HTMLElement; x: number; y: number; pri: number }[] = []
-    for (let i = 0; i < children.length; i++) {
-      const el = children[i] as HTMLElement
-      const lot = lots[i]
-      if (!lot) continue
-      const [px, , pz] = worldPos(lot.x + (lot.w - 1) / 2, lot.y + (lot.h - 1) / 2)
-      const h = 0.6 + lot.floors * 0.5 + 0.9
-      const p = cc.worldToScreen(at.current.set(px, h, pz), tmp.current)
-      const x = p.x
-      const y = p.y
-      // Inside the map area: below the top bars, above the bottom navigation, off the edges.
-      const visible = p.z > 0 && x >= 24 && y >= 200 && x <= r.width - 24 && y <= r.height - 110
-      if (!visible) {
-        el.style.display = 'none'
-        continue
-      }
-      const d = Math.hypot(x - r.width / 2, y - r.height / 2)
-      items.push({ el, x, y, pri: (el.dataset.priority === '1' ? -1e6 : 0) + d })
-    }
-    items.sort((a, b) => a.pri - b.pri)
-    // Reserve the compact camera toolbar as well as other labels.
-    const placed: [number, number, number, number][] = [
-      [r.width - 64, r.height * 0.38, r.width - 8, r.height * 0.38 + 250],
-    ]
-    let shownNames = 0
-    for (const it of items) {
-      let size = sizes.current.get(it.el)
-      if (!size) {
-        it.el.style.display = ''
-        size = { w: it.el.offsetWidth || 44, h: it.el.offsetHeight || 44 }
-        sizes.current.set(it.el, size)
-      }
-      // Long names must fit inside the viewport, not merely have an anchor inside it.
-      it.x = Math.max(8 + size.w / 2, Math.min(r.width - 8 - size.w / 2, it.x))
-      it.y = Math.max(200 + size.h, it.y)
-      const box: [number, number, number, number] = [
-        it.x - size.w / 2,
-        it.y - size.h,
-        it.x + size.w / 2,
-        it.y,
-      ]
-      const hit = placed.some(
-        (b) => box[0] < b[2] + 4 && box[2] > b[0] - 4 && box[1] < b[3] + 4 && box[3] > b[1] - 4,
-      )
-      const tooManyNames = names && it.el.dataset.priority !== '1' && shownNames >= 8
-      if (hit || tooManyNames) {
-        it.el.style.display = 'none'
-        continue
-      }
-      placed.push(box)
-      if (names) shownNames++
-      it.el.style.display = ''
-      it.el.style.transform = `translate(${Math.round(it.x)}px, ${Math.round(it.y)}px) translate(-50%, -100%)`
-    }
-  })
-  return null
-}
-
-/** Frame statistics for the debug hook, the statistics overlay and the e2e performance scenarios. */
-function StatsProbe({
-  onFrame,
-  paused,
-}: {
-  onFrame: (s: { drawCalls: number; fps: number }) => void
-  /** Another renderer is on screen: it publishes the stats and the scene probe meanwhile. */
-  paused: boolean
-}) {
-  const app = useApp()
-  const last = useRef(0)
-  const ring = useRef(new FrameRing(600))
-  // One observer for the probe's lifetime. `useRef(watchLongTasks())` evaluated its argument on
-  // every render and leaked a new, never-disconnected PerformanceObserver each time.
-  const tasks = useRef<ReturnType<typeof watchLongTasks> | null>(null)
-  useEffect(() => {
-    const t = watchLongTasks()
-    tasks.current = t
-    return () => {
-      t.stop()
-      tasks.current = null
-    }
-  }, [])
-  useEffect(() => {
-    if (!app || paused) return
-    const w = window as unknown as {
-      __LOME_PERF_RESET?: () => void
-      __LOME_APP?: unknown
-      __LOME_SCENE?: unknown
-    }
-    w.__LOME_PERF_RESET = () => ring.current.reset()
-    // Debugging only: tests read the engine-neutral __LOME_SCENE.
-    w.__LOME_APP = app
-    w.__LOME_SCENE = playCanvasProbe(app)
-    return () => {
-      w.__LOME_PERF_RESET = undefined
-      w.__LOME_APP = undefined
-      w.__LOME_SCENE = undefined
-    }
-  }, [app, paused])
-  const prev = useRef(0)
-  useAppEvent('update', () => {
-    if (!app || paused) {
-      prev.current = 0
-      return
-    }
-    const now = performance.now()
-    if (prev.current) ring.current.push(now - prev.current)
-    prev.current = now
-    if (now - last.current < 500) return
-    last.current = now
-    const stats = app.stats as unknown as {
-      drawCalls: { total: number }
-      frame: { fps: number; triangles: number }
-    }
-    let renderEntities = 0
-    let meshInstances = 0
-    let animated = 0
-    let animating = 0
-    let triangles = 0
-    app.root.forEach((e) => {
-      const ent = e as pc.Entity
-      if (ent.render) {
-        renderEntities++
-        const list = ent.render.meshInstances ?? []
-        meshInstances += list.length
-        for (const mi of list) {
-          if (!mi.visible || !ent.enabled) continue
-          const prim = mi.mesh?.primitive?.[0]
-          if (prim) triangles += Math.floor(prim.count / 3)
-        }
-      }
-      if (ent.anim) {
-        animated++
-        if (ent.anim.playing) animating++
-      }
-    })
-    const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory
-    const snap: PerfSnapshot = {
-      at: Math.round(now),
-      frame: ring.current.summary(),
-      drawCalls: stats.drawCalls.total,
-      triangles: Number.isFinite(stats.frame.triangles) ? stats.frame.triangles : triangles,
-      renderEntities,
-      meshInstances,
-      animated,
-      animating,
-      heapMB: mem ? Math.round(mem.usedJSHeapSize / 1048576) : null,
-      longTasks: tasks.current?.count() ?? 0,
-      longTaskMs: tasks.current?.totalMs() ?? 0,
-      renders: { ...renders },
-      assets: app.assets.list().filter((a) => a.loaded).length,
-      pixelRatio: app.graphicsDevice.maxPixelRatio,
-      resolution: [app.graphicsDevice.width, app.graphicsDevice.height],
-    }
-    ;(window as unknown as { __LOME_PERF?: PerfSnapshot }).__LOME_PERF = snap
-    onFrame({ drawCalls: snap.drawCalls, fps: snap.frame.fps })
-  })
-  return null
-}
-
-/**
- * While another renderer draws the scene, PlayCanvas stops rendering frames (its context and
- * loaded city stay, so coming back is instant).
- */
-function PauseRendering({ paused }: { paused: boolean }) {
-  const app = useApp()
-  useEffect(() => {
-    if (!app || !paused) return
-    const before = app.autoRender
-    app.autoRender = false
-    app.renderNextFrame = false
-    // Hidden too: the browser would otherwise composite two full-screen canvases every frame
-    // (measured: about a quarter of the frame time on a software renderer).
-    const canvas = app.graphicsDevice.canvas as HTMLCanvasElement
-    canvas.style.visibility = 'hidden'
-    return () => {
-      app.autoRender = before
-      app.renderNextFrame = true
-      canvas.style.visibility = ''
-    }
-  }, [app, paused])
-  return null
-}
-
 export default function CityWorld({
   city,
-  tool,
-  selected,
   onTile,
   controller,
   onPlayerEvents,
-  onCameraSync,
-  hasVehicle,
   avatarModel = PLAYER_MODEL,
   avatarPagne,
   camera,
-  onCamera,
-  step,
   hour,
   interior,
   interiorTitle,
@@ -736,13 +93,10 @@ export default function CityWorld({
   onTalk,
   onNotice,
   ride,
-  visitors,
-  onBillboard,
   onCell,
   onLotIcon,
   filter,
   selectedLot,
-  labelsHidden,
   showNames = false,
   onStats,
   onFrame,
@@ -751,29 +105,22 @@ export default function CityWorld({
   remoteFeed,
   remotePresent,
   ads,
-  renderer = 'playcanvas',
-  street = 'haroo',
+  renderer = 'haroo',
   input,
   onLeave,
   mapView = false,
-  onOverview,
-  onFollow,
 }: {
   city: City
-  tool: EditTool
-  selected: { x: number; y: number } | null
+  /** A cell of the player's estate was touched (local coordinates). */
   onTile: (x: number, y: number) => void
-  /** The continuous player controller: avatar, camera rig and vehicle are driven from it. */
+  /** The continuous player controller: the street engine steps it and draws the player. */
   controller: PlayerController
   onPlayerEvents: (events: ReturnType<PlayerController['drain']>, c: PlayerController) => void
-  onCameraSync: (cam: CameraRig) => void
-  /** Whether the player's taxi exists in this town. */
-  hasVehicle: boolean
   /** The player's chosen look: Kenney model and pagne colour (also used indoors). */
   avatarModel?: string
   avatarPagne?: string
   /** Other players in this locality (realtime relay), interpolated between snapshots. */
-  remoteFeed?: PoseFeed
+  remoteFeed?: StreetPoseFeed
   remotePresent?: PresenceEntry[]
   /** Street billboards (M2): campaigns, exposure statistics, the support the player stands by. */
   ads?: {
@@ -781,10 +128,8 @@ export default function CityWorld({
     tracker: ExposureTracker
     onNear: (p: { placement: AdPlacement; campaign: AdCampaign } | null) => void
   }
-  /** Low-rate camera state (chunk streaming, labels); the rig moves the real camera. */
+  /** Camera state of the game (the interiors' viewing angle). */
   camera: CameraState
-  onCamera: (c: CameraState) => void
-  step: number
   hour: number
   interior: Interior | null
   interiorTitle: string
@@ -795,164 +140,34 @@ export default function CityWorld({
   onTalk?: (npc: Npc) => void
   onNotice?: (message: string) => void
   ride: { transport: Transport; rain: boolean } | null
-  visitors: PlacedResident[]
-  onBillboard: (id: string) => void
   onCell: (cell: { x: number; y: number }) => void
   onLotIcon: (lot: Lot) => void
   filter: Category | 'all'
   selectedLot: Lot | null
-  labelsHidden: boolean
   /** Map view: write every place's name (by priority, without overlaps); off by default. */
   showNames?: boolean
-  onStats?: (s: ChunkStats) => void
+  /** Building tiles loaded around the player (chunks, buildings, triangles). */
+  onStats?: (s: StreetStats) => void
   onFrame?: (s: { drawCalls: number; fps: number }) => void
   quality?: Quality
   /** Town on screen; the estate is drawn only where it exists (Lomé). */
   locality?: LocalityId
-  /** Renderer for the scenes it supports (interiors for 'three'); PlayCanvas draws the rest. */
+  /** Renderer of the interiors: the HarooLife engine, React Three Fiber or PlayCanvas. */
   renderer?: RendererId
-  /** Engine of the street and its map (`haroo`: the HarooLife engine and the clear map). */
-  street?: StreetEngine
   /** Joystick and keyboard input, read by renderers that let the player walk indoors. */
   input?: InputState
-  /** Leave the current building (walking out of the door in the 'three' interior). */
+  /** Leave the current building (walking out of the door in the Three interiors). */
   onLeave?: () => void
   mapView?: boolean
-  onOverview?: () => void
-  onFollow?: () => void
 }) {
   bump('world')
   const hasEstate = LOCALITIES[locality].estate !== null
-  const preset = PRESETS[quality]
-  // Antialiasing is fixed when the WebGL context is created. Keying the Application on it rebuilt
-  // the whole context (chunks, models, shaders) exactly when the quality governor stepped down
-  // on a struggling phone; the governor now only changes resolution and detail.
-  const [antialias] = useState(preset.antialias)
-  const overlay = useRef<HTMLDivElement | null>(null)
-  const dragging = useRef(false)
-  const centerCell = useMemo(() => cellOf(camera.tx, camera.tz), [camera.tx, camera.tz])
-  const agents = useMemo(
-    () => agentsNear(step, centerCell.x, centerCell.y, preset.vehicleRadius, preset.maxWalkers),
-    [step, centerCell.x, centerCell.y, preset.vehicleRadius, preset.maxWalkers],
-  )
-  // Skinned animation budget: the pedestrians and riders nearest the camera target.
-  const animated = useMemo(() => {
-    const movers = agents
-      .filter((a) => a.kind === 'walker' || a.kind === 'zem')
-      .map((a) => ({ id: a.id, d: Math.hypot(a.x - centerCell.x, a.y - centerCell.y) }))
-      .sort((a, b) => a.d - b.d)
-      .slice(0, preset.maxAnimated)
-    return new Set(movers.map((m) => m.id))
-  }, [agents, centerCell.x, centerCell.y, preset.maxAnimated])
-  // Stable callbacks so the memoised estate does not re-render on every HUD change.
-  const onTileRef = useRef(onTile)
-  onTileRef.current = onTile
-  const stableOnTile = useCallback((x: number, y: number) => onTileRef.current(x, y), [])
-  const onBillboardRef = useRef(onBillboard)
-  onBillboardRef.current = onBillboard
-  const stableOnBillboard = useCallback((id: string) => onBillboardRef.current(id), [])
-  const labels = useMemo(() => {
-    const source = filter === 'homes' || filter === 'lots' ? worldLots() : landmarks()
-    const all = source.filter((l) => filter === 'all' || CATEGORY_OF[l.type] === filter)
-    if (selectedLot && !all.some((l) => l.id === selectedLot.id)) all.unshift(selectedLot)
-    const radius = camera.distance < 40 ? 20 : 30
-    // The nearest places first: the projector then keeps those that fit on screen.
-    return all
-      .filter(
-        (l) => Math.abs(l.x - centerCell.x) < radius && Math.abs(l.y - centerCell.y) < radius * 0.8,
-      )
-      .sort(
-        (a, b) =>
-          (a.id === selectedLot?.id ? -1e6 : Math.hypot(a.x - centerCell.x, a.y - centerCell.y)) -
-          (b.id === selectedLot?.id ? -1e6 : Math.hypot(b.x - centerCell.x, b.y - centerCell.y)),
-      )
-      .slice(0, camera.distance < 40 ? 24 : 16)
-    // biome-ignore lint/correctness/useExhaustiveDependencies: landmarks() reads the active locality
-  }, [centerCell.x, centerCell.y, filter, camera.distance, locality, selectedLot])
-  // The aerial map is a readable territory guide; the street keeps the game's day/night cycle.
   const light = useMemo(() => daylight(mapView ? 10 : hour), [hour, mapView])
-
-  // Free camera (not following): drag pans the rig's target in ground units.
-  const onPan = useCallback(
-    (dx: number, dz: number) => {
-      dragging.current = true
-      const rig = controller.camera
-      rig.follow = false
-      rig.tx = Math.max(-5, Math.min(WORLD_W + 5, rig.tx + dx / CELL))
-      rig.tz = Math.max(-5, Math.min(WORLD_H + 5, rig.tz + dz / CELL))
-      const [tx, , tz] = worldPos(rig.tx, rig.tz)
-      onCamera({ ...camera, tx, tz })
-    },
-    [camera, onCamera, controller],
-  )
-  // Following the player: horizontal drag orbits, vertical drag zooms.
-  const onOrbit = useCallback(
-    (dx: number, dy: number) => {
-      const rig = controller.camera
-      if (!rig.follow) return false
-      rig.angle = (rig.angle - dx * 0.35 + 360) % 360
-      rig.distance = Math.max(7, Math.min(110, rig.distance * (1 + dy * 0.004)))
-      return true
-    },
-    [controller],
-  )
-  const onZoom = useCallback(
-    (f: number) => {
-      const rig = controller.camera
-      rig.distance = Math.max(7, Math.min(110, rig.distance * f))
-      onCamera({ ...camera, distance: rig.distance })
-    },
-    [camera, onCamera, controller],
-  )
-  const onTap = useCallback(
-    (cell: { x: number; y: number }) => {
-      if (interior || ride) return
-      // The estate ground is one mesh: route its taps to the estate handler (local cells).
-      if (inEstate(cell.x, cell.y)) {
-        onTileRef.current(cell.x - ESTATE.x0, cell.y - ESTATE.y0)
-        return
-      }
-      onCell(cell)
-    },
-    [interior, ride, onCell],
-  )
-  const canTap = useCallback(() => true, [])
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-      const k = e.key.toLowerCase()
-      if (k === 'q') controller.camera.angle = (controller.camera.angle + 315) % 360
-      else if (k === 'e') controller.camera.angle = (controller.camera.angle + 45) % 360
-      else if (k === '+' || k === '=') onZoom(0.8)
-      else if (k === '-') onZoom(1.25)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [controller, onZoom])
-
-  const vehicleEntity = useRef<pc.Entity | null>(null)
-  const registerVehicle = useCallback((e: pc.Entity | null) => {
-    vehicleEntity.current = e
-  }, [])
-  const vehicleStart = useMemo<[number, number, number]>(() => {
-    const v = controller.vehicle
-    const [x, , z] = v ? worldPos(v.x, v.z) : [0, 0, 0]
-    return [x, 0.02, z]
-    // biome-ignore lint/correctness/useExhaustiveDependencies: the rig moves the car afterwards
-  }, [hasVehicle])
-  const estateCenter = worldPos(ESTATE.x0 + (SIZE_HINT - 1) / 2, ESTATE.y0 + (SIZE_HINT - 1) / 2)
-  const scene = interior || ride
-  // Interiors drawn by Three.js (the HarooLife engine, or React Three Fiber with
-  // ?engine=three): PlayCanvas pauses and draws nothing underneath.
-  const threeInterior = renderer !== 'playcanvas' && Boolean(interior) && !ride && Boolean(input)
-  const harooRoom = threeInterior && renderer === 'haroo'
-  // The street drawn by the HarooLife engine (and its clear map): PlayCanvas pauses and its
-  // player rig is not mounted (the engine steps the same PlayerController instead).
-  const harooStreet = street === 'haroo' && !interior && !ride
-  const paused = threeInterior || harooStreet
-  const selPos = selectedLot
-    ? worldPos(selectedLot.x + (selectedLot.w - 1) / 2, selectedLot.y + (selectedLot.h - 1) / 2)
-    : null
+  const pixelRatio = renderPixelRatio(quality)
+  // Interiors walked with the joystick (HarooLife engine by default, React Three Fiber with
+  // ?engine=three); without input, or with ?engine=playcanvas, the PlayCanvas interior.
+  const walkable = renderer !== 'playcanvas' && Boolean(input)
+  const room = !ride && interior ? (walkable ? renderer : 'playcanvas') : null
 
   return (
     <div
@@ -960,121 +175,17 @@ export default function CityWorld({
       style={{ background: light.sky }}
       data-testid="city-world"
     >
-      <Application
-        graphicsDeviceOptions={{ antialias }}
-        className="h-full w-full"
-        style={{ width: '100%', height: '100%' }}
-      >
-        {onFrame && <StatsProbe onFrame={onFrame} paused={paused} />}
-        <PauseRendering paused={paused} />
-        <QualityController quality={quality} />
-        <CityChunks
-          centerX={centerCell.x}
-          centerY={centerCell.y}
-          onStats={onStats}
-          rings={{
-            near: preset.nearRing,
-            mid: preset.midRing,
-            // Keep land and water under the whole aerial frame. Only the cheap far
-            // silhouettes extend; the detailed geometry and animation budgets stay bounded.
-            far: mapView
-              ? Math.max(preset.farRing, Math.ceil(camera.distance / 20))
-              : preset.farRing,
-          }}
-          detailCells={preset.detailCells}
-          lowCells={preset.lowCells}
-          triangleBudget={preset.triangleBudget}
-          hidden={Boolean(scene) || harooStreet}
-        />
-        {ride ? (
-          <Ride transport={ride.transport} rain={ride.rain} />
-        ) : threeInterior || harooStreet ? null : interior ? (
-          <InteriorScene
-            layout={layoutFor(interior)}
-            title={interiorTitle}
-            angle={camera.angle}
-            distance={24}
-            activity={activity}
-            playerModel={avatarModel}
-            playerPagne={avatarPagne}
-            onUse={onUseProp}
+      {ride && (
+        <div className="absolute inset-0" data-renderer="haroo">
+          <HarooRideView
+            transport={ride.transport}
+            rain={ride.rain}
+            pixelRatio={pixelRatio}
+            onFrame={onFrame}
           />
-        ) : (
-          <>
-            <Entity name="CityCamera" position={CAMERA_START} rotation={CAMERA_START_ROT}>
-              <Camera fov={46} nearClip={0.5} farClip={420} clearColor={light.sky} />
-            </Entity>
-            <Ambient color={light.ambient} />
-            <Entity rotation={[56, 28, 0]}>
-              <Light type="directional" intensity={light.sun} color={light.sunColor} />
-            </Entity>
-            {preset.fillLight && (
-              <Entity rotation={[22, 200, 0]}>
-                <Light
-                  type="directional"
-                  intensity={light.night ? 0.35 : 0.55}
-                  color={light.night ? '#8fa8ff' : '#ffffff'}
-                />
-              </Entity>
-            )}
-            {hasEstate && (
-              <Entity position={estateCenter}>
-                <EstateTilesMemo
-                  city={city}
-                  tool={tool}
-                  selected={selected}
-                  onTile={stableOnTile}
-                  canTap={canTap}
-                  visitors={visitors}
-                  onBillboard={stableOnBillboard}
-                />
-              </Entity>
-            )}
-            {selPos && selectedLot && (
-              <SelectionRing
-                position={[selPos[0], 0.03, selPos[2]]}
-                w={selectedLot.w * CELL + 0.3}
-                d={selectedLot.h * CELL + 0.3}
-              />
-            )}
-            <Agents agents={agents} step={step} animated={animated} />
-            <PlayerRig
-              mapView={mapView}
-              controller={controller}
-              model={avatarModel}
-              pagne={avatarPagne}
-              vehicleEntity={vehicleEntity}
-              onEvents={onPlayerEvents}
-              onCameraSync={onCameraSync}
-            />
-            {ads && ads.campaigns.length > 0 && (
-              <Billboards
-                locality={locality}
-                campaigns={ads.campaigns}
-                controller={controller}
-                tracker={ads.tracker}
-                onNear={ads.onNear}
-              />
-            )}
-            {remoteFeed && remotePresent && remotePresent.length > 0 && (
-              <RemotePlayers feed={remoteFeed} present={remotePresent} />
-            )}
-            {hasVehicle && (
-              <Baked
-                name="Taxi du joueur"
-                model="taxi"
-                position={vehicleStart}
-                rotation={0}
-                scale={0.36}
-                onEntity={registerVehicle}
-              />
-            )}
-            <Picker camera={camera} onPan={onPan} onOrbit={onOrbit} onZoom={onZoom} onTap={onTap} />
-            <LabelProjector overlay={overlay} lots={labels} names={showNames} />
-          </>
-        )}
-      </Application>
-      {harooRoom && interior && input && (
+        </div>
+      )}
+      {room === 'haroo' && interior && input && (
         <div className="absolute inset-0" data-renderer="haroo">
           <HarooRoomView
             key={interior}
@@ -1092,11 +203,11 @@ export default function CityWorld({
             input={input}
             onLeave={onLeave ?? (() => {})}
             onFrame={onFrame}
-            pixelRatio={renderPixelRatio(quality)}
+            pixelRatio={pixelRatio}
           />
         </div>
       )}
-      {threeInterior && !harooRoom && interior && input && (
+      {room === 'three' && interior && input && (
         <div className="absolute inset-0" data-renderer="three">
           <InteriorThree
             layout={layoutFor(interior)}
@@ -1112,18 +223,34 @@ export default function CityWorld({
             input={input}
             onLeave={onLeave ?? (() => {})}
             onFrame={onFrame}
-            pixelRatio={renderPixelRatio(quality)}
+            pixelRatio={pixelRatio}
           />
         </div>
       )}
-      {harooStreet && !mapView && (
+      {room === 'playcanvas' && interior && (
+        <div className="absolute inset-0" data-renderer="playcanvas">
+          <PlayCanvasInterior
+            key={interior}
+            layout={layoutFor(interior)}
+            title={interiorTitle}
+            angle={camera.angle}
+            activity={activity}
+            playerModel={avatarModel}
+            playerPagne={avatarPagne}
+            onUse={onUseProp}
+            quality={quality}
+            onFrame={onFrame}
+          />
+        </div>
+      )}
+      {!ride && !interior && !mapView && (
         <div className="absolute inset-0" data-renderer="haroo">
           <HarooStreetView
             controller={controller}
             avatarModel={avatarModel}
             avatarPagne={avatarPagne}
             estate={hasEstate ? city.buildings : []}
-            pixelRatio={renderPixelRatio(quality)}
+            pixelRatio={pixelRatio}
             locality={locality}
             ads={ads && ads.campaigns.length > 0 ? ads : null}
             remoteFeed={remoteFeed}
@@ -1133,12 +260,19 @@ export default function CityWorld({
               const lot = lotById(id)
               if (lot) onLotIcon(lot)
             }}
-            onCell={onCell}
+            onCell={(cell) => {
+              // The player's own estate: its cells go to the estate handler (local cells).
+              if (hasEstate && inEstate(cell.x, cell.y))
+                onTile(cell.x - ESTATE.x0, cell.y - ESTATE.y0)
+              else onCell(cell)
+            }}
             onFrame={onFrame}
+            onStats={onStats}
+            light={light}
           />
         </div>
       )}
-      {harooStreet && mapView && (
+      {!ride && !interior && mapView && (
         <CityMap
           locality={locality}
           filter={filter}
@@ -1148,112 +282,6 @@ export default function CityWorld({
           onLot={onLotIcon}
         />
       )}
-      {!scene && !harooStreet && (
-        <div
-          ref={overlay}
-          className="pointer-events-none absolute inset-0"
-          aria-hidden={labelsHidden ? 'true' : undefined}
-          style={{ visibility: labelsHidden ? 'hidden' : 'visible' }}
-        >
-          {labels.map((lot) => {
-            const named = showNames || selectedLot?.id === lot.id
-            return (
-              <button
-                type="button"
-                key={lot.id}
-                data-lot={lot.id}
-                data-priority={selectedLot?.id === lot.id ? 1 : 0}
-                onClick={() => onLotIcon(lot)}
-                tabIndex={labelsHidden ? -1 : 0}
-                aria-label={lot.name ?? TYPE_ICONS[lot.type]}
-                // 44 px touch target around a 32 px round icon; the name only when asked.
-                className={`pointer-events-auto absolute left-0 top-0 flex min-h-11 min-w-11 items-center justify-center gap-1 ${
-                  named ? 'max-w-[170px]' : ''
-                }`}
-                title={lot.name ?? ''}
-                style={{ display: 'none' }}
-              >
-                <span
-                  className={`flex h-8 min-w-0 max-w-full items-center gap-1.5 rounded-full border-2 px-1.5 text-[11px] font-bold shadow-md ${
-                    selectedLot?.id === lot.id
-                      ? 'border-emerald-800 bg-emerald-700 text-white'
-                      : 'border-white bg-white/95 text-slate-900'
-                  } ${named ? 'pr-2.5' : 'w-8 justify-center'}`}
-                >
-                  <span className="shrink-0 text-sm leading-none">{TYPE_ICONS[lot.type]}</span>
-                  {named && <span className="min-w-0 truncate">{lot.name}</span>}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      )}
-      {!scene && !harooStreet && (
-        <div className="absolute right-3 top-[38%] flex flex-col gap-1 rounded-2xl bg-white/95 p-1 shadow-lg [&>button]:min-h-11 [&>button]:min-w-11 [&>button]:shadow-none">
-          <button
-            type="button"
-            aria-label="Zoom avant"
-            onClick={() => onZoom(0.8)}
-            className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
-          >
-            <Plus className="h-5 w-5" />
-          </button>
-          <button
-            type="button"
-            aria-label="Zoom arrière"
-            onClick={() => onZoom(1.25)}
-            className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
-          >
-            <Minus className="h-5 w-5" />
-          </button>
-          <button
-            type="button"
-            aria-label="Tourner la caméra"
-            onClick={() => {
-              controller.camera.angle = (controller.camera.angle + 45) % 360
-            }}
-            className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
-          >
-            <RotateCcw className="h-5 w-5" />
-          </button>
-          <button
-            type="button"
-            aria-label="Recentrer sur moi"
-            onClick={() => {
-              if (onFollow) {
-                onFollow()
-                return
-              }
-              controller.camera.follow = true
-              controller.camera.distance = Math.min(controller.camera.distance, FOLLOW_DISTANCE)
-            }}
-            className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
-          >
-            <Maximize2 className="h-5 w-5" />
-          </button>
-          <button
-            type="button"
-            aria-label="Vue de la ville"
-            onClick={() => {
-              if (onOverview) {
-                onOverview()
-                return
-              }
-              const rig = controller.camera
-              rig.follow = false
-              rig.tx = 60
-              rig.tz = 40
-              rig.distance = MAP_DISTANCE
-              const [tx, , tz] = worldPos(60, 40)
-              onCamera({ ...camera, tx, tz, distance: MAP_DISTANCE })
-            }}
-            className="rounded-xl bg-white/95 p-3 text-emerald-950 shadow"
-          >
-            <Compass className="h-5 w-5" />
-          </button>
-        </div>
-      )}
     </div>
   )
 }
-export { Model as CityModel, ESTATE_ASSETS as CITY_ESTATE_ASSETS }

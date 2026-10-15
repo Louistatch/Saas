@@ -30,6 +30,7 @@ import {
 } from '@/lib/haroolife/city/avatar-catalogue'
 import { type Bank, loadBank } from '@/lib/haroolife/city/bank'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
+import { FrameRing, type PerfSnapshot, renders, watchLongTasks } from '@/lib/haroolife/city/perf'
 import { DEFAULT_CONFIG, type PlayerController } from '@/lib/haroolife/city/player'
 import {
   type GroundKind,
@@ -53,11 +54,15 @@ import type { Pose, PresenceEntry } from '@/lib/haroolife/realtime/protocol'
 import type { Building } from '@/lib/haroolife/townsmen-engine'
 import * as THREE from 'three'
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { DETAIL_CELLS, buildCityGeometry } from './city-models'
 import { createGltfLoader } from './gltf'
 
 const FIGURE = 1.85
+/** Background by day (the prototype's soft green) and at night. */
+const DAY_SKY = '#c6d9bd'
+const NIGHT_SKY = '#33456b'
 /** Cells drawn around the player; the window is rebuilt when the player gets near its edge. */
 const RADIUS = 13
 const REBUILD_AT = 6
@@ -101,6 +106,18 @@ export interface StreetWorldEvents {
   onReady?: () => void
   onError?: (message: string) => void
   onFrame?: (s: { drawCalls: number; fps: number }) => void
+  /** Building tiles loaded around the player (the game's chunk statistics). */
+  onStats?: (s: StreetStats) => void
+}
+
+export interface StreetStats {
+  /** Building tiles in the scene. */
+  chunks: number
+  buildings: number
+  /** Triangles in the loaded building tiles. */
+  tris: number
+  /** True once the Kenney models are in use (not fallback boxes). */
+  detailed: boolean
 }
 
 export interface StreetWorldOptions {
@@ -180,10 +197,13 @@ export class StreetWorld {
   private readonly loaded: GLTF[] = []
   private readonly materials = new Map<string, THREE.MeshStandardMaterial>()
   private readonly unitBox = new THREE.BoxGeometry(1, 1, 1)
+  /** Billboard posts and frame, built once and shared by every support. */
+  private boardFrame: THREE.BufferGeometry | null = null
   private readonly raycaster = new THREE.Raycaster()
   private readonly groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
   private readonly resizeObserver: ResizeObserver
   private readonly sun = new THREE.DirectionalLight('#fff1d6', 3)
+  private readonly hemi = new THREE.HemisphereLight('#f2f6ff', '#9aa380', 2.4)
   private estate: readonly Building[]
   private win: StreetWindow | null = null
   private winGroup: THREE.Group | null = null
@@ -196,7 +216,7 @@ export class StreetWorld {
   /** Duration of the last neighbourhood rebuild (ms), for the probe. */
   private rebuildMs = 0
   /** Building tiles (Kenney models), cached: key → mesh and level of detail. */
-  private tiles = new Map<string, { mesh: THREE.Mesh; detail: boolean }>()
+  private tiles = new Map<string, { mesh: THREE.Mesh; detail: boolean; buildings: number }>()
   private tileMs = 0
   private cityMaterial: THREE.MeshStandardMaterial | null = null
   private wheels: { node: THREE.Object3D; front: boolean }[] = []
@@ -230,6 +250,10 @@ export class StreetWorld {
   private disposed = false
   private frames = 0
   private statsAt = 0
+  /** Frame times and long tasks for `__LOME_PERF` (same snapshot as the PlayCanvas city had). */
+  private readonly ring = new FrameRing(600)
+  private readonly longTasks = watchLongTasks()
+  private prevFrame = 0
   private seed = 1
   private down: { x: number; y: number } | null = null
   /** Animation of the player, in the game's words (idle, walk, run), for the probes. */
@@ -280,8 +304,8 @@ export class StreetWorld {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.15
     this.scene.name = 'HarooLife rue'
-    this.scene.background = new THREE.Color('#c6d9bd')
-    this.scene.add(new THREE.HemisphereLight('#f2f6ff', '#9aa380', 2.4))
+    this.scene.background = new THREE.Color(DAY_SKY)
+    this.scene.add(this.hemi)
     this.sun.castShadow = true
     this.sun.shadow.mapSize.set(1024, 1024)
     Object.assign(this.sun.shadow.camera, { left: -26, right: 26, top: 26, bottom: -26, far: 120 })
@@ -334,6 +358,18 @@ export class StreetWorld {
     this.events.onReady?.()
   }
 
+  /**
+   * The game's hour of day: `sun` from 0.65 (night) to 1 (noon), as the city's daylight cycle.
+   * By day the street keeps its soft palette; at night the sky and the lights go down.
+   */
+  setDaylight(light: { sun: number; sunColor: string }): void {
+    const k = Math.max(0, Math.min(1, (light.sun - 0.65) / 0.35))
+    ;(this.scene.background as THREE.Color).set(NIGHT_SKY).lerp(new THREE.Color(DAY_SKY), k)
+    this.hemi.intensity = 2.4 * (0.45 + 0.55 * k)
+    this.sun.intensity = 3 * (0.25 + 0.75 * k)
+    this.sun.color.set(light.sunColor)
+  }
+
   /** The player's own buildings changed (construction): redraw the window. */
   setEstate(estate: readonly Building[]): void {
     this.estate = estate
@@ -371,6 +407,7 @@ export class StreetWorld {
     this.car = null
     this.wheels = []
     this.unitBox.dispose()
+    this.boardFrame?.dispose()
     for (const m of this.materials.values()) m.dispose()
     for (const gltf of this.loaded.splice(0))
       gltf.scene.traverse((o) => {
@@ -383,11 +420,14 @@ export class StreetWorld {
         }
       })
     this.renderer.dispose()
+    this.longTasks.stop()
     const w = window as unknown as {
       __LOME_STREET?: unknown
       __LOME_SCENE?: unknown
       __LOME_ADS?: unknown
+      __LOME_PERF_RESET?: unknown
     }
+    w.__LOME_PERF_RESET = undefined
     w.__LOME_STREET = undefined
     w.__LOME_SCENE = undefined
     w.__LOME_ADS = undefined
@@ -647,16 +687,14 @@ export class StreetWorld {
       const t = performance.now()
       if (!this.cityMaterial)
         this.cityMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })
-      const mesh = new THREE.Mesh(
-        buildCityGeometry(bank, buildingsInTile(w.tx, w.ty, this.estate), detail),
-        this.cityMaterial,
-      )
+      const inTile = buildingsInTile(w.tx, w.ty, this.estate)
+      const mesh = new THREE.Mesh(buildCityGeometry(bank, inTile, detail), this.cityMaterial)
       mesh.name = `Bâtiments ${key}`
       mesh.castShadow = true
       mesh.receiveShadow = true
       if (have) this.dropTile(key)
       this.scene.add(mesh)
-      this.tiles.set(key, { mesh, detail })
+      this.tiles.set(key, { mesh, detail, buildings: inTile.length })
       this.tileMs = Math.round(performance.now() - t)
       built++
     }
@@ -803,7 +841,12 @@ export class StreetWorld {
     const now = performance.now()
     const dt = Math.min((now - this.last) / 1000, 0.25)
     this.last = now
-    if (document.hidden) return
+    if (document.hidden) {
+      this.prevFrame = 0
+      return
+    }
+    if (this.prevFrame) this.ring.push(now - this.prevFrame)
+    this.prevFrame = now
     const ctl = this.controller
     ctl.update(dt)
     const events = ctl.drain()
@@ -875,6 +918,7 @@ export class StreetWorld {
       this.frames = 0
       this.statsAt = now
       this.publishProbe()
+      this.publishPerf(now)
     }
   }
 
@@ -951,19 +995,23 @@ export class StreetWorld {
     root.position.set(placement.x * U, 0, placement.y * U)
     root.rotation.y = THREE.MathUtils.degToRad(BOARD_YAW[placement.faces])
     root.scale.setScalar(BOARD_SCALE)
-    const metal = this.mat('#383d45')
-    // Square steel posts and the frame: 12 triangles per box.
-    for (const [x, y, w, h] of [
-      [-0.72, 0.8, 0.09, 1.6],
-      [0.72, 0.8, 0.09, 1.6],
-      [0, 2.05, 1.95, 1.2],
-    ] as const) {
-      const m = new THREE.Mesh(this.unitBox, metal)
-      m.scale.set(w, h, w === 1.95 ? 0.08 : 0.09)
-      m.position.set(x, y, -0.06)
-      m.castShadow = true
-      root.add(m)
+    // Square steel posts and the frame, merged: one mesh (36 triangles) per support.
+    if (!this.boardFrame) {
+      const parts = (
+        [
+          [-0.72, 0.8, 0.09, 1.6],
+          [0.72, 0.8, 0.09, 1.6],
+          [0, 2.05, 1.95, 1.2],
+        ] as const
+      ).map(([x, y, w, h]) =>
+        new THREE.BoxGeometry(w, h, w === 1.95 ? 0.08 : 0.09).translate(x, y, -0.06),
+      )
+      this.boardFrame = mergeGeometries(parts) ?? new THREE.BoxGeometry(1, 1, 1)
+      for (const g of parts) g.dispose()
     }
+    const frame = new THREE.Mesh(this.boardFrame, this.mat('#383d45'))
+    frame.castShadow = true
+    root.add(frame)
     const canvas = document.createElement('canvas')
     canvas.width = POSTER_W
     canvas.height = POSTER_H
@@ -1076,6 +1124,52 @@ export class StreetWorld {
       } else p.actions.get(p.current)?.setEffectiveTimeScale(1)
       p.mixer.update(dt)
     }
+  }
+
+  /** Chunk statistics for the game (`__LOME_CITY`) and the frame snapshot (`__LOME_PERF`). */
+  private publishPerf(now: number): void {
+    const info = this.renderer.info
+    let buildings = 0
+    let tris = 0
+    for (const t of this.tiles.values()) {
+      buildings += t.buildings
+      tris += (t.mesh.geometry.index?.count ?? 0) / 3
+    }
+    this.events.onStats?.({
+      chunks: this.bank ? this.tiles.size : this.win ? 1 : 0,
+      buildings: this.bank ? buildings : (this.win?.buildings.length ?? 0),
+      tris,
+      detailed: Boolean(this.bank),
+    })
+    let meshes = 0
+    this.scene.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh && o.visible) meshes++
+    })
+    const people = [this.player, ...this.walkers.map((w) => w.person)].filter((p): p is Person =>
+      Boolean(p),
+    )
+    const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory
+    const size = this.renderer.getDrawingBufferSize(new THREE.Vector2())
+    const snap: PerfSnapshot = {
+      at: Math.round(now),
+      frame: this.ring.summary(),
+      drawCalls: info.render.calls,
+      triangles: info.render.triangles,
+      renderEntities: meshes,
+      meshInstances: meshes,
+      animated: people.length + this.remotes.size,
+      animating: people.length + this.remotes.size,
+      heapMB: mem ? Math.round(mem.usedJSHeapSize / 1048576) : null,
+      longTasks: this.longTasks.count(),
+      longTaskMs: this.longTasks.totalMs(),
+      renders: { ...renders },
+      assets: this.loaded.length + (this.bank ? 1 : 0),
+      pixelRatio: this.renderer.getPixelRatio(),
+      resolution: [size.x, size.y],
+    }
+    const w = window as unknown as { __LOME_PERF?: PerfSnapshot; __LOME_PERF_RESET?: () => void }
+    w.__LOME_PERF = snap
+    w.__LOME_PERF_RESET = () => this.ring.reset()
   }
 
   /** Test hooks: the same `__LOME_PLAYER` the PlayCanvas rig published, plus the street. */

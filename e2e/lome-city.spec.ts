@@ -60,12 +60,13 @@ test('Lomé Life 3D opens on a dense, explorable city and completes a full outin
     true,
   )
 
-  // 1. Streaming: chunks around the camera are built and carry hundreds of buildings.
+  // 1. Streaming: the building tiles around the player are built (start cell: 16 tiles of
+  // 8 × 8 cells, 211 city buildings) with the Kenney models.
   await expect
     .poll(() => stats(page).then((s) => s?.chunks ?? 0), { timeout: 30000 })
-    .toBeGreaterThanOrEqual(20)
+    .toBeGreaterThanOrEqual(9)
   const first = await stats(page)
-  expect(first?.buildings ?? 0).toBeGreaterThanOrEqual(250)
+  expect(first?.buildings ?? 0).toBeGreaterThanOrEqual(150)
   await expect
     .poll(
       () => stats(page).then((s) => (s as unknown as { detailed?: boolean })?.detailed ?? false),
@@ -87,19 +88,17 @@ test('Lomé Life 3D opens on a dense, explorable city and completes a full outin
   expect(density.built, 'roads and buildings must fill the frame').toBeGreaterThan(0.3)
   expect(density.colours, 'a city has many colours').toBeGreaterThan(60)
 
-  // 3. Camera: drag pans, buttons zoom and rotate, recentre comes back.
-  const canvas = page.locator('canvas').first()
-  const box = (await canvas.boundingBox())!
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-  await page.mouse.down()
-  await page.mouse.move(box.x + box.width / 2 + 160, box.y + box.height / 2 + 90, { steps: 8 })
-  await page.mouse.up()
-  await page.getByRole('button', { name: 'Zoom arrière' }).click()
-  await page.getByRole('button', { name: 'Tourner la caméra' }).click()
-  await page.getByRole('button', { name: 'Vue de la ville' }).click()
-  await page.waitForTimeout(1200)
+  // 3. The city map: zoom out, recentre on me, back to the game.
+  await page
+    .getByRole('navigation', { name: 'Navigation du jeu' })
+    .getByRole('button', { name: 'Carte' })
+    .click()
+  await expect(page.getByTestId('city-map')).toBeVisible()
+  await page.getByRole('button', { name: 'Zoom arrière sur la carte' }).click()
+  await page.getByRole('button', { name: 'Centrer la carte sur moi' }).click()
   await page.screenshot({ path: path.join(dir, `${testInfo.project.name}-overview.png`) })
-  await page.getByRole('button', { name: 'Recentrer sur moi' }).click()
+  await page.getByRole('button', { name: 'Retour au jeu' }).click()
+  await expect(page.getByTestId('city-map')).toBeHidden()
 
   // 4. Places: filter, open a sheet from the map, go there by zémidjan, enter the interior.
   await openPlaces(page)

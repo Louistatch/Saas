@@ -3,8 +3,8 @@ import { expect, openPlaces, test } from './lome-test'
 /**
  * One national world: from Lomé the player opens the Togo map (sourced boundaries), takes
  * the bush taxi to Kara, finds that town's own buildings and actors loaded chunk by chunk
- * around the station, walks, and comes back to the estate untouched. The same PlayCanvas
- * application serves both towns; no error may reach the console.
+ * around the station, walks, and comes back to the estate untouched. The same street engine
+ * serves both towns; no error may reach the console.
  */
 type Live = {
   locality: string

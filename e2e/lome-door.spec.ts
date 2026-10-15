@@ -175,7 +175,7 @@ test('enter and leave my house with continuous movement, taxi and reload', async
   else await page.keyboard.press('e')
   await expect.poll(async () => (await live(page))?.inside ?? null).toBe(null)
 
-  await expect.poll(() => page.locator('canvas').count(), 'one PlayCanvas canvas').toBe(1)
+  await expect.poll(() => page.locator('canvas').count(), 'one canvas').toBe(1)
   expect(await page.evaluate(() => (window as unknown as { __LOST?: number }).__LOST ?? 0)).toBe(0)
   expect(errors).toEqual([])
 })
