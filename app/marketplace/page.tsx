@@ -7,13 +7,11 @@ import { MyPurchases } from '@/components/marketplace/my-purchases'
 import { PresalesStrip } from '@/components/marketplace/presales-strip'
 import { ProductGrid } from '@/components/marketplace/product-grid'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
-import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useFichesPublic } from '@/hooks/use-fiches-public'
 import { useMarketplaceData } from '@/hooks/use-marketplace-data'
 import { useMarketplaceFilters } from '@/hooks/use-marketplace-filters'
-import { Calculator, FileText, ShoppingCart } from 'lucide-react'
-import Link from 'next/link'
+import { FileText, ShoppingCart } from 'lucide-react'
 import { Suspense, useState } from 'react'
 
 function FichesTab() {
@@ -122,11 +120,6 @@ function MarketplaceContent() {
             coopératives. Filtrez par région, préfecture ou canton pour trouver ce qui vous
             correspond.
           </p>
-          <Button asChild className="mt-5 gap-2">
-            <Link href="/comptes-exploitation/nouveau">
-              <Calculator className="h-4 w-4" /> Simuler mon compte d’exploitation
-            </Link>
-          </Button>
         </div>
       </section>
 
