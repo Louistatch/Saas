@@ -489,3 +489,27 @@ test('game money sent to another player reaches their game once', async ({ brows
   await ama.context.close()
   await kofi.context.close()
 })
+
+test('debate of the day: a vote is posted in the Togo room for everyone', async ({
+  browser,
+}, testInfo) => {
+  test.setTimeout(120_000)
+  test.skip(/mobile/.test(testInfo.project.name), 'opens its own desktop context')
+  const ama = await player(browser, 'ama', devices['Desktop Chrome'])
+  await ama.page
+    .getByRole('navigation', { name: 'Navigation du jeu' })
+    .getByRole('button', { name: 'Téléphone' })
+    .click()
+  await ama.page.getByRole('button', { name: /Débats$/ }).click()
+  const debates = ama.page.getByTestId('debates')
+  await expect(debates.getByRole('region', { name: 'Débat du jour' })).toBeVisible()
+  await expect(debates.getByRole('region', { name: 'Blague du jour' })).toBeVisible()
+  const first = debates.getByRole('region', { name: 'Débat du jour' }).getByRole('button').first()
+  const side = (await first.textContent())?.trim() ?? ''
+  await first.click()
+  // The vote is in the « Togo » room, which opens.
+  await expect(ama.page.getByRole('region', { name: 'Discussions en direct' })).toBeVisible()
+  await expect(log(ama.page)).toContainText(`Moi je suis pour : ${side}`)
+  expect(ama.errors).toEqual([])
+  await ama.context.close()
+})

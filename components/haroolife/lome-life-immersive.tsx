@@ -123,6 +123,7 @@ import {
 } from '@/lib/haroolife/lome-districts'
 import { eventById, resolveEvent } from '@/lib/haroolife/lome-events'
 import { claimMoney, sendMoney } from '@/lib/haroolife/money'
+import { debateOfDay, jokeAt, jokeMessage, voteMessage } from '@/lib/haroolife/humour'
 import { uuid } from '@/lib/haroolife/realtime/client'
 import {
   type Action,
@@ -216,6 +217,7 @@ type Sheet =
   | 'residence'
   | 'avatar'
   | 'player'
+  | 'debates'
   | null
 type Mode = 'walk' | 'build' | 'demolish'
 /** The module a HarooLife address opens inside the single 3D world. */
@@ -502,6 +504,10 @@ export function LomeLifeImmersive() {
   const [gift, setGift] = useState({ amount: '1000', note: '', busy: false })
   const giftClient = useRef<string | null>(null)
   const [chatRoom, setChatRoom] = useState<string | null>(null)
+  // Debates and humour: the same debate and first joke for everyone on a calendar day.
+  const today = Math.floor(Date.now() / 86_400_000)
+  const [jokeN, setJokeN] = useState(today)
+  const [debateNote, setDebateNote] = useState('')
   // A conversation with a passer-by of the game (never stored, never sent anywhere).
   const [npcTalk, setNpcTalk] = useState<{ from: 'me' | 'npc'; text: string }[]>([])
   const [npcDraft, setNpcDraft] = useState('')
@@ -578,33 +584,35 @@ export function LomeLifeImmersive() {
               ? 'Construire'
               : panel === 'jobs'
                 ? 'Travailler & gagner'
-                : panel === 'messages'
-                  ? 'Messages du quartier'
-                  : panel === 'wallet'
-                    ? 'Mes finances'
-                    : panel === 'missions'
-                      ? 'Mes objectifs'
-                      : panel === 'journal'
-                        ? 'Journal de vie'
-                        : panel === 'billboard'
-                          ? 'Panneau publicitaire'
-                          : panel === 'ad'
-                            ? adFocus && isSponsored(adFocus.campaign)
-                              ? 'Promotion'
-                              : 'Information FaîtiereHub'
-                            : panel === 'lot'
-                              ? 'Lieu'
-                              : panel === 'cooperative'
-                                ? 'Coopérative'
-                                : panel === 'avatar'
-                                  ? 'Mon apparence'
-                                  : panel === 'player'
-                                    ? playerKey?.startsWith('npc:')
-                                      ? 'Habitant'
-                                      : 'Joueur'
-                                    : panel === 'market'
-                                      ? 'Marché'
-                                      : ''
+                : panel === 'debates'
+                  ? 'Débats & blagues'
+                  : panel === 'messages'
+                    ? 'Messages du quartier'
+                    : panel === 'wallet'
+                      ? 'Mes finances'
+                      : panel === 'missions'
+                        ? 'Mes objectifs'
+                        : panel === 'journal'
+                          ? 'Journal de vie'
+                          : panel === 'billboard'
+                            ? 'Panneau publicitaire'
+                            : panel === 'ad'
+                              ? adFocus && isSponsored(adFocus.campaign)
+                                ? 'Promotion'
+                                : 'Information FaîtiereHub'
+                              : panel === 'lot'
+                                ? 'Lieu'
+                                : panel === 'cooperative'
+                                  ? 'Coopérative'
+                                  : panel === 'avatar'
+                                    ? 'Mon apparence'
+                                    : panel === 'player'
+                                      ? playerKey?.startsWith('npc:')
+                                        ? 'Habitant'
+                                        : 'Joueur'
+                                      : panel === 'market'
+                                        ? 'Marché'
+                                        : ''
   const needs = life.needs
   const wellbeing = Math.round(NEED_KEYS.reduce((sum, k) => sum + needs[k], 0) / NEED_KEYS.length)
   const pending = eventById(life.pendingEvent)
@@ -2674,6 +2682,93 @@ export function LomeLifeImmersive() {
                     </div>
                   </>
                 )}
+                {panel === 'debates' &&
+                  (() => {
+                    const debate = debateOfDay(today)
+                    const joke = jokeAt(jokeN)
+                    const canTalk =
+                      !!realtime.client &&
+                      realtime.state.status === 'online' &&
+                      !!realtime.state.me?.can_write
+                    // Post in the « Togo » room, then open it: the real players argue there.
+                    const say = (body: string) => {
+                      if (!canTalk || !realtime.client) {
+                        setDebateNote(
+                          'Le salon Togo n’est pas disponible : connecte-toi et choisis ta maison pour débattre.',
+                        )
+                        return
+                      }
+                      const refused = realtime.client.send('world:togo', body)
+                      if (refused) {
+                        setDebateNote(refused)
+                        return
+                      }
+                      setDebateNote('')
+                      setChatRoom('world:togo')
+                      setPanel('messages')
+                    }
+                    return (
+                      <div className="space-y-4" data-testid="debates">
+                        <section
+                          aria-label="Débat du jour"
+                          className="space-y-3 rounded-3xl bg-[#123b33] p-4 text-white"
+                        >
+                          <p className="text-xs font-semibold text-emerald-200">
+                            🎤 Débat du jour · même sujet pour tout le Togo
+                          </p>
+                          <p className="text-xl font-black leading-tight">{debate.question}</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {debate.sides.map((side, i) => (
+                              <button
+                                type="button"
+                                key={side}
+                                onClick={() => say(voteMessage(debate, i as 0 | 1))}
+                                className={`min-h-14 rounded-2xl px-3 py-2 text-sm font-black text-slate-900 shadow ${
+                                  i === 0 ? 'bg-amber-300' : 'bg-emerald-300'
+                                }`}
+                              >
+                                {side}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-xs text-emerald-100">
+                            Ton camp est annoncé dans le salon « Togo », où les autres joueurs te
+                            répondent.
+                          </p>
+                        </section>
+                        <section
+                          aria-label="Blague du jour"
+                          className="space-y-3 rounded-3xl bg-amber-50 p-4 ring-1 ring-amber-200"
+                        >
+                          <p className="text-xs font-semibold text-amber-800">😂 Blague du jour</p>
+                          <p className="text-base font-semibold leading-snug text-slate-900">
+                            {joke}
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setJokeN((n) => n + 1)}
+                              className="flex-1 rounded-xl bg-white px-3 py-3 text-sm font-bold text-slate-800 ring-1 ring-amber-200"
+                            >
+                              Une autre
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => say(jokeMessage(joke))}
+                              className="flex-1 rounded-xl bg-amber-500 px-3 py-3 text-sm font-black text-white"
+                            >
+                              Partager au salon Togo
+                            </button>
+                          </div>
+                        </section>
+                        {debateNote && (
+                          <p role="status" className="text-sm text-slate-600">
+                            {debateNote}
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })()}
                 {panel === 'jobs' && (
                   <>
                     <p className="text-sm text-slate-600">
