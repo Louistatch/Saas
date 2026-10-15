@@ -1,3 +1,4 @@
+import { calculateEnterpriseBudget } from '@/lib/agronomy/enterprise-budget'
 import { assertRole } from '@/lib/security/assert-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { createLogger } from '@/lib/utils/logger'
@@ -60,7 +61,54 @@ const reviewVersion = z.object({
   review_note: z.string().trim().min(3).max(2000),
 })
 
-const schema = z.union([createSource, createTemplate, createVersion, reviewVersion])
+const createBudget = z.object({
+  action: z.literal('create_budget'),
+  area_ha: z.number().positive().max(100000),
+  campaign: z.string().trim().max(50).optional(),
+  metadata: z.object({
+    culture: z.string().trim().min(1).max(100),
+    variety: z.string().trim().max(120).optional(),
+    region: z.string().trim().max(120),
+  }),
+  costs: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(80),
+        label: z.string().min(1).max(200),
+        category: z.enum([
+          'land',
+          'seed',
+          'fertilizer',
+          'crop_protection',
+          'labour',
+          'mechanization',
+          'harvest',
+          'post_harvest',
+          'transport',
+          'other',
+        ]),
+        quantity: z.number().nonnegative(),
+        unitPrice: z.number().nonnegative(),
+        scaling: z.enum(['per_hectare', 'per_farm', 'per_tonne', 'per_kg']),
+      }),
+    )
+    .min(1)
+    .max(100),
+  scenarios: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(80),
+        label: z.string().min(1).max(120),
+        yieldTonnesPerHa: z.number().nonnegative(),
+        salePricePerTonne: z.number().nonnegative(),
+        lossRatePercent: z.number().min(0).max(99),
+      }),
+    )
+    .min(1)
+    .max(10),
+})
+
+const schema = z.union([createSource, createTemplate, createVersion, reviewVersion, createBudget])
 
 export async function GET() {
   const guard = await assertRole('super_admin')
@@ -158,6 +206,33 @@ export async function POST(request: NextRequest) {
         .update({ status: 'in_review', updated_at: new Date().toISOString() })
         .eq('id', template_id)
       return NextResponse.json({ version: data }, { status: 201 })
+    }
+    if (payload.action === 'create_budget') {
+      const results = calculateEnterpriseBudget({
+        areaHa: payload.area_ha,
+        costs: payload.costs,
+        scenarios: payload.scenarios,
+      })
+      const { data, error } = await admin
+        .from('enterprise_budget_snapshots')
+        .insert({
+          user_id: guard.ctx.userId,
+          area_ha: payload.area_ha,
+          campaign: payload.campaign || null,
+          inputs: {
+            metadata: payload.metadata,
+            costs: payload.costs,
+            scenarios: payload.scenarios,
+          },
+          results,
+          source_manifest: [],
+          completeness_score: 60,
+          status: 'draft',
+        })
+        .select('id, status, created_at')
+        .single()
+      if (error) throw error
+      return NextResponse.json({ budget: data }, { status: 201 })
     }
     const { data: version, error } = await admin
       .from('agronomic_template_versions')
