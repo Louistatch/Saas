@@ -101,8 +101,15 @@ test('a warehouse of the industrial zone leads to a paid odd job, once a day', (
   const inside = cityInteract(arrive(goToLot(s, depot)), 'enter')
   assert.equal(inside.insideLot, depot.id)
   const worked = cityInteract(inside, 'work-city')
-  assert.equal(worked.life.wallet, inside.life.wallet + 1500)
+  assert.equal(worked.life.wallet, inside.life.wallet + 2200)
   assert.equal(cityInteract(worked, 'work-city').life.wallet, worked.life.wallet)
+})
+
+test('les gares et entrepôts proposent des métiers togolais distincts', () => {
+  const station = actionsFor('station').find((action) => action.id === 'work-city')
+  const industry = actionsFor('industry').find((action) => action.id === 'work-city')
+  assert.match(station?.label ?? '', /Livrer/)
+  assert.match(industry?.label ?? '', /produits agricoles/)
 })
 
 test('rides charge once and land at the destination; saves migrate and reload', () => {

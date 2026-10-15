@@ -491,13 +491,27 @@ export function actionsFor(t: LotType): { id: CityAction; label: string; hint: s
     case 'port':
       return [{ id: 'relax', label: 'Se détendre', hint: 'Loisir +25' }]
     case 'townhall':
+      return [
+        {
+          id: 'work-city',
+          label: 'Service communal',
+          hint: '+1 500 FCFA · Énergie −20 · une fois par jour',
+        },
+      ]
     case 'station':
+      return [
+        {
+          id: 'work-city',
+          label: 'Livrer et trier les colis',
+          hint: '+2 000 FCFA · Énergie −20 · une fois par jour',
+        },
+      ]
     case 'industry':
       return [
         {
           id: 'work-city',
-          label: 'Petit boulot',
-          hint: '+1 500 FCFA · Énergie −20 · une fois par jour',
+          label: 'Charger les produits agricoles',
+          hint: '+2 200 FCFA · Énergie −25 · une fois par jour',
         },
       ]
     default:
@@ -648,7 +662,7 @@ export function cityInteract(s: CityLife, action: CityAction): CityLife {
       if (s.life.hour < 7 || s.life.hour >= 19)
         return note(s, 'Les petits boulots se trouvent entre 7 h et 19 h.')
       if (s.life.needs.energy < 20) return note(s, 'Repose-toi avant de travailler.')
-      const wage = 1500
+      const wage = lot.type === 'industry' ? 2200 : lot.type === 'station' ? 2000 : 1500
       if (s.life.city.coins < wage)
         return note(s, 'La caisse municipale ne peut pas payer aujourd’hui.')
       return note(
@@ -665,7 +679,7 @@ export function cityInteract(s: CityLife, action: CityAction): CityLife {
           },
           { energy: -20 },
         ),
-        'Petit boulot fait : +1 500 FCFA.',
+        `${lot.type === 'industry' ? 'Chargement terminé' : lot.type === 'station' ? 'Livraisons triées' : 'Service communal terminé'} : +${wage.toLocaleString('fr-FR')} FCFA.`,
       )
     }
     default:

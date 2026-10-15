@@ -43,6 +43,167 @@ const say = (state: LifeState, msg: string): LifeState => ({
 
 export const LIFE_EVENTS: LifeEvent[] = [
   {
+    id: 'coupure-tde',
+    icon: '🚰',
+    title: 'L’eau est partie se promener',
+    body: 'La TdE répare une conduite. Dans le quartier, chaque bassine est devenue ministre de l’Eau.',
+    choices: [
+      {
+        label: 'Partager la réserve avec la voisine',
+        hint: 'Social +18 · Hygiène −8',
+        apply: (s) =>
+          say(
+            bump(s, { social: 18, hygiene: -8 }),
+            'La voisine promet de rendre la bassine… un jour.',
+          ),
+      },
+      {
+        label: 'Acheter deux sachets d’eau · 200 FCFA',
+        hint: 'Hygiène +8',
+        apply: (s) => {
+          const paid = pay(s, 200)
+          return paid
+            ? say(
+                bump(paid, { hygiene: 8 }),
+                'Réserve sécurisée. Même la douche est devenue comptable.',
+              )
+            : say(s, 'Même le portefeuille est en coupure.')
+        },
+      },
+    ],
+  },
+  {
+    id: 'harmattan-kara',
+    icon: '🌫️',
+    title: 'L’harmattan a blanchi Kara',
+    body: 'La poussière est arrivée avant le taxi. On voit les collines comme à travers une moustiquaire.',
+    choices: [
+      {
+        label: 'Nouer un foulard et continuer',
+        hint: 'Énergie −8 · Hygiène −12',
+        apply: (s) =>
+          say(
+            bump(s, { energy: -8, hygiene: -12 }),
+            'Tu avances. Tes chaussures ont changé de couleur sans permission.',
+          ),
+      },
+      {
+        label: 'Prendre un thé chaud · 300 FCFA',
+        hint: 'Énergie +10 · Social +6',
+        apply: (s) => {
+          const paid = pay(s, 300)
+          return paid
+            ? say(
+                bump(paid, { energy: 10, social: 6 }),
+                'Thé partagé au bord de la route. Le froid recule.',
+              )
+            : say(s, 'Tu gardes les mains dans les poches et le portefeuille aussi.')
+        },
+      },
+    ],
+  },
+  {
+    id: 'mousson-lome',
+    icon: '🌧️',
+    title: 'La mousson lance son direct',
+    body: 'À Lomé, le ciel vient d’ouvrir tous ses robinets. Même les zémidjans négocient avec les nuages.',
+    choices: [
+      {
+        label: 'S’abriter chez une vendeuse',
+        hint: 'Social +12 · Faim +8 · 400 FCFA',
+        apply: (s) => {
+          const paid = pay(s, 400)
+          return paid
+            ? say(
+                bump(paid, { social: 12, hunger: 8 }),
+                'Beignets chauds, pluie dehors : finalement le retard a bon goût.',
+              )
+            : say(s, 'Tu t’abrites seulement. La bonne odeur, elle, est gratuite.')
+        },
+      },
+      {
+        label: 'Courir sous la pluie',
+        hint: 'Énergie −12 · Hygiène +5',
+        apply: (s) =>
+          say(
+            bump(s, { energy: -12, hygiene: 5 }),
+            'Arrivé trempé. Le quartier applaudit la performance, pas la prudence.',
+          ),
+      },
+    ],
+  },
+  {
+    id: 'livraison-marche',
+    icon: '📦',
+    title: 'Livraison urgente au marché',
+    body: 'Un tricycle est bloqué et les tomates attendent. Le vendeur cherche quelqu’un avant que le soleil ne négocie leur prix.',
+    choices: [
+      {
+        label: 'Aider au déchargement',
+        hint: '+1 200 FCFA · Énergie −15',
+        apply: (s) =>
+          say(
+            bump({ ...s, wallet: s.wallet + 1200, earned: s.earned + 1200 }, { energy: -15 }),
+            'Livraison sauvée : +1 200 FCFA. Les tomates te saluent.',
+          ),
+      },
+      {
+        label: 'Appeler un ami livreur',
+        hint: 'Social +10',
+        apply: (s) =>
+          say(
+            bump(s, { social: 10 }),
+            'Ton contact arrive en tricycle. Le réseau du quartier a encore gagné.',
+          ),
+      },
+    ],
+  },
+  {
+    id: 'alerte-createur',
+    icon: '📱',
+    title: 'Ça tourne sur le fil vidéo',
+    body: '@tantie_marche.jeu, créatrice fictive HarooLife, annonce : « Le prix est doux aujourd’hui. Demain, je ne promets rien hein ! »',
+    choices: [
+      {
+        label: 'Passer voir le marché',
+        hint: 'Loisir +8 · Social +6',
+        apply: (s) =>
+          say(
+            bump(s, { fun: 8, social: 6 }),
+            'La vidéo avait raison : tout le quartier est déjà là.',
+          ),
+      },
+      {
+        label: 'Couper les notifications',
+        hint: 'Énergie +4',
+        apply: (s) =>
+          say(bump(s, { energy: 4 }), 'Silence numérique. Même le téléphone se repose.'),
+      },
+    ],
+  },
+  {
+    id: 'kiosque-lonato',
+    icon: '🎟️',
+    title: 'Le kiosque LONATO affiche les résultats',
+    body: 'Les voisins commentent les numéros. HarooLife ne vend aucun pari et ne promet aucun gain : ici, on discute seulement.',
+    choices: [
+      {
+        label: 'Écouter les commentaires',
+        hint: 'Social +8 · Loisir +6',
+        apply: (s) =>
+          say(
+            bump(s, { social: 8, fun: 6 }),
+            'Chacun avait « presque trouvé ». Le débat, lui, est gagnant.',
+          ),
+      },
+      {
+        label: 'Continuer sa route',
+        hint: 'Énergie conservée',
+        apply: (s) => say(s, 'Tu continues ton programme sans miser un franc.'),
+      },
+    ],
+  },
+  {
     id: 'inondation-be',
     icon: '🌊',
     title: 'La rue est inondée !',

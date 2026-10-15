@@ -19,6 +19,29 @@ import {
   saveAvatar,
   shownModel,
 } from '@/lib/haroolife/city/avatar'
+import {
+  COMPANIES,
+  type Stop,
+  coachTrip,
+  companyById,
+  hh,
+  routeOf,
+} from '@/lib/haroolife/city/coaches'
+import {
+  CAMERA_MODE_STORAGE,
+  STREET_CAMERA_MODES,
+  type StreetCameraMode,
+  isStreetCameraMode,
+  nextStreetCameraMode,
+} from '@/lib/haroolife/city/camera-modes'
+import {
+  type Fare,
+  bearingTo,
+  canDrop,
+  completeFare,
+  remaining,
+  startFare,
+} from '@/lib/haroolife/city/fares'
 import { CAMERA_HOME, type CameraState, worldPos } from '@/lib/haroolife/city/geometry'
 import {
   type InteractionTarget,
@@ -52,33 +75,12 @@ import {
   useProp,
   walkStep,
 } from '@/lib/haroolife/city/life'
-import {
-  COMPANIES,
-  type Stop,
-  coachTrip,
-  companyById,
-  hh,
-  routeOf,
-} from '@/lib/haroolife/city/coaches'
-import {
-  type Fare,
-  bearingTo,
-  canDrop,
-  completeFare,
-  remaining,
-  startFare,
-} from '@/lib/haroolife/city/fares'
 import { LOCALITIES, LOCALITY_IDS, type LocalityId } from '@/lib/haroolife/city/locality'
 import { CITY_STORAGE, loadCityLife } from '@/lib/haroolife/city/migrate'
 import { ESTATE_GATE } from '@/lib/haroolife/city/navigation'
 import { findPath } from '@/lib/haroolife/city/navigation'
 import { bump } from '@/lib/haroolife/city/perf'
-import {
-  type CameraRig,
-  FOLLOW_DISTANCE,
-  type InputState,
-  PlayerController,
-} from '@/lib/haroolife/city/player'
+import { FOLLOW_DISTANCE, type InputState, PlayerController } from '@/lib/haroolife/city/player'
 import {
   PRESETS,
   type Quality,
@@ -146,11 +148,13 @@ import {
 } from '@/lib/haroolife/lome-life-engine'
 import { placeResidents, residentsAt } from '@/lib/haroolife/lome-presence'
 import { BILLBOARDS, PARTNER_APPS, billboardById } from '@/lib/haroolife/lome-sponsors'
+import { STREET_VENDORS, TOGO_JOBS, TOGO_JOB_IDS } from '@/lib/haroolife/togo-social-life'
 import { type BuildType, CATALOG } from '@/lib/haroolife/townsmen-engine'
 import { ROLE_LABELS } from '@/lib/haroolife/world'
 import {
   ArrowRight,
   Bell,
+  Camera,
   Check,
   Clock3,
   Hammer,
@@ -178,8 +182,8 @@ import DiagOverlay, { initialDiag, rememberDiag } from './city/diag-overlay'
 import Joystick, { useKeyboardInput } from './city/joystick'
 import MarketPanel from './city/market-panel'
 import NationalMap from './city/national-map'
-import TravelSplash from './city/travel-splash'
 import OnboardingSteps from './city/onboarding'
+import TravelSplash from './city/travel-splash'
 import LiveChat from './live-chat'
 import { PAGNES } from './pagnes'
 import { PhoneDevice } from './phone-device'
@@ -239,7 +243,7 @@ const BUILDINGS: BuildType[] = [
   'well',
   'park',
 ]
-const JOBS: Career[] = ['vendeur', 'boulanger', 'agent-communal']
+const JOBS: Career[] = TOGO_JOB_IDS
 const VENUE_LABELS: Record<string, string> = {
   house: 'Maison',
   market: 'Marché',
@@ -452,6 +456,7 @@ export function LomeLifeImmersive() {
    * view keeps the close camera and shows no town-wide filters or names.
    */
   const [mapView, setMapView] = useState(false)
+  const [cameraMode, setCameraMode] = useState<StreetCameraMode>('follow')
   const playHeading = useRef(35)
   const [showNames, setShowNames] = useState(false)
   const [chunkStats, setChunkStats] = useState({
@@ -463,6 +468,17 @@ export function LomeLifeImmersive() {
   const frameRef = useRef({ drawCalls: 0, fps: 0 })
   const [quality, setQuality] = useState<Quality>('balanced')
   useEffect(() => setQuality(detectQuality()), [])
+  useEffect(() => {
+    let saved: string | null = null
+    try {
+      saved = localStorage.getItem(CAMERA_MODE_STORAGE)
+    } catch {
+      /* storage can be blocked; the normal follow camera remains available */
+    }
+    const mode = isStreetCameraMode(saved) ? saved : 'follow'
+    setCameraMode(mode)
+    controller.camera.distance = STREET_CAMERA_MODES[mode].distance
+  }, [controller])
   // Adaptive quality: when frames stay slow for two consecutive checks the preset steps down
   // (the machine, not the player, decides), so the interface never freezes behind the renderer.
   // With hysteresis: three slow checks step down, a fast minute steps back up (never above
@@ -1319,10 +1335,22 @@ export function LomeLifeImmersive() {
     const rig = controller.camera
     rig.follow = true
     rig.angle = playHeading.current
-    rig.distance = FOLLOW_DISTANCE
+    rig.distance = STREET_CAMERA_MODES[cameraMode].distance
     setCamera((c) => ({ ...c, distance: rig.distance, angle: rig.angle }))
     setShowNames(false)
     setMapView(false)
+  }
+  function cycleCameraMode() {
+    const next = nextStreetCameraMode(cameraMode)
+    setCameraMode(next)
+    controller.camera.follow = true
+    controller.camera.distance = STREET_CAMERA_MODES[next].distance
+    setCamera((old) => ({ ...old, distance: controller.camera.distance }))
+    try {
+      localStorage.setItem(CAMERA_MODE_STORAGE, next)
+    } catch {
+      /* the selected mode still works for this session */
+    }
   }
   function open(id: Exclude<Sheet, null>) {
     setPanel((cur) => (cur === id ? null : id))
@@ -1944,6 +1972,18 @@ export function LomeLifeImmersive() {
             />
           </div>
           <div className="pointer-events-auto flex flex-col items-end gap-2">
+            {!insideAny && !riding && (
+              <button
+                type="button"
+                onClick={cycleCameraMode}
+                aria-label={`${STREET_CAMERA_MODES[cameraMode].label}. Changer de caméra`}
+                title="Changer la distance de la caméra"
+                className="flex min-h-11 items-center gap-2 rounded-full border border-white/70 bg-white/95 px-3 py-2 text-xs font-black text-slate-800 shadow-lg backdrop-blur"
+              >
+                <Camera size={18} className="text-emerald-700" />
+                {STREET_CAMERA_MODES[cameraMode].shortLabel}
+              </button>
+            )}
             {driving && hail && !fare && (
               <button
                 type="button"
@@ -2782,7 +2822,9 @@ export function LomeLifeImmersive() {
                         }
                       >
                         <span>
-                          <strong className="block capitalize">{job}</strong>
+                          <strong className="block">
+                            {TOGO_JOBS[job].icon} {TOGO_JOBS[job].label}
+                          </strong>
                           <span className="text-xs text-slate-500">
                             Lieu : {VENUE_LABELS[jobVenue(job)]}
                           </span>
@@ -3368,6 +3410,23 @@ export function LomeLifeImmersive() {
                             </p>
                           </div>
                         </div>
+                        {lot.type === 'market' && (
+                          <div className="grid grid-cols-2 gap-2" aria-label="Vendeurs du marché">
+                            {STREET_VENDORS.map((vendor, index) => (
+                              <div key={vendor.id} className="rounded-2xl bg-amber-50 p-3 text-xs">
+                                <strong className="block text-sm">
+                                  {vendor.icon} {vendor.name}
+                                </strong>
+                                <span className="block text-slate-600">
+                                  {vendor.offer} · {money(vendor.price)}
+                                </span>
+                                <span className="mt-1 block italic text-amber-900">
+                                  « {vendor.lines[(life.day + index) % vendor.lines.length]} »
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         {acts.length > 0 && (
                           <div className="flex flex-wrap gap-1.5" aria-label="Activités proposées">
                             {acts.map((a) => (

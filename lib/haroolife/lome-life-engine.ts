@@ -1,5 +1,6 @@
 import { CITIES, type CityId, isCityId } from './lome-districts'
 import { EVENT_IDS, rollEvent } from './lome-events'
+import { TOGO_JOBS, type TogoJobId } from './togo-social-life'
 /**
  * HarooLife — Lomé life/city gameplay slice, entirely fictitious.
  * Models life needs, real player movement on connected in-game streets,
@@ -25,7 +26,7 @@ import {
 } from './vendor/simcity-road-path'
 
 export type Venue = 'house' | 'market' | 'bakery' | 'hall' | 'well' | 'park'
-export type Career = 'vendeur' | 'boulanger' | 'agent-communal'
+export type Career = TogoJobId
 export type Action =
   | 'work'
   | 'buy-meal'
@@ -73,9 +74,14 @@ export interface LifeState {
   cityId: CityId
 }
 export const SALARIES: Record<Career, number> = {
-  vendeur: 3400,
-  boulanger: 4200,
-  'agent-communal': 3900,
+  vendeur: TOGO_JOBS.vendeur.wage,
+  boulanger: TOGO_JOBS.boulanger.wage,
+  'agent-communal': TOGO_JOBS['agent-communal'].wage,
+  livreur: TOGO_JOBS.livreur.wage,
+  'conducteur-tricycle': TOGO_JOBS['conducteur-tricycle'].wage,
+  'manutentionnaire-agricole': TOGO_JOBS['manutentionnaire-agricole'].wage,
+  couturier: TOGO_JOBS.couturier.wage,
+  'vendeur-mobile-money': TOGO_JOBS['vendeur-mobile-money'].wage,
 }
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)))
 const id = (p: RoadPoint) => p.x + ':' + p.y
@@ -222,7 +228,11 @@ export function selectJob(state: LifeState, job: Career): LifeState {
   )
 }
 export function jobVenue(job: Career): Venue {
-  return job === 'vendeur' ? 'market' : job === 'boulanger' ? 'bakery' : 'hall'
+  if (job === 'boulanger') return 'bakery'
+  if (job === 'agent-communal' || job === 'conducteur-tricycle') return 'hall'
+  // The market is the departure/dispatch point for selling, deliveries, farm handling,
+  // tailoring and mobile-money shifts in the current playable neighbourhood.
+  return 'market'
 }
 function nearVenue(state: LifeState, venue: Venue): boolean {
   if (state.inside === venue) return true

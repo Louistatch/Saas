@@ -1,6 +1,6 @@
 /**
- * The one manifest of playable characters, shared by both renderers (PlayCanvas outdoors,
- * React Three Fiber indoors): file, raw height, clip names, which materials take the pagne
+ * The one manifest of playable characters, shared by the imperative Three.js street renderer
+ * and the interior renderers: file, raw height, clip names, which materials take the pagne
  * colour, skin and hair. Two families:
  * - Quaternius adult characters (CC0, public/haroolife/vendor/quaternius): ~1.85 units tall,
  *   clips Idle, Idle_Neutral, Interact, Run, Walk, Wave. The default for new games.
