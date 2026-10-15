@@ -6,6 +6,7 @@ import { performLogout } from '@/lib/auth/logout'
 import {
   Activity,
   Award,
+  BookOpen,
   Briefcase,
   Bug,
   Building2,
@@ -90,6 +91,7 @@ const ADMIN_SECTIONS: { title: string; links: AdminLink[] }[] = [
     title: 'Économie',
     links: [
       { href: '/admin/comptes-exploitation', label: "Comptes d'exploitation", icon: FileText },
+      { href: '/admin/referentiel-agronomique', label: 'Référentiel agronomique', icon: BookOpen },
       { href: '/admin/organization-earnings', label: 'Gains des organisations', icon: Coins },
       { href: '/admin/credits', label: 'Demandes de crédit', icon: Landmark },
     ],

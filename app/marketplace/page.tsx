@@ -1,37 +1,26 @@
 'use client'
 
-import { Suspense, useState } from 'react'
 import { FicheFilterBar } from '@/components/marketplace/fiche-filter-bar'
 import { FicheGrid } from '@/components/marketplace/fiche-grid'
+import { MarketplaceFilterBar } from '@/components/marketplace/filter-bar'
 import { MyPurchases } from '@/components/marketplace/my-purchases'
 import { PresalesStrip } from '@/components/marketplace/presales-strip'
-import { MarketplaceFilterBar } from '@/components/marketplace/filter-bar'
 import { ProductGrid } from '@/components/marketplace/product-grid'
-import { useMarketplaceFilters } from '@/hooks/use-marketplace-filters'
+import { MarketingLayout } from '@/components/shared/marketing-layout'
+import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useFichesPublic } from '@/hooks/use-fiches-public'
 import { useMarketplaceData } from '@/hooks/use-marketplace-data'
-import { MarketingLayout } from '@/components/shared/marketing-layout'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { FileText, ShoppingCart } from 'lucide-react'
+import { useMarketplaceFilters } from '@/hooks/use-marketplace-filters'
+import { Calculator, FileText, ShoppingCart } from 'lucide-react'
+import Link from 'next/link'
+import { Suspense, useState } from 'react'
 
 function FichesTab() {
-  const {
-    filters,
-    localSearch,
-    setLocalSearch,
-    setFilter,
-    resetFilters,
-    activeFilterCount,
-  } = useMarketplaceFilters()
+  const { filters, localSearch, setLocalSearch, setFilter, resetFilters, activeFilterCount } =
+    useMarketplaceFilters()
 
-  const {
-    fiches,
-    total,
-    totalPages,
-    isLoading,
-    error,
-    referenceData,
-  } = useFichesPublic(filters)
+  const { fiches, total, totalPages, isLoading, error, referenceData } = useFichesPublic(filters)
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
@@ -74,23 +63,11 @@ function FichesTab() {
 }
 
 function ProduitsTab() {
-  const {
-    filters,
-    localSearch,
-    setLocalSearch,
-    setFilter,
-    resetFilters,
-    activeFilterCount,
-  } = useMarketplaceFilters()
+  const { filters, localSearch, setLocalSearch, setFilter, resetFilters, activeFilterCount } =
+    useMarketplaceFilters()
 
-  const {
-    products,
-    total,
-    totalPages,
-    isLoading,
-    error,
-    referenceData,
-  } = useMarketplaceData(filters)
+  const { products, total, totalPages, isLoading, error, referenceData } =
+    useMarketplaceData(filters)
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
@@ -139,13 +116,17 @@ function MarketplaceContent() {
       {/* Hero */}
       <section className="bg-gradient-to-br from-primary/5 via-background to-accent/5 border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-            Marketplace agricole
-          </h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Marketplace agricole</h1>
           <p className="text-muted-foreground mt-2 max-w-2xl">
-            Accédez aux comptes d'exploitation et aux produits agricoles publiés par les coopératives.
-            Filtrez par région, préfecture ou canton pour trouver ce qui vous correspond.
+            Accédez aux comptes d'exploitation et aux produits agricoles publiés par les
+            coopératives. Filtrez par région, préfecture ou canton pour trouver ce qui vous
+            correspond.
           </p>
+          <Button asChild className="mt-5 gap-2">
+            <Link href="/comptes-exploitation/nouveau">
+              <Calculator className="h-4 w-4" /> Simuler mon compte d’exploitation
+            </Link>
+          </Button>
         </div>
       </section>
 
