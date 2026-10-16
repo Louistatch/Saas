@@ -17,6 +17,7 @@ import { type NpcAnim, animFor, layoutFor } from './interiors'
 import { type Commerce, decodeCommerce, emptyCommerce } from './commerce'
 import { type Farm, decodeFarm } from './farm'
 import { type SocialLife, decodeSocial } from './social'
+import { nextSession, sessionAt, sessionKey, whenOf } from './university'
 import { type Fleet, decodeFleet, manualVehicleService } from './vehicle-economy'
 import { restoreServiceVehicle } from './jobs'
 import { LOCALITIES, type LocalityId, current, isLocalityId, setLocality } from './locality'
@@ -110,6 +111,8 @@ export interface CityLife {
   duty?: 'moto' | 'taxi' | null
   /** « Mon champ »: the player's plot and the harvest not yet sold (see farm.ts). */
   farm?: Farm
+  /** Last university lecture followed (`day:slot`, see university.ts): once per lecture. */
+  lecture?: string
 }
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)))
@@ -218,6 +221,8 @@ export function decodeCityLife(value: unknown): CityLife | null {
     target: v.target ?? null,
     insideLot: v.insideLot ?? null,
     skills: v.skills!,
+    lecture:
+      typeof v.lecture === 'string' && /^\d{1,6}:[0-3]$/.test(v.lecture) ? v.lecture : undefined,
     visited: v.visited,
     fitness: Number.isInteger(v.fitness) && v.fitness! >= 0 && v.fitness! <= 100 ? v.fitness! : 0,
     activity: null,
@@ -570,6 +575,27 @@ export function cityInteract(s: CityLife, action: CityAction): CityLife {
       return note(bump(paid, { energy: 30, hygiene: 20 }), 'Consultation faite : −1 500 FCFA.')
     }
     case 'learn': {
+      if (lot.type === 'university') {
+        const now = sessionAt(s.life.day, s.life.hour)
+        if (!now) {
+          const next = nextSession(s.life.day, s.life.hour)
+          return note(
+            s,
+            next
+              ? `Pas de cours en ce moment. Prochain cours : ${next.course.title} avec ${next.course.lecturer.name}, ${whenOf(next, s.life.day)}.`
+              : 'Pas de cours cette semaine.',
+          )
+        }
+        if (s.lecture === sessionKey(now))
+          return note(s, `Tu suis déjà ce cours : ${now.course.title} jusqu’à ${now.end} h.`)
+        if (s.life.needs.energy < 15) return note(s, 'Trop fatigué pour suivre le cours.')
+        const paid = pay(s, 1000)
+        if (!paid) return note(s, 'Solde insuffisant pour les frais du cours.')
+        return note(
+          bump({ ...paid, skills: paid.skills + 1, lecture: sessionKey(now) }, { energy: -10 }),
+          `${now.course.title} avec ${now.course.lecturer.name} (${now.start} h–${now.end} h) : compétence ${paid.skills + 1}. −1 000 FCFA.`,
+        )
+      }
       const paid = pay(s, 1000)
       if (!paid) return note(s, 'Solde insuffisant pour le cours.')
       return note(
@@ -663,7 +689,7 @@ export function useProp(s: CityLife, propId: string): CityLife {
   const lot = s.insideLot ? lotById(s.insideLot) : null
   const room: Interior | null = lot ? interiorFor(lot.type) : null
   if (!room) return note(s, 'Entre d’abord dans un lieu.')
-  const prop = layoutFor(room, lot ?? undefined).props.find((p) => p.id === propId)
+  const prop = layoutFor(room, lot ?? undefined, s.life).props.find((p) => p.id === propId)
   if (!prop || !prop.action) return note(s, 'Rien à faire avec cet objet.')
   const next = cityInteract(s, prop.action as CityAction)
   if (next === s || next.life.lastEvent === s.life.lastEvent) return next

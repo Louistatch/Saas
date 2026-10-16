@@ -206,6 +206,9 @@ import LiveChat from './live-chat'
 import { PAGNES } from './pagnes'
 import FarmPanel from './farm-panel'
 import InvitePanel from './invite-panel'
+import PayBubbles, { usePayBubbles } from './pay-bubbles'
+import PhotoPanel from './photo-panel'
+import Timetable from './timetable'
 import { PhoneDevice } from './phone-device'
 import { HomeDialog } from './residence-dialog'
 import { sayOnPlace, usePresence } from './use-presence'
@@ -246,6 +249,7 @@ type Sheet =
   | 'debates'
   | 'farm'
   | 'invite'
+  | 'photo'
   | null
 type Mode = 'walk' | 'build' | 'demolish'
 /** The module a HarooLife address opens inside the single 3D world. */
@@ -668,33 +672,35 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                     ? 'Mon champ'
                     : panel === 'invite'
                       ? 'Inviter des amis'
-                  : panel === 'messages'
-                    ? 'Messages du quartier'
-                    : panel === 'wallet'
-                      ? 'Mes finances'
-                      : panel === 'missions'
-                        ? 'Mes objectifs'
-                        : panel === 'journal'
-                          ? 'Journal de vie'
-                          : panel === 'billboard'
-                            ? 'Panneau publicitaire'
-                            : panel === 'ad'
-                              ? adFocus && isSponsored(adFocus.campaign)
-                                ? 'Promotion'
-                                : 'Information FaîtiereHub'
-                              : panel === 'lot'
-                                ? 'Lieu'
-                                : panel === 'cooperative'
-                                  ? 'Coopérative'
-                                  : panel === 'avatar'
-                                    ? 'Mon apparence'
-                                    : panel === 'player'
-                                      ? playerKey?.startsWith('npc:')
-                                        ? 'Habitant'
-                                        : 'Joueur'
-                                      : panel === 'market'
-                                        ? 'Marché'
-                                        : ''
+                      : panel === 'photo'
+                        ? 'Photo du jeu'
+                        : panel === 'messages'
+                          ? 'Messages du quartier'
+                          : panel === 'wallet'
+                            ? 'Mes finances'
+                            : panel === 'missions'
+                              ? 'Mes objectifs'
+                              : panel === 'journal'
+                                ? 'Journal de vie'
+                                : panel === 'billboard'
+                                  ? 'Panneau publicitaire'
+                                  : panel === 'ad'
+                                    ? adFocus && isSponsored(adFocus.campaign)
+                                      ? 'Promotion'
+                                      : 'Information FaîtiereHub'
+                                    : panel === 'lot'
+                                      ? 'Lieu'
+                                      : panel === 'cooperative'
+                                        ? 'Coopérative'
+                                        : panel === 'avatar'
+                                          ? 'Mon apparence'
+                                          : panel === 'player'
+                                            ? playerKey?.startsWith('npc:')
+                                              ? 'Habitant'
+                                              : 'Joueur'
+                                            : panel === 'market'
+                                              ? 'Marché'
+                                              : ''
   const needs = life.needs
   const wellbeing = Math.round(NEED_KEYS.reduce((sum, k) => sum + needs[k], 0) / NEED_KEYS.length)
   const pending = eventById(life.pendingEvent)
@@ -858,6 +864,11 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     }
   }
   const mood = wellbeing >= 75 ? 'Heureux' : wellbeing >= 40 ? 'Bien' : 'Fatigué'
+  // At the wheel on a shift: the street stays visible, money moves show as brief bubbles.
+  const onDuty = driving && !!cityLife.duty
+  const dutyCare = cityLife.duty ? vehicleCare(cityLife, cityLife.duty) : null
+  const payBubbles = usePayBubbles(life.wallet, onDuty, dutyCare?.lastReceipt, life.lastEvent)
+  const [dutyOpen, setDutyOpen] = useState(false)
   const status =
     driving && cityLife.duty
       ? serviceState.stop
@@ -970,7 +981,11 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
       ? interiorFor(lotById(cityLife.insideLot)?.type ?? 'lot')
       : (life.inside as Interior | null)
     const layout = room
-      ? layoutFor(room, cityLife.insideLot ? (lotById(cityLife.insideLot) ?? undefined) : undefined)
+      ? layoutFor(
+          room,
+          cityLife.insideLot ? (lotById(cityLife.insideLot) ?? undefined) : undefined,
+          life,
+        )
       : null
     ;(window as unknown as { __LOME_CITY?: unknown }).__LOME_CITY = {
       ...chunkStats,
@@ -1777,6 +1792,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
       ? layoutFor(
           room,
           cityLife.insideLot ? (lotById(cityLife.insideLot) ?? undefined) : undefined,
+          life,
         ).props.find((p) => p.action === a)
       : null
     if (prop) {
@@ -1944,6 +1960,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
               avatarPagne={pagneColor(avatar.pagne)}
               camera={camera}
               hour={life.hour}
+              day={life.day}
               interior={interior}
               interiorTitle={
                 cityLife.insideLot
@@ -2158,22 +2175,26 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
           </button>
         </div>
         <div className="pointer-events-auto mx-auto mt-2 flex max-w-[900px] items-start justify-between gap-2">
-          <button
-            type="button"
-            onClick={() => open('missions')}
-            className="flex max-w-[79%] items-center gap-2 rounded-full border border-white/40 bg-white/85 px-3 py-2 text-left text-xs font-semibold shadow-md backdrop-blur"
-          >
-            <span>🎯</span>
-            <span className="truncate">
-              {life.route.length
-                ? 'Destination en cours…'
-                : needs.hunger < 35
-                  ? 'Mange quelque chose'
-                  : life.workToday
-                    ? 'Développe ton quartier'
-                    : 'Gagne ton premier salaire'}
-            </span>
-          </button>
+          {onDuty ? (
+            <span />
+          ) : (
+            <button
+              type="button"
+              onClick={() => open('missions')}
+              className="flex max-w-[79%] items-center gap-2 rounded-full border border-white/40 bg-white/85 px-3 py-2 text-left text-xs font-semibold shadow-md backdrop-blur"
+            >
+              <span>🎯</span>
+              <span className="truncate">
+                {life.route.length
+                  ? 'Destination en cours…'
+                  : needs.hunger < 35
+                    ? 'Mange quelque chose'
+                    : life.workToday
+                      ? 'Développe ton quartier'
+                      : 'Gagne ton premier salaire'}
+              </span>
+            </button>
+          )}
           {actor && (
             <button
               type="button"
@@ -2194,6 +2215,11 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
             {playing ? <Pause size={17} /> : <Play size={17} />}
           </button>
         </div>
+        {payBubbles.length > 0 && (
+          <div className="mx-auto mt-1 flex max-w-[900px] justify-end">
+            <PayBubbles bubbles={payBubbles} />
+          </div>
+        )}
         {mode !== 'walk' && (
           <div className="pointer-events-auto mx-auto mt-2 flex max-w-[900px] items-center justify-between gap-2 rounded-2xl border border-emerald-200 bg-emerald-950/90 px-3 py-2 text-xs font-semibold text-white shadow">
             <span>
@@ -2275,62 +2301,87 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                 className="flex min-h-11 items-center gap-2 rounded-full border border-white/70 bg-white/95 px-3 py-2 text-xs font-black text-slate-800 shadow-lg backdrop-blur"
               >
                 <Camera size={18} className="text-emerald-700" />
-                {STREET_CAMERA_MODES[cameraMode].shortLabel}
+                {!onDuty && STREET_CAMERA_MODES[cameraMode].shortLabel}
               </button>
             )}
-            {driving && cityLife.duty && (
-              <output
+            {onDuty && dutyCare && (
+              // One line over the street; tap it for the details of the shift.
+              <button
+                type="button"
                 data-testid="service-status"
-                aria-live="polite"
-                className="max-w-[13rem] rounded-2xl bg-emerald-800 px-3 py-2 text-xs text-white shadow-lg"
+                aria-expanded={dutyOpen}
+                onClick={() => setDutyOpen((o) => !o)}
+                className="flex max-w-[14rem] items-center gap-1.5 rounded-full bg-emerald-800/90 py-1.5 pl-1.5 pr-3 text-left text-[11px] font-bold text-white shadow-lg backdrop-blur"
               >
-                <strong className="block">
-                  {serviceState.stop
-                    ? `${serviceState.phase === 'servicing' ? 'En cours' : 'Vers'} : ${serviceState.stop.service === 'fuel' ? 'Station-service' : serviceState.stop.service === 'garage' ? 'Garage' : 'Contrôle de police'}`
-                    : serviceState.phase === 'pickup'
-                      ? `Prise en charge de ${hail}`
-                      : serviceState.phase === 'trip'
-                        ? 'Trajet automatique'
-                        : serviceState.phase === 'paid'
-                          ? 'Client déposé · course payée'
-                          : 'Recherche automatique de clients'}
-                </strong>
-                <span>
-                  {serviceState.completed} course(s) · brut {money(serviceState.earned)}
-                </span>
-                <span className="mt-1 block text-emerald-100">
-                  ⛽ {(vehicleCare(cityLife, cityLife.duty).fuelMl / 1000).toFixed(1)} L · entretien
-                  automatique
-                </span>
-                {vehicleCare(cityLife, cityLife.duty).lastReceipt && (
-                  <span className="block font-bold">
-                    Dernière course : net +
-                    {money(vehicleCare(cityLife, cityLife.duty).lastReceipt!.net)}
+                {fare && serviceState.phase === 'trip' && !serviceState.stop ? (
+                  <span
+                    data-testid="fare-banner"
+                    aria-label={`Course vers ${fare.to.name}`}
+                    className="flex min-w-0 items-center gap-1.5"
+                  >
+                    <span
+                      aria-hidden
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-400 text-sm font-black text-slate-900"
+                      style={{ transform: `rotate(${fareLive.arrow.toFixed(0)}deg)` }}
+                    >
+                      ↑
+                    </span>
+                    <span className="shrink-0">{money(fare.price)}</span>
+                    <span className="truncate font-semibold text-emerald-100">{fare.to.name}</span>
+                  </span>
+                ) : (
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span aria-hidden className="text-sm leading-none">
+                      {serviceState.stop
+                        ? serviceState.stop.service === 'fuel'
+                          ? '⛽'
+                          : serviceState.stop.service === 'garage'
+                            ? '🔧'
+                            : '👮'
+                        : serviceState.phase === 'pickup'
+                          ? '🧍'
+                          : serviceState.phase === 'paid'
+                            ? '✅'
+                            : '🔎'}
+                    </span>
+                    <span className="truncate">
+                      {serviceState.stop
+                        ? serviceState.stop.service === 'fuel'
+                          ? 'Station-service'
+                          : serviceState.stop.service === 'garage'
+                            ? 'Garage'
+                            : 'Contrôle de police'
+                        : serviceState.phase === 'pickup'
+                          ? hail
+                          : serviceState.phase === 'paid'
+                            ? 'Course payée'
+                            : 'Client…'}
+                    </span>
                   </span>
                 )}
-              </output>
+              </button>
             )}
-            {driving && fare && (
+            {onDuty && dutyCare && dutyOpen && (
               <output
-                data-testid="fare-banner"
-                aria-label={`Course vers ${fare.to.name}`}
-                className="flex max-w-[13rem] items-center gap-2 rounded-2xl bg-white/95 px-3 py-2 text-xs shadow-lg ring-1 ring-amber-300"
+                data-testid="service-details"
+                className="max-w-[14rem] rounded-2xl bg-emerald-900/90 px-3 py-2 text-[11px] text-white shadow-lg"
               >
-                <span
-                  aria-hidden
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-400 text-base font-black text-slate-900"
-                  style={{ transform: `rotate(${fareLive.arrow.toFixed(0)}deg)` }}
-                >
-                  ↑
-                </span>
-                <span className="min-w-0 leading-tight">
-                  <strong className="block truncate">
-                    {fare.passenger} → {fare.to.name}
-                  </strong>
-                  <span className="text-slate-600">
-                    {fareLive.left} cases · {money(fare.price)}
+                {fare && (
+                  <span className="block truncate font-bold">
+                    {fare.passenger} → {fare.to.name} · {fareLive.left} cases
                   </span>
+                )}
+                <span className="block">
+                  {serviceState.completed} course(s) · brut {money(serviceState.earned)}
                 </span>
+                <span className="block text-emerald-100">
+                  ⛽ {(dutyCare.fuelMl / 1000).toFixed(1)} L · entretien automatique
+                </span>
+                {dutyCare.lastReceipt && (
+                  <span className="block font-bold">
+                    Dernière course : net +{money(dutyCare.lastReceipt.net)}
+                  </span>
+                )}
               </output>
             )}
             {!insideAny && cityLife.duty && !nearVehicle && !driving && panel === null && (
@@ -2414,22 +2465,26 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                 </span>
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => open('build')}
-              aria-label="Ouvrir les outils de construction"
-              className="rounded-full bg-emerald-700 p-3 text-white shadow-lg"
-            >
-              <Hammer size={21} />
-            </button>
-            <button
-              type="button"
-              onClick={() => open('missions')}
-              aria-label="Ouvrir les objectifs"
-              className="rounded-full bg-white/90 p-3 text-slate-900 shadow"
-            >
-              <Bell size={20} />
-            </button>
+            {!onDuty && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => open('build')}
+                  aria-label="Ouvrir les outils de construction"
+                  className="rounded-full bg-emerald-700 p-3 text-white shadow-lg"
+                >
+                  <Hammer size={21} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => open('missions')}
+                  aria-label="Ouvrir les objectifs"
+                  className="rounded-full bg-white/90 p-3 text-slate-900 shadow"
+                >
+                  <Bell size={20} />
+                </button>
+              </>
+            )}
           </div>
         </div>
         {life.inside && hereNow.length > 0 && (
@@ -2451,7 +2506,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
             {hereNow.length > 6 && <span className="text-white">+{hereNow.length - 6}</span>}
           </div>
         )}
-        <div className="pointer-events-auto mx-auto mt-2 max-w-[900px]">
+        <div className={`pointer-events-auto mx-auto mt-2 max-w-[900px] ${onDuty ? 'hidden' : ''}`}>
           <button
             type="button"
             onClick={() => open('journal')}
@@ -3029,6 +3084,15 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                   </>
                 )}
                 {panel === 'invite' && <InvitePanel onOpen={() => void invites.refresh()} />}
+                {panel === 'photo' && (
+                  <PhotoPanel
+                    place={
+                      cityLife.insideLot
+                        ? `${lotById(cityLife.insideLot)?.name ?? 'Lomé'}, ${LOCALITIES[cityLife.locality].name}`
+                        : LOCALITIES[cityLife.locality].name
+                    }
+                  />
+                )}
                 {panel === 'farm' && (
                   <FarmPanel cityLife={cityLife} update={(change) => setCityLife(change)} />
                 )}
@@ -3741,7 +3805,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                       cityLife.insideLot === lot.id || doorLot?.id === lot.id || door?.id === lot.id
                     const insideHere = cityLife.insideLot === lot.id
                     const room = interiorFor(lot.type)
-                    const layout = room ? layoutFor(room, lot) : null
+                    const layout = room ? layoutFor(room, lot, life) : null
                     const acts = actionsFor(lot.type, lot.service)
                     const path = here ? null : findPath(cityLife.at, lot.door, roadsOf(cityLife))
                     const cells = path ? path.length - 1 : null
@@ -3831,23 +3895,28 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                         {insideHere && acts.length > 0 && (
                           <div className="space-y-2">
                             <p className="text-xs font-bold text-slate-700">Choisir une activité</p>
-                            {acts.map((a) => (
-                              <button
-                                type="button"
-                                key={a.id}
-                                onClick={() => startActivity(a.id)}
-                                className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm"
-                              >
-                                <span className="font-bold">{a.label}</span>
-                                <span className="text-xs text-slate-500">
-                                  {(a.id === 'fuel' || a.id === 'maintain') && cityLife.duty
-                                    ? `À payer : ${money(manualVehicleQuote(cityLife, cityLife.duty, a.id === 'fuel' ? 'fuel' : 'garage'))} après provisions`
-                                    : a.hint}
-                                </span>
-                              </button>
-                            ))}
+                            {acts.map((a) => {
+                              // The room's own wording when it has one (the lecture of the hour).
+                              const prop = layout?.props.find((p) => p.action === a.id)
+                              return (
+                                <button
+                                  type="button"
+                                  key={a.id}
+                                  onClick={() => startActivity(a.id)}
+                                  className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm"
+                                >
+                                  <span className="font-bold">{prop?.label ?? a.label}</span>
+                                  <span className="text-xs text-slate-500">
+                                    {(a.id === 'fuel' || a.id === 'maintain') && cityLife.duty
+                                      ? `À payer : ${money(manualVehicleQuote(cityLife, cityLife.duty, a.id === 'fuel' ? 'fuel' : 'garage'))} après provisions`
+                                      : (prop?.hint ?? a.hint)}
+                                  </span>
+                                </button>
+                              )
+                            })}
                           </div>
                         )}
+                        {lot.type === 'university' && <Timetable day={life.day} hour={life.hour} />}
                         {lot.type === 'cooperative' && actor && (
                           <p className="text-xs text-slate-600">
                             {worldAdapter.organizationsAt(lot, actor.organizations).length > 0

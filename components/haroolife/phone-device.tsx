@@ -17,6 +17,7 @@ export type PhoneApp =
   | 'debates'
   | 'farm'
   | 'invite'
+  | 'photo'
   | 'wallet'
   | 'missions'
   | 'journal'
@@ -30,6 +31,7 @@ const APPS: { id: PhoneApp | 'settings'; icon: string; name: string; tone: strin
   { id: 'debates', icon: '🎤', name: 'Débats', tone: '#be123c' },
   { id: 'farm', icon: '🌱', name: 'Mon champ', tone: '#4d7c0f' },
   { id: 'invite', icon: '📨', name: 'Inviter', tone: '#15803d' },
+  { id: 'photo', icon: '📸', name: 'Photo', tone: '#0e7490' },
   { id: 'wallet', icon: '💵', name: 'Argent', tone: '#15803d' },
   { id: 'missions', icon: '🎯', name: 'Missions', tone: '#c2410c' },
   { id: 'journal', icon: '📰', name: 'Journal', tone: '#475569' },

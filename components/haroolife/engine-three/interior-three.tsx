@@ -805,7 +805,7 @@ function Room({
       </mesh>
       {/* Touching a resident walks up to them, then opens the conversation. */}
       {layout.npcs
-        .filter((n) => !n.to)
+        .filter((n) => !n.to && !n.extra)
         .map((n) => (
           // biome-ignore lint/a11y/useKeyWithClickEvents: a 3D mesh; residents are also listed in the HUD.
           <mesh

@@ -350,6 +350,7 @@ export function sceneFromLayout(id: string, layout: Layout, s = LAYOUT_SCALE): R
     })
   }
   for (const n of layout.npcs) {
+    if (n.extra) continue
     const others = obstacles.filter((o) => o.id !== `npc:${n.id}`)
     let at = approachSpot(
       { x: n.x * s, z: n.z * s, rot: ((n.rot ?? 0) * Math.PI) / 180, hx: 0.3, hz: 0.3 },

@@ -89,6 +89,7 @@ export default function CityWorld({
   avatarPagne,
   camera,
   hour,
+  day,
   interior,
   interiorTitle,
   interiorLot,
@@ -140,6 +141,8 @@ export default function CityWorld({
   /** Camera state of the game (the interiors' viewing angle). */
   camera: CameraState
   hour: number
+  /** Game day (the university's timetable). */
+  day?: number
   interior: Interior | null
   interiorTitle: string
   interiorLot?: Lot
@@ -208,7 +211,7 @@ export default function CityWorld({
           <HarooRoomView
             key={`${interior}:${interiorLot?.id ?? 'home'}`}
             interior={interior}
-            layout={layoutFor(interior, interiorLot)}
+            layout={layoutFor(interior, interiorLot, { day: day ?? 1, hour })}
             title={interiorTitle}
             angle={camera.angle}
             activity={activity}
@@ -228,7 +231,7 @@ export default function CityWorld({
       {room === 'three' && interior && input && (
         <div className="absolute inset-0" data-renderer="three">
           <InteriorThree
-            layout={layoutFor(interior, interiorLot)}
+            layout={layoutFor(interior, interiorLot, { day: day ?? 1, hour })}
             title={interiorTitle}
             angle={camera.angle}
             activity={activity}

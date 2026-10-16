@@ -6,6 +6,7 @@
  */
 import type { Interior } from './life'
 import { actionsFor } from './activities'
+import { nextSession, sessionAt, sessionKey, universityLayout } from './university'
 import type { Lot } from './world'
 
 export type PropKind =
@@ -80,6 +81,8 @@ export interface Npc {
   role: string
   /** Walks back and forth to this point when set. */
   to?: { x: number; z: number }
+  /** A figurant (a student in the amphitheatre): present and animated, not talked to. */
+  extra?: boolean
 }
 export interface Layout {
   /** City rooms use their own furniture actions; the prototype home remains unchanged. */
@@ -721,33 +724,49 @@ const cityLayouts = new Map<string, Layout>()
 export function layoutFor(
   i: Interior,
   lot?: Pick<Lot, 'type' | 'service'> & Partial<Pick<Lot, 'name'>>,
+  /** Game day and hour: the university's lecture (lecturer, students) depends on it. */
+  clock: { day: number; hour: number } = { day: 1, hour: 8 },
 ): Layout {
   if (!lot) return LAYOUTS[i]
   const mosque = lot.type === 'worship' && /mosqu/i.test(lot.name ?? '')
-  const key = `${i}:${lot.type}:${lot.service ?? ''}:${mosque ? 'mosque' : ''}`
+  const university = lot.type === 'university'
+  // One layout per lecture (or per gap between two): the room is rebuilt when a course starts.
+  const session = university ? sessionAt(clock.day, clock.hour) : null
+  const next = university && !session ? nextSession(clock.day, clock.hour) : null
+  const lecture = university
+    ? session
+      ? `on:${sessionKey(session)}`
+      : `off:${clock.day}:${next ? sessionKey(next) : ''}`
+    : ''
+  const key = `${i}:${lot.type}:${lot.service ?? ''}:${mosque ? 'mosque' : ''}${lecture}`
   const cached = cityLayouts.get(key)
   if (cached) return cached
-  const base = mosque
-    ? {
-        ...LAYOUTS[i],
-        name: 'Mosquée du quartier',
-        wall: '#d8e6dc',
-        props: LAYOUTS[i].props.map(
-          (p): Prop =>
-            ['pew', 'altar'].includes(p.kind)
-              ? { ...p, kind: 'mat', label: p.action ? 'Moment de prière' : undefined }
-              : p,
-        ),
-      }
-    : LAYOUTS[i]
+  const base = university
+    ? universityLayout(clock.day, clock.hour)
+    : mosque
+      ? {
+          ...LAYOUTS[i],
+          name: 'Mosquée du quartier',
+          wall: '#d8e6dc',
+          props: LAYOUTS[i].props.map(
+            (p): Prop =>
+              ['pew', 'altar'].includes(p.kind)
+                ? { ...p, kind: 'mat', label: p.action ? 'Moment de prière' : undefined }
+                : p,
+          ),
+        }
+      : LAYOUTS[i]
   const actions = actionsFor(lot.type, lot.service)
   const allowed = new Set(actions.map((a) => a.id as string))
   const props = base.props.map((p): Prop => {
     if (!p.action) return p
     const action = p.action === 'buy-meal' ? 'browse' : p.action
     const definition = actions.find((a) => a.id === action)
+    // The university's seat names the lecture of the hour: its own label wins.
     return allowed.has(action)
-      ? { ...p, action, label: definition?.label ?? p.label, hint: definition?.hint ?? p.hint }
+      ? university
+        ? { ...p, action }
+        : { ...p, action, label: definition?.label ?? p.label, hint: definition?.hint ?? p.hint }
       : { ...p, action: undefined, label: undefined, hint: undefined }
   })
   const kinds: Partial<Record<string, PropKind>> = {
@@ -814,7 +833,7 @@ export function layoutFor(
     cityType: key,
     props,
     npcs: base.npcs.map((n, index) =>
-      index === 0 && roles[lot.service ?? lot.type]
+      index === 0 && !university && roles[lot.service ?? lot.type]
         ? { ...n, role: roles[lot.service ?? lot.type]! }
         : n,
     ),
