@@ -34,9 +34,9 @@ test('choose coach or plane: the flight to Kara from the street', async ({ page 
     await expect(
       map.getByRole('button', { name: new RegExp(`Voyager vers ${name} Car dès`) }),
     ).toBeVisible()
-  await expect(
-    map.getByRole('button', { name: /Voyager vers Kara Car dès/ }),
-  ).toContainText('Avion 1 h, 65 000 FCFA')
+  await expect(map.getByRole('button', { name: /Voyager vers Kara Car dès/ })).toContainText(
+    'Avion 1 h, 65 000 FCFA',
+  )
   await map.getByRole('button', { name: /Voyager vers Kara Car dès/ }).click()
   const choices = page.getByTestId('coach-companies')
   await expect(choices.getByRole('button', { name: /^Prendre le car / })).toHaveCount(5)
@@ -45,8 +45,59 @@ test('choose coach or plane: the flight to Kara from the street', async ({ page 
 
   // A taxi to the terminal, then the flight: the player is in Kara, the ticket paid once.
   await expect.poll(async () => (await live())?.locality, { timeout: 120000 }).toBe('kara')
+  // Inside the plane: the player seated by a porthole, other passengers, the sky outside.
+  const cabin = page.getByTestId('cabin')
+  await expect(cabin).toHaveAttribute('data-mode', 'plane')
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const c = (
+            window as unknown as {
+              __LOME_CABIN?: { seated: boolean; passengers: number; windows: number }
+            }
+          ).__LOME_CABIN
+          return c ? `${c.seated}:${c.passengers > 1}:${c.windows > 4}` : null
+        }),
+      { timeout: 30000 },
+    )
+    .toBe('true:true:true')
+  await page.waitForTimeout(1500)
+  await page.screenshot({ path: info.outputPath('plane-cabin.png') })
   const after = (await live())?.wallet ?? 0
   expect(after).toBeLessThanOrEqual(100000 - 65000)
   expect(after).toBeGreaterThan(100000 - 65000 - 2000)
+  expect(errors).toEqual([])
+})
+
+test('the coach: seated by the window on the way to Kpalimé', async ({ page }, info) => {
+  test.setTimeout(150_000)
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
+  await expect(page.locator('canvas:visible').first()).toBeVisible({ timeout: 30000 })
+  await openPlaces(page)
+  await page
+    .getByTestId('national-map')
+    .getByRole('button', { name: /Voyager vers Kpalimé Car dès 2 000 FCFA/ })
+    .click()
+  await page
+    .getByTestId('coach-companies')
+    .getByRole('button', { name: 'Prendre le car Minibus de la gare routière vers Kpalimé' })
+    .click()
+  await expect(page.getByTestId('cabin')).toHaveAttribute('data-mode', 'coach')
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () => (window as unknown as { __LOME_CABIN?: { seated: boolean } }).__LOME_CABIN?.seated,
+        ),
+      { timeout: 30000 },
+    )
+    .toBe(true)
+  await page.waitForTimeout(1500)
+  await page.screenshot({ path: info.outputPath('coach-cabin.png') })
+  // Arrived: the trip ends by itself once Kpalimé is drawn (or by « Descendre du car »).
+  await expect(page.getByTestId('travel-splash')).toHaveCount(0, { timeout: 45000 })
   expect(errors).toEqual([])
 })

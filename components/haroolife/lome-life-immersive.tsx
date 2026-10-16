@@ -107,6 +107,7 @@ import {
   detectQuality,
   lowerQuality,
   rememberQuality,
+  renderPixelRatio,
   softwareRenderer,
 } from '@/lib/haroolife/city/quality'
 import { TRAFFIC_STEP_MS } from '@/lib/haroolife/city/traffic'
@@ -205,6 +206,7 @@ import MarketPanel from './city/market-panel'
 import NationalMap from './city/national-map'
 import OnboardingSteps from './city/onboarding'
 import TravelSplash from './city/travel-splash'
+import HarooCabinView from './game/haroo-cabin-view'
 import LiveChat from './live-chat'
 import { PAGNES } from './pagnes'
 import FarmPanel from './farm-panel'
@@ -582,7 +584,11 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   } | null>(null)
   // Destination whose coach companies are being compared in the map sheet.
   const [coachTo, setCoachTo] = useState<LocalityId | null>(null)
-  const endJourney = useCallback(() => setJourney(null), [])
+  const [cabinReady, setCabinReady] = useState(false)
+  const endJourney = useCallback(() => {
+    setJourney(null)
+    setCabinReady(false)
+  }, [])
   // A flight booked away from the airport: the player is driven to the terminal, then boards.
   const [pendingFlight, setPendingFlight] = useState<LocalityId | null>(null)
   const [mode, setMode] = useState<Mode>('walk')
@@ -2023,7 +2029,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
       from: cityLife.locality,
       to,
       hours: trip.hours,
-      company: 'Vol HarooLife · simulation',
+      company: 'Vol Lomé – Niamtougou',
       mode: 'air',
     })
     setChunkStats({ chunks: 0, buildings: 0, tris: 0, detailed: false })
@@ -2165,6 +2171,19 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
           company={journey.company}
           stops={journey.stops}
           mode={journey.mode}
+          cabin={
+            webgl ? (
+              <HarooCabinView
+                mode={journey.mode === 'air' ? 'plane' : 'coach'}
+                hour={life.hour}
+                pixelRatio={renderPixelRatio(quality)}
+                avatarModel={shownModel(avatar)}
+                avatarPagne={pagneColor(avatar.pagne)}
+                onReady={() => setCabinReady(true)}
+              />
+            ) : undefined
+          }
+          cabinReady={cabinReady}
           ready={cityLife.locality === journey.to && chunkStats.chunks > 0}
           onDone={endJourney}
         />
@@ -2990,7 +3009,9 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                                     {road
                                       ? (() => {
                                           const trips = companiesBetween(cityLife.locality, id)
-                                            .map((c) => coachTrip(cityLife.locality, id, c, life.hour))
+                                            .map((c) =>
+                                              coachTrip(cityLife.locality, id, c, life.hour),
+                                            )
                                             .filter((t) => t !== null)
                                           const cheapest = Math.min(...trips.map((t) => t.fare))
                                           const hours = Math.min(...trips.map((t) => t.hours))
@@ -2998,7 +3019,9 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                                           return `Car dès ${money(cheapest)}, ${hours} h par ${road
                                             .slice(1, -1)
                                             .map((s) => s.name)
-                                            .join(', ')}${air ? ` · Avion ${air.hours} h, ${money(air.fare)}` : ''}.`
+                                            .join(
+                                              ', ',
+                                            )}${air ? ` · Avion ${air.hours} h, ${money(air.fare)}` : ''}.`
                                         })()
                                       : `${LOCALITIES[id].note} Car interurbain : ${trip.hours} h, ${money(trip.fare)}.`}
                                   </span>
