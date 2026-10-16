@@ -1,4 +1,10 @@
 import {
+  type AvatarActor,
+  createAvatarActor,
+  disposeAvatarActor,
+  playAvatarActor,
+} from './avatar-actor'
+import {
   type AdCampaign,
   type AdPlacement,
   PLACEMENTS,
@@ -25,8 +31,6 @@ import {
   adultFor,
   avatarSpec,
   clipFor,
-  needsPagneWrap,
-  recolorMap,
 } from '@/lib/haroolife/city/avatar-catalogue'
 import { type Bank, loadBank } from '@/lib/haroolife/city/bank'
 import { drivingRoute, type VehicleKind } from '@/lib/haroolife/city/fares'
@@ -57,7 +61,6 @@ import type { Building } from '@/lib/haroolife/townsmen-engine'
 import * as THREE from 'three'
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { DETAIL_CELLS, buildCityGeometry } from './city-models'
 import { createGltfLoader } from './gltf'
 import { type MotoParts, buildMoto } from './moto'
@@ -81,12 +84,7 @@ const TILE_RANGE = 11
 const CAMERA_ELEVATION = 0.7
 const CAMERA_DISTANCE = 80
 const PEDESTRIANS = 8
-const PEDESTRIAN_MODELS = [
-  'character-female-a',
-  'character-male-b',
-  'character-female-c',
-  'character-male-a',
-]
+const PEDESTRIAN_MODELS = ['afi', 'koffi', 'abra', 'kossi']
 /** First names of the passers-by (game characters, never real people), one per model. */
 const PEDESTRIAN_NAMES = [
   'Abla',
@@ -210,15 +208,7 @@ interface Remote {
   tag: HTMLButtonElement | null
 }
 
-interface Person {
-  root: THREE.Group
-  mixer: THREE.AnimationMixer
-  actions: Map<string, THREE.AnimationAction>
-  current: string
-  spec: AvatarSpec
-  owned: THREE.Material[]
-  ownedGeometry: THREE.BufferGeometry[]
-}
+type Person = AvatarActor
 
 interface Walker {
   person: Person
@@ -699,74 +689,15 @@ export class StreetWorld {
   }
 
   private makePerson(gltf: GLTF, spec: AvatarSpec, pagne?: string): Person {
-    const root = new THREE.Group()
-    const figure = cloneSkeleton(gltf.scene) as THREE.Group
-    figure.name = 'figure'
-    figure.rotation.y = THREE.MathUtils.degToRad(spec.yaw)
-    const k = FIGURE / spec.height
-    figure.scale.setScalar(k)
-    root.add(figure)
-    const colors = recolorMap(spec, pagne)
-    const owned: THREE.Material[] = []
-    const clones = new Map<THREE.Material, THREE.Material>()
-    figure.traverse((o) => {
-      const mesh = o as THREE.Mesh
-      if (!mesh.isMesh) return
-      mesh.castShadow = true
-      mesh.frustumCulled = false
-      const swap = (m: THREE.Material) => {
-        const color = colors.get(m.name)
-        if (!color) return m
-        let c = clones.get(m)
-        if (!c) {
-          c = m.clone()
-          ;(c as THREE.MeshStandardMaterial).color?.set(color)
-          clones.set(m, c)
-          owned.push(c)
-        }
-        return c
-      }
-      mesh.material = Array.isArray(mesh.material) ? mesh.material.map(swap) : swap(mesh.material)
-    })
-    const ownedGeometry: THREE.BufferGeometry[] = []
-    if (pagne && needsPagneWrap(spec)) {
-      const geo = new THREE.BoxGeometry(1, 1, 1)
-      const mat = new THREE.MeshStandardMaterial({ color: pagne, roughness: 0.9 })
-      const wrap = new THREE.Mesh(geo, mat)
-      wrap.name = 'pagne'
-      wrap.position.set(0, 0.16 * k, -0.02 * k)
-      wrap.scale.set(0.3 * k, 0.13 * k, 0.22 * k)
-      root.add(wrap)
-      ownedGeometry.push(geo)
-      owned.push(mat)
-    }
-    const mixer = new THREE.AnimationMixer(figure)
-    const actions = new Map<string, THREE.AnimationAction>()
-    for (const clip of gltf.animations) actions.set(clip.name, mixer.clipAction(clip))
-    const idle = clipFor(spec, 'idle')
-    actions.get(idle)?.play()
-    return { root, mixer, actions, current: idle, spec, owned, ownedGeometry }
+    return createAvatarActor(gltf, spec, FIGURE, pagne)
   }
 
   private disposePerson(p: Person): void {
-    p.mixer.stopAllAction()
-    p.mixer.uncacheRoot(p.root)
-    p.root.removeFromParent()
-    p.root.traverse((o) => {
-      const s = o as THREE.SkinnedMesh
-      if (s.isSkinnedMesh) s.skeleton.dispose()
-    })
-    for (const m of p.owned) m.dispose()
-    for (const g of p.ownedGeometry) g.dispose()
+    disposeAvatarActor(p)
   }
 
   private play(p: Person, clip: string): void {
-    if (p.current === clip) return
-    const next = p.actions.get(clip)
-    if (!next) return
-    p.actions.get(p.current)?.fadeOut(0.2)
-    next.reset().fadeIn(0.2).play()
-    p.current = clip
+    playAvatarActor(p, clip)
   }
 
   /**
@@ -831,7 +762,7 @@ export class StreetWorld {
     const h = (v.heading * Math.PI) / 180
     p.root.position.set(
       v.x * U + Math.sin(h) * along,
-      (this.moto?.seat ?? 0) - FIGURE * 0.42,
+      (this.moto?.seat ?? 0) - p.seatOffset,
       v.z * U + Math.cos(h) * along,
     )
     p.root.rotation.y = h
@@ -1603,7 +1534,8 @@ export class StreetWorld {
       driving: ctl.driving,
       automaticDriving: ctl.automaticDriving,
       drivingRouteState: ctl.drivingRouteState,
-      model: this.avatarModel,
+      model: this.player?.spec.id ?? avatarSpec(this.avatarModel).id,
+      avatar: this.player?.root.userData.avatar ?? null,
       anim: this.anim,
     }
     const scene = this.scene

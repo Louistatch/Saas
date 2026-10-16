@@ -19,7 +19,6 @@ import {
   clipRate,
   figureHeight,
   figureScale,
-  needsPagneWrap,
   recolorMap,
 } from '../lib/haroolife/city/avatar-catalogue'
 
@@ -27,7 +26,7 @@ describe('avatar appearance', () => {
   it('decodes valid choices and rejects the rest', () => {
     assert.deepEqual(decodeAvatar({ v: 1, model: 'character-male-b', pagne: 3 }), {
       v: 1,
-      model: 'character-male-b',
+      model: 'koffi',
       pagne: 3,
     })
     assert.equal(decodeAvatar({ v: 1, model: 'robot', pagne: 1 }), null)
@@ -43,14 +42,14 @@ describe('avatar appearance', () => {
     assert.ok(Math.abs(figureScale(afi) * afi.height - FIGURE_HEIGHT * afi.stature) < 1e-9)
     assert.equal(adultFor('character-male-b'), 'koffi')
     assert.equal(adultFor('afi'), 'afi')
-    assert.ok(Math.abs(figureScale(mini) * mini.height - FIGURE_HEIGHT) < 1e-9)
+    assert.equal(mini.id, 'kossi')
+    assert.ok(Math.abs(figureScale(mini) * mini.height - FIGURE_HEIGHT * mini.stature) < 1e-9)
     assert.equal(clipFor(afi, 'walk'), 'Walk')
     assert.equal(clipFor(afi, 'run'), 'Run')
     assert.equal(clipFor(afi, 'work'), 'Interact')
     assert.equal(clipFor(afi, 'sit'), 'Idle_Neutral', 'no sit clip in the pack: neutral pose')
-    assert.equal(clipFor(mini, 'sit'), 'sit')
-    assert.equal(needsPagneWrap(mini), true)
-    assert.equal(needsPagneWrap(afi), false)
+    assert.equal(clipFor(mini, 'sit'), 'Idle_Neutral')
+    assert.equal(clipFor(mini, 'drive'), 'HarooDrive')
     // V3: the pagne colours a garment (Afi's top), never the hair or the shoes; every other
     // garment has a chosen colour, so no light-grey `White` top is left on screen.
     assert.equal(recolorMap(afi, '#123456').get('White'), '#123456')
@@ -61,8 +60,11 @@ describe('avatar appearance', () => {
     assert.equal(recolorMap(abra, '#123456').get('Red'), HAIR_COLOR, 'Red is her hair')
     assert.equal(recolorMap(avatarSpec('kossi'), '#123456').get('LightBrown'), '#123456')
     assert.notEqual(recolorMap(avatarSpec('kossi'), '#123456').get('Red_Dark'), '#123456')
-    // An NPC model name unknown to the catalogue still resolves to a mini character file.
-    assert.match(avatarSpec('character-female-z').url, /mini-characters\/character-female-z\.glb$/)
+    // Unknown NPC names resolve to a shipped adult, never an arbitrary asset URL.
+    assert.equal(avatarSpec('character-female-z').url, afi.url)
+    assert.equal(avatarSpec('../../unknown.glb').url, afi.url)
+    assert.equal(AVATAR_SPECS.length, 4)
+    for (const spec of AVATAR_SPECS) assert.equal(spec.family, 'quaternius')
     for (const s of AVATAR_SPECS) assert.ok(s.url.startsWith('/haroolife/vendor/'), s.id)
   })
   it('faces the move direction: one yaw convention, measured 0 for every file', () => {
@@ -78,14 +80,14 @@ describe('avatar appearance', () => {
     assert.equal(clipRate(afi, 'walk', 0, STREET_SCALE), 1)
     assert.equal(clipRate(afi, 'run', 100, STREET_SCALE), 3, 'capped')
   })
-  it('shows an old mini save as its dressed adult unless the classic look was chosen', () => {
+  it('migrates every historic look to a dressed adult, including explicit classic choices', () => {
     const old = { v: 1 as const, model: 'character-male-b', pagne: 4 }
     assert.equal(shownModel(old), 'koffi')
-    assert.equal(old.model, 'character-male-b', 'the stored model is never rewritten')
+    assert.equal(old.model, 'character-male-b', 'resolving a model does not mutate the input')
     assert.equal(shownModel({ ...old, model: 'character-female-c' }), 'afi')
     assert.equal(shownModel({ ...old, model: 'character-male-c' }), 'kossi')
-    assert.equal(shownModel({ ...old, classic: true }), 'character-male-b')
-    assert.deepEqual(decodeAvatar({ ...old, classic: true }), { ...old, classic: true })
+    assert.equal(shownModel({ ...old, classic: true }), 'koffi')
+    assert.deepEqual(decodeAvatar({ ...old, classic: true }), { v: 1, model: 'koffi', pagne: 4 })
     assert.equal(decodeAvatar({ ...old, classic: 'yes' })?.classic, undefined)
     assert.equal(shownModel({ v: 1, model: 'abra', pagne: 1 }), 'abra')
   })
@@ -97,7 +99,32 @@ describe('avatar appearance', () => {
     }
     assert.deepEqual(loadAvatar(storage), DEFAULT_AVATAR)
     saveAvatar(storage, { v: 1, model: 'character-female-c', pagne: 5 })
-    assert.deepEqual(loadAvatar(storage), { v: 1, model: 'character-female-c', pagne: 5 })
+    assert.deepEqual(loadAvatar(storage), { v: 1, model: 'afi', pagne: 5 })
     assert.match(pagneColor(5), /^#/)
   })
+})
+
+it('persists the migration without touching game progress and preserves the look in a read-only store', () => {
+  const old = JSON.stringify({ v: 1, model: 'character-male-b', pagne: 3, classic: true })
+  const progress = JSON.stringify({ wallet: 5432, job: 'taxi' })
+  const store = new Map([
+    ['haroolife.avatar.v1', old],
+    ['haroolife.lome-city.v1', progress],
+  ])
+  const storage = {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      store.set(key, value)
+    },
+  }
+  assert.deepEqual(loadAvatar(storage), { v: 1, model: 'koffi', pagne: 3 })
+  assert.equal(store.get('haroolife.lome-city.v1'), progress)
+  assert.doesNotMatch(store.get('haroolife.avatar.v1') ?? '', /classic|character-male/)
+  const readOnly = {
+    getItem: () => old,
+    setItem: () => {
+      throw Error('quota')
+    },
+  }
+  assert.equal(loadAvatar(readOnly).model, 'koffi')
 })

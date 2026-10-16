@@ -31,6 +31,7 @@ import {
   type Avatar,
   DEFAULT_AVATAR,
   loadAvatar,
+  decodeAvatar,
   pagneColor,
   saveAvatar,
   shownModel,
@@ -427,8 +428,7 @@ export function LomeLifeImmersive() {
   }
   const chooseAvatar = (next: Partial<Avatar>) =>
     setAvatar((cur) => {
-      const { classic, ...rest } = { ...cur, ...next }
-      const a: Avatar = classic ? { ...rest, classic } : rest
+      const a = decodeAvatar({ ...cur, ...next }) ?? DEFAULT_AVATAR
       saveAvatar(localStorage, a)
       return a
     })
@@ -2091,7 +2091,7 @@ export function LomeLifeImmersive() {
       </header>
 
       <div
-        className={`pointer-events-none absolute inset-x-0 bottom-[calc(100px+env(safe-area-inset-bottom))] z-20 px-3 sm:px-5 ${mapView ? 'hidden' : ''}`}
+        className={`pointer-events-none absolute inset-x-0 bottom-[calc(100px+env(safe-area-inset-bottom))] z-20 px-3 sm:px-5 ${mapView || riding ? 'hidden' : ''}`}
       >
         <div className="mx-auto flex max-w-[900px] items-end justify-between gap-2">
           <div className="flex min-w-0 flex-col items-start gap-2">
@@ -3928,7 +3928,7 @@ export function LomeLifeImmersive() {
                     <p className="text-sm text-slate-600">
                       {firstRun
                         ? 'Choisis qui tu es dans Lomé : le même personnage te suit dans la rue, dans les bâtiments et au volant. Tu pourras changer depuis le téléphone.'
-                        : 'Le même personnage te suit dans la rue, dans les bâtiments et au volant. Personnages Quaternius et Kenney (CC0) ; ton choix reste sur cet appareil.'}
+                        : 'Le même personnage te suit dans la rue, dans les bâtiments et au volant. Ton apparence reste enregistrée sur cet appareil ; tu peux changer de tenue à tout moment.'}
                     </p>
                     <AvatarPreview model={shownModel(avatar)} pagne={pagneColor(avatar.pagne)} />
                     <div
@@ -3936,12 +3936,12 @@ export function LomeLifeImmersive() {
                       role="group"
                       aria-label="Choisir mon personnage"
                     >
-                      {AVATAR_MODELS.filter((m) => m.family === 'quaternius').map((m) => (
+                      {AVATAR_MODELS.map((m) => (
                         <button
                           type="button"
                           key={m.id}
                           aria-pressed={shownModel(avatar) === m.id}
-                          onClick={() => chooseAvatar({ model: m.id, classic: undefined })}
+                          onClick={() => chooseAvatar({ model: m.id })}
                           className={
                             'rounded-2xl border p-3 text-left ' +
                             (shownModel(avatar) === m.id
@@ -3954,34 +3954,6 @@ export function LomeLifeImmersive() {
                         </button>
                       ))}
                     </div>
-                    <details className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
-                      <summary className="cursor-pointer text-sm font-semibold text-slate-700">
-                        Personnages classiques (mini)
-                      </summary>
-                      <div
-                        className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3"
-                        role="group"
-                        aria-label="Choisir un personnage classique"
-                      >
-                        {AVATAR_MODELS.filter((m) => m.family === 'kenney-mini').map((m) => (
-                          <button
-                            type="button"
-                            key={m.id}
-                            aria-pressed={shownModel(avatar) === m.id}
-                            onClick={() => chooseAvatar({ model: m.id, classic: true })}
-                            className={
-                              'rounded-2xl border p-3 text-left ' +
-                              (shownModel(avatar) === m.id
-                                ? 'border-emerald-600 bg-emerald-50'
-                                : 'border-slate-200 bg-white')
-                            }
-                          >
-                            <span className="block text-sm font-black">{m.label}</span>
-                            <span className="block text-[11px] text-slate-500">{m.hint}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </details>
                     <fieldset className="space-y-2">
                       <legend className="text-sm font-black">Mon pagne</legend>
                       <div className="flex flex-wrap gap-2">

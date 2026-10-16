@@ -70,7 +70,7 @@ export type NpcAnim =
   | 'enter'
 export interface Npc {
   id: string
-  /** Kenney Mini Characters model name. */
+  /** Adult avatar id from the shared catalogue. */
   model: string
   x: number
   z: number
@@ -97,14 +97,7 @@ export interface Layout {
   spawn: { x: number; z: number }
 }
 
-const CH = [
-  'character-female-a',
-  'character-female-b',
-  'character-female-c',
-  'character-male-a',
-  'character-male-b',
-  'character-male-c',
-]
+const CH = ['afi', 'abra', 'afi', 'kossi', 'koffi', 'kossi']
 
 const GYM: Layout = {
   name: 'Salle de sport',

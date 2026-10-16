@@ -1,3 +1,7 @@
+> Mise à jour du 16 octobre 2026 : le retrait des minis, leur migration et les nouveaux clips
+> articulés sont décrits dans [haroolife-remove-cubic-avatars.md](haroolife-remove-cubic-avatars.md).
+> Les mentions de personnages classiques ci-dessous sont historiques.
+
 # HarooLife — personnages adultes, caméra de jeu et intérieurs Three par défaut
 
 Date : 14 octobre 2026. Branche `feat/haroolife-adult-avatars`, à partir de `main` 8c289b6.

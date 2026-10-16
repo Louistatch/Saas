@@ -288,5 +288,5 @@ test('registry, world adapter and avatar renderer are deterministic and private'
   )
   assert.equal(spec.label, 'Abalo K.')
   assert.equal(spec.badge, '🌾')
-  assert.ok(spec.model.startsWith('character-'))
+  assert.ok(['afi', 'abra', 'kossi', 'koffi'].includes(spec.model))
 })

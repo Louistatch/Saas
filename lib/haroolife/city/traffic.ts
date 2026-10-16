@@ -30,7 +30,7 @@ export interface Agent {
   fx: number
   fy: number
   heading: number
-  /** Kenney Mini Characters model for pedestrians. */
+  /** Adult avatar id from the shared catalogue. */
   model?: string
   /** What the pedestrian is doing. */
   activity?: 'walk' | 'run'
@@ -147,14 +147,7 @@ export function vehiclesNear(step: number, cx: number, cy: number, radius = 26):
   return out
 }
 
-const CH = [
-  'character-female-a',
-  'character-female-b',
-  'character-female-c',
-  'character-male-a',
-  'character-male-b',
-  'character-male-c',
-]
+const CH = ['afi', 'abra', 'afi', 'kossi', 'koffi', 'kossi']
 const WALKERS = 48
 interface Route {
   path: { x: number; y: number }[]
