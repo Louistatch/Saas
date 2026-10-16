@@ -54,6 +54,11 @@ for (const locality of ['lome', 'kara'] as const)
       }
       for (const npc of layout.npcs) {
         const hotspot = scene.hotspots.find((h) => h.kind === 'npc' && h.ref === npc.id)
+        // Figurants (students in the amphitheatre) are present but not talked to.
+        if (npc.extra) {
+          assert.equal(hotspot, undefined, `${lot.type}: ${npc.id} is a figurant`)
+          continue
+        }
         assert.ok(hotspot, `${lot.type}: missing conversation hotspot for ${npc.id}`)
         assert.ok(
           pathfind(scene.spawn, hotspot.at, scene.obstacles, scene.bounds).length > 0 ||
