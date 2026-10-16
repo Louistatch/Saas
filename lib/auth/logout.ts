@@ -10,6 +10,7 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { destroySession, broadcastLogout } from './session'
+import { gameReturnPath, withGameReturn } from '@/lib/haroolife/entry'
 
 /**
  * Full logout procedure — call this instead of supabase.auth.signOut() directly.
@@ -17,7 +18,10 @@ import { destroySession, broadcastLogout } from './session'
  * Critical: uses scope:'global' to revoke the refresh token server-side,
  * not just clear local state. Otherwise the user stays logged-in across tabs.
  */
-export async function performLogout(): Promise<never> {
+export const performLogout = (): Promise<never> => endSession()
+export const performGameLogout = (returnTo: string): Promise<never> => endSession(returnTo)
+
+async function endSession(returnTo?: string): Promise<never> {
   // STEP 0: Instant visual feedback — show transition overlay BEFORE any async work
   // This eliminates the white flash that makes logout feel slow
   showTransitionOverlay()
@@ -54,7 +58,7 @@ export async function performLogout(): Promise<never> {
   // - Forces re-init of all React providers (clears stale auth state)
   // - Removes the transition overlay from the DOM
   // - Prevents back-button from returning to authenticated state
-  window.location.replace('/auth/login')
+  window.location.replace(withGameReturn('/auth/login', gameReturnPath(returnTo)))
 
   // TypeScript: this never returns
   return new Promise(() => {}) as never

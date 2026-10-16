@@ -3,6 +3,16 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Explicit fallbacks also cover Firefox Android with a visible address/navigation toolbar. */
+.haroolife-screen {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  height: 100svh;
+  height: 100dvh;
+}
+
 :root {
   --background: oklch(0.98 0.001 70);
   --foreground: oklch(0.15 0.02 70);

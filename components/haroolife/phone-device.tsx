@@ -56,6 +56,7 @@ export function PhoneDevice({
   onQuality,
   onOpen,
   onClose,
+  onExit,
 }: {
   hour: number
   day: number
@@ -69,6 +70,7 @@ export function PhoneDevice({
   onQuality: (id: string) => void
   onOpen: (app: PhoneApp) => void
   onClose: () => void
+  onExit?: () => void
 }) {
   const [screen, setScreen] = useState<'home' | 'settings'>('home')
   const time = `${String(hour).padStart(2, '0')}:00`
@@ -83,7 +85,7 @@ export function PhoneDevice({
       />
       <section
         aria-label="Mon téléphone"
-        className="absolute inset-x-0 top-[max(12px,env(safe-area-inset-top))] bottom-[calc(88px+env(safe-area-inset-bottom))] mx-auto flex w-[min(360px,calc(100%-24px))] max-h-[760px] flex-col rounded-[44px] bg-[#101214] p-2.5 shadow-2xl ring-1 ring-white/10"
+        className="absolute inset-x-0 top-[max(12px,env(safe-area-inset-top,0px))] bottom-[calc(88px+env(safe-area-inset-bottom,0px))] mx-auto flex w-[min(360px,calc(100%-24px))] max-h-[760px] flex-col rounded-[44px] bg-[#101214] p-2.5 shadow-2xl ring-1 ring-white/10"
       >
         <button
           type="button"
@@ -158,6 +160,7 @@ export function PhoneDevice({
                 <ChevronLeft size={18} /> Accueil
               </button>
               <h2 className="mt-2 text-2xl font-black">Réglages</h2>
+              {onExit && <button type="button" onClick={onExit} className="mt-4 min-h-11 w-full rounded-xl bg-white p-3 text-left text-sm font-bold ring-1 ring-slate-200">Accueil HarooLife · Compte FaîtiereHub</button>}
               <h3 className="mt-5 text-xs font-bold text-slate-500">Avancé</h3>
               <div className="mt-2 space-y-2 rounded-2xl bg-white p-3 ring-1 ring-slate-200">
                 <label className="flex items-center justify-between gap-3 text-sm font-semibold">

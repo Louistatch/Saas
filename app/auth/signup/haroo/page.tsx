@@ -1,6 +1,8 @@
 'use client'
 
 import { AuthSidePanel } from '@/components/shared/auth-side-panel'
+import { useGameReturn } from '@/hooks/use-game-return'
+import { withGameReturn } from '@/lib/haroolife/entry'
 import { Spinner } from '@/components/shared/loading'
 import { Logo } from '@/components/shared/logo'
 import { Button } from '@/components/ui/button'
@@ -75,6 +77,7 @@ const SPECIALITES = [
  * ensuite sur /auth/login comme pour tout utilisateur de la plateforme.
  */
 function HarooSignupForm() {
+  const gameReturn = useGameReturn()
   const { user } = useAuth()
   const journey = accountJourney(user)
   // Le profil choisi à l'étape 1 de /auth/signup arrive par ?type= : sans
@@ -162,7 +165,7 @@ function HarooSignupForm() {
       } = await res.json().catch(() => ({}))
       if (data.fields) setFieldErrors(data.fields)
       if (res.ok && data.success && data.verify_email) {
-        window.location.assign(`/auth/verify-email?email=${encodeURIComponent(parsed.data.email)}`)
+        window.location.assign(withGameReturn(`/auth/verify-email?email=${encodeURIComponent(parsed.data.email)}`, gameReturn))
       } else if (res.ok && data.success) {
         setSubmitted(true)
       } else {
@@ -188,7 +191,7 @@ function HarooSignupForm() {
               mot de passe pour accéder aux services Haroo.
             </p>
             <div className="pt-4">
-              <Link href="/auth/login">
+              <Link href={withGameReturn('/auth/login', gameReturn)}>
                 <Button className="w-full">Se connecter</Button>
               </Link>
             </div>
@@ -439,13 +442,13 @@ function HarooSignupForm() {
               <div className="mt-6 text-center space-y-2">
                 <p className="text-sm text-muted-foreground">
                   Vous avez déjà un compte ?{' '}
-                  <Link href="/auth/login" className="text-primary font-medium hover:underline">
+                  <Link href={withGameReturn('/auth/login', gameReturn)} className="text-primary font-medium hover:underline">
                     Se connecter
                   </Link>
                 </p>
                 <p className="text-sm text-muted-foreground">
                   Vous êtes une coopérative ?{' '}
-                  <Link href="/auth/signup" className="text-primary font-medium hover:underline">
+                  <Link href={withGameReturn('/auth/signup', gameReturn)} className="text-primary font-medium hover:underline">
                     Demander un accès
                   </Link>
                 </p>

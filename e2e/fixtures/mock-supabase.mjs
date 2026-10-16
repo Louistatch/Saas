@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 // (120 membres, 40 parcelles, cartes, regroupements). Aucune donnée réelle.
 //   node e2e/fixtures/mock-supabase.mjs   (port 54329)
 import http from 'node:http'
-const PORT = 54329
+const PORT = Number(process.env.HAROOLIFE_SUPABASE_PORT || 54329)
 const UID = '11111111-1111-4111-8111-111111111111'
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url')
 let refreshCount = 0
@@ -712,6 +712,7 @@ http
         }
         return send(200, session())
       }
+      if (p === '/auth/v1/verify') return send(200, session())
       if (p.startsWith('/auth/v1/')) return send(200, {})
       // Private messages outside the game: run in the local relay's PGlite (the real
       // migrations), as the token's subject, so the dashboard and the game share one database.

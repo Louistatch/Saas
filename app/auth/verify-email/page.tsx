@@ -10,8 +10,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ArrowLeft, MailCheck, RefreshCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { errorMessage } from '@/lib/utils/errors'
+import { useGameReturn } from '@/hooks/use-game-return'
+import { withGameReturn } from '@/lib/haroolife/entry'
 
 function VerifyEmailInner() {
+  const gameReturn = useGameReturn()
   const searchParams = useSearchParams()
   const email = searchParams?.get('email') ?? ''
   const [resending, setResending] = useState(false)
@@ -28,7 +31,7 @@ function VerifyEmailInner() {
       const { error: resendError } = await supabase.auth.resend({
         type: 'signup',
         email,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback?type=signup` },
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback?type=signup${gameReturn ? `&next=${encodeURIComponent(gameReturn)}` : ''}` },
       })
       if (resendError) throw resendError
       setMessage('Email renvoyé. Vérifiez votre boîte de réception.')
@@ -58,7 +61,7 @@ function VerifyEmailInner() {
               <> à votre adresse email</>
             )}
             . Cliquez dessus pour activer votre compte et finaliser la création de votre
-            coopérative.
+            compte FaîtiereHub.
           </p>
 
           {message && (
@@ -82,7 +85,7 @@ function VerifyEmailInner() {
             {resending ? 'Envoi…' : "Renvoyer l'email"}
           </Button>
 
-          <Link href="/auth/login">
+          <Link href={withGameReturn('/auth/login', gameReturn)}>
             <Button variant="ghost" className="w-full gap-2 text-muted-foreground">
               <ArrowLeft className="h-4 w-4" />
               Retour à la connexion

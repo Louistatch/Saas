@@ -60,9 +60,10 @@ async function signIn(browser: Browser, who: keyof typeof ACCOUNTS, device: obje
     { name: 'sb-127-auth-token', value: `base64-${b64(session)}`, domain: '127.0.0.1', path: '/' },
   ])
   // A returning player: the first-run appearance sheet would otherwise take the keyboard.
-  await context.addInitScript(() => {
+  await context.addInitScript((id) => {
     localStorage.setItem('haroolife.avatar.chosen', '1')
-  })
+    sessionStorage.setItem('haroolife.entered.v1', id)
+  }, sub)
   const page = await context.newPage()
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(e.message))

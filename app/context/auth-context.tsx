@@ -4,6 +4,7 @@ import { destroySession, onLogoutBroadcast, setTenantId, setUserId } from '@/lib
 import { createClient } from '@/lib/supabase/client'
 import { createLogger } from '@/lib/utils/logger'
 import { effectiveHarooType } from '@/lib/utils/permissions'
+import { gameReturnPath, withGameReturn } from '@/lib/haroolife/entry'
 import type { AuthUser, HarooType, UserRole } from '@/types/domain'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
@@ -83,7 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       destroySession()
       // Only redirect if we're on a protected page (avoid redirect loops on auth pages)
       if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth/')) {
-        window.location.replace('/auth/login')
+        window.location.replace(withGameReturn('/auth/login', gameReturnPath(window.location.pathname + window.location.search)))
       }
     })
     return cleanup

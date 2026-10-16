@@ -1,6 +1,8 @@
 'use client'
 
 import { AuthSidePanel } from '@/components/shared/auth-side-panel'
+import { useGameReturn } from '@/hooks/use-game-return'
+import { withGameReturn } from '@/lib/haroolife/entry'
 import { Logo } from '@/components/shared/logo'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -117,6 +119,7 @@ function ChoiceButton({
 }
 
 function SignupChooser() {
+  const gameReturn = useGameReturn()
   const router = useRouter()
   const params = useSearchParams()
   const requested = params.get('espace')
@@ -124,7 +127,7 @@ function SignupChooser() {
 
   const pickSpace = (value: Space) => {
     // FaîtiereHub n'a qu'un parcours d'inscription : l'opérateur.
-    if (value === 'faitierehub') router.push('/auth/signup/operator')
+    if (value === 'faitierehub') router.push(withGameReturn('/auth/signup/operator', gameReturn))
     else setSpace(value)
   }
 
@@ -183,7 +186,7 @@ function SignupChooser() {
                       label={label}
                       blurb={blurb}
                       icon={icon}
-                      onClick={() => router.push(`/auth/signup/haroo?type=${value}`)}
+                      onClick={() => router.push(withGameReturn(`/auth/signup/haroo?type=${value}`, gameReturn))}
                     />
                   ))
                 : SPACES.map(({ value, label, hint, blurb, icon }) => (
@@ -212,7 +215,7 @@ function SignupChooser() {
 
           <p className="text-center text-sm text-muted-foreground">
             Vous avez déjà un compte ?{' '}
-            <Link href="/auth/login" className="font-medium text-primary hover:underline">
+            <Link href={withGameReturn('/auth/login', gameReturn)} className="font-medium text-primary hover:underline">
               Se connecter
             </Link>
           </p>
