@@ -3498,7 +3498,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                         </div>
                         {visitor && (
                           <AccountPrompt
-                            reason={`Pour écrire à ${name} ou lui envoyer de l’argent du jeu.`}
+                            reason={`Pour écrire à ${name} ou lui envoyer de l’argent, crée ton compte : ta partie te suit.`}
                             compact
                           />
                         )}

@@ -298,7 +298,10 @@ export default function LiveChat({
         </p>
       )}
       {state.me?.visitor ? (
-        <AccountPrompt reason="Les visiteurs lisent les salons." compact />
+        <AccountPrompt
+          reason="Visiteur : tu lis les salons. Pour écrire, crée ton compte, ta partie te suit."
+          compact
+        />
       ) : state.me && !state.me.can_write ? (
         <button
           type="button"

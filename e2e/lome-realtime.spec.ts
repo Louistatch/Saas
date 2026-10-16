@@ -664,15 +664,22 @@ test('a visitor enters HarooLife with one tap, reads the rooms, and is sent to a
   await expect.poll(async () => (await rt(page))?.status, { timeout: 30000 }).toBe('online')
   expect(await rt(page)).toMatchObject({ me: 'Visiteur (test)' })
 
-  // The visitor reads what the others write.
-  const said = await rpc(tokenOf(ACCOUNTS.ama), 'haroolife_chat_send', {
-    p_room: 'locality:lome',
-    p_body: `bienvenue au visiteur ${run}`,
-    p_client_id: randomUUID(),
-  })
-  expect(said.status).toBe(200)
+  // The visitor reads what the others write, live (Ama writes through the relay).
   await openChat(page, 'Lomé')
+  const ama: Socket = io(RELAY, {
+    transports: ['websocket'],
+    auth: { token: tokenOf(ACCOUNTS.ama) },
+  })
+  await new Promise<void>((r) => ama.once('system:hello', () => r()))
+  const said = (await ama.timeout(10_000).emitWithAck('chat:send', {
+    v: 1,
+    room: 'locality:lome',
+    body: `bienvenue au visiteur ${run}`,
+    clientId: randomUUID(),
+  })) as { ok: boolean }
+  expect(said.ok).toBe(true)
   await expect(log(page)).toContainText(`bienvenue au visiteur ${run}`)
+  ama.close()
   // No message box: creating a FaîtiereHub account instead (the game comes back after it).
   await expect(page.getByRole('textbox', { name: 'Écrire dans la discussion' })).toHaveCount(0)
   const prompt = page.getByTestId('account-prompt')

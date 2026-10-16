@@ -30,17 +30,35 @@ export async function startVisit(): Promise<string | null> {
 /** In place of a real feature, for a visitor: create a FaîtiereHub account (the game follows). */
 export function AccountPrompt({ reason, compact = false }: { reason?: string; compact?: boolean }) {
   const back = '/haroolife'
+  const signup = withGameReturn('/auth/signup', back)
+  // In the chat and the player sheet: one line, the height of the message box it replaces.
+  if (compact)
+    return (
+      <div
+        data-testid="account-prompt"
+        className="flex items-center gap-2 rounded-xl bg-amber-50 p-2 text-left"
+      >
+        <p className="min-w-0 flex-1 text-[11px] leading-snug text-amber-900">
+          {reason ?? 'Tu joues en visiteur.'}
+        </p>
+        <Link
+          href={signup}
+          onClick={() => rememberGameReturn(back)}
+          aria-label="Créer mon compte FaîtiereHub"
+          className="inline-flex min-h-10 shrink-0 items-center rounded-lg bg-amber-500 px-3 text-xs font-black text-white"
+        >
+          Créer mon compte
+        </Link>
+      </div>
+    )
   return (
-    <div
-      data-testid="account-prompt"
-      className={`space-y-2 rounded-2xl bg-amber-50 text-left ${compact ? 'p-3' : 'p-4'}`}
-    >
+    <div data-testid="account-prompt" className="space-y-2 rounded-2xl bg-amber-50 p-4 text-left">
       <p className="text-xs text-amber-900">
         {reason ?? 'Tu joues en visiteur.'} Crée ton compte FaîtiereHub : ta partie te suit.
       </p>
       <div className="flex flex-wrap gap-2">
         <Link
-          href={withGameReturn('/auth/signup', back)}
+          href={signup}
           onClick={() => rememberGameReturn(back)}
           className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-amber-500 px-3 py-2 text-sm font-black text-white"
         >
