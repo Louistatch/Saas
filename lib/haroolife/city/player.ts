@@ -1,3 +1,4 @@
+import { type CollisionBody, touchesBody, bodiesOverlap } from './collisions'
 /**
  * Continuous player controller for the single 3D world: positions in floating cell
  * units, analogue input, acceleration and braking, capsule-against-cells collision,
@@ -139,6 +140,8 @@ export function cameraBasis(angleDeg: number): { forward: Vec2; right: Vec2 } {
 
 export class PlayerController {
   pos: Vec2
+  /** Visible moving traffic and physical street objects, refreshed by the street renderer. */
+  obstacles: CollisionBody[] = []
   /** Degrees around the vertical axis (0 = facing +z). */
   heading = 0
   vel: Vec2 = { x: 0, z: 0 }
@@ -150,6 +153,26 @@ export class PlayerController {
   /** Which vehicle the player drives (null on foot). */
   driving = false
   automaticDriving = false
+  /** Physical street lane used by the service, also drawn by the renderer. */
+  get shownVehicle() {
+    const v = this.vehicle
+    if (!v) return null
+    const lane = this.automaticDriving && this.driving ? 0.3 : 0
+    const angle = v.heading / DEG
+    return { ...v, x: v.x + Math.cos(angle) * lane, z: v.z - Math.sin(angle) * lane }
+  }
+  private vehicleBlocked(x: number, z: number) {
+    const v = this.shownVehicle
+    if (!v || !this.vehicle) return false
+    const body = {
+      x: x + v.x - this.vehicle.x,
+      z: z + v.z - this.vehicle.z,
+      heading: v.heading,
+      halfWidth: 0.27,
+      halfLength: 0.67,
+    }
+    return this.obstacles.some((o) => bodiesOverlap(body, o, 0.015))
+  }
   private drivingRoute: Vec2[] = []
   drivingRouteState: 'idle' | 'moving' | 'arrived' | 'blocked' = 'idle'
   camera: CameraRig
@@ -316,6 +339,13 @@ export class PlayerController {
   /** The capsule's footprint (four corners) stands on walkable cells. */
   private fits(x: number, z: number): boolean {
     const r = this.config.radius
+    if (this.obstacles.some((body) => touchesBody(x, z, r, body))) return false
+    if (
+      !this.driving &&
+      this.vehicle &&
+      touchesBody(x, z, r, { ...this.vehicle, halfWidth: 0.22, halfLength: 0.65 })
+    )
+      return false
     for (const [ox, oz] of [
       [-r, -r],
       [r, -r],
@@ -430,8 +460,14 @@ export class PlayerController {
         const speed = Math.min(3, Math.sqrt(2 * this.config.vehicle.brake * distance))
         v.speed = approach(v.speed, last ? speed : 3, this.config.vehicle.accel * dt)
         const step = Math.min(distance, v.speed * dt)
-        v.x += (dx / distance) * step
-        v.z += (dz / distance) * step
+        const nx = v.x + (dx / distance) * step
+        const nz = v.z + (dz / distance) * step
+        if (this.vehicleBlocked(nx, nz)) {
+          v.speed = 0
+          return
+        }
+        v.x = nx
+        v.z = nz
       }
     }
     this.pos = { x: v.x, z: v.z }
@@ -474,7 +510,7 @@ export class PlayerController {
     const ok = [0.45, -0.45].every((o) =>
       this.world.drivable(Math.round(nx + Math.sin(a) * o), Math.round(nz + Math.cos(a) * o)),
     )
-    if (ok) {
+    if (ok && !this.vehicleBlocked(nx, nz)) {
       v.x = nx
       v.z = nz
     } else {

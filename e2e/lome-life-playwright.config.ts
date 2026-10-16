@@ -38,6 +38,7 @@ export default defineConfig({
     'lome-place-workflows.spec.ts',
     'lome-entry.spec.ts',
     'lome-farm.spec.ts',
+    'lome-regional-life.spec.ts',
   ],
   reporter: [['list'], ['html', { outputFolder: 'test-results/lome-report', open: 'never' }]],
   fullyParallel: false,

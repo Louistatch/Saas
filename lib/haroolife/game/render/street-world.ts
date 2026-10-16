@@ -1,3 +1,4 @@
+import { RoadTraffic } from '@/lib/haroolife/city/road-traffic'
 import {
   type AvatarActor,
   createAvatarActor,
@@ -270,6 +271,12 @@ export class StreetWorld {
   /** Camera framing factor (1 on foot, wider at the wheel), eased. */
   private framing = 1
   private walkers: Walker[] = []
+  private readonly traffic = new RoadTraffic((x, z) => isCityRoad(x, z) || isDriveway(x, z))
+  private readonly trafficModels = new Map<number, THREE.Object3D>()
+  private readonly trafficMotos: MotoParts[] = []
+  private readonly trafficRiders = new Map<number, Person>()
+  private trafficRiderTemplate: { gltf: GLTF; spec: AvatarSpec } | null = null
+  private readonly trafficTemplates = new Map<string, THREE.Object3D>()
   private readonly avatarModel: string
   private readonly pagne?: string
   private readonly locality: string
@@ -454,6 +461,18 @@ export class StreetWorld {
     } catch {
       // Storage refused: no test hook.
     }
+    const riderIndex = peds.findIndex((p) => p.status === 'fulfilled')
+    const rider = peds[riderIndex]
+    if (rider?.status === 'fulfilled')
+      this.trafficRiderTemplate = { gltf: rider.value, spec: pedSpecs[riderIndex] }
+    // Licensed CC0 models already bundled with the game, no external runtime download.
+    await Promise.allSettled(
+      ['taxi', 'sedan', 'van'].map(async (kind) => {
+        const gltf = await this.load(`/haroolife/vendor/kenney-3d/car-kit/${kind}.glb`)
+        if (!this.disposed) this.trafficTemplates.set(kind, gltf.scene)
+      }),
+    )
+    if (this.disposed) return
     this.startAds()
     this.startRemote()
     this.publishProbe()
@@ -511,6 +530,18 @@ export class StreetWorld {
       w.tag.remove()
     }
     this.walkers = []
+    this.controller.obstacles = []
+    for (const model of this.trafficModels.values()) this.scene.remove(model)
+    this.trafficModels.clear()
+    for (const rider of this.trafficRiders.values()) this.disposePerson(rider)
+    this.trafficRiders.clear()
+    this.trafficRiderTemplate = null
+    for (const moto of this.trafficMotos) {
+      for (const g of moto.geometries) g.dispose()
+      for (const m of moto.materials) m.dispose()
+    }
+    this.trafficMotos.length = 0
+    this.trafficTemplates.clear()
     if (this.player) this.disposePerson(this.player)
     this.player = null
     this.dropCar()
@@ -980,7 +1011,7 @@ export class StreetWorld {
         // On board: behind the driver on the zémidjan, out of sight in the taxi.
         w.person.root.visible = !!this.moto
         if (this.moto) {
-          this.seat(w.person, v, this.moto.passengerZ)
+          this.seat(w.person, this.controller.shownVehicle ?? v, this.moto.passengerZ)
           this.play(w.person, clipFor(w.person.spec, 'drive'))
         }
         w.person.mixer.update(dt)
@@ -1053,6 +1084,85 @@ export class StreetWorld {
     this.sun.target.position.set(tx, 0, tz)
   }
 
+  private stepTraffic(dt: number): void {
+    const ctl = this.controller
+    const point = ctl.driving && ctl.shownVehicle ? ctl.shownVehicle : ctl.pos
+    const blockers = [
+      {
+        ...point,
+        heading: ctl.heading,
+        halfWidth: ctl.driving ? 0.28 : 0.3,
+        halfLength: ctl.driving ? 0.7 : 0.3,
+      },
+    ]
+    // NPC cars yield to crossing people, including the visible pedestrians.
+    for (const w of this.walkers)
+      if (w.person.root.visible)
+        blockers.push({
+          x: w.person.root.position.x / U,
+          z: w.person.root.position.z / U,
+          heading: 0,
+          halfWidth: 0.22,
+          halfLength: 0.22,
+        })
+    if (!ctl.driving && ctl.vehicle)
+      blockers.push({ ...ctl.vehicle, halfWidth: 0.3, halfLength: 1 })
+    this.traffic.step(dt, point.x, point.z, blockers)
+    ctl.obstacles = [
+      ...this.traffic.cars,
+      ...this.walkers
+        .filter(
+          (w) =>
+            w.person.root.visible &&
+            w.name !== this.fare.passenger &&
+            w.name !== this.fare.pickup?.name,
+        )
+        .map((w) => ({
+          x: w.person.root.position.x / U,
+          z: w.person.root.position.z / U,
+          heading: 0,
+          halfWidth: 0.13,
+          halfLength: 0.13,
+        })),
+    ]
+    for (const agent of this.traffic.cars) {
+      let model = this.trafficModels.get(agent.id)
+      if (!model) {
+        if (agent.kind === 'moto') {
+          const moto = buildMoto(FIGURE * 0.85)
+          this.trafficMotos.push(moto)
+          model = moto.root
+          if (this.trafficRiderTemplate) {
+            const rider = this.makePerson(
+              this.trafficRiderTemplate.gltf,
+              this.trafficRiderTemplate.spec,
+              '#d4a72c',
+            )
+            rider.root.scale.setScalar(0.85)
+            rider.root.position.y = moto.seat - rider.seatOffset * 0.85
+            this.play(rider, clipFor(rider.spec, 'drive'))
+            model.add(rider.root)
+            this.trafficRiders.set(agent.id, rider)
+          }
+        } else {
+          const template = this.trafficTemplates.get(agent.kind)
+          if (!template) continue
+          model = template.clone(true)
+          fitTaxiModel(model, FIGURE * 0.78, U * 0.67)
+          const root = new THREE.Group()
+          root.add(model)
+          model = root
+        }
+        model.name = `Circulation ${agent.kind} ${agent.id}`
+        this.scene.add(model)
+        this.trafficModels.set(agent.id, model)
+      }
+      model.position.set(agent.x * U, 0, agent.z * U)
+      model.rotation.y = (agent.heading * Math.PI) / 180
+      this.trafficRiders.get(agent.id)?.mixer.update(dt)
+    }
+  }
+
   private readonly frame = () => {
     if (this.disposed) return
     this.raf = requestAnimationFrame(this.frame)
@@ -1065,6 +1175,7 @@ export class StreetWorld {
     }
     this.perf.frame(now)
     const ctl = this.controller
+    this.stepTraffic(dt)
     ctl.update(dt)
     const events = ctl.drain()
     if (events.length) this.events.onEvents(events, ctl)
@@ -1083,7 +1194,7 @@ export class StreetWorld {
       const astride = ctl.driving && !!this.moto && !!ctl.vehicle
       pl.root.visible = onFoot || astride
       if (astride && ctl.vehicle && this.moto) {
-        this.seat(pl, ctl.vehicle, this.moto.driverZ)
+        this.seat(pl, ctl.shownVehicle ?? ctl.vehicle, this.moto.driverZ)
       } else {
         pl.root.position.set(ctl.pos.x * U, 0, ctl.pos.z * U)
         pl.root.rotation.y = (ctl.heading * Math.PI) / 180
@@ -1113,7 +1224,8 @@ export class StreetWorld {
       if (!this.car && !this.carLoading) this.loadCar()
       const car = this.car
       if (car) {
-        car.position.set(v.x * U, 0, v.z * U)
+        const shown = ctl.shownVehicle ?? v
+        car.position.set(shown.x * U, 0, shown.z * U)
         car.rotation.y = (v.heading * Math.PI) / 180
         this.wheelSpin += ((v.speed * U) / WHEEL_RADIUS) * dt
         const steer = ctl.driving ? Math.max(-1, Math.min(1, ctl.input.x)) * MAX_STEER : 0
@@ -1484,6 +1596,14 @@ export class StreetWorld {
       window: this.win ? { cx: this.win.cx, cy: this.win.cy, doors: this.win.doors.length } : null,
       buildings: this.win?.buildings.length ?? 0,
       pedestrians: this.walkers.length,
+      traffic: this.traffic.cars.map((c) => ({
+        id: c.id,
+        kind: c.kind,
+        x: c.x,
+        z: c.z,
+        stopped: c.stopped,
+      })),
+      collisions: true,
       kenney: Boolean(this.bank),
       rebuildMs: this.rebuildMs,
       tiles: this.tiles.size,

@@ -5,6 +5,7 @@
  * they are shown to others, own messages with their delivery state, typing, presence, offline
  * queue, report / block. Text is rendered as text (React escapes it): never as HTML.
  */
+import { LOCALITIES, type LocalityId, isLocalityId } from '@/lib/haroolife/city/locality'
 import type { RealtimeClient, RealtimeSnapshot } from '@/lib/haroolife/realtime/client'
 import { LIMITS, type Peer, type RoomId, isDm } from '@/lib/haroolife/realtime/protocol'
 import { Send } from 'lucide-react'
@@ -18,8 +19,8 @@ const TIME = new Intl.DateTimeFormat('fr-FR', {
 export function roomLabel(room: RoomId, peers: Record<RoomId, Peer> = {}): string {
   if (isDm(room)) return peers[room]?.name ?? 'Conversation privée'
   if (room === 'world:togo') return 'Togo'
-  if (room === 'locality:lome') return 'Lomé'
-  if (room === 'locality:kara') return 'Kara'
+  if (room.startsWith('locality:') && isLocalityId(room.slice(9)))
+    return LOCALITIES[room.slice(9) as LocalityId].name
   if (room.startsWith('canton:')) return 'Mon canton'
   if (room.startsWith('coop:')) return 'Ma coopérative'
   return room
@@ -34,7 +35,7 @@ export default function LiveChat({
 }: {
   client: RealtimeClient | null
   state: RealtimeSnapshot
-  locality: 'lome' | 'kara'
+  locality: LocalityId
   onChooseHome: () => void
   /** Open on this room (a private conversation started from a player's sheet). */
   initialRoom?: RoomId | null
@@ -107,7 +108,7 @@ export default function LiveChat({
           <span data-testid="present-count" className="text-slate-500">
             {here === 0
               ? 'Personne d’autre ici pour l’instant'
-              : `${here} ${here > 1 ? 'personnes' : 'personne'} en ligne à ${locality === 'lome' ? 'Lomé' : 'Kara'}`}
+              : `${here} ${here > 1 ? 'personnes' : 'personne'} en ligne à ${LOCALITIES[locality].name}`}
           </span>
         )}
       </div>

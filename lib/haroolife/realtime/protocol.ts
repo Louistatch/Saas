@@ -7,7 +7,7 @@
  * reconnection (`sync:resume`). Socket.IO itself is at-most-once and is never the source of truth.
  */
 export const PROTOCOL_VERSION = 1
-export const LOCALITIES = ['lome', 'kara'] as const
+export const LOCALITIES = ['lome', 'kara', 'dapaong', 'sokode', 'kpalime', 'atakpame'] as const
 export type Locality = (typeof LOCALITIES)[number]
 
 /**

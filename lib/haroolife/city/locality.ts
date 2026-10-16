@@ -15,7 +15,7 @@ import { SIZE } from '../townsmen-engine'
 import { hash } from './seed'
 import type { DistrictDef, Landmark, Terrain } from './world'
 
-export type LocalityId = 'lome' | 'kara'
+export type LocalityId = 'lome' | 'kara' | 'dapaong' | 'sokode' | 'kpalime' | 'atakpame'
 
 export interface LocalityDecor {
   /** Ground colour per district (hex). */
@@ -568,10 +568,207 @@ export const KARA: LocalityDef = {
   },
 }
 
-export const LOCALITIES: Record<LocalityId, LocalityDef> = { lome: LOME, kara: KARA }
-export const LOCALITY_IDS: LocalityId[] = ['lome', 'kara']
+/** Regional centres reuse the city engine, with distinct landscapes and named places.
+ * These layouts are fictional neighbourhoods, never a GPS reconstruction. Plateaux East/West
+ * are game sectors of the same administrative Plateaux region. */
+function regionalTown(
+  id: LocalityId,
+  name: string,
+  region: string,
+  prefecture: string,
+  climate: 'savanna' | 'central' | 'forest' | 'hills',
+  note: string,
+): LocalityDef {
+  const ds: DistrictDef[] = [
+    {
+      id: `${id}-nord`,
+      name: 'Quartier nord',
+      note: 'Concessions et jardins.',
+      density: 1,
+      x0: 0,
+      x1: 120,
+      y0: 0,
+      y1: 20,
+    },
+    {
+      id: `${id}-ouest`,
+      name: 'Quartier ouest',
+      note: 'Ateliers, écoles et artisans.',
+      density: 2,
+      x0: 0,
+      x1: 36,
+      y0: 20,
+      y1: 60,
+    },
+    {
+      id: `${id}-centre`,
+      name: `Centre de ${name}`,
+      note: 'Marché, gare et services.',
+      density: 3,
+      x0: 36,
+      x1: 84,
+      y0: 20,
+      y1: 60,
+    },
+    {
+      id: `${id}-est`,
+      name: 'Quartier est',
+      note: 'Commerces et transporteurs.',
+      density: 2,
+      x0: 84,
+      x1: 120,
+      y0: 20,
+      y1: 60,
+    },
+    {
+      id: `${id}-sud`,
+      name: 'Quartier des cultures',
+      note: 'Champs et coopératives.',
+      density: 1,
+      x0: 0,
+      x1: 120,
+      y0: 60,
+      y1: 80,
+    },
+  ]
+  const terrain = (x: number, y: number): Terrain => {
+    if ((climate === 'forest' || climate === 'hills') && x > 102 && y < 18) return 'hill'
+    if (climate !== 'savanna' && y >= 66 && y <= 68) return 'lagoon'
+    return 'land'
+  }
+  const road = (x: number, y: number) => {
+    const t = terrain(x, y)
+    if (t === 'hill') return false
+    if (t === 'lagoon') return x === 24 || x === 60 || x === 96
+    return (
+      x % 12 === 0 ||
+      y % 10 === 0 ||
+      (y >= 20 && y < 60 && x >= 36 && x < 84 && (x % 12 === 6 || y % 10 === 5))
+    )
+  }
+  const centre = `${id}-centre`
+  const lm: Landmark[] = [
+    { type: 'market', name: `Grand marché de ${name}`, district: centre, x: 50, y: 42, w: 4, h: 2 },
+    {
+      type: 'station',
+      name: `Gare routière de ${name}`,
+      district: centre,
+      x: 62,
+      y: 42,
+      w: 4,
+      h: 2,
+    },
+    { type: 'townhall', name: `Mairie de ${name}`, district: centre, x: 56, y: 32, floors: 2 },
+    {
+      type: 'hospital',
+      name: `Centre de santé de ${name}`,
+      district: centre,
+      x: 44,
+      y: 26,
+      floors: 2,
+    },
+    { type: 'bank', name: `Banque de ${name}`, district: centre, x: 68, y: 32, floors: 2 },
+    { type: 'school', name: `Lycée de ${name}`, district: `${id}-ouest`, x: 20, y: 32, w: 3, h: 2 },
+    { type: 'worship', name: `Mosquée de ${name}`, district: centre, x: 44, y: 52 },
+    { type: 'worship', name: `Église de ${name}`, district: centre, x: 74, y: 52 },
+    { type: 'sport', name: `Salle de sport de ${name}`, district: centre, x: 68, y: 52 },
+    { type: 'park', name: `Jardin de ${name}`, district: centre, x: 38, y: 42, w: 3, h: 2 },
+    { type: 'hotel', name: `Auberge de ${name}`, district: centre, x: 74, y: 42, floors: 2 },
+    coop(`Maison des coopératives de ${name}`, `${id}-sud`, 50, 72),
+    {
+      type: 'industry',
+      name: `Dépôt agricole de ${name}`,
+      district: `${id}-est`,
+      x: 92,
+      y: 32,
+      w: 3,
+      h: 2,
+    },
+  ]
+  const grass = climate === 'savanna' ? '#c3b77e' : climate === 'forest' ? '#7aa768' : '#a9b87b'
+  return {
+    id,
+    name,
+    region,
+    geo: {
+      region: region.startsWith('Plateaux') ? 'Plateaux Region' : `${region} Region`,
+      prefecture,
+    },
+    estate: null,
+    gate: { x: 48, y: 40 },
+    note,
+    terrain,
+    road,
+    districts: ds,
+    landmarks: lm,
+    waterNames: { lagoon: 'Rivière du quartier', ocean: 'Retenue', sand: 'Berge' },
+    industry: { x0: 85, x1: 102, y0: 22, y1: 58 },
+    decor: {
+      grass: Object.fromEntries(ds.map((d) => [d.id, grass])),
+      earth: climate === 'savanna' ? '#c3a079' : '#ad9373',
+      sand: '#d3c398',
+      lagoon: '#639fbb',
+      ocean: '#639fbb',
+      hill: '#648954',
+      streetTree: climate === 'savanna' ? 'tree-small' : 'oak',
+      shoreTree: 'oak',
+      concessionTree: 'oak',
+      coastalDistricts: [],
+      shoreRow: null,
+      sky: '#b9d9e4',
+    },
+  }
+}
+export const DAPAONG = regionalTown(
+  'dapaong',
+  'Dapaong',
+  'Savanes',
+  'Tone',
+  'savanna',
+  'Savanes : marchés, greniers, artisanat et terres de mil.',
+)
+export const SOKODE = regionalTown(
+  'sokode',
+  'Sokodé',
+  'Centrale',
+  'Tchaoudjo',
+  'central',
+  'Centrale : commerce, tissage et carrefour de la RN1.',
+)
+export const KPALIME = regionalTown(
+  'kpalime',
+  'Kpalimé',
+  'Plateaux Ouest',
+  'Kloto',
+  'forest',
+  'Plateaux Ouest : collines vertes, café, cacao et artisans.',
+)
+export const ATAKPAME = regionalTown(
+  'atakpame',
+  'Atakpamé',
+  'Plateaux Est',
+  'Ogou',
+  'hills',
+  'Plateaux Est : collines, marchés agricoles et transporteurs.',
+)
+export const LOCALITIES: Record<LocalityId, LocalityDef> = {
+  lome: LOME,
+  kara: KARA,
+  dapaong: DAPAONG,
+  sokode: SOKODE,
+  kpalime: KPALIME,
+  atakpame: ATAKPAME,
+}
+export const LOCALITY_IDS: LocalityId[] = [
+  'lome',
+  'kpalime',
+  'atakpame',
+  'sokode',
+  'kara',
+  'dapaong',
+]
 export const isLocalityId = (v: unknown): v is LocalityId =>
-  typeof v === 'string' && v in LOCALITIES
+  typeof v === 'string' && Object.hasOwn(LOCALITIES, v)
 
 let active: LocalityDef = LOME
 /** The locality the world generators and renderers are reading right now. */

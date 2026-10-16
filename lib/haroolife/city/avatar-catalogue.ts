@@ -63,6 +63,7 @@ const QUATERNIUS_CLIPS: Partial<Record<NpcAnim, string>> = {
   lift: 'Interact',
   talk: 'Wave',
   drive: 'HarooDrive',
+  cycle: 'HarooCycle',
 }
 /** Skin tones of the reference (dark to deep), hair near-black. */
 export const SKIN_TONES = ['#6b3e28', '#4b2d20', '#855235', '#593522'] as const

@@ -2,6 +2,10 @@
 
 import { useHarooLifeViewport } from '@/hooks/use-haroolife-viewport'
 import GraphicsBoundary from './graphics-boundary'
+import { EmploymentPanel, AviationPanel, OnlinePlayers } from './regional-services'
+import { advanceHourlyShift } from '@/lib/haroolife/city/employment'
+import { careerWorkStatus, careerWorkplace, workCareer } from '@/lib/haroolife/city/careers'
+import { airTrip, atAirport, takeFlight } from '@/lib/haroolife/city/aviation'
 
 import {
   type AdCampaign,
@@ -17,6 +21,7 @@ import { buyEstateMeal } from '@/lib/haroolife/city/commerce'
 import {
   VEHICLE_RULES,
   GAME_FUEL_PER_LITRE,
+  FUEL_REFERENCE,
   vehicleCare,
   nextVehicleStop,
   settleVehicleFare,
@@ -161,7 +166,6 @@ import {
   selectCity,
   selectJob,
   waitForNextWorkShift,
-  workStatus,
 } from '@/lib/haroolife/lome-life-engine'
 import { placeResidents, residentsAt } from '@/lib/haroolife/lome-presence'
 import { BILLBOARDS, PARTNER_APPS, billboardById } from '@/lib/haroolife/lome-sponsors'
@@ -186,7 +190,6 @@ import {
   Sun,
   UserRound,
   Users,
-  Utensils,
   X,
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
@@ -214,7 +217,7 @@ const CityWorld = dynamic(() => import('./city/city-world'), {
   ssr: false,
   loading: () => (
     <div className="flex h-full items-center justify-center bg-[#9bbd9d] text-sm font-bold text-white">
-      Chargement du monde 3D de Lomé…
+      Chargement du monde 3D…
     </div>
   ),
 })
@@ -242,6 +245,7 @@ type Sheet =
   | 'player'
   | 'debates'
   | 'farm'
+  | 'online'
   | null
 type Mode = 'walk' | 'build' | 'demolish'
 /** The module a HarooLife address opens inside the single 3D world. */
@@ -351,7 +355,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   // The generators read one locality at a time: the save's town, applied before any lookup.
   ensureLocality(cityLife)
   const life = cityLife.life
-  const currentWorkStatus = workStatus(life)
+  const currentWorkStatus = careerWorkStatus(cityLife)
   const setLife = useCallback(
     (next: LifeState | ((old: LifeState) => LifeState)) =>
       setCityLife((c) => ({ ...c, life: typeof next === 'function' ? next(c.life) : next })),
@@ -564,13 +568,14 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     hours: number
     company?: string
     stops?: Stop[]
+    mode?: 'air'
   } | null>(null)
   // Destination whose coach companies are being compared in the map sheet.
   const [coachTo, setCoachTo] = useState<LocalityId | null>(null)
   const endJourney = useCallback(() => setJourney(null), [])
   const [mode, setMode] = useState<Mode>('walk')
   const [building, setBuilding] = useState<BuildType>('house')
-  const [selection, setSelection] = useState<{ x: number; y: number } | null>(null)
+  const [, setSelection] = useState<{ x: number; y: number } | null>(null)
   const [playing, setPlaying] = useState(false)
   const [transport, setTransport] = useState<Transport>('walk')
   const [tripChoice, setTripChoice] = useState<Transport | null>(null)
@@ -629,49 +634,51 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
       ? `${door.isAccessible ? 'Entrer' : 'Fermé'} — ${door.label}`
       : 'Entrer'
   const title =
-    panel === 'home'
-      ? 'Mon foyer'
-      : panel === 'shop'
-        ? 'Marché & commerces'
-        : panel === 'map'
-          ? `Explorer ${LOCALITIES[cityLife.locality].name}`
-          : panel === 'phone'
-            ? 'Mon téléphone'
-            : panel === 'build'
-              ? 'Construire'
-              : panel === 'jobs'
-                ? 'Travailler & gagner'
-                : panel === 'debates'
-                  ? 'Débats & blagues'
-                  : panel === 'farm'
-                    ? 'Mon champ'
-                  : panel === 'messages'
-                    ? 'Messages du quartier'
-                    : panel === 'wallet'
-                      ? 'Mes finances'
-                      : panel === 'missions'
-                        ? 'Mes objectifs'
-                        : panel === 'journal'
-                          ? 'Journal de vie'
-                          : panel === 'billboard'
-                            ? 'Panneau publicitaire'
-                            : panel === 'ad'
-                              ? adFocus && isSponsored(adFocus.campaign)
-                                ? 'Promotion'
-                                : 'Information FaîtiereHub'
-                              : panel === 'lot'
-                                ? 'Lieu'
-                                : panel === 'cooperative'
-                                  ? 'Coopérative'
-                                  : panel === 'avatar'
-                                    ? 'Mon apparence'
-                                    : panel === 'player'
-                                      ? playerKey?.startsWith('npc:')
-                                        ? 'Habitant'
-                                        : 'Joueur'
-                                      : panel === 'market'
-                                        ? 'Marché'
-                                        : ''
+    panel === 'online'
+      ? 'Joueurs en ligne'
+      : panel === 'home'
+        ? 'Mon foyer'
+        : panel === 'shop'
+          ? 'Marché & commerces'
+          : panel === 'map'
+            ? `Explorer ${LOCALITIES[cityLife.locality].name}`
+            : panel === 'phone'
+              ? 'Mon téléphone'
+              : panel === 'build'
+                ? 'Construire'
+                : panel === 'jobs'
+                  ? 'Travailler & gagner'
+                  : panel === 'debates'
+                    ? 'Débats & blagues'
+                    : panel === 'farm'
+                      ? 'Mon champ'
+                      : panel === 'messages'
+                        ? 'Messages du quartier'
+                        : panel === 'wallet'
+                          ? 'Mes finances'
+                          : panel === 'missions'
+                            ? 'Mes objectifs'
+                            : panel === 'journal'
+                              ? 'Journal de vie'
+                              : panel === 'billboard'
+                                ? 'Panneau publicitaire'
+                                : panel === 'ad'
+                                  ? adFocus && isSponsored(adFocus.campaign)
+                                    ? 'Promotion'
+                                    : 'Information FaîtiereHub'
+                                  : panel === 'lot'
+                                    ? 'Lieu'
+                                    : panel === 'cooperative'
+                                      ? 'Coopérative'
+                                      : panel === 'avatar'
+                                        ? 'Mon apparence'
+                                        : panel === 'player'
+                                          ? playerKey?.startsWith('npc:')
+                                            ? 'Habitant'
+                                            : 'Joueur'
+                                          : panel === 'market'
+                                            ? 'Marché'
+                                            : ''
   const needs = life.needs
   const wellbeing = Math.round(NEED_KEYS.reduce((sum, k) => sum + needs[k], 0) / NEED_KEYS.length)
   const pending = eventById(life.pendingEvent)
@@ -685,8 +692,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   const online = realtime.state.status === 'online'
   // Slow presence: which locality the player is in (re-sent by the client after reconnection).
   useEffect(() => {
-    if (online && realtime.client)
-      void realtime.client.join(cityLife.locality === 'kara' ? 'kara' : 'lome')
+    if (online && realtime.client) void realtime.client.join(cityLife.locality)
   }, [online, realtime.client, cityLife.locality])
   // Movement snapshots at 5 Hz, only when the avatar moved (or every 2 s to stay visible).
   useEffect(() => {
@@ -988,6 +994,12 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     setCoopOrg(housed[0] ?? myOrg)
     setPanel('cooperative')
   }, [cityLife.insideLot, actor, myOrg, worldAdapter])
+  useEffect(() => {
+    const lot = cityLife.insideLot ? lotById(cityLife.insideLot) : null
+    if (!lot || (!lot.employer && !/aéroport/i.test(lot.name ?? ''))) return
+    setSelectedLot(lot)
+    setPanel(lot.employer ? 'jobs' : 'lot')
+  }, [cityLife.insideLot])
   // An activity animation lasts a few seconds, then the player stands idle again.
   useEffect(() => {
     if (!cityLife.activity) return
@@ -1386,12 +1398,17 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     }
   }, [cityLife.duty, cityLife.fleet, hail, fare, fareLive, serviceState])
   useEffect(() => {
-    if (!playing) return
+    if (!playing && !cityLife.employment?.shift) return
     const id = window.setInterval(() => {
-      if (document.visibilityState === 'visible') setLife((old) => advanceLifeHour(old))
+      if (document.visibilityState === 'visible')
+        setCityLife((old) =>
+          old.employment?.shift
+            ? advanceHourlyShift(old)
+            : { ...old, life: advanceLifeHour(old.life) },
+        )
     }, 11000)
     return () => window.clearInterval(id)
-  }, [playing])
+  }, [playing, !!cityLife.employment?.shift])
   useEffect(() => {
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') setPlaying(false)
@@ -1512,6 +1529,12 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     setCityLife((old) => goToEstate(old, x, y))
   }
   function goToWork() {
+    if (cityLife.locality !== 'lome') {
+      const place = careerWorkplace(cityLife)
+      if (place) goService(place)
+      else setNotice('Aucun poste accessible ici pour ce métier.')
+      return
+    }
     const target = LIFE_LOCATIONS.find((loc) => loc.venue === jobVenue(life.job))
     if (!target) {
       setNotice('Lieu de travail introuvable dans ce quartier.')
@@ -1587,6 +1610,10 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     setPanel(null)
   }
   function action(a: Action) {
+    if (a === 'work') {
+      setCityLife(workCareer)
+      return
+    }
     if (a === 'buy-meal') {
       setCityLife(buyEstateMeal)
       return
@@ -1791,7 +1818,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
         },
       }
       for (let h = 0; h < hours; h++) next = { ...next, life: advanceLifeHour(next.life) }
-      if (to in CITIES) next = { ...next, life: selectCity(next.life, to) }
+      if (to in CITIES) next = { ...next, life: selectCity(next.life, to as keyof typeof CITIES) }
       return travelTo(next, to)
     })
     setCoachTo(null)
@@ -1815,6 +1842,47 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     setTransport('walk')
   }
 
+  function goService(lot: Lot) {
+    setCityLife((old) => ({
+      ...old,
+      insideLot: null,
+      activity: null,
+      employment: old.employment ? { ...old.employment, shift: null } : undefined,
+      life: old.life.inside ? interact(old.life, 'leave') : old.life,
+    }))
+    goLot(lot)
+  }
+  function fly(to: LocalityId) {
+    const trip = airTrip(cityLife.locality, to)
+    if (!trip) return
+    if (!atAirport(cityLife)) {
+      const airport = landmarks().find((l) => /aéroport/i.test(l.name ?? ''))
+      if (airport) goService(airport)
+      return
+    }
+    const next = takeFlight(cityLife, to)
+    if (next.locality === cityLife.locality) {
+      setNotice(next.life.lastEvent)
+      return
+    }
+    setCityLife(next)
+    setJourney({
+      from: cityLife.locality,
+      to,
+      hours: trip.hours,
+      company: 'Vol HarooLife · simulation',
+      mode: 'air',
+    })
+    setChunkStats({ chunks: 0, buildings: 0, tris: 0, detailed: false })
+    const gate = LOCALITIES[to].gate
+    setCamera(CAMERA_HOME(gate.x, gate.y))
+    controller.camera.follow = true
+    setSelectedLot(null)
+    setPanel(null)
+    setMode('walk')
+    setTransport('walk')
+    if (mapView) exitMap()
+  }
   function reset() {
     if (!window.confirm('Recommencer uniquement ta partie fictive de Lomé Life ?')) return
     setCityLife(initialCityLife())
@@ -1826,11 +1894,19 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   }
 
   return (
-    <main ref={screenRef} className="haroolife-screen fixed inset-0 z-[95] w-full overflow-hidden bg-[#98b7a8] font-sans text-slate-900">
+    <main
+      ref={screenRef}
+      className="haroolife-screen fixed inset-0 z-[95] w-full overflow-hidden bg-[#98b7a8] font-sans text-slate-900"
+    >
       {/* The game world remains mounted under overlays. No map or dashboard replaces the canvas. */}
-      <div className="absolute inset-0" aria-label="Monde de jeu 3D de Lomé">
+      <div
+        className="absolute inset-0"
+        aria-label={`Monde de jeu 3D de ${LOCALITIES[cityLife.locality].name}`}
+      >
         {webgl === null ? (
-          <output className="flex h-full items-center justify-center p-8 text-center text-sm">Préparation de l’affichage 3D…</output>
+          <output className="flex h-full items-center justify-center p-8 text-center text-sm">
+            Préparation de l’affichage 3D…
+          </output>
         ) : webgl === false ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#123b33] p-8 text-center text-white">
             <h1 className="text-2xl font-bold">Lomé Life 3D</h1>
@@ -1838,7 +1914,13 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
               Le rendu 3D exige WebGL2. Active l’accélération graphique et utilise une version
               récente de Firefox, Chrome ou Safari. Les commandes restent accessibles ci-dessous.
             </p>
-            <button type="button" onClick={() => window.location.reload()} className="min-h-11 rounded-xl bg-white px-4 py-2 text-sm font-bold text-emerald-950">Réessayer l’affichage</button>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="min-h-11 rounded-xl bg-white px-4 py-2 text-sm font-bold text-emerald-950"
+            >
+              Réessayer l’affichage
+            </button>
           </div>
         ) : (
           <GraphicsBoundary onUnavailable={() => setWebgl(false)}>
@@ -1928,6 +2010,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
           hours={journey.hours}
           company={journey.company}
           stops={journey.stops}
+          mode={journey.mode}
           ready={cityLife.locality === journey.to && chunkStats.chunks > 0}
           onDone={endJourney}
         />
@@ -2046,15 +2129,18 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
           >
             {wellbeing >= 75 ? '🙂' : wellbeing >= 40 ? '😌' : '😟'} {mood}
           </button>
-          {here && (
-            <span
-              className="flex shrink-0 items-center gap-1 rounded-xl bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-800"
-              title={'Habitants de ' + here.canton.canton + ' présents dans le quartier'}
-            >
-              <Users size={14} /> {here.residents.length}
-              <span className="hidden sm:inline"> · {here.canton.canton}</span>
-            </span>
-          )}
+          <button
+            type="button"
+            onClick={() => open('online')}
+            aria-label="Voir les joueurs en ligne"
+            className="flex shrink-0 items-center gap-1 rounded-xl bg-emerald-50 px-2 py-2 text-[11px] font-bold text-emerald-800"
+          >
+            <Users size={14} />{' '}
+            {online
+              ? realtime.state.present.filter((p) => p.locality === cityLife.locality).length + 1
+              : '—'}
+            <span className="hidden sm:inline">{online ? ' en ligne' : ' connexion…'}</span>
+          </button>
           <span className="h-6 w-px bg-slate-200" />
           <button
             type="button"
@@ -2501,7 +2587,14 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
       )}
       {panel === 'phone' && (
         <PhoneDevice
-          onExit={onExit ? () => { flushSave(); onExit() } : undefined}
+          onExit={
+            onExit
+              ? () => {
+                  flushSave()
+                  onExit()
+                }
+              : undefined
+          }
           hour={life.hour}
           day={life.day}
           place={LOCALITIES[cityLife.locality].name}
@@ -2670,9 +2763,15 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                         interurbain t’y dépose à la gare routière, la ville se charge au fur et à
                         mesure autour de toi.
                       </p>
+                      <AviationPanel state={cityLife} onFly={fly} />
                       <NationalMap
                         current={cityLife.locality}
-                        onPick={(id) => setCoachTo(routeOf(cityLife.locality, id) ? id : null)}
+                        onPick={(id) => {
+                          if (id !== cityLife.locality) {
+                            if (routeOf(cityLife.locality, id)) setCoachTo(id)
+                            else travel(id)
+                          }
+                        }}
                       />
                       <div className="mt-2 grid gap-1">
                         {LOCALITY_IDS.filter((id) => id !== cityLife.locality).map((id) => {
@@ -3028,8 +3127,20 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                       </div>
                     )
                   })()}
+                {panel === 'online' && (
+                  <OnlinePlayers
+                    state={realtime.state}
+                    locality={cityLife.locality}
+                    onPlayer={(key) => {
+                      setPlayerKey(key)
+                      setPlayerNote('')
+                      setPanel('player')
+                    }}
+                  />
+                )}
                 {panel === 'jobs' && (
                   <>
+                    <EmploymentPanel state={cityLife} onChange={setCityLife} onGo={goService} />
                     <p className="text-sm text-slate-600">
                       Choisis un métier et rends-toi sur place entre 7h et 19h. Un seul salaire par
                       journée.
@@ -3185,9 +3296,19 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                               {kind === 'taxi' ? '🚕 Taxi' : '🏍️ Zémidjan'} · frais automatiques
                             </h3>
                             <p className="mt-1 text-xs text-slate-500">
-                              Essence : {GAME_FUEL_PER_LITRE} FCFA/L du jeu. Réservoir initial
-                              fourni. Les provisions sont débitées sur les recettes, puis utilisées
-                              à la pompe et au garage.
+                              Super : {GAME_FUEL_PER_LITRE} FCFA/L · référence officielle du
+                              11/09/2026, vérifiée le 16/10/2026. Réservoir initial fourni. Les
+                              provisions sont débitées sur les recettes, puis utilisées à la pompe
+                              et au garage.{' '}
+                              <a
+                                href={FUEL_REFERENCE.source}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline"
+                              >
+                                Source Togo Officiel
+                              </a>
+                              .
                             </p>
                             <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
                               <dt>Réservoir</dt>
@@ -3239,7 +3360,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                     initialRoom={chatRoom}
                     client={realtime.client}
                     state={realtime.state}
-                    locality={cityLife.locality === 'kara' ? 'kara' : 'lome'}
+                    locality={cityLife.locality}
                     onChooseHome={() => open('residence')}
                   />
                 )}
@@ -3720,6 +3841,9 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                             </div>
                           </div>
                         )}
+                        {insideHere && /aéroport/i.test(lot.name ?? '') && (
+                          <AviationPanel state={cityLife} onFly={fly} />
+                        )}
                         {insideHere && acts.length > 0 && (
                           <div className="space-y-2">
                             <p className="text-xs font-bold text-slate-700">Choisir une activité</p>
@@ -3969,7 +4093,20 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                         ? 'Choisis qui tu es dans Lomé : le même personnage te suit dans la rue, dans les bâtiments et au volant. Tu pourras changer depuis le téléphone.'
                         : 'Le même personnage te suit dans la rue, dans les bâtiments et au volant. Ton apparence reste enregistrée sur cet appareil ; tu peux changer de tenue à tout moment.'}
                     </p>
-                    {webgl === true && <GraphicsBoundary onUnavailable={() => setNotice('L’aperçu 3D est indisponible ; le choix du personnage reste possible.')}><AvatarPreview model={shownModel(avatar)} pagne={pagneColor(avatar.pagne)} /></GraphicsBoundary>}
+                    {webgl === true && (
+                      <GraphicsBoundary
+                        onUnavailable={() =>
+                          setNotice(
+                            'L’aperçu 3D est indisponible ; le choix du personnage reste possible.',
+                          )
+                        }
+                      >
+                        <AvatarPreview
+                          model={shownModel(avatar)}
+                          pagne={pagneColor(avatar.pagne)}
+                        />
+                      </GraphicsBoundary>
+                    )}
                     <div
                       className="grid grid-cols-2 gap-2 sm:grid-cols-4"
                       role="group"

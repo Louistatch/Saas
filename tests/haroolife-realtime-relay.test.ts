@@ -260,6 +260,32 @@ describe('HarooLife Socket.IO relay', () => {
     kofi.disconnect()
   })
 
+  it('presence and private messaging work in all four newly opened regional centres', async () => {
+    const ama = connect('ama')
+    const yawa = connect('yawa')
+    await Promise.all([ready(ama), ready(yawa)])
+    let amaKey = ''
+    for (const locality of ['dapaong', 'sokode', 'kpalime', 'atakpame'] as const) {
+      const alone = await ama.timeout(2000).emitWithAck('presence:join', { locality })
+      assert.ok(alone.ok && alone.present.length === 0)
+      const together = await yawa.timeout(2000).emitWithAck('presence:join', { locality })
+      assert.ok(together.ok)
+      if (together.ok) {
+        assert.equal(together.present.length, 1)
+        amaKey = together.present[0].key
+        assert.equal(together.present[0].name, 'Ama (test)')
+        assert.equal(together.present[0].locality, locality)
+        assert.equal('email' in together.present[0], false)
+      }
+    }
+    assert.ok(amaKey)
+    const dm = await yawa.timeout(2000).emitWithAck('dm:open', { key: amaKey })
+    assert.ok(dm.ok)
+    if (dm.ok) assert.ok((await send(yawa, dm.room, 'Bonjour depuis Atakpamé')).ok)
+    ama.disconnect()
+    yawa.disconnect()
+  })
+
   it('a token that expires during the session gets auth_expired (the client then reconnects)', async () => {
     const exp = Math.floor(Date.now() / 1000) + 2
     const token = `${b64({ alg: 'none' })}.${b64({ sub: LOCAL_ACCOUNTS.ama.id, exp })}.x`

@@ -3,6 +3,20 @@ import { initialCityLife } from '../lib/haroolife/city/life'
 import { landmarks } from '../lib/haroolife/city/world'
 import { vehicleCare } from '../lib/haroolife/city/vehicle-economy'
 
+test.afterEach(async ({ page }, info) => {
+  if (info.status === info.expectedStatus) return
+  const state = await page
+    .evaluate(() => {
+      const w = window as unknown as Record<string, unknown>
+      return { player: w.__LOME_PLAYER, fare: w.__LOME_FARE, street: w.__LOME_STREET }
+    })
+    .catch(() => null)
+  await info.attach('vehicle-state', {
+    body: JSON.stringify(state, null, 2),
+    contentType: 'application/json',
+  })
+})
+
 test('market: touch the counter, buy and eat, speak to a resident, preserve the conversation', async ({
   page,
 }, info) => {
