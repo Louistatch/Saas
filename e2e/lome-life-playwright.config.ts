@@ -42,6 +42,7 @@ export default defineConfig({
     'lome-taxi-hud.spec.ts',
     'lome-university.spec.ts',
     'lome-photo.spec.ts',
+    'lome-transport.spec.ts',
     'lome-regional-life.spec.ts',
   ],
   reporter: [['list'], ['html', { outputFolder: 'test-results/lome-report', open: 'never' }]],

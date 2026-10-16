@@ -45,7 +45,7 @@ import {
   shownModel,
 } from '@/lib/haroolife/city/avatar'
 import {
-  COMPANIES,
+  companiesBetween,
   type Stop,
   coachTrip,
   companyById,
@@ -583,6 +583,8 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   // Destination whose coach companies are being compared in the map sheet.
   const [coachTo, setCoachTo] = useState<LocalityId | null>(null)
   const endJourney = useCallback(() => setJourney(null), [])
+  // A flight booked away from the airport: the player is driven to the terminal, then boards.
+  const [pendingFlight, setPendingFlight] = useState<LocalityId | null>(null)
   const [mode, setMode] = useState<Mode>('walk')
   const [building, setBuilding] = useState<BuildType>('house')
   const [, setSelection] = useState<{ x: number; y: number } | null>(null)
@@ -1980,14 +1982,37 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     }))
     goLot(lot)
   }
+  // Driven to the terminal for a booked flight: once there, the player goes in and boards.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: fly reads the state of this render
+  useEffect(() => {
+    if (!pendingFlight || riding || cityLife.route.length) return
+    if (atAirport(cityLife)) {
+      fly(pendingFlight)
+      return
+    }
+    const airport = landmarks().find((l) => /aéroport/i.test(l.name ?? ''))
+    if (airport && cityLife.target === airport.id) setCityLife((old) => enterLot(old, airport))
+    else setPendingFlight(null)
+  }, [pendingFlight, riding, cityLife.route.length, cityLife.target, cityLife.insideLot])
   function fly(to: LocalityId) {
     const trip = airTrip(cityLife.locality, to)
     if (!trip) return
     if (!atAirport(cityLife)) {
       const airport = landmarks().find((l) => /aéroport/i.test(l.name ?? ''))
-      if (airport) goService(airport)
+      if (!airport) return
+      if (life.wallet < trip.fare + TRAVEL_COST.taxi) {
+        setNotice(
+          `Il te faut ${money(trip.fare)} pour le billet et ${money(TRAVEL_COST.taxi)} pour le taxi jusqu’au terminal.`,
+        )
+        return
+      }
+      // A taxi to the terminal, then boarding on arrival (see the effect on pendingFlight).
+      setPendingFlight(to)
+      setCityLife((old) => ({ ...old, insideLot: null, activity: null }))
+      rideTo(airport, 'taxi')
       return
     }
+    setPendingFlight(null)
     const next = takeFlight(cityLife, to)
     if (next.locality === cityLife.locality) {
       setNotice(next.life.lastEvent)
@@ -2954,20 +2979,28 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                                 }
                                 className="flex items-center gap-3 rounded-xl bg-white px-3 py-2 text-left text-xs ring-1 ring-slate-200 hover:ring-emerald-400"
                               >
-                                <span className="text-base">🚌</span>
+                                <span className="text-base">
+                                  {airTrip(cityLife.locality, id) ? '✈️' : '🚌'}
+                                </span>
                                 <span className="min-w-0 flex-1">
                                   <span className="block font-bold">
                                     Voyager vers {LOCALITIES[id].name}
                                   </span>
                                   <span className="block text-slate-500">
                                     {road
-                                      ? `${LOCALITIES[id].note} Par la RN1 (${road
-                                          .slice(1, -1)
-                                          .map((s) => s.name)
-                                          .join(
-                                            ', ',
-                                          )}), ≈ ${Math.abs(road[road.length - 1].km - road[0].km)} km. Choisis ta compagnie.`
-                                      : `${LOCALITIES[id].note} Car interurbain : ${trip.hours} h, ${money(trip.fare)} (tarif fictif).`}
+                                      ? (() => {
+                                          const trips = companiesBetween(cityLife.locality, id)
+                                            .map((c) => coachTrip(cityLife.locality, id, c, life.hour))
+                                            .filter((t) => t !== null)
+                                          const cheapest = Math.min(...trips.map((t) => t.fare))
+                                          const hours = Math.min(...trips.map((t) => t.hours))
+                                          const air = airTrip(cityLife.locality, id)
+                                          return `Car dès ${money(cheapest)}, ${hours} h par ${road
+                                            .slice(1, -1)
+                                            .map((s) => s.name)
+                                            .join(', ')}${air ? ` · Avion ${air.hours} h, ${money(air.fare)}` : ''}.`
+                                        })()
+                                      : `${LOCALITIES[id].note} Car interurbain : ${trip.hours} h, ${money(trip.fare)}.`}
                                   </span>
                                 </span>
                                 <ArrowRight size={14} className="shrink-0 text-emerald-700" />
@@ -2978,7 +3011,33 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                                   data-testid="coach-companies"
                                   className="grid gap-1 pl-3"
                                 >
-                                  {COMPANIES.map((c) => {
+                                  {airTrip(cityLife.locality, id) && (
+                                    <li>
+                                      <button
+                                        type="button"
+                                        aria-label={`Prendre l’avion vers ${LOCALITIES[id].name}`}
+                                        onClick={() => fly(id)}
+                                        className="flex w-full items-center gap-3 rounded-xl bg-sky-50 px-3 py-2 text-left text-xs ring-1 ring-sky-200 hover:ring-sky-500"
+                                      >
+                                        <span className="min-w-0 flex-1">
+                                          <span className="block font-bold">
+                                            ✈️ Avion · {airTrip(cityLife.locality, id)?.from} →{' '}
+                                            {airTrip(cityLife.locality, id)?.to}
+                                          </span>
+                                          <span className="block text-slate-600">
+                                            {atAirport(cityLife)
+                                              ? 'Tu es au terminal : embarquement maintenant'
+                                              : 'Un taxi te dépose au terminal, puis tu embarques'}{' '}
+                                            · {airTrip(cityLife.locality, id)?.hours} h de vol
+                                          </span>
+                                        </span>
+                                        <strong className="shrink-0">
+                                          {money(airTrip(cityLife.locality, id)?.fare ?? 0)}
+                                        </strong>
+                                      </button>
+                                    </li>
+                                  )}
+                                  {companiesBetween(cityLife.locality, id).map((c) => {
                                     const t = coachTrip(cityLife.locality, id, c, life.hour)
                                     if (!t) return null
                                     return (
@@ -3003,7 +3062,10 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                                     )
                                   })}
                                   <li className="px-1 text-[10px] text-slate-500">
-                                    Compagnies réelles ; horaires et prix du jeu, indicatifs.
+                                    Car : plafonds officiels de déc. 2024 et prix observés des
+                                    compagnies (hausse du carburant en 2026 possible). Avion : prix
+                                    annoncé par Liz Aviation en 2023, ligne non confirmée en 2026.
+                                    Horaires du jeu. Argent du jeu uniquement.
                                   </li>
                                 </ul>
                               )}

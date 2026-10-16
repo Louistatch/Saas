@@ -45,6 +45,12 @@ test('mobile: all requested regions open through the national map, preserving th
       .getByRole('button', { name: `Voyager vers ${name}`, exact: true })
       .last()
       .click()
+    // Every town is reached by coach now: the companies are listed, the first one is taken.
+    await page
+      .getByTestId('coach-companies')
+      .getByRole('button', { name: /^Prendre le car / })
+      .first()
+      .click()
     await expect.poll(async () => (await save(page)).locality).toBe(id)
     await expect(page.getByTestId('travel-splash')).toBeHidden({ timeout: 45000 })
     await expect

@@ -190,9 +190,15 @@ export const PRAYER_MOMENTS: PrayerMoment[] = [
 export const prayerMomentAt = (hour: number) =>
   PRAYER_MOMENTS.find((p) => hour >= p.from && hour < p.to) ?? null
 
+/**
+ * The only domestic air link of Togo: Lomé – Niamtougou (Kara's airport, about 30 km away), opened
+ * by Liz Aviation on 5 July 2023 (ATR 72-600, 55 min), one way announced at 65 000 FCFA. Its
+ * running in 2025-2026 is not confirmed: the game keeps that price. The other towns have no
+ * scheduled flight (Sokodé, Atakpamé, Dapaong and Mango have airfields without one).
+ */
 export const AIR_ROUTES = {
-  'lome>kara': { from: 'Aéroport de Lomé', to: 'Aéroport de Niamtougou', hours: 1, fare: 18000 },
-  'kara>lome': { from: 'Aéroport de Niamtougou', to: 'Aéroport de Lomé', hours: 1, fare: 18000 },
+  'lome>kara': { from: 'Aéroport de Lomé', to: 'Aéroport de Niamtougou', hours: 1, fare: 65000 },
+  'kara>lome': { from: 'Aéroport de Niamtougou', to: 'Aéroport de Lomé', hours: 1, fare: 65000 },
 } as const
 
 export const PUBLIC_SERVICE_ALERTS = [

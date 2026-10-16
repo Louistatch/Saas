@@ -148,16 +148,16 @@ test('aviation: terminal, sufficient money, one debit, arrival and return', () =
   assert.equal(poor.life.wallet, s.life.wallet)
   assert.equal(poor.locality, 'lome')
   const flying = takeFlight(
-    { ...s, insideLot: airport.id, life: { ...s.life, wallet: 50000 } },
+    { ...s, insideLot: airport.id, life: { ...s.life, wallet: 150000 } },
     'kara',
   )
   assert.equal(flying.locality, 'kara')
-  assert.equal(flying.life.wallet, 50000 - airTrip('lome', 'kara')!.fare)
+  assert.equal(flying.life.wallet, 150000 - airTrip('lome', 'kara')!.fare)
   assert.equal(flying.insideLot, null)
   const terminal = landmarks().find((l) => /aéroport/i.test(l.name ?? ''))!
   const home = takeFlight({ ...flying, insideLot: terminal.id }, 'lome')
   assert.equal(home.locality, 'lome')
-  assert.equal(home.life.wallet, 14000)
+  assert.equal(home.life.wallet, 150000 - 2 * airTrip('lome', 'kara')!.fare)
   assert.equal(airTrip('dapaong', 'kara'), null, 'do not invent real airports')
 })
 
