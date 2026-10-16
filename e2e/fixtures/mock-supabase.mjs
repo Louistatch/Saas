@@ -716,7 +716,7 @@ http
       // Private messages outside the game: run in the local relay's PGlite (the real
       // migrations), as the token's subject, so the dashboard and the game share one database.
       const localRpc =
-        /^\/rest\/v1\/rpc\/(haroolife_dm_inbox|haroolife_dm_read|haroolife_chat_history|haroolife_chat_send|haroolife_money_send|haroolife_money_claim|haroolife_save_get|haroolife_save_put)$/.exec(
+        /^\/rest\/v1\/rpc\/(haroolife_dm_inbox|haroolife_dm_read|haroolife_chat_history|haroolife_chat_send|haroolife_money_send|haroolife_money_claim|haroolife_save_get|haroolife_save_put|haroolife_chat_report|haroolife_mod_queue|haroolife_mod_act)$/.exec(
           p,
         )?.[1]
       if (localRpc) {

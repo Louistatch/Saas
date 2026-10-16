@@ -16,6 +16,8 @@ const ACCOUNTS = {
   ama: 'a1a1a1a1-0000-4000-8000-000000000001',
   kofi: 'b2b2b2b2-0000-4000-8000-000000000002',
   yawa: 'c3c3c3c3-0000-4000-8000-000000000003',
+  // The team (the mock Supabase's super_admin, the local moderator of realtime/pglite.ts).
+  equipe: '11111111-1111-4111-8111-111111111111',
 }
 const tokenOf = (sub: string) =>
   `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub, role: 'authenticated', aud: 'authenticated', exp: 4102444800 })}.c2ln`
@@ -576,4 +578,56 @@ test('the game follows the player to another phone, and a hand-raised wallet is 
 
   expect(two.errors).toEqual([])
   await two.context.close()
+})
+
+test('the team moderates a reported message from the admin console', async ({
+  browser,
+}, testInfo) => {
+  test.setTimeout(120_000)
+  test.skip(/mobile/.test(testInfo.project.name), 'opens its own desktop context')
+  const run = Date.now().toString(36)
+  const say = (who: keyof typeof ACCOUNTS, body: string) =>
+    fetch(`${SUPABASE}/rest/v1/rpc/haroolife_chat_send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${tokenOf(ACCOUNTS[who])}`,
+      },
+      body: JSON.stringify({ p_room: 'locality:lome', p_body: body, p_client_id: randomUUID() }),
+    })
+  // Kofi writes an insult on the Lomé room; Ama reports it from the game.
+  const posted = await say('kofi', `insulte de test ${run}`)
+  expect(posted.status).toBe(200)
+  const message = (await posted.json()) as { id: string }
+  await rpcAs('ama', 'haroolife_chat_report', { p_id: message.id, p_reason: 'Insulte' })
+
+  // The team (super_admin) sees it in the console and hides it, suspending Kofi.
+  const team = await signIn(browser, 'equipe', devices['Desktop Chrome'])
+  await team.page.goto('/admin/haroolife-moderation', { waitUntil: 'domcontentloaded' })
+  const card = team.page.getByTestId('mod-message').filter({ hasText: `insulte de test ${run}` })
+  await expect(card).toBeVisible({ timeout: 30000 })
+  await expect(card).toContainText('Kofi (test)')
+  await expect(card).toContainText('Insulte')
+  await card.getByRole('button', { name: /Masquer et suspendre/ }).click()
+  await expect(card).toBeHidden()
+  const suspended = team.page.getByTestId('mod-suspended').filter({ hasText: 'Kofi (test)' })
+  await expect(suspended).toBeVisible()
+  await expect(team.page.getByText('Joueur suspendu · Insulte').first()).toBeVisible()
+
+  // Kofi can no longer write; the message is hidden for everyone.
+  expect((await say('kofi', `encore ${run}`)).status).toBe(403)
+  const lome = (await rpcAs('yawa', 'haroolife_chat_history', {
+    p_room: 'locality:lome',
+    p_limit: 100,
+  })) as { id: string; deleted: boolean; body: string }[]
+  const hidden = lome.find((m) => m.id === message.id)
+  expect(hidden?.deleted).toBe(true)
+  expect(hidden?.body).toBe('')
+
+  // Lifting the suspension: Kofi writes again.
+  await suspended.getByRole('button', { name: 'Lever la suspension' }).click()
+  await expect(suspended).toBeHidden()
+  expect((await say('kofi', `pardon ${run}`)).status).toBe(200)
+  expect(team.errors).toEqual([])
+  await team.context.close()
 })

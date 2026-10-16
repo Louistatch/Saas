@@ -31,6 +31,8 @@ export const LOCAL_ACCOUNTS = {
     pagne: 7,
   },
 } as const
+/** The local team account: same id as the mock Supabase's signed-in super_admin. */
+export const LOCAL_MODERATOR = '11111111-1111-4111-8111-111111111111'
 export const LOCAL_CANTONS = {
   be: 'cccccccc-0000-4000-8000-0000000000be',
   kara: 'cccccccc-0000-4000-8000-0000000000ca',
@@ -67,6 +69,9 @@ const LOCAL_RPC: Record<string, string[]> = {
   haroolife_money_claim: [],
   haroolife_save_get: [],
   haroolife_save_put: ['p_save', 'p_version'],
+  haroolife_chat_report: ['p_id', 'p_reason'],
+  haroolife_mod_queue: [],
+  haroolife_mod_act: ['p_kind', 'p_target', 'p_action', 'p_reason', 'p_days'],
 }
 
 export type LocalChat = ChatRepository & {
@@ -97,6 +102,8 @@ export async function pgliteChat(migrationPaths: string | string[]): Promise<Loc
     INSERT INTO haroolife_residents VALUES ${accounts
       .map((a) => `('${a.id}','${LOCAL_CANTONS[a.canton]}','${a.name}',${a.pagne},true)`)
       .join(',')};
+    -- The local team account (the mock Supabase's signed-in admin): moderates, does not play.
+    INSERT INTO profiles VALUES ('${LOCAL_MODERATOR}','super_admin',NULL,NULL);
   `)
   for (const path of [migrationPaths].flat()) await db.exec(readFileSync(path, 'utf8'))
   await db.exec('SET ROLE authenticated')

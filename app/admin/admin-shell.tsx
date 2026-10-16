@@ -26,6 +26,7 @@ import {
   Menu,
   Printer,
   Settings,
+  ShieldAlert,
   TrendingUp,
   UserCheck,
   Users,
@@ -80,6 +81,7 @@ const ADMIN_SECTIONS: { title: string; links: AdminLink[] }[] = [
       { href: '/admin/haroo', label: 'Professionnels Haroo', icon: Briefcase },
       { href: '/admin/cartes', label: 'Cartes et PIN', icon: CreditCard },
       { href: '/admin/haroolife-panneaux', label: 'Panneaux HarooLife', icon: Megaphone },
+      { href: '/admin/haroolife-moderation', label: 'Modération HarooLife', icon: ShieldAlert },
       {
         href: '/admin/commandes-cartes',
         label: 'Commandes de cartes',
