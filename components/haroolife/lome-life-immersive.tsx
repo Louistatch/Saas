@@ -207,10 +207,12 @@ import TravelSplash from './city/travel-splash'
 import LiveChat from './live-chat'
 import { PAGNES } from './pagnes'
 import FarmPanel from './farm-panel'
+import InvitePanel from './invite-panel'
 import { PhoneDevice } from './phone-device'
 import { HomeDialog } from './residence-dialog'
 import { sayOnPlace, usePresence } from './use-presence'
 import { useCloudSave } from './use-cloud-save'
+import { useInvites } from './use-invites'
 import { useRealtime } from './use-realtime'
 
 const CityWorld = dynamic(() => import('./city/city-world'), {
@@ -246,6 +248,7 @@ type Sheet =
   | 'debates'
   | 'farm'
   | 'online'
+  | 'invite'
   | null
 type Mode = 'walk' | 'build' | 'demolish'
 /** The module a HarooLife address opens inside the single 3D world. */
@@ -608,6 +611,23 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     },
     notify: setNotice,
   })
+  // Invitations: a friend's bonus on arrival, the bonuses of the friends this player brought.
+  const invites = useInvites({
+    loaded,
+    credit: (amount, line) => {
+      setCityLife((old) => ({
+        ...old,
+        life: {
+          ...old.life,
+          wallet: old.life.wallet + amount,
+          earned: old.life.earned + amount,
+          lastEvent: line,
+          events: [line, ...old.life.events].slice(0, 8),
+        },
+      }))
+      setNotice(line)
+    },
+  })
   // The door in reach of the avatar (single resolver, continuous position, hysteresis).
   const [door, setDoor] = useState<InteractionTarget | null>(null)
   const doorRef = useRef<InteractionTarget | null>(null)
@@ -652,33 +672,36 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                     ? 'Débats & blagues'
                     : panel === 'farm'
                       ? 'Mon champ'
-                      : panel === 'messages'
-                        ? 'Messages du quartier'
-                        : panel === 'wallet'
-                          ? 'Mes finances'
-                          : panel === 'missions'
-                            ? 'Mes objectifs'
-                            : panel === 'journal'
-                              ? 'Journal de vie'
-                              : panel === 'billboard'
-                                ? 'Panneau publicitaire'
-                                : panel === 'ad'
-                                  ? adFocus && isSponsored(adFocus.campaign)
-                                    ? 'Promotion'
-                                    : 'Information FaîtiereHub'
-                                  : panel === 'lot'
-                                    ? 'Lieu'
-                                    : panel === 'cooperative'
-                                      ? 'Coopérative'
-                                      : panel === 'avatar'
-                                        ? 'Mon apparence'
-                                        : panel === 'player'
-                                          ? playerKey?.startsWith('npc:')
-                                            ? 'Habitant'
-                                            : 'Joueur'
-                                          : panel === 'market'
-                                            ? 'Marché'
-                                            : ''
+                      : panel === 'invite'
+                        ? 'Inviter des amis'
+                        : panel === 'messages'
+                          ? 'Messages du quartier'
+                          : panel === 'wallet'
+                            ? 'Mes finances'
+                            : panel === 'missions'
+                              ? 'Mes objectifs'
+                              : panel === 'journal'
+                                ? 'Journal de vie'
+                                : panel === 'billboard'
+                                  ? 'Panneau publicitaire'
+                                  : panel === 'ad'
+                                    ? adFocus && isSponsored(adFocus.campaign)
+                                      ? 'Promotion'
+                                      : 'Information FaîtiereHub'
+                                    : panel === 'lot'
+                                      ? 'Lieu'
+                                      : panel === 'cooperative'
+                                        ? 'Coopérative'
+                                        : panel === 'avatar'
+                                          ? 'Mon apparence'
+                                          : panel === 'player'
+                                            ? playerKey?.startsWith('npc:')
+                                              ? 'Habitant'
+                                              : 'Joueur'
+                                            : panel === 'market'
+                                              ? 'Marché'
+                                              : ''
+
   const needs = life.needs
   const wellbeing = Math.round(NEED_KEYS.reduce((sum, k) => sum + needs[k], 0) / NEED_KEYS.length)
   const pending = eventById(life.pendingEvent)
@@ -3037,6 +3060,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                     </div>
                   </>
                 )}
+                {panel === 'invite' && <InvitePanel onOpen={() => void invites.refresh()} />}
                 {panel === 'farm' && (
                   <FarmPanel cityLife={cityLife} update={(change) => setCityLife(change)} />
                 )}

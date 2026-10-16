@@ -74,6 +74,9 @@ const LOCAL_RPC: Record<string, string[]> = {
   haroolife_chat_report: ['p_id', 'p_reason'],
   haroolife_mod_queue: [],
   haroolife_mod_act: ['p_kind', 'p_target', 'p_action', 'p_reason', 'p_days'],
+  haroolife_invite_code: [],
+  haroolife_invite_accept: ['p_code'],
+  haroolife_invite_claim: [],
 }
 
 export type LocalChat = ChatRepository & {
@@ -107,6 +110,9 @@ export async function pgliteChat(migrationPaths: string | string[]): Promise<Loc
     -- The local team account (the mock Supabase's signed-in admin): moderates, does not play.
     INSERT INTO profiles VALUES ('${LOCAL_MODERATOR}','super_admin',NULL,NULL);
     INSERT INTO profiles VALUES ('${LOCAL_VISITOR}','none',NULL,NULL);
+    -- Account ages (invitations count for new players only): every local account is new.
+    CREATE TABLE auth.users(id uuid PRIMARY KEY, created_at timestamptz DEFAULT now());
+    INSERT INTO auth.users(id) SELECT id FROM profiles;
     INSERT INTO haroolife_residents VALUES ('${LOCAL_VISITOR}','${LOCAL_CANTONS.be}','Visiteur (test)',2,true);
   `)
   for (const path of [migrationPaths].flat()) await db.exec(readFileSync(path, 'utf8'))
