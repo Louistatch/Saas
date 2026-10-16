@@ -11,7 +11,8 @@
 -- rien pour un compte FaîtiereHub (la condition est vraie), et refuse le visiteur. Les tables
 -- lisibles par tous (anon compris), profiles (le visiteur lit son propre profil) et le jeu
 -- (haroolife_*, fonctions SECURITY DEFINER) ne sont pas concernés.
--- Additif : aucune politique existante n'est modifiée, aucune ligne n'est touchée.
+-- Additif et rejouable : chaque politique n'est créée que si elle manque ; aucune politique
+-- existante n'est modifiée, aucune ligne n'est touchée.
 -- Retour arrière : supabase/rollbacks/20261016_150000_visitors_outside_faitierehub.rollback.sql
 
 DO $$
@@ -28,18 +29,20 @@ BEGIN
     'enterprise_budget_snapshots', 'professional_documents',
     'haroo_ouvrier_profiles', 'haroo_acheteur_profiles', 'haroo_agronome_profiles'
   ] LOOP
-    IF to_regclass('public.' || t) IS NULL THEN CONTINUE; END IF;
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', 'pas de visiteur HarooLife', t);
+    IF to_regclass('public.' || t) IS NULL OR EXISTS (SELECT 1 FROM pg_policies
+       WHERE schemaname = 'public' AND tablename = t AND policyname = 'pas de visiteur HarooLife') THEN
+      CONTINUE;
+    END IF;
     EXECUTE format(
       'CREATE POLICY %I ON public.%I AS RESTRICTIVE FOR ALL TO authenticated USING (%s) WITH CHECK (%s)',
       'pas de visiteur HarooLife', t, not_visitor, not_visitor);
   END LOOP;
   -- Lisibles par tous (anon compris) : seule l'écriture est réservée.
   FOREACH t IN ARRAY ARRAY['market_prices', 'haroo_ouvrier_cantons'] LOOP
-    IF to_regclass('public.' || t) IS NULL THEN CONTINUE; END IF;
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', 'pas de visiteur HarooLife (ajout)', t);
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', 'pas de visiteur HarooLife (modif)', t);
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', 'pas de visiteur HarooLife (suppr)', t);
+    IF to_regclass('public.' || t) IS NULL OR EXISTS (SELECT 1 FROM pg_policies
+       WHERE schemaname = 'public' AND tablename = t AND policyname LIKE 'pas de visiteur HarooLife%') THEN
+      CONTINUE;
+    END IF;
     EXECUTE format('CREATE POLICY %I ON public.%I AS RESTRICTIVE FOR INSERT TO authenticated WITH CHECK (%s)',
       'pas de visiteur HarooLife (ajout)', t, not_visitor);
     EXECUTE format('CREATE POLICY %I ON public.%I AS RESTRICTIVE FOR UPDATE TO authenticated USING (%s) WITH CHECK (%s)',

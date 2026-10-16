@@ -34,7 +34,7 @@ test('visiteur : rien de FaîtiereHub au-delà du public ; un compte n’est pas
   `)
   const migration = 'supabase/migrations/20261016_150000_visitors_outside_faitierehub.sql'
   await db.exec(readFileSync(migration, 'utf8'))
-  // Rejouable sans doublon (DROP POLICY IF EXISTS).
+  // Rejouable sans doublon (chaque politique n’est créée que si elle manque).
   await db.exec(readFileSync(migration, 'utf8'))
 
   await as(false)
