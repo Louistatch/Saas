@@ -8,7 +8,7 @@
 import { ACTIVITIES } from '@/lib/haroolife/core'
 import type { Actor } from '@/lib/haroolife/domain/actor'
 import type { InteractionEngine } from '@/lib/haroolife/domain/engine'
-import { HttpAggregationService } from '@/lib/haroolife/domain/http'
+import { ACCOUNT_REQUIRED, HttpAggregationService } from '@/lib/haroolife/domain/http'
 import {
   type AreaUnit,
   type LandAggregation,
@@ -16,6 +16,7 @@ import {
   toHectares,
 } from '@/lib/haroolife/domain/land-aggregation'
 import { useEffect, useState } from 'react'
+import { AccountPrompt } from '../visitor'
 
 const parcels = new HttpAggregationService()
 const input = 'w-full rounded-xl border border-slate-300 px-3 py-2 text-sm'
@@ -144,10 +145,14 @@ export function RecruitForm({
           placeholder="Nom du producteur bénéficiaire"
         />
       </label>
-      {error && (
-        <p role="alert" className="rounded-xl bg-rose-50 p-2 text-xs font-semibold text-rose-800">
-          {error}
-        </p>
+      {error === ACCOUNT_REQUIRED ? (
+        <AccountPrompt reason={error} compact />
+      ) : (
+        error && (
+          <p role="alert" className="rounded-xl bg-rose-50 p-2 text-xs font-semibold text-rose-800">
+            {error}
+          </p>
+        )
       )}
       <SubmitRow busy={busy} onCancel={onCancel} cta="Ouvrir le recrutement" />
     </form>
@@ -305,10 +310,14 @@ export function PledgeForm({
         unit={unit}
         setUnit={setUnit}
       />
-      {error && (
-        <p role="alert" className="rounded-xl bg-rose-50 p-2 text-xs font-semibold text-rose-800">
-          {error}
-        </p>
+      {error === ACCOUNT_REQUIRED ? (
+        <AccountPrompt reason={error} compact />
+      ) : (
+        error && (
+          <p role="alert" className="rounded-xl bg-rose-50 p-2 text-xs font-semibold text-rose-800">
+            {error}
+          </p>
+        )
       )}
       <SubmitRow busy={busy} onCancel={onCancel} cta="Engager cette surface" />
     </form>
@@ -419,10 +428,14 @@ export function OpenPoolForm({
         unit={unit}
         setUnit={setUnit}
       />
-      {error && (
-        <p role="alert" className="rounded-xl bg-rose-50 p-2 text-xs font-semibold text-rose-800">
-          {error}
-        </p>
+      {error === ACCOUNT_REQUIRED ? (
+        <AccountPrompt reason={error} compact />
+      ) : (
+        error && (
+          <p role="alert" className="rounded-xl bg-rose-50 p-2 text-xs font-semibold text-rose-800">
+            {error}
+          </p>
+        )
       )}
       <SubmitRow busy={busy} onCancel={onCancel} cta="Ouvrir le regroupement" />
     </form>

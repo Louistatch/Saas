@@ -181,7 +181,7 @@ export default function GameEntry() {
               </p>
               {visitor && (
                 <div className="mt-4">
-                  <AccountPrompt reason="Tu joues en visiteur : tu lis les salons sans écrire." />
+                  <AccountPrompt reason="Tu joues en visiteur. Pour ta coopérative et les fonctions FaîtiereHub, connecte-toi d’abord : ta partie te suit." />
                 </div>
               )}
               <button
@@ -209,9 +209,9 @@ export default function GameEntry() {
                 <ArrowRight size={19} />
               </button>
               <p className="mt-2 text-center text-xs text-[#687b68]">
-                Sans compte, sans e-mail. Tu joues et tu lis les salons. Pour écrire, envoyer de
-                l’argent ou rejoindre ta coopérative, tu crées ton compte FaîtiereHub : ta partie te
-                suit.
+                Sans compte, sans e-mail : tu joues à tout, avec les autres joueurs. Pour les
+                fonctions FaîtiereHub (ta coopérative, tes parcelles), on te demandera de te
+                connecter.
               </p>
               {visit !== 'idle' && visit !== 'busy' && (
                 <p role="alert" className="mt-2 text-center text-xs font-semibold text-red-700">

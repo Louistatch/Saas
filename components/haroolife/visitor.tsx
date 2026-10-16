@@ -3,10 +3,11 @@
 /**
  * The HarooLife visitor: someone without a FaîtiereHub account who opens the game with one tap
  * (a Supabase anonymous account, no e-mail, no password). A visitor is not a FaîtiereHub account:
- * the rest of FaîtiereHub sees them signed out (auth context, middleware, getAccessContext). In the
- * game they play and read the rooms; the real features (writing, private messages, game money,
- * cooperatives, the market) lead to creating a FaîtiereHub account, and their game follows it
- * (lib/haroolife/cloud-save.ts). Server rules: supabase/migrations/20261016_140000_haroolife_visitors.sql.
+ * the rest of FaîtiereHub sees them signed out (auth context, middleware, getAccessContext, and
+ * supabase/migrations/20261016_150000_visitors_outside_faitierehub.sql). In the game they do
+ * everything a player does (chat, private messages, game money, market, the place, every town);
+ * a feature tied to FaîtiereHub itself (their cooperative, worker groups, parcels) asks them to
+ * sign in first, and their game follows the account (lib/haroolife/cloud-save.ts).
  */
 import { rememberGameReturn, withGameReturn } from '@/lib/haroolife/entry'
 import Link from 'next/link'
@@ -27,49 +28,39 @@ export async function startVisit(): Promise<string | null> {
     : 'Impossible d’entrer en visiteur pour le moment. Réessaie dans un instant.'
 }
 
-/** In place of a real feature, for a visitor: create a FaîtiereHub account (the game follows). */
+/**
+ * In place of a FaîtiereHub feature, for a visitor: sign in first (or create the account); the
+ * game follows the account.
+ */
 export function AccountPrompt({ reason, compact = false }: { reason?: string; compact?: boolean }) {
   const back = '/haroolife'
+  const login = withGameReturn('/auth/login', back)
   const signup = withGameReturn('/auth/signup', back)
-  // In the chat and the player sheet: one line, the height of the message box it replaces.
-  if (compact)
-    return (
-      <div
-        data-testid="account-prompt"
-        className="flex items-center gap-2 rounded-xl bg-amber-50 p-2 text-left"
-      >
-        <p className="min-w-0 flex-1 text-[11px] leading-snug text-amber-900">
-          {reason ?? 'Tu joues en visiteur.'}
-        </p>
-        <Link
-          href={signup}
-          onClick={() => rememberGameReturn(back)}
-          aria-label="Créer mon compte FaîtiereHub"
-          className="inline-flex min-h-10 shrink-0 items-center rounded-lg bg-amber-500 px-3 text-xs font-black text-white"
-        >
-          Créer mon compte
-        </Link>
-      </div>
-    )
+  const remember = () => rememberGameReturn(back)
+  const text =
+    reason ?? 'Cette fonction est liée à FaîtiereHub : connecte-toi d’abord. Ta partie te suit.'
   return (
-    <div data-testid="account-prompt" className="space-y-2 rounded-2xl bg-amber-50 p-4 text-left">
-      <p className="text-xs text-amber-900">
-        {reason ?? 'Tu joues en visiteur.'} Crée ton compte FaîtiereHub : ta partie te suit.
-      </p>
-      <div className="flex flex-wrap gap-2">
+    <div
+      data-testid="account-prompt"
+      className={`rounded-2xl bg-amber-50 text-left ${compact ? 'space-y-1.5 p-3' : 'space-y-2 p-4'}`}
+    >
+      <p className="text-xs leading-snug text-amber-900">{text}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Link
+          href={login}
+          onClick={remember}
+          className={`inline-flex flex-1 items-center justify-center rounded-xl bg-amber-500 px-3 font-black text-white ${
+            compact ? 'min-h-10 text-xs' : 'min-h-11 text-sm'
+          }`}
+        >
+          Me connecter
+        </Link>
         <Link
           href={signup}
-          onClick={() => rememberGameReturn(back)}
-          className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-amber-500 px-3 py-2 text-sm font-black text-white"
+          onClick={remember}
+          className="inline-flex min-h-10 items-center px-2 text-xs font-semibold text-amber-900 underline"
         >
           Créer mon compte FaîtiereHub
-        </Link>
-        <Link
-          href={withGameReturn('/auth/login', back)}
-          onClick={() => rememberGameReturn(back)}
-          className="inline-flex min-h-11 items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold text-amber-900 underline"
-        >
-          J’ai déjà un compte
         </Link>
       </div>
     </div>

@@ -21,9 +21,12 @@ import type {
 } from './services'
 import { type WorkerGroup, fromBoardGroup } from './worker-group'
 
-/** In the game, a 401 means a HarooLife visitor reached a real FaîtiereHub feature. */
-const ACCOUNT_REQUIRED =
-  'Cette fonction demande un compte FaîtiereHub. Crée ton compte : ta partie te suit.'
+/**
+ * In the game, a 401 means a HarooLife visitor reached a real FaîtiereHub feature (cooperative,
+ * worker groups, parcels): they are asked to sign in first (components/haroolife/visitor.tsx).
+ */
+export const ACCOUNT_REQUIRED =
+  'Cette fonction est liée à FaîtiereHub : connecte-toi d’abord. Ta partie te suit.'
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { cache: 'no-store' })

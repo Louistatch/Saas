@@ -53,8 +53,6 @@ export interface ChatMessage {
 }
 export interface Me extends Author {
   can_write: boolean
-  /** A visitor (no e-mail yet): reads the rooms, writes once the game is kept with an e-mail. */
-  visitor?: boolean
   rooms: RoomId[]
   blocked: string[]
 }

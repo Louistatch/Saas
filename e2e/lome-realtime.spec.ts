@@ -633,21 +633,12 @@ test('the team moderates a reported message from the admin console', async ({
   await team.context.close()
 })
 
-test('a visitor enters HarooLife with one tap, reads the rooms, and is sent to a FaîtiereHub account for the rest', async ({
+test('a visitor plays HarooLife without an account, talks with the players, and signs in only for FaîtiereHub', async ({
   browser,
 }, testInfo) => {
   test.setTimeout(150_000)
   test.skip(/mobile/.test(testInfo.project.name), 'opens its own Android context')
   const run = Date.now().toString(36)
-  // The visitor's anonymous account (mock Supabase signInAnonymously, realtime/pglite.ts).
-  const VISITOR = 'd4d4d4d4-0000-4000-8000-000000000004'
-  const visitorToken = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: VISITOR, role: 'authenticated', aud: 'authenticated', is_anonymous: true, exp: 4102444800 })}.c2ln`
-  const rpc = (token: string, fn: string, args: object) =>
-    fetch(`${SUPABASE}/rest/v1/rpc/${fn}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(args),
-    })
 
   // Signed out, on a phone: one tap on « Jouer en visiteur », no e-mail, no password.
   const context = await browser.newContext({
@@ -664,13 +655,20 @@ test('a visitor enters HarooLife with one tap, reads the rooms, and is sent to a
   await expect.poll(async () => (await rt(page))?.status, { timeout: 30000 }).toBe('online')
   expect(await rt(page)).toMatchObject({ me: 'Visiteur (test)' })
 
-  // The visitor reads what the others write, live (Ama writes through the relay).
-  await openChat(page, 'Lomé')
+  // The visitor talks with the players like anyone: Ama hears them live, and answers.
   const ama: Socket = io(RELAY, {
     transports: ['websocket'],
     auth: { token: tokenOf(ACCOUNTS.ama) },
   })
+  const amaHeard: string[] = []
+  ama.on('chat:new', (m: { body: string }) => amaHeard.push(m.body))
   await new Promise<void>((r) => ama.once('system:hello', () => r()))
+  await openChat(page, 'Lomé')
+  await page
+    .getByRole('textbox', { name: 'Écrire dans la discussion' })
+    .fill(`salut de visiteur ${run}`)
+  await page.getByRole('button', { name: 'Envoyer le message', exact: true }).click()
+  await expect.poll(() => amaHeard).toContain(`salut de visiteur ${run}`)
   const said = (await ama.timeout(10_000).emitWithAck('chat:send', {
     v: 1,
     room: 'locality:lome',
@@ -680,32 +678,14 @@ test('a visitor enters HarooLife with one tap, reads the rooms, and is sent to a
   expect(said.ok).toBe(true)
   await expect(log(page)).toContainText(`bienvenue au visiteur ${run}`)
   ama.close()
-  // No message box: creating a FaîtiereHub account instead (the game comes back after it).
-  await expect(page.getByRole('textbox', { name: 'Écrire dans la discussion' })).toHaveCount(0)
-  const prompt = page.getByTestId('account-prompt')
-  await expect(prompt).toBeVisible()
-  const signup = prompt.getByRole('link', { name: 'Créer mon compte FaîtiereHub' })
-  expect(await signup.getAttribute('href')).toMatch(/^\/auth\/signup\?.*haroolife/)
-
-  // The server refuses a visitor's writing even outside the screen: room, money.
-  const write = await rpc(visitorToken, 'haroolife_chat_send', {
-    p_room: 'locality:lome',
-    p_body: `ecrit quand meme ${run}`,
-    p_client_id: randomUUID(),
-  })
-  expect(write.status).not.toBe(200)
-  const gift = await rpc(visitorToken, 'haroolife_money_send', {
-    p_key: keyOf(ACCOUNTS.ama),
-    p_amount: 500,
-    p_note: null,
-    p_client_id: randomUUID(),
-  })
-  expect(gift.status).not.toBe(200)
-
   await page.screenshot({ path: testInfo.outputPath('realtime-visitor.png') })
 
-  // A visitor is not a FaîtiereHub account: the dashboard sends them to the login page, which
-  // stays open to them (no redirect back as if they were signed in).
+  // A FaîtiereHub feature (a cooperative's data) asks them to sign in first.
+  const coop = await page.request.get(
+    '/api/haroolife/cooperatives/c1000000-0000-4000-8000-000000000001',
+  )
+  expect(coop.status()).toBe(401)
+  // And for FaîtiereHub they are signed out: the dashboard opens the login page, which stays open.
   await page.goto('/dashboard', { waitUntil: 'domcontentloaded' })
   await expect(page).toHaveURL(/\/auth\/login/)
   await expect(page.locator('input#password')).toBeVisible({ timeout: 15000 })

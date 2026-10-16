@@ -207,7 +207,6 @@ import { PhoneDevice } from './phone-device'
 import { HomeDialog } from './residence-dialog'
 import { sayOnPlace, usePresence } from './use-presence'
 import { useCloudSave } from './use-cloud-save'
-import { AccountPrompt } from './visitor'
 import { useRealtime } from './use-realtime'
 
 const CityWorld = dynamic(() => import('./city/city-world'), {
@@ -2947,9 +2946,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                     const say = (body: string) => {
                       if (!canTalk || !realtime.client) {
                         setDebateNote(
-                          realtime.state.me?.visitor
-                            ? 'Crée ton compte FaîtiereHub pour débattre dans le salon Togo : ta partie te suit.'
-                            : 'Le salon Togo n’est pas disponible : connecte-toi et choisis ta maison pour débattre.',
+                          'Le salon Togo n’est pas disponible : connecte-toi et choisis ta maison pour débattre.',
                         )
                         return
                       }
@@ -3477,7 +3474,6 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                     const name = who?.name ?? 'Joueur'
                     const blocked = realtime.state.me?.blocked.includes(playerKey) ?? false
                     const offline = !realtime.client || realtime.state.status !== 'online'
-                    const visitor = !!realtime.state.me?.visitor
                     return (
                       <div className="space-y-3" data-testid="player-sheet">
                         <div className="flex items-center gap-3">
@@ -3496,15 +3492,8 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                             </p>
                           </div>
                         </div>
-                        {visitor && (
-                          <AccountPrompt
-                            reason={`Pour écrire à ${name} ou lui envoyer de l’argent, crée ton compte : ta partie te suit.`}
-                            compact
-                          />
-                        )}
                         <button
                           type="button"
-                          hidden={visitor}
                           disabled={offline || blocked}
                           onClick={async () => {
                             const c = realtime.client
@@ -3521,7 +3510,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                         >
                           💬 Discuter avec {name}
                         </button>
-                        <p className="text-xs text-slate-500" hidden={visitor}>
+                        <p className="text-xs text-slate-500">
                           {offline
                             ? 'La discussion en direct n’est pas disponible pour le moment.'
                             : blocked
@@ -3558,7 +3547,6 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                           </button>
                         </div>
                         <form
-                          hidden={visitor}
                           aria-label={`Envoyer de l’argent à ${name}`}
                           className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-3"
                           onSubmit={(e) => {

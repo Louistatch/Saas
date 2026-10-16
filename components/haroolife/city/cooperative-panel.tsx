@@ -3,7 +3,7 @@
 import { type Actor, type OrgRef, can } from '@/lib/haroolife/domain/actor'
 import type { CooperativeDashboard, MembersPage } from '@/lib/haroolife/domain/cooperative'
 import type { InteractionEngine } from '@/lib/haroolife/domain/engine'
-import { HttpOrganizationService } from '@/lib/haroolife/domain/http'
+import { ACCOUNT_REQUIRED, HttpOrganizationService } from '@/lib/haroolife/domain/http'
 import type { LandAggregation } from '@/lib/haroolife/domain/land-aggregation'
 import { STATE_LABELS, canJoin, canRecruit } from '@/lib/haroolife/domain/worker-group'
 /**
@@ -13,6 +13,7 @@ import { STATE_LABELS, canJoin, canRecruit } from '@/lib/haroolife/domain/worker
  * are members, never a fake crowd.
  */
 import { useCallback, useEffect, useState } from 'react'
+import { AccountPrompt } from '../visitor'
 import { OpenPoolForm, PledgeForm, RecruitForm } from './aggregation'
 
 const service = new HttpOrganizationService()
@@ -94,6 +95,7 @@ export default function CooperativePanel({
     if (listOpen) void loadMembers(page, q)
   }, [listOpen, page, q, loadMembers])
 
+  if (error === ACCOUNT_REQUIRED) return <AccountPrompt reason={error} />
   if (error)
     return (
       <div className="rounded-2xl bg-rose-50 p-4 text-sm text-rose-800" role="alert">

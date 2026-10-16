@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   const parsed = query.safeParse(Object.fromEntries(request.nextUrl.searchParams))
   if (!parsed.success)
     return NextResponse.json({ error: 'Paramètres invalides' }, { status: 400, headers })
-  const ctx = await getAccessContext()
+  const ctx = await getAccessContext({ allowVisitor: true })
   if (!ctx) return NextResponse.json({ error: 'Connexion requise' }, { status: 401, headers })
   if (
     !rateLimit(

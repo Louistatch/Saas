@@ -17,6 +17,31 @@ type Live = {
   lastEvent: string
 }
 test('travel Lomé → Kara → Lomé inside the single 3D world', async ({ page }, testInfo) => {
+  // The journey screen closes by itself once the arrival town is drawn (2.6 s at least): the page
+  // notes what it shows the moment it appears, whatever the speed of the machine running the test.
+  type Seen = { text: string; stops: string[] }
+  const watchSplash = () =>
+    page.evaluate(() => {
+      const w = window as unknown as { __SPLASH?: Seen | null }
+      w.__SPLASH = null
+      new MutationObserver((_, observer) => {
+        const el = document.querySelector('[data-testid="travel-splash"]')
+        if (!el) return
+        w.__SPLASH = {
+          text: el.textContent ?? '',
+          stops: [...el.querySelectorAll('[data-stop]')].map(
+            (x) => x.getAttribute('data-stop') ?? '',
+          ),
+        }
+        observer.disconnect()
+      }).observe(document.body, { childList: true, subtree: true })
+    })
+  const seenSplash = async () => {
+    const read = () =>
+      page.evaluate(() => (window as unknown as { __SPLASH?: Seen | null }).__SPLASH ?? null)
+    await expect.poll(read).not.toBeNull()
+    return (await read()) as Seen
+  }
   test.setTimeout(240_000)
   const live = () =>
     page.evaluate(() => (window as unknown as { __LOME_CITY?: Live }).__LOME_CITY ?? null)
@@ -81,21 +106,19 @@ test('travel Lomé → Kara → Lomé inside the single 3D world', async ({ page
       companies.getByRole('button', { name: `Prendre le car ${c} vers Kara` }),
     ).toBeVisible()
   await expect(companies).toContainText('7 500')
+  await watchSplash()
   await companies.getByRole('button', { name: 'Prendre le car Solim vers Kara' }).click()
 
   // The journey is shown full screen: the map of Togo, the real road from Lomé to Kara.
   const splash = page.getByTestId('travel-splash')
-  // Read as soon as it shows: it closes by itself once Kara is drawn (2.6 s at least).
-  await expect(splash).toBeVisible()
-  const shown = (await splash.textContent()) ?? ''
+  await page.screenshot({ path: testInfo.outputPath('travel-splash.png') })
+  const { text: shown, stops } = await seenSplash()
   expect(shown).toContain('En route vers Kara')
   expect(shown).toContain('Lomé → Kara')
   expect(shown).toContain('Solim')
   expect(shown).toContain('413 km')
   // The towns of the RN1 on the way.
-  for (const stop of ['Tsévié', 'Notsé', 'Atakpamé', 'Blitta', 'Sokodé'])
-    await expect(splash.locator(`[data-stop="${stop}"]`)).toHaveCount(1)
-  await page.screenshot({ path: testInfo.outputPath('travel-splash.png') })
+  expect(stops).toEqual(expect.arrayContaining(['Tsévié', 'Notsé', 'Atakpamé', 'Blitta', 'Sokodé']))
 
   // Arrival: the locality switched, the sheet closed, Kara's chunks and buildings stream in.
   await expect.poll(async () => (await live())?.locality).toBe('kara')
@@ -147,9 +170,9 @@ test('travel Lomé → Kara → Lomé inside the single 3D world', async ({ page
     .getByRole('button', { name: /Voyager vers Lomé/ })
     .first()
     .click()
+  await watchSplash()
   await map.getByRole('button', { name: 'Prendre le car CTT Rakieta vers Lomé' }).click()
-  await expect(splash).toBeVisible()
-  const back2 = (await splash.textContent()) ?? ''
+  const back2 = (await seenSplash()).text
   expect(back2).toContain('En route vers Lomé')
   expect(back2).toContain('CTT Rakieta')
   await expect.poll(async () => (await live())?.locality).toBe('lome')

@@ -9,7 +9,6 @@ import type { RealtimeClient, RealtimeSnapshot } from '@/lib/haroolife/realtime/
 import { LIMITS, type Peer, type RoomId, isDm } from '@/lib/haroolife/realtime/protocol'
 import { Send } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AccountPrompt } from './visitor'
 
 const TIME = new Intl.DateTimeFormat('fr-FR', {
   hour: '2-digit',
@@ -297,12 +296,7 @@ export default function LiveChat({
           {error}
         </p>
       )}
-      {state.me?.visitor ? (
-        <AccountPrompt
-          reason="Visiteur : tu lis les salons. Pour écrire, crée ton compte, ta partie te suit."
-          compact
-        />
-      ) : state.me && !state.me.can_write ? (
+      {state.me && !state.me.can_write ? (
         <button
           type="button"
           onClick={onChooseHome}
