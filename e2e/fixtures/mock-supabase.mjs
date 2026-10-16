@@ -450,6 +450,23 @@ const WORLD = {
   },
 }
 const MARKET = [
+  // Lomé (Maritime), with the culture names of the real survey (« Mon champ » sells at these).
+  {
+    region_id: 'r1',
+    price: 143,
+    unit: 'kg',
+    market_name: 'Lomé',
+    observed_at: new Date().toISOString(),
+    cultures: { name: 'Mais', icon: '🌽' },
+  },
+  {
+    region_id: 'r1',
+    price: 505,
+    unit: 'kg',
+    market_name: 'Lomé',
+    observed_at: new Date().toISOString(),
+    cultures: { name: 'Haricot', icon: '🫘' },
+  },
   {
     region_id: 'r2',
     price: 132,
@@ -613,7 +630,10 @@ const TABLES = {
   profiles: PROFILES,
   cooperatives: COOPS,
   cooperative_stats: COOPS,
-  regions: [{ id: 'r2', name: 'Kara' }],
+  regions: [
+    { id: 'r2', name: 'Kara' },
+    { id: 'r1', name: 'Maritime' },
+  ],
   market_prices: MARKET,
   members: MEMBERS,
   member_cards: CARDS,

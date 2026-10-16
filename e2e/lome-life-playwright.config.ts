@@ -37,6 +37,7 @@ export default defineConfig({
     'lome-service-vehicle.spec.ts',
     'lome-place-workflows.spec.ts',
     'lome-entry.spec.ts',
+    'lome-farm.spec.ts',
   ],
   reporter: [['list'], ['html', { outputFolder: 'test-results/lome-report', open: 'never' }]],
   fullyParallel: false,

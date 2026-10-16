@@ -203,6 +203,7 @@ import OnboardingSteps from './city/onboarding'
 import TravelSplash from './city/travel-splash'
 import LiveChat from './live-chat'
 import { PAGNES } from './pagnes'
+import FarmPanel from './farm-panel'
 import { PhoneDevice } from './phone-device'
 import { HomeDialog } from './residence-dialog'
 import { sayOnPlace, usePresence } from './use-presence'
@@ -240,6 +241,7 @@ type Sheet =
   | 'avatar'
   | 'player'
   | 'debates'
+  | 'farm'
   | null
 type Mode = 'walk' | 'build' | 'demolish'
 /** The module a HarooLife address opens inside the single 3D world. */
@@ -641,6 +643,8 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                 ? 'Travailler & gagner'
                 : panel === 'debates'
                   ? 'Débats & blagues'
+                  : panel === 'farm'
+                    ? 'Mon champ'
                   : panel === 'messages'
                     ? 'Messages du quartier'
                     : panel === 'wallet'
@@ -2933,6 +2937,9 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                       </p>
                     </div>
                   </>
+                )}
+                {panel === 'farm' && (
+                  <FarmPanel cityLife={cityLife} update={(change) => setCityLife(change)} />
                 )}
                 {panel === 'debates' &&
                   (() => {

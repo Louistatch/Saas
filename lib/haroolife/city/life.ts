@@ -15,6 +15,7 @@ export { actionsFor } from './activities'
 import type { Building } from '../townsmen-engine'
 import { type NpcAnim, animFor, layoutFor } from './interiors'
 import { type Commerce, decodeCommerce, emptyCommerce } from './commerce'
+import { type Farm, decodeFarm } from './farm'
 import { type SocialLife, decodeSocial } from './social'
 import { type Fleet, decodeFleet, manualVehicleService } from './vehicle-economy'
 import { restoreServiceVehicle } from './jobs'
@@ -107,6 +108,8 @@ export interface CityLife {
    * Passers-by hail the driver; fares are paid on arrival (see fares.ts).
    */
   duty?: 'moto' | 'taxi' | null
+  /** « Mon champ »: the player's plot and the harvest not yet sold (see farm.ts). */
+  farm?: Farm
 }
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)))
@@ -197,6 +200,7 @@ export function decodeCityLife(value: unknown): CityLife | null {
     commerce: decodeCommerce(v.commerce, life.spent),
     social: decodeSocial(v.social),
     fleet: decodeFleet(v.fleet),
+    farm: decodeFarm(v.farm),
     socialDays:
       v.socialDays && typeof v.socialDays === 'object'
         ? Object.fromEntries(
