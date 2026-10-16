@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { safeInternalPath } from '@/lib/auth/safe-redirect'
+import { useGameReturn } from '@/hooks/use-game-return'
+import { clearGameReturn, rememberedGameReturn, withGameReturn } from '@/lib/haroolife/entry'
 import { errorMessage } from '@/lib/utils/errors'
 import { hasOrgLayer, isHarooRole } from '@/lib/utils/permissions'
 import { flattenZodErrors, loginSchema } from '@/lib/validators/schemas'
@@ -32,6 +34,7 @@ import { Suspense, useCallback, useState } from 'react'
 function LoginInner() {
   const searchParams = useSearchParams()
   const { login } = useAuth()
+  const gameReturn = useGameReturn()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -82,7 +85,7 @@ function LoginInner() {
 
         // Chemin interne uniquement : « /\evil.com » passait l'ancien contrôle et le navigateur
         // le lit comme « //evil.com ». On résout l'adresse et on exige la même origine.
-        const safeRedirect = safeInternalPath(redirectTo, window.location.origin)
+        const safeRedirect = safeInternalPath(redirectTo ?? rememberedGameReturn(), window.location.origin)
         // Un professionnel Haroo ne doit jamais être renvoyé vers le dashboard
         // coopérative, même si ?redirect=/dashboard a été posé par le middleware
         // lors d'une visite déconnectée — son espace est /haroo.
@@ -118,6 +121,7 @@ function LoginInner() {
         // suspendu sur l'écran « Chargement… » si le jeton vient d'être posé ou
         // si le cache du routeur garde une redirection périmée. Un vrai
         // chargement envoie les cookies frais et repart d'un état propre.
+        clearGameReturn()
         window.location.assign(target)
       } catch (err: unknown) {
         clearTimeout(progressTimer)
@@ -173,9 +177,9 @@ function LoginInner() {
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
               <ShieldCheck className="h-5 w-5 text-primary" aria-hidden="true" />
             </div>
-            <CardTitle className="text-2xl">Bon retour</CardTitle>
+            <CardTitle className="text-2xl"><h1>{gameReturn ? 'Retrouvez HarooLife' : 'Bon retour'}</h1></CardTitle>
             <CardDescription>
-              Connectez-vous pour retrouver votre espace personnel FaîtiereHub.
+              {gameReturn ? 'Utilisez votre compte FaîtiereHub habituel. Vous reviendrez ensuite à HarooLife.' : 'Connectez-vous pour retrouver votre espace personnel FaîtiereHub.'}
             </CardDescription>
           </CardHeader>
 
@@ -189,7 +193,7 @@ function LoginInner() {
                   {error}
                   {unconfirmed && (
                     <Link
-                      href={`/auth/verify-email?email=${encodeURIComponent(email.trim())}`}
+                      href={withGameReturn(`/auth/verify-email?email=${encodeURIComponent(email.trim())}`, gameReturn)}
                       className="mt-1 block font-medium underline"
                     >
                       Renvoyer l’e-mail de confirmation
@@ -227,7 +231,7 @@ function LoginInner() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <Label htmlFor="password">Mot de passe</Label>
                   <Link
-                    href="/auth/forgot-password"
+                    href={withGameReturn('/auth/forgot-password', gameReturn)}
                     className="text-xs text-primary hover:underline"
                   >
                     Mot de passe oublié ?
@@ -279,7 +283,7 @@ function LoginInner() {
 
             <p className="mt-6 text-center text-sm text-muted-foreground">
               Vous n&apos;avez pas de compte ?{' '}
-              <Link href="/auth/signup" className="text-primary hover:underline font-medium">
+              <Link href={withGameReturn('/auth/signup', gameReturn)} className="text-primary hover:underline font-medium">
                 S&apos;inscrire
               </Link>
             </p>

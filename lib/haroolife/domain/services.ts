@@ -116,14 +116,7 @@ export interface AvatarSpec {
 /** From an actor to a drawable figure: never contact data, never the full last name. */
 export const AvatarRenderer = {
   describe(a: Pick<Actor, 'id' | 'displayName' | 'roles' | 'harooType'>, pagne = 1): AvatarSpec {
-    const models = [
-      'character-female-a',
-      'character-female-b',
-      'character-female-c',
-      'character-male-a',
-      'character-male-b',
-      'character-male-c',
-    ]
+    const models = ['afi', 'abra', 'afi', 'kossi', 'koffi', 'kossi']
     let h = 0
     for (let i = 0; i < a.id.length; i++) h = (h * 31 + a.id.charCodeAt(i)) >>> 0
     const badge = a.roles.includes('producteur')

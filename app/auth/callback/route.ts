@@ -1,6 +1,8 @@
 import { confirmedHomePath, hasOperatorFile } from '@/lib/account/confirmed-home'
 import { createClient } from '@/lib/supabase/server'
 import { type NextRequest, NextResponse } from 'next/server'
+import { safeInternalPath } from '@/lib/auth/safe-redirect'
+import { GAME_RETURN_COOKIE, resolveGameReturn } from '@/lib/haroolife/entry'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -37,6 +39,13 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(`${base}/auth/login?error=callback_failed`)
       }
 
+      const gameReturn = resolveGameReturn(next, request.cookies.get(GAME_RETURN_COOKIE)?.value)
+      if (gameReturn) {
+        const response = NextResponse.redirect(new URL(gameReturn, base))
+        response.cookies.delete(GAME_RETURN_COOKIE)
+        return response
+      }
+
       if (type === 'signup' || type === 'email') {
         // Un candidat Opérateur (ni organisation, ni Haroo) arrive dans son espace, pas sur
         // un tableau de bord vide ; les autres comptes gardent l'accueil du dashboard.
@@ -59,7 +68,7 @@ export async function GET(request: NextRequest) {
         !!profile?.haroo_type || (!!role && ['ouvrier', 'acheteur', 'agronome'].includes(role))
 
       // Validate ?next parameter: must start with '/' and not '//' (open redirect prevention)
-      const validNext = next && /^\/[^/]/.test(next) ? next : null
+      const validNext = safeInternalPath(next, base, { refuseAuthPages: true })
 
       if (validNext) {
         return NextResponse.redirect(`${base}${validNext}`)

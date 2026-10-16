@@ -38,7 +38,7 @@ const HarooStreetView = dynamic(() => import('../game/haroo-street-view'), { ssr
 const HarooRideView = dynamic(() => import('../game/haroo-ride-view'), { ssr: false })
 const CityMap = dynamic(() => import('../game/city-map'), { ssr: false })
 
-/** The player's own look (a Kenney Mini Character). */
+/** The player's adult skinned avatar. */
 export const PLAYER_MODEL = 'afi'
 
 /** Sun, sky and ambient light for an hour of the day. */
@@ -196,6 +196,8 @@ export default function CityWorld({
           <HarooRideView
             transport={ride.transport}
             rain={ride.rain}
+            avatarModel={avatarModel}
+            avatarPagne={avatarPagne}
             pixelRatio={pixelRatio}
             onFrame={onFrame}
           />

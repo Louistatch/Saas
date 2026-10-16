@@ -1,4 +1,5 @@
 import { test as base } from '@playwright/test'
+import { gameAccount } from './fixtures/game-account'
 
 /**
  * Shared Playwright `test` for the Lomé suite. With PW_CPU_THROTTLE=<n> every page runs
@@ -12,7 +13,8 @@ export const test = base.extend<{
   // Every scenario plays as someone who already chose a look: the new-game appearance sheet
   // (opened on a device with no choice yet) is covered by lome-avatar.spec.ts, which clears it.
   returningPlayer: [
-    async ({ page }, use) => {
+    async ({ page, context }, use) => {
+      await gameAccount(context)
       await page.addInitScript(() => {
         try {
           localStorage.setItem('haroolife.avatar.chosen', '1')

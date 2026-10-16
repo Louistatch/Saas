@@ -1,5 +1,8 @@
 'use client'
 
+import { useHarooLifeViewport } from '@/hooks/use-haroolife-viewport'
+import GraphicsBoundary from './graphics-boundary'
+
 import {
   type AdCampaign,
   type AdPlacement,
@@ -31,6 +34,7 @@ import {
   type Avatar,
   DEFAULT_AVATAR,
   loadAvatar,
+  decodeAvatar,
   pagneColor,
   saveAvatar,
   shownModel,
@@ -338,7 +342,8 @@ function DailyStatus({ life }: { life: LifeState }) {
   )
 }
 
-export function LomeLifeImmersive() {
+export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
+  const screenRef = useHarooLifeViewport<HTMLElement>()
   bump('immersive')
   const [cityLife, setCityLife] = useState<CityLife>(initialCityLife)
   // The generators read one locality at a time: the save's town, applied before any lookup.
@@ -428,8 +433,7 @@ export function LomeLifeImmersive() {
   }
   const chooseAvatar = (next: Partial<Avatar>) =>
     setAvatar((cur) => {
-      const { classic, ...rest } = { ...cur, ...next }
-      const a: Avatar = classic ? { ...rest, classic } : rest
+      const a = decodeAvatar({ ...cur, ...next }) ?? DEFAULT_AVATAR
       saveAvatar(localStorage, a)
       return a
     })
@@ -862,7 +866,15 @@ export function LomeLifeImmersive() {
 
   useEffect(() => {
     try {
-      setWebgl(Boolean(document.createElement('canvas').getContext('webgl2')))
+      const gl = document.createElement('canvas').getContext('webgl2')
+      setWebgl(Boolean(gl))
+      // This context is only a probe. Free it before the real engine creates its own.
+      gl?.getExtension('WEBGL_lose_context')?.loseContext()
+    } catch {
+      setWebgl(false)
+    }
+    // Graphics availability must never prevent loading the saved game or reset its wallet.
+    try {
       const loaded = loadCityLife(localStorage)
       if (loaded.source !== 'fresh' || loaded.importedBuilder) {
         setCityLife(loaded.world)
@@ -870,7 +882,7 @@ export function LomeLifeImmersive() {
       }
       if (loaded.importedBuilder) setNotice('Vos constructions HarooVille sont sur le domaine.')
     } catch {
-      setWebgl(false)
+      setNotice('La sauvegarde locale n’a pas pu être lue sur cet appareil.')
     }
     setLoaded(true)
   }, [])
@@ -1438,10 +1450,10 @@ export function LomeLifeImmersive() {
   const walking = cityLife.route.length > 0
   // biome-ignore lint/correctness/useExhaustiveDependencies: reacts to these transitions only
   useEffect(() => {
-    if (mapView && (insideAny || riding || walking)) exitMap()
-  }, [insideAny, riding, walking])
+    if (mapView && (insideAny || riding || walking || webgl === false)) exitMap()
+  }, [insideAny, riding, walking, webgl])
   function enterMap() {
-    if (controller.driving && cityLife.duty) {
+    if (webgl === false || (controller.driving && cityLife.duty)) {
       setPanel('map')
       return
     }
@@ -1810,94 +1822,99 @@ export function LomeLifeImmersive() {
   }
 
   return (
-    <main className="fixed inset-0 z-[95] h-[100dvh] w-screen overflow-hidden bg-[#98b7a8] font-sans text-slate-900">
+    <main ref={screenRef} className="haroolife-screen fixed inset-0 z-[95] w-full overflow-hidden bg-[#98b7a8] font-sans text-slate-900">
       {/* The game world remains mounted under overlays. No map or dashboard replaces the canvas. */}
       <div className="absolute inset-0" aria-label="Monde de jeu 3D de Lomé">
-        {webgl === false ? (
+        {webgl === null ? (
+          <output className="flex h-full items-center justify-center p-8 text-center text-sm">Préparation de l’affichage 3D…</output>
+        ) : webgl === false ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#123b33] p-8 text-center text-white">
             <h1 className="text-2xl font-bold">Lomé Life 3D</h1>
             <p>
-              Le rendu 3D exige WebGL2. Ouvre ce jeu dans Chrome avec l’accélération graphique
-              activée.
+              Le rendu 3D exige WebGL2. Active l’accélération graphique et utilise une version
+              récente de Firefox, Chrome ou Safari. Les commandes restent accessibles ci-dessous.
             </p>
+            <button type="button" onClick={() => window.location.reload()} className="min-h-11 rounded-xl bg-white px-4 py-2 text-sm font-bold text-emerald-950">Réessayer l’affichage</button>
           </div>
         ) : (
-          <CityWorld
-            city={life.city}
-            onTile={tile}
-            controller={controller}
-            onPlayerEvents={onPlayerEvents}
-            remoteFeed={realtime.client ?? undefined}
-            remotePresent={realtime.state.present}
-            ads={adsProp}
-            avatarModel={shownModel(avatar)}
-            avatarPagne={pagneColor(avatar.pagne)}
-            camera={camera}
-            hour={life.hour}
-            interior={interior}
-            interiorTitle={
-              cityLife.insideLot
-                ? (lotById(cityLife.insideLot)?.name ??
-                  TYPE_LABELS[lotById(cityLife.insideLot)?.type ?? 'lot'])
-                : (VENUE_LABELS[life.inside ?? ''] ?? '')
-            }
-            interiorLot={
-              cityLife.insideLot ? (lotById(cityLife.insideLot) ?? undefined) : undefined
-            }
-            activity={cityLife.activity}
-            onUseProp={useEquipment}
-            approach={approachReq}
-            onTalk={(npc) => {
-              setPanel(null)
-              setTalkNpc(npc)
-            }}
-            onNotice={setNotice}
-            ride={riding && cityLife.route.length > 0 && !insideAny ? { transport, rain } : null}
-            onCell={(cell) => {
-              const lot = lotAtCell(cell.x, cell.y)
-              if (lot) {
+          <GraphicsBoundary onUnavailable={() => setWebgl(false)}>
+            <CityWorld
+              city={life.city}
+              onTile={tile}
+              controller={controller}
+              onPlayerEvents={onPlayerEvents}
+              remoteFeed={realtime.client ?? undefined}
+              remotePresent={realtime.state.present}
+              ads={adsProp}
+              avatarModel={shownModel(avatar)}
+              avatarPagne={pagneColor(avatar.pagne)}
+              camera={camera}
+              hour={life.hour}
+              interior={interior}
+              interiorTitle={
+                cityLife.insideLot
+                  ? (lotById(cityLife.insideLot)?.name ??
+                    TYPE_LABELS[lotById(cityLife.insideLot)?.type ?? 'lot'])
+                  : (VENUE_LABELS[life.inside ?? ''] ?? '')
+              }
+              interiorLot={
+                cityLife.insideLot ? (lotById(cityLife.insideLot) ?? undefined) : undefined
+              }
+              activity={cityLife.activity}
+              onUseProp={useEquipment}
+              approach={approachReq}
+              onTalk={(npc) => {
+                setPanel(null)
+                setTalkNpc(npc)
+              }}
+              onNotice={setNotice}
+              ride={riding && cityLife.route.length > 0 && !insideAny ? { transport, rain } : null}
+              onCell={(cell) => {
+                const lot = lotAtCell(cell.x, cell.y)
+                if (lot) {
+                  setSelectedLot(lot)
+                  setPanel('lot')
+                } else if (!mapView) {
+                  controller.camera.follow = true
+                  setCityLife((old) => goToPoint(old, cell))
+                }
+              }}
+              onLotIcon={(lot) => {
                 setSelectedLot(lot)
                 setPanel('lot')
-              } else if (!mapView) {
-                controller.camera.follow = true
-                setCityLife((old) => goToPoint(old, cell))
+              }}
+              onPlayer={(key) => {
+                setPlayerKey(key)
+                setPlayerNote('')
+                setPanel('player')
+              }}
+              fare={streetFare}
+              onHail={receiveCustomer}
+              onVehicle={toggleVehicle}
+              filter={cityFilter}
+              selectedLot={selectedLot}
+              showNames={showNames}
+              mapView={mapView}
+              onStats={(s) =>
+                setChunkStats((old) =>
+                  old.chunks === s.chunks &&
+                  old.buildings === s.buildings &&
+                  old.tris === s.tris &&
+                  old.detailed === s.detailed
+                    ? old
+                    : s,
+                )
               }
-            }}
-            onLotIcon={(lot) => {
-              setSelectedLot(lot)
-              setPanel('lot')
-            }}
-            onPlayer={(key) => {
-              setPlayerKey(key)
-              setPlayerNote('')
-              setPanel('player')
-            }}
-            fare={streetFare}
-            onHail={receiveCustomer}
-            onVehicle={toggleVehicle}
-            filter={cityFilter}
-            selectedLot={selectedLot}
-            showNames={showNames}
-            mapView={mapView}
-            onStats={(s) =>
-              setChunkStats((old) =>
-                old.chunks === s.chunks &&
-                old.buildings === s.buildings &&
-                old.tris === s.tris &&
-                old.detailed === s.detailed
-                  ? old
-                  : s,
-              )
-            }
-            onFrame={(f) => {
-              frameRef.current = f
-            }}
-            quality={quality}
-            locality={cityLife.locality}
-            renderer={renderer}
-            input={input}
-            onLeave={() => action('leave')}
-          />
+              onFrame={(f) => {
+                frameRef.current = f
+              }}
+              quality={quality}
+              locality={cityLife.locality}
+              renderer={renderer}
+              input={input}
+              onLeave={() => action('leave')}
+            />
+          </GraphicsBoundary>
         )}
       </div>
       {journey && (
@@ -2007,7 +2024,7 @@ export function LomeLifeImmersive() {
           Activités · {lotById(cityLife.insideLot)?.name ?? 'ce lieu'}
         </button>
       )}
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-20 px-3 pt-[max(12px,env(safe-area-inset-top))] sm:px-5">
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-20 px-3 pt-[max(12px,env(safe-area-inset-top,0px))] sm:px-5">
         <div className="pointer-events-auto mx-auto flex max-w-[900px] items-center gap-2 rounded-[24px] border border-white/65 bg-white/95 p-2 shadow-lg shadow-slate-900/10 backdrop-blur-lg">
           <div className="flex shrink-0 items-center gap-1 rounded-2xl px-2 text-xs font-bold sm:text-sm">
             <Sun size={17} className="text-amber-500" />{' '}
@@ -2105,7 +2122,7 @@ export function LomeLifeImmersive() {
       </header>
 
       <div
-        className={`pointer-events-none absolute inset-x-0 bottom-[calc(100px+env(safe-area-inset-bottom))] z-20 px-3 sm:px-5 ${mapView ? 'hidden' : ''}`}
+        className={`pointer-events-none absolute inset-x-0 bottom-[calc(100px+env(safe-area-inset-bottom,0px))] z-20 px-3 sm:px-5 ${mapView || riding ? 'hidden' : ''}`}
       >
         <div className="mx-auto flex max-w-[900px] items-end justify-between gap-2">
           <div className="flex min-w-0 flex-col items-start gap-2">
@@ -2366,7 +2383,7 @@ export function LomeLifeImmersive() {
       {talkNpc && (
         <section
           aria-label="Conversation"
-          className="pointer-events-auto absolute inset-x-3 bottom-[calc(100px+env(safe-area-inset-bottom))] z-40 mx-auto max-h-[75dvh] max-w-[520px] overflow-y-auto overscroll-contain rounded-[24px] bg-white p-4 shadow-2xl"
+          className="pointer-events-auto absolute inset-x-3 bottom-[calc(100px+env(safe-area-inset-bottom,0px))] z-40 mx-auto max-h-[75dvh] max-w-[520px] overflow-y-auto overscroll-contain rounded-[24px] bg-white p-4 shadow-2xl"
         >
           <button
             type="button"
@@ -2395,7 +2412,7 @@ export function LomeLifeImmersive() {
       )}
       <nav
         aria-label="Navigation du jeu"
-        className="absolute inset-x-0 bottom-0 z-30 px-3 pb-[max(10px,env(safe-area-inset-bottom))]"
+        className="absolute inset-x-0 bottom-0 z-30 px-3 pb-[max(10px,env(safe-area-inset-bottom,0px))]"
       >
         <div className="mx-auto grid max-w-[520px] grid-cols-4 gap-1 rounded-[26px] border border-white/75 bg-white/95 p-2 shadow-2xl backdrop-blur-lg">
           {NAV_ITEMS.map((item) => {
@@ -2480,6 +2497,7 @@ export function LomeLifeImmersive() {
       )}
       {panel === 'phone' && (
         <PhoneDevice
+          onExit={onExit ? () => { flushSave(); onExit() } : undefined}
           hour={life.hour}
           day={life.day}
           place={LOCALITIES[cityLife.locality].name}
@@ -2530,7 +2548,7 @@ export function LomeLifeImmersive() {
             <Drawer.Content
               aria-label={title}
               aria-describedby={undefined}
-              className="fixed inset-x-0 bottom-[calc(85px+env(safe-area-inset-bottom))] z-[120] mx-auto flex max-h-[min(68dvh,680px)] w-[calc(100%-16px)] max-w-[620px] flex-col overflow-hidden rounded-[30px] border border-white/80 bg-white shadow-2xl outline-none sm:max-h-[70dvh]"
+              className="fixed inset-x-0 bottom-[calc(var(--haroo-bottom-gap,0px)+85px+env(safe-area-inset-bottom,0px))] z-[120] mx-auto flex max-h-[min(calc(var(--haroo-visible-height,100vh)*0.68),680px)] w-[calc(100%-16px)] max-w-[620px] flex-col overflow-hidden rounded-[30px] border border-white/80 bg-white shadow-2xl outline-none sm:max-h-[calc(var(--haroo-visible-height,100vh)*0.7)]"
             >
               <Drawer.Handle
                 aria-label="Faire glisser pour fermer"
@@ -3942,20 +3960,20 @@ export function LomeLifeImmersive() {
                     <p className="text-sm text-slate-600">
                       {firstRun
                         ? 'Choisis qui tu es dans Lomé : le même personnage te suit dans la rue, dans les bâtiments et au volant. Tu pourras changer depuis le téléphone.'
-                        : 'Le même personnage te suit dans la rue, dans les bâtiments et au volant. Personnages Quaternius et Kenney (CC0) ; ton choix reste sur cet appareil.'}
+                        : 'Le même personnage te suit dans la rue, dans les bâtiments et au volant. Ton apparence reste enregistrée sur cet appareil ; tu peux changer de tenue à tout moment.'}
                     </p>
-                    <AvatarPreview model={shownModel(avatar)} pagne={pagneColor(avatar.pagne)} />
+                    {webgl === true && <GraphicsBoundary onUnavailable={() => setNotice('L’aperçu 3D est indisponible ; le choix du personnage reste possible.')}><AvatarPreview model={shownModel(avatar)} pagne={pagneColor(avatar.pagne)} /></GraphicsBoundary>}
                     <div
                       className="grid grid-cols-2 gap-2 sm:grid-cols-4"
                       role="group"
                       aria-label="Choisir mon personnage"
                     >
-                      {AVATAR_MODELS.filter((m) => m.family === 'quaternius').map((m) => (
+                      {AVATAR_MODELS.map((m) => (
                         <button
                           type="button"
                           key={m.id}
                           aria-pressed={shownModel(avatar) === m.id}
-                          onClick={() => chooseAvatar({ model: m.id, classic: undefined })}
+                          onClick={() => chooseAvatar({ model: m.id })}
                           className={
                             'rounded-2xl border p-3 text-left ' +
                             (shownModel(avatar) === m.id
@@ -3968,34 +3986,6 @@ export function LomeLifeImmersive() {
                         </button>
                       ))}
                     </div>
-                    <details className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
-                      <summary className="cursor-pointer text-sm font-semibold text-slate-700">
-                        Personnages classiques (mini)
-                      </summary>
-                      <div
-                        className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3"
-                        role="group"
-                        aria-label="Choisir un personnage classique"
-                      >
-                        {AVATAR_MODELS.filter((m) => m.family === 'kenney-mini').map((m) => (
-                          <button
-                            type="button"
-                            key={m.id}
-                            aria-pressed={shownModel(avatar) === m.id}
-                            onClick={() => chooseAvatar({ model: m.id, classic: true })}
-                            className={
-                              'rounded-2xl border p-3 text-left ' +
-                              (shownModel(avatar) === m.id
-                                ? 'border-emerald-600 bg-emerald-50'
-                                : 'border-slate-200 bg-white')
-                            }
-                          >
-                            <span className="block text-sm font-black">{m.label}</span>
-                            <span className="block text-[11px] text-slate-500">{m.hint}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </details>
                     <fieldset className="space-y-2">
                       <legend className="text-sm font-black">Mon pagne</legend>
                       <div className="flex flex-wrap gap-2">

@@ -7,6 +7,15 @@
  *
  * Lifecycle as the street and the rooms: one renderer, one frame loop; `dispose()` frees all.
  */
+import { avatarSpec, clipFor } from '@/lib/haroolife/city/avatar-catalogue'
+import {
+  type AvatarActor,
+  createAvatarActor,
+  disposeAvatarActor,
+  playAvatarActor,
+} from './avatar-actor'
+import { buildMoto, type MotoParts } from './moto'
+import { fitTaxiModel } from './vehicle-scale'
 import type { Transport } from '@/lib/haroolife/lome-life-engine'
 import * as THREE from 'three'
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
@@ -22,7 +31,7 @@ const TRAFFIC = [
   { kind: 'taxi', lane: 1, z: -66, s: 0.9 },
   { kind: 'van', lane: 0, z: -80, s: 0.78 },
 ] as const
-const SPEED: Record<Transport, number> = { walk: 4, moto: 11, taxi: 8 }
+const SPEED: Record<Transport, number> = { walk: 1.3, moto: 11, taxi: 8 }
 const DASHES = 40
 const SIDES = 14
 const deg = THREE.MathUtils.degToRad
@@ -32,6 +41,8 @@ export interface RideWorldOptions {
   transport: Transport
   rain: boolean
   pixelRatio?: number
+  avatarModel?: string
+  avatarPagne?: string
   onFrame?: (s: { drawCalls: number; fps: number }) => void
 }
 
@@ -48,6 +59,11 @@ export class RideWorld {
   /** Street lights and compounds: one group per row, moved together. */
   private readonly sides: THREE.Group[] = []
   private readonly cars: { root: THREE.Object3D; z: number; i: number }[] = []
+  private actor: AvatarActor | null = null
+  private moto: MotoParts | null = null
+  private vehicle: THREE.Object3D | null = null
+  private wheels: THREE.Object3D[] = []
+  private probe: unknown = null
   private run = 0
   private raf = 0
   private last = 0
@@ -59,14 +75,24 @@ export class RideWorld {
     this.renderer = new THREE.WebGLRenderer({ canvas: o.canvas, antialias: true })
     this.renderer.setPixelRatio(o.pixelRatio ?? Math.min(window.devicePixelRatio || 1, 1.7))
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping
+    this.renderer.toneMappingExposure = 1.15
+    this.renderer.shadowMap.enabled = (o.pixelRatio ?? 1.5) >= 1.4
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     this.scene.name = 'HarooLife trajet'
     this.scene.background = new THREE.Color(o.rain ? '#9aa3a8' : '#bfe0f2')
-    this.camera.position.set(0, 2.4, 7)
-    this.camera.rotation.x = deg(-11)
+    const cameraLane = o.transport === 'walk' ? -4.9 : -2.1
+    this.camera.position.set(cameraLane, 2.9, o.transport === 'taxi' ? 10.5 : 9.5)
+    this.camera.lookAt(cameraLane, 0.5, -5)
     this.scene.add(new THREE.HemisphereLight('#f2f6ff', '#9a8f70', o.rain ? 1.3 : 1.8))
     const sun = new THREE.DirectionalLight('#fff4de', o.rain ? 1.4 : 2.6)
     sun.position.set(-6, 10, 8)
+    sun.castShadow = this.renderer.shadowMap.enabled
+    sun.shadow.mapSize.set(1024, 1024)
+    Object.assign(sun.shadow.camera, { left: -12, right: 12, top: 12, bottom: -12, far: 50 })
+    sun.shadow.bias = -0.001
     this.scene.add(sun)
+    this.scene.fog = new THREE.Fog(o.rain ? '#9aa3a8' : '#bfe0f2', 45, 170)
     this.resizeObserver = new ResizeObserver(() => this.resize())
     this.resizeObserver.observe(o.canvas)
     this.resize()
@@ -93,6 +119,7 @@ export class RideWorld {
       const mesh = new THREE.Mesh(box, m)
       mesh.position.set(...p)
       mesh.scale.set(...s)
+      mesh.receiveShadow = true
       return mesh
     }
     // Ground, boulevard, kerbs.
@@ -105,15 +132,10 @@ export class RideWorld {
       this.dashes.push(d)
       this.scene.add(d)
     }
-    const me =
-      this.o.transport === 'moto'
-        ? `${BASE}characters/character-female-a.glb`
-        : this.o.transport === 'taxi'
-          ? `${BASE}car-kit/taxi.glb`
-          : `${BASE}car-kit/sedan.glb`
+    const spec = avatarSpec(this.o.avatarModel ?? 'afi')
     const urls = [
       `${BASE}city-kit-roads/light-curved.glb`,
-      me,
+      spec.url,
       ...new Set(TRAFFIC.map((v) => `${BASE}car-kit/${v.kind}.glb`)),
     ]
     const results = await Promise.allSettled(urls.map((u) => this.load(u)))
@@ -160,12 +182,50 @@ export class RideWorld {
       this.cars.push({ root: car, z: v.z, i })
       this.scene.add(car)
     })
-    // Us.
-    const us = place(me, [-2.1, 0, 2.5], this.o.transport === 'moto' ? 1.2 : 0.9, 180)
-    if (us) {
-      us.name = 'Véhicule du joueur'
-      this.scene.add(us)
+    // The same adult rig as the street and the rooms, with independent bones and animations.
+    const avatar = model.get(spec.url)
+    if (!avatar) throw new Error('Le personnage 3D du trajet n’a pas pu être chargé.')
+    this.actor = createAvatarActor(avatar, spec, 1.75, this.o.avatarPagne)
+    this.actor.root.name = 'Joueur du trajet'
+    if (this.o.transport === 'walk') {
+      this.actor.root.position.set(-4.9, 0.2, 2.5)
+      this.actor.root.rotation.y = Math.PI
+      playAvatarActor(this.actor, clipFor(spec, 'walk'))
+      this.scene.add(this.actor.root)
+    } else if (this.o.transport === 'moto') {
+      this.moto = buildMoto(1.75)
+      this.vehicle = this.moto.root
+      this.actor.root.position.set(0, this.moto.seat - this.actor.seatOffset, this.moto.driverZ)
+      this.vehicle.add(this.actor.root)
+      playAvatarActor(this.actor, clipFor(spec, 'drive'))
+    } else {
+      const taxi = model.get(`${BASE}car-kit/taxi.glb`)
+      if (!taxi) throw new Error('Le taxi 3D n’a pas pu être chargé.')
+      this.vehicle = taxi.scene.clone(true)
+      fitTaxiModel(this.vehicle, 1.75, 4.6)
+      this.actor.root.position.set(0.3, 0.22 - this.actor.seatOffset, 0.1)
+      // A sibling, so the taxi's non-uniform scale cannot distort the human skeleton.
+      const group = new THREE.Group()
+      group.add(this.vehicle, this.actor.root)
+      this.vehicle = group
+      playAvatarActor(this.actor, clipFor(spec, 'drive'))
     }
+    if (this.vehicle) {
+      this.vehicle.name = 'Véhicule du joueur'
+      this.vehicle.position.set(-2.1, 0, 2.5)
+      this.vehicle.rotation.y = Math.PI
+      this.vehicle.traverse((o) => {
+        if ((o as THREE.Mesh).isMesh) {
+          ;(o as THREE.Mesh).castShadow = true
+          ;(o as THREE.Mesh).receiveShadow = true
+        }
+        if (/wheel/i.test(o.name) && !/wheel/i.test(o.parent?.name ?? '')) this.wheels.push(o)
+      })
+      this.scene.add(this.vehicle)
+    }
+    // The trip starts seated; do not briefly render the standing pose through the roof.
+    this.actor.mixer.update(0.25)
+    this.publishProbe()
     this.step(0)
     this.last = performance.now()
     this.statsAt = this.last
@@ -176,6 +236,19 @@ export class RideWorld {
     this.disposed = true
     cancelAnimationFrame(this.raf)
     this.resizeObserver.disconnect()
+    if (this.actor) {
+      disposeAvatarActor(this.actor)
+      this.actor = null
+    }
+    if (this.moto) {
+      for (const g of this.moto.geometries) g.dispose()
+      for (const m of this.moto.materials) m.dispose()
+      this.moto = null
+    }
+    this.vehicle = null
+    this.wheels = []
+    const w = window as unknown as Record<string, unknown>
+    if (w.__LOME_RIDE === this.probe) w.__LOME_RIDE = undefined
     for (const g of this.geometries) g.dispose()
     for (const m of this.materials) m.dispose()
     for (const gltf of this.loaded.splice(0))
@@ -193,6 +266,17 @@ export class RideWorld {
 
   private load(url: string): Promise<GLTF> {
     return this.loader.loadAsync(url).then((g) => {
+      if (this.disposed) {
+        g.scene.traverse((o) => {
+          const m = o as THREE.Mesh
+          if (m.isMesh) {
+            m.geometry.dispose()
+            for (const material of Array.isArray(m.material) ? m.material : [m.material])
+              material.dispose()
+          }
+        })
+        throw new Error('Trajet fermé.')
+      }
       this.loaded.push(g)
       return g
     })
@@ -210,6 +294,9 @@ export class RideWorld {
   /** Places everything for the distance travelled so far. */
   private step(dt: number): void {
     this.run += dt * SPEED[this.o.transport]
+    this.actor?.mixer.update(Math.min(dt, 0.1))
+    for (const wheel of this.wheels) wheel.rotation.x -= (dt * SPEED[this.o.transport]) / 0.3
+    if (this.moto && this.vehicle) this.vehicle.rotation.z = Math.sin(this.run * 0.12) * 0.015
     const dash = this.run % 6
     const light = this.run % 18
     this.dashes.forEach((d, i) => {
@@ -222,6 +309,42 @@ export class RideWorld {
       const z = c.z + ((this.run * 0.55 + c.i * 7) % 90)
       c.root.position.z = z > 12 ? z - 90 : z
     }
+  }
+
+  private publishProbe(): void {
+    this.camera.updateMatrixWorld(true)
+    let vehicleScreen: { x: number; y: number; width: number; height: number } | null = null
+    const shown = this.vehicle ?? this.actor?.root
+    if (shown) {
+      // SkinnedMesh.updateMatrixWorld also refreshes bindMatrixInverse; updateWorldMatrix
+      // alone leaves a stale bind transform until the first WebGL render.
+      shown.updateMatrixWorld(true)
+      // Skinning changes the vertex bounds: a cached neutral-pose box overstates the
+      // on-screen footprint and cannot verify a seated driver on a narrow phone.
+      const bounds = new THREE.Box3().setFromObject(shown, true)
+      const points: THREE.Vector3[] = []
+      for (const x of [bounds.min.x, bounds.max.x])
+        for (const y of [bounds.min.y, bounds.max.y])
+          for (const z of [bounds.min.z, bounds.max.z])
+            points.push(new THREE.Vector3(x, y, z).project(this.camera))
+      const xs = points.map((p) => (p.x * 0.5 + 0.5) * this.o.canvas.clientWidth)
+      const ys = points.map((p) => (-p.y * 0.5 + 0.5) * this.o.canvas.clientHeight)
+      const x = Math.min(...xs)
+      const y = Math.min(...ys)
+      vehicleScreen = { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y }
+    }
+    this.probe = {
+      vehicleScreen,
+      transport: this.o.transport,
+      model: this.actor?.spec.id,
+      source: this.actor?.spec.url,
+      avatar: this.actor?.root.userData.avatar,
+      clip: this.actor?.current,
+      distance: this.run,
+      moto: !!this.moto,
+      wheels: this.wheels.length,
+    }
+    ;(window as unknown as Record<string, unknown>).__LOME_RIDE = this.probe
   }
 
   private readonly frame = () => {
@@ -237,6 +360,7 @@ export class RideWorld {
     if (now - this.statsAt >= 500) {
       const fps = (this.frames * 1000) / Math.max(1, now - this.statsAt)
       this.o.onFrame?.({ drawCalls: this.renderer.info.render.calls, fps })
+      this.publishProbe()
       this.frames = 0
       this.statsAt = now
     }

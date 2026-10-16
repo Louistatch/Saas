@@ -10,8 +10,11 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowLeft, CheckCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useGameReturn } from '@/hooks/use-game-return'
+import { withGameReturn } from '@/lib/haroolife/entry'
 
 export default function ForgotPasswordPage() {
+  const gameReturn = useGameReturn()
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
   const [sent, setSent] = useState(false)
@@ -55,7 +58,7 @@ export default function ForgotPasswordPage() {
         <div className="md:hidden w-full max-w-sm mb-6 space-y-4">
           <div className="flex items-center justify-between">
             <Link
-              href="/auth/login"
+              href={withGameReturn('/auth/login', gameReturn)}
               className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -111,7 +114,7 @@ export default function ForgotPasswordPage() {
                   Si cet email est enregistré, un lien de réinitialisation a été envoyé à{' '}
                   <strong>{email}</strong>
                 </p>
-                <Link href="/auth/login">
+                <Link href={withGameReturn('/auth/login', gameReturn)}>
                   <Button variant="outline" className="w-full border-border gap-2">
                     <ArrowLeft className="h-4 w-4" />
                     Retour à la connexion

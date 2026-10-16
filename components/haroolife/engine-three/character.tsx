@@ -6,12 +6,12 @@ import {
   clipFor,
   clipRate,
   figureScale,
-  needsPagneWrap,
   recolorMap,
 } from '@/lib/haroolife/city/avatar-catalogue'
+import { avatarAnimations } from '@/lib/haroolife/game/render/avatar-actor'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 /**
- * A character of the catalogue (Quaternius adult or Kenney mini, both CC0) for the React
+ * An adult character of the shared CC0 catalogue for the React
  * Three Fiber renderer: the rigged glTF named in the manifest, its clips mapped by
  * `clipFor`, played by an AnimationMixer with 150 ms cross-fades. Each instance clones the
  * skeleton (`SkeletonUtils.clone`): a plain scene clone would share bones between characters.
@@ -22,9 +22,6 @@ import { useFrame } from '@react-three/fiber'
 import { forwardRef, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js'
-
-/** Kept for callers that still build mini-character paths by hand. */
-export const CHARACTER_BASE = '/haroolife/vendor/kenney-3d/mini-characters/'
 
 /**
  * Recolours this figure's garments, skin and hair on cloned materials and returns the undo.
@@ -92,13 +89,23 @@ export const Character = forwardRef<
 ) {
   const spec = avatarSpec(model)
   const gltf = useGLTF(spec.url)
-  const figure = useMemo(() => cloneSkinned(gltf.scene), [gltf.scene])
+  const figure = useMemo(() => {
+    const cloned = cloneSkinned(gltf.scene)
+    cloned.traverse((o) => {
+      const mesh = o as THREE.Mesh
+      if (mesh.isMesh) {
+        mesh.castShadow = true
+        mesh.frustumCulled = false
+      }
+    })
+    return cloned
+  }, [gltf.scene])
   const mixer = useMemo(() => new THREE.AnimationMixer(figure), [figure])
   const actions = useMemo(() => {
     const map = new Map<string, THREE.AnimationAction>()
-    for (const clip of gltf.animations) map.set(clip.name, mixer.clipAction(clip))
+    for (const clip of avatarAnimations(gltf)) map.set(clip.name, mixer.clipAction(clip))
     return map
-  }, [gltf.animations, mixer])
+  }, [gltf, mixer])
   const current = useRef<THREE.AnimationAction | null>(null)
   const rate =
     groundSpeed === undefined
@@ -122,7 +129,11 @@ export const Character = forwardRef<
   useEffect(
     () => () => {
       mixer.stopAllAction()
+      current.current = null
       mixer.uncacheRoot(figure)
+      figure.traverse((o) => {
+        if ((o as THREE.SkinnedMesh).isSkinnedMesh) (o as THREE.SkinnedMesh).skeleton.dispose()
+      })
     },
     [mixer, figure],
   )
@@ -131,12 +142,6 @@ export const Character = forwardRef<
   // Garment, skin and hair colours: cloned materials owned by this figure.
   useEffect(() => recolor(figure, spec, pagne), [figure, spec, pagne])
 
-  const wrap = pagne && needsPagneWrap(spec)
-  const pagneMaterial = useMemo(
-    () => (wrap ? new THREE.MeshStandardMaterial({ color: pagne, roughness: 0.9 }) : null),
-    [wrap, pagne],
-  )
-  useEffect(() => () => pagneMaterial?.dispose(), [pagneMaterial])
   const s = figureScale(spec, scale)
 
   return (
@@ -148,19 +153,8 @@ export const Character = forwardRef<
       scale={scale}
     >
       <group name="figure" scale={s / scale} rotation={[0, THREE.MathUtils.degToRad(spec.yaw), 0]}>
-        <primitive object={figure} />
+        <primitive object={figure} dispose={null} />
       </group>
-      {pagneMaterial && (
-        // Legacy mini characters only: a wrap from the hips to mid-thigh on a 0.66-unit figure.
-        <mesh
-          name="pagne"
-          position={[0, 0.16, -0.02]}
-          scale={[0.3, 0.13, 0.22]}
-          material={pagneMaterial}
-        >
-          <boxGeometry />
-        </mesh>
-      )}
       {/* Contact shadow: a soft dark disc instead of a shadow map (no cost on LOW devices). */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]} renderOrder={-1}>
         <circleGeometry args={[0.22, 20]} />
