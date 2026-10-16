@@ -39,7 +39,7 @@ export async function GET() {
     .eq('id', ctx.userId)
     .maybeSingle<{
       id: string
-      email: string
+      email: string | null
       first_name: string | null
       last_name: string | null
       role: string
@@ -54,12 +54,15 @@ export async function GET() {
   const roles = (me?.roles ?? []) as Role[]
 
   // Organisations : la coopérative du compte et celles où la personne est membre (par e-mail).
-  const { data: memberRows } = await admin
-    .from('members')
-    .select('id, cooperative_id, canton_id, cantons(name)')
-    .ilike('email', profile.email)
-    .is('deleted_at', null)
-    .limit(10)
+  // A HarooLife visitor has no e-mail, hence no membership.
+  const { data: memberRows } = profile.email
+    ? await admin
+        .from('members')
+        .select('id, cooperative_id, canton_id, cantons(name)')
+        .ilike('email', profile.email)
+        .is('deleted_at', null)
+        .limit(10)
+    : { data: [] }
   const members = (memberRows ?? []) as unknown as {
     id: string
     cooperative_id: string

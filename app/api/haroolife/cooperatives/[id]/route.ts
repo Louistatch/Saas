@@ -51,8 +51,8 @@ export async function cooperativeAccess(
     .from('profiles')
     .select('email')
     .eq('id', ctx.userId)
-    .maybeSingle<{ email: string }>()
-  if (!profile) return null
+    .maybeSingle<{ email: string | null }>()
+  if (!profile?.email) return null
   const { count } = await admin
     .from('members')
     .select('id', { count: 'exact', head: true })
@@ -230,7 +230,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const residentIds = ((residents ?? []) as { user_id: string }[]).map((r) => r.user_id)
   if (residentIds.length) {
     const { data: emails } = await admin.from('profiles').select('email').in('id', residentIds)
-    const list = ((emails ?? []) as { email: string }[]).map((e) => e.email.toLowerCase())
+    // Visitors have no e-mail: they are nobody's member.
+    const list = ((emails ?? []) as { email: string | null }[]).flatMap((e) =>
+      e.email ? [e.email.toLowerCase()] : [],
+    )
     if (list.length) {
       const { count } = await admin
         .from('members')

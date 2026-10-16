@@ -83,7 +83,7 @@ export default function UsersAdminPage() {
     const q = debouncedSearch.toLowerCase().trim()
     if (!q) return users
     return users.filter((u) =>
-      `${u.first_name ?? ''} ${u.last_name ?? ''} ${u.email}`.toLowerCase().includes(q),
+      `${u.first_name ?? ''} ${u.last_name ?? ''} ${u.email ?? ''}`.toLowerCase().includes(q),
     )
   }, [users, debouncedSearch])
 
