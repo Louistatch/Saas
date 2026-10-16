@@ -109,9 +109,45 @@ export function avatarAnimations(gltf: AvatarAsset): THREE.AnimationClip[] {
       ),
     )
   }
+  // Derive a looping pedal action on the same adult rig, preserving shin lengths and feet.
+  const cycleSamples = new Map<string, { q: number[]; p: number[] }>()
+  const times = Array.from({ length: 17 }, (_, i) => i / 16)
+  for (const t of times) {
+    for (const [side, sign] of [
+      ['L', 1],
+      ['R', -1],
+    ] as const) {
+      const phase = t * Math.PI * 2 + (side === 'R' ? Math.PI : 0)
+      const thigh = new THREE.Vector3(sign * 0.12, -0.4 + 0.3 * Math.sin(phase), 0.85)
+      const shin = new THREE.Vector3(sign * 0.04, -0.9, -0.3 + 0.25 * Math.cos(phase)).normalize()
+      aim(`UpperLeg${side}`, `LowerLeg${side}`, thigh)
+      aim(`LowerLeg${side}`, `Foot${side}`, shin)
+      const foot = bone(`Foot${side}`)
+      const knee = bone(`LowerLeg${side}`).getWorldPosition(new THREE.Vector3())
+      const length = original(`Foot${side}`).point.distanceTo(original(`LowerLeg${side}`).point)
+      if (!foot.parent) throw new Error('Pied sans articulation parente.')
+      foot.position.copy(foot.parent.worldToLocal(knee.addScaledVector(shin, length)))
+      rig.updateMatrixWorld(true)
+    }
+    for (const b of bones.values()) {
+      const sample = cycleSamples.get(b.name) ?? { q: [], p: [] }
+      sample.q.push(...b.quaternion.toArray())
+      sample.p.push(...b.position.toArray())
+      cycleSamples.set(b.name, sample)
+    }
+  }
+  const cycleTracks: THREE.KeyframeTrack[] = []
+  for (const [name, sample] of cycleSamples) {
+    cycleTracks.push(new THREE.QuaternionKeyframeTrack(`${name}.quaternion`, times, sample.q))
+    cycleTracks.push(new THREE.VectorKeyframeTrack(`${name}.position`, times, sample.p))
+  }
   mixer.stopAllAction()
   mixer.uncacheRoot(rig)
-  const clips = [...gltf.animations, new THREE.AnimationClip('HarooDrive', 2.4, tracks)]
+  const clips = [
+    ...gltf.animations,
+    new THREE.AnimationClip('HarooDrive', 2.4, tracks),
+    new THREE.AnimationClip('HarooCycle', 1, cycleTracks),
+  ]
   cachedAnimations.set(gltf, clips)
   return clips
 }

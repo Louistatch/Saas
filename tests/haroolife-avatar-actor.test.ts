@@ -27,7 +27,7 @@ for (const spec of AVATAR_SPECS)
     const b = createAvatarActor(gltf, spec, 1.75, '#1a7958')
     assert.equal(a.root.children.length, 1, 'only the imported skinned figure, no box wrap')
     assert.ok(a.root.userData.avatar.skinnedMeshes > 0)
-    assert.equal(a.actions.size, 7)
+    assert.equal(a.actions.size, 8)
     assert.equal(
       avatarAnimations(gltf),
       avatarAnimations(gltf),
@@ -63,6 +63,25 @@ for (const spec of AVATAR_SPECS)
       point(b, 'LowerLegL').z < point(a, 'LowerLegL').z - 0.2,
       'the second actor keeps its own neutral animation',
     )
+    playAvatarActor(a, clipFor(spec, 'cycle'))
+    a.mixer.update(0.35)
+    a.root.updateMatrixWorld(true)
+    const firstKnee = point(a, 'LowerLegL')
+    a.mixer.update(0.25)
+    a.root.updateMatrixWorld(true)
+    assert.ok(
+      firstKnee.distanceTo(point(a, 'LowerLegL')) > 0.03,
+      'cycling moves the real leg bones',
+    )
+    for (const side of ['L', 'R']) {
+      const leg = point(a, `LowerLeg${side}`)
+      const foot = point(a, `Foot${side}`)
+      const neutralLength = point(b, `LowerLeg${side}`).distanceTo(point(b, `Foot${side}`))
+      assert.ok(
+        Math.abs(leg.distanceTo(foot) - neutralLength) < 0.015,
+        'pedalling preserves attached feet',
+      )
+    }
     let disposedSharedGeometry = 0
     gltf.scene.traverse((o) => {
       const mesh = o as THREE.Mesh

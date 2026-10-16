@@ -2,7 +2,7 @@
  * HarooLife's fictional Togolese social layer. Values are game balancing values only:
  * no real fare, wage, lottery, influencer account or public-service schedule is represented.
  */
-export type SocialLocality = 'lome' | 'kara'
+export type SocialLocality = import('./city/locality').LocalityId
 export type JobVenue = 'market' | 'bakery' | 'hall' | 'station' | 'industry' | 'shop'
 
 export const TOGO_JOBS = {
@@ -90,7 +90,7 @@ export type ClimateMood =
 
 export function climateForMonth(month: number, locality: SocialLocality): ClimateMood {
   const m = Math.max(1, Math.min(12, Math.round(month)))
-  if (locality === 'kara') {
+  if (locality === 'kara' || locality === 'dapaong' || locality === 'sokode') {
     if (m === 12 || m <= 2) return 'harmattan'
     if (m >= 5 && m <= 9) return 'grande-mousson'
     return 'grande-saison-seche'

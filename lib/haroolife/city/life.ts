@@ -1,3 +1,4 @@
+import { type Employment, decodeEmployment } from './employment'
 import {
   type LifeState,
   TRAVEL_COST,
@@ -20,7 +21,14 @@ import { type SocialLife, decodeSocial } from './social'
 import { nextSession, sessionAt, sessionKey, whenOf } from './university'
 import { type Fleet, decodeFleet, manualVehicleService } from './vehicle-economy'
 import { restoreServiceVehicle } from './jobs'
-import { LOCALITIES, type LocalityId, current, isLocalityId, setLocality } from './locality'
+import {
+  LOCALITIES,
+  LOCALITY_IDS,
+  type LocalityId,
+  current,
+  isLocalityId,
+  setLocality,
+} from './locality'
 import {
   ESTATE_GATE,
   type WorldPoint,
@@ -80,6 +88,7 @@ export type CityAction =
 
 export interface CityLife {
   v: 1
+  employment?: Employment
   commerce?: Commerce
   social?: SocialLife
   fleet?: Fleet
@@ -200,6 +209,7 @@ export function decodeCityLife(value: unknown): CityLife | null {
   if (v.insideLot !== null && v.insideLot !== undefined && !lotById(v.insideLot)) return null
   return restoreServiceVehicle({
     v: 1,
+    employment: decodeEmployment(v.employment, life.day),
     commerce: decodeCommerce(v.commerce, life.spent),
     social: decodeSocial(v.social),
     fleet: decodeFleet(v.fleet),
@@ -506,7 +516,15 @@ export function enterLot(s: CityLife, lot: Lot, pose?: CityLife['pose']): CityLi
 export function cityInteract(s: CityLife, action: CityAction): CityLife {
   if (action === 'leave') {
     if (!s.insideLot) return note(s, 'Tu es déjà dehors.')
-    return note({ ...s, insideLot: null, activity: null }, 'Tu es sorti.')
+    return note(
+      {
+        ...s,
+        insideLot: null,
+        activity: null,
+        employment: s.employment ? { ...s.employment, shift: null } : undefined,
+      },
+      'Tu es sorti.',
+    )
   }
   if (action === 'enter') {
     if (s.insideLot || s.life.inside) return note(s, 'Sors avant de changer de bâtiment.')
@@ -702,12 +720,34 @@ export function useProp(s: CityLife, propId: string): CityLife {
 export const stopActivity = (s: CityLife): CityLife => (s.activity ? { ...s, activity: null } : s)
 
 /** Inter-city travel: cost and duration of the bush taxi, indicative and fictional. */
-export const TRIPS: Record<`${LocalityId}>${LocalityId}`, { hours: number; fare: number }> = {
-  'lome>lome': { hours: 0, fare: 0 },
-  'kara>kara': { hours: 0, fare: 0 },
-  'lome>kara': { hours: 7, fare: 4000 },
-  'kara>lome': { hours: 7, fare: 4000 },
+const ROAD_KM: Record<LocalityId, number> = {
+  lome: 0,
+  kpalime: 120,
+  atakpame: 161,
+  sokode: 339,
+  kara: 413,
+  dapaong: 620,
 }
+export const TRIPS = Object.fromEntries(
+  LOCALITY_IDS.flatMap((from) =>
+    LOCALITY_IDS.map((to) => {
+      const km =
+        from === to
+          ? 0
+          : Math.abs(ROAD_KM[to] - ROAD_KM[from]) +
+            (from === 'kpalime' || to === 'kpalime' ? 80 : 0)
+      return [
+        `${from}>${to}`,
+        {
+          hours: km ? Math.max(1, Math.ceil(km / 60)) : 0,
+          fare: km ? Math.max(700, Math.round((km * 10) / 100) * 100) : 0,
+        },
+      ]
+    }),
+  ),
+) as Record<`${LocalityId}>${LocalityId}`, { hours: number; fare: number }>
+// Preserve the legacy bush-taxi price used by existing saves and journeys.
+TRIPS['lome>kara'] = TRIPS['kara>lome'] = { hours: 7, fare: 4000 }
 export const tripTo = (s: CityLife, to: LocalityId) => TRIPS[`${s.locality}>${to}`]
 
 /**
@@ -722,6 +762,7 @@ export function travelTo(s: CityLife, to: LocalityId): CityLife {
     {
       ...s,
       locality: to,
+      employment: s.employment ? { ...s.employment, shift: null } : undefined,
       at: { ...loc.gate },
       route: [],
       target: null,

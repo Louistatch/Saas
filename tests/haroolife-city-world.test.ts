@@ -80,7 +80,10 @@ test('lots never overlap roads, water or the estate, and each has a reachable do
     assert.equal(districtAt(lot.x, lot.y).id, lot.district)
   }
   // Every named landmark was placed, in its own district.
-  assert.equal(landmarks().filter((l) => !l.service).length, landmarkAnchors().length)
+  assert.equal(
+    landmarks().filter((l) => !l.service && !l.employer).length,
+    landmarkAnchors().length,
+  )
   assert.equal(landmarks().filter((l) => l.service).length, 3)
   for (const lm of landmarks()) assert.ok(CATEGORY_OF[lm.type])
 })

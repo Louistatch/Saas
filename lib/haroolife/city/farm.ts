@@ -9,7 +9,7 @@
  * December finds the sowing over, as a farmer would. Growth, care and yield are in game days.
  */
 import type { CityLife } from './life'
-import type { LocalityId } from './locality'
+import { isLocalityId, type LocalityId } from './locality'
 
 export type CropId = 'mais' | 'haricot' | 'soja' | 'sorgho' | 'mil'
 
@@ -37,6 +37,10 @@ export const CROPS: Record<CropId, Crop> = {
 /** Months (1–12) when each crop is sown, by town: a simplified calendar of the real rains. */
 export const SOWING: Record<LocalityId, Partial<Record<CropId, number[]>>> = {
   lome: { mais: [3, 4, 5, 9, 10], haricot: [4, 5, 9, 10], soja: [5, 6] },
+  dapaong: { mais: [5, 6], sorgho: [5, 6], mil: [5, 6], haricot: [7, 8], soja: [6, 7] },
+  sokode: { mais: [4, 5, 6], sorgho: [5, 6], soja: [5, 6, 7], haricot: [6, 7, 8] },
+  kpalime: { mais: [3, 4, 5, 9, 10], haricot: [4, 5, 9, 10], soja: [5, 6] },
+  atakpame: { mais: [3, 4, 5, 9], haricot: [4, 5, 9], soja: [5, 6] },
   kara: { mais: [5, 6, 7], sorgho: [5, 6, 7], mil: [5, 6], soja: [6, 7], haricot: [7, 8] },
 }
 
@@ -243,7 +247,7 @@ export function decodeFarm(v: unknown): Farm | undefined {
   const f = raw.field as Partial<Field> | null | undefined
   if (
     f &&
-    (f.locality === 'lome' || f.locality === 'kara') &&
+    isLocalityId(f.locality) &&
     isCrop(f.crop) &&
     Number.isSafeInteger(f.sownDay) &&
     Number.isSafeInteger(f.tended) &&

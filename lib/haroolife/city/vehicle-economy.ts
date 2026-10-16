@@ -2,12 +2,20 @@ import type { CityLife } from './life'
 import type { Fare, VehicleKind } from './fares'
 import { landmarks } from './world'
 
-/** Deliberately accelerated game economy; these are not current Togolese pump tariffs. */
+/** Consumption and maintenance are accelerated game rules; pump price is a dated official reference. */
 export const VEHICLE_RULES = {
   taxi: { tankMl: 4000, mlPerCell: 2.6, maintenancePerKm: 18 },
   moto: { tankMl: 2000, mlPerCell: 1, maintenancePerKm: 10 },
 } as const
-export const GAME_FUEL_PER_LITRE = 700
+export const FUEL_REFERENCE = {
+  product: 'Super sans plomb',
+  fcfaPerLitre: 817,
+  effective: '2026-09-11',
+  checked: '2026-10-16',
+  source:
+    'https://www.republiquetogolaise.tg/gouvernance-economique/1109-12268-nouveaux-tarifs-pour-les-produits-petroliers-a-partir-de-ce-vendredi',
+} as const
+export const GAME_FUEL_PER_LITRE = FUEL_REFERENCE.fcfaPerLitre
 export type VehicleReceipt = {
   gross: number
   fuel: number

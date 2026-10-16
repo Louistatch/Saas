@@ -1,5 +1,11 @@
 'use client'
-import { GOODS, canShop, consume, purchase } from '@/lib/haroolife/city/commerce'
+import {
+  GOODS,
+  canShop,
+  consume,
+  purchase,
+  purchaseAndConsume,
+} from '@/lib/haroolife/city/commerce'
 import type { CityLife } from '@/lib/haroolife/city/life'
 export default function GameMarket({
   state,
@@ -56,6 +62,21 @@ export default function GameMarket({
                   </p>
                 </div>
               </div>
+              {here && (
+                <button
+                  type="button"
+                  disabled={state.life.wallet < item.price || qty >= 20}
+                  onClick={() => onChange((s) => purchaseAndConsume(s, item.id))}
+                  className="mt-2 min-h-11 w-full rounded-xl bg-amber-50 px-3 text-xs font-bold text-amber-900 disabled:opacity-40"
+                >
+                  {item.id === 'soap'
+                    ? 'Acheter et se laver'
+                    : item.id === 'water'
+                      ? 'Acheter et boire ici'
+                      : 'Commander et manger ici'}{' '}
+                  · {item.price} FCFA
+                </button>
+              )}
               <div className="mt-2 flex gap-2">
                 <button
                   type="button"

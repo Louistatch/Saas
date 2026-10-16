@@ -9,7 +9,14 @@ import { type NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store' }
-const REGION = { lome: 'Maritime', kara: 'Kara' } as const
+const REGION = {
+  lome: 'Maritime',
+  kara: 'Kara',
+  dapaong: 'Savanes',
+  sokode: 'Centrale',
+  kpalime: 'Plateaux',
+  atakpame: 'Plateaux',
+} as const
 
 export async function GET(request: NextRequest) {
   const ctx = await getAccessContext({ allowVisitor: true })

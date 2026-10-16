@@ -1,3 +1,4 @@
+import { placeScreenMarkers } from '../core/screen-markers'
 import {
   type AvatarActor,
   createAvatarActor,
@@ -287,7 +288,7 @@ export class RoomWorld {
     if (spot && !this.offDevice) {
       // Machines are used standing on them (treadmill, bike, bench, mat).
       this.offDevice = { x: pl.root.position.x, z: pl.root.position.z }
-      pl.root.position.set(spot.x, 0, spot.z)
+      pl.root.position.set(spot.x, spot.seat === undefined ? 0 : spot.seat - pl.seatOffset, spot.z)
       pl.root.rotation.y = spot.heading
     } else if (!spot) this.stepOff()
   }
@@ -756,15 +757,23 @@ export class RoomWorld {
     if (this.def.view.follow) this.updateCamera(false, dt)
     this.scene.updateMatrixWorld()
     const v = new THREE.Vector3()
-    for (const m of this.markers) {
+    const projected = this.markers.flatMap((m) => {
       m.anchor.getWorldPosition(v)
       v.project(this.camera)
       const x = (v.x * 0.5 + 0.5) * this.width
       const y = (-v.y * 0.5 + 0.5) * this.height
-      m.el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`
       const inside =
         v.z < 1 && v.z > -1 && x > -20 && x < this.width + 20 && y > 0 && y < this.height + 40
-      m.el.style.visibility = inside && this.markerShown(m.hotspot) ? 'visible' : 'hidden'
+      return inside && this.markerShown(m.hotspot)
+        ? [{ id: m.hotspot.id, x, y, priority: m.hotspot.kind === 'npc' ? 2 : 1 }]
+        : []
+    })
+    const placed = placeScreenMarkers(projected, this.width, this.height)
+    for (const m of this.markers) {
+      const p = placed.get(m.hotspot.id)
+      m.el.style.visibility = p ? 'visible' : 'hidden'
+      if (p)
+        m.el.style.transform = `translate(${p.x.toFixed(1)}px,${p.y.toFixed(1)}px) translate(-50%,-50%)`
     }
     this.renderer.render(this.scene, this.camera)
     // The scene probe appears once the first frame is drawn (its GPU counters are then real).

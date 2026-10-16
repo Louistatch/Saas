@@ -151,6 +151,7 @@ export const TYPE_ICONS: Record<LotType, string> = {
 }
 
 export interface Lot {
+  employer?: 'mixx' | 'moov'
   /** Fictional local services, reusing the existing building engine and stable lot ids. */
   service?: 'fuel' | 'garage' | 'police'
   id: string
@@ -418,6 +419,20 @@ export function worldIndex(): WorldIndex {
     )
     const lot = candidates[0]
     if (lot) Object.assign(lot, { service, type, name: `${name} · ${loc.name} (jeu)`, floors: 1 })
+  }
+  // Name existing anonymous shops, keeping all historical footprints and ids intact.
+  for (const [employer, brand, offset] of [
+    ['mixx', 'Mixx by Yas', 3],
+    ['moov', 'Moov Africa', -3],
+  ] as const) {
+    const candidates = lots.filter((l) => !l.name && l.type === 'shop')
+    candidates.sort(
+      (a, b) =>
+        Math.hypot(a.door.x - loc.gate.x - offset, a.door.y - loc.gate.y) -
+        Math.hypot(b.door.x - loc.gate.x - offset, b.door.y - loc.gate.y),
+    )
+    if (candidates[0])
+      Object.assign(candidates[0], { employer, name: `${brand} · ${loc.name} (jeu)` })
   }
   const byCell = new Map<string, Lot>()
   const byId = new Map<string, Lot>()

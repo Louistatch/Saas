@@ -1,3 +1,4 @@
+import { LOCALITIES } from './locality'
 import type { CityLife } from './life'
 import type { Lot } from './world'
 export type DialogueMessage = { from: 'me' | 'npc'; text: string }
@@ -74,7 +75,7 @@ export function residentReply(resident: Resident, text: string, s: CityLife): st
       'Le service communal est rémunéré une fois par jour, entre 7 h et 19 h. Prévois un peu d’énergie.',
   }
   if (/bonjour|salut|coucou|bonsoir|comment|ca va/.test(t))
-    return `Bienvenue ${s.locality === 'kara' ? 'à Kara' : 'à Lomé'} ! Moi, c’est ${resident.name.split(' · ')[0]}. ${resident.lot?.type && local[resident.lot.type] ? local[resident.lot.type] : 'On peut parler du quartier, du marché, des métiers ou de la sécurité.'}`
+    return `Bienvenue à ${LOCALITIES[s.locality].name} ! Moi, c’est ${resident.name.split(' · ')[0]}. ${resident.lot?.type && local[resident.lot.type] ? local[resident.lot.type] : 'On peut parler du quartier, du marché, des métiers ou de la sécurité.'}`
   return (
     (resident.lot?.type && local[resident.lot.type]) ||
     'Je connais le quartier : demande-moi où acheter, comment travailler, gérer ton véhicule ou parler à la police. Doucement, on va y arriver !'

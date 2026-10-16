@@ -100,7 +100,7 @@ export interface RoomScene {
    */
   view: { height: number; width: number; follow: boolean }
   /** Where the figure stands while using a machine (gym): prop id → spot and heading. */
-  onDevice: Record<string, { x: number; z: number; heading: number }>
+  onDevice: Record<string, { x: number; z: number; heading: number; seat?: number }>
   palette: {
     background: string
     ground: string
@@ -416,9 +416,21 @@ export function sceneFromLayout(id: string, layout: Layout, s = LAYOUT_SCALE): R
   for (const prop of layout.props) {
     if (!ON_DEVICE.has(prop.kind)) continue
     const a = ((prop.rot ?? 0) * Math.PI) / 180
-    const off = prop.kind === 'treadmill' ? 0.15 : prop.kind === 'bench-press' ? 0.35 : 0.3
+    const off =
+      prop.kind === 'bike'
+        ? 0.1
+        : prop.kind === 'treadmill'
+          ? 0.15
+          : prop.kind === 'bench-press'
+            ? 0.35
+            : 0.3
     const o = rotate(0, off, a)
-    onDevice[prop.id] = { x: (prop.x + o.x) * s, z: (prop.z + o.z) * s, heading: a }
+    onDevice[prop.id] = {
+      x: (prop.x + o.x) * s,
+      z: (prop.z + o.z) * s,
+      heading: prop.kind === 'bike' ? a + Math.PI : a,
+      ...(prop.kind === 'bike' ? { seat: 0.98 * s } : {}),
+    }
   }
 
   const k = Math.max(w / 12.25, d / 10.25)

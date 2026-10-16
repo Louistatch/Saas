@@ -135,6 +135,7 @@ export function consume(s: CityLife, id: GoodsId): CityLife {
         inventory: { ...commerce.inventory, [id]: commerce.inventory[id]! - 1 },
       },
       life: { ...s.life, needs },
+      activity: s.insideLot || s.life.inside ? { prop: `consume:${id}`, anim: 'work' } : s.activity,
     },
     `${item.name} utilisé. Tes besoins ont été améliorés.`,
   )
@@ -151,4 +152,12 @@ export function buyEstateMeal(s: CityLife): CityLife {
       ? { ...(s.commerce ?? emptyCommerce()), boughtMeals: (s.commerce?.boughtMeals ?? 0) + gained }
       : s.commerce,
   }
+}
+
+/** One deliberate counter action: stock, debit and consume succeed together, or nothing is consumed. */
+export function purchaseAndConsume(s: CityLife, id: GoodsId): CityLife {
+  const before = s.commerce?.inventory[id] ?? 0
+  const bought = purchase(s, id)
+  if ((bought.commerce?.inventory[id] ?? 0) !== before + 1) return bought
+  return consume(bought, id)
 }

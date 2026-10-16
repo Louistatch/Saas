@@ -21,6 +21,7 @@ import {
   settleVehicleFare,
   vehicleCare,
   VEHICLE_RULES,
+  GAME_FUEL_PER_LITRE,
 } from '../lib/haroolife/city/vehicle-economy'
 import { AutomaticDrivingService } from '../lib/haroolife/city/automatic-service'
 import { PlayerController } from '../lib/haroolife/city/player'
@@ -150,7 +151,13 @@ for (const kind of ['taxi', 'moto'] as const)
       ...s,
       fleet: {
         ...s.fleet,
-        [kind]: { ...c, fuelMl: 100, fuelReserve: 3000, sinceMaintenanceKm: 9, courses: 3 },
+        [kind]: {
+          ...c,
+          fuelMl: 100,
+          fuelReserve: Math.ceil((VEHICLE_RULES[kind].tankMl * GAME_FUEL_PER_LITRE) / 1000),
+          sinceMaintenanceKm: 9,
+          courses: 3,
+        },
       },
     }
     assert.equal(nextVehicleStop(s, kind)?.service, 'fuel')

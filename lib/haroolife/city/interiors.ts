@@ -67,6 +67,7 @@ export type NpcAnim =
   | 'work'
   | 'pray'
   | 'rest'
+  | 'cycle'
   | 'drive'
   | 'enter'
 export interface Npc {
@@ -850,6 +851,7 @@ export function animFor(kind: PropKind): NpcAnim {
     case 'treadmill':
       return 'run'
     case 'bike':
+      return 'cycle'
     case 'chair':
     case 'pew':
     case 'sofa':

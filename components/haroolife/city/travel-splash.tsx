@@ -21,6 +21,7 @@ export default function TravelSplash({
   onDone,
   company,
   stops,
+  mode = 'road',
 }: {
   from: LocalityId
   to: LocalityId
@@ -33,6 +34,7 @@ export default function TravelSplash({
   company?: string
   /** The real road, town by town (RN1), when known: drawn instead of a curve. */
   stops?: Stop[]
+  mode?: 'road' | 'air'
 }) {
   const [shown, setShown] = useState(false)
   useEffect(() => {
@@ -81,7 +83,7 @@ export default function TravelSplash({
       `}</style>
       <p className="text-sm font-semibold text-emerald-200">
         {company ? `${company} · ` : ''}
-        {LOCALITIES[from].name} → {dest} · {hours} h de car
+        {LOCALITIES[from].name} → {dest} · {hours} h {mode === 'air' ? 'de vol' : 'de car'}
         {km ? ` · ≈ ${km} km` : ''}
       </p>
       <h2 className="text-center text-3xl font-black leading-tight">En route vers {dest}</h2>
@@ -159,7 +161,7 @@ export default function TravelSplash({
         <g className="haroolife-bus" style={{ offsetPath: `path('${road}')` }}>
           <circle r={9} fill="#f7f8f1" stroke="#c2410c" strokeWidth={2} />
           <text textAnchor="middle" y={4} fontSize={11}>
-            🚌
+            {mode === 'air' ? '✈️' : '🚌'}
           </text>
         </g>
       </svg>
