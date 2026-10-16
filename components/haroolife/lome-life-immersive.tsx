@@ -81,7 +81,7 @@ import { ESTATE_GATE } from '@/lib/haroolife/city/navigation'
 import { findPath } from '@/lib/haroolife/city/navigation'
 import { bump } from '@/lib/haroolife/city/perf'
 import { FOLLOW_DISTANCE, type InputState, PlayerController } from '@/lib/haroolife/city/player'
-import { serviceVehicleSpot } from '@/lib/haroolife/city/jobs'
+import { serviceVehiclePlacement } from '@/lib/haroolife/city/jobs'
 import {
   PRESETS,
   type Quality,
@@ -1126,21 +1126,25 @@ export function LomeLifeImmersive() {
       setNotice('Service de transport terminé.')
       return
     }
-    const spot = serviceVehicleSpot(controller.pos, (x, z) => isCityRoad(x, z) || isDriveway(x, z))
-    if (!spot) {
+    const placement = serviceVehiclePlacement(
+      controller.pos,
+      (x, z) => isCityRoad(x, z) || isDriveway(x, z),
+    )
+    if (!placement) {
       setNotice('Aucune route accessible pour garer le véhicule de service.')
       return
     }
-    const vehicle = { x: spot.x, z: spot.z, heading: controller.heading }
+    const { approach, vehicle: parked } = placement
+    const vehicle = { x: parked.x, z: parked.z, heading: controller.heading }
     controller.vehicle = { ...vehicle, speed: 0 }
-    const close = Math.hypot(spot.x - controller.pos.x, spot.z - controller.pos.z) <= 1.8
+    const close = Math.hypot(approach.x - controller.pos.x, approach.z - controller.pos.z) <= 0.5
     setNearVehicle(close)
     const message = close
       ? `${duty === 'moto' ? 'Ton zémidjan' : 'Ton taxi'} est garé juste devant toi. Appuie sur « Monter ».`
       : `${duty === 'moto' ? 'Ton zémidjan' : 'Ton taxi'} est prêt sur la route : tu y vas automatiquement.`
     setCityLife((old) => {
       const ready = { ...old, duty, vehicle }
-      const moving = close ? ready : goToPoint(ready, { x: spot.x, y: spot.z })
+      const moving = close ? ready : goToPoint(ready, { x: approach.x, y: approach.z })
       return {
         ...moving,
         life: {

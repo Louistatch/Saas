@@ -654,9 +654,28 @@ test('HarooLife zémidjan: take the job, ride the moto, pick up a passer-by, dro
   await page.getByTestId('duty-moto').click()
   await expect.poll(async () => (await fareProbe())?.duty).toBe('moto')
 
-  // The automatic walk ends beside the provided moto; climb on and see the driver astride.
+  // The automatic walk ends beside the provided moto. It must be a real scene object on a
+  // distinct cell, visible beside the avatar before they climb on.
   const getOn = page.getByRole('button', { name: 'Monter sur le zémidjan' })
   await expect(getOn).toBeVisible({ timeout: 45000 })
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const w = window as unknown as {
+          __LOME_PLAYER?: { x: number; z: number; vehicle?: { x: number; z: number } | null }
+          __LOME_SCENE?: { has: (name: string) => boolean }
+        }
+        const player = w.__LOME_PLAYER
+        const vehicle = player?.vehicle
+        return {
+          model: w.__LOME_SCENE?.has('Zémidjan du joueur') ?? false,
+          distance:
+            player && vehicle ? Math.hypot(player.x - vehicle.x, player.z - vehicle.z) : 0,
+        }
+      }),
+    )
+    .toMatchObject({ model: true, distance: 1 })
+  await page.screenshot({ path: testInfo.outputPath('zemidjan-visible.png') })
   await tap(getOn)
   await expect.poll(async () => (await rider())?.vehicleKind, { timeout: 10000 }).toBe('moto')
   await expect.poll(async () => (await rider())?.astride).toBe(true)
