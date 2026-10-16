@@ -1,3 +1,6 @@
+import type { CityLife } from './life'
+import { isCityRoad, isDriveway } from './world'
+
 export type JobPoint = { x: number; z: number }
 
 export type ServiceVehiclePlacement = {
@@ -62,4 +65,30 @@ export function serviceVehicleSpot(
     }
   candidates.sort((a, b) => Math.hypot(a.x - at.x, a.z - at.z) - Math.hypot(b.x - at.x, b.z - at.z))
   return candidates[0] ?? null
+}
+/** Older saves may leave a driver inside their parked moto or keep a Lomé vehicle in Kara. */
+export function restoreServiceVehicle(state: CityLife): CityLife {
+  if (!state.duty) return state
+  const vehicle = state.vehicle
+  const at = state.pose ?? { x: state.at.x, z: state.at.y }
+  const drivable = (x: number, z: number) => isCityRoad(x, z) || isDriveway(x, z)
+  const overlaps =
+    !state.insideLot &&
+    !state.life.inside &&
+    vehicle &&
+    Math.hypot(at.x - vehicle.x, at.z - vehicle.z) < 0.75
+  if (
+    vehicle &&
+    (state.vehicleLocality ?? 'lome') === state.locality &&
+    drivable(Math.round(vehicle.x), Math.round(vehicle.z)) &&
+    !overlaps
+  )
+    return state
+  const placement = serviceVehiclePlacement(at, drivable)
+  if (!placement) return state
+  return {
+    ...state,
+    vehicle: { ...placement.vehicle, heading: vehicle?.heading ?? 0 },
+    vehicleLocality: state.locality,
+  }
 }

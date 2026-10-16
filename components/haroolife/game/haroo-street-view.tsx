@@ -43,6 +43,7 @@ export default function HarooStreetView(props: {
   fare?: StreetFare | null
   /** A passer-by close enough to climb on (or null). */
   onHail?: (name: string | null) => void
+  onVehicle?: () => void
 }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const markers = useRef<HTMLDivElement>(null)
@@ -81,6 +82,7 @@ export default function HarooStreetView(props: {
         onFrame: (s) => live.current.onFrame?.(s),
         onStats: (s) => live.current.onStats?.(s),
         onHail: (name) => live.current.onHail?.(name),
+        onVehicle: () => live.current.onVehicle?.(),
       },
     })
     world.current = w

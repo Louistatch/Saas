@@ -12,6 +12,7 @@ import {
  */
 import type { Building } from '../townsmen-engine'
 import { type NpcAnim, animFor, layoutFor } from './interiors'
+import { restoreServiceVehicle } from './jobs'
 import { LOCALITIES, type LocalityId, current, isLocalityId, setLocality } from './locality'
 import {
   ESTATE_GATE,
@@ -83,8 +84,10 @@ export interface CityLife {
   activity: { prop: string; anim: NpcAnim } | null
   /** Continuous position (cell units) and heading of the avatar, when known. */
   pose?: { x: number; z: number; heading: number }
-  /** The player's taxi, parked somewhere in the town (Lomé), or absent. */
+  /** The player's service vehicle, parked in vehicleLocality, or absent. */
   vehicle?: { x: number; z: number; heading: number } | null
+  /** Old saves without this field parked their vehicle in Lomé. */
+  vehicleLocality?: LocalityId
   /**
    * Driver's job in service: zémidjan (the vehicle is a moto-taxi) or taxi; absent when off.
    * Passers-by hail the driver; fares are paid on arrival (see fares.ts).
@@ -173,7 +176,7 @@ export function decodeCityLife(value: unknown): CityLife | null {
     return null
   if (v.target !== null && v.target !== undefined && !lotById(v.target)) return null
   if (v.insideLot !== null && v.insideLot !== undefined && !lotById(v.insideLot)) return null
-  return {
+  return restoreServiceVehicle({
     v: 1,
     life: syncEstate(life, at),
     locality,
@@ -205,7 +208,8 @@ export function decodeCityLife(value: unknown): CityLife | null {
           }
         : (v.vehicle ?? undefined),
     duty: v.duty === 'moto' || v.duty === 'taxi' ? v.duty : null,
-  }
+    vehicleLocality: isLocalityId(v.vehicleLocality) ? v.vehicleLocality : 'lome',
+  })
 }
 
 /** Keep the estate engine's local position in step with the world position while inside the fence. */

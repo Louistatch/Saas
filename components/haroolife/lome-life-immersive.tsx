@@ -980,7 +980,7 @@ export function LomeLifeImmersive() {
     controller.setTravelling(riding)
   }, [riding, controller])
   useEffect(() => {
-    const v = cityLife.locality === 'lome' ? cityLife.vehicle : null
+    const v = cityLife.locality === (cityLife.vehicleLocality ?? 'lome') ? cityLife.vehicle : null
     if (v) {
       if (!controller.vehicle) controller.vehicle = { x: v.x, z: v.z, heading: v.heading, speed: 0 }
       else if (!controller.driving)
@@ -988,14 +988,24 @@ export function LomeLifeImmersive() {
     } else {
       controller.vehicle = null
       controller.driving = false
+      setDriving(false)
     }
-  }, [cityLife.vehicle, cityLife.locality, controller])
+    setNearVehicle(!insideAny && controller.canEnterVehicle())
+  }, [cityLife.vehicle, cityLife.locality, cityLife.vehicleLocality, insideAny, controller])
+  // Boarding uses the continuous pose, including loading a save or moving within one cell.
+  useEffect(() => {
+    const check = () => setNearVehicle(!insideAny && controller.canEnterVehicle())
+    check()
+    const id = window.setInterval(check, 140)
+    return () => window.clearInterval(id)
+  }, [insideAny, controller])
   // A first visit to Lomé parks the player's taxi on the avenue by the estate gate.
   useEffect(() => {
     if (!loaded || cityLife.vehicle !== undefined) return
     setCityLife((old) => ({
       ...old,
       vehicle: { x: ESTATE_GATE.x, z: ESTATE_GATE.y + 3, heading: 0 },
+      vehicleLocality: 'lome',
     }))
   }, [loaded, cityLife.vehicle])
   const onPlayerEvents = useCallback(
@@ -1004,11 +1014,21 @@ export function LomeLifeImmersive() {
         if (ev.type === 'cell') {
           const key = `${cityLifeRef.current.locality}:${ev.x}:${ev.y}`
           reportedCell.current = key
-          const pose = { x: c.pos.x, z: c.pos.z, heading: c.heading }
+          const v = c.driving ? c.vehicle : null
+          const pose = v
+            ? { x: v.x, z: v.z, heading: v.heading }
+            : { x: c.pos.x, z: c.pos.z, heading: c.heading }
           setCityLife((old) => {
             const head = old.route[0]
             if (head && head.x === ev.x && head.y === ev.y) return { ...walkStep(old), pose }
-            return moveTo(old, { x: ev.x, y: ev.y }, pose)
+            const moved = moveTo(old, { x: ev.x, y: ev.y }, pose)
+            return v
+              ? {
+                  ...moved,
+                  vehicle: { x: v.x, z: v.z, heading: v.heading },
+                  vehicleLocality: old.locality,
+                }
+              : moved
           })
           setNearVehicle(c.canEnterVehicle())
         } else if (ev.type === 'vehicle') {
@@ -1018,6 +1038,7 @@ export function LomeLifeImmersive() {
           setCityLife((old) => ({
             ...old,
             vehicle: v ? { x: v.x, z: v.z, heading: v.heading } : old.vehicle,
+            vehicleLocality: v ? old.locality : old.vehicleLocality,
             pose: { x: c.pos.x, z: c.pos.z, heading: c.heading },
           }))
           const moto = cityLifeRef.current.duty === 'moto'
@@ -1119,6 +1140,10 @@ export function LomeLifeImmersive() {
       setNotice('Descends du véhicule avant de changer de métier.')
       return
     }
+    if (duty && insideAny) {
+      setNotice('Sors du bâtiment pour récupérer ton véhicule de service.')
+      return
+    }
     setFare(null)
     setHail(null)
     if (!duty) {
@@ -1143,7 +1168,7 @@ export function LomeLifeImmersive() {
       ? `${duty === 'moto' ? 'Ton zémidjan' : 'Ton taxi'} est garé juste devant toi. Appuie sur « Monter ».`
       : `${duty === 'moto' ? 'Ton zémidjan' : 'Ton taxi'} est prêt sur la route : tu y vas automatiquement.`
     setCityLife((old) => {
-      const ready = { ...old, duty, vehicle }
+      const ready = { ...old, duty, vehicle, vehicleLocality: old.locality }
       const moving = close ? ready : goToPoint(ready, { x: approach.x, y: approach.z })
       return {
         ...moving,
@@ -1155,6 +1180,8 @@ export function LomeLifeImmersive() {
       }
     })
     setPanel(null)
+    if (mapView) exitMap()
+    controller.camera.follow = true
     setNotice(message)
   }
   // While a passenger is on board: distance left, arrival, and the arrow towards the place.
@@ -1764,6 +1791,7 @@ export function LomeLifeImmersive() {
             }}
             fare={streetFare}
             onHail={setHail}
+            onVehicle={toggleVehicle}
             filter={cityFilter}
             selectedLot={selectedLot}
             showNames={showNames}
@@ -2102,7 +2130,16 @@ export function LomeLifeImmersive() {
                 {fareLive.can ? `Déposer ${fare.passenger}` : 'Arrête-toi à la destination'}
               </button>
             )}
-            {(nearVehicle || driving) && (
+            {!insideAny && cityLife.duty && !nearVehicle && !driving && panel === null && (
+              <button
+                type="button"
+                onClick={() => setDuty(cityLife.duty ?? null)}
+                className="min-h-12 max-w-[12rem] rounded-2xl bg-amber-400 px-3 py-2 text-xs font-black shadow"
+              >
+                {cityLife.duty === 'moto' ? '🏍️ Retrouver ma moto' : '🚕 Retrouver mon taxi'}
+              </button>
+            )}
+            {!insideAny && (nearVehicle || driving) && (
               <button
                 type="button"
                 aria-label={
@@ -2982,6 +3019,12 @@ export function LomeLifeImmersive() {
                         En commençant, un véhicule de service est garé sur la route la plus proche
                         et ton personnage s’y rend automatiquement.
                       </p>
+                      {cityLife.duty && !driving && (
+                        <ActionButton
+                          title="Rapprocher mon véhicule de service"
+                          onClick={() => setDuty(cityLife.duty ?? null)}
+                        />
+                      )}
                     </div>
                     <DailyStatus life={life} />
                   </>

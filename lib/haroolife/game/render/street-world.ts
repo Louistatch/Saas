@@ -121,6 +121,8 @@ export interface StreetWorldEvents {
   onStats?: (s: StreetStats) => void
   /** At the wheel, looking for clients: the passer-by close enough to climb on (or null). */
   onHail?: (name: string | null) => void
+  /** Touching the nearby parked vehicle boards it through the normal game action. */
+  onVehicle?: () => void
 }
 
 /** The driver's job in the street: the vehicle, who is on board, where they go. */
@@ -242,6 +244,9 @@ export class StreetWorld {
   private player: Person | null = null
   private car: THREE.Object3D | null = null
   private carLoading = false
+  /** Invalidates an old taxi download when changing vehicle or disposing the street. */
+  private carLoadId = 0
+  private carTag: HTMLButtonElement | null = null
   private moto: MotoParts | null = null
   private fare: StreetFare = { vehicle: 'taxi', hailing: false, passenger: null, dest: null }
   private hailed: string | null = null
@@ -315,6 +320,14 @@ export class StreetWorld {
       ),
       this.camera,
     )
+    if (
+      this.car &&
+      this.controller.canEnterVehicle() &&
+      this.raycaster.intersectObject(this.car, true).length
+    ) {
+      this.events.onVehicle?.()
+      return
+    }
     const hit = new THREE.Vector3()
     if (this.raycaster.ray.intersectPlane(this.groundPlane, hit))
       this.events.onCell({ x: Math.round(hit.x / U), y: Math.round(hit.z / U) })
@@ -805,9 +818,12 @@ export class StreetWorld {
   }
 
   private dropCar(): void {
+    this.carLoadId++
     this.car?.removeFromParent()
     this.car = null
     this.carLoading = false
+    this.carTag?.remove()
+    this.carTag = null
     this.wheels = []
     if (this.moto) {
       for (const g of this.moto.geometries) g.dispose()
@@ -901,6 +917,17 @@ export class StreetWorld {
 
   private loadCar(): void {
     this.carLoading = true
+    const loadId = ++this.carLoadId
+    const tag = document.createElement('button')
+    tag.type = 'button'
+    tag.dataset.serviceVehicle = this.fare.vehicle
+    tag.className =
+      'pointer-events-auto absolute left-0 top-0 whitespace-nowrap rounded-full border-2 border-amber-300 bg-white px-3 py-1 text-xs font-bold text-slate-900 shadow-md'
+    tag.textContent = this.fare.vehicle === 'moto' ? '🏍️ Zémidjan · Monter' : '🚕 Taxi · Monter'
+    tag.style.visibility = 'hidden'
+    tag.addEventListener('click', () => this.events.onVehicle?.())
+    this.markersRoot.append(tag)
+    this.carTag = tag
     if (this.fare.vehicle === 'moto') {
       const moto = buildMoto(FIGURE)
       this.moto = moto
@@ -910,11 +937,12 @@ export class StreetWorld {
       })
       this.scene.add(moto.root)
       this.car = moto.root
+      this.carLoading = false
       return
     }
     this.load(TAXI_URL)
       .then((g) => {
-        if (this.disposed) return
+        if (this.disposed || loadId !== this.carLoadId) return
         const root = new THREE.Group()
         root.name = 'Taxi du joueur'
         const model = g.scene.clone(true)
@@ -931,8 +959,10 @@ export class StreetWorld {
         root.add(model)
         this.scene.add(root)
         this.car = root
+        this.carLoading = false
       })
       .catch(() => {
+        if (this.disposed || loadId !== this.carLoadId) return
         // Honest fallback: a yellow volume of the taxi's size, never an invisible car.
         const box = new THREE.Mesh(this.unitBox, this.mat('#f2c230'))
         box.name = 'Taxi du joueur'
@@ -942,6 +972,7 @@ export class StreetWorld {
         root.add(box)
         this.scene.add(root)
         this.car = root
+        this.carLoading = false
       })
   }
 
@@ -1106,6 +1137,7 @@ export class StreetWorld {
     }
     // The player's taxi, when this town has one: the Kenney model, wheels turning and steering.
     const v = ctl.vehicle
+    if (!v && (this.car || this.carLoading)) this.dropCar()
     if (v) {
       if (!this.car && !this.carLoading) this.loadCar()
       const car = this.car
@@ -1128,6 +1160,19 @@ export class StreetWorld {
     this.stepRemotes(dt)
     this.updateCamera()
     const p = new THREE.Vector3()
+    if (this.carTag && this.car) {
+      p.copy(this.car.position)
+      p.y += this.moto ? this.moto.seat + 0.3 : FIGURE + 0.3
+      p.project(this.camera)
+      const x = (p.x * 0.5 + 0.5) * this.width
+      const y = (-p.y * 0.5 + 0.5) * this.height
+      this.carTag.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`
+      this.carTag.style.visibility =
+        ctl.canEnterVehicle() &&
+        p.z > -1 && p.z < 1 && x > 0 && x < this.width && y > 80 && y < this.height - 100
+          ? 'visible'
+          : 'hidden'
+    }
     for (const m of this.markers) {
       p.copy(m.at).project(this.camera)
       const x = (p.x * 0.5 + 0.5) * this.width
@@ -1473,6 +1518,24 @@ export class StreetWorld {
         shown: Boolean(r.person?.root.visible),
       })),
     }
+    // The bounds of the actual attached model let browser checks inspect its rendered pixels.
+    let vehicleScreen: { x: number; y: number; width: number; height: number } | null = null
+    if (this.car?.parent === this.scene) {
+      const box = new THREE.Box3().setFromObject(this.car)
+      const points: THREE.Vector3[] = []
+      for (const x of [box.min.x, box.max.x])
+        for (const y of [box.min.y, box.max.y])
+          for (const z of [box.min.z, box.max.z])
+            points.push(new THREE.Vector3(x, y, z).project(this.camera))
+      const xs = points.map((p) => (p.x * 0.5 + 0.5) * this.width)
+      const ys = points.map((p) => (-p.y * 0.5 + 0.5) * this.height)
+      vehicleScreen = {
+        x: Math.min(...xs),
+        y: Math.min(...ys),
+        width: Math.max(...xs) - Math.min(...xs),
+        height: Math.max(...ys) - Math.min(...ys),
+      }
+    }
     w.__LOME_PLAYER = {
       x: ctl.pos.x,
       z: ctl.pos.z,
@@ -1482,7 +1545,9 @@ export class StreetWorld {
       cell: ctl.cell,
       camera: { ...ctl.camera },
       vehicle: ctl.vehicle ? { ...ctl.vehicle } : null,
-      vehicleKind: this.car ? (this.moto ? 'moto' : 'taxi') : null,
+      vehicleKind:
+        this.car?.parent === this.scene ? (this.car === this.moto?.root ? 'moto' : 'taxi') : null,
+      vehicleScreen,
       hailed: this.hailed,
       passenger: this.fare.passenger,
       astride: !!this.moto && ctl.driving && this.player?.root.visible === true,

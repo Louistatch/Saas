@@ -23,6 +23,7 @@ export default defineConfig({
     'lome-endurance.spec.ts',
     'lome-interior-three.spec.ts',
     'lome-house-haroo.spec.ts',
+    'lome-service-vehicle.spec.ts',
   ],
   reporter: [['list'], ['html', { outputFolder: 'test-results/lome-report', open: 'never' }]],
   fullyParallel: false,
@@ -59,9 +60,11 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `[ -f .next/BUILD_ID ] || npm run build; npm run start -- --hostname 127.0.0.1 --port ${port}`,
+    // A leftover BUILD_ID or running server does not prove it contains the current sources.
+    // Reuse requires an explicit choice after building this exact checkout.
+    command: `${process.env.HAROOLIFE_TEST_USE_BUILD === '1' ? '' : 'npm run build && '}npm run start -- --hostname 127.0.0.1 --port ${port}`,
     url: `${baseURL}/haroolife/territoire/lome`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: process.env.HAROOLIFE_REUSE_SERVER === '1' && !process.env.CI,
     timeout: 300_000,
   },
 })

@@ -101,6 +101,7 @@ export default function CityWorld({
   onPlayer,
   fare,
   onHail,
+  onVehicle,
   filter,
   selectedLot,
   showNames = false,
@@ -154,6 +155,7 @@ export default function CityWorld({
   fare?: StreetFare | null
   /** A passer-by close enough to climb on (or null). */
   onHail?: (name: string | null) => void
+  onVehicle?: () => void
   filter: Category | 'all'
   selectedLot: Lot | null
   /** Map view: write every place's name (by priority, without overlaps); off by default. */
@@ -267,6 +269,7 @@ export default function CityWorld({
             light={light}
             fare={fare}
             onHail={onHail}
+            onVehicle={onVehicle}
           />
         </div>
       )}
