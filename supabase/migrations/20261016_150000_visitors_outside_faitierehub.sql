@@ -25,7 +25,7 @@ BEGIN
     'academy_assignments', 'academy_lesson_slides', 'academy_lessons', 'academy_media_assets',
     'academy_quiz_options', 'academy_quiz_questions', 'academy_quizzes', 'billing_rules',
     'cooperative_settings', 'market_listings', 'market_price_forecasts', 'notification_templates',
-    'enterprise_budget_snapshots', 'professional_documents', 'haroo_ouvrier_cantons',
+    'enterprise_budget_snapshots', 'professional_documents',
     'haroo_ouvrier_profiles', 'haroo_acheteur_profiles', 'haroo_agronome_profiles'
   ] LOOP
     IF to_regclass('public.' || t) IS NULL THEN CONTINUE; END IF;
@@ -35,7 +35,7 @@ BEGIN
       'pas de visiteur HarooLife', t, not_visitor, not_visitor);
   END LOOP;
   -- Lisibles par tous (anon compris) : seule l'écriture est réservée.
-  FOREACH t IN ARRAY ARRAY['market_prices'] LOOP
+  FOREACH t IN ARRAY ARRAY['market_prices', 'haroo_ouvrier_cantons'] LOOP
     IF to_regclass('public.' || t) IS NULL THEN CONTINUE; END IF;
     EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', 'pas de visiteur HarooLife (ajout)', t);
     EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', 'pas de visiteur HarooLife (modif)', t);
