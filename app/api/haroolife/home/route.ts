@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
   if (request.headers.get('origin') !== request.nextUrl.origin) {
     return NextResponse.json({ error: 'Origine invalide' }, { status: 403, headers })
   }
-  const ctx = await getAccessContext()
+  const ctx = await getAccessContext({ allowVisitor: true })
   if (!ctx) return NextResponse.json({ error: 'Connexion requise' }, { status: 401, headers })
   if (
     !rateLimit(`haroolife-home:${ctx.userId}:${clientKeyFromHeaders(request.headers)}`, 10, 600_000)

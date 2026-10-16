@@ -71,3 +71,14 @@ test('mémo du téléphone illisible : ignoré', () => {
     localAt: 0,
   })
 })
+
+test('un visiteur crée son compte FaîtiereHub : sa partie le suit, sauf si le compte a déjà la sienne', () => {
+  const visit = meta({ owner: 'anonyme', visitor: true })
+  assert.deepEqual(decideOnLoad('ama', visit, null), { action: 'push-local', base: 0 })
+  assert.deepEqual(decideOnLoad('ama', visit, cloud(3, '2026-10-16T10:00:00Z')), {
+    action: 'adopt-cloud',
+    base: 3,
+  })
+  assert.equal(readMeta(JSON.stringify(visit))?.visitor, true)
+  assert.equal(readMeta(JSON.stringify(meta({})))?.visitor, undefined)
+})

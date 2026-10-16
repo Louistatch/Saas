@@ -47,6 +47,8 @@ export async function sayOnPlace(cantonId: string, body: string): Promise<string
     body: JSON.stringify({ canton_id: cantonId, body }),
   }).catch(() => null)
   if (res?.ok) return null
+  if (res?.status === 401)
+    return 'Les visiteurs écoutent la place. Crée ton compte FaîtiereHub pour parler : ta partie te suit.'
   const data: { error?: string } = res ? await res.json().catch(() => ({})) : {}
   return data.error ?? 'Connexion interrompue. Réessayez.'
 }

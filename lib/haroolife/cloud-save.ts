@@ -9,7 +9,9 @@
  *   - the online game is the one this phone last saved: keep playing here, save on top of it;
  *   - another device saved since: the most recent wins (the online one, unless this phone has
  *     changes made after it);
- *   - the local game is someone else's, or unknown: the online game.
+ *   - the local game is someone else's, or unknown: the online game;
+ *   - the local game is a visitor's (HarooLife without a FaîtiereHub account) and the account now
+ *     signed in has no online game yet: the visitor created their account, the game follows them.
  */
 
 export const CLOUD_META = 'haroolife.cloud.v1'
@@ -23,6 +25,8 @@ export interface CloudMeta {
   syncedAt: number
   /** Last change of the local game (ms). */
   localAt: number
+  /** The owner was a HarooLife visitor (anonymous account). */
+  visitor?: boolean
 }
 
 export interface CloudCopy {
@@ -44,7 +48,9 @@ export function decideOnLoad(
 ): Decision {
   const mine = meta?.owner === user
   if (!cloud)
-    return meta && !mine ? { action: 'push-fresh', base: 0 } : { action: 'push-local', base: 0 }
+    return meta && !mine && !meta.visitor
+      ? { action: 'push-fresh', base: 0 }
+      : { action: 'push-local', base: 0 }
   if (!mine || !meta) return { action: 'adopt-cloud', base: cloud.version }
   if (meta.version === cloud.version) return { action: 'push-local', base: cloud.version }
   const cloudAt = Date.parse(cloud.updated_at) || 0
@@ -64,6 +70,7 @@ export function readMeta(raw: string | null): CloudMeta | null {
       version: m.version as number,
       syncedAt: Number(m.syncedAt) || 0,
       localAt: Number(m.localAt) || 0,
+      ...(m.visitor === true ? { visitor: true } : {}),
     }
   } catch {
     return null

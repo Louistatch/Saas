@@ -21,9 +21,14 @@ import type {
 } from './services'
 import { type WorkerGroup, fromBoardGroup } from './worker-group'
 
+/** In the game, a 401 means a HarooLife visitor reached a real FaîtiereHub feature. */
+const ACCOUNT_REQUIRED =
+  'Cette fonction demande un compte FaîtiereHub. Crée ton compte : ta partie te suit.'
+
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { cache: 'no-store' })
   if (!res.ok) {
+    if (res.status === 401) throw new Error(ACCOUNT_REQUIRED)
     const body = (await res.json().catch(() => ({}))) as { error?: string }
     throw new Error(body.error ?? `Erreur ${res.status}`)
   }
@@ -35,6 +40,7 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
+  if (res.status === 401) throw new Error(ACCOUNT_REQUIRED)
   const data = (await res.json().catch(() => ({}))) as T & { error?: string }
   if (!res.ok) throw new Error(data.error ?? `Erreur ${res.status}`)
   return data

@@ -57,8 +57,6 @@ const REALTIME_BY_REFRESH = {
   'r-kofi': 'b2b2b2b2-0000-4000-8000-000000000002',
   'r-yawa': 'c3c3c3c3-0000-4000-8000-000000000003',
 }
-// Last e-mail a visitor asked to keep their game with (read by the e2e test).
-let visitorKeepEmail = null
 const C1 = 'c1000000-0000-4000-8000-000000000001'
 const C2 = 'c2000000-0000-4000-8000-000000000002'
 const C3 = 'c3000000-0000-4000-8000-000000000003'
@@ -712,15 +710,7 @@ http
         try {
           sub = JSON.parse(Buffer.from(bearer.split('.')[1] ?? '', 'base64url').toString()).sub
         } catch {}
-        if (sub === VISITOR) {
-          if (req.method === 'PUT') {
-            try {
-              visitorKeepEmail = JSON.parse(body || '{}').email ?? null
-            } catch {}
-            return send(200, { ...visitorUser, new_email: visitorKeepEmail })
-          }
-          return send(200, visitorUser)
-        }
+        if (sub === VISITOR) return send(200, visitorUser)
         if (typeof sub === 'string' && REALTIME_ACCOUNTS.has(sub))
           return send(200, {
             ...user,
@@ -762,7 +752,6 @@ http
         // No e-mail: an anonymous sign-in (« Jouer en visiteur »).
         if (!email) return send(200, visitorSession())
       }
-      if (p === '/__visitor-keep') return send(200, { email: visitorKeepEmail })
       if (p.startsWith('/auth/v1/')) return send(200, {})
       // Private messages outside the game: run in the local relay's PGlite (the real
       // migrations), as the token's subject, so the dashboard and the game share one database.

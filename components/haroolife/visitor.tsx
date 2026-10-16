@@ -1,42 +1,19 @@
 'use client'
 
 /**
- * The HarooLife visitor: someone who entered the game with one tap, without e-mail or password (a
- * Supabase anonymous account: a real account, no identity). A visitor plays everything and reads
- * the rooms; to write, send a private message or game money, they keep their game by adding their
- * e-mail: the same account (same id, same game), confirmed by a link. Server rules:
- * supabase/migrations/20261016_140000_haroolife_visitors.sql.
+ * The HarooLife visitor: someone without a FaîtiereHub account who opens the game with one tap
+ * (a Supabase anonymous account, no e-mail, no password). A visitor is not a FaîtiereHub account:
+ * the rest of FaîtiereHub sees them signed out (auth context, middleware, getAccessContext). In the
+ * game they play and read the rooms; the real features (writing, private messages, game money,
+ * cooperatives, the market) lead to creating a FaîtiereHub account, and their game follows it
+ * (lib/haroolife/cloud-save.ts). Server rules: supabase/migrations/20261016_140000_haroolife_visitors.sql.
  */
-import { rememberGameReturn } from '@/lib/haroolife/entry'
-import { useEffect, useState } from 'react'
+import { rememberGameReturn, withGameReturn } from '@/lib/haroolife/entry'
+import Link from 'next/link'
 
 async function supabase() {
   const { createClient } = await import('@/lib/supabase/client')
   return createClient()
-}
-
-/** True while the signed-in account is a visitor (anonymous); false otherwise or signed out. */
-export function useVisitor(): boolean {
-  const [visitor, setVisitor] = useState(false)
-  useEffect(() => {
-    let stop = false
-    let unsubscribe: (() => void) | undefined
-    void supabase().then((sb) => {
-      if (stop) return
-      void sb.auth.getSession().then(({ data }) => {
-        if (!stop) setVisitor(Boolean(data.session?.user.is_anonymous))
-      })
-      const { data } = sb.auth.onAuthStateChange((_event, session) => {
-        setVisitor(Boolean(session?.user.is_anonymous))
-      })
-      unsubscribe = () => data.subscription.unsubscribe()
-    })
-    return () => {
-      stop = true
-      unsubscribe?.()
-    }
-  }, [])
-  return visitor
 }
 
 /** One tap: an anonymous account, named « Visiteur » until the player picks a name in the game. */
@@ -50,83 +27,33 @@ export async function startVisit(): Promise<string | null> {
     : 'Impossible d’entrer en visiteur pour le moment. Réessaie dans un instant.'
 }
 
-/** Keep the game: the visitor's account gets their e-mail (confirmed by a link), nothing else. */
-export function KeepGameForm({ reason, compact = false }: { reason?: string; compact?: boolean }) {
-  const [email, setEmail] = useState('')
-  const [state, setState] = useState<'idle' | 'busy' | 'sent' | 'error'>('idle')
-  const [message, setMessage] = useState('')
-  const submit = async () => {
-    const value = email.trim()
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-      setState('error')
-      setMessage('Écris une adresse e-mail valide.')
-      return
-    }
-    setState('busy')
-    rememberGameReturn('/haroolife')
-    const { error } = await (await supabase()).auth.updateUser(
-      { email: value },
-      {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent('/haroolife')}`,
-      },
-    )
-    if (error) {
-      setState('error')
-      setMessage(
-        /already|registered|exists/i.test(error.message)
-          ? 'Cette adresse a déjà un compte FaîtiereHub : connecte-toi avec elle.'
-          : 'L’e-mail n’a pas pu être envoyé. Réessaie dans un instant.',
-      )
-      return
-    }
-    setState('sent')
-    setMessage(`Un lien a été envoyé à ${value}. Ouvre-le pour garder ta partie.`)
-  }
+/** In place of a real feature, for a visitor: create a FaîtiereHub account (the game follows). */
+export function AccountPrompt({ reason, compact = false }: { reason?: string; compact?: boolean }) {
+  const back = '/haroolife'
   return (
-    <form
-      aria-label="Garder ma partie"
-      data-testid="keep-game"
+    <div
+      data-testid="account-prompt"
       className={`space-y-2 rounded-2xl bg-amber-50 text-left ${compact ? 'p-3' : 'p-4'}`}
-      onSubmit={(e) => {
-        e.preventDefault()
-        void submit()
-      }}
     >
-      <p className="text-sm font-black text-amber-950">Garder ma partie</p>
       <p className="text-xs text-amber-900">
-        {reason ?? 'Tu joues en visiteur.'} Ajoute ton e-mail : ta partie reste la même, sur tous
-        tes appareils.
+        {reason ?? 'Tu joues en visiteur.'} Crée ton compte FaîtiereHub : ta partie te suit.
       </p>
-      {state === 'sent' ? (
-        <output className="block text-xs font-semibold text-emerald-800">{message}</output>
-      ) : (
-        <>
-          <div className="flex gap-2">
-            <input
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              aria-label="Ton e-mail"
-              placeholder="ton@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="min-w-0 flex-1 rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm text-slate-900"
-            />
-            <button
-              type="submit"
-              disabled={state === 'busy'}
-              className="shrink-0 rounded-xl bg-amber-500 px-3 py-2 text-sm font-black text-white disabled:opacity-50"
-            >
-              {state === 'busy' ? '…' : 'Garder'}
-            </button>
-          </div>
-          {state === 'error' && (
-            <p role="alert" className="text-xs font-semibold text-red-700">
-              {message}
-            </p>
-          )}
-        </>
-      )}
-    </form>
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href={withGameReturn('/auth/signup', back)}
+          onClick={() => rememberGameReturn(back)}
+          className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-amber-500 px-3 py-2 text-sm font-black text-white"
+        >
+          Créer mon compte FaîtiereHub
+        </Link>
+        <Link
+          href={withGameReturn('/auth/login', back)}
+          onClick={() => rememberGameReturn(back)}
+          className="inline-flex min-h-11 items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold text-amber-900 underline"
+        >
+          J’ai déjà un compte
+        </Link>
+      </div>
+    </div>
   )
 }

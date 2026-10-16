@@ -11,7 +11,7 @@ import { ArrowLeft, ArrowRight, Leaf, ShieldCheck, UserRound } from 'lucide-reac
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { KeepGameForm, startVisit, useVisitor } from './visitor'
+import { AccountPrompt, startVisit } from './visitor'
 
 // The world and Three.js are loaded only after a real FaîtiereHub profile and entry consent.
 const World = dynamic(() => import('./lome-life-immersive').then((m) => m.LomeLifeImmersive), {
@@ -46,13 +46,16 @@ function savedSummary(): Summary | null {
 }
 
 export default function GameEntry() {
-  const { user, isLoading, isAuthenticated } = useAuth()
+  const { user: account, visitor: visiting, isLoading } = useAuth()
+  // The player: a FaîtiereHub account, or else a HarooLife visitor (opens the game only).
+  const user = account ?? visiting
+  const isAuthenticated = !!user
+  const visitor = !account && !!visiting
   const viewport = useHarooLifeViewport<HTMLElement>()
   const [entered, setEntered] = useState<string | null>(null)
   const [summary, setSummary] = useState<Summary | null>(null)
   const [returnTo, setReturnTo] = useState('/haroolife')
   const [leaving, setLeaving] = useState(false)
-  const visitor = useVisitor()
   // « Jouer en visiteur »: one tap, then straight into the game once the account exists.
   const [visit, setVisit] = useState<'idle' | 'busy' | string>('idle')
   useEffect(() => {
@@ -178,11 +181,12 @@ export default function GameEntry() {
               </p>
               {visitor && (
                 <div className="mt-4">
-                  <KeepGameForm reason="Tu joues en visiteur : tu lis les salons sans écrire." />
+                  <AccountPrompt reason="Tu joues en visiteur : tu lis les salons sans écrire." />
                 </div>
               )}
               <button
                 type="button"
+                hidden={visitor}
                 disabled={leaving}
                 onClick={() => {
                   setLeaving(true)
@@ -190,11 +194,7 @@ export default function GameEntry() {
                 }}
                 className="mx-auto mt-3 block min-h-11 px-3 text-xs font-semibold text-emerald-800 underline disabled:opacity-50"
               >
-                {leaving
-                  ? 'Déconnexion…'
-                  : visitor
-                    ? 'Se connecter avec un compte FaîtiereHub'
-                    : 'Changer de compte'}
+                {leaving ? 'Déconnexion…' : 'Changer de compte'}
               </button>
             </>
           ) : (
@@ -209,8 +209,9 @@ export default function GameEntry() {
                 <ArrowRight size={19} />
               </button>
               <p className="mt-2 text-center text-xs text-[#687b68]">
-                Sans e-mail ni mot de passe. Tu joues et tu lis les salons ; ajoute ton e-mail plus
-                tard pour écrire et garder ta partie.
+                Sans compte, sans e-mail. Tu joues et tu lis les salons. Pour écrire, envoyer de
+                l’argent ou rejoindre ta coopérative, tu crées ton compte FaîtiereHub : ta partie te
+                suit.
               </p>
               {visit !== 'idle' && visit !== 'busy' && (
                 <p role="alert" className="mt-2 text-center text-xs font-semibold text-red-700">

@@ -207,7 +207,7 @@ import { PhoneDevice } from './phone-device'
 import { HomeDialog } from './residence-dialog'
 import { sayOnPlace, usePresence } from './use-presence'
 import { useCloudSave } from './use-cloud-save'
-import { KeepGameForm } from './visitor'
+import { AccountPrompt } from './visitor'
 import { useRealtime } from './use-realtime'
 
 const CityWorld = dynamic(() => import('./city/city-world'), {
@@ -2948,7 +2948,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                       if (!canTalk || !realtime.client) {
                         setDebateNote(
                           realtime.state.me?.visitor
-                            ? 'Garde ta partie avec ton e-mail (Messages) pour débattre dans le salon Togo.'
+                            ? 'Crée ton compte FaîtiereHub pour débattre dans le salon Togo : ta partie te suit.'
                             : 'Le salon Togo n’est pas disponible : connecte-toi et choisis ta maison pour débattre.',
                         )
                         return
@@ -3497,7 +3497,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                           </div>
                         </div>
                         {visitor && (
-                          <KeepGameForm
+                          <AccountPrompt
                             reason={`Pour écrire à ${name} ou lui envoyer de l’argent du jeu.`}
                             compact
                           />

@@ -1,10 +1,10 @@
 'use client'
 
 import { destroySession, onLogoutBroadcast, setTenantId, setUserId } from '@/lib/auth/session'
+import { gameReturnPath, withGameReturn } from '@/lib/haroolife/entry'
 import { createClient } from '@/lib/supabase/client'
 import { createLogger } from '@/lib/utils/logger'
 import { effectiveHarooType } from '@/lib/utils/permissions'
-import { gameReturnPath, withGameReturn } from '@/lib/haroolife/entry'
 import type { AuthUser, HarooType, UserRole } from '@/types/domain'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
@@ -18,7 +18,13 @@ export type { AuthUser, UserRole, HarooType } from '@/types/domain'
 export type User = AuthUser
 
 export interface AuthContextType {
+  /** The FaîtiereHub account. Never a HarooLife visitor (see `visitor`). */
   user: AuthUser | null
+  /**
+   * A HarooLife visitor: an anonymous account that opens the game only. For FaîtiereHub the
+   * person is signed out (`user` null, `isAuthenticated` false); HarooLife lets them play.
+   */
+  visitor: AuthUser | null
   isLoading: boolean
   isAuthenticated: boolean
   login: (email: string, password: string) => Promise<AuthUser | null>
@@ -54,6 +60,7 @@ function profileToAuthUser(profile: ProfileRow): AuthUser {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
+  const [visitor, setVisitor] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
   const router = useRouter()
@@ -84,7 +91,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       destroySession()
       // Only redirect if we're on a protected page (avoid redirect loops on auth pages)
       if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth/')) {
-        window.location.replace(withGameReturn('/auth/login', gameReturnPath(window.location.pathname + window.location.search)))
+        window.location.replace(
+          withGameReturn(
+            '/auth/login',
+            gameReturnPath(window.location.pathname + window.location.search),
+          ),
+        )
       }
     })
     return cleanup
@@ -143,7 +155,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const profile = await fetchProfile(sbUser.id)
           if (mounted) {
             if (profile) {
-              setUser(profile)
+              if (sbUser.is_anonymous) setVisitor(profile)
+              else setUser(profile)
             } else {
               // User exists in auth but no profile → zombie session
               log.debug('Zombie session detected (no profile), cleaning up')
@@ -177,6 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (event === 'SIGNED_OUT') {
         setUser(null)
+        setVisitor(null)
         return
       }
 
@@ -190,7 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Connexion réelle uniquement (jamais INITIAL_SESSION/TOKEN_REFRESHED,
       // qui se déclenchent à chaque rechargement de page) — § suivi admin
       // « qui s'est connecté ». Fire-and-forget, ne bloque jamais l'UI.
-      if (event === 'SIGNED_IN') {
+      if (event === 'SIGNED_IN' && !session?.user.is_anonymous) {
         void fetch('/api/auth/log-login', { method: 'POST' }).catch(() => {})
       }
 
@@ -216,11 +230,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // sort du callback et libère le verrou avant la requête.
       if (session?.user) {
         const userId = session.user.id
+        const anonymous = !!session.user.is_anonymous
         setTimeout(() => {
           if (!mounted) return
           void fetchProfile(userId).then((profile) => {
             if (mounted && profile) {
-              setUser(profile)
+              // A visitor is not a FaîtiereHub account; a real sign-in ends the visit.
+              setUser(anonymous ? null : profile)
+              setVisitor(anonymous ? profile : null)
               // Le profil est résolu : inutile d'attendre encore initAuth,
               // dont getUser() peut rester suspendu sur le verrou d'auth
               // (observé au retour d'un lien de confirmation e-mail).
@@ -247,7 +264,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!data.user) return null
       // Resolve the freshest profile so the caller can route by role.
       const profile = await fetchProfile(data.user.id)
-      if (profile) setUser(profile)
+      if (profile) {
+        setUser(profile)
+        setVisitor(null)
+      }
       return profile
     },
     [supabase, fetchProfile],
@@ -267,6 +287,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value: AuthContextType = {
     user,
+    visitor,
     isLoading,
     isAuthenticated: !!user,
     login,

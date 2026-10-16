@@ -30,7 +30,7 @@ const toOrg = (c: CoopRow): OrgRef => ({
 export async function GET() {
   if (process.env.HAROOLIFE_ENABLED !== 'true')
     return NextResponse.json({ error: 'HarooLife est en préparation.' }, { status: 503, headers })
-  const ctx = await getAccessContext()
+  const ctx = await getAccessContext({ allowVisitor: true })
   if (!ctx) return NextResponse.json({ error: 'Connexion requise' }, { status: 401, headers })
   const admin = createAdminClient()
   const { data: profile } = await admin

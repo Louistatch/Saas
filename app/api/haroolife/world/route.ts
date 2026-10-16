@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
   if (canton && !z.string().uuid().safeParse(canton).success) {
     return NextResponse.json({ error: 'Canton invalide' }, { status: 400, headers })
   }
-  const ctx = await getAccessContext()
+  const ctx = await getAccessContext({ allowVisitor: true })
   if (!ctx) return NextResponse.json({ error: 'Connexion requise' }, { status: 401, headers })
   const { data, error } = await ctx.supabase.rpc('haroolife_world', { p_canton: canton })
   if (error) {

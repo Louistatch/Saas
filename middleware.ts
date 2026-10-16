@@ -72,8 +72,11 @@ export async function middleware(request: NextRequest) {
   // Refresh session on EVERY request — this is the Supabase-recommended pattern.
   // It ensures the JWT stays fresh and cookies are properly rotated.
   const {
-    data: { user },
+    data: { user: sessionUser },
   } = await supabase.auth.getUser()
+  // A HarooLife visitor (anonymous account) opens the game only: for FaîtiereHub they are signed
+  // out, so the dashboards send them to the login page and the login page stays open to them.
+  const user = sessionUser && !sessionUser.is_anonymous ? sessionUser : null
 
   // ─── Route protection logic ───
   const isProtected =

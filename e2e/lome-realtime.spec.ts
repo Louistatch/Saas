@@ -633,7 +633,7 @@ test('the team moderates a reported message from the admin console', async ({
   await team.context.close()
 })
 
-test('a visitor enters with one tap, plays and reads the rooms, and keeps the game with an e-mail only', async ({
+test('a visitor enters HarooLife with one tap, reads the rooms, and is sent to a FaîtiereHub account for the rest', async ({
   browser,
 }, testInfo) => {
   test.setTimeout(150_000)
@@ -673,10 +673,12 @@ test('a visitor enters with one tap, plays and reads the rooms, and keeps the ga
   expect(said.status).toBe(200)
   await openChat(page, 'Lomé')
   await expect(log(page)).toContainText(`bienvenue au visiteur ${run}`)
-  // No message box: keeping the game (an e-mail) instead.
+  // No message box: creating a FaîtiereHub account instead (the game comes back after it).
   await expect(page.getByRole('textbox', { name: 'Écrire dans la discussion' })).toHaveCount(0)
-  const keep = page.getByTestId('keep-game')
-  await expect(keep).toBeVisible()
+  const prompt = page.getByTestId('account-prompt')
+  await expect(prompt).toBeVisible()
+  const signup = prompt.getByRole('link', { name: 'Créer mon compte FaîtiereHub' })
+  expect(await signup.getAttribute('href')).toMatch(/^\/auth\/signup\?.*haroolife/)
 
   // The server refuses a visitor's writing even outside the screen: room, money.
   const write = await rpc(visitorToken, 'haroolife_chat_send', {
@@ -693,14 +695,13 @@ test('a visitor enters with one tap, plays and reads the rooms, and keeps the ga
   })
   expect(gift.status).not.toBe(200)
 
-  // Keeping the game asks for the e-mail only (same account, confirmed by a link).
-  await keep.getByRole('textbox', { name: 'Ton e-mail' }).fill(`visiteur-${run}@test.local`)
-  await keep.getByRole('button', { name: 'Garder' }).click()
-  await expect(keep).toContainText('Un lien a été envoyé')
-  expect(await (await fetch(`${SUPABASE}/__visitor-keep`)).json()).toEqual({
-    email: `visiteur-${run}@test.local`,
-  })
   await page.screenshot({ path: testInfo.outputPath('realtime-visitor.png') })
+
+  // A visitor is not a FaîtiereHub account: the dashboard sends them to the login page, which
+  // stays open to them (no redirect back as if they were signed in).
+  await page.goto('/dashboard', { waitUntil: 'domcontentloaded' })
+  await expect(page).toHaveURL(/\/auth\/login/)
+  await expect(page.locator('input#password')).toBeVisible({ timeout: 15000 })
   expect(errors).toEqual([])
   await context.close()
 })

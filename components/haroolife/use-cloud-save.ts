@@ -60,6 +60,8 @@ export function useCloudSave({
   const live = useRef(cityLife)
   live.current = cityLife
   const meta = useRef<CloudMeta | null>(null)
+  // The signed-in person is a visitor: their game can follow the FaîtiereHub account they create.
+  const visitor = useRef(false)
   const ready = useRef(false)
   const dirty = useRef(false)
   const skipNext = useRef(false)
@@ -82,6 +84,7 @@ export function useCloudSave({
         version: copy.version,
         syncedAt: Date.now(),
         localAt: Date.now(),
+        ...(visitor.current ? { visitor: true } : {}),
       }
       writeMeta(meta.current)
       if (why) callbacks.current.notify(why)
@@ -141,6 +144,7 @@ export function useCloudSave({
       const { data: auth } = await sb.auth.getSession()
       const user = auth.session?.user.id
       if (!user || stop) return
+      visitor.current = !!auth.session?.user.is_anonymous
       const { data, error } = await sb.rpc('haroolife_save_get')
       if (stop) return
       if (error || (data !== null && (typeof data !== 'object' || Array.isArray(data)))) {
@@ -161,6 +165,7 @@ export function useCloudSave({
         version: decision.base,
         syncedAt: previous?.owner === user ? previous.syncedAt : 0,
         localAt: previous?.owner === user ? previous.localAt : 0,
+        ...(visitor.current ? { visitor: true } : {}),
       }
       ready.current = true
       if (decision.action === 'adopt-cloud' && cloud && take(cloud, user, '')) {
