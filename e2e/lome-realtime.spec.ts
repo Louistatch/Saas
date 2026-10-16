@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { type Browser, type BrowserContext, type Page, devices } from '@playwright/test'
 import { type Socket, io } from 'socket.io-client'
-import { expect, test } from './lome-test'
+import { expect, openPlaces, test } from './lome-test'
 
 /**
  * M1 (D4+): real-time chat over the Socket.IO relay with two signed-in people in two browsers
@@ -756,4 +756,103 @@ test('a friend invited by WhatsApp link arrives in one tap, and both get their g
   expect(ama.errors).toEqual([])
   await context.close()
   await ama.context.close()
+})
+
+test('a player at the wheel or riding is seen in their vehicle by the others', async ({
+  browser,
+}, testInfo) => {
+  test.skip(/mobile/.test(testInfo.project.name), 'opens its own desktop context')
+  test.setTimeout(150_000)
+  type Remote = {
+    name: string
+    vehicle: string | null
+    vehicleShown: boolean
+    seated: string | null
+  }
+  const yawa = await player(browser, 'yawa', devices['Desktop Chrome'])
+  const at = await yawa.page.evaluate(
+    () => (window as unknown as { __LOME_CITY?: { at: { x: number; y: number } } }).__LOME_CITY?.at,
+  )
+  expect(at).toBeTruthy()
+  const ama: Socket = io(RELAY, {
+    transports: ['websocket'],
+    auth: { token: tokenOf(ACCOUNTS.ama) },
+  })
+  await new Promise<void>((r) => ama.once('system:hello', () => r()))
+  const joined = (await ama.timeout(10_000).emitWithAck('presence:join', { locality: 'lome' })) as {
+    ok: boolean
+  }
+  expect(joined.ok).toBe(true)
+  // Ama drives slowly along the street next to Yawa (5 Hz, well under the relay's speed limit).
+  let n = 0
+  let mode = 'drive:taxi'
+  const send = setInterval(() => {
+    n++
+    ama.emit('player:pose', {
+      x: (at?.x ?? 0) + 1 + ((n * 0.2) % 3),
+      z: (at?.y ?? 0) + 1,
+      heading: 90,
+      mode,
+      n,
+    })
+  }, 200)
+  const seen = () =>
+    yawa.page.evaluate(
+      () =>
+        (
+          window as unknown as { __LOME_STREET?: { remotes: Remote[] } }
+        ).__LOME_STREET?.remotes.find((r) => r.name === 'Ama (test)') ?? null,
+    )
+  try {
+    // At the wheel of a taxi: Yawa sees the taxi on the road (Ama is inside it).
+    await expect
+      .poll(seen, { timeout: 30000 })
+      .toMatchObject({ vehicle: 'taxi', vehicleShown: true })
+    await yawa.page.screenshot({ path: testInfo.outputPath('remote-taxi.png') })
+    // Behind a zémidjan driver: the moto, Ama seated on it.
+    mode = 'ride:moto'
+    await expect
+      .poll(seen, { timeout: 15000 })
+      .toMatchObject({ vehicle: 'moto', vehicleShown: true })
+    expect((await seen())?.seated).toMatch(/drive/i)
+    await yawa.page.screenshot({ path: testInfo.outputPath('remote-zemidjan.png') })
+    // On foot again: no vehicle left behind.
+    mode = 'walk'
+    await expect.poll(seen, { timeout: 15000 }).toMatchObject({ vehicle: null })
+  } finally {
+    clearInterval(send)
+  }
+
+  // The other way: Yawa takes a taxi; what the relay forwards names it and moves along the route.
+  const heard: { mode: string; x: number; z: number }[] = []
+  ama.on('player:snapshot', (s: { pose: { mode: string; x: number; z: number } }) =>
+    heard.push(s.pose),
+  )
+  await openPlaces(yawa.page)
+  await yawa.page
+    .getByRole('group', { name: 'Filtrer la ville' })
+    .getByRole('button', { name: 'Éducation' })
+    .click()
+  await yawa.page
+    .getByRole('button', { name: /Université de Lomé/ })
+    .first()
+    .click()
+  const sheet = yawa.page.getByRole('dialog', { name: 'Lieu' })
+  await sheet
+    .getByRole('group', { name: 'Comment y aller' })
+    .getByRole('button', { name: /Taxi/ })
+    .click()
+  await sheet.getByRole('button', { name: 'Confirmer le trajet' }).click()
+  await expect
+    .poll(() => heard.filter((p) => p.mode === 'ride:taxi').length, { timeout: 15000 })
+    .toBeGreaterThan(3)
+  const rides = heard.filter((p) => p.mode === 'ride:taxi')
+  const moved = Math.hypot(
+    rides[rides.length - 1].x - rides[0].x,
+    rides[rides.length - 1].z - rides[0].z,
+  )
+  expect(moved).toBeGreaterThan(1)
+  ama.close()
+  expect(yawa.errors).toEqual([])
+  await yawa.context.close()
 })

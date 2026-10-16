@@ -54,9 +54,11 @@ import {
   INTERP_DELAY_MS,
   MAX_SHOWN,
   STALE_MS,
+  type RemoteVehicle,
   type Sample,
   remoteAnim,
   remoteModel,
+  remoteVehicle,
   sampleAt,
 } from '@/lib/haroolife/realtime/interpolate'
 import type { Pose, PresenceEntry } from '@/lib/haroolife/realtime/protocol'
@@ -216,6 +218,23 @@ interface Remote {
   loading: boolean
   /** Name tag over the head: touching it (or the player) opens their sheet. */
   tag: HTMLButtonElement | null
+  /** The vehicle they drive or ride in, as the others see it (none on foot). */
+  ride: RemoteRide | null
+}
+
+interface RemoteRide {
+  kind: RemoteVehicle
+  role: 'drive' | 'ride'
+  root: THREE.Group
+  /** The zémidjan's own parts (built, so disposed with it); taxis and buses share templates. */
+  moto: MotoParts | null
+  /** The zémidjan driver carrying a passenger player. */
+  driver: Person | null
+  wheels: THREE.Object3D[]
+  spin: number
+  last: { x: number; z: number } | null
+  /** Height of the name tag above the ground. */
+  top: number
 }
 
 type Person = AvatarActor
@@ -541,6 +560,7 @@ export class StreetWorld {
     this.unsubscribe = null
     for (const r of this.remotes.values()) {
       if (r.person) this.disposePerson(r.person)
+      this.dropRemoteRide(r)
       r.tag?.remove()
     }
     this.remotes.clear()
@@ -1354,14 +1374,17 @@ export class StreetWorld {
     // Other players' name tags, over their heads.
     for (const r of this.remotes.values()) {
       if (!r.tag || !r.person) continue
-      p.copy(r.person.root.position)
-      p.y += FIGURE + 0.25
+      // Over the head on foot, over the roof in a taxi or a bus.
+      const ride = r.ride
+      p.copy(ride ? ride.root.position : r.person.root.position)
+      p.y += ride ? ride.top : FIGURE + 0.25
       p.project(this.camera)
       const x = (p.x * 0.5 + 0.5) * this.width
       const y = (-p.y * 0.5 + 0.5) * this.height
+      const shown = ride ? ride.root.visible : r.person.root.visible
       r.tag.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`
       r.tag.style.visibility =
-        r.person.root.visible && p.z < 1 && x > 0 && x < this.width && y > 40 ? 'visible' : 'hidden'
+        shown && p.z < 1 && x > 0 && x < this.width && y > 40 ? 'visible' : 'hidden'
     }
     if (this.shadows === 'throttled' && this.frames % 3 === 0)
       this.renderer.shadowMap.needsUpdate = true
@@ -1519,6 +1542,7 @@ export class StreetWorld {
     for (const [k, r] of this.remotes)
       if (!keys.has(k)) {
         if (r.person) this.disposePerson(r.person)
+        this.dropRemoteRide(r)
         r.tag?.remove()
         this.remotes.delete(k)
       }
@@ -1540,7 +1564,7 @@ export class StreetWorld {
   private spawnRemote(key: string): void {
     const who = this.present.find((p) => p.key === key)
     if (!who || this.remotes.size >= MAX_SHOWN) return
-    const r: Remote = { key, name: who.name, person: null, loading: true, tag: null }
+    const r: Remote = { key, name: who.name, person: null, loading: true, tag: null, ride: null }
     this.remotes.set(key, r)
     const spec = avatarSpec(remoteModel(key))
     void this.load(spec.url)
@@ -1581,11 +1605,43 @@ export class StreetWorld {
       while (list.length > 2 && list[1].at < at) list.shift()
       const s = sampleAt(list, at)
       if (!s) continue
-      p.root.position.set(s.x * U, 0, s.z * U)
-      p.root.rotation.y = (s.heading * Math.PI) / 180
-      p.root.visible = now - list[list.length - 1].at < STALE_MS
-      const anim = remoteAnim(this.modes.get(r.key) ?? 'idle')
-      const clip = clipFor(p.spec, anim === 'drive' ? 'idle' : anim)
+      const fresh = now - list[list.length - 1].at < STALE_MS
+      const mode = this.modes.get(r.key) ?? 'idle'
+      const ride = this.remoteRide(r, remoteVehicle(mode))
+      const h = (s.heading * Math.PI) / 180
+      if (ride) {
+        // Seen as the player sees their own: the vehicle on the road, the player on or in it.
+        ride.root.position.set(s.x * U, 0, s.z * U)
+        ride.root.rotation.y = h
+        ride.root.visible = fresh
+        const moved = ride.last ? Math.hypot(s.x - ride.last.x, s.z - ride.last.z) * U : 0
+        ride.last = { x: s.x, z: s.z }
+        ride.spin += moved / WHEEL_RADIUS
+        for (const w of ride.wheels) w.rotation.x = ride.spin
+        if (ride.moto) {
+          // Astride: at the handlebars, or behind the zémidjan driver.
+          const along = ride.role === 'drive' ? ride.moto.driverZ : ride.moto.passengerZ
+          p.root.position.set(
+            s.x * U + Math.sin(h) * along,
+            ride.moto.seat - p.seatOffset,
+            s.z * U + Math.cos(h) * along,
+          )
+          p.root.rotation.y = h
+          p.root.visible = fresh
+          if (ride.driver) ride.driver.mixer.update(dt)
+        } else {
+          // In the taxi or the bus, seated out of sight, as the player's own taxi.
+          p.root.position.set(s.x * U, 0, s.z * U)
+          p.root.visible = false
+        }
+      } else {
+        p.root.position.set(s.x * U, 0, s.z * U)
+        p.root.rotation.y = h
+        p.root.visible = fresh
+      }
+      const anim = remoteAnim(mode)
+      // Seated only on a vehicle drawn under them; a bare `drive` (old client) stands.
+      const clip = clipFor(p.spec, anim === 'drive' && !ride?.moto ? 'idle' : anim)
       this.play(p, clip)
       if (anim === 'walk' || anim === 'run') {
         const speed = (anim === 'run' ? DEFAULT_CONFIG.runSpeed : DEFAULT_CONFIG.walkSpeed) * U
@@ -1594,6 +1650,79 @@ export class StreetWorld {
       } else p.actions.get(p.current)?.setEffectiveTimeScale(1)
       p.mixer.update(dt)
     }
+  }
+
+  /**
+   * The vehicle under another player, built when their mode names one and dropped when they get
+   * off: the same taxi as the player's own, a zémidjan (with its driver when they ride behind),
+   * or a bus drawn from the van of the traffic, lengthened.
+   */
+  private remoteRide(
+    r: Remote,
+    want: { role: 'drive' | 'ride'; vehicle: RemoteVehicle } | null,
+  ): RemoteRide | null {
+    if (r.ride && (!want || r.ride.kind !== want.vehicle || r.ride.role !== want.role))
+      this.dropRemoteRide(r)
+    if (!want || r.ride) return r.ride
+    const root = new THREE.Group()
+    root.name = `Véhicule de ${r.name}`
+    const ride: RemoteRide = {
+      kind: want.vehicle,
+      role: want.role,
+      root,
+      moto: null,
+      driver: null,
+      wheels: [],
+      spin: 0,
+      last: null,
+      top: FIGURE + 0.25,
+    }
+    if (want.vehicle === 'moto') {
+      const moto = buildMoto(FIGURE)
+      ride.moto = moto
+      root.add(moto.root)
+      if (want.role === 'ride' && this.trafficRiderTemplate) {
+        const driver = this.makePerson(
+          this.trafficRiderTemplate.gltf,
+          this.trafficRiderTemplate.spec,
+          '#d4a72c',
+        )
+        driver.root.position.set(0, moto.seat - driver.seatOffset, moto.driverZ)
+        this.play(driver, clipFor(driver.spec, 'drive'))
+        root.add(driver.root)
+        ride.driver = driver
+      }
+      ride.top = moto.seat + FIGURE * 0.75
+    } else {
+      const template = this.trafficTemplates.get(want.vehicle === 'bus' ? 'van' : 'taxi')
+      if (!template) return null
+      const model = template.clone(true)
+      fitTaxiModel(model, FIGURE, U)
+      // No bus in the CC0 kit: the van, longer and taller, stands for the SOTRAL bus.
+      if (want.vehicle === 'bus') model.scale.multiply(new THREE.Vector3(1.15, 1.3, 1.6))
+      root.add(model)
+      const box = new THREE.Box3().setFromObject(model)
+      ride.top = box.max.y + 0.2
+    }
+    root.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).castShadow = true
+      if (o.name.startsWith('wheel-')) ride.wheels.push(o)
+    })
+    this.scene.add(root)
+    r.ride = ride
+    return ride
+  }
+
+  private dropRemoteRide(r: Remote): void {
+    const ride = r.ride
+    if (!ride) return
+    ride.root.removeFromParent()
+    if (ride.driver) this.disposePerson(ride.driver)
+    if (ride.moto) {
+      for (const g of ride.moto.geometries) g.dispose()
+      for (const m of ride.moto.materials) m.dispose()
+    }
+    r.ride = null
   }
 
   /** Chunk statistics for the game (`__LOME_CITY`) and the frame snapshot (`__LOME_PERF`). */
@@ -1670,6 +1799,10 @@ export class StreetWorld {
         key: r.key,
         name: r.name,
         shown: Boolean(r.person?.root.visible),
+        // The vehicle drawn under them (taxi, zémidjan or bus), and whether it is on screen.
+        vehicle: r.ride?.kind ?? null,
+        vehicleShown: Boolean(r.ride?.root.visible),
+        seated: r.person?.current ?? null,
       })),
     }
     // The bounds of the actual attached model let browser checks inspect its rendered pixels.

@@ -147,6 +147,7 @@ import { eventById, resolveEvent } from '@/lib/haroolife/lome-events'
 import { claimMoney, sendMoney } from '@/lib/haroolife/money'
 import { debateOfDay, jokeAt, jokeMessage, voteMessage } from '@/lib/haroolife/humour'
 import { uuid } from '@/lib/haroolife/realtime/client'
+import { type RemoteVehicle, ridePose, vehicleMode } from '@/lib/haroolife/realtime/interpolate'
 import {
   type Action,
   type Career,
@@ -280,6 +281,8 @@ export function routeModule(pathname: string | null): 'walk' | 'build' | 'map' {
   return 'walk'
 }
 const money = (n: number) => new Intl.NumberFormat('fr-FR').format(n) + ' FCFA'
+/** How long a ride lasts on the boulevard: a few seconds, longer for a longer route. */
+const rideMs = (cells: number) => 4000 + Math.min(6000, 120 * cells)
 const BUILDINGS: BuildType[] = [
   'road',
   'house',
@@ -611,6 +614,13 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   const [tripChoice, setTripChoice] = useState<Transport | null>(null)
   useEffect(() => setTripChoice(null), [selectedLot?.id, panel])
   const [riding, setRiding] = useState(false)
+  const rideTrack = useRef<{
+    start: { x: number; y: number }
+    route: { x: number; y: number }[]
+    since: number
+    seconds: number
+    vehicle: RemoteVehicle
+  } | null>(null)
   const [mapFilter, setMapFilter] = useState<MapFilter>('all')
   const [billboard, setBillboard] = useState<string | null>(null)
   const board = billboardById(billboard)
@@ -754,7 +764,13 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     let n = 0
     let last = { x: Number.NaN, z: Number.NaN, at: 0 }
     const id = window.setInterval(() => {
-      const p = controller.driving && controller.vehicle ? controller.vehicle : controller.pos
+      // A passenger is seen in the ride's vehicle, along its route; a driver, in their own.
+      const ride = rideTrack.current
+      const along = ride
+        ? ridePose(ride.start, ride.route, (performance.now() - ride.since) / 1000, ride.seconds)
+        : null
+      const p =
+        along ?? (controller.driving && controller.vehicle ? controller.vehicle : controller.pos)
       const now = performance.now()
       if (Math.hypot(p.x - last.x, p.z - last.z) < 0.03 && now - last.at < 2000) return
       last = { x: p.x, z: p.z, at: now }
@@ -763,11 +779,18 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
         x: Math.round(p.x * 100) / 100,
         z: Math.round(p.z * 100) / 100,
         heading: Math.round(
-          controller.driving && controller.vehicle
-            ? controller.vehicle.heading
-            : controller.heading,
+          along
+            ? along.heading
+            : controller.driving && controller.vehicle
+              ? controller.vehicle.heading
+              : controller.heading,
         ),
-        mode: controller.driving ? 'drive' : controller.mode,
+        mode:
+          along && ride
+            ? vehicleMode('ride', ride.vehicle)
+            : controller.driving
+              ? vehicleMode('drive', cityLifeRef.current.duty === 'moto' ? 'moto' : 'taxi')
+              : controller.mode,
         n,
       })
     }, 200)
@@ -1540,10 +1563,24 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   useEffect(() => {
     if (riding && (cityLife.route.length === 0 || insideAny)) setRiding(false)
   }, [riding, cityLife.route.length, insideAny])
+  // The others see the ride's vehicle drive the route meanwhile (pose sent at 5 Hz above).
+  useEffect(() => {
+    const s = cityLifeRef.current
+    rideTrack.current =
+      riding && transport !== 'walk'
+        ? {
+            start: s.at,
+            route: s.route,
+            since: performance.now(),
+            seconds: rideMs(s.route.length) / 1000,
+            vehicle: transport,
+          }
+        : null
+  }, [riding, transport])
   // A ride lasts a few seconds on the boulevard (longer for a longer route), then lands.
   useEffect(() => {
     if (!riding) return
-    const ms = 4000 + Math.min(6000, 120 * cityLife.route.length)
+    const ms = rideMs(cityLife.route.length)
     const id = window.setTimeout(() => {
       setRiding(false)
       setCityLife((old) => arrive(old))
