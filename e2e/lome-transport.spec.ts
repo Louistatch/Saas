@@ -101,3 +101,48 @@ test('the coach: seated by the window on the way to Kpalimé', async ({ page }, 
   await expect(page.getByTestId('travel-splash')).toHaveCount(0, { timeout: 45000 })
   expect(errors).toEqual([])
 })
+
+test('in Lomé: the SOTRAL bus, seated inside, at its fare by distance', async ({ page }, info) => {
+  test.setTimeout(150_000)
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
+  await expect(page.locator('canvas:visible').first()).toBeVisible({ timeout: 30000 })
+  const wallet = () =>
+    page.evaluate(
+      () => (window as unknown as { __LOME_CITY?: { wallet: number } }).__LOME_CITY?.wallet ?? 0,
+    )
+  await openPlaces(page)
+  await page
+    .getByRole('group', { name: 'Filtrer la ville' })
+    .getByRole('button', { name: 'Éducation' })
+    .click()
+  await page
+    .getByRole('button', { name: /Université de Lomé/ })
+    .first()
+    .click()
+  const sheet = page.getByRole('dialog', { name: 'Lieu' })
+  const options = sheet.getByRole('group', { name: 'Comment y aller' })
+  // Four ways in Lomé: on foot, zémidjan, taxi and the SOTRAL bus (100 to 300 FCFA).
+  await expect(options.getByRole('button')).toHaveCount(4)
+  const bus = options.getByRole('button', { name: /Bus/ })
+  const fare = Number(((await bus.textContent()) ?? '').replace(/\D+FCFA.*$|[^\d]/g, ''))
+  expect([100, 150, 200, 250, 300]).toContain(fare)
+  const before = await wallet()
+  await bus.click()
+  await expect(sheet).toContainText('Ticket SOTRAL')
+  await sheet.getByRole('button', { name: 'Confirmer le trajet' }).click()
+  await expect(page.getByTestId('cabin')).toHaveAttribute('data-mode', 'bus')
+  await expect.poll(wallet).toBe(before - fare)
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () => (window as unknown as { __LOME_CABIN?: { seated: boolean } }).__LOME_CABIN?.seated,
+        ),
+      { timeout: 30000 },
+    )
+    .toBe(true)
+  await page.screenshot({ path: info.outputPath('bus-cabin.png') })
+  expect(errors).toEqual([])
+})

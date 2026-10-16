@@ -154,8 +154,10 @@ import {
   type LifeState,
   NEED_KEYS,
   SALARIES,
+  TRANSPORT_LABEL,
   TRAVEL_COST,
   type Transport,
+  sotralFare,
   advanceLifeHour,
   buildInLome,
   buildNearPlayer,
@@ -4194,7 +4196,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                         )}
                         {!here && (
                           <div
-                            className="grid grid-cols-3 gap-2"
+                            className={`grid gap-2 ${cityLife.locality === 'lome' ? 'grid-cols-4' : 'grid-cols-3'}`}
                             role="group"
                             aria-label="Comment y aller"
                           >
@@ -4221,13 +4223,29 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                                   price: money(TRAVEL_COST.taxi),
                                   eta: eta(0.1),
                                 },
+                                // The SOTRAL city bus runs in Lomé only, priced by distance.
+                                ...(cityLife.locality === 'lome'
+                                  ? [
+                                      {
+                                        t: 'bus' as const,
+                                        icon: '🚌',
+                                        label: 'Bus',
+                                        price: money(sotralFare(cells ?? 0)),
+                                        eta: eta(0.16),
+                                      },
+                                    ]
+                                  : []),
                               ] as const
                             ).map((o) => (
                               <button
                                 type="button"
                                 key={o.t}
                                 onClick={() => setTripChoice(o.t)}
-                                disabled={cells === null || life.wallet < TRAVEL_COST[o.t]}
+                                disabled={
+                                  cells === null ||
+                                  life.wallet <
+                                    (o.t === 'bus' ? sotralFare(cells) : TRAVEL_COST[o.t])
+                                }
                                 aria-pressed={tripChoice === o.t}
                                 className={`flex flex-col items-center gap-0.5 rounded-2xl border px-2 py-3 text-center disabled:opacity-40 ${tripChoice === o.t ? 'border-emerald-700 bg-emerald-50' : 'border-slate-200 bg-white'}`}
                               >
@@ -4245,17 +4263,14 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                             aria-label="Confirmer le trajet"
                           >
                             <p className="text-sm font-bold">
-                              {tripChoice === 'walk'
-                                ? 'À pied'
-                                : tripChoice === 'moto'
-                                  ? 'Zémidjan'
-                                  : 'Taxi'}{' '}
-                              vers {lot.name ?? TYPE_LABELS[lot.type]}
+                              {TRANSPORT_LABEL[tripChoice]} vers {lot.name ?? TYPE_LABELS[lot.type]}
                             </p>
                             <p className="text-xs text-slate-600">
                               {TRAVEL_COST[tripChoice] === 0
                                 ? 'Trajet gratuit.'
-                                : `${money(TRAVEL_COST[tripChoice])} de monnaie de jeu seront déduits au départ.`}
+                                : tripChoice === 'bus'
+                                  ? `Ticket SOTRAL ${money(sotralFare(cells ?? 0))} (tarif par distance depuis déc. 2024), payé au départ.`
+                                  : `${money(TRAVEL_COST[tripChoice])} de monnaie de jeu seront déduits au départ.`}
                             </p>
                             <div className="flex gap-2">
                               <ActionButton

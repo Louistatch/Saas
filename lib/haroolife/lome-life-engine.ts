@@ -165,8 +165,26 @@ export function directTo(state: LifeState, destination: RoadPoint): LifeState {
     'Trajet commencé : ' + (route.length - 1) + ' cases.',
   )
 }
-export type Transport = 'walk' | 'moto' | 'taxi'
-export const TRAVEL_COST: Record<Transport, number> = { walk: 0, moto: 350, taxi: 900 }
+export type Transport = 'walk' | 'moto' | 'taxi' | 'bus'
+/** Fare of a ride; the bus's is its lowest (SOTRAL charges by distance: see sotralFare). */
+export const TRAVEL_COST: Record<Transport, number> = { walk: 0, moto: 350, taxi: 900, bus: 100 }
+/**
+ * The SOTRAL city bus of Lomé, priced by distance since 23 December 2024: 100, 150, 200, 250 or
+ * 300 FCFA. The game's sections are counted in cells of the route.
+ */
+export function sotralFare(cells: number): number {
+  if (cells <= 15) return 100
+  if (cells <= 30) return 150
+  if (cells <= 50) return 200
+  if (cells <= 80) return 250
+  return 300
+}
+export const TRANSPORT_LABEL: Record<Transport, string> = {
+  walk: 'À pied',
+  moto: 'Zémidjan',
+  taxi: 'Taxi',
+  bus: 'Bus SOTRAL',
+}
 
 /** Moves the avatar one connected road tile without advancing an entire day-hour.
  * Call only during active on-screen play: never perform background progress. */
@@ -204,7 +222,7 @@ export function chooseTransport(state: LifeState, transport: Transport): LifeSta
       spent: state.spent + cost,
       city: { ...state.city, coins: state.city.coins + cost },
     },
-    (transport === 'moto' ? 'Moto-taxi' : 'Taxi') + ' réservé : −' + cost + ' FCFA (simulation).',
+    TRANSPORT_LABEL[transport] + ' réservé : −' + cost + ' FCFA (simulation).',
   )
 }
 

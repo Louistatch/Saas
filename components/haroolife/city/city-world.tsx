@@ -36,6 +36,7 @@ const InteriorThree = dynamic(() => import('../engine-three/interior-three'), { 
 const HarooRoomView = dynamic(() => import('../game/haroo-room-view'), { ssr: false })
 const HarooStreetView = dynamic(() => import('../game/haroo-street-view'), { ssr: false })
 const HarooRideView = dynamic(() => import('../game/haroo-ride-view'), { ssr: false })
+const HarooCabinView = dynamic(() => import('../game/haroo-cabin-view'), { ssr: false })
 const CityMap = dynamic(() => import('../game/city-map'), { ssr: false })
 
 /** The player's adult skinned avatar. */
@@ -194,7 +195,18 @@ export default function CityWorld({
       style={{ background: light.sky }}
       data-testid="city-world"
     >
-      {ride && (
+      {ride?.transport === 'bus' && (
+        <div className="absolute inset-0" data-renderer="haroo">
+          <HarooCabinView
+            mode="bus"
+            hour={hour}
+            pixelRatio={pixelRatio}
+            avatarModel={avatarModel}
+            avatarPagne={avatarPagne}
+          />
+        </div>
+      )}
+      {ride && ride.transport !== 'bus' && (
         <div className="absolute inset-0" data-renderer="haroo">
           <HarooRideView
             transport={ride.transport}

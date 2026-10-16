@@ -1,7 +1,9 @@
 import { type Employment, decodeEmployment } from './employment'
 import {
   type LifeState,
+  TRANSPORT_LABEL,
   TRAVEL_COST,
+  sotralFare,
   type Transport,
   decodeLomeLife,
   initialLomeLife,
@@ -383,11 +385,11 @@ export function arrive(s: CityLife): CityLife {
 /** Pay a ride for the current route (one fee, fictional money to the city treasury). */
 export function payRide(s: CityLife, transport: Transport): CityLife {
   if (s.route.length === 0) return note(s, 'Choisis une destination avant un transport.')
-  const cost = TRAVEL_COST[transport]
+  const cost = transport === 'bus' ? sotralFare(s.route.length) : TRAVEL_COST[transport]
   if (cost === 0) return s
   const paid = pay(s, cost)
   if (!paid) return note(s, 'Solde insuffisant pour ce déplacement.')
-  return note(paid, `${transport === 'moto' ? 'Zémidjan' : 'Taxi'} : −${cost} FCFA.`)
+  return note(paid, `${TRANSPORT_LABEL[transport]} : −${cost} FCFA.`)
 }
 /** Manual step (arrow keys, on-screen pad). Facing a lot selects it as the target. */
 export function stepDir(s: CityLife, dx: -1 | 0 | 1, dy: -1 | 0 | 1): CityLife {

@@ -279,7 +279,8 @@ export class CabinWorld {
       if (!g) return null
       const actor = createAvatarActor(g, spec, FIGURE, pagne)
       const x = -half + 0.8 + row * ROW
-      actor.root.position.set(x + 0.06, 0.52 - actor.seatOffset, L.seats[seatIndex])
+      // A little back on the cushion: the seated pose's hands stay behind the seat in front.
+      actor.root.position.set(x - 0.1, 0.52 - actor.seatOffset, L.seats[seatIndex])
       // Facing the front of the vehicle (+x).
       actor.root.rotation.y = Math.PI / 2
       playAvatarActor(actor, clipFor(spec, 'drive'))
@@ -381,7 +382,9 @@ export class CabinWorld {
     const crown = this.geo(new THREE.IcosahedronGeometry(1, 0))
     const house = this.geo(new THREE.BoxGeometry(1, 1, 1))
     const roof = this.geo(new THREE.ConeGeometry(1, 1, 4))
-    const trees = Array.from({ length: 46 }, () => ({
+    // In town (the city bus) the street is lined with buildings; on the road, the savanna.
+    const town = this.o.mode === 'bus'
+    const trees = Array.from({ length: town ? 16 : 46 }, () => ({
       x: (rnd() - 0.5) * span,
       z: -(7 + rnd() * 60),
       h: 2.5 + rnd() * 3,
@@ -403,16 +406,17 @@ export class CabinWorld {
         s: [1.6 + trees[i].h * 0.25, 1.4, 1.6 + trees[i].h * 0.25],
       }),
     )
-    const homes = Array.from({ length: 14 }, () => ({
+    const homes = Array.from({ length: town ? 40 : 14 }, () => ({
       x: (rnd() - 0.5) * span,
-      z: -(10 + rnd() * 40),
+      z: -(town ? 8 + rnd() * 18 : 10 + rnd() * 40),
       w: 3 + rnd() * 3,
+      h: town ? 3 + rnd() * 7 : 2.4,
     }))
     scatter(house, this.mat(night ? '#6d6455' : '#d9c7a3'), homes.length, (i) => ({
       x: homes[i].x,
-      y: 0.6,
+      y: -0.6 + homes[i].h / 2,
       z: homes[i].z,
-      s: [homes[i].w, 2.4, 3],
+      s: [homes[i].w, homes[i].h, 3],
     }))
     scatter(
       roof,
@@ -420,9 +424,9 @@ export class CabinWorld {
       homes.length,
       (i) => ({
         x: homes[i].x,
-        y: 2.4,
+        y: -0.6 + homes[i].h + 0.5,
         z: homes[i].z,
-        s: [homes[i].w * 0.78, 1.1, 2.3],
+        s: [homes[i].w * 0.78, town ? 0.4 : 1.1, 2.3],
       }),
     )
     // Hills on the horizon (the Plateaux and the Kara mountains), still.

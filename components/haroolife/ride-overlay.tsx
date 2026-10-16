@@ -22,7 +22,14 @@ export default function RideOverlay({
   onSkip: () => void
   onMap: () => void
 }) {
-  const label = transport === 'moto' ? 'En zémidjan' : transport === 'taxi' ? 'En taxi' : 'À pied'
+  const label =
+    transport === 'moto'
+      ? 'En zémidjan'
+      : transport === 'taxi'
+        ? 'En taxi'
+        : transport === 'bus'
+          ? 'En bus SOTRAL'
+          : 'À pied'
   return (
     <div className="pointer-events-none absolute inset-0 z-30" aria-label="Trajet en cours">
       {rain && (
@@ -47,8 +54,8 @@ export default function RideOverlay({
         </div>
         <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-white/95 px-3 py-2 text-xs font-bold shadow">
           <span>
-            {transport === 'moto' ? '🏍️' : '🚕'} {label} vers {destination}…
-            {rain ? ' Il pleut.' : ''}
+            {transport === 'moto' ? '🏍️' : transport === 'bus' ? '🚌' : '🚕'} {label} vers{' '}
+            {destination}…{rain ? ' Il pleut.' : ''}
           </span>
           <button type="button" onClick={onMap} className="rounded-full bg-slate-100 px-3 py-1">
             Carte

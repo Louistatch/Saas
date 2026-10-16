@@ -31,7 +31,7 @@ const TRAFFIC = [
   { kind: 'taxi', lane: 1, z: -66, s: 0.9 },
   { kind: 'van', lane: 0, z: -80, s: 0.78 },
 ] as const
-const SPEED: Record<Transport, number> = { walk: 1.3, moto: 11, taxi: 8 }
+const SPEED: Record<Transport, number> = { walk: 1.3, moto: 11, taxi: 8, bus: 6 }
 const DASHES = 40
 const SIDES = 14
 const deg = THREE.MathUtils.degToRad
