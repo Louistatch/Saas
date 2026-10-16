@@ -644,21 +644,17 @@ test('HarooLife zémidjan: take the job, ride the moto, pick up a passer-by, dro
   await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
   await expect.poll(async () => (await street())?.engine, { timeout: 60000 }).toBe('haroo')
 
-  // Phone → Métiers → Zémidjan: the parked vehicle becomes a moto-taxi.
+  // Phone → Métiers → Zémidjan: a service moto is parked on the closest road and the player
+  // walks to it automatically. The flow must not depend on already owning/finding a vehicle.
   await page
     .getByRole('navigation', { name: 'Navigation du jeu' })
     .getByRole('button', { name: 'Téléphone' })
     .click()
   await page.getByRole('button', { name: /Métiers/ }).click()
   await page.getByTestId('duty-moto').click()
-  await expect(page.getByTestId('duty-moto')).toContainText('En service')
-  await page.keyboard.press('Escape')
   await expect.poll(async () => (await fareProbe())?.duty).toBe('moto')
 
-  // Walk to it, climb on: the driver is seen astride.
-  await page.evaluate(() =>
-    (window as unknown as { __LOME_GOTO_TAXI?: () => void }).__LOME_GOTO_TAXI?.(),
-  )
+  // The automatic walk ends beside the provided moto; climb on and see the driver astride.
   const getOn = page.getByRole('button', { name: 'Monter sur le zémidjan' })
   await expect(getOn).toBeVisible({ timeout: 45000 })
   await tap(getOn)

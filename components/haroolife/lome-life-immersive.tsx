@@ -81,6 +81,7 @@ import { ESTATE_GATE } from '@/lib/haroolife/city/navigation'
 import { findPath } from '@/lib/haroolife/city/navigation'
 import { bump } from '@/lib/haroolife/city/perf'
 import { FOLLOW_DISTANCE, type InputState, PlayerController } from '@/lib/haroolife/city/player'
+import { serviceVehicleSpot } from '@/lib/haroolife/city/jobs'
 import {
   PRESETS,
   type Quality,
@@ -143,8 +144,11 @@ import {
   initialLomeLife,
   interact,
   jobVenue,
+  prepareForWork,
   selectCity,
   selectJob,
+  waitForNextWorkShift,
+  workStatus,
 } from '@/lib/haroolife/lome-life-engine'
 import { placeResidents, residentsAt } from '@/lib/haroolife/lome-presence'
 import { BILLBOARDS, PARTNER_APPS, billboardById } from '@/lib/haroolife/lome-sponsors'
@@ -330,6 +334,7 @@ export function LomeLifeImmersive() {
   // The generators read one locality at a time: the save's town, applied before any lookup.
   ensureLocality(cityLife)
   const life = cityLife.life
+  const currentWorkStatus = workStatus(life)
   const setLife = useCallback(
     (next: LifeState | ((old: LifeState) => LifeState)) =>
       setCityLife((c) => ({ ...c, life: typeof next === 'function' ? next(c.life) : next })),
@@ -1116,7 +1121,37 @@ export function LomeLifeImmersive() {
     }
     setFare(null)
     setHail(null)
-    setCityLife((old) => ({ ...old, duty }))
+    if (!duty) {
+      setCityLife((old) => ({ ...old, duty: null }))
+      setNotice('Service de transport terminé.')
+      return
+    }
+    const spot = serviceVehicleSpot(controller.pos, (x, z) => isCityRoad(x, z) || isDriveway(x, z))
+    if (!spot) {
+      setNotice('Aucune route accessible pour garer le véhicule de service.')
+      return
+    }
+    const vehicle = { x: spot.x, z: spot.z, heading: controller.heading }
+    controller.vehicle = { ...vehicle, speed: 0 }
+    const close = Math.hypot(spot.x - controller.pos.x, spot.z - controller.pos.z) <= 1.8
+    setNearVehicle(close)
+    const message = close
+      ? `${duty === 'moto' ? 'Ton zémidjan' : 'Ton taxi'} est garé juste devant toi. Appuie sur « Monter ».`
+      : `${duty === 'moto' ? 'Ton zémidjan' : 'Ton taxi'} est prêt sur la route : tu y vas automatiquement.`
+    setCityLife((old) => {
+      const ready = { ...old, duty, vehicle }
+      const moving = close ? ready : goToPoint(ready, { x: spot.x, y: spot.z })
+      return {
+        ...moving,
+        life: {
+          ...moving.life,
+          lastEvent: message,
+          events: [message, ...moving.life.events].slice(0, 8),
+        },
+      }
+    })
+    setPanel(null)
+    setNotice(message)
   }
   // While a passenger is on board: distance left, arrival, and the arrow towards the place.
   useEffect(() => {
@@ -1367,6 +1402,22 @@ export function LomeLifeImmersive() {
     setTransport('walk')
     controller.camera.follow = true
     setCityLife((old) => goToEstate(old, x, y))
+  }
+  function goToWork() {
+    const target = LIFE_LOCATIONS.find((loc) => loc.venue === jobVenue(life.job))
+    if (!target) {
+      setNotice('Lieu de travail introuvable dans ce quartier.')
+      return
+    }
+    go(target.x, target.y)
+  }
+  function waitForWork() {
+    setLife((old) => waitForNextWorkShift(old))
+    setNotice('Tu te reposes jusqu’à l’ouverture du prochain service à 7 h.')
+  }
+  function prepareWorkNeeds() {
+    setLife((old) => prepareForWork(old))
+    setNotice('Pause et collation terminées. Vérifie l’heure puis rejoins ton poste.')
   }
   function goLot(lot: Lot) {
     if (mapView) exitMap()
@@ -1972,6 +2023,19 @@ export function LomeLifeImmersive() {
             />
           </div>
           <div className="pointer-events-auto flex flex-col items-end gap-2">
+            {currentWorkStatus === 'ready' && panel === null && (
+              <button
+                type="button"
+                onClick={() => action('work')}
+                className="flex min-h-12 max-w-[13rem] items-center gap-2 rounded-2xl bg-emerald-600 px-3 py-2 text-left text-xs font-black text-white shadow-lg"
+              >
+                <span aria-hidden className="text-lg">💼</span>
+                <span>
+                  Faire mon service
+                  <span className="block font-semibold">+{money(SALARIES[life.job])}</span>
+                </span>
+              </button>
+            )}
             {!insideAny && !riding && (
               <button
                 type="button"
@@ -2837,21 +2901,44 @@ export function LomeLifeImmersive() {
                         </span>
                       </button>
                     ))}
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm">
+                      <p className="font-black">
+                        {currentWorkStatus === 'done'
+                          ? '✅ Service payé aujourd’hui'
+                          : currentWorkStatus === 'closed'
+                            ? '🌙 Service fermé · ouverture à 7 h'
+                            : currentWorkStatus === 'tired'
+                              ? '😴 Trop fatigué pour commencer'
+                              : currentWorkStatus === 'hungry'
+                                ? '🍲 Mange avant ton service'
+                                : currentWorkStatus === 'away'
+                                  ? '📍 Rejoins ton lieu de travail'
+                                  : '💼 Tu es sur place · service prêt'}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-600">
+                        Métier : {TOGO_JOBS[life.job].label} · salaire {money(SALARIES[life.job])}
+                      </p>
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <ActionButton
-                        title="Aller travailler"
-                        onClick={() => {
-                          const target = LIFE_LOCATIONS.find(
-                            (loc) => loc.venue === jobVenue(life.job),
-                          )
-                          if (target) go(target.x, target.y)
-                        }}
-                      />
-                      <ActionButton
-                        title="Faire mon service"
-                        outline
-                        onClick={() => action('work')}
-                      />
+                      {currentWorkStatus === 'closed' && (
+                        <ActionButton title="Se reposer jusqu’à 7 h" onClick={waitForWork} />
+                      )}
+                      {currentWorkStatus === 'away' && (
+                        <ActionButton title="Aller au travail" onClick={goToWork} />
+                      )}
+                      {currentWorkStatus === 'ready' && (
+                        <ActionButton
+                          title={`Faire le service · +${money(SALARIES[life.job])}`}
+                          onClick={() => action('work')}
+                        />
+                      )}
+                      {(currentWorkStatus === 'tired' || currentWorkStatus === 'hungry') && (
+                        <ActionButton
+                          title="Pause et collation · 1 h"
+                          onClick={prepareWorkNeeds}
+                        />
+                      )}
+                      <ActionButton title="Fermer" outline onClick={() => setPanel(null)} />
                     </div>
                     <div className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-4">
                       <p className="text-sm font-black">Au volant : payé à la course</p>
@@ -2887,11 +2974,10 @@ export function LomeLifeImmersive() {
                           </span>
                         </button>
                       ))}
-                      {cityLife.duty && !cityLife.vehicle && (
-                        <p className="text-xs text-slate-600">
-                          Ton véhicule t’attend à Lomé, devant ta concession.
-                        </p>
-                      )}
+                      <p className="text-xs text-slate-600">
+                        En commençant, un véhicule de service est garé sur la route la plus proche
+                        et ton personnage s’y rend automatiquement.
+                      </p>
                     </div>
                     <DailyStatus life={life} />
                   </>
@@ -3132,7 +3218,10 @@ export function LomeLifeImmersive() {
                       </div>
                     ))}
                     <div className="grid grid-cols-2 gap-2">
-                      <ActionButton title="Aller au marché" onClick={() => go(12, 11)} />
+                      <ActionButton
+                        title={life.spent < 650 ? 'Aller au marché' : 'Continuer mon travail'}
+                        onClick={() => (life.spent < 650 ? go(12, 11) : open('jobs'))}
+                      />
                       <ActionButton title="Voir les métiers" outline onClick={() => open('jobs')} />
                       {actor && (
                         <ActionButton

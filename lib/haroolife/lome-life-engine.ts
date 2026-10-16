@@ -238,6 +238,17 @@ function nearVenue(state: LifeState, venue: Venue): boolean {
   if (state.inside === venue) return true
   return state.city.buildings.some((b) => b.type === venue && manhattan(b, state.pos) === 1)
 }
+export type WorkStatus = 'done' | 'closed' | 'tired' | 'hungry' | 'away' | 'ready'
+
+/** One source of truth for the job screen, the street prompt and the payment rule. */
+export function workStatus(state: LifeState): WorkStatus {
+  if (state.workToday) return 'done'
+  if (state.hour < 7 || state.hour >= 19) return 'closed'
+  if (state.needs.energy < 16) return 'tired'
+  if (state.needs.hunger < 12) return 'hungry'
+  if (!nearVenue(state, jobVenue(state.job))) return 'away'
+  return 'ready'
+}
 export const isVenue = (t: string): t is Venue => venues.has(t as Venue)
 /**
  * Enter an estate building chosen by the interaction resolver (which measured the continuous
@@ -277,14 +288,13 @@ export function interact(state: LifeState, action: Action): LifeState {
     )
   }
   if (action === 'work') {
-    if (state.workToday) return events(state, 'Tu as déjà effectué ton service aujourd’hui.')
-    if (state.hour < 7 || state.hour >= 19)
-      return events(state, 'Les emplois sont accessibles entre 7 h et 19 h.')
-    const venue = jobVenue(state.job)
-    if (!nearVenue(state, venue))
-      return events(state, 'Rejoins d’abord ton lieu de travail : ' + venue + '.')
-    if (state.needs.energy < 16 || state.needs.hunger < 12)
-      return events(state, 'Mange ou repose-toi avant de travailler.')
+    const status = workStatus(state)
+    if (status === 'done') return events(state, 'Tu as déjà effectué ton service aujourd’hui.')
+    if (status === 'closed') return events(state, 'Les emplois sont accessibles entre 7 h et 19 h.')
+    if (status === 'tired') return events(state, 'Repose-toi avant de travailler.')
+    if (status === 'hungry') return events(state, 'Mange avant de travailler.')
+    if (status === 'away')
+      return events(state, `Rejoins d’abord ton lieu de travail : ${jobVenue(state.job)}.`)
     const salary = SALARIES[state.job]
     if (state.city.coins < salary)
       return events(state, 'La caisse municipale ne peut pas verser le salaire fictif.')
@@ -410,6 +420,45 @@ export function advanceLifeHour(state: LifeState): LifeState {
   if (drawn)
     next = events({ ...next, pendingEvent: drawn }, 'Il se passe quelque chose dans le quartier…')
   return next
+}
+
+/** Let the player recover until the next opening instead of being stranded by a closed shift. */
+export function waitForNextWorkShift(state: LifeState): LifeState {
+  if (state.hour >= 7 && state.hour < 19) return state
+  let next = state
+  let elapsed = 0
+  while ((next.hour < 7 || next.hour >= 19) && elapsed < 24) {
+    next = advanceLifeHour(next)
+    elapsed++
+  }
+  return events(
+    {
+      ...next,
+      needs: {
+        ...next.needs,
+        energy: Math.max(65, next.needs.energy),
+        hunger: Math.max(35, next.needs.hunger),
+        hygiene: Math.max(45, next.needs.hygiene),
+      },
+    },
+    `Il est ${next.hour} h : repos et collation terminés, le service peut commencer.`,
+  )
+}
+
+/** Prevent a no-money/no-energy deadlock: the workplace offers a short recovery break. */
+export function prepareForWork(state: LifeState): LifeState {
+  const next = advanceLifeHour(state)
+  return events(
+    {
+      ...next,
+      needs: {
+        ...next.needs,
+        energy: Math.max(45, next.needs.energy),
+        hunger: Math.max(25, next.needs.hunger),
+      },
+    },
+    'Pause et collation de service terminées. Tu peux aller travailler.',
+  )
 }
 export function buildInLome(state: LifeState, x: number, y: number, type: BuildType): LifeState {
   if (state.inside) return events(state, 'Sors du bâtiment pour construire.')

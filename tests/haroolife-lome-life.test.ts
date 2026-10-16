@@ -11,8 +11,11 @@ import {
   initialLomeLife,
   interact,
   jobVenue,
+  prepareForWork,
   selectJob,
   simulatedTraffic,
+  waitForNextWorkShift,
+  workStatus,
 } from '../lib/haroolife/lome-life-engine'
 import { roadNetwork } from '../lib/haroolife/townsmen-engine'
 import {
@@ -85,6 +88,30 @@ test('jobs pay once a day only near workplace with municipal funds', () => {
   assert.equal(jobVenue('livreur'), 'market')
   assert.equal(jobVenue('conducteur-tricycle'), 'hall')
   assert.equal(selectJob(paid, 'vendeur-mobile-money').job, 'vendeur-mobile-money')
+})
+test('a closed shift can advance to opening and exposes a clear ready state', () => {
+  const night = { ...initialLomeLife(), hour: 21, needs: { ...initialLomeLife().needs, energy: 20 } }
+  assert.equal(workStatus(night), 'closed')
+  const morning = waitForNextWorkShift(night)
+  assert.equal(morning.hour, 7)
+  assert.equal(morning.day, night.day + 1)
+  assert.ok(morning.needs.energy >= 65)
+  assert.equal(morning.wallet, night.wallet)
+  assert.equal(workStatus(morning), 'away')
+})
+test('the service break removes an energy or hunger deadlock without changing money', () => {
+  const weak = {
+    ...initialLomeLife(),
+    hour: 10,
+    needs: { ...initialLomeLife().needs, energy: 2, hunger: 1 },
+  }
+  assert.equal(workStatus(weak), 'tired')
+  const readyToTravel = prepareForWork(weak)
+  assert.equal(readyToTravel.hour, 11)
+  assert.ok(readyToTravel.needs.energy >= 45)
+  assert.ok(readyToTravel.needs.hunger >= 25)
+  assert.equal(readyToTravel.wallet, weak.wallet)
+  assert.equal(workStatus(readyToTravel), 'away')
 })
 test('construction preserves city budget and personal savings', () => {
   const s = initialLomeLife()
