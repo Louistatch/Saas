@@ -513,3 +513,67 @@ test('debate of the day: a vote is posted in the Togo room for everyone', async 
   expect(ama.errors).toEqual([])
   await ama.context.close()
 })
+
+test('the game follows the player to another phone, and a hand-raised wallet is capped', async ({
+  browser,
+}, testInfo) => {
+  test.setTimeout(180_000)
+  test.skip(/mobile/.test(testInfo.project.name), 'opens its own desktop contexts')
+  type Cloud = { status: string; version: number | null; capped: number }
+  const cloudOf = (page: Page) =>
+    page.evaluate(() => (window as unknown as { __LOME_CLOUD?: Cloud }).__LOME_CLOUD ?? null)
+  const save = (page: Page) =>
+    page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem('haroolife.lome-city.v1') || 'null') as {
+          life: { wallet: number; events: string[] }
+        } | null,
+    )
+  const open = async (page: Page) => {
+    await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
+    await expect(page.locator('canvas:visible').first()).toBeVisible({ timeout: 30000 })
+    await expect.poll(async () => (await cloudOf(page))?.status, { timeout: 20000 }).toBe('saved')
+  }
+  // Phone 1: Yawa plays, her game is saved online.
+  const one = await signIn(browser, 'yawa', devices['Desktop Chrome'])
+  await open(one.page)
+  // A recognisable state: a few hundred francs more (within what can be earned), saved.
+  const mark = 1000 + (Date.now() % 900)
+  // Edited from a light page of the site: leaving the game writes its own save on the way out.
+  await one.page.goto('/robots.txt')
+  await one.page.evaluate((extra) => {
+    const s = JSON.parse(localStorage.getItem('haroolife.lome-city.v1') || 'null')
+    s.life.wallet += extra
+    localStorage.setItem('haroolife.lome-city.v1', JSON.stringify(s))
+  }, mark)
+  const expected = (await save(one.page))?.life.wallet ?? 0
+  await open(one.page)
+  await expect.poll(async () => (await save(one.page))?.life.wallet).toBe(expected)
+  const saved = (await cloudOf(one.page))?.version ?? 0
+  expect(saved).toBeGreaterThan(0)
+
+  // Phone 2, never used by Yawa: it opens her online game, not a new one.
+  const two = await signIn(browser, 'yawa', devices['Pixel 7'])
+  await open(two.page)
+  await expect.poll(async () => (await save(two.page))?.life.wallet).toBe(expected)
+
+  // Phone 1 is put away (still open, it would keep saving a newer game, which would rightly win).
+  expect(one.errors).toEqual([])
+  await one.context.close()
+  // A wallet raised by hand on phone 2 is brought back to what the server recognises.
+  await two.page.goto('/robots.txt')
+  await two.page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem('haroolife.lome-city.v1') || 'null')
+    s.life.wallet = 9_999_999
+    localStorage.setItem('haroolife.lome-city.v1', JSON.stringify(s))
+  })
+  await open(two.page)
+  await expect
+    .poll(async () => (await save(two.page))?.life.wallet ?? 0, { timeout: 20000 })
+    .toBeLessThan(expected + 20000 + 6000 * 5)
+  // The server said so: the wallet was capped (the player is told in a notice).
+  expect((await cloudOf(two.page))?.capped).toBeGreaterThan(0)
+
+  expect(two.errors).toEqual([])
+  await two.context.close()
+})

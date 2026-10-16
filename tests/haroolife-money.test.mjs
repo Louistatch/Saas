@@ -44,11 +44,14 @@ test('argent du jeu : envoi, idempotence, plafonds, blocage, encaissement unique
     '20261013_120000_haroolife_realtime_chat',
     '20261015_130000_haroolife_chat_dm',
     '20261015_150000_haroolife_money',
+    '20261016_120000_haroolife_saves',
   ])
     await sql(readFileSync(`supabase/migrations/${f}.sql`, 'utf8'))
 
-  // Ama envoie 1 500 FCFA à Yawa ; le même envoi rejoué ne compte qu'une fois.
+  // Ama a sa partie en ligne (100 000 FCFA) : l'envoi est contrôlé sur ce solde.
   await as(1)
+  await one('SELECT haroolife_save_put($1,0)', [{ v: 1, life: { wallet: 100000 } }])
+  // Ama envoie 1 500 FCFA à Yawa ; le même envoi rejoué ne compte qu'une fois.
   const sentOnce = await send(keyOf(2), 1500, 100, '  pour le   zém  ')
   assert.equal(sentOnce.amount, 1500)
   assert.deepEqual(sentOnce.to, { key: keyOf(2), name: 'Yawa', pagne: 7 })

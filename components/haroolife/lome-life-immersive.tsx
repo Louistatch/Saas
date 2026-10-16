@@ -202,6 +202,7 @@ import { PAGNES } from './pagnes'
 import { PhoneDevice } from './phone-device'
 import { HomeDialog } from './residence-dialog'
 import { sayOnPlace, usePresence } from './use-presence'
+import { useCloudSave } from './use-cloud-save'
 import { useRealtime } from './use-realtime'
 
 const CityWorld = dynamic(() => import('./city/city-world'), {
@@ -585,6 +586,17 @@ export function LomeLifeImmersive() {
     },
   ])
   const [notice, setNotice] = useState<string | null>(null)
+  // The game saved online (another phone, a cleared browser), the wallet capped by the server.
+  const cloud = useCloudSave({
+    loaded,
+    cityLife,
+    adopt: (world) => {
+      setCityLife(world)
+      if (world.at.x !== cityLifeRef.current.at.x || world.at.y !== cityLifeRef.current.at.y)
+        setCamera(CAMERA_HOME(world.at.x, world.at.y))
+    },
+    notify: setNotice,
+  })
   // The door in reach of the avatar (single resolver, continuous position, hysteresis).
   const [door, setDoor] = useState<InteractionTarget | null>(null)
   const doorRef = useRef<InteractionTarget | null>(null)
@@ -1304,6 +1316,8 @@ export function LomeLifeImmersive() {
     }
     giftClient.current ??= uuid()
     setGift((g) => ({ ...g, busy: true }))
+    // The server checks the wallet it knows: save the latest game first.
+    await cloud.flush()
     const r = await sendMoney(key, amount, gift.note, giftClient.current)
     setGift((g) => ({ ...g, busy: false }))
     if ('error' in r) {

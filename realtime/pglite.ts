@@ -65,6 +65,8 @@ const LOCAL_RPC: Record<string, string[]> = {
   haroolife_chat_send: ['p_room', 'p_body', 'p_client_id'],
   haroolife_money_send: ['p_key', 'p_amount', 'p_note', 'p_client_id'],
   haroolife_money_claim: [],
+  haroolife_save_get: [],
+  haroolife_save_put: ['p_save', 'p_version'],
 }
 
 export type LocalChat = ChatRepository & {
