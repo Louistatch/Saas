@@ -38,7 +38,10 @@ export async function sendMoney(
     const known = /Montant|Plafond|introuvable|non autorisé|maison|Connexion/.exec(error.message)
     return { error: known ? error.message : 'Envoi impossible : vérifie ta connexion.' }
   }
-  const r = data as { amount: number; to: Peer }
+  const r = data as { amount: number; to: Peer; duplicate?: boolean }
+  // The recipient's phone is told (lib/push/server.ts), once: a replayed send queued nothing.
+  if (!r.duplicate)
+    void fetch('/api/push/dispatch', { method: 'POST', keepalive: true }).catch(() => {})
   return { amount: r.amount, to: r.to }
 }
 

@@ -62,6 +62,8 @@ export function useInvites({
         if (!error && r) {
           if (r.ok) {
             forget()
+            // The friend who invited is told on their phone (lib/push/server.ts).
+            void fetch('/api/push/dispatch', { method: 'POST', keepalive: true }).catch(() => {})
             give.current(
               r.bonus,
               `Bienvenue ! ${r.inviter} t’a invité : +${r.bonus.toLocaleString('fr-FR')} FCFA de jeu.`,

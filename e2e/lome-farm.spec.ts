@@ -1,3 +1,4 @@
+import { initialCityLife } from '../lib/haroolife/city/life'
 import { expect, test } from './lome-test'
 
 /**
@@ -79,5 +80,32 @@ test('my field: sow in season, tend, harvest and sell at the real market price',
   await expect(farm.locator('output')).toContainText(`Vendu : ${kg} kg de maïs à 143 FCFA le kg`)
   await expect(farm.getByRole('region', { name: 'Ma récolte' })).toHaveCount(0)
   await page.screenshot({ path: testInfo.outputPath('farm-sold.png') })
+  expect(errors).toEqual([])
+})
+
+test('my field: the game says when it is ripe', async ({ page }, info) => {
+  test.setTimeout(150_000)
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  // Sown on day 2 (4 days for maize), late on day 5: ripe when day 6 begins.
+  const save = initialCityLife()
+  save.life.day = 5
+  save.life.hour = 23
+  save.farm = {
+    field: { locality: 'lome', crop: 'mais', sownDay: 2, tended: 2, lastTendDay: 3 },
+    stock: {},
+  }
+  await page.addInitScript((save) => {
+    if (sessionStorage.getItem('farm.ripe-seeded')) return
+    sessionStorage.setItem('farm.ripe-seeded', '1')
+    localStorage.setItem('haroolife.lome-city.v1', JSON.stringify(save))
+  }, save)
+  await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
+  await expect(page.locator('canvas:visible').first()).toBeVisible({ timeout: 30000 })
+  await page.getByRole('button', { name: 'Faire avancer le temps' }).click()
+  await expect(page.getByText('Ton maïs est mûr : récolte-le dans Mon champ.').first()).toBeVisible(
+    { timeout: 90000 },
+  )
+  await page.screenshot({ path: info.outputPath('farm-ripe.png') })
   expect(errors).toEqual([])
 })

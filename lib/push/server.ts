@@ -72,7 +72,11 @@ export async function dispatchPendingEvents(): Promise<{ events: number; sent: n
     sent += await sendTo(admin, subs ?? [], payload)
   }
   const dm = await dispatchHarooLifeMessages(admin)
-  return { events: (events?.length ?? 0) + dm.events, sent: sent + dm.sent }
+  const game = await dispatchHarooLifeAlerts(admin)
+  return {
+    events: (events?.length ?? 0) + dm.events + game.events,
+    sent: sent + dm.sent + game.sent,
+  }
 }
 
 interface DmPush {
@@ -149,6 +153,51 @@ async function dispatchHarooLifeMessages(
         body: item.body,
         link: '/messages',
         tag: `haroolife.dm:${item.recipient_id}`,
+      }),
+    )
+  }
+  return { events: pending.length, sent }
+}
+
+interface GamePush {
+  id: number
+  recipient_id: string
+  kind: 'money' | 'invite'
+  title: string
+  body: string
+}
+
+/**
+ * Alertes HarooLife hors du jeu : argent du jeu reçu, ami arrivé par le lien d'invitation, vers
+ * les appareils du seul destinataire. Réservées avant l'envoi (une seule expédition). Sans la
+ * file en base (migration non appliquée), ne fait rien.
+ */
+async function dispatchHarooLifeAlerts(
+  admin: ReturnType<typeof createAdminClient>,
+): Promise<{ events: number; sent: number }> {
+  const { data: pending, error } = await admin
+    .from('haroolife_push')
+    .update({ dispatched_at: new Date().toISOString() })
+    .is('dispatched_at', null)
+    .select('id, recipient_id, kind, title, body')
+    .returns<GamePush[]>()
+  if (error || !pending?.length) return { events: 0, sent: 0 }
+  let sent = 0
+  for (const item of pending) {
+    const { data: subs } = await admin
+      .from('push_subscriptions')
+      .select('id, user_id, endpoint, p256dh, auth, failures')
+      .eq('user_id', item.recipient_id)
+      .returns<Subscription[]>()
+    if (!subs?.length) continue
+    sent += await sendTo(
+      admin,
+      subs,
+      JSON.stringify({
+        title: item.title,
+        body: item.body,
+        link: '/haroolife',
+        tag: `haroolife.${item.kind}:${item.id}`,
       }),
     )
   }

@@ -209,6 +209,8 @@ import InvitePanel from './invite-panel'
 import PayBubbles, { usePayBubbles } from './pay-bubbles'
 import PhotoPanel from './photo-panel'
 import Timetable from './timetable'
+import { CROPS, fieldStatus } from '@/lib/haroolife/city/farm'
+import { alertIfAway } from '@/lib/haroolife/local-alert'
 import { PhoneDevice } from './phone-device'
 import { HomeDialog } from './residence-dialog'
 import { sayOnPlace, usePresence } from './use-presence'
@@ -919,6 +921,19 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     },
   ]
   const completion = missions.filter((m) => m.done).length
+  // « Mon champ » is ripe: said in the game, and on the phone when the player is in another app.
+  const ripe = fieldStatus(cityLife)
+  const ripeCrop = ripe.kind === 'ready' ? ripe.field.crop : null
+  const wasRipe = useRef(ripeCrop)
+  useEffect(() => {
+    const before = wasRipe.current
+    wasRipe.current = ripeCrop
+    if (!ripeCrop || before) return
+    const c = CROPS[ripeCrop]
+    const msg = `${c.icon} Ton ${c.name.toLowerCase()} est mûr : récolte-le dans Mon champ.`
+    say(msg)
+    void alertIfAway('Ton champ est mûr', msg, 'haroolife.farm')
+  }, [ripeCrop])
 
   useEffect(() => {
     try {
@@ -1567,6 +1582,13 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     controller.camera.follow = true
     setCityLife((old) => goToEstate(old, x, y))
   }
+  /** A message in the game's own line (the status strip and the journal), sheet open or not. */
+  function say(msg: string) {
+    setCityLife((old) => ({
+      ...old,
+      life: { ...old.life, lastEvent: msg, events: [msg, ...old.life.events].slice(0, 8) },
+    }))
+  }
   /** The workplace of a job (the player's quarter in Lomé), or null when away from Lomé. */
   const workplace = (job: Career) =>
     LOCALITIES[cityLife.locality].estate
@@ -1576,7 +1598,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     const target = workplace(job)
     if (!target) {
       setPanel(null)
-      setNotice(
+      say(
         `Ton poste (${VENUE_LABELS[jobVenue(job)]}) est dans ton quartier de Lomé : prends le car pour y retourner.`,
       )
       return
@@ -1590,7 +1612,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     goToWork(job)
     if (!target) return
     const open = life.hour >= 7 && life.hour < 19
-    setNotice(
+    say(
       `${TOGO_JOBS[job].icon} ${TOGO_JOBS[job].label} : en route vers ${target.name}. ` +
         (life.workToday
           ? 'Ton service d’aujourd’hui est déjà payé : reviens demain.'
@@ -1619,10 +1641,9 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
       setNotice('Ton terrain est dans ton quartier de Lomé : prends le car pour y construire.')
       return
     }
-    const next = buildNearPlayer(life, b)
-    setLife(next)
+    // The result (built, or why not) is the engine's message, shown in the status strip.
+    setLife((old) => buildNearPlayer(old, b))
     setPanel(null)
-    setNotice(next.lastEvent)
   }
   function waitForWork() {
     setLife((old) => waitForNextWorkShift(old))
