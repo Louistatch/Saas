@@ -24,6 +24,9 @@ export default function HarooStreetView(props: {
   avatarPagne?: string
   estate: readonly Building[]
   pixelRatio: number
+  /** From the quality preset: shadow refresh and multisampling. */
+  shadows?: 'full' | 'throttled' | 'off'
+  antialias?: boolean
   /** Town on screen (billboard supports are per town). */
   locality: string
   /** Street billboards (campaigns, exposure, nearby support); null when switched off. */
@@ -54,6 +57,7 @@ export default function HarooStreetView(props: {
   live.current = props
 
   const { controller, avatarModel, avatarPagne, pixelRatio, estate, locality, remoteFeed } = props
+  const { shadows, antialias } = props
   const { ads, remotePresent, light, fare } = props
   // biome-ignore lint/correctness/useExhaustiveDependencies: the estate is pushed below without remounting
   useEffect(() => {
@@ -69,6 +73,8 @@ export default function HarooStreetView(props: {
       pagne: avatarPagne,
       estate: live.current.estate,
       pixelRatio,
+      shadows,
+      antialias,
       locality,
       ads: live.current.ads ?? null,
       remote: remoteFeed ? { feed: remoteFeed, present: live.current.remotePresent ?? [] } : null,
@@ -93,7 +99,7 @@ export default function HarooStreetView(props: {
       world.current = null
       w.dispose()
     }
-  }, [controller, avatarModel, avatarPagne, pixelRatio, locality, remoteFeed])
+  }, [controller, avatarModel, avatarPagne, pixelRatio, shadows, antialias, locality, remoteFeed])
   useEffect(() => {
     if (state === 'ready') world.current?.setEstate(estate)
   }, [estate, state])

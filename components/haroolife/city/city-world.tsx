@@ -8,7 +8,7 @@ import type { Interior } from '@/lib/haroolife/city/life'
 import { LOCALITIES, type LocalityId } from '@/lib/haroolife/city/locality'
 import { bump } from '@/lib/haroolife/city/perf'
 import type { InputState, PlayerController } from '@/lib/haroolife/city/player'
-import { type Quality, renderPixelRatio } from '@/lib/haroolife/city/quality'
+import { PRESETS, type Quality, renderPixelRatio } from '@/lib/haroolife/city/quality'
 import { type Category, ESTATE, type Lot, inEstate, lotById } from '@/lib/haroolife/city/world'
 import type { RendererId } from '@/lib/haroolife/engine/types'
 import type {
@@ -268,6 +268,8 @@ export default function CityWorld({
             avatarPagne={avatarPagne}
             estate={hasEstate ? city.buildings : []}
             pixelRatio={pixelRatio}
+            shadows={quality === 'eco' ? 'off' : quality === 'balanced' ? 'throttled' : 'full'}
+            antialias={PRESETS[quality].antialias}
             locality={locality}
             ads={ads && ads.campaigns.length > 0 ? ads : null}
             remoteFeed={remoteFeed}

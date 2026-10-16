@@ -176,6 +176,13 @@ export interface StreetWorldOptions {
   remote?: { feed: StreetPoseFeed; present: PresenceEntry[] } | null
   /** The vehicle and the driver's fare (zémidjan or taxi). */
   fare?: StreetFare | null
+  /**
+   * Cast shadows: every frame (high), refreshed one frame in three (balanced: the shadow pass
+   * draws every caster a second time), or none (eco). Default: every frame.
+   */
+  shadows?: 'full' | 'throttled' | 'off'
+  /** Multisampling of the canvas (off in eco). Default: on. */
+  antialias?: boolean
 }
 
 export interface StreetAds {
@@ -273,6 +280,7 @@ export class StreetWorld {
   /** Camera framing factor (1 on foot, wider at the wheel), eased. */
   private framing = 1
   private walkers: Walker[] = []
+  private readonly shadows: 'full' | 'throttled' | 'off'
   private readonly traffic = new RoadTraffic((x, z) => isCityRoad(x, z) || isDriveway(x, z))
   private readonly trafficModels = new Map<number, THREE.Object3D>()
   private readonly trafficMotos: MotoParts[] = []
@@ -304,6 +312,8 @@ export class StreetWorld {
   private last = 0
   private disposed = false
   private frames = 0
+  /** Reused every frame to place the taxi label: no allocation in the loop. */
+  private readonly tagPoint = new THREE.Vector3()
   private statsAt = 0
   /** Frame times and long tasks for `__LOME_PERF` (same snapshot as the PlayCanvas city had). */
   private readonly perf = new PerfProbe()
@@ -364,9 +374,16 @@ export class StreetWorld {
       this.remoteFeed = o.remote.feed
       this.present = o.remote.present
     }
-    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true })
+    this.renderer = new THREE.WebGLRenderer({
+      canvas: this.canvas,
+      antialias: o.antialias ?? true,
+      powerPreference: 'high-performance',
+    })
     this.renderer.setPixelRatio(o.pixelRatio ?? Math.min(window.devicePixelRatio || 1, 1.7))
-    this.renderer.shadowMap.enabled = true
+    this.shadows = o.shadows ?? 'full'
+    this.renderer.shadowMap.enabled = this.shadows !== 'off'
+    // Throttled: the shadow map is redrawn on chosen frames only (see the frame loop).
+    this.renderer.shadowMap.autoUpdate = this.shadows === 'full'
     this.renderer.shadowMap.type = THREE.PCFShadowMap
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
@@ -374,7 +391,7 @@ export class StreetWorld {
     this.scene.name = 'HarooLife rue'
     this.scene.background = new THREE.Color(DAY_SKY)
     this.scene.add(this.hemi)
-    this.sun.castShadow = true
+    this.sun.castShadow = this.shadows !== 'off'
     this.sun.shadow.mapSize.set(1024, 1024)
     Object.assign(this.sun.shadow.camera, { left: -26, right: 26, top: 26, bottom: -26, far: 120 })
     this.sun.shadow.bias = -0.0004
@@ -1280,7 +1297,7 @@ export class StreetWorld {
     this.stepHail(dt)
     this.stepRemotes(dt)
     this.updateCamera()
-    const p = new THREE.Vector3()
+    const p = this.tagPoint
     if (this.carTag && this.car) {
       p.copy(this.car.position)
       p.y += this.moto ? this.moto.seat + 0.3 : FIGURE + 0.3
@@ -1346,6 +1363,8 @@ export class StreetWorld {
       r.tag.style.visibility =
         r.person.root.visible && p.z < 1 && x > 0 && x < this.width && y > 40 ? 'visible' : 'hidden'
     }
+    if (this.shadows === 'throttled' && this.frames % 3 === 0)
+      this.renderer.shadowMap.needsUpdate = true
     this.renderer.render(this.scene, this.camera)
     this.frames++
     if (now - this.statsAt >= 500) {
