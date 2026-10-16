@@ -14,7 +14,7 @@ const keyOf = (n) =>
     .digest('hex')
     .slice(0, 16)
 const dm = (a, b) => `dm:${[keyOf(a), keyOf(b)].sort().join(':')}`
-const db = new PGlite()
+let db
 const sql = (s) => db.exec(s)
 /** Signed in as n; `visitor`: the token carries is_anonymous, as Supabase's does. */
 const as = (n, visitor = false) =>
@@ -25,7 +25,9 @@ const one = async (s, args) => Object.values((await db.query(s, args)).rows[0])[
 let c = 1000
 const send = (room, body) => one('SELECT haroolife_chat_send($1,$2,$3)', [room, body, id(c++)])
 
-test('visiteur : lit, n’écrit pas, n’envoie pas d’argent ; écrit une fois sa partie gardée', async (t) => {
+// Avec la sauvegarde en ligne (main) et sans elle (la production tant qu'elle n'y est pas).
+const scenario = (withSaves) => async (t) => {
+  db = new PGlite()
   t.after(() => db.close())
   await sql(`
     CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;
@@ -45,7 +47,7 @@ test('visiteur : lit, n’écrit pas, n’envoie pas d’argent ; écrit une foi
     '20261013_120000_haroolife_realtime_chat',
     '20261015_130000_haroolife_chat_dm',
     '20261015_150000_haroolife_money',
-    '20261016_120000_haroolife_saves',
+    ...(withSaves ? ['20261016_120000_haroolife_saves'] : []),
     '20261016_130000_haroolife_moderation',
     '20261016_140000_haroolife_visitors',
   ])
@@ -68,17 +70,29 @@ test('visiteur : lit, n’écrit pas, n’envoie pas d’argent ; écrit une foi
   // Ni salon ni message privé ni argent.
   await assert.rejects(() => send('locality:lome', 'spam'), /non autorisé/)
   await assert.rejects(() => send(dm(1, 7), 'salut'), /non autorisé/)
-  await one('SELECT haroolife_save_put($1,0)', [{ v: 1, life: { wallet: 8000 } }])
+  if (withSaves) await one('SELECT haroolife_save_put($1,0)', [{ v: 1, life: { wallet: 8000 } }])
   await assert.rejects(
     () => one('SELECT haroolife_money_send($1,$2,$3,$4)', [keyOf(1), 100, null, id(500)]),
     /Garde ta partie/,
   )
   // Sa partie en ligne fonctionne (elle le suivra quand il gardera sa partie).
-  assert.equal((await one('SELECT haroolife_save_get()')).wallet, 8000)
+  if (withSaves) assert.equal((await one('SELECT haroolife_save_get()')).wallet, 8000)
+  await sql('RESET ROLE')
+  assert.equal(
+    (await one('SELECT count(*)::int FROM haroolife_money_transfers')) ?? 0,
+    0,
+    'aucun virement du visiteur',
+  )
 
   // Partie gardée avec un e-mail : même compte, il n'est plus visiteur, il écrit.
   await as(7, false)
   assert.equal((await one('SELECT haroolife_chat_me()')).can_write, true)
   await send('locality:lome', 'Merci, je reste !')
   await one('SELECT haroolife_money_send($1,$2,$3,$4)', [keyOf(1), 100, null, id(501)])
-})
+}
+
+test(
+  'visiteur : lit, n’écrit pas, n’envoie pas d’argent ; écrit une fois sa partie gardée',
+  scenario(true),
+)
+test('visiteur, sans la sauvegarde en ligne (production actuelle) : mêmes règles', scenario(false))
