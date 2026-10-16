@@ -12,7 +12,7 @@
 import type { Layout, Npc, Prop, PropKind, animFor } from '@/lib/haroolife/city/interiors'
 import { type ShapePart, footprintOf, shapeOf } from '@/lib/haroolife/city/prop-shapes'
 import { HOUSE_SCENE as HOUSE_DATA } from './house'
-import { type Bounds, type Obstacle, type Point, isFree } from './pathfind'
+import { type Bounds, type Obstacle, type Point, isFree, pathfind } from './pathfind'
 
 /** Layout units → scene units (Saas rooms were drawn for figures about 0.9 unit tall). */
 export const LAYOUT_SCALE = 1.6
@@ -185,6 +185,14 @@ const ACTION_ICON: Record<string, string> = {
   wash: '🚿',
   toilet: '🚽',
   'buy-meal': '🛒',
+  browse: '🧺',
+  fuel: '⛽',
+  maintain: '🔧',
+  police: '👮🏿',
+  bank: '💳',
+  learn: '📚',
+  coop: '🤝',
+  offers: '🌾',
   workout: '🏋️',
   run: '🏃',
   pray: '🙏',
@@ -343,13 +351,41 @@ export function sceneFromLayout(id: string, layout: Layout, s = LAYOUT_SCALE): R
   }
   for (const n of layout.npcs) {
     const others = obstacles.filter((o) => o.id !== `npc:${n.id}`)
-    const at = approachSpot(
+    let at = approachSpot(
       { x: n.x * s, z: n.z * s, rot: ((n.rot ?? 0) * Math.PI) / 180, hx: 0.3, hz: 0.3 },
       others,
       bounds,
       spawn,
       0.5,
     )
+    const reachable = (p: Point | null): p is Point =>
+      !!p &&
+      isFree(p.x, p.z, obstacles, bounds) &&
+      (pathfind(spawn, p, obstacles, bounds).length > 0 ||
+        Math.hypot(p.x - spawn.x, p.z - spawn.z) < 0.5)
+    // A patient on a bed or a clerk behind a counter must be approachable from its edge.
+    if (!reachable(at)) {
+      at = null
+      search: for (const radius of [0.8, 1.2, 1.6, 2, 2.5]) {
+        for (const offset of [
+          0,
+          Math.PI / 2,
+          -Math.PI / 2,
+          Math.PI,
+          Math.PI / 4,
+          -Math.PI / 4,
+          (Math.PI * 3) / 4,
+          (-Math.PI * 3) / 4,
+        ]) {
+          const yaw = ((n.rot ?? 0) * Math.PI) / 180 + offset
+          const p = { x: n.x * s + Math.sin(yaw) * radius, z: n.z * s + Math.cos(yaw) * radius }
+          if (reachable(p)) {
+            at = p
+            break search
+          }
+        }
+      }
+    }
     if (!at) continue
     hotspots.push({
       id: `npc:${n.id}`,
@@ -407,11 +443,8 @@ export function sceneFromLayout(id: string, layout: Layout, s = LAYOUT_SCALE): R
     rugs: [],
     plants: [],
     door: { x: spawn.x, z: d / 2 },
-    // Bigger than the house: follow the player at (about) the house's zoom.
-    view:
-      k > 1.15
-        ? { height: 6.4, width: 7.4, follow: true }
-        : { height: 7.7 * k, width: 8.8 * k, follow: false },
+    // Public rooms open in overview: the counter and residents must be discoverable on a phone.
+    view: { height: 7.7 * k, width: 8.8 * k, follow: false },
     onDevice,
     palette: {
       ...HOUSE_SCENE.palette,
@@ -426,5 +459,5 @@ export function sceneFromLayout(id: string, layout: Layout, s = LAYOUT_SCALE): R
 
 /** The scene of an interior: the prototype's house, or the converted Saas layout. */
 export function sceneFor(id: string, layout: Layout): RoomScene {
-  return id === 'house' ? HOUSE_SCENE : sceneFromLayout(id, layout)
+  return id === 'house' && !layout.cityType ? HOUSE_SCENE : sceneFromLayout(id, layout)
 }

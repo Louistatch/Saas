@@ -174,6 +174,16 @@ export function shapeOf(kind: PropKind): ShapePart[] {
       ]
     case 'desk':
       return [model('desk', [0, 0.1, 0], 1.2), model('laptop', [0.2, 0.9, 0], 0.8)]
+    case 'fuel-pump':
+      return [
+        box([0, 0.12, 0], [0.85, 0.24, 0.65], 'steel'),
+        box([0, 0.65, 0], [0.65, 0.9, 0.48], 'green'),
+        box([0, 1.25, 0], [0.78, 0.4, 0.5], 'white'),
+        box([0, 1.26, 0.26], [0.5, 0.18, 0.04], 'dark'),
+        box([0.48, 0.85, 0], [0.06, 0.8, 0.06], 'black'),
+        box([0.4, 0.45, 0], [0.22, 0.06, 0.06], 'black'),
+        box([0.38, 1.15, 0], [0.16, 0.28, 0.07], 'steel'),
+      ]
     case 'counter':
       return [
         box([0, 0.5, 0], [5.6, 1.0, 0.8], 'wood'),

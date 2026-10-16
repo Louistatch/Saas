@@ -5,8 +5,11 @@
  * prop triggers. Pure data, so tests can check that a gym really has treadmills.
  */
 import type { Interior } from './life'
+import { actionsFor } from './activities'
+import type { Lot } from './world'
 
 export type PropKind =
+  | 'fuel-pump'
   | 'treadmill'
   | 'bench-press'
   | 'dumbbell-rack'
@@ -79,6 +82,8 @@ export interface Npc {
   to?: { x: number; z: number }
 }
 export interface Layout {
+  /** City rooms use their own furniture actions; the prototype home remains unchanged. */
+  cityType?: string
   name: string
   /** Room size (scene units). */
   w: number
@@ -669,13 +674,161 @@ const LAYOUTS: Record<Interior, Layout> = {
   house: HOUSE,
   market: MARKET,
   bakery: { ...MARKET, name: 'Boulangerie', wall: '#b07a3b' },
-  hall: HALL,
-  well: { ...PARK, name: 'Puits', props: PARK.props.filter((p) => p.kind !== 'stall') },
+  hall: {
+    ...HALL,
+    props: [
+      ...HALL.props.map(
+        (p): Prop =>
+          p.action === 'work-city' || p.action === 'learn'
+            ? { ...p, action: undefined, label: undefined, hint: undefined }
+            : p,
+      ),
+      {
+        id: 'toilet',
+        kind: 'toilet',
+        x: -4.1,
+        z: 1.5,
+        rot: 90,
+        action: 'toilet',
+        label: 'Toilettes',
+        hint: 'Vessie 100',
+      },
+    ],
+  },
+  well: {
+    ...PARK,
+    name: 'Puits',
+    props: PARK.props
+      .filter((p) => p.kind !== 'stall')
+      .map(
+        (p): Prop =>
+          p.id === 'fountain'
+            ? { ...p, action: 'wash', label: 'Se laver au puits', hint: 'Hygiène 100' }
+            : { ...p, action: undefined, label: undefined, hint: undefined },
+      ),
+  },
   chapel: CHAPEL,
   clinic: CLINIC,
-  park: PARK,
+  park: {
+    ...PARK,
+    props: PARK.props.map(
+      (p): Prop =>
+        p.kind === 'stall'
+          ? {
+              ...p,
+              action: 'browse',
+              label: 'Choisir mes achats',
+              hint: 'Brochettes, eau et provisions · prix au comptoir',
+            }
+          : p,
+    ),
+  },
 }
-export const layoutFor = (i: Interior): Layout => LAYOUTS[i]
+const cityLayouts = new Map<string, Layout>()
+export function layoutFor(
+  i: Interior,
+  lot?: Pick<Lot, 'type' | 'service'> & Partial<Pick<Lot, 'name'>>,
+): Layout {
+  if (!lot) return LAYOUTS[i]
+  const mosque = lot.type === 'worship' && /mosqu/i.test(lot.name ?? '')
+  const key = `${i}:${lot.type}:${lot.service ?? ''}:${mosque ? 'mosque' : ''}`
+  const cached = cityLayouts.get(key)
+  if (cached) return cached
+  const base = mosque
+    ? {
+        ...LAYOUTS[i],
+        name: 'Mosquée du quartier',
+        wall: '#d8e6dc',
+        props: LAYOUTS[i].props.map(
+          (p): Prop =>
+            ['pew', 'altar'].includes(p.kind)
+              ? { ...p, kind: 'mat', label: p.action ? 'Moment de prière' : undefined }
+              : p,
+        ),
+      }
+    : LAYOUTS[i]
+  const actions = actionsFor(lot.type, lot.service)
+  const allowed = new Set(actions.map((a) => a.id as string))
+  const props = base.props.map((p): Prop => {
+    if (!p.action) return p
+    const action = p.action === 'buy-meal' ? 'browse' : p.action
+    const definition = actions.find((a) => a.id === action)
+    return allowed.has(action)
+      ? { ...p, action, label: definition?.label ?? p.label, hint: definition?.hint ?? p.hint }
+      : { ...p, action: undefined, label: undefined, hint: undefined }
+  })
+  const kinds: Partial<Record<string, PropKind>> = {
+    bank: 'atm',
+    learn: 'desk',
+    coop: 'board',
+    rest: 'bed',
+    'work-city': 'desk',
+    socialize: 'table',
+    train: 'mat',
+    offers: 'board',
+    fuel: 'counter',
+    maintain: 'desk',
+    police: 'reception',
+  }
+  const occupied = new Set<string>()
+  let extraBoards = 0
+  // Give every advertised action an actual walk-to object, using the existing furniture.
+  for (const action of actions) {
+    if (props.some((p) => p.action === action.id)) continue
+    let prop = props.find((p) => !p.action && !occupied.has(p.id) && p.kind === kinds[action.id])
+    prop ??= props.find(
+      (p) =>
+        !p.action &&
+        !occupied.has(p.id) &&
+        ['desk', 'counter', 'board', 'table', 'sofa', 'shelf', 'mat'].includes(p.kind),
+    )
+    if (prop) {
+      const index = props.indexOf(prop)
+      occupied.add(prop.id)
+      props[index] = { ...prop, action: action.id, label: action.label, hint: action.hint }
+    } else {
+      props.push({
+        id: `city-${action.id}`,
+        kind: kinds[action.id] === 'board' ? 'board' : 'sign',
+        x: -1.5 + extraBoards++ * 1.5,
+        z: -base.d / 2 + 0.15,
+        action: action.id,
+        label: action.label,
+        hint: action.hint,
+      })
+    }
+  }
+  const roles: Partial<Record<Lot['type'] | NonNullable<Lot['service']>, string>> = {
+    bank: 'Akossiwa · conseillère du compte de jeu',
+    school: 'Kossi · enseignant',
+    university: 'Kossi · formateur',
+    station: 'Dodzi · responsable de la gare',
+    cooperative: 'Abla · animatrice de coopérative',
+    industry: 'Komi · magasinier',
+    townhall: 'Enyonam · agent communal',
+    fuel: 'Yao · pompiste',
+    garage: 'Komi · mécanicien',
+    police: 'Agent Afi · police du quartier',
+    shop: 'Maman Abla · vendeuse',
+    market: 'Maman Abla · commerçante',
+  }
+  if (lot.service === 'fuel') {
+    const pump = props.find((p) => p.action === 'fuel')
+    if (pump) pump.kind = 'fuel-pump'
+  }
+  const layout: Layout = {
+    ...base,
+    cityType: key,
+    props,
+    npcs: base.npcs.map((n, index) =>
+      index === 0 && roles[lot.service ?? lot.type]
+        ? { ...n, role: roles[lot.service ?? lot.type]! }
+        : n,
+    ),
+  }
+  cityLayouts.set(key, layout)
+  return layout
+}
 /** Activities offered in a room: one entry per labelled prop, in layout order. */
 export const activitiesOf = (l: Layout) =>
   l.props.filter((p): p is Prop & { action: string; label: string } => Boolean(p.action && p.label))

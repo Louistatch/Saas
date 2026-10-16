@@ -8,7 +8,22 @@ import {
   safeHref,
 } from '@/lib/haroolife/ads/campaigns'
 import { ExposureTracker } from '@/lib/haroolife/ads/exposure'
-import { AutomaticDrivingService, type ServiceCustomer } from '@/lib/haroolife/city/automatic-service'
+import ResidentConversation from './resident-conversation'
+import GameMarket from './game-market'
+import { buyEstateMeal } from '@/lib/haroolife/city/commerce'
+import {
+  VEHICLE_RULES,
+  GAME_FUEL_PER_LITRE,
+  vehicleCare,
+  nextVehicleStop,
+  settleVehicleFare,
+  finishVehicleStop,
+  manualVehicleQuote,
+} from '@/lib/haroolife/city/vehicle-economy'
+import {
+  AutomaticDrivingService,
+  type ServiceCustomer,
+} from '@/lib/haroolife/city/automatic-service'
 import {
   AVATAR_CHOSEN_STORAGE,
   AVATAR_MODELS,
@@ -35,12 +50,7 @@ import {
   isStreetCameraMode,
   nextStreetCameraMode,
 } from '@/lib/haroolife/city/camera-modes'
-import {
-  bearingTo,
-  canDrop,
-  completeFare,
-  remaining,
-} from '@/lib/haroolife/city/fares'
+import { bearingTo, canDrop, remaining } from '@/lib/haroolife/city/fares'
 import { CAMERA_HOME, type CameraState, worldPos } from '@/lib/haroolife/city/geometry'
 import {
   type InteractionTarget,
@@ -96,7 +106,7 @@ import {
   CATEGORY_OF,
   type Category,
   type Lot,
-  TYPE_ICONS,
+  lotIcon,
   TYPE_LABELS,
   placeName as cityPlaceName,
   districts,
@@ -371,11 +381,16 @@ export function LomeLifeImmersive() {
   const [nearVehicle, setNearVehicle] = useState(false)
   const [driving, setDriving] = useState(false)
   // Driver's job: the passer-by hailing, the fare on board and its live progress.
-  const automaticService = useMemo(() => new AutomaticDrivingService(controller, {
-    drivable: (x, y) => isCityRoad(x, y) || isDriveway(x, y),
-    places: landmarks,
-    random: Math.random,
-  }), [controller])
+  const automaticService = useMemo(
+    () =>
+      new AutomaticDrivingService(controller, {
+        drivable: (x, y) => isCityRoad(x, y) || isDriveway(x, y),
+        places: landmarks,
+        random: Math.random,
+        nextStop: (kind) => nextVehicleStop(cityLifeRef.current, kind),
+      }),
+    [controller],
+  )
   const [serviceState, setServiceState] = useState(() => automaticService.snapshot())
   const fare = serviceState.fare
   const hail = serviceState.customer?.name ?? null
@@ -535,8 +550,6 @@ export function LomeLifeImmersive() {
   const [jokeN, setJokeN] = useState(today)
   const [debateNote, setDebateNote] = useState('')
   // A conversation with a passer-by of the game (never stored, never sent anywhere).
-  const [npcTalk, setNpcTalk] = useState<{ from: 'me' | 'npc'; text: string }[]>([])
-  const [npcDraft, setNpcDraft] = useState('')
   // The journey between two towns, shown full screen while the arrival town loads.
   const [journey, setJourney] = useState<{
     from: LocalityId
@@ -802,25 +815,31 @@ export function LomeLifeImmersive() {
     }
   }
   const mood = wellbeing >= 75 ? 'Heureux' : wellbeing >= 40 ? 'Bien' : 'Fatigué'
-  const status = driving && cityLife.duty
-    ? fare
-      ? `Trajet automatique vers ${fare.to.name} · ${money(fare.price)} à l’arrivée.`
-      : serviceState.phase === 'pickup'
-        ? `Le véhicule rejoint ${hail} automatiquement.`
-        : serviceState.phase === 'paid'
-          ? `Course payée · gains du service : ${money(serviceState.earned)}.`
-          : 'Recherche automatique du prochain client…'
-    : cityLife.route.length
-    ? 'En chemin vers ' + destinationName + '…'
-    : cityLife.insideLot
-      ? 'À l’intérieur : ' +
-        (lotById(cityLife.insideLot)?.name ??
-          TYPE_LABELS[lotById(cityLife.insideLot)?.type ?? 'lot'])
-      : life.inside
-        ? 'À l’intérieur : ' + (VENUE_LABELS[life.inside] ?? life.inside)
-        : life.lastEvent
+  const status =
+    driving && cityLife.duty
+      ? serviceState.stop
+        ? `${serviceState.phase === 'servicing' ? 'En cours' : 'Arrêt automatique'} : ${serviceState.stop.name}.`
+        : fare
+          ? `Trajet automatique vers ${fare.to.name} · ${money(fare.price)} à l’arrivée.`
+          : serviceState.phase === 'pickup'
+            ? `Le véhicule rejoint ${hail} automatiquement.`
+            : serviceState.phase === 'paid'
+              ? `Course payée · recettes brutes du service : ${money(serviceState.earned)}.`
+              : 'Recherche automatique du prochain client…'
+      : cityLife.route.length
+        ? 'En chemin vers ' + destinationName + '…'
+        : cityLife.insideLot
+          ? 'À l’intérieur : ' +
+            (lotById(cityLife.insideLot)?.name ??
+              TYPE_LABELS[lotById(cityLife.insideLot)?.type ?? 'lot'])
+          : life.inside
+            ? 'À l’intérieur : ' + (VENUE_LABELS[life.inside] ?? life.inside)
+            : life.lastEvent
   const missions = [
-    { done: life.spent >= 650, text: 'Acheter un repas dans un commerce' },
+    {
+      done: (cityLife.commerce?.boughtMeals ?? (life.spent >= 650 ? 1 : 0)) > 0,
+      text: 'Acheter un repas dans un commerce',
+    },
     { done: life.earned > 0, text: 'Effectuer une journée de travail' },
     {
       done: life.city.buildings.length > initialLomeLife().city.buildings.length,
@@ -881,7 +900,9 @@ export function LomeLifeImmersive() {
     const room = cityLife.insideLot
       ? interiorFor(lotById(cityLife.insideLot)?.type ?? 'lot')
       : (life.inside as Interior | null)
-    const layout = room ? layoutFor(room) : null
+    const layout = room
+      ? layoutFor(room, cityLife.insideLot ? (lotById(cityLife.insideLot) ?? undefined) : undefined)
+      : null
     ;(window as unknown as { __LOME_CITY?: unknown }).__LOME_CITY = {
       ...chunkStats,
       ...frameRef.current,
@@ -901,6 +922,8 @@ export function LomeLifeImmersive() {
       riding,
       transport,
       panel,
+      commerce: cityLife.commerce,
+      fleet: cityLife.fleet,
       wallet: life.wallet,
       lastEvent: life.lastEvent,
       estateBuildings: life.city.buildings.length,
@@ -1082,7 +1105,10 @@ export function LomeLifeImmersive() {
       setCityLife((old) => ({ ...old, route: [], target: null }))
   }, [controller])
   // The keyboard walks the player in the street and indoors (every renderer lets them walk).
-  useKeyboardInput(input, panel === null && !mapView && !riding && !(driving && cityLife.duty))
+  useKeyboardInput(
+    input,
+    panel === null && !talkNpc && !mapView && !riding && !(driving && cityLife.duty),
+  )
   // Test hooks: walkability of a cell and an automatic walk to the player's taxi.
   useEffect(() => {
     const w = window as unknown as {
@@ -1131,23 +1157,42 @@ export function LomeLifeImmersive() {
     pickup: ServiceCustomer | null
     dest: { x: number; y: number; name: string } | null
   }
-  const receiveCustomer = useCallback((customer: ServiceCustomer | null) => {
-    automaticService.offer(customer)
-  }, [automaticService])
+  const receiveCustomer = useCallback(
+    (customer: ServiceCustomer | null) => {
+      automaticService.offer(customer)
+    },
+    [automaticService],
+  )
   useEffect(() => {
     if (!driving || !cityLife.duty) return
     const id = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return
       for (const event of automaticService.update(0.2)) {
         if (event.type === 'paid') {
-          setCityLife((old) => completeFare(old, event.fare, event.kind))
-          setNotice(`${event.fare.passenger} est arrivé·e : +${money(event.fare.price)}.`)
+          setCityLife((old) => settleVehicleFare(old, event.fare, event.kind, event.traveledCells))
+          setNotice(
+            'Client déposé : recette encaissée, essence et réserve entretien déduites. Détail dans Mes finances.',
+          )
+        } else if (event.type === 'serviced') {
+          setCityLife((old) => finishVehicleStop(old, event.kind, event.service))
+          setNotice(
+            event.service === 'police'
+              ? 'Contrôle terminé : bonne route !'
+              : 'Véhicule prêt : les courses reprennent automatiquement.',
+          )
         } else setNotice(event.message)
       }
       const next = automaticService.snapshot()
-      setServiceState((old) => old.phase === next.phase && old.fare === next.fare &&
-        old.customer === next.customer && old.stopRequested === next.stopRequested &&
-        old.completed === next.completed ? old : next)
+      setServiceState((old) =>
+        old.phase === next.phase &&
+        old.fare === next.fare &&
+        old.customer === next.customer &&
+        old.stopRequested === next.stopRequested &&
+        old.completed === next.completed &&
+        old.stop === next.stop
+          ? old
+          : next,
+      )
     }, 200)
     return () => window.clearInterval(id)
   }, [automaticService, driving, cityLife.duty])
@@ -1306,9 +1351,10 @@ export function LomeLifeImmersive() {
       hail,
       fare,
       service: serviceState,
+      care: cityLife.duty ? vehicleCare(cityLife, cityLife.duty) : null,
       ...fareLive,
     }
-  }, [cityLife.duty, hail, fare, fareLive, serviceState])
+  }, [cityLife.duty, cityLife.fleet, hail, fare, fareLive, serviceState])
   useEffect(() => {
     if (!playing) return
     const id = window.setInterval(() => {
@@ -1326,13 +1372,14 @@ export function LomeLifeImmersive() {
   // Key E on a PC: the same action as the door button (never while typing in a field).
   const doorKey = useRef<() => void>(() => {})
   doorKey.current = () => {
-    if (panel !== null || riding) return
+    if (panel !== null || talkNpc || riding) return
     if (insideAny) action('leave')
     else if (doorRef.current) action('enter')
   }
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        setTalkNpc(null)
         setPanel(null)
         return
       }
@@ -1510,6 +1557,10 @@ export function LomeLifeImmersive() {
     setPanel(null)
   }
   function action(a: Action) {
+    if (a === 'buy-meal') {
+      setCityLife(buyEstateMeal)
+      return
+    }
     if (a === 'enter' && !insideAny) {
       enterDoor()
       return
@@ -1538,6 +1589,14 @@ export function LomeLifeImmersive() {
     setApproachReq((r) => ({ prop: prop.id, n: (r?.n ?? 0) + 1 }))
   }
   function cityAction(a: CityAction) {
+    if (a === 'browse') {
+      setPanel('shop')
+      return
+    }
+    if (a === 'bank') {
+      setPanel('wallet')
+      return
+    }
     if (a === 'offers') {
       setPanel('market')
       return
@@ -1576,6 +1635,10 @@ export function LomeLifeImmersive() {
   function useEquipment(p: Prop) {
     if (!p.action) return
     setPanel(null)
+    if (['browse', 'offers', 'coop', 'bank'].includes(p.action)) {
+      cityAction(p.action as CityAction)
+      return
+    }
     if (cityLife.insideLot) {
       setCityLife((old) => useProp(old, p.id))
       return
@@ -1590,7 +1653,12 @@ export function LomeLifeImmersive() {
    */
   function startActivity(a: CityAction) {
     const room = cityLife.insideLot ? interiorFor(lotById(cityLife.insideLot)?.type ?? 'lot') : null
-    const prop = room ? layoutFor(room).props.find((p) => p.action === a) : null
+    const prop = room
+      ? layoutFor(
+          room,
+          cityLife.insideLot ? (lotById(cityLife.insideLot) ?? undefined) : undefined,
+        ).props.find((p) => p.action === a)
+      : null
     if (prop) {
       setPanel(null)
       setApproachReq((r) => ({ prop: prop.id, n: (r?.n ?? 0) + 1 }))
@@ -1759,6 +1827,9 @@ export function LomeLifeImmersive() {
                   TYPE_LABELS[lotById(cityLife.insideLot)?.type ?? 'lot'])
                 : (VENUE_LABELS[life.inside ?? ''] ?? '')
             }
+            interiorLot={
+              cityLife.insideLot ? (lotById(cityLife.insideLot) ?? undefined) : undefined
+            }
             activity={cityLife.activity}
             onUseProp={useEquipment}
             approach={approachReq}
@@ -1785,8 +1856,6 @@ export function LomeLifeImmersive() {
             onPlayer={(key) => {
               setPlayerKey(key)
               setPlayerNote('')
-              setNpcTalk([])
-              setNpcDraft('')
               setPanel('player')
             }}
             fare={streetFare}
@@ -2063,7 +2132,9 @@ export function LomeLifeImmersive() {
                 onClick={() => action('work')}
                 className="flex min-h-12 max-w-[13rem] items-center gap-2 rounded-2xl bg-emerald-600 px-3 py-2 text-left text-xs font-black text-white shadow-lg"
               >
-                <span aria-hidden className="text-lg">💼</span>
+                <span aria-hidden className="text-lg">
+                  💼
+                </span>
                 <span>
                   Faire mon service
                   <span className="block font-semibold">+{money(SALARIES[life.job])}</span>
@@ -2089,12 +2160,29 @@ export function LomeLifeImmersive() {
                 className="max-w-[13rem] rounded-2xl bg-emerald-800 px-3 py-2 text-xs text-white shadow-lg"
               >
                 <strong className="block">
-                  {serviceState.phase === 'pickup' ? `Prise en charge de ${hail}`
-                    : serviceState.phase === 'trip' ? 'Trajet automatique'
-                      : serviceState.phase === 'paid' ? 'Client déposé · course payée'
-                        : 'Recherche automatique de clients'}
+                  {serviceState.stop
+                    ? `${serviceState.phase === 'servicing' ? 'En cours' : 'Vers'} : ${serviceState.stop.service === 'fuel' ? 'Station-service' : serviceState.stop.service === 'garage' ? 'Garage' : 'Contrôle de police'}`
+                    : serviceState.phase === 'pickup'
+                      ? `Prise en charge de ${hail}`
+                      : serviceState.phase === 'trip'
+                        ? 'Trajet automatique'
+                        : serviceState.phase === 'paid'
+                          ? 'Client déposé · course payée'
+                          : 'Recherche automatique de clients'}
                 </strong>
-                <span>{serviceState.completed} course(s) · +{money(serviceState.earned)}</span>
+                <span>
+                  {serviceState.completed} course(s) · brut {money(serviceState.earned)}
+                </span>
+                <span className="mt-1 block text-emerald-100">
+                  ⛽ {(vehicleCare(cityLife, cityLife.duty).fuelMl / 1000).toFixed(1)} L · entretien
+                  automatique
+                </span>
+                {vehicleCare(cityLife, cityLife.duty).lastReceipt && (
+                  <span className="block font-bold">
+                    Dernière course : net +
+                    {money(vehicleCare(cityLife, cityLife.duty).lastReceipt!.net)}
+                  </span>
+                )}
               </output>
             )}
             {driving && fare && (
@@ -2145,9 +2233,15 @@ export function LomeLifeImmersive() {
                 disabled={serviceState.stopRequested}
                 className="flex min-h-12 max-w-[12rem] items-center justify-center rounded-xl bg-amber-400 px-3 py-2 text-xs font-black text-slate-900 shadow disabled:bg-slate-200"
               >
-                {serviceState.stopRequested ? 'Arrêt prévu à l’arrivée'
-                  : driving && fare ? 'Descendre à l’arrivée'
-                    : driving ? 'Descendre' : vehicleKind === 'moto' ? '🏍️ Monter' : '🚕 Monter'}
+                {serviceState.stopRequested
+                  ? 'Arrêt prévu à l’arrivée'
+                  : driving && fare
+                    ? 'Descendre à l’arrivée'
+                    : driving
+                      ? 'Descendre'
+                      : vehicleKind === 'moto'
+                        ? '🏍️ Monter'
+                        : '🚕 Monter'}
               </button>
             )}
             {nearAd && !insideAny && !driving && panel === null && (
@@ -2258,38 +2352,31 @@ export function LomeLifeImmersive() {
       {talkNpc && (
         <section
           aria-label="Conversation"
-          className="pointer-events-auto absolute inset-x-3 bottom-[calc(100px+env(safe-area-inset-bottom))] z-40 mx-auto max-w-[520px] rounded-[24px] border border-white/70 bg-white/95 p-4 shadow-2xl backdrop-blur"
+          className="pointer-events-auto absolute inset-x-3 bottom-[calc(100px+env(safe-area-inset-bottom))] z-40 mx-auto max-h-[75dvh] max-w-[520px] overflow-y-auto overscroll-contain rounded-[24px] bg-white p-4 shadow-2xl"
         >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-bold text-emerald-700">Personnage du jeu (PNJ)</p>
-              <p className="text-base font-black text-slate-900">{talkNpc.role}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setTalkNpc(null)}
-              className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold"
-            >
-              Fermer
-            </button>
-          </div>
-          <p className="mt-2 rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
-            « Bonjour voisin ! Il fait bon aujourd’hui. Passe me voir au marché si tu as besoin de
-            quelque chose. »
-          </p>
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                // The game's own social action (need « Social »), applied once per greeting.
-                action('socialize')
-                setTalkNpc(null)
-              }}
-              className="flex-1 rounded-2xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white"
-            >
-              Saluer et discuter
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setTalkNpc(null)}
+            aria-label="Fermer la conversation"
+            className="mb-2 ml-auto block rounded-full bg-slate-100 px-3 py-2 text-xs font-bold"
+          >
+            Fermer ✕
+          </button>
+          <ResidentConversation
+            key={`${cityLife.insideLot ?? life.inside}:${talkNpc.id}`}
+            resident={{
+              key: `${cityLife.insideLot ?? life.inside}:${talkNpc.id}`,
+              name: talkNpc.role,
+              role: talkNpc.role,
+              lot: cityLife.insideLot ? (lotById(cityLife.insideLot) ?? undefined) : undefined,
+            }}
+            state={cityLife}
+            onChange={setCityLife}
+            onAction={(a) => {
+              setTalkNpc(null)
+              startActivity(a)
+            }}
+          />
         </section>
       )}
       <nav
@@ -2502,38 +2589,39 @@ export function LomeLifeImmersive() {
                 )}
                 {panel === 'shop' && (
                   <>
-                    <p className="text-sm text-slate-600">
-                      Les achats modifient ton argent et le stock réel du moteur de simulation
-                      fictive.
-                    </p>
-                    <div className="flex items-center justify-between rounded-2xl bg-emerald-50 p-4">
-                      <div>
-                        <strong className="block">🍲 Repas du quartier</strong>
-                        <span className="text-xs text-slate-600">
-                          Stock municipal : {life.city.food} · À consommer ensuite
-                        </span>
-                      </div>
-                      <strong className="text-sm">650 FCFA</strong>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <ActionButton title="Aller au marché" onClick={() => go(12, 11)} />
+                    <GameMarket
+                      state={cityLife}
+                      onChange={setCityLife}
+                      onGoMarket={() => {
+                        const market = landmarks().find((l) => l.type === 'market')
+                        if (market) {
+                          setTalkNpc(null)
+                          // Choosing a destination also leaves the current interior.
+                          setCityLife((old) => ({
+                            ...old,
+                            insideLot: null,
+                            activity: null,
+                            life: old.life.inside ? interact(old.life, 'leave') : old.life,
+                          }))
+                          goLot(market)
+                        }
+                      }}
+                      onRealOffers={() => setPanel('market')}
+                    />
+                    <details className="rounded-2xl border border-slate-100 p-3">
+                      <summary className="text-sm font-bold">
+                        Repas du domaine · {life.meals} disponible(s)
+                      </summary>
                       <ActionButton
-                        title="Aller à la boulangerie"
-                        outline
-                        onClick={() => go(13, 11)}
+                        title="Acheter au domaine · 650 FCFA"
+                        onClick={() => action('buy-meal')}
                       />
-                    </div>
-                    <ActionButton
-                      title="Acheter un repas · 650 FCFA"
-                      icon={<ShoppingBag size={17} />}
-                      onClick={() => action('buy-meal')}
-                    />
-                    <ActionButton
-                      title={'Manger · ' + life.meals + ' repas disponible(s)'}
-                      outline
-                      icon={<Utensils size={17} />}
-                      onClick={() => action('eat')}
-                    />
+                      <ActionButton
+                        title="Manger un repas du domaine"
+                        outline
+                        onClick={() => action('eat')}
+                      />
+                    </details>
                   </>
                 )}
                 {panel === 'map' && (
@@ -2681,7 +2769,7 @@ export function LomeLifeImmersive() {
                                 }}
                                 className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-left text-xs ring-1 ring-slate-200 hover:ring-emerald-400"
                               >
-                                <span className="text-base">{TYPE_ICONS[lot.type]}</span>
+                                <span className="text-base">{lotIcon(lot)}</span>
                                 <span className="min-w-0 flex-1 truncate font-semibold">
                                   {lot.name}
                                 </span>
@@ -2808,8 +2896,8 @@ export function LomeLifeImmersive() {
                         ))}
                       </div>
                       <p className="mt-2 text-[11px] text-slate-500">
-                        Ces trajets te déposent automatiquement. Pour gagner de l’argent,
-                        ouvre Métiers et monte dans ton véhicule de service.
+                        Ces trajets te déposent automatiquement. Pour gagner de l’argent, ouvre
+                        Métiers et monte dans ton véhicule de service.
                       </p>
                     </div>
                   </>
@@ -2967,19 +3055,18 @@ export function LomeLifeImmersive() {
                         />
                       )}
                       {(currentWorkStatus === 'tired' || currentWorkStatus === 'hungry') && (
-                        <ActionButton
-                          title="Pause et collation · 1 h"
-                          onClick={prepareWorkNeeds}
-                        />
+                        <ActionButton title="Pause et collation · 1 h" onClick={prepareWorkNeeds} />
                       )}
                       <ActionButton title="Fermer" outline onClick={() => setPanel(null)} />
                     </div>
                     <div className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-4">
                       <p className="text-sm font-black">Au volant : payé à la course</p>
                       <p className="text-xs text-slate-600">
-                        Monte sur ton véhicule : il cherche les clients, les prend en charge,
-                        suit les routes et encaisse à l’arrivée automatiquement. Les courses
-                        s’enchaînent jusqu’à ta descente.
+                        Monte sur ton véhicule : il cherche les clients, les prend en charge, suit
+                        les routes et encaisse à l’arrivée automatiquement. Les courses s’enchaînent
+                        jusqu’à ta descente. Essence et réserve entretien sont déduites de chaque
+                        recette : ton gain net est affiché. Les arrêts à la station, au garage et à
+                        la brigade sont automatiques.
                       </p>
                       {(
                         [
@@ -3045,6 +3132,65 @@ export function LomeLifeImmersive() {
                       Budget municipal distinct : <strong>{money(life.city.coins)}</strong> · bois
                       disponible : {life.city.wood}
                     </div>
+                    {(['taxi', 'moto'] as const)
+                      .filter((kind) => cityLife.fleet?.[kind] || cityLife.duty === kind)
+                      .map((kind) => {
+                        const care = vehicleCare(cityLife, kind)
+                        return (
+                          <section
+                            key={kind}
+                            className="rounded-2xl border border-emerald-100 p-4 text-sm"
+                            data-testid={`vehicle-ledger-${kind}`}
+                          >
+                            <h3 className="font-black">
+                              {kind === 'taxi' ? '🚕 Taxi' : '🏍️ Zémidjan'} · frais automatiques
+                            </h3>
+                            <p className="mt-1 text-xs text-slate-500">
+                              Essence : {GAME_FUEL_PER_LITRE} FCFA/L du jeu. Réservoir initial
+                              fourni. Les provisions sont débitées sur les recettes, puis utilisées
+                              à la pompe et au garage.
+                            </p>
+                            <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                              <dt>Réservoir</dt>
+                              <dd>
+                                {(care.fuelMl / 1000).toFixed(2)} /{' '}
+                                {VEHICLE_RULES[kind].tankMl / 1000} L
+                              </dd>
+                              <dt>Provision essence</dt>
+                              <dd>{money(care.fuelReserve)}</dd>
+                              <dt>Réserve entretien</dt>
+                              <dd>{money(care.maintenanceReserve)}</dd>
+                              <dt>Kilométrage</dt>
+                              <dd>
+                                {care.km.toFixed(1)} km · {care.courses} courses
+                              </dd>
+                              <dt>Arrêts effectués</dt>
+                              <dd>
+                                {care.refills} plein(s), {care.services} entretien(s), {care.checks}{' '}
+                                contrôle(s)
+                              </dd>
+                            </dl>
+                            {care.lastReceipt && (
+                              <div
+                                className="mt-3 rounded-xl bg-emerald-50 p-3"
+                                aria-label="Reçu de la dernière course"
+                              >
+                                <p className="text-xs">{care.lastReceipt.destination}</p>
+                                <p>Recette : {money(care.lastReceipt.gross)}</p>
+                                <p>Essence : −{money(care.lastReceipt.fuel)}</p>
+                                <p>Réserve entretien : −{money(care.lastReceipt.maintenance)}</p>
+                                <strong className="block">
+                                  Net gagné : +{money(care.lastReceipt.net)}
+                                </strong>
+                              </div>
+                            )}
+                            <p className="mt-2 text-xs text-slate-500">
+                              Arrêt essence à 25 %, entretien tous les 8 km de jeu et contrôle tous
+                              les 3 trajets. Rythme accéléré pour la simulation.
+                            </p>
+                          </section>
+                        )
+                      })}
                     <ActionButton title="Trouver un travail" onClick={() => open('jobs')} />
                   </>
                 )}
@@ -3259,8 +3405,8 @@ export function LomeLifeImmersive() {
                     ))}
                     <div className="grid grid-cols-2 gap-2">
                       <ActionButton
-                        title={life.spent < 650 ? 'Aller au marché' : 'Continuer mon travail'}
-                        onClick={() => (life.spent < 650 ? go(12, 11) : open('jobs'))}
+                        title={!missions[0].done ? 'Aller au marché' : 'Continuer mon travail'}
+                        onClick={() => (!missions[0].done ? go(12, 11) : open('jobs'))}
                       />
                       <ActionButton title="Voir les métiers" outline onClick={() => open('jobs')} />
                       {actor && (
@@ -3274,86 +3420,20 @@ export function LomeLifeImmersive() {
                     </div>
                   </>
                 )}
-                {panel === 'player' &&
-                  playerKey?.startsWith('npc:') &&
-                  (() => {
-                    const name = playerKey.slice(4)
-                    const reply = `Je ne suis pas connecté. Je suis ${name}, un habitant du jeu, pas un vrai joueur : je ne peux pas te répondre. Les vrais joueurs portent une étiquette verte à leur nom.`
-                    return (
-                      <div className="space-y-3" data-testid="npc-sheet">
-                        <div className="flex items-center gap-3">
-                          <span
-                            aria-hidden
-                            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xl font-black text-slate-700"
-                          >
-                            {name.slice(0, 1)}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="truncate text-lg font-black">{name}</p>
-                            <p className="text-sm text-slate-500">Habitant du jeu · pas connecté</p>
-                          </div>
-                        </div>
-                        <div
-                          role="log"
-                          aria-label={`Discussion avec ${name}`}
-                          className="max-h-[32vh] min-h-20 space-y-2 overflow-y-auto rounded-2xl bg-slate-50 p-3"
-                        >
-                          {npcTalk.length === 0 && (
-                            <p className="py-3 text-center text-xs text-slate-500">
-                              Dis bonjour à {name}.
-                            </p>
-                          )}
-                          {npcTalk.map((m, i) => (
-                            <div
-                              // biome-ignore lint/suspicious/noArrayIndexKey: an append-only local list
-                              key={i}
-                              className={`flex ${m.from === 'me' ? 'justify-end' : 'justify-start'}`}
-                            >
-                              <p
-                                className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
-                                  m.from === 'me'
-                                    ? 'bg-emerald-600 text-white'
-                                    : 'bg-white text-slate-800 shadow-sm'
-                                }`}
-                              >
-                                {m.text}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                        <form
-                          className="flex gap-2"
-                          onSubmit={(e) => {
-                            e.preventDefault()
-                            const text = npcDraft.trim().slice(0, 200)
-                            if (!text) return
-                            setNpcTalk((old) => [
-                              ...old,
-                              { from: 'me', text },
-                              { from: 'npc', text: reply },
-                            ])
-                            setNpcDraft('')
-                          }}
-                        >
-                          <input
-                            aria-label={`Écrire à ${name}`}
-                            value={npcDraft}
-                            maxLength={200}
-                            onChange={(e) => setNpcDraft(e.target.value)}
-                            placeholder={`Écrire à ${name}…`}
-                            className="min-w-0 flex-1 rounded-2xl border border-slate-200 px-3 py-3 text-sm"
-                          />
-                          <button
-                            type="submit"
-                            disabled={!npcDraft.trim()}
-                            className="rounded-2xl bg-emerald-600 px-4 text-sm font-bold text-white disabled:opacity-50"
-                          >
-                            Envoyer
-                          </button>
-                        </form>
-                      </div>
-                    )
-                  })()}
+                {panel === 'player' && playerKey?.startsWith('npc:') && (
+                  <div data-testid="npc-sheet">
+                    <ResidentConversation
+                      key={playerKey}
+                      resident={{
+                        key: playerKey,
+                        name: playerKey.slice(4),
+                        role: 'Habitant du quartier',
+                      }}
+                      state={cityLife}
+                      onChange={setCityLife}
+                    />
+                  </div>
+                )}
                 {panel === 'player' &&
                   playerKey &&
                   !playerKey.startsWith('npc:') &&
@@ -3514,8 +3594,8 @@ export function LomeLifeImmersive() {
                       cityLife.insideLot === lot.id || doorLot?.id === lot.id || door?.id === lot.id
                     const insideHere = cityLife.insideLot === lot.id
                     const room = interiorFor(lot.type)
-                    const layout = room ? layoutFor(room) : null
-                    const acts = actionsFor(lot.type)
+                    const layout = room ? layoutFor(room, lot) : null
+                    const acts = actionsFor(lot.type, lot.service)
                     const path = here ? null : findPath(cityLife.at, lot.door, roadsOf(cityLife))
                     const cells = path ? path.length - 1 : null
                     const eta = (perCell: number) =>
@@ -3526,7 +3606,7 @@ export function LomeLifeImmersive() {
                       <>
                         <div className="flex items-center gap-3">
                           <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-100 text-3xl">
-                            {TYPE_ICONS[lot.type]}
+                            {lotIcon(lot)}
                           </span>
                           <div className="min-w-0">
                             <p className="truncate text-xl font-black">
@@ -3612,7 +3692,11 @@ export function LomeLifeImmersive() {
                                 className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm"
                               >
                                 <span className="font-bold">{a.label}</span>
-                                <span className="text-xs text-slate-500">{a.hint}</span>
+                                <span className="text-xs text-slate-500">
+                                  {(a.id === 'fuel' || a.id === 'maintain') && cityLife.duty
+                                    ? `À payer : ${money(manualVehicleQuote(cityLife, cityLife.duty, a.id === 'fuel' ? 'fuel' : 'garage'))} après provisions`
+                                    : a.hint}
+                                </span>
                               </button>
                             ))}
                           </div>

@@ -10,8 +10,13 @@ import {
  * interiors, and the actions each kind of place offers. Wraps the estate engine state
  * (`LifeState`, local coordinates, construction rules, saves) without changing it.
  */
+import { actionsFor } from './activities'
+export { actionsFor } from './activities'
 import type { Building } from '../townsmen-engine'
 import { type NpcAnim, animFor, layoutFor } from './interiors'
+import { type Commerce, decodeCommerce, emptyCommerce } from './commerce'
+import { type SocialLife, decodeSocial } from './social'
+import { type Fleet, decodeFleet, manualVehicleService } from './vehicle-economy'
 import { restoreServiceVehicle } from './jobs'
 import { LOCALITIES, type LocalityId, current, isLocalityId, setLocality } from './locality'
 import {
@@ -65,9 +70,18 @@ export type CityAction =
   | 'toilet'
   | 'coop'
   | 'offers'
+  | 'browse'
+  | 'socialize'
+  | 'fuel'
+  | 'maintain'
+  | 'police'
 
 export interface CityLife {
   v: 1
+  commerce?: Commerce
+  social?: SocialLife
+  fleet?: Fleet
+  socialDays?: Record<string, number>
   life: LifeState
   /** The town the player is in (the estate and home stay in Lomé). */
   locality: LocalityId
@@ -128,6 +142,7 @@ export function initialCityLife(): CityLife {
   return {
     v: 1,
     life,
+    commerce: emptyCommerce(),
     locality: 'lome',
     at: { ...ESTATE_GATE },
     route: [],
@@ -144,6 +159,7 @@ export function fromLegacy(life: LifeState): CityLife {
   return {
     v: 1,
     life: { ...life, route: [], target: null },
+    commerce: decodeCommerce(undefined, life.spent),
     locality: 'lome',
     at: toWorld(life.pos),
     route: [],
@@ -178,6 +194,17 @@ export function decodeCityLife(value: unknown): CityLife | null {
   if (v.insideLot !== null && v.insideLot !== undefined && !lotById(v.insideLot)) return null
   return restoreServiceVehicle({
     v: 1,
+    commerce: decodeCommerce(v.commerce, life.spent),
+    social: decodeSocial(v.social),
+    fleet: decodeFleet(v.fleet),
+    socialDays:
+      v.socialDays && typeof v.socialDays === 'object'
+        ? Object.fromEntries(
+            Object.entries(v.socialDays)
+              .filter(([k, n]) => k.length < 160 && Number.isSafeInteger(n) && n >= 0)
+              .slice(-100),
+          )
+        : {},
     life: syncEstate(life, at),
     locality,
     at,
@@ -434,95 +461,6 @@ export function interiorFor(t: LotType): Interior | null {
       return null
   }
 }
-/** Actions a lot offers, in display order. */
-export function actionsFor(t: LotType): { id: CityAction; label: string; hint: string }[] {
-  switch (t) {
-    case 'shop':
-      return [{ id: 'buy-meal', label: 'Acheter un repas', hint: '650 FCFA' }]
-    case 'market':
-      return [
-        { id: 'buy-meal', label: 'Acheter un repas', hint: '650 FCFA' },
-        {
-          id: 'offers',
-          label: 'Voir les offres de producteurs',
-          hint: 'Préventes réelles (Haroo)',
-        },
-      ]
-    case 'sport':
-    case 'stadium':
-      return [
-        {
-          id: 'use-treadmill',
-          label: 'Tapis de course',
-          hint: 'Forme +6 · Énergie −15 · 500 FCFA',
-        },
-        { id: 'use-weights', label: 'Musculation', hint: 'Forme +8 · Énergie −20 · 500 FCFA' },
-        { id: 'use-bike', label: 'Vélo', hint: 'Forme +4 · Énergie −10 · 500 FCFA' },
-        { id: 'use-yoga', label: 'Yoga', hint: 'Loisir +12 · Forme +3' },
-        { id: 'coach', label: 'Coach', hint: 'Forme +5 · 1 000 FCFA' },
-        { id: 'use-shower', label: 'Douche', hint: 'Hygiène +40' },
-        { id: 'train', label: 'S’entraîner', hint: 'Loisir +20 · Énergie −15 · 500 FCFA' },
-      ]
-    case 'worship':
-      return [{ id: 'pray', label: 'Prier avec la communauté', hint: 'Social +20 · Loisir +10' }]
-    case 'hospital':
-      return [
-        { id: 'care', label: 'Consultation', hint: 'Énergie +30 · Hygiène +20 · 1 500 FCFA' },
-        { id: 'toilet', label: 'Toilettes', hint: 'Vessie 100' },
-      ]
-    case 'school':
-    case 'university':
-      return [{ id: 'learn', label: 'Suivre un cours', hint: 'Compétence +1 · 1 000 FCFA' }]
-    case 'hotel':
-      return [
-        {
-          id: 'rest',
-          label: 'Prendre une chambre',
-          hint: 'Énergie 100 · Hygiène 100 · 3 000 FCFA',
-        },
-      ]
-    case 'bank':
-      return [{ id: 'bank', label: 'Voir mon compte', hint: 'Solde et dépenses' }]
-    case 'cooperative':
-      return [
-        {
-          id: 'coop',
-          label: 'Tableau de bord de la coopérative',
-          hint: 'Membres, superficies, regroupements, besoins en ouvriers',
-        },
-      ]
-    case 'park':
-    case 'port':
-      return [{ id: 'relax', label: 'Se détendre', hint: 'Loisir +25' }]
-    case 'townhall':
-      return [
-        {
-          id: 'work-city',
-          label: 'Service communal',
-          hint: '+1 500 FCFA · Énergie −20 · une fois par jour',
-        },
-      ]
-    case 'station':
-      return [
-        {
-          id: 'work-city',
-          label: 'Livrer et trier les colis',
-          hint: '+2 000 FCFA · Énergie −20 · une fois par jour',
-        },
-      ]
-    case 'industry':
-      return [
-        {
-          id: 'work-city',
-          label: 'Charger les produits agricoles',
-          hint: '+2 200 FCFA · Énergie −25 · une fois par jour',
-        },
-      ]
-    default:
-      return []
-  }
-}
-
 /** The lot whose door the player stands on (or next to its footprint). */
 export function lotAtDoor(s: CityLife): Lot | null {
   const t = s.target ? lotById(s.target) : null
@@ -569,9 +507,28 @@ export function cityInteract(s: CityLife, action: CityAction): CityLife {
   }
   const lot = s.insideLot ? lotById(s.insideLot) : lotAtDoor(s)
   if (!lot) return note(s, 'Entre d’abord dans un lieu.')
-  const allowed = actionsFor(lot.type).some((a) => a.id === action)
+  const allowed = actionsFor(lot.type, lot.service).some((a) => a.id === action)
   if (!allowed) return note(s, 'Ce lieu ne propose pas cette activité.')
   switch (action) {
+    case 'socialize': {
+      if (s.socialDays?.[lot.id] === s.life.day)
+        return note(s, 'Vous avez déjà discuté aujourd’hui. Parle aussi directement à un habitant.')
+      return note(
+        bump({ ...s, socialDays: { ...s.socialDays, [lot.id]: s.life.day } }, { social: 15 }),
+        'Discussion avec les habitants : social +15.',
+      )
+    }
+    case 'browse':
+      return note(s, 'Choisis un article au comptoir. Tes achats restent dans Mon sac.')
+    case 'fuel':
+      return manualVehicleService(s, 'fuel')
+    case 'maintain':
+      return manualVehicleService(s, 'garage')
+    case 'police':
+      return note(
+        s,
+        'Brigade du jeu : casque, ceinture et respect des piétons. Les papiers du véhicule de service sont fournis. Pour signaler un joueur réel, utilise son profil.',
+      )
     case 'buy-meal': {
       const paid = pay(s, 650)
       if (!paid) return note(s, 'Solde insuffisant.')
@@ -580,6 +537,10 @@ export function cityInteract(s: CityLife, action: CityAction): CityLife {
       return note(
         {
           ...paid,
+          commerce: {
+            ...(paid.commerce ?? emptyCommerce()),
+            boughtMeals: (paid.commerce?.boughtMeals ?? 0) + 1,
+          },
           life: {
             ...paid.life,
             meals: paid.life.meals + 1,
@@ -698,7 +659,7 @@ export function useProp(s: CityLife, propId: string): CityLife {
   const lot = s.insideLot ? lotById(s.insideLot) : null
   const room: Interior | null = lot ? interiorFor(lot.type) : null
   if (!room) return note(s, 'Entre d’abord dans un lieu.')
-  const prop = layoutFor(room).props.find((p) => p.id === propId)
+  const prop = layoutFor(room, lot ?? undefined).props.find((p) => p.id === propId)
   if (!prop || !prop.action) return note(s, 'Rien à faire avec cet objet.')
   const next = cityInteract(s, prop.action as CityAction)
   if (next === s || next.life.lastEvent === s.life.lastEvent) return next

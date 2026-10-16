@@ -278,7 +278,7 @@ test('HarooLife market: travel, buy a meal once, talk to the seller, leave', asy
   const before = await save()
   await page.getByRole('button', { name: /Activités du lieu|Activités · / }).click()
   await sheet
-    .getByRole('button', { name: /Acheter un repas/ })
+    .getByRole('button', { name: /Acheter un repas|Repas à emporter/ })
     .first()
     .click()
   await expect
@@ -292,9 +292,12 @@ test('HarooLife market: travel, buy a meal once, talk to the seller, leave', asy
 
   // The seller is a character of the game: reaching them opens the conversation.
   await page.locator('[data-hotspot="npc:seller"]').click()
-  await expect(page.getByLabel('Conversation')).toBeVisible({ timeout: 30000 })
-  await expect(page.getByLabel('Conversation')).toContainText('PNJ')
-  await page.getByLabel('Conversation').getByRole('button', { name: 'Fermer' }).click()
+  await expect(page.getByLabel('Conversation', { exact: true })).toBeVisible({ timeout: 30000 })
+  await expect(page.getByLabel('Conversation', { exact: true })).toContainText('Personnage fictif')
+  await page
+    .getByLabel('Conversation')
+    .getByRole('button', { name: 'Fermer la conversation' })
+    .click()
 
   await page.getByRole('button', { name: 'Entrer ou sortir' }).click()
   await expect.poll(async () => (await live(page))?.inside ?? null).toBeNull()
@@ -372,13 +375,13 @@ test('HarooLife street and clear map: walk, places without overlap, sheet, route
   await page.mouse.click(at.x, at.y)
   const npc = page.getByTestId('npc-sheet')
   await expect(npc).toBeVisible()
-  await expect(npc).toContainText('pas connecté')
+  await expect(npc).toContainText('dialogue scénarisé')
   const field = npc.getByRole('textbox', { name: /^Écrire à / })
   await field.fill('Bonjour, ça va ?')
   await npc.getByRole('button', { name: 'Envoyer' }).click()
   const log = npc.getByRole('log')
   await expect(log).toContainText('Bonjour, ça va ?')
-  await expect(log).toContainText('Je ne suis pas connecté')
+  await expect(log.locator('p').last()).toContainText(/Bienvenue|Casque/)
   await expect(field).toHaveValue('')
   await page.keyboard.press('Escape')
   await expect(npc).toBeHidden()
@@ -512,33 +515,47 @@ test('HarooLife street billboards: built near, read, learn more, statistics', as
 })
 
 for (const kind of ['taxi', 'moto'] as const) {
-  test(`HarooLife ${kind === 'moto' ? 'zémidjan' : 'street taxi'}: automatic pickup, two fares, arrival and payment`, async ({ page }, info) => {
+  test(`HarooLife ${kind === 'moto' ? 'zémidjan' : 'street taxi'}: automatic pickup, two fares, arrival and payment`, async ({
+    page,
+  }, info) => {
     test.setTimeout(240_000)
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
     type Service = {
-      phase: string; completed: number; earned: number; stopRequested: boolean
+      phase: string
+      completed: number
+      earned: number
+      stopRequested: boolean
       fare: { price: number; to: { name: string } } | null
     }
     type Driver = {
-      driving: boolean; automaticDriving: boolean
-      vehicleKind: string | null; vehicle: { x: number; z: number } | null
+      driving: boolean
+      automaticDriving: boolean
+      vehicleKind: string | null
+      vehicle: { x: number; z: number } | null
       vehicleSize: { x: number; y: number; z: number } | null
     }
-    const service = () => page.evaluate(() =>
-      (window as unknown as { __LOME_FARE?: { service: Service } }).__LOME_FARE?.service)
-    const driver = () => page.evaluate(() =>
-      (window as unknown as { __LOME_PLAYER?: Driver }).__LOME_PLAYER)
-    const wallet = () => page.evaluate(() =>
-      (window as unknown as { __LOME_CITY?: { wallet: number } }).__LOME_CITY?.wallet)
+    const service = () =>
+      page.evaluate(
+        () => (window as unknown as { __LOME_FARE?: { service: Service } }).__LOME_FARE?.service,
+      )
+    const driver = () =>
+      page.evaluate(() => (window as unknown as { __LOME_PLAYER?: Driver }).__LOME_PLAYER)
+    const wallet = () =>
+      page.evaluate(
+        () => (window as unknown as { __LOME_CITY?: { wallet: number } }).__LOME_CITY?.wallet,
+      )
 
     await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
-    await page.getByRole('navigation', { name: 'Navigation du jeu' })
-      .getByRole('button', { name: 'Téléphone' }).click()
+    await page
+      .getByRole('navigation', { name: 'Navigation du jeu' })
+      .getByRole('button', { name: 'Téléphone' })
+      .click()
     await page.getByRole('button', { name: /Métiers/ }).click()
     await page.getByTestId(`duty-${kind}`).click()
     const board = page.getByRole('button', {
-      name: kind === 'moto' ? 'Monter sur le zémidjan' : 'Monter dans le taxi', exact: true,
+      name: kind === 'moto' ? 'Monter sur le zémidjan' : 'Monter dans le taxi',
+      exact: true,
     })
     await expect(board).toBeVisible({ timeout: 45000 })
     await expect.poll(async () => (await driver())?.vehicleKind).toBe(kind)
@@ -558,27 +575,42 @@ for (const kind of ['taxi', 'moto'] as const) {
     await expect(page.getByTestId('fare-drop')).toHaveCount(0)
 
     // No stick, no keys, no customer spawn and no destination teleport from this point.
-    await expect.poll(async () => (await service())?.phase,
-      { timeout: 60000 }).toBe('trip')
+    await expect.poll(async () => (await service())?.phase, { timeout: 60000 }).toBe('trip')
     const first = (await service())?.fare
     expect(first?.price).toBeGreaterThanOrEqual(200)
     await page.screenshot({ path: info.outputPath(`${kind}-automatic-trip.png`) })
-    await expect.poll(async () => (await service())?.completed,
-      { timeout: 90000 }).toBe(1)
-    await expect.poll(wallet).toBe(before + (first?.price ?? 0))
+    await expect.poll(async () => (await service())?.completed, { timeout: 90000 }).toBe(1)
+    const lastReceipt = () =>
+      page.evaluate(
+        () =>
+          (
+            window as unknown as {
+              __LOME_FARE?: {
+                care?: {
+                  lastReceipt?: { gross: number; fuel: number; maintenance: number; net: number }
+                }
+              }
+            }
+          ).__LOME_FARE?.care?.lastReceipt,
+      )
+    await expect.poll(async () => (await lastReceipt())?.gross).toBe(first?.price)
+    const firstNet = (await lastReceipt())!.net
+    expect(firstNet).toBeLessThan(first!.price)
+    await expect.poll(wallet).toBe(before + firstNet)
 
     // The second client is found and transported without another action.
-    await expect.poll(async () => (await service())?.phase,
-      { timeout: 60000 }).toBe('trip')
+    await expect.poll(async () => (await service())?.phase, { timeout: 60000 }).toBe('trip')
     const second = (await service())?.fare
     const leave = page.getByRole('button', {
-      name: kind === 'moto' ? 'Descendre du zémidjan' : 'Descendre du taxi', exact: true,
+      name: kind === 'moto' ? 'Descendre du zémidjan' : 'Descendre du taxi',
+      exact: true,
     })
     await leave.click()
     await expect.poll(async () => (await service())?.stopRequested).toBe(true)
-    await expect.poll(async () => (await driver())?.driving,
-      { timeout: 90000 }).toBe(false)
-    const expected = before + (first?.price ?? 0) + (second?.price ?? 0)
+    await expect.poll(async () => (await driver())?.driving, { timeout: 90000 }).toBe(false)
+    await expect.poll(async () => (await lastReceipt())?.gross).toBe(second?.price)
+    const secondReceipt = (await lastReceipt())!
+    const expected = before + firstNet + secondReceipt.net
     await expect.poll(wallet).toBe(expected)
     await expect.poll(async () => (await service())?.completed).toBe(2)
     await page.waitForTimeout(1200)

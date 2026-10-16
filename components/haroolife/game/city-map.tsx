@@ -13,7 +13,7 @@ import {
   type Category,
   type Lot,
   type LotType,
-  TYPE_ICONS,
+  lotIcon,
   WORLD_H,
   WORLD_W,
   districts,
@@ -301,7 +301,7 @@ export default function CityMap({
             }`}
             style={{ left: x, top: y, zIndex: selected ? 3 : 2 }}
           >
-            <span aria-hidden>{TYPE_ICONS[lot.type]}</span>
+            <span aria-hidden>{lotIcon(lot)}</span>
             {(selected || namesShown) && (
               <span className="max-w-36 truncate text-xs font-bold">{lot.name}</span>
             )}

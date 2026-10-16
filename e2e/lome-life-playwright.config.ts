@@ -24,6 +24,7 @@ export default defineConfig({
     'lome-interior-three.spec.ts',
     'lome-house-haroo.spec.ts',
     'lome-service-vehicle.spec.ts',
+    'lome-place-workflows.spec.ts',
   ],
   reporter: [['list'], ['html', { outputFolder: 'test-results/lome-report', open: 'never' }]],
   fullyParallel: false,

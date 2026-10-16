@@ -157,7 +157,14 @@ test('starting a moto service in Kara really creates a boardable vehicle', async
         () => (window as unknown as { __LOME_CITY?: { wallet: number } }).__LOME_CITY?.wallet,
       ),
     )
-    .toBe(before + price)
+    .toBe(
+      before +
+        (await page.evaluate(
+          () =>
+            (window as unknown as { __LOME_FARE?: { care?: { lastReceipt?: { net: number } } } })
+              .__LOME_FARE?.care?.lastReceipt?.net ?? 0,
+        )),
+    )
 })
 
 test('a delayed taxi download cannot replace the moto selected in the meantime', async ({

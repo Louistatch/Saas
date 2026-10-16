@@ -151,6 +151,8 @@ export const TYPE_ICONS: Record<LotType, string> = {
 }
 
 export interface Lot {
+  /** Fictional local services, reusing the existing building engine and stable lot ids. */
+  service?: 'fuel' | 'garage' | 'police'
   id: string
   type: LotType
   district: DistrictId
@@ -165,6 +167,9 @@ export interface Lot {
   /** The road cell to stand on to enter (door side). */
   door: { x: number; y: number }
 }
+
+export const lotIcon = (lot: Pick<Lot, 'type' | 'service'>) =>
+  lot.service ? { fuel: '⛽', garage: '🔧', police: '👮🏿' }[lot.service] : TYPE_ICONS[lot.type]
 
 export const key = (x: number, y: number) => `${x}:${y}`
 export const within = (x: number, y: number) => x >= 0 && y >= 0 && x < WORLD_W && y < WORLD_H
@@ -399,6 +404,21 @@ export function worldIndex(): WorldIndex {
         door,
       })
     }
+  // Reuse three unnamed plots: existing landmarks, footprints and save ids never move.
+  for (const [service, type, name, offset] of [
+    ['fuel', 'shop', 'Station-service du quartier', 0],
+    ['garage', 'industry', 'Garage des chauffeurs', 8],
+    ['police', 'townhall', 'Brigade de quartier', -8],
+  ] as const) {
+    const candidates = lots.filter((l) => !l.name)
+    candidates.sort(
+      (a, b) =>
+        Math.hypot(a.door.x - loc.gate.x - offset, a.door.y - loc.gate.y) -
+        Math.hypot(b.door.x - loc.gate.x - offset, b.door.y - loc.gate.y),
+    )
+    const lot = candidates[0]
+    if (lot) Object.assign(lot, { service, type, name: `${name} · ${loc.name} (jeu)`, floors: 1 })
+  }
   const byCell = new Map<string, Lot>()
   const byId = new Map<string, Lot>()
   for (const lot of lots) {

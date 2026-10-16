@@ -91,6 +91,7 @@ export default function CityWorld({
   hour,
   interior,
   interiorTitle,
+  interiorLot,
   activity,
   onUseProp,
   approach,
@@ -141,6 +142,7 @@ export default function CityWorld({
   hour: number
   interior: Interior | null
   interiorTitle: string
+  interiorLot?: Lot
   activity: { prop: string; anim: NpcAnim } | null
   onUseProp: (p: Prop) => void
   /** HUD activity button: walk to that equipment, then use it (Three interiors). */
@@ -202,9 +204,9 @@ export default function CityWorld({
       {room === 'haroo' && interior && input && (
         <div className="absolute inset-0" data-renderer="haroo">
           <HarooRoomView
-            key={interior}
+            key={`${interior}:${interiorLot?.id ?? 'home'}`}
             interior={interior}
-            layout={layoutFor(interior)}
+            layout={layoutFor(interior, interiorLot)}
             title={interiorTitle}
             angle={camera.angle}
             activity={activity}
@@ -224,7 +226,7 @@ export default function CityWorld({
       {room === 'three' && interior && input && (
         <div className="absolute inset-0" data-renderer="three">
           <InteriorThree
-            layout={layoutFor(interior)}
+            layout={layoutFor(interior, interiorLot)}
             title={interiorTitle}
             angle={camera.angle}
             activity={activity}

@@ -80,7 +80,7 @@ const REBUILD_AT = 6
 const TILE_RANGE = 11
 const CAMERA_ELEVATION = 0.7
 const CAMERA_DISTANCE = 80
-const PEDESTRIANS = 6
+const PEDESTRIANS = 8
 const PEDESTRIAN_MODELS = [
   'character-female-a',
   'character-male-b',
@@ -88,7 +88,16 @@ const PEDESTRIAN_MODELS = [
   'character-male-a',
 ]
 /** First names of the passers-by (game characters, never real people), one per model. */
-const PEDESTRIAN_NAMES = ['Abla', 'Kossi', 'Enyonam', 'Komi', 'Akossiwa', 'Yao']
+const PEDESTRIAN_NAMES = [
+  'Abla',
+  'Kossi',
+  'Enyonam',
+  'Komi',
+  'Akossiwa',
+  'Yao',
+  'Agent Afi',
+  'Agent Dodzi',
+]
 const U = STREET_CELL
 /** The player's taxi (Kenney Car Kit, CC0): front along +Z, as the controller's heading 0. */
 const TAXI_URL = '/haroolife/vendor/kenney-3d/car-kit/taxi.glb'
@@ -218,6 +227,7 @@ interface Walker {
   t: number
   /** A passer-by of the game (not a connected player): their name and tag (shown when near). */
   name: string
+  police?: boolean
   tag: HTMLButtonElement
 }
 
@@ -401,7 +411,12 @@ export class StreetWorld {
     for (let i = 0; i < PEDESTRIANS; i++) {
       const r = peds[i % peds.length]
       if (r.status !== 'fulfilled') continue
-      const person = this.makePerson(r.value, pedSpecs[i % pedSpecs.length])
+      const police = i >= 6
+      const person = this.makePerson(
+        r.value,
+        pedSpecs[i % pedSpecs.length],
+        police ? '#243e78' : undefined,
+      )
       person.root.name = `Piéton ${i + 1}`
       this.scene.add(person.root)
       const start = this.randomRoad()
@@ -410,7 +425,8 @@ export class StreetWorld {
       tag.type = 'button'
       tag.dataset.pedestrian = name
       tag.setAttribute('aria-label', `Habitant ${name}`)
-      tag.textContent = name
+      tag.textContent = police ? `👮🏿 ${name}` : name
+      if (police) tag.dataset.police = name
       tag.className =
         'pointer-events-auto absolute left-0 top-0 min-h-8 rounded-full border border-white/80 bg-white/85 px-3 text-xs font-semibold text-slate-700 shadow'
       tag.style.visibility = 'hidden'
@@ -425,6 +441,7 @@ export class StreetWorld {
         to: this.nextRoad(start, start),
         t: Math.random(),
         name,
+        police,
         tag,
       })
       this.play(person, clipFor(person.spec, 'walk'))
@@ -909,11 +926,14 @@ export class StreetWorld {
     if (ctl.driving && v && this.fare.hailing && !this.fare.passenger) {
       if (this.hailed) return
       for (const w of this.walkers) {
+        if (w.police) continue
         const p = w.person.root.position
         const d = Math.hypot(p.x / U - v.x, p.z / U - v.z)
         const customer = { name: w.name, x: Math.round(p.x / U), y: Math.round(p.z / U) }
-        if ((!best || d < best.d) &&
-          drivingRoute(v, customer, (x, y) => isCityRoad(x, y) || isDriveway(x, y)))
+        if (
+          (!best || d < best.d) &&
+          drivingRoute(v, customer, (x, y) => isCityRoad(x, y) || isDriveway(x, y))
+        )
           best = { customer, d }
       }
     }
@@ -975,8 +995,8 @@ export class StreetWorld {
         // Honest fallback: a yellow volume of the taxi's size, never an invisible car.
         const box = new THREE.Mesh(this.unitBox, this.mat('#f2c230'))
         box.name = 'Taxi du joueur'
-        box.scale.set(1.7 * FIGURE / 1.75, 1.45 * FIGURE / 1.75, 4.1 * FIGURE / 1.75)
-        box.position.y = 0.725 * FIGURE / 1.75
+        box.scale.set((1.7 * FIGURE) / 1.75, (1.45 * FIGURE) / 1.75, (4.1 * FIGURE) / 1.75)
+        box.position.y = (0.725 * FIGURE) / 1.75
         const root = new THREE.Group()
         root.add(box)
         this.scene.add(root)
@@ -993,14 +1013,18 @@ export class StreetWorld {
   }
 
   private randomRoad(): { x: number; y: number } {
-    const roads = (this.win?.roads ?? []).filter((p) => isCityRoad(p.x, p.y) || isDriveway(p.x, p.y))
+    const roads = (this.win?.roads ?? []).filter(
+      (p) => isCityRoad(p.x, p.y) || isDriveway(p.x, p.y),
+    )
     return roads.length ? roads[Math.floor(this.rand() * roads.length)] : this.controller.cell
   }
 
   private nextRoad(at: { x: number; y: number }, prev: { x: number; y: number }) {
-    const roads = new Set((this.win?.roads ?? [])
-      .filter((p) => isCityRoad(p.x, p.y) || isDriveway(p.x, p.y))
-      .map((r) => `${r.x}:${r.y}`))
+    const roads = new Set(
+      (this.win?.roads ?? [])
+        .filter((p) => isCityRoad(p.x, p.y) || isDriveway(p.x, p.y))
+        .map((r) => `${r.x}:${r.y}`),
+    )
     const options = [
       { x: at.x + 1, y: at.y },
       { x: at.x - 1, y: at.y },
@@ -1185,7 +1209,12 @@ export class StreetWorld {
       this.carTag.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`
       this.carTag.style.visibility =
         ctl.canEnterVehicle() &&
-        p.z > -1 && p.z < 1 && x > 0 && x < this.width && y > 80 && y < this.height - 100
+        p.z > -1 &&
+        p.z < 1 &&
+        x > 0 &&
+        x < this.width &&
+        y > 80 &&
+        y < this.height - 100
           ? 'visible'
           : 'hidden'
     }

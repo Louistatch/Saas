@@ -91,7 +91,7 @@ test('each place category has an interior and actions with real consequences', (
 
 test('a warehouse of the industrial zone leads to a paid odd job, once a day', () => {
   const s = initialCityLife()
-  const depot = worldLots().find((l) => l.type === 'industry')
+  const depot = worldLots().find((l) => l.type === 'industry' && !l.service)
   assert.ok(depot, 'Lomé has an industrial zone')
   assert.equal(interiorFor(depot.type), 'hall')
   assert.deepEqual(
