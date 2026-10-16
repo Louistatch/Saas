@@ -1,5 +1,34 @@
 # Véhicules de service HarooLife
 
+## Service automatique
+
+Monter dans le taxi ou le zémidjan lance maintenant l'activité complète : recherche d'un
+passant, déplacement routier vers lui, embarquement, trajet routier, arrêt, dépôt et crédit
+du portefeuille fictif. Deux secondes après le paiement, le véhicule cherche le client
+suivant. Aucune accélération, direction, prise de client ou validation de dépôt n'est
+demandée au joueur. Descendre pendant une course programme l'arrêt après le dépôt et le
+paiement. Descendre avant embarquement annule la recherche sans gain.
+
+`AutomaticDrivingService` coordonne les étapes ; le `PlayerController` existant déplace
+réellement le véhicule de case routière en case routière. `planServiceFare` vérifie la
+connexion de la destination et calcule le tarif sur la distance routière. L'événement de
+paiement est émis une seule fois, après l'arrivée et l'arrêt. Il n'y a pas de paiement
+pendant que l'onglet est masqué, ni de saut à destination pour terminer une course.
+
+Le taxi Kenney CC0 est ajusté sur ses dimensions réelles : berline de 4,1 × 1,7 × 1,45 m
+pour un adulte de 1,75 m. Le toit est plus bas que la tête du personnage et la largeur
+reste inférieure à 60 % d'une cellule de rue.
+
+Les scénarios taxi et zémidjan de `lome-house-haroo.spec.ts` attendent deux courses
+automatiques réelles et leurs paiements après un seul embarquement. Ils ne font apparaître
+aucun client artificiel et ne déplacent pas le véhicule par une sonde de test.
+
+```sh
+HAROOLIFE_TEST_PORT=3122 PW_CHROMIUM_PATH=/usr/bin/chromium \
+  npx playwright test --config=e2e/lome-life-playwright.config.ts \
+  lome-house-haroo.spec.ts --grep 'automatic pickup' --project=mobile-android
+```
+
 Diagnostic du 16 octobre 2026, après les correctifs `85ad6587` et `db217d27`.
 
 ## Défauts reproduits
@@ -52,7 +81,7 @@ l'augmentation du portefeuille fictif.
 HAROOLIFE_TEST_PORT=3112 PW_CHROMIUM_PATH=/usr/bin/chromium \
   npx playwright test --config=e2e/lome-life-playwright.config.ts \
   lome-service-vehicle.spec.ts lome-house-haroo.spec.ts \
-  --grep 'returning driver|old save with|starting a moto|delayed taxi|HarooLife zémidjan' \
+  --grep 'returning driver|old save with|starting a moto|delayed taxi|automatic pickup' \
   --project=mobile-android
 ```
 

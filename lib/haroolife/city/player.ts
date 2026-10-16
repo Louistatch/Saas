@@ -149,6 +149,9 @@ export class PlayerController {
   vehicle: VehicleState | null = null
   /** Which vehicle the player drives (null on foot). */
   driving = false
+  automaticDriving = false
+  private drivingRoute: Vec2[] = []
+  drivingRouteState: 'idle' | 'moving' | 'arrived' | 'blocked' = 'idle'
   camera: CameraRig
   readonly config: PlayerConfig
   private acc = 0
@@ -360,6 +363,7 @@ export class PlayerController {
     ]
     const spot = candidates.find((c) => this.fits(c.x, c.z)) ?? { x: v.x, z: v.z }
     this.driving = false
+    this.stopAutomaticDriving()
     this.pos = { ...spot }
     this.heading = v.heading
     this.vel = { x: 0, z: 0 }
@@ -367,9 +371,80 @@ export class PlayerController {
     this.events.push({ type: 'vehicle', state: 'left' })
     return true
   }
+
+  /** A road route is separate from the avatar's walking route. Inputs cannot override it. */
+  driveAutomatically(route: readonly Vec2[]): boolean {
+    if (!this.driving || !this.vehicle || !route.length) return false
+    let previous = { x: Math.round(this.vehicle.x), z: Math.round(this.vehicle.z) }
+    for (const point of route) {
+      if (
+        !this.world.drivable(point.x, point.z) ||
+        Math.abs(point.x - previous.x) + Math.abs(point.z - previous.z) > 1
+      )
+        return false
+      previous = point
+    }
+    this.automaticDriving = true
+    this.drivingRoute = route.map((p) => ({ ...p }))
+    this.drivingRouteState = 'moving'
+    this.vehicle.speed = 0
+    return true
+  }
+
+  stopAutomaticDriving(): void {
+    this.automaticDriving = false
+    this.drivingRoute = []
+    this.drivingRouteState = 'idle'
+    if (this.vehicle) this.vehicle.speed = 0
+  }
+
+  private stepAutomaticVehicle(dt: number): void {
+    const v = this.vehicle
+    const next = this.drivingRoute[0]
+    if (!v || !next) return
+    if (!this.world.drivable(next.x, next.z)) {
+      this.drivingRoute = []
+      this.drivingRouteState = 'blocked'
+      v.speed = 0
+      return
+    }
+    const dx = next.x - v.x
+    const dz = next.z - v.z
+    const distance = Math.hypot(dx, dz)
+    if (distance < 0.015) {
+      v.x = next.x
+      v.z = next.z
+      this.drivingRoute.shift()
+      if (!this.drivingRoute.length) {
+        v.speed = 0
+        this.drivingRouteState = 'arrived'
+      }
+    } else {
+      const wanted = Math.atan2(dx, dz) * DEG
+      const turn = angleDelta(v.heading, wanted)
+      v.heading = (v.heading + clamp(turn, -210 * dt, 210 * dt) + 360) % 360
+      // Turn at the centre of intersections; never cut the corner across a building.
+      if (Math.abs(turn) > 8) v.speed = approach(v.speed, 0, this.config.vehicle.brake * dt)
+      else {
+        const last = this.drivingRoute.length === 1
+        const speed = Math.min(3, Math.sqrt(2 * this.config.vehicle.brake * distance))
+        v.speed = approach(v.speed, last ? speed : 3, this.config.vehicle.accel * dt)
+        const step = Math.min(distance, v.speed * dt)
+        v.x += (dx / distance) * step
+        v.z += (dz / distance) * step
+      }
+    }
+    this.pos = { x: v.x, z: v.z }
+    this.heading = v.heading
+  }
+
   private stepVehicle(dt: number) {
     const v = this.vehicle
     if (!v) return
+    if (this.automaticDriving) {
+      this.stepAutomaticVehicle(dt)
+      return
+    }
     const cfg = this.config.vehicle
     const throttle = clamp(this.input.y, -1, 1)
     // Throttle forward, reverse, brake against the motion, or coast with friction.

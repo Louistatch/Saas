@@ -1,6 +1,7 @@
 'use client'
 
 import type { AdCampaign, AdPlacement } from '@/lib/haroolife/ads/campaigns'
+import type { ServiceCustomer } from '@/lib/haroolife/city/automatic-service'
 import type { ExposureTracker } from '@/lib/haroolife/ads/exposure'
 import { type Npc, type NpcAnim, type Prop, layoutFor } from '@/lib/haroolife/city/interiors'
 import type { Interior } from '@/lib/haroolife/city/life'
@@ -154,7 +155,7 @@ export default function CityWorld({
   /** The vehicle and the driver's fare (zémidjan or taxi job). */
   fare?: StreetFare | null
   /** A passer-by close enough to climb on (or null). */
-  onHail?: (name: string | null) => void
+  onHail?: (customer: ServiceCustomer | null) => void
   onVehicle?: () => void
   filter: Category | 'all'
   selectedLot: Lot | null

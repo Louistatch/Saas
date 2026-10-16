@@ -150,47 +150,22 @@ test('avatar, joystick, collisions, camera and taxi in the single 3D world', asy
   await page.waitForTimeout(800)
   expect(errors).toEqual([])
 
-  // 4. Taxi: walk to it (the controller knows where), get in, drive, brake, get out.
+  // 4. Taxi: board, let the service move on its own, request a safe exit.
   const before = (await player()) as Player
-  expect(before.vehicle, 'the player taxi is parked in Lomé').not.toBeNull()
+  expect(before.vehicle).not.toBeNull()
   await page.evaluate(() =>
     (window as unknown as { __LOME_GOTO_TAXI?: () => void }).__LOME_GOTO_TAXI?.(),
   )
-  await expect
-    .poll(
-      async () => {
-        const p = (await player()) as Player
-        const l = await live()
-        console.log('[taxi approach]', JSON.stringify({ pos: [p.x, p.z], mode: p.mode, at: l?.at }))
-        return page.getByRole('button', { name: 'Monter dans le taxi' }).count()
-      },
-      { timeout: 45000, intervals: [1500] },
-    )
-    .toBe(1)
-  await expect(page.getByRole('button', { name: 'Monter dans le taxi' })).toBeVisible({
-    timeout: 30000,
-  })
-  await page.getByRole('button', { name: 'Monter dans le taxi' }).click()
+  const board = page.getByRole('button', { name: 'Monter dans le taxi' })
+  await expect(board).toBeVisible({ timeout: 45000 })
+  await board.click()
   await expect.poll(async () => (await player())?.driving).toBe(true)
-  await expect(page.getByRole('button', { name: 'Descendre du taxi' })).toBeVisible()
-  await hold(270, 2500, 52) // throttle
-  const driving = (await player()) as Player
-  await release()
-  expect(driving.vehicle!.speed).toBeGreaterThan(2)
-  await hold(90, 1200, 52) // brake
-  await release()
-  await expect
-    .poll(async () => Math.abs(((await player()) as Player).vehicle!.speed), { timeout: 6000 })
-    .toBeLessThan(0.6)
-  const stoppedCar = (await player()) as Player
-  expect(
-    Math.hypot(
-      stoppedCar.vehicle!.x - before.vehicle!.x,
-      stoppedCar.vehicle!.z - before.vehicle!.z,
-    ),
-  ).toBeGreaterThan(2)
+  await expect.poll(async () => {
+    const car = (await player())?.vehicle
+    return car ? Math.hypot(car.x - before.vehicle!.x, car.z - before.vehicle!.z) : 0
+  }, { timeout: 45000 }).toBeGreaterThan(2)
   await page.getByRole('button', { name: 'Descendre du taxi' }).click()
-  await expect.poll(async () => (await player())?.driving).toBe(false)
+  await expect.poll(async () => (await player())?.driving, { timeout: 90000 }).toBe(false)
   await expect.poll(async () => (await player())?.mode).toBe('idle')
   await hold(0, 1000)
   await release()

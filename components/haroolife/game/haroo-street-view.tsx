@@ -6,6 +6,7 @@
  * One engine per mount, disposed on unmount.
  */
 import type { PlayerController } from '@/lib/haroolife/city/player'
+import type { ServiceCustomer } from '@/lib/haroolife/city/automatic-service'
 import {
   type StreetAds,
   type StreetFare,
@@ -42,7 +43,7 @@ export default function HarooStreetView(props: {
   /** The vehicle and the driver's fare (zémidjan or taxi). */
   fare?: StreetFare | null
   /** A passer-by close enough to climb on (or null). */
-  onHail?: (name: string | null) => void
+  onHail?: (customer: ServiceCustomer | null) => void
   onVehicle?: () => void
 }) {
   const canvas = useRef<HTMLCanvasElement>(null)

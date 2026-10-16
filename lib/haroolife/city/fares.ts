@@ -7,6 +7,7 @@
  * francs, the taxi dearer), scaled to the game's distances; indicative, not a tariff.
  */
 import type { CityLife } from './life'
+import { type WorldPoint, findPathWhere } from './navigation'
 import { type Lot, landmarks } from './world'
 
 export type VehicleKind = 'taxi' | 'moto'
@@ -74,6 +75,60 @@ export function startFare(
   if (!to) return null
   const cells = Math.round(dist(from, to))
   return { passenger, to, cells, price: fareFor(cells, kind) }
+}
+
+/** Only public roads are eligible, even when a pedestrian could take a shortcut. */
+export function drivingRoute(
+  from: { x: number; z: number },
+  to: WorldPoint,
+  drivable: (x: number, y: number) => boolean,
+): WorldPoint[] | null {
+  const origin = { x: Math.round(from.x), y: Math.round(from.z) }
+  const stops: WorldPoint[] = []
+  for (let dx = -2; dx <= 2; dx++)
+    for (let dy = -2; dy <= 2; dy++)
+      if (Math.hypot(dx, dy) <= DROP_RADIUS && drivable(to.x + dx, to.y + dy))
+        stops.push({ x: to.x + dx, y: to.y + dy })
+  stops.sort((a, b) => dist(a, to) - dist(b, to))
+  for (const stop of stops) {
+    const path = findPathWhere(origin, stop, drivable)
+    if (path) return path
+  }
+  return null
+}
+
+/** Quote and route are calculated together, so an unreachable destination is never sold. */
+export function planServiceFare(
+  passenger: string,
+  from: { x: number; z: number },
+  kind: VehicleKind,
+  rand: () => number,
+  drivable: (x: number, y: number) => boolean,
+  places: Lot[] = landmarks(),
+): { fare: Fare; route: WorldPoint[] } | null {
+  const named = places.filter((p) => p.name)
+  const fair = named.filter((p) => {
+    const d = dist({ x: from.x, y: from.z }, p.door)
+    return d >= 8 && d <= 40
+  })
+  const pool = fair.length ? fair : named
+  const start = Math.floor(rand() * pool.length)
+  for (let i = 0; i < pool.length; i++) {
+    const place = pool[(start + i) % pool.length]
+    const route = drivingRoute(from, place.door, drivable)
+    if (!route || route.length < 3) continue
+    const cells = route.length - 1
+    return {
+      fare: {
+        passenger,
+        to: { lotId: place.id, name: place.name as string, x: place.door.x, y: place.door.y },
+        cells,
+        price: fareFor(cells, kind),
+      },
+      route,
+    }
+  }
+  return null
 }
 
 /** The vehicle is at the door and nearly still: the passenger can get off. */

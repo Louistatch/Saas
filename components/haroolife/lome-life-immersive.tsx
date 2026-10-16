@@ -8,6 +8,7 @@ import {
   safeHref,
 } from '@/lib/haroolife/ads/campaigns'
 import { ExposureTracker } from '@/lib/haroolife/ads/exposure'
+import { AutomaticDrivingService, type ServiceCustomer } from '@/lib/haroolife/city/automatic-service'
 import {
   AVATAR_CHOSEN_STORAGE,
   AVATAR_MODELS,
@@ -35,12 +36,10 @@ import {
   nextStreetCameraMode,
 } from '@/lib/haroolife/city/camera-modes'
 import {
-  type Fare,
   bearingTo,
   canDrop,
   completeFare,
   remaining,
-  startFare,
 } from '@/lib/haroolife/city/fares'
 import { CAMERA_HOME, type CameraState, worldPos } from '@/lib/haroolife/city/geometry'
 import {
@@ -372,8 +371,14 @@ export function LomeLifeImmersive() {
   const [nearVehicle, setNearVehicle] = useState(false)
   const [driving, setDriving] = useState(false)
   // Driver's job: the passer-by hailing, the fare on board and its live progress.
-  const [hail, setHail] = useState<string | null>(null)
-  const [fare, setFare] = useState<Fare | null>(null)
+  const automaticService = useMemo(() => new AutomaticDrivingService(controller, {
+    drivable: (x, y) => isCityRoad(x, y) || isDriveway(x, y),
+    places: landmarks,
+    random: Math.random,
+  }), [controller])
+  const [serviceState, setServiceState] = useState(() => automaticService.snapshot())
+  const fare = serviceState.fare
+  const hail = serviceState.customer?.name ?? null
   const [fareLive, setFareLive] = useState<{ left: number; can: boolean; arrow: number }>({
     left: 0,
     can: false,
@@ -797,7 +802,15 @@ export function LomeLifeImmersive() {
     }
   }
   const mood = wellbeing >= 75 ? 'Heureux' : wellbeing >= 40 ? 'Bien' : 'Fatigué'
-  const status = cityLife.route.length
+  const status = driving && cityLife.duty
+    ? fare
+      ? `Trajet automatique vers ${fare.to.name} · ${money(fare.price)} à l’arrivée.`
+      : serviceState.phase === 'pickup'
+        ? `Le véhicule rejoint ${hail} automatiquement.`
+        : serviceState.phase === 'paid'
+          ? `Course payée · gains du service : ${money(serviceState.earned)}.`
+          : 'Recherche automatique du prochain client…'
+    : cityLife.route.length
     ? 'En chemin vers ' + destinationName + '…'
     : cityLife.insideLot
       ? 'À l’intérieur : ' +
@@ -1042,19 +1055,18 @@ export function LomeLifeImmersive() {
             pose: { x: c.pos.x, z: c.pos.z, heading: c.heading },
           }))
           const moto = cityLifeRef.current.duty === 'moto'
-          if (ev.state === 'left') {
-            // Getting off ends the ride: a passenger on board leaves without paying.
-            setFare((f) => {
-              if (f) setNotice(`${f.passenger} est descendu·e sans payer : course annulée.`)
-              return null
-            })
-            setHail(null)
+          if (ev.state === 'left') automaticService.stop()
+          else {
+            const kind = cityLifeRef.current.duty ?? 'taxi'
+            automaticService.start(kind)
+            if (!cityLifeRef.current.duty) setCityLife((old) => ({ ...old, duty: kind }))
           }
+          setServiceState(automaticService.snapshot())
           setNotice(
             ev.state === 'entered'
               ? moto
-                ? 'Tu conduis ton zémidjan : approche-toi des passants qui font signe.'
-                : 'Tu conduis le taxi : joystick pour accélérer, freiner et tourner.'
+                ? 'Zémidjan automatique : recherche de clients, trajet et paiement inclus.'
+                : 'Taxi automatique : recherche de clients, trajet et paiement inclus.'
               : moto
                 ? 'Tu es descendu de ton zémidjan.'
                 : 'Tu es descendu du taxi.',
@@ -1062,7 +1074,7 @@ export function LomeLifeImmersive() {
         }
       }
     },
-    [],
+    [automaticService],
   )
   const onJoystickActive = useCallback(() => {
     controller.camera.follow = true
@@ -1070,7 +1082,7 @@ export function LomeLifeImmersive() {
       setCityLife((old) => ({ ...old, route: [], target: null }))
   }, [controller])
   // The keyboard walks the player in the street and indoors (every renderer lets them walk).
-  useKeyboardInput(input, panel === null && !mapView && !riding)
+  useKeyboardInput(input, panel === null && !mapView && !riding && !(driving && cityLife.duty))
   // Test hooks: walkability of a cell and an automatic walk to the player's taxi.
   useEffect(() => {
     const w = window as unknown as {
@@ -1092,7 +1104,10 @@ export function LomeLifeImmersive() {
   function toggleVehicle() {
     const what = cityLife.duty === 'moto' ? 'ton zémidjan' : 'du taxi'
     if (controller.driving) {
-      if (!controller.exitVehicle()) setNotice(`Freine avant de descendre ${what}.`)
+      if (cityLife.duty) {
+        automaticService.requestStop()
+        setServiceState(automaticService.snapshot())
+      } else if (!controller.exitVehicle()) setNotice(`Freine avant de descendre ${what}.`)
     } else if (!controller.enterVehicle())
       setNotice(
         cityLife.duty === 'moto' ? 'Approche-toi de ta moto.' : 'Approche-toi du taxi pour monter.',
@@ -1103,38 +1118,39 @@ export function LomeLifeImmersive() {
   const streetFare = useMemo(
     () => ({
       vehicle: vehicleKind,
-      hailing: !!cityLife.duty && driving,
+      hailing: !!cityLife.duty && driving && serviceState.phase === 'searching',
       passenger: fare?.passenger ?? null,
+      pickup: serviceState.phase === 'pickup' ? serviceState.customer : null,
       dest: fare ? { x: fare.to.x, y: fare.to.y, name: fare.to.name } : null,
     }),
-    [vehicleKind, cityLife.duty, driving, fare],
+    [vehicleKind, cityLife.duty, driving, fare, serviceState.phase, serviceState.customer],
   ) as {
     vehicle: 'moto' | 'taxi'
     hailing: boolean
     passenger: string | null
+    pickup: ServiceCustomer | null
     dest: { x: number; y: number; name: string } | null
   }
-  function takePassenger() {
-    const v = controller.vehicle
-    if (!hail || !v || fare) return
-    const f = startFare(hail, { x: v.x, y: v.z }, vehicleKind, Math.random)
-    if (!f) {
-      setNotice('Aucune destination connue dans cette ville.')
-      return
-    }
-    setFare(f)
-    setHail(null)
-    setNotice(
-      `${f.passenger} monte : « Emmène-moi à ${f.to.name} ». ${money(f.price)} à l’arrivée.`,
-    )
-  }
-  function dropPassenger() {
-    const v = controller.vehicle
-    if (!fare || !v || !canDrop(fare, v, v.speed)) return
-    setCityLife((old) => completeFare(old, fare, vehicleKind))
-    setNotice(`${fare.passenger} descend à ${fare.to.name} et te paie ${money(fare.price)}.`)
-    setFare(null)
-  }
+  const receiveCustomer = useCallback((customer: ServiceCustomer | null) => {
+    automaticService.offer(customer)
+  }, [automaticService])
+  useEffect(() => {
+    if (!driving || !cityLife.duty) return
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      for (const event of automaticService.update(0.2)) {
+        if (event.type === 'paid') {
+          setCityLife((old) => completeFare(old, event.fare, event.kind))
+          setNotice(`${event.fare.passenger} est arrivé·e : +${money(event.fare.price)}.`)
+        } else setNotice(event.message)
+      }
+      const next = automaticService.snapshot()
+      setServiceState((old) => old.phase === next.phase && old.fare === next.fare &&
+        old.customer === next.customer && old.stopRequested === next.stopRequested &&
+        old.completed === next.completed ? old : next)
+    }, 200)
+    return () => window.clearInterval(id)
+  }, [automaticService, driving, cityLife.duty])
   function setDuty(duty: 'moto' | 'taxi' | null) {
     if (controller.driving) {
       setNotice('Descends du véhicule avant de changer de métier.')
@@ -1144,8 +1160,8 @@ export function LomeLifeImmersive() {
       setNotice('Sors du bâtiment pour récupérer ton véhicule de service.')
       return
     }
-    setFare(null)
-    setHail(null)
+    automaticService.stop()
+    setServiceState(automaticService.snapshot())
     if (!duty) {
       setCityLife((old) => ({ ...old, duty: null }))
       setNotice('Service de transport terminé.')
@@ -1289,30 +1305,10 @@ export function LomeLifeImmersive() {
       duty: cityLife.duty ?? null,
       hail,
       fare,
+      service: serviceState,
       ...fareLive,
     }
-  }, [cityLife.duty, hail, fare, fareLive])
-  // End-to-end tests only: park the vehicle at the fare's door (driving there by joystick in a
-  // test would be slow and depend on the town's layout).
-  useEffect(() => {
-    let e2e = false
-    try {
-      e2e = localStorage.getItem('haroolife.e2e') === '1'
-    } catch {
-      e2e = false
-    }
-    if (!e2e) return
-    const w = window as unknown as { __LOME_PARK_AT_FARE?: () => boolean }
-    w.__LOME_PARK_AT_FARE = () => {
-      const v = controller.vehicle
-      if (!fare || !v) return false
-      Object.assign(v, { x: fare.to.x, z: fare.to.y, speed: 0 })
-      return true
-    }
-    return () => {
-      w.__LOME_PARK_AT_FARE = undefined
-    }
-  }, [fare, controller])
+  }, [cityLife.duty, hail, fare, fareLive, serviceState])
   useEffect(() => {
     if (!playing) return
     const id = window.setInterval(() => {
@@ -1384,6 +1380,10 @@ export function LomeLifeImmersive() {
     if (mapView && (insideAny || riding || walking)) exitMap()
   }, [insideAny, riding, walking])
   function enterMap() {
+    if (controller.driving && cityLife.duty) {
+      setPanel('map')
+      return
+    }
     setPanel(null)
     const rig = controller.camera
     if (!mapView) playHeading.current = rig.angle
@@ -1790,7 +1790,7 @@ export function LomeLifeImmersive() {
               setPanel('player')
             }}
             fare={streetFare}
-            onHail={setHail}
+            onHail={receiveCustomer}
             onVehicle={toggleVehicle}
             filter={cityFilter}
             selectedLot={selectedLot}
@@ -2048,11 +2048,13 @@ export function LomeLifeImmersive() {
                 ))}
               </span>
             </button>
-            <Joystick
-              input={input}
-              disabled={panel !== null || riding}
-              onActive={onJoystickActive}
-            />
+            {!(driving && cityLife.duty) && (
+              <Joystick
+                input={input}
+                disabled={panel !== null || riding}
+                onActive={onJoystickActive}
+              />
+            )}
           </div>
           <div className="pointer-events-auto flex flex-col items-end gap-2">
             {currentWorkStatus === 'ready' && panel === null && (
@@ -2080,21 +2082,20 @@ export function LomeLifeImmersive() {
                 {STREET_CAMERA_MODES[cameraMode].shortLabel}
               </button>
             )}
-            {driving && hail && !fare && (
-              <button
-                type="button"
-                data-testid="fare-take"
-                onClick={takePassenger}
-                className="flex min-h-12 max-w-[12rem] items-center gap-2 rounded-2xl bg-amber-400 px-3 py-2 text-left text-xs font-black text-slate-900 shadow-lg"
+            {driving && cityLife.duty && (
+              <output
+                data-testid="service-status"
+                aria-live="polite"
+                className="max-w-[13rem] rounded-2xl bg-emerald-800 px-3 py-2 text-xs text-white shadow-lg"
               >
-                <span aria-hidden className="text-lg leading-none">
-                  🙋
-                </span>
-                <span className="leading-tight">
-                  {hail} te fait signe
-                  <span className="block font-semibold">Prendre le client</span>
-                </span>
-              </button>
+                <strong className="block">
+                  {serviceState.phase === 'pickup' ? `Prise en charge de ${hail}`
+                    : serviceState.phase === 'trip' ? 'Trajet automatique'
+                      : serviceState.phase === 'paid' ? 'Client déposé · course payée'
+                        : 'Recherche automatique de clients'}
+                </strong>
+                <span>{serviceState.completed} course(s) · +{money(serviceState.earned)}</span>
+              </output>
             )}
             {driving && fare && (
               <output
@@ -2119,17 +2120,6 @@ export function LomeLifeImmersive() {
                 </span>
               </output>
             )}
-            {driving && fare && (
-              <button
-                type="button"
-                data-testid="fare-drop"
-                disabled={!fareLive.can}
-                onClick={dropPassenger}
-                className="flex min-h-12 max-w-[12rem] items-center gap-2 rounded-2xl bg-emerald-600 px-3 py-2 text-left text-xs font-black text-white shadow-lg disabled:bg-slate-400"
-              >
-                {fareLive.can ? `Déposer ${fare.passenger}` : 'Arrête-toi à la destination'}
-              </button>
-            )}
             {!insideAny && cityLife.duty && !nearVehicle && !driving && panel === null && (
               <button
                 type="button"
@@ -2152,9 +2142,12 @@ export function LomeLifeImmersive() {
                       : 'Monter dans le taxi'
                 }
                 onClick={toggleVehicle}
-                className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-400 text-[10px] font-black text-slate-900 shadow"
+                disabled={serviceState.stopRequested}
+                className="flex min-h-12 max-w-[12rem] items-center justify-center rounded-xl bg-amber-400 px-3 py-2 text-xs font-black text-slate-900 shadow disabled:bg-slate-200"
               >
-                {driving ? 'Descendre' : vehicleKind === 'moto' ? '🏍️ Monter' : '🚕 Monter'}
+                {serviceState.stopRequested ? 'Arrêt prévu à l’arrivée'
+                  : driving && fare ? 'Descendre à l’arrivée'
+                    : driving ? 'Descendre' : vehicleKind === 'moto' ? '🏍️ Monter' : '🚕 Monter'}
               </button>
             )}
             {nearAd && !insideAny && !driving && panel === null && (
@@ -2815,8 +2808,8 @@ export function LomeLifeImmersive() {
                         ))}
                       </div>
                       <p className="mt-2 text-[11px] text-slate-500">
-                        Les déplacements motorisés accélèrent le trajet simulé, sans véhicules
-                        physiques pilotables pour le moment.
+                        Ces trajets te déposent automatiquement. Pour gagner de l’argent,
+                        ouvre Métiers et monte dans ton véhicule de service.
                       </p>
                     </div>
                   </>
@@ -2984,9 +2977,9 @@ export function LomeLifeImmersive() {
                     <div className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-4">
                       <p className="text-sm font-black">Au volant : payé à la course</p>
                       <p className="text-xs text-slate-600">
-                        Monte sur ton véhicule, approche-toi d’un passant qui fait signe, emmène-le
-                        où il veut aller et arrête-toi devant : il te paie à l’arrivée selon la
-                        distance.
+                        Monte sur ton véhicule : il cherche les clients, les prend en charge,
+                        suit les routes et encaisse à l’arrivée automatiquement. Les courses
+                        s’enchaînent jusqu’à ta descente.
                       </p>
                       {(
                         [

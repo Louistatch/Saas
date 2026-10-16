@@ -29,7 +29,9 @@ import {
   recolorMap,
 } from '@/lib/haroolife/city/avatar-catalogue'
 import { type Bank, loadBank } from '@/lib/haroolife/city/bank'
-import { HAIL_RADIUS, type VehicleKind } from '@/lib/haroolife/city/fares'
+import { drivingRoute, type VehicleKind } from '@/lib/haroolife/city/fares'
+import type { ServiceCustomer } from '@/lib/haroolife/city/automatic-service'
+import { isCityRoad, isDriveway } from '@/lib/haroolife/city/world'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 import { DEFAULT_CONFIG, type PlayerController } from '@/lib/haroolife/city/player'
 import {
@@ -60,6 +62,7 @@ import { DETAIL_CELLS, buildCityGeometry } from './city-models'
 import { createGltfLoader } from './gltf'
 import { type MotoParts, buildMoto } from './moto'
 import { PerfProbe } from './perf-probe'
+import { fitTaxiModel } from './vehicle-scale'
 
 /**
  * Height of an adult (scene units; a cell is STREET_CELL). With the buildings drawn taller
@@ -89,9 +92,8 @@ const PEDESTRIAN_NAMES = ['Abla', 'Kossi', 'Enyonam', 'Komi', 'Akossiwa', 'Yao']
 const U = STREET_CELL
 /** The player's taxi (Kenney Car Kit, CC0): front along +Z, as the controller's heading 0. */
 const TAXI_URL = '/haroolife/vendor/kenney-3d/car-kit/taxi.glb'
-/** Kenney's taxi is 2.75 units long: about 4.5 m against a 1.75 m figure. */
-const TAXI_SCALE = (4.5 / 1.75) * (FIGURE / 2.75)
-const WHEEL_RADIUS = 0.3 * TAXI_SCALE
+/** Rolling radius of a compact taxi or moto, in the adult avatar's scale. */
+const WHEEL_RADIUS = 0.3 * (FIGURE / 1.75)
 /** Front wheels at full steering (radians), drawn from the stick. */
 const MAX_STEER = 0.45
 
@@ -120,7 +122,7 @@ export interface StreetWorldEvents {
   /** Building tiles loaded around the player (the game's chunk statistics). */
   onStats?: (s: StreetStats) => void
   /** At the wheel, looking for clients: the passer-by close enough to climb on (or null). */
-  onHail?: (name: string | null) => void
+  onHail?: (customer: ServiceCustomer | null) => void
   /** Touching the nearby parked vehicle boards it through the normal game action. */
   onVehicle?: () => void
 }
@@ -131,6 +133,7 @@ export interface StreetFare {
   /** Passers-by may hail the driver (the job is on and nobody is on board). */
   hailing: boolean
   passenger: string | null
+  pickup?: ServiceCustomer | null
   /** Destination door (road cell) and its name, while a passenger is on board. */
   dest: { x: number; y: number; name: string } | null
 }
@@ -851,7 +854,8 @@ export class StreetWorld {
       }
     }
     this.setBeacon(fare.passenger ? fare.dest : null)
-    if (!fare.hailing || fare.passenger) this.hailed = null
+    if ((!fare.hailing && !fare.pickup) || fare.passenger || (was.pickup && !fare.pickup))
+      this.hailed = null
   }
 
   private setBeacon(dest: StreetFare['dest']): void {
@@ -900,18 +904,23 @@ export class StreetWorld {
     this.hailTimer = 0
     const ctl = this.controller
     const v = ctl.vehicle
-    let best: { name: string; d: number } | null = null
+    if (this.fare.pickup) return
+    let best: { customer: ServiceCustomer; d: number } | null = null
     if (ctl.driving && v && this.fare.hailing && !this.fare.passenger) {
+      if (this.hailed) return
       for (const w of this.walkers) {
         const p = w.person.root.position
         const d = Math.hypot(p.x / U - v.x, p.z / U - v.z)
-        if (d <= HAIL_RADIUS && (!best || d < best.d)) best = { name: w.name, d }
+        const customer = { name: w.name, x: Math.round(p.x / U), y: Math.round(p.z / U) }
+        if ((!best || d < best.d) &&
+          drivingRoute(v, customer, (x, y) => isCityRoad(x, y) || isDriveway(x, y)))
+          best = { customer, d }
       }
     }
-    const name = best?.name ?? null
+    const name = best?.customer.name ?? null
     if (name !== this.hailed) {
       this.hailed = name
-      this.events.onHail?.(name)
+      this.events.onHail?.(best?.customer ?? null)
     }
   }
 
@@ -946,7 +955,7 @@ export class StreetWorld {
         const root = new THREE.Group()
         root.name = 'Taxi du joueur'
         const model = g.scene.clone(true)
-        model.scale.setScalar(TAXI_SCALE)
+        fitTaxiModel(model, FIGURE, U)
         model.traverse((o) => {
           const mesh = o as THREE.Mesh
           if (mesh.isMesh) {
@@ -966,8 +975,8 @@ export class StreetWorld {
         // Honest fallback: a yellow volume of the taxi's size, never an invisible car.
         const box = new THREE.Mesh(this.unitBox, this.mat('#f2c230'))
         box.name = 'Taxi du joueur'
-        box.scale.set(1.5 * TAXI_SCALE, 1.1 * TAXI_SCALE, 2.7 * TAXI_SCALE)
-        box.position.y = 0.55 * TAXI_SCALE
+        box.scale.set(1.7 * FIGURE / 1.75, 1.45 * FIGURE / 1.75, 4.1 * FIGURE / 1.75)
+        box.position.y = 0.725 * FIGURE / 1.75
         const root = new THREE.Group()
         root.add(box)
         this.scene.add(root)
@@ -984,12 +993,14 @@ export class StreetWorld {
   }
 
   private randomRoad(): { x: number; y: number } {
-    const roads = this.win?.roads ?? []
+    const roads = (this.win?.roads ?? []).filter((p) => isCityRoad(p.x, p.y) || isDriveway(p.x, p.y))
     return roads.length ? roads[Math.floor(this.rand() * roads.length)] : this.controller.cell
   }
 
   private nextRoad(at: { x: number; y: number }, prev: { x: number; y: number }) {
-    const roads = new Set((this.win?.roads ?? []).map((r) => `${r.x}:${r.y}`))
+    const roads = new Set((this.win?.roads ?? [])
+      .filter((p) => isCityRoad(p.x, p.y) || isDriveway(p.x, p.y))
+      .map((r) => `${r.x}:${r.y}`))
     const options = [
       { x: at.x + 1, y: at.y },
       { x: at.x - 1, y: at.y },
@@ -1005,6 +1016,11 @@ export class StreetWorld {
     const speed = 1.1 // units/s: a calm walk
     const v = this.controller.vehicle
     for (const w of this.walkers) {
+      if (w.name === this.fare.pickup?.name || (this.fare.hailing && w.name === this.hailed)) {
+        this.play(w.person, clipFor(w.person.spec, 'idle'))
+        w.person.mixer.update(dt)
+        continue
+      }
       if (w.name === this.fare.passenger && v) {
         // On board: behind the driver on the zémidjan, out of sight in the taxi.
         w.person.root.visible = !!this.moto
@@ -1520,8 +1536,11 @@ export class StreetWorld {
     }
     // The bounds of the actual attached model let browser checks inspect its rendered pixels.
     let vehicleScreen: { x: number; y: number; width: number; height: number } | null = null
+    let vehicleSize: { x: number; y: number; z: number } | null = null
     if (this.car?.parent === this.scene) {
       const box = new THREE.Box3().setFromObject(this.car)
+      const size = box.getSize(new THREE.Vector3())
+      vehicleSize = { x: size.x, y: size.y, z: size.z }
       const points: THREE.Vector3[] = []
       for (const x of [box.min.x, box.max.x])
         for (const y of [box.min.y, box.max.y])
@@ -1548,10 +1567,13 @@ export class StreetWorld {
       vehicleKind:
         this.car?.parent === this.scene ? (this.car === this.moto?.root ? 'moto' : 'taxi') : null,
       vehicleScreen,
+      vehicleSize,
       hailed: this.hailed,
       passenger: this.fare.passenger,
       astride: !!this.moto && ctl.driving && this.player?.root.visible === true,
       driving: ctl.driving,
+      automaticDriving: ctl.automaticDriving,
+      drivingRouteState: ctl.drivingRouteState,
       model: this.avatarModel,
       anim: this.anim,
     }

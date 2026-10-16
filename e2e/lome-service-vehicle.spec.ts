@@ -128,6 +128,36 @@ test('starting a moto service in Kara really creates a boardable vehicle', async
   await expect(page.getByRole('button', { name: 'Monter sur le zémidjan' })).toBeVisible()
   await expectMotoPixels(page)
   await page.screenshot({ path: info.outputPath('kara-moto.png') })
+  const before = await page.evaluate(
+    () => (window as unknown as { __LOME_CITY?: { wallet: number } }).__LOME_CITY?.wallet ?? 0,
+  )
+  await page.getByRole('button', { name: 'Monter sur le zémidjan' }).click()
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            (window as unknown as { __LOME_FARE?: { service: { phase: string } } }).__LOME_FARE
+              ?.service.phase,
+        ),
+      { timeout: 60000 },
+    )
+    .toBe('trip')
+  const price = await page.evaluate(
+    () =>
+      (window as unknown as { __LOME_FARE?: { fare?: { price: number } } }).__LOME_FARE?.fare
+        ?.price ?? 0,
+  )
+  expect(price).toBeGreaterThanOrEqual(200)
+  await page.getByRole('button', { name: 'Descendre du zémidjan' }).click()
+  await expect.poll(async () => (await player(page))?.driving, { timeout: 90000 }).toBe(false)
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { __LOME_CITY?: { wallet: number } }).__LOME_CITY?.wallet,
+      ),
+    )
+    .toBe(before + price)
 })
 
 test('a delayed taxi download cannot replace the moto selected in the meantime', async ({
