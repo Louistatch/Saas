@@ -146,7 +146,10 @@ test('Lomé Life 3D opens on a dense, explorable city and completes a full outin
       ),
     )
     .toBe(wallet - 500)
-  await page.getByRole('button', { name: 'Sortir', exact: true }).click()
+  // The place sheet closes once the activity starts: the door button leaves the room.
+  const door = page.getByRole('button', { name: 'Entrer ou sortir' })
+  await expect(door).toHaveAttribute('data-door', 'inside')
+  await door.click()
   await expect.poll(() => stats(page).then((s) => s?.inside ?? null)).toBeNull()
 
   // 5. A second interior type (a place of worship) and a third (a clinic) are reachable.
