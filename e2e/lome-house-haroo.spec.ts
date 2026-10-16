@@ -1,6 +1,20 @@
 import type { Page } from '@playwright/test'
 import { expect, openPlaces, test } from './lome-test'
 
+test.afterEach(async ({ page }, info) => {
+  if (info.status === info.expectedStatus) return
+  const state = await page
+    .evaluate(() => {
+      const w = window as unknown as Record<string, unknown>
+      return { player: w.__LOME_PLAYER, fare: w.__LOME_FARE, street: w.__LOME_STREET }
+    })
+    .catch(() => null)
+  await info.attach('vehicle-state', {
+    body: JSON.stringify(state, null, 2),
+    contentType: 'application/json',
+  })
+})
+
 /**
  * Refonte, jalon 1: the house drawn by the HarooLife engine (imperative Three.js) on the normal
  * /haroolife. A clothed avatar walks the way the stick points (four directions and the

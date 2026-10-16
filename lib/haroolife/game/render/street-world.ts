@@ -1,3 +1,4 @@
+import { current } from '@/lib/haroolife/city/locality'
 import { RoadTraffic } from '@/lib/haroolife/city/road-traffic'
 import {
   type AvatarActor,
@@ -630,7 +631,18 @@ export class StreetWorld {
       const water = kind === 'water'
       const road = kind === 'road' || kind === 'estate-road'
       const h = water ? 0.05 : road ? 0.12 : 0.18
-      const im = new THREE.InstancedMesh(this.unitBox, this.mat(GROUND[kind]), list.length)
+      const loc = current()
+      const color =
+        loc.id === 'lome' || loc.id === 'kara'
+          ? GROUND[kind]
+          : kind === 'land'
+            ? Object.values(loc.decor.grass)[0]
+            : kind === 'water'
+              ? loc.decor.lagoon
+              : kind === 'hill'
+                ? loc.decor.hill
+                : GROUND[kind]
+      const im = new THREE.InstancedMesh(this.unitBox, this.mat(color), list.length)
       im.name = `sol:${kind}`
       list.forEach((cell, i) => {
         m4.makeScale(U, h, U)
@@ -1086,13 +1098,17 @@ export class StreetWorld {
 
   private stepTraffic(dt: number): void {
     const ctl = this.controller
+    ctl.vehicleDimensions =
+      this.fare.vehicle === 'moto'
+        ? { halfWidth: 0.12, halfLength: 0.33 }
+        : { halfWidth: 0.27, halfLength: 0.67 }
     const point = ctl.driving && ctl.shownVehicle ? ctl.shownVehicle : ctl.pos
     const blockers = [
       {
         ...point,
         heading: ctl.heading,
-        halfWidth: ctl.driving ? 0.28 : 0.3,
-        halfLength: ctl.driving ? 0.7 : 0.3,
+        halfWidth: ctl.turning ? 1.05 : ctl.driving ? ctl.vehicleDimensions.halfWidth : 0.3,
+        halfLength: ctl.turning ? 1.05 : ctl.driving ? ctl.vehicleDimensions.halfLength : 0.3,
       },
     ]
     // NPC cars yield to crossing people, including the visible pedestrians.
@@ -1102,14 +1118,14 @@ export class StreetWorld {
           x: w.person.root.position.x / U,
           z: w.person.root.position.z / U,
           heading: 0,
-          halfWidth: 0.22,
-          halfLength: 0.22,
+          halfWidth: 0.07,
+          halfLength: 0.07,
         })
     if (!ctl.driving && ctl.vehicle)
       blockers.push({ ...ctl.vehicle, halfWidth: 0.3, halfLength: 1 })
     this.traffic.step(dt, point.x, point.z, blockers)
     ctl.obstacles = [
-      ...this.traffic.cars,
+      ...this.traffic.cars.filter((c) => this.trafficModels.has(c.id)),
       ...this.walkers
         .filter(
           (w) =>
@@ -1121,8 +1137,8 @@ export class StreetWorld {
           x: w.person.root.position.x / U,
           z: w.person.root.position.z / U,
           heading: 0,
-          halfWidth: 0.13,
-          halfLength: 0.13,
+          halfWidth: 0.07,
+          halfLength: 0.07,
         })),
     ]
     for (const agent of this.traffic.cars) {
@@ -1599,6 +1615,7 @@ export class StreetWorld {
       traffic: this.traffic.cars.map((c) => ({
         id: c.id,
         kind: c.kind,
+        shown: this.trafficModels.has(c.id),
         x: c.x,
         z: c.z,
         stopped: c.stopped,

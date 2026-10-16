@@ -57,10 +57,10 @@ test('mobile: all requested regions open through the national map, preserving th
       )
       .toBeGreaterThan(20)
     expect((await save(page)).life.city.buildings).toEqual(state.life.city.buildings)
-    await page.screenshot({ path: info.outputPath(`${id}-street.png`) })
     const dialog = page.locator('[aria-labelledby="event-title"]')
     for (let n = 0; n < 6 && (await dialog.isVisible()); n++)
       await dialog.getByRole('button').first().click()
+    await page.screenshot({ path: info.outputPath(`${id}-street.png`) })
   }
   expect(errors).toEqual([])
 })

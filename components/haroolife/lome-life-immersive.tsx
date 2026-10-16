@@ -2679,7 +2679,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
                     {panel === 'messages' && realtime.state.status === 'online'
                       ? 'Lomé Life · En direct'
-                      : 'Lomé Life · Quartier fictif'}
+                      : `HarooLife · ${LOCALITIES[cityLife.locality].name} · Quartier fictif`}
                   </p>
                   <Drawer.Title className="text-xl font-black">{title}</Drawer.Title>
                 </div>
@@ -2938,101 +2938,119 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                         </div>
                       )
                     })}
-                    <p className="text-sm font-black">Mon quartier</p>
-                    <div
-                      className="flex flex-wrap gap-1"
-                      role="group"
-                      aria-label="Filtrer la carte"
-                    >
-                      {MAP_FILTERS.map((f) => (
-                        <button
-                          type="button"
-                          key={f.id}
-                          aria-pressed={mapFilter === f.id}
-                          onClick={() => setMapFilter(f.id)}
-                          className={
-                            'rounded-full px-3 py-1.5 text-xs font-semibold ' +
-                            (mapFilter === f.id
-                              ? 'bg-slate-900 text-white'
-                              : 'bg-slate-100 text-slate-700')
-                          }
+                    {cityLife.locality === 'lome' ? (
+                      <>
+                        <p className="text-sm font-black">Mon quartier</p>
+                        <div
+                          className="flex flex-wrap gap-1"
+                          role="group"
+                          aria-label="Filtrer la carte"
                         >
-                          {f.label}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {LIFE_LOCATIONS.filter((place) => matchesFilter(mapFilter, place.venue)).map(
-                        (place) => (
-                          <button
-                            type="button"
-                            key={place.name}
-                            onClick={() => go(place.x, place.y)}
-                            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left hover:border-emerald-400"
-                          >
-                            <span className="text-xl">
-                              {LOCATION_ICONS[LIFE_LOCATIONS.indexOf(place)]}
-                            </span>
-                            <span className="min-w-0 text-xs font-bold">
-                              {place.name}
-                              <span className="block font-normal text-slate-500">
-                                {districtAt(life.cityId, place.x, place.y).name}
-                              </span>
-                            </span>
-                            <ArrowRight size={14} className="ml-auto shrink-0 text-emerald-700" />
-                          </button>
-                        ),
-                      )}
-                    </div>
-                    <div className="rounded-2xl bg-slate-50 p-3 text-sm">
-                      <strong>Les quartiers de {cityDef.name}</strong>
-                      <ul className="mt-2 space-y-1 text-xs text-slate-600">
-                        {cityDef.districts.map((d) => (
-                          <li key={d.id}>
-                            <strong className="text-slate-800">{d.name}</strong> · {d.note}
-                          </li>
-                        ))}
-                        <li>
-                          <strong className="text-sky-800">{cityDef.water.northEast}</strong> au
-                          nord-est,{' '}
-                          <strong className="text-sky-800">{cityDef.water.southWest}</strong> au
-                          sud-ouest.
-                        </li>
-                      </ul>
-                      <p className="mt-1 text-[11px] text-slate-500">
-                        Les noms du domaine suivent la ville où tu habites. Pour changer de ville,
-                        voyage depuis la carte du Togo ci-dessus.
-                      </p>
-                    </div>
-                    <div className="rounded-2xl bg-slate-50 p-3 text-sm">
-                      <strong>Panneaux publicitaires</strong>
-                      <p className="mt-1 text-xs text-slate-500">
-                        Un panneau par quartier, visible par tous les habitants. Tarif affiché par
-                        semaine ; aucune réservation n’est encore facturée.
-                      </p>
-                      <ul className="mt-2 space-y-1">
-                        {BILLBOARDS.map((bb) => (
-                          <li key={bb.id}>
+                          {MAP_FILTERS.map((f) => (
                             <button
                               type="button"
-                              onClick={() => {
-                                setBillboard(bb.id)
-                                setPanel('billboard')
-                              }}
-                              className="flex w-full items-center justify-between rounded-xl bg-white px-3 py-2 text-left text-xs ring-1 ring-slate-200"
+                              key={f.id}
+                              aria-pressed={mapFilter === f.id}
+                              onClick={() => setMapFilter(f.id)}
+                              className={
+                                'rounded-full px-3 py-1.5 text-xs font-semibold ' +
+                                (mapFilter === f.id
+                                  ? 'bg-slate-900 text-white'
+                                  : 'bg-slate-100 text-slate-700')
+                              }
                             >
-                              <span>
-                                <strong>{cityDef.districts[bb.district].name}</strong> ·{' '}
-                                {bb.status === 'house' ? bb.headline : 'Disponible'}
-                              </span>
-                              <span className="font-bold text-emerald-800">
-                                {money(bb.priceWeek)}/sem.
-                              </span>
+                              {f.label}
                             </button>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {LIFE_LOCATIONS.filter((place) =>
+                            matchesFilter(mapFilter, place.venue),
+                          ).map((place) => (
+                            <button
+                              type="button"
+                              key={place.name}
+                              onClick={() => go(place.x, place.y)}
+                              className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left hover:border-emerald-400"
+                            >
+                              <span className="text-xl">
+                                {LOCATION_ICONS[LIFE_LOCATIONS.indexOf(place)]}
+                              </span>
+                              <span className="min-w-0 text-xs font-bold">
+                                {place.name}
+                                <span className="block font-normal text-slate-500">
+                                  {districtAt(life.cityId, place.x, place.y).name}
+                                </span>
+                              </span>
+                              <ArrowRight size={14} className="ml-auto shrink-0 text-emerald-700" />
+                            </button>
+                          ))}
+                        </div>
+                        <div className="rounded-2xl bg-slate-50 p-3 text-sm">
+                          <strong>Les quartiers de {cityDef.name}</strong>
+                          <ul className="mt-2 space-y-1 text-xs text-slate-600">
+                            {cityDef.districts.map((d) => (
+                              <li key={d.id}>
+                                <strong className="text-slate-800">{d.name}</strong> · {d.note}
+                              </li>
+                            ))}
+                            <li>
+                              <strong className="text-sky-800">{cityDef.water.northEast}</strong> au
+                              nord-est,{' '}
+                              <strong className="text-sky-800">{cityDef.water.southWest}</strong> au
+                              sud-ouest.
+                            </li>
+                          </ul>
+                          <p className="mt-1 text-[11px] text-slate-500">
+                            Les noms du domaine suivent la ville où tu habites. Pour changer de
+                            ville, voyage depuis la carte du Togo ci-dessus.
+                          </p>
+                        </div>
+                        <div className="rounded-2xl bg-slate-50 p-3 text-sm">
+                          <strong>Panneaux publicitaires</strong>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Un panneau par quartier, visible par tous les habitants. Tarif affiché
+                            par semaine ; aucune réservation n’est encore facturée.
+                          </p>
+                          <ul className="mt-2 space-y-1">
+                            {BILLBOARDS.map((bb) => (
+                              <li key={bb.id}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setBillboard(bb.id)
+                                    setPanel('billboard')
+                                  }}
+                                  className="flex w-full items-center justify-between rounded-xl bg-white px-3 py-2 text-left text-xs ring-1 ring-slate-200"
+                                >
+                                  <span>
+                                    <strong>{cityDef.districts[bb.district].name}</strong> ·{' '}
+                                    {bb.status === 'house' ? bb.headline : 'Disponible'}
+                                  </span>
+                                  <span className="font-bold text-emerald-800">
+                                    {money(bb.priceWeek)}/sem.
+                                  </span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </>
+                    ) : (
+                      <section
+                        className="rounded-2xl bg-slate-50 p-3 text-sm"
+                        aria-label="Quartiers de la ville"
+                      >
+                        <strong>Les quartiers de {LOCALITIES[cityLife.locality].name}</strong>
+                        <ul className="mt-2 space-y-1 text-xs text-slate-600">
+                          {districts().map((d) => (
+                            <li key={d.id}>
+                              <strong>{d.name}</strong> · {d.note}
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    )}
                     <div className="rounded-2xl bg-slate-50 p-3 text-sm">
                       <strong>Déplacement</strong>
                       <p className="mt-1 text-xs text-slate-500">
@@ -3798,7 +3816,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                             </p>
                             <p className="text-xs text-slate-500">
                               📍 {districts().find((d) => d.id === lot.district)?.name},{' '}
-                              {cityDef.name} · {TYPE_LABELS[lot.type]}
+                              {LOCALITIES[cityLife.locality].name} · {TYPE_LABELS[lot.type]}
                               {lot.name && lot.floors > 1 ? ` · ${lot.floors} niveaux` : ''}
                             </p>
                           </div>

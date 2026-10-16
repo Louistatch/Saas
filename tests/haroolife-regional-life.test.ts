@@ -32,6 +32,7 @@ import {
 } from '../lib/haroolife/city/employment'
 import { takeFlight, airTrip } from '../lib/haroolife/city/aviation'
 import { purchaseAndConsume } from '../lib/haroolife/city/commerce'
+import { drivingRoute } from '../lib/haroolife/city/fares'
 import { PlayerController } from '../lib/haroolife/city/player'
 import { RoadTraffic } from '../lib/haroolife/city/road-traffic'
 import { touchesBody, bodiesOverlap } from '../lib/haroolife/city/collisions'
@@ -309,3 +310,139 @@ for (const id of ['dapaong', 'sokode', 'kpalime', 'atakpame', 'kara'] as const)
     assert.ok(s.life.pos.x >= 0, 'never save the temporary workplace context position')
     setLocality('lome')
   })
+
+test('autopilot detours around a stationary vehicle and completes the trip without crossing it', () => {
+  const road = (x: number, z: number) =>
+    x >= 0 && x <= 12 && z >= 0 && z <= 6 && (x === 0 || x === 12 || z === 0 || z === 6)
+  const ctl = new PlayerController({ walkable: road, drivable: road }, { x: 0, y: 0 })
+  ctl.vehicle = { x: 0, z: 0, heading: 90, speed: 0 }
+  ctl.enterVehicle()
+  const obstacle = { x: 6, z: -0.3, heading: 90, halfWidth: 0.2, halfLength: 0.54 }
+  ctl.obstacles = [obstacle]
+  assert.ok(ctl.driveAutomatically(Array.from({ length: 12 }, (_, i) => ({ x: i + 1, z: 0 }))))
+  let detoured = false
+  for (let i = 0; i < 60 * 60; i++) {
+    ctl.update(1 / 60)
+    if (ctl.vehicle.z > 1) detoured = true
+    const p = ctl.shownVehicle!
+    assert.equal(bodiesOverlap({ ...p, halfWidth: 0.27, halfLength: 0.67 }, obstacle), false)
+  }
+  assert.ok(detoured)
+  assert.equal(ctl.drivingRouteState, 'arrived')
+  assert.ok(Math.hypot(ctl.vehicle.x - 12, ctl.vehicle.z) <= 1)
+})
+
+for (const kind of ['taxi', 'moto'] as const)
+  test(`Lomé ${kind}: reaches a real market in the bounded moving traffic`, () => {
+    setLocality('lome')
+    const road = (x: number, z: number) => isCityRoad(x, z) || isDriveway(x, z)
+    const from = LOCALITIES.lome.gate
+    const ctl = new PlayerController({ walkable: road, drivable: road }, from)
+    ctl.vehicle = { x: from.x, z: from.y, heading: 0, speed: 0 }
+    ctl.vehicleDimensions =
+      kind === 'moto'
+        ? { halfWidth: 0.12, halfLength: 0.33 }
+        : { halfWidth: 0.27, halfLength: 0.67 }
+    ctl.enterVehicle()
+    const goal = landmarks().find((l) => l.type === 'market')!.door
+    const route = drivingRoute(ctl.vehicle, goal, road)!
+    ctl.driveAutomatically(route.map((p) => ({ x: p.x, z: p.y })))
+    const traffic = new RoadTraffic(road)
+    for (let i = 0; i < 60 * 180 && ctl.drivingRouteState !== 'arrived'; i++) {
+      const p = ctl.shownVehicle!
+      traffic.step(1 / 60, p.x, p.z, [{ ...p, ...ctl.vehicleDimensions }])
+      ctl.obstacles = traffic.cars
+      ctl.update(1 / 60)
+      assert.ok(road(Math.round(ctl.vehicle.x), Math.round(ctl.vehicle.z)))
+    }
+    assert.equal(ctl.drivingRouteState, 'arrived')
+    assert.ok(Math.hypot(ctl.vehicle.x - goal.x, ctl.vehicle.z - goal.y) <= 2.2)
+  })
+
+test('traffic keeps real-time speed on a slow phone instead of losing frame time', () => {
+  const road = (x: number, z: number) =>
+    x >= 0 && x <= 40 && z >= 0 && z <= 40 && (x % 6 === 0 || z % 6 === 0)
+  const normal = new RoadTraffic(road, 1)
+  const slow = new RoadTraffic(road, 1)
+  for (let i = 0; i < 120; i++) normal.step(1 / 60, 20, 20)
+  for (let i = 0; i < 8; i++) slow.step(0.25, 20, 20)
+  assert.ok(Math.hypot(normal.cars[0].x - slow.cars[0].x, normal.cars[0].z - slow.cars[0].z) < 0.2)
+})
+
+test('a waiting passenger does not block both traffic lanes: body dimensions match the adult models', () => {
+  const traffic = new RoadTraffic((x, z) => z === 0 && x >= 0 && x <= 40, 1)
+  traffic.cars.push({
+    id: 0,
+    kind: 'taxi',
+    from: { x: 10, z: 0 },
+    to: { x: 11, z: 0 },
+    t: 0,
+    stopped: false,
+    x: 10,
+    z: -0.3,
+    heading: 90,
+    halfWidth: 0.2,
+    halfLength: 0.54,
+  })
+  const person = { x: 12, z: 0, heading: 0, halfWidth: 0.07, halfLength: 0.07 }
+  for (let i = 0; i < 60 * 5; i++) {
+    traffic.step(1 / 60, 10, 0, [person])
+    assert.equal(bodiesOverlap(traffic.cars[0], person), false)
+  }
+  assert.ok(traffic.cars[0].x > 14, 'the customer waits while the lane remains passable')
+})
+
+test('oncoming traffic crosses an avenue without random turns locking both lanes', () => {
+  const traffic = new RoadTraffic(
+    (x, z) => Math.abs(x) <= 20 && Math.abs(z) <= 20 && (x === 0 || z === 0),
+    2,
+  )
+  traffic.cars.push(
+    {
+      id: 0,
+      kind: 'taxi',
+      from: { x: -1, z: 0 },
+      to: { x: 0, z: 0 },
+      t: 1,
+      stopped: false,
+      x: 0,
+      z: -0.3,
+      heading: 90,
+      halfWidth: 0.2,
+      halfLength: 0.54,
+    },
+    {
+      id: 1,
+      kind: 'sedan',
+      from: { x: 1, z: 0 },
+      to: { x: 0, z: 0 },
+      t: 1,
+      stopped: false,
+      x: 0,
+      z: 0.3,
+      heading: 270,
+      halfWidth: 0.2,
+      halfLength: 0.54,
+    },
+  )
+  for (let i = 0; i < 180; i++) {
+    traffic.step(1 / 60, 0, 0)
+    assert.equal(bodiesOverlap(traffic.cars[0], traffic.cars[1]), false)
+  }
+  assert.ok(traffic.cars[0].x > 2 && traffic.cars[1].x < -2)
+})
+
+test('a turn checks the entire body sweep before rotating, then resumes when clear', () => {
+  const ctl = new PlayerController({ walkable: () => true, drivable: () => true }, { x: 0, y: 0 })
+  ctl.vehicle = { x: 0, z: 0, heading: 0, speed: 0 }
+  ctl.enterVehicle()
+  ctl.obstacles = [{ x: -0.3, z: 0.8, heading: 0, halfWidth: 0.1, halfLength: 0.1 }]
+  ctl.driveAutomatically(Array.from({ length: 4 }, (_, i) => ({ x: -i - 1, z: 0 })))
+  for (let i = 0; i < 60; i++) ctl.update(1 / 60)
+  assert.equal(ctl.vehicle.heading, 0, 'never freeze halfway into a blocked turn')
+  assert.equal(ctl.vehicle.x, 0)
+  ctl.obstacles = []
+  for (let i = 0; i < 600; i++) ctl.update(1 / 60)
+  assert.equal(ctl.drivingRouteState, 'arrived')
+  assert.equal(ctl.vehicle.x, -4)
+})

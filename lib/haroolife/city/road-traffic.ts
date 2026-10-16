@@ -19,7 +19,7 @@ export class RoadTraffic {
   private seed = 723
   constructor(
     private readonly road: (x: number, z: number) => boolean,
-    readonly count = 10,
+    readonly count = 6,
   ) {}
   private random() {
     this.seed = (this.seed * 16807) % 2147483647
@@ -31,6 +31,20 @@ export class RoadTraffic {
     )
     const onward = choices.filter((p) => p.x !== previous.x || p.z !== previous.z)
     const list = onward.length ? onward : choices
+    const dx = from.x - previous.x
+    const dz = from.z - previous.z
+    if (dx || dz) {
+      // Keep the avenue ahead; random turns at every cell used to gridlock opposite lanes.
+      // At the end of a street, prefer the right turn before crossing the oncoming lane.
+      for (const [sx, sz] of [
+        [dx, dz],
+        [dz, -dx],
+        [-dz, dx],
+      ]) {
+        const next = list.find((p) => p.x === from.x + sx && p.z === from.z + sz)
+        if (next) return next
+      }
+    }
     return list.length ? list[Math.floor(this.random() * list.length)] : from
   }
   private pose(car: TrafficCar, t: number): CollisionBody {
@@ -38,8 +52,8 @@ export class RoadTraffic {
     const dz = car.to.z - car.from.z
     // Right-hand traffic: oncoming vehicles use the opposite side of the centre line.
     return {
-      x: car.from.x + dx * t + dz * 0.27,
-      z: car.from.z + dz * t - dx * 0.27,
+      x: car.from.x + dx * t + dz * 0.3,
+      z: car.from.z + dz * t - dx * 0.3,
       heading: (Math.atan2(dx, dz) * 180) / Math.PI,
       halfWidth: car.halfWidth,
       halfLength: car.halfLength,
@@ -78,7 +92,11 @@ export class RoadTraffic {
     return null
   }
   step(dt: number, cx: number, cz: number, blockers: CollisionBody[] = []): void {
-    const delta = Math.min(0.05, Math.max(0, dt))
+    const elapsed = Math.min(0.25, Math.max(0, dt))
+    const steps = Math.max(1, Math.ceil(elapsed / 0.05))
+    for (let i = 0; i < steps; i++) this.advance(elapsed / steps, cx, cz, blockers)
+  }
+  private advance(delta: number, cx: number, cz: number, blockers: CollisionBody[]): void {
     for (let id = 0; id < this.count; id++) {
       let car = this.cars.find((c) => c.id === id)
       if (!car || Math.hypot(car.x - cx, car.z - cz) > 17) {
@@ -102,7 +120,7 @@ export class RoadTraffic {
       // Never stop a vehicle from clearing the way: a following taxi is behind it, not an
       // obstacle ahead. Inflating both ends used to freeze the two vehicles permanently.
       car.stopped =
-        blockers.some((body) => approaching(body) && bodiesOverlap(ahead, body, 0.1)) ||
+        blockers.some((body) => approaching(body) && bodiesOverlap(ahead, body, 0.015)) ||
         this.cars.some(
           (body) => body.id !== id && approaching(body) && bodiesOverlap(ahead, body, 0.02),
         )

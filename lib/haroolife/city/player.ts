@@ -142,6 +142,7 @@ export class PlayerController {
   pos: Vec2
   /** Visible moving traffic and physical street objects, refreshed by the street renderer. */
   obstacles: CollisionBody[] = []
+  vehicleDimensions = { halfWidth: 0.27, halfLength: 0.67 }
   /** Degrees around the vertical axis (0 = facing +z). */
   heading = 0
   vel: Vec2 = { x: 0, z: 0 }
@@ -153,6 +154,7 @@ export class PlayerController {
   /** Which vehicle the player drives (null on foot). */
   driving = false
   automaticDriving = false
+  turning = false
   /** Physical street lane used by the service, also drawn by the renderer. */
   get shownVehicle() {
     const v = this.vehicle
@@ -161,19 +163,28 @@ export class PlayerController {
     const angle = v.heading / DEG
     return { ...v, x: v.x + Math.cos(angle) * lane, z: v.z - Math.sin(angle) * lane }
   }
-  private vehicleBlocked(x: number, z: number) {
-    const v = this.shownVehicle
-    if (!v || !this.vehicle) return false
+  private vehicleBlocked(x: number, z: number, heading = this.vehicle?.heading ?? 0) {
+    if (!this.vehicle) return false
+    const lane = this.automaticDriving && this.driving ? 0.3 : 0
+    const angle = heading / DEG
     const body = {
-      x: x + v.x - this.vehicle.x,
-      z: z + v.z - this.vehicle.z,
-      heading: v.heading,
-      halfWidth: 0.27,
-      halfLength: 0.67,
+      x: x + Math.cos(angle) * lane,
+      z: z - Math.sin(angle) * lane,
+      heading,
+      ...this.vehicleDimensions,
     }
     return this.obstacles.some((o) => bodiesOverlap(body, o, 0.015))
   }
+  private turnClear(x: number, z: number, heading: number, wanted: number) {
+    const delta = angleDelta(heading, wanted)
+    const steps = Math.max(1, Math.ceil(Math.abs(delta) / 10))
+    for (let i = 0; i <= steps; i++)
+      if (this.vehicleBlocked(x, z, heading + (delta * i) / steps)) return false
+    return true
+  }
   private drivingRoute: Vec2[] = []
+  private trafficWait = 0
+  private automaticGoal: Vec2 | null = null
   drivingRouteState: 'idle' | 'moving' | 'arrived' | 'blocked' = 'idle'
   camera: CameraRig
   readonly config: PlayerConfig
@@ -343,7 +354,7 @@ export class PlayerController {
     if (
       !this.driving &&
       this.vehicle &&
-      touchesBody(x, z, r, { ...this.vehicle, halfWidth: 0.22, halfLength: 0.65 })
+      touchesBody(x, z, r, { ...this.vehicle, ...this.vehicleDimensions })
     )
       return false
     for (const [ox, oz] of [
@@ -416,16 +427,94 @@ export class PlayerController {
     }
     this.automaticDriving = true
     this.drivingRoute = route.map((p) => ({ ...p }))
+    this.automaticGoal = { ...route[route.length - 1] }
     this.drivingRouteState = 'moving'
+    this.trafficWait = 0
     this.vehicle.speed = 0
     return true
   }
 
   stopAutomaticDriving(): void {
+    this.turning = false
     this.automaticDriving = false
     this.drivingRoute = []
     this.drivingRouteState = 'idle'
+    this.automaticGoal = null
     if (this.vehicle) this.vehicle.speed = 0
+  }
+
+  /** A persistent traffic jam changes the route, never the position or the fare payment. */
+  private avoidTraffic(): void {
+    const v = this.vehicle
+    const end = this.automaticGoal
+    if (!v || !end) return
+    const centre = { x: Math.round(v.x), z: Math.round(v.z) }
+    const angle = v.heading / DEG
+    const retreat = {
+      x: Math.round(v.x - Math.sin(angle) * 1.5),
+      z: Math.round(v.z - Math.cos(angle) * 1.5),
+    }
+    const close = this.obstacles.some((o) => Math.hypot(o.x - v.x, o.z - v.z) < 2)
+    const candidates = [
+      centre,
+      { x: centre.x + 1, z: centre.z },
+      { x: centre.x - 1, z: centre.z },
+      { x: centre.x, z: centre.z + 1 },
+      { x: centre.x, z: centre.z - 1 },
+    ]
+      .filter((p) => this.world.drivable(p.x, p.z) && !this.vehicleBlocked(p.x, p.z))
+      .sort((a, b) => Math.hypot(a.x - v.x, a.z - v.z) - Math.hypot(b.x - v.x, b.z - v.z))[0]
+    const start =
+      close &&
+      this.world.drivable(retreat.x, retreat.z) &&
+      !this.vehicleBlocked(retreat.x, retreat.z)
+        ? retreat
+        : candidates
+    if (!start) return
+    // Finish at a free kerb next to a crowded stop when the precise road cell is occupied.
+    const goals = [
+      end,
+      { x: end.x + 1, z: end.z },
+      { x: end.x - 1, z: end.z },
+      { x: end.x, z: end.z + 1 },
+      { x: end.x, z: end.z - 1 },
+    ].filter((p) => this.world.drivable(p.x, p.z) && !this.vehicleBlocked(p.x, p.z))
+    if (!goals.length) return
+    const key = (p: Vec2) => `${p.x}:${p.z}`
+    const queue = [start]
+    const seen = new Set([key(start)])
+    const previous = new Map<string, Vec2>()
+    for (let i = 0; i < queue.length && i < 5000; i++) {
+      const at = queue[i]
+      if (i && goals.some((p) => p.x === at.x && p.z === at.z)) {
+        const route: Vec2[] = []
+        let point = at
+        while (key(point) !== key(start)) {
+          route.push(point)
+          const parent = previous.get(key(point))
+          if (!parent) return
+          point = parent
+        }
+        route.reverse()
+        // First return to the centre of this road cell, then follow adjacent cells only.
+        if (Math.hypot(v.x - start.x, v.z - start.z) > 0.02) route.unshift(start)
+        this.drivingRoute = route
+        return
+      }
+      for (const [dx, dz] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        const p = { x: at.x + dx, z: at.z + dz }
+        const k = key(p)
+        if (seen.has(k) || !this.world.drivable(p.x, p.z) || this.vehicleBlocked(p.x, p.z)) continue
+        seen.add(k)
+        previous.set(k, at)
+        queue.push(p)
+      }
+    }
   }
 
   private stepAutomaticVehicle(dt: number): void {
@@ -452,7 +541,47 @@ export class PlayerController {
     } else {
       const wanted = Math.atan2(dx, dz) * DEG
       const turn = angleDelta(v.heading, wanted)
+      // Back away before a tight U-turn, so the body and its lane do not sweep through
+      // the vehicle that made us reroute. Reversing is slow and still collision checked.
+      if (
+        Math.abs(turn) > 100 &&
+        this.obstacles.some((o) => Math.hypot(o.x - v.x, o.z - v.z) < 2)
+      ) {
+        const step = Math.min(distance, dt * 0.9)
+        const nx = v.x + (dx / distance) * step
+        const nz = v.z + (dz / distance) * step
+        if (!this.vehicleBlocked(nx, nz)) {
+          v.x = nx
+          v.z = nz
+          v.speed = -0.9
+        } else v.speed = 0
+        this.pos = { x: v.x, z: v.z }
+        this.heading = v.heading
+        return
+      }
+      if (Math.abs(turn) > 8 && !this.turnClear(v.x, v.z, v.heading, wanted)) {
+        this.turning = false
+        v.speed = 0
+        this.trafficWait += dt
+        if (this.trafficWait > 4) {
+          this.trafficWait = 0
+          this.avoidTraffic()
+        }
+        return
+      }
+      this.turning = Math.abs(turn) > 8
+      const previousHeading = v.heading
       v.heading = (v.heading + clamp(turn, -210 * dt, 210 * dt) + 360) % 360
+      if (this.vehicleBlocked(v.x, v.z)) {
+        v.heading = previousHeading
+        v.speed = 0
+        this.trafficWait += dt
+        if (this.trafficWait > 4) {
+          this.trafficWait = 0
+          this.avoidTraffic()
+        }
+        return
+      }
       // Turn at the centre of intersections; never cut the corner across a building.
       if (Math.abs(turn) > 8) v.speed = approach(v.speed, 0, this.config.vehicle.brake * dt)
       else {
@@ -464,8 +593,14 @@ export class PlayerController {
         const nz = v.z + (dz / distance) * step
         if (this.vehicleBlocked(nx, nz)) {
           v.speed = 0
+          this.trafficWait += dt
+          if (this.trafficWait > 4) {
+            this.trafficWait = 0
+            this.avoidTraffic()
+          }
           return
         }
+        this.trafficWait = 0
         v.x = nx
         v.z = nz
       }
