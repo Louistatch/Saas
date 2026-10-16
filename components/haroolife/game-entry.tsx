@@ -8,6 +8,7 @@ import { performGameLogout } from '@/lib/auth/logout'
 import { LOCALITIES } from '@/lib/haroolife/city/locality'
 import { CITY_STORAGE } from '@/lib/haroolife/city/migrate'
 import { GAME_ENTERED, rememberGameReturn, withGameReturn } from '@/lib/haroolife/entry'
+import { INVITE_STORAGE, inviteCodeFrom } from '@/lib/haroolife/invite'
 import { ArrowLeft, ArrowRight, Leaf, ShieldCheck, UserRound } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
@@ -60,6 +61,14 @@ export default function GameEntry() {
   // « Jouer en visiteur »: one tap, then straight into the game once the account exists.
   const [visit, setVisit] = useState<'idle' | 'busy' | string>('idle')
   useEffect(() => {
+    // Arrived by a friend's link: the code waits on this phone until the game can accept it.
+    const invite = inviteCodeFrom(new URLSearchParams(window.location.search).get('invite'))
+    if (invite)
+      try {
+        localStorage.setItem(INVITE_STORAGE, invite)
+      } catch {
+        /* storage refused: no bonus, the game still opens */
+      }
     setReturnTo(window.location.pathname + window.location.search)
     setSummary(savedSummary())
     try {

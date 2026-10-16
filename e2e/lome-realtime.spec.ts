@@ -555,14 +555,15 @@ test('the game follows the player to another phone, and a hand-raised wallet is 
   const saved = (await cloudOf(one.page))?.version ?? 0
   expect(saved).toBeGreaterThan(0)
 
+  // Phone 1 is put away first: its last save on the way out is the newest game, which phone 2
+  // would rightly take over later (that would not be the cap this test checks).
+  expect(one.errors).toEqual([])
+  await one.context.close()
+
   // Phone 2, never used by Yawa: it opens her online game, not a new one.
   const two = await signIn(browser, 'yawa', devices['Pixel 7'])
   await open(two.page)
   await expect.poll(async () => (await save(two.page))?.life.wallet).toBe(expected)
-
-  // Phone 1 is put away (still open, it would keep saving a newer game, which would rightly win).
-  expect(one.errors).toEqual([])
-  await one.context.close()
   // A wallet raised by hand on phone 2 is brought back to what the server recognises.
   await two.page.goto('/robots.txt')
   await two.page.evaluate(() => {
@@ -691,4 +692,68 @@ test('a visitor plays HarooLife without an account, talks with the players, and 
   await expect(page.locator('input#password')).toBeVisible({ timeout: 15000 })
   expect(errors).toEqual([])
   await context.close()
+})
+
+test('a friend invited by WhatsApp link arrives in one tap, and both get their game bonus once', async ({
+  browser,
+}, testInfo) => {
+  test.setTimeout(150_000)
+  test.skip(/mobile/.test(testInfo.project.name), 'opens its own Android context')
+  // Ama opens « Inviter » in her phone: her link, ready for WhatsApp.
+  const ama = await player(browser, 'ama', devices['Desktop Chrome'])
+  const openInvite = async () => {
+    await ama.page
+      .getByRole('navigation', { name: 'Navigation du jeu' })
+      .getByRole('button', { name: 'Téléphone' })
+      .click()
+    await ama.page.getByRole('button', { name: /Inviter$/ }).click()
+    await expect(ama.page.getByTestId('invite')).toBeVisible()
+  }
+  await openInvite()
+  const link = (await ama.page.getByTestId('invite-link').textContent())?.trim() ?? ''
+  const code = new URL(link).searchParams.get('invite') ?? ''
+  expect(code).toMatch(/^[A-HJ-NP-Z2-9]{6}$/)
+  const wa = ama.page.getByRole('link', { name: 'Inviter sur WhatsApp' })
+  const href = (await wa.getAttribute('href')) ?? ''
+  expect(href.startsWith('https://wa.me/?text=')).toBe(true)
+  expect(decodeURIComponent(href)).toContain(`/haroolife?invite=${code}`)
+  await ama.page.screenshot({ path: testInfo.outputPath('invite-panel.png') })
+
+  // The friend opens the link on a phone, no account: one tap, and the bonus is there.
+  const context = await browser.newContext({
+    ...devices['Pixel 7'],
+    baseURL: 'http://127.0.0.1:3000',
+  })
+  await context.addInitScript(() => localStorage.setItem('haroolife.avatar.chosen', '1'))
+  const friend = await context.newPage()
+  const errors: string[] = []
+  friend.on('pageerror', (e) => errors.push(e.message))
+  await friend.goto(`/haroolife?invite=${code}`, { waitUntil: 'domcontentloaded' })
+  await friend.getByRole('button', { name: 'Jouer en visiteur' }).click()
+  await expect(friend.locator('canvas:visible').first()).toBeVisible({ timeout: 30000 })
+  await expect(
+    friend.getByText('Bienvenue ! Ama (test) t’a invité : +2 000 FCFA de jeu.'),
+  ).toBeVisible({
+    timeout: 30000,
+  })
+  await expect
+    .poll(() => friend.evaluate(() => localStorage.getItem('haroolife.invite.v1')))
+    .toBeNull()
+  await friend.screenshot({ path: testInfo.outputPath('invite-friend.png') })
+
+  // Back in her phone, Ama receives hers, once.
+  await ama.page
+    .getByRole('dialog', { name: 'Inviter des amis' })
+    .getByRole('button', { name: 'Fermer' })
+    .click()
+  await expect(ama.page.getByTestId('invite')).toHaveCount(0)
+  await openInvite()
+  await expect(
+    ama.page.getByText('Visiteur (test) est arrivé grâce à toi : +2 000 FCFA de jeu.').first(),
+  ).toBeVisible({ timeout: 30000 })
+  await expect(ama.page.getByTestId('invite')).toContainText('ami')
+  expect(errors).toEqual([])
+  expect(ama.errors).toEqual([])
+  await context.close()
+  await ama.context.close()
 })
