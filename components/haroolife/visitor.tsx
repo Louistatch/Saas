@@ -18,11 +18,12 @@ async function supabase() {
 }
 
 /** One tap: an anonymous account, named « Visiteur » until the player picks a name in the game. */
-export async function startVisit(): Promise<string | null> {
+export async function startVisit(captchaToken?: string | null): Promise<string | null> {
   const { error } = await (await supabase()).auth.signInAnonymously({
-    options: { data: { first_name: 'Visiteur' } },
+    options: { data: { first_name: 'Visiteur' }, captchaToken: captchaToken ?? undefined },
   })
   if (!error) return null
+  if (/captcha/i.test(error.message)) return 'Vérification anti-robot à refaire : réessaie.'
   return /anonymous/i.test(error.message)
     ? 'Le mode visiteur n’est pas encore ouvert. Connecte-toi ou crée un compte.'
     : 'Impossible d’entrer en visiteur pour le moment. Réessaie dans un instant.'

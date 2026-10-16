@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/app/context/auth-context'
+import { useCaptcha } from '@/components/shared/captcha'
 import { Logo } from '@/components/shared/logo'
 import { useHarooLifeViewport } from '@/hooks/use-haroolife-viewport'
 import { performGameLogout } from '@/lib/auth/logout'
@@ -83,10 +84,15 @@ export default function GameEntry() {
       enter()
     }
   }, [visit, user, isAuthenticated, isLoading])
+  // Anti-robot check before a visitor account is created (off until its key is configured).
+  const captcha = useCaptcha()
   const playAsVisitor = async () => {
     setVisit('busy')
-    const error = await startVisit()
-    if (error) setVisit(error)
+    const error = await startVisit(captcha.token)
+    if (error) {
+      setVisit(error)
+      captcha.reset()
+    }
   }
   if (!isLoading && isAuthenticated && user && entered === user.id)
     return (
@@ -202,12 +208,13 @@ export default function GameEntry() {
               <button
                 type="button"
                 onClick={() => void playAsVisitor()}
-                disabled={visit === 'busy'}
+                disabled={visit === 'busy' || !captcha.ready}
                 className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 px-4 py-3 font-bold text-white shadow-md shadow-amber-800/15 hover:bg-amber-600 disabled:opacity-60"
               >
                 {visit === 'busy' ? 'Entrée…' : 'Jouer en visiteur'}
                 <ArrowRight size={19} />
               </button>
+              {captcha.box && <div className="mt-2">{captcha.box}</div>}
               <p className="mt-2 text-center text-xs text-[#687b68]">
                 Sans compte, sans e-mail : tu joues à tout, avec les autres joueurs. Pour les
                 fonctions FaîtiereHub (ta coopérative, tes parcelles), on te demandera de te

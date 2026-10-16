@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { Logo } from '@/components/shared/logo'
 import { AuthSidePanel } from '@/components/shared/auth-side-panel'
+import { useCaptcha } from '@/components/shared/captcha'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,6 +20,8 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState('')
   const [sent, setSent] = useState(false)
   const [loading, setLoading] = useState(false)
+  // Anti-robot check (off until NEXT_PUBLIC_TURNSTILE_SITE_KEY is configured).
+  const captcha = useCaptcha()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,9 +34,17 @@ export default function ForgotPasswordPage() {
     setLoading(true)
     const supabase = createClient()
     // [SECURITY FIX - PHANTOM-002] Ne jamais révéler si l'email existe ou non
-    await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
       redirectTo: `${window.location.origin}/auth/reset-password`,
+      captchaToken: captcha.token ?? undefined,
     })
+    // Only the anti-robot check is reported (it says nothing about the address).
+    if (resetError && /captcha/i.test(resetError.message)) {
+      captcha.reset()
+      setError('Vérification anti-robot à refaire, puis renvoyez le lien.')
+      setLoading(false)
+      return
+    }
     // TOUJOURS afficher le message de succès, même si l'email n'existe pas
     // (Supabase peut retourner une erreur "User not found" — ne pas la transmettre)
     setSent(true)
@@ -140,10 +151,11 @@ export default function ForgotPasswordPage() {
                     required
                   />
                 </div>
+                {captcha.box}
                 <Button
                   type="submit"
                   className="w-full bg-primary hover:bg-primary/90"
-                  disabled={loading}
+                  disabled={loading || !captcha.ready}
                 >
                   {loading ? 'Envoi en cours...' : 'Envoyer le lien de réinitialisation'}
                 </Button>

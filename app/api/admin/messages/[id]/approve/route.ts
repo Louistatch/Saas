@@ -6,7 +6,6 @@ import { audit, checkParent, organisationSchema } from '@/lib/admin/cooperatives
 import { emailUser } from '@/lib/email/resend'
 import { assertRole } from '@/lib/security/assert-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { type NextRequest, NextResponse, after } from 'next/server'
 import { z } from 'zod'
 
@@ -29,10 +28,14 @@ async function waitForProfile(admin: ReturnType<typeof createAdminClient>, userI
 }
 
 async function sendPasswordSetupEmail(email: string, origin: string) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!url || !anon) return false
-  const client = createSupabaseClient(url, anon, { auth: { persistSession: false } })
+  // Service key: Supabase does not ask it for the anti-robot check (components/shared/captcha.tsx),
+  // which it would require from this server call once CAPTCHA protection is on.
+  let client: ReturnType<typeof createAdminClient>
+  try {
+    client = createAdminClient()
+  } catch {
+    return false
+  }
   const { error } = await client.auth.resetPasswordForEmail(email, {
     redirectTo: `${origin}/auth/reset-password`,
   })

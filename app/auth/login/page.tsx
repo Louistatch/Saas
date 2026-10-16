@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/app/context/auth-context'
 import { AuthSidePanel } from '@/components/shared/auth-side-panel'
+import { useCaptcha } from '@/components/shared/captcha'
 import { Spinner } from '@/components/shared/loading'
 import { Logo } from '@/components/shared/logo'
 import { Button } from '@/components/ui/button'
@@ -34,6 +35,8 @@ import { Suspense, useCallback, useState } from 'react'
 function LoginInner() {
   const searchParams = useSearchParams()
   const { login } = useAuth()
+  // Anti-robot check (off until NEXT_PUBLIC_TURNSTILE_SITE_KEY is configured).
+  const captcha = useCaptcha()
   const gameReturn = useGameReturn()
 
   const [email, setEmail] = useState('')
@@ -76,7 +79,7 @@ function LoginInner() {
 
       try {
         // SINGLE source of truth: the AuthContext.login() method.
-        const user = await login(parsed.data.email, parsed.data.password)
+        const user = await login(parsed.data.email, parsed.data.password, captcha.token)
 
         clearTimeout(progressTimer)
         clearTimeout(slowTimer)
@@ -137,9 +140,10 @@ function LoginInner() {
         }
         setSubmitting(false)
         setProgress('')
+        captcha.reset()
       }
     },
-    [email, password, login, redirectTo, submitting],
+    [email, password, login, redirectTo, submitting, captcha],
   )
 
   return (
@@ -271,10 +275,11 @@ function LoginInner() {
                 )}
               </div>
 
+              {captcha.box}
               <Button
                 type="submit"
                 className="h-12 w-full bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
-                disabled={submitting}
+                disabled={submitting || !captcha.ready}
               >
                 {submitting ? <Spinner className="h-4 w-4" /> : null}
                 {submitting ? progress || 'Connexion…' : 'Se connecter'}

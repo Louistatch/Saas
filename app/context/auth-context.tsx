@@ -27,7 +27,7 @@ export interface AuthContextType {
   visitor: AuthUser | null
   isLoading: boolean
   isAuthenticated: boolean
-  login: (email: string, password: string) => Promise<AuthUser | null>
+  login: (email: string, password: string, captchaToken?: string | null) => Promise<AuthUser | null>
   logout: () => Promise<void>
   refreshProfile: () => Promise<void>
 }
@@ -257,9 +257,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase, fetchProfile, router])
 
   const login = useCallback(
-    async (email: string, password: string): Promise<AuthUser | null> => {
+    async (
+      email: string,
+      password: string,
+      captchaToken?: string | null,
+    ): Promise<AuthUser | null> => {
       if (!supabase) throw new Error('Auth client not initialized')
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+        // Anti-robot token (components/shared/captcha.tsx), absent while the check is off.
+        options: captchaToken ? { captchaToken } : undefined,
+      })
       if (error) throw error
       if (!data.user) return null
       // Resolve the freshest profile so the caller can route by role.

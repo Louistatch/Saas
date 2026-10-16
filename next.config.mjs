@@ -51,11 +51,11 @@ const buildSecurityHeaders = ({ wasm = false } = {}) => [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://*.supabase.co https:",
       "font-src 'self'",
-      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.vercel-analytics.com https://*.vercel.app https://*.i.posthog.com https://*.posthog.com${realtimeSources}${localSupabase}`,
+      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.vercel-analytics.com https://*.vercel.app https://*.i.posthog.com https://*.posthog.com https://challenges.cloudflare.com${realtimeSources}${localSupabase}`,
       "worker-src 'self'",
       "manifest-src 'self'",
       "frame-ancestors 'none'",
-      "frame-src 'self' https://*.vercel.app https://*.fedapay.com",
+      "frame-src 'self' https://*.vercel.app https://*.fedapay.com https://challenges.cloudflare.com",
       "base-uri 'self'",
       "form-action 'self'",
       // Local LAN test builds (scripts/haroolife-lan.sh) are served over plain http from the PC's
