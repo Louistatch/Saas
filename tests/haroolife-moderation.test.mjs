@@ -9,7 +9,10 @@ import { PGlite } from '@electric-sql/pglite'
 
 const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const keyOf = (n) =>
-  createHash('md5').update(`haroolife-author:${id(n)}`).digest('hex').slice(0, 16)
+  createHash('md5')
+    .update(`haroolife-author:${id(n)}`)
+    .digest('hex')
+    .slice(0, 16)
 const dm = (a, b) => `dm:${[keyOf(a), keyOf(b)].sort().join(':')}`
 const db = new PGlite()
 const sql = (s) => db.exec(s)
@@ -19,8 +22,7 @@ const as = (n) =>
   )
 const one = async (s, args) => Object.values((await db.query(s, args)).rows[0])[0]
 let c = 1000
-const send = (room, body) =>
-  one('SELECT haroolife_chat_send($1,$2,$3)', [room, body, id(c++)])
+const send = (room, body) => one('SELECT haroolife_chat_send($1,$2,$3)', [room, body, id(c++)])
 const queue = () => one('SELECT haroolife_mod_queue()')
 const act = (kind, target, action, reason = null, days = 7) =>
   one('SELECT haroolife_mod_act($1,$2,$3,$4,$5)', [kind, target, action, reason, days])
@@ -98,7 +100,9 @@ test('modération : file, masquer, classer, suspendre, lever, journal', async (t
   await as(3)
   await assert.rejects(() => send('locality:lome', 'encore'), /non autorisé/)
   await assert.rejects(() => send(dm(1, 3), 'réponse'), /non autorisé/)
-  assert.ok((await one('SELECT haroolife_chat_history($1,NULL,NULL,50)', ['locality:lome'])).length > 0)
+  assert.ok(
+    (await one('SELECT haroolife_chat_history($1,NULL,NULL,50)', ['locality:lome'])).length > 0,
+  )
   // Les autres écrivent normalement.
   await as(2)
   await send('locality:lome', 'la vie continue')
