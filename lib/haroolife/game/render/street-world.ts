@@ -38,6 +38,7 @@ import { type Bank, loadBank } from '@/lib/haroolife/city/bank'
 import { drivingRoute, type VehicleKind } from '@/lib/haroolife/city/fares'
 import type { ServiceCustomer } from '@/lib/haroolife/city/automatic-service'
 import { isCityRoad, isDriveway } from '@/lib/haroolife/city/world'
+import { WALK_SIDE, streetDressing } from '@/lib/haroolife/game/core/sidewalks'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 import { DEFAULT_CONFIG, type PlayerController } from '@/lib/haroolife/city/player'
 import {
@@ -664,6 +665,25 @@ export class StreetWorld {
       })
       g.add(im)
     }
+    // Sidewalks along every plot and zebra crossings at the crossroads (one draw call each).
+    const dressing = streetDressing(win.cells)
+    for (const [list, color, top, name] of [
+      [dressing.sidewalks, '#e4e0d6', 0.05, 'trottoir'],
+      [dressing.curbs, '#8f8a80', 0.06, 'bordure'],
+      [dressing.zebras, '#f2efe6', -0.025, 'passage-pieton'],
+    ] as const) {
+      if (!list.length) continue
+      const im = new THREE.InstancedMesh(this.unitBox, this.mat(color), list.length)
+      im.name = name
+      list.forEach((s, i) => {
+        const h = name === 'passage-pieton' ? 0.02 : 0.13
+        m4.makeScale(s.w * U, h, s.h * U)
+        m4.setPosition(s.x * U, top - h / 2, s.y * U)
+        im.setMatrixAt(i, m4)
+      })
+      im.receiveShadow = true
+      g.add(im)
+    }
     // Buildings: the Kenney models by tiles (updateTiles); boxes only when the pack is missing.
     if (this.bank) {
       // Drawn by the tile cache.
@@ -1047,13 +1067,15 @@ export class StreetWorld {
           w.to = this.nextRoad(w.from, w.from)
         }
       }
-      // Walk on the right-hand side of the lane.
-      const side = 0.55
+      // Walk on the sidewalk to the right of the road; turns are eased (no jump at a corner).
+      const side = WALK_SIDE * U
       const nx = len ? -dz / len : 0
       const nz = len ? dx / len : 0
       const x = w.from.x * U + dx * w.t + nx * side
       const z = w.from.y * U + dz * w.t + nz * side
-      w.person.root.position.set(x, 0, z)
+      const p = w.person.root.position
+      const ease = Math.hypot(x - p.x, z - p.z) > 3 ? 1 : Math.min(1, dt * 6)
+      p.set(p.x + (x - p.x) * ease, 0, p.z + (z - p.z) * ease)
       if (dx || dz) w.person.root.rotation.y = Math.atan2(dx, dz)
       const natural = w.person.spec.pace.walk * FIGURE
       w.person.actions.get(w.person.current)?.setEffectiveTimeScale(Math.max(0.5, speed / natural))
