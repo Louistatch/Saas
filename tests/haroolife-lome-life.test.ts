@@ -5,12 +5,14 @@ import {
   SALARIES,
   advanceLifeHour,
   buildInLome,
+  buildNearPlayer,
   canEnter,
   decodeLomeLife,
   directTo,
   initialLomeLife,
   interact,
   jobVenue,
+  nearestBuildSpot,
   prepareForWork,
   selectJob,
   simulatedTraffic,
@@ -146,4 +148,23 @@ test('MIT house builder zoom utility remains mathematically invertible', () => {
     const actual = zoomSliderDistance(zoomSliderValue(distance))
     assert.ok(Math.abs(actual - distance) < 2)
   }
+})
+
+test('the build sheet builds on the free road-side plot nearest to the player', () => {
+  const s = initialLomeLife()
+  const { spot, error } = nearestBuildSpot(s.city, s.pos, 'house')
+  assert.equal(error, null)
+  assert.ok(spot)
+  assert.equal(
+    s.city.buildings.some((b) => b.x === spot.x && b.y === spot.y),
+    false,
+  )
+  const built = buildNearPlayer(s, 'house')
+  assert.equal(built.city.buildings.length, s.city.buildings.length + 1)
+  assert.deepEqual(built.city.buildings.at(-1), { ...spot, type: 'house' })
+  assert.ok(built.city.coins < s.city.coins)
+  // No budget: nothing built, and the reason is said.
+  const poor = buildNearPlayer({ ...s, city: { ...s.city, coins: 0 } }, 'house')
+  assert.equal(poor.city.buildings.length, s.city.buildings.length)
+  assert.equal(poor.lastEvent, 'Ressources insuffisantes.')
 })

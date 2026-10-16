@@ -11,6 +11,8 @@ import {
   type BuildType,
   CATALOG,
   type City,
+  SIZE,
+  canBuild,
   decodeCity,
   initialCity,
   place,
@@ -466,6 +468,42 @@ export function buildInLome(state: LifeState, x: number, y: number, type: BuildT
   if (result.error) return events(state, result.error)
   // City funds, NOT personal wallet: strict separation of player's money and budget.
   return events({ ...state, city: result.city }, 'Chantier achevé : ' + CATALOG[type].label + '.')
+}
+/**
+ * The free plot nearest to `from` where `type` can be built (road-connected, dry, in the estate),
+ * or the reason none is: the 3D street makes a free cell hard to find by touch, so the build
+ * sheet places on the nearest one.
+ */
+export function nearestBuildSpot(
+  city: City,
+  from: RoadPoint,
+  type: BuildType,
+): { spot: RoadPoint | null; error: string | null } {
+  let best: RoadPoint | null = null
+  let bestD = Number.POSITIVE_INFINITY
+  let firstError: string | null = null
+  for (let y = 0; y < SIZE; y++)
+    for (let x = 0; x < SIZE; x++) {
+      const error = canBuild(city, x, y, type)
+      if (error) {
+        if (error === 'Ressources insuffisantes.') return { spot: null, error }
+        firstError ??= error
+        continue
+      }
+      const d = manhattan({ x, y }, from)
+      if (d < bestD) {
+        bestD = d
+        best = { x, y }
+      }
+    }
+  return best ? { spot: best, error: null } : { spot: null, error: firstError }
+}
+/** Build `type` on the free plot nearest to the player. */
+export function buildNearPlayer(state: LifeState, type: BuildType): LifeState {
+  if (state.inside) return events(state, 'Sors du bâtiment pour construire.')
+  const { spot, error } = nearestBuildSpot(state.city, state.pos, type)
+  if (!spot) return events(state, error ?? 'Plus de terrain libre près des routes.')
+  return buildInLome(state, spot.x, spot.y, type)
 }
 export function demolishInLome(state: LifeState, x: number, y: number): LifeState {
   const result = removeBuilding(state.city, x, y)

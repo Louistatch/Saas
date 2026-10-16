@@ -152,6 +152,7 @@ import {
   type Transport,
   advanceLifeHour,
   buildInLome,
+  buildNearPlayer,
   demolishInLome,
   enterBuilding,
   initialLomeLife,
@@ -877,15 +878,33 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
           : life.inside
             ? 'À l’intérieur : ' + (VENUE_LABELS[life.inside] ?? life.inside)
             : life.lastEvent
+  // Each objective carries the action that achieves it, run from the objectives sheet.
+  const inLome = LOCALITIES[cityLife.locality].estate !== null
   const missions = [
     {
       done: (cityLife.commerce?.boughtMeals ?? (life.spent >= 650 ? 1 : 0)) > 0,
       text: 'Acheter un repas dans un commerce',
+      go: inLome ? 'Aller au marché' : 'Voir la carte',
+      run: () => (inLome ? go(12, 11) : open('map')),
     },
-    { done: life.earned > 0, text: 'Effectuer une journée de travail' },
+    {
+      done: life.earned > 0,
+      text: 'Effectuer une journée de travail',
+      go:
+        currentWorkStatus === 'ready'
+          ? 'Travailler'
+          : currentWorkStatus === 'closed'
+            ? 'Attendre 7 h'
+            : currentWorkStatus === 'tired' || currentWorkStatus === 'hungry'
+              ? 'Se préparer'
+              : 'Y aller',
+      run: () => workNextStep().run(),
+    },
     {
       done: life.city.buildings.length > initialLomeLife().city.buildings.length,
       text: 'Construire un nouveau bâtiment',
+      go: 'Construire',
+      run: () => open('build'),
     },
   ]
   const completion = missions.filter((m) => m.done).length
@@ -1533,13 +1552,62 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     controller.camera.follow = true
     setCityLife((old) => goToEstate(old, x, y))
   }
-  function goToWork() {
-    const target = LIFE_LOCATIONS.find((loc) => loc.venue === jobVenue(life.job))
+  /** The workplace of a job (the player's quarter in Lomé), or null when away from Lomé. */
+  const workplace = (job: Career) =>
+    LOCALITIES[cityLife.locality].estate
+      ? (LIFE_LOCATIONS.find((loc) => loc.venue === jobVenue(job)) ?? null)
+      : null
+  function goToWork(job: Career = life.job) {
+    const target = workplace(job)
     if (!target) {
-      setNotice('Lieu de travail introuvable dans ce quartier.')
+      setPanel(null)
+      setNotice(
+        `Ton poste (${VENUE_LABELS[jobVenue(job)]}) est dans ton quartier de Lomé : prends le car pour y retourner.`,
+      )
       return
     }
     go(target.x, target.y)
+  }
+  /** « Choisir » : the job is taken, the sheet closes and the player heads to the workplace. */
+  function chooseJob(job: Career) {
+    setLife((old) => selectJob(old, job))
+    const target = workplace(job)
+    goToWork(job)
+    if (!target) return
+    const open = life.hour >= 7 && life.hour < 19
+    setNotice(
+      `${TOGO_JOBS[job].icon} ${TOGO_JOBS[job].label} : en route vers ${target.name}. ` +
+        (life.workToday
+          ? 'Ton service d’aujourd’hui est déjà payé : reviens demain.'
+          : open
+            ? `Sur place, touche « Faire mon service » (+${money(SALARIES[job])}).`
+            : 'Le service ouvre à 7 h : tu pourras te reposer en attendant.'),
+    )
+  }
+  /** The one next step for today's work, whatever the status: used by the objectives. */
+  function workNextStep(): { title: string; run: () => void } {
+    if (currentWorkStatus === 'ready')
+      return {
+        title: `Faire mon service · +${money(SALARIES[life.job])}`,
+        run: () => action('work'),
+      }
+    if (currentWorkStatus === 'away') return { title: 'Aller au travail', run: () => goToWork() }
+    if (currentWorkStatus === 'closed') return { title: 'Se reposer jusqu’à 7 h', run: waitForWork }
+    if (currentWorkStatus === 'tired' || currentWorkStatus === 'hungry')
+      return { title: 'Pause et collation · 1 h', run: prepareWorkNeeds }
+    return { title: 'Voir les métiers', run: () => open('jobs') }
+  }
+  /** Build on the free plot nearest to the player: the result is said, whatever it is. */
+  function buildNear(b: BuildType) {
+    setBuilding(b)
+    if (!LOCALITIES[cityLife.locality].estate) {
+      setNotice('Ton terrain est dans ton quartier de Lomé : prends le car pour y construire.')
+      return
+    }
+    const next = buildNearPlayer(life, b)
+    setLife(next)
+    setPanel(null)
+    setNotice(next.lastEvent)
   }
   function waitForWork() {
     setLife((old) => waitForNextWorkShift(old))
@@ -3061,7 +3129,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                       <button
                         type="button"
                         key={job}
-                        onClick={() => setLife((old) => selectJob(old, job))}
+                        onClick={() => chooseJob(job)}
                         className={
                           'flex w-full items-center justify-between rounded-2xl border p-4 text-left text-sm ' +
                           (life.job === job
@@ -3108,7 +3176,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                         <ActionButton title="Se reposer jusqu’à 7 h" onClick={waitForWork} />
                       )}
                       {currentWorkStatus === 'away' && (
-                        <ActionButton title="Aller au travail" onClick={goToWork} />
+                        <ActionButton title="Aller au travail" onClick={() => goToWork()} />
                       )}
                       {currentWorkStatus === 'ready' && (
                         <ActionButton
@@ -3395,8 +3463,9 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                 {panel === 'build' && (
                   <>
                     <p className="text-sm text-slate-600">
-                      Sélectionne une construction puis touche une parcelle libre dans la scène 3D.
-                      Les ressources sont déduites du budget municipal fictif.
+                      Touche une construction : elle est bâtie sur le terrain libre le plus proche
+                      de toi, au bord d’une route. Les ressources sont déduites du budget municipal
+                      fictif.
                     </p>
                     <div className="flex items-center justify-between rounded-xl bg-slate-100 p-3 text-xs font-semibold">
                       <span>🏛️ {money(life.city.coins)}</span>
@@ -3407,13 +3476,12 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                         <button
                           type="button"
                           key={b}
-                          onClick={() => {
-                            setBuilding(b)
-                            setMode('build')
-                            setPanel(null)
-                          }}
+                          onClick={() => buildNear(b)}
+                          disabled={
+                            life.city.coins < CATALOG[b].coins || life.city.wood < CATALOG[b].wood
+                          }
                           className={
-                            'rounded-2xl border p-3 text-left text-xs ' +
+                            'rounded-2xl border p-3 text-left text-xs disabled:opacity-50 ' +
                             (building === b
                               ? 'border-emerald-600 bg-emerald-50'
                               : 'border-slate-200 bg-white')
@@ -3427,6 +3495,14 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                         </button>
                       ))}
                     </div>
+                    <ActionButton
+                      title={`Choisir moi-même l’emplacement (${CATALOG[building].label})`}
+                      outline
+                      onClick={() => {
+                        setMode('build')
+                        setPanel(null)
+                      }}
+                    />
                     <ActionButton
                       title="Passer en mode démolition"
                       outline
@@ -3452,6 +3528,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                     {missions.map((m, i) => (
                       <div
                         key={i}
+                        data-testid={`mission-${i}`}
                         className="flex items-center gap-3 rounded-xl border border-slate-100 p-3 text-sm"
                       >
                         <span
@@ -3462,14 +3539,22 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                         >
                           {m.done ? <Check size={16} /> : i + 1}
                         </span>
-                        <span>{m.text}</span>
+                        <span className="min-w-0 flex-1">{m.text}</span>
+                        {!m.done && (
+                          <button
+                            type="button"
+                            onClick={m.run}
+                            className="shrink-0 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-black text-white"
+                          >
+                            {m.go}
+                          </button>
+                        )}
                       </div>
                     ))}
                     <div className="grid grid-cols-2 gap-2">
-                      <ActionButton
-                        title={!missions[0].done ? 'Aller au marché' : 'Continuer mon travail'}
-                        onClick={() => (!missions[0].done ? go(12, 11) : open('jobs'))}
-                      />
+                      {currentWorkStatus !== 'done' && (
+                        <ActionButton title={workNextStep().title} onClick={workNextStep().run} />
+                      )}
                       <ActionButton title="Voir les métiers" outline onClick={() => open('jobs')} />
                       {actor && (
                         <ActionButton
