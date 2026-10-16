@@ -21,6 +21,7 @@ import { type Commerce, decodeCommerce, emptyCommerce } from './commerce'
 import { type Farm, decodeFarm } from './farm'
 import { type SocialLife, decodeSocial } from './social'
 import { nextSession, sessionAt, sessionKey, whenOf } from './university'
+import { type Housing, decodeHousing } from './housing'
 import { type Fleet, decodeFleet, manualVehicleService } from './vehicle-economy'
 import { restoreServiceVehicle } from './jobs'
 import {
@@ -124,6 +125,8 @@ export interface CityLife {
   farm?: Farm
   /** Last university lecture followed (`day:slot`, see university.ts): once per lecture. */
   lecture?: string
+  /** The player's home: rent, CEET and TdE bills, the landlord (see housing.ts). */
+  housing?: Housing
 }
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)))
@@ -233,6 +236,7 @@ export function decodeCityLife(value: unknown): CityLife | null {
     target: v.target ?? null,
     insideLot: v.insideLot ?? null,
     skills: v.skills!,
+    housing: decodeHousing(v.housing),
     lecture:
       typeof v.lecture === 'string' && /^\d{1,6}:[0-3]$/.test(v.lecture) ? v.lecture : undefined,
     visited: v.visited,

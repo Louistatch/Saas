@@ -215,6 +215,15 @@ import FarmPanel from './farm-panel'
 import InvitePanel from './invite-panel'
 import PayBubbles, { usePayBubbles } from './pay-bubbles'
 import PhotoPanel from './photo-panel'
+import HousingPanel from './housing-panel'
+import {
+  housingOf,
+  moveTo as moveHome,
+  payBill,
+  quartierById,
+  receiveGuest,
+  settleHousing,
+} from '@/lib/haroolife/city/housing'
 import Timetable from './timetable'
 import { CROPS, fieldStatus } from '@/lib/haroolife/city/farm'
 import { alertIfAway } from '@/lib/haroolife/local-alert'
@@ -260,6 +269,7 @@ type Sheet =
   | 'online'
   | 'invite'
   | 'photo'
+  | 'housing'
   | null
 type Mode = 'walk' | 'build' | 'demolish'
 /** The module a HarooLife address opens inside the single 3D world. */
@@ -693,33 +703,35 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                         ? 'Inviter des amis'
                         : panel === 'photo'
                           ? 'Photo du jeu'
-                          : panel === 'messages'
-                            ? 'Messages du quartier'
-                            : panel === 'wallet'
-                              ? 'Mes finances'
-                              : panel === 'missions'
-                                ? 'Mes objectifs'
-                                : panel === 'journal'
-                                  ? 'Journal de vie'
-                                  : panel === 'billboard'
-                                    ? 'Panneau publicitaire'
-                                    : panel === 'ad'
-                                      ? adFocus && isSponsored(adFocus.campaign)
-                                        ? 'Promotion'
-                                        : 'Information FaîtiereHub'
-                                      : panel === 'lot'
-                                        ? 'Lieu'
-                                        : panel === 'cooperative'
-                                          ? 'Coopérative'
-                                          : panel === 'avatar'
-                                            ? 'Mon apparence'
-                                            : panel === 'player'
-                                              ? playerKey?.startsWith('npc:')
-                                                ? 'Habitant'
-                                                : 'Joueur'
-                                              : panel === 'market'
-                                                ? 'Marché'
-                                                : ''
+                          : panel === 'housing'
+                            ? 'Mon logement'
+                            : panel === 'messages'
+                              ? 'Messages du quartier'
+                              : panel === 'wallet'
+                                ? 'Mes finances'
+                                : panel === 'missions'
+                                  ? 'Mes objectifs'
+                                  : panel === 'journal'
+                                    ? 'Journal de vie'
+                                    : panel === 'billboard'
+                                      ? 'Panneau publicitaire'
+                                      : panel === 'ad'
+                                        ? adFocus && isSponsored(adFocus.campaign)
+                                          ? 'Promotion'
+                                          : 'Information FaîtiereHub'
+                                        : panel === 'lot'
+                                          ? 'Lieu'
+                                          : panel === 'cooperative'
+                                            ? 'Coopérative'
+                                            : panel === 'avatar'
+                                              ? 'Mon apparence'
+                                              : panel === 'player'
+                                                ? playerKey?.startsWith('npc:')
+                                                  ? 'Habitant'
+                                                  : 'Joueur'
+                                                : panel === 'market'
+                                                  ? 'Marché'
+                                                  : ''
   const needs = life.needs
   const wellbeing = Math.round(NEED_KEYS.reduce((sum, k) => sum + needs[k], 0) / NEED_KEYS.length)
   const pending = eventById(life.pendingEvent)
@@ -937,6 +949,11 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     },
   ]
   const completion = missions.filter((m) => m.done).length
+  // The home: each new game day brings the month's rent and bills, and the landlord's steps.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per game day
+  useEffect(() => {
+    setCityLife((old) => settleHousing(old))
+  }, [life.day])
   // « Mon champ » is ripe: said in the game, and on the phone when the player is in another app.
   const ripe = fieldStatus(cityLife)
   const ripeCrop = ripe.kind === 'ready' ? ripe.field.crop : null
@@ -1741,6 +1758,13 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     const pose = { x: controller.pos.x, z: controller.pos.z, heading: controller.heading }
     const b = estateRef(t)
     const lot = lotRef(t)
+    // Locked out by the landlord: the home's door stays shut until a new home is rented.
+    const home =
+      b && life.city.buildings.some((x) => x.x === b.x && x.y === b.y && x.type === 'house')
+    if (home && housingOf(cityLife).evicted) {
+      say('Le propriétaire a changé la serrure : loue un nouveau logement dans le téléphone.')
+      return
+    }
     if (b) setCityLife((old) => ({ ...old, pose, route: [], life: enterBuilding(old.life, b) }))
     else if (lot) setCityLife((old) => enterLot(old, lot, pose))
     setNotice(null)
@@ -3310,6 +3334,34 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                   </>
                 )}
                 {panel === 'invite' && <InvitePanel onOpen={() => void invites.refresh()} />}
+                {panel === 'housing' && (
+                  <HousingPanel
+                    state={cityLife}
+                    onPay={(bill) => setCityLife((old) => payBill(old, bill))}
+                    onMove={(q, kind) => setCityLife((old) => moveHome(old, q, kind))}
+                    onReceive={(name) => setCityLife((old) => receiveGuest(old, name))}
+                    online={realtime.state.present
+                      .filter(
+                        (p) => p.locality === cityLife.locality && p.key !== realtime.state.me?.key,
+                      )
+                      .slice(0, 6)
+                      .map((p) => ({ key: p.key, name: p.name }))}
+                    onInvitePlayer={async (g) => {
+                      const client = realtime.client
+                      if (!client) return 'Messagerie indisponible pour le moment.'
+                      const dm = await client.openDm(g.key)
+                      if ('error' in dm) return dm.error
+                      const where = quartierById(housingOf(cityLife).quartier)?.name ?? 'Lomé'
+                      const refused = client.send(
+                        dm.room,
+                        `Viens chez moi ce soir à ${where} ! On boit une sucrerie et on cause.`,
+                      )
+                      return refused
+                        ? String(refused)
+                        : `Invitation envoyée à ${g.name} en message privé.`
+                    }}
+                  />
+                )}
                 {panel === 'photo' && (
                   <PhotoPanel
                     place={
