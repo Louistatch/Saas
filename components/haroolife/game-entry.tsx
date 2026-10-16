@@ -1,16 +1,17 @@
 'use client'
 
 import { useAuth } from '@/app/context/auth-context'
-import { useHarooLifeViewport } from '@/hooks/use-haroolife-viewport'
-import { GAME_ENTERED, rememberGameReturn, withGameReturn } from '@/lib/haroolife/entry'
-import { CITY_STORAGE } from '@/lib/haroolife/city/migrate'
-import { LOCALITIES } from '@/lib/haroolife/city/locality'
 import { Logo } from '@/components/shared/logo'
+import { useHarooLifeViewport } from '@/hooks/use-haroolife-viewport'
 import { performGameLogout } from '@/lib/auth/logout'
+import { LOCALITIES } from '@/lib/haroolife/city/locality'
+import { CITY_STORAGE } from '@/lib/haroolife/city/migrate'
+import { GAME_ENTERED, rememberGameReturn, withGameReturn } from '@/lib/haroolife/entry'
 import { ArrowLeft, ArrowRight, Leaf, ShieldCheck, UserRound } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { KeepGameForm, startVisit, useVisitor } from './visitor'
 
 // The world and Three.js are loaded only after a real FaîtiereHub profile and entry consent.
 const World = dynamic(() => import('./lome-life-immersive').then((m) => m.LomeLifeImmersive), {
@@ -51,6 +52,9 @@ export default function GameEntry() {
   const [summary, setSummary] = useState<Summary | null>(null)
   const [returnTo, setReturnTo] = useState('/haroolife')
   const [leaving, setLeaving] = useState(false)
+  const visitor = useVisitor()
+  // « Jouer en visiteur »: one tap, then straight into the game once the account exists.
+  const [visit, setVisit] = useState<'idle' | 'busy' | string>('idle')
   useEffect(() => {
     setReturnTo(window.location.pathname + window.location.search)
     setSummary(savedSummary())
@@ -68,6 +72,18 @@ export default function GameEntry() {
       /* current tab still works */
     }
     setEntered(user.id)
+  }
+  // biome-ignore lint/correctness/useExhaustiveDependencies: enters once the visitor's account is ready
+  useEffect(() => {
+    if (visit === 'busy' && user && isAuthenticated && !isLoading) {
+      setVisit('idle')
+      enter()
+    }
+  }, [visit, user, isAuthenticated, isLoading])
+  const playAsVisitor = async () => {
+    setVisit('busy')
+    const error = await startVisit()
+    if (error) setVisit(error)
   }
   if (!isLoading && isAuthenticated && user && entered === user.id)
     return (
@@ -136,7 +152,9 @@ export default function GameEntry() {
                 </span>
                 <div>
                   <h2 className="font-bold">Bonjour, {user.firstName || 'cher joueur'}</h2>
-                  <p className="mt-0.5 text-xs text-[#58725d]">Connecté avec FaîtiereHub</p>
+                  <p className="mt-0.5 text-xs text-[#58725d]">
+                    {visitor ? 'Tu joues en visiteur' : 'Connecté avec FaîtiereHub'}
+                  </p>
                 </div>
               </div>
               {summary && (
@@ -158,6 +176,11 @@ export default function GameEntry() {
                   ? 'Ta progression reste enregistrée sur cet appareil.'
                   : 'Ton aventure et ton apparence commencent dans le jeu.'}
               </p>
+              {visitor && (
+                <div className="mt-4">
+                  <KeepGameForm reason="Tu joues en visiteur : tu lis les salons sans écrire." />
+                </div>
+              )}
               <button
                 type="button"
                 disabled={leaving}
@@ -167,11 +190,34 @@ export default function GameEntry() {
                 }}
                 className="mx-auto mt-3 block min-h-11 px-3 text-xs font-semibold text-emerald-800 underline disabled:opacity-50"
               >
-                {leaving ? 'Déconnexion…' : 'Changer de compte'}
+                {leaving
+                  ? 'Déconnexion…'
+                  : visitor
+                    ? 'Se connecter avec un compte FaîtiereHub'
+                    : 'Changer de compte'}
               </button>
             </>
           ) : (
             <>
+              <button
+                type="button"
+                onClick={() => void playAsVisitor()}
+                disabled={visit === 'busy'}
+                className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 px-4 py-3 font-bold text-white shadow-md shadow-amber-800/15 hover:bg-amber-600 disabled:opacity-60"
+              >
+                {visit === 'busy' ? 'Entrée…' : 'Jouer en visiteur'}
+                <ArrowRight size={19} />
+              </button>
+              <p className="mt-2 text-center text-xs text-[#687b68]">
+                Sans e-mail ni mot de passe. Tu joues et tu lis les salons ; ajoute ton e-mail plus
+                tard pour écrire et garder ta partie.
+              </p>
+              {visit !== 'idle' && visit !== 'busy' && (
+                <p role="alert" className="mt-2 text-center text-xs font-semibold text-red-700">
+                  {visit}
+                </p>
+              )}
+              <div className="my-5 h-px bg-emerald-900/10" />
               <h2 className="text-xl font-bold">Votre compte, votre aventure</h2>
               <p className="mt-2 text-sm leading-relaxed text-[#58725d]">
                 Connectez-vous avec votre compte FaîtiereHub habituel. Il donne aussi accès à

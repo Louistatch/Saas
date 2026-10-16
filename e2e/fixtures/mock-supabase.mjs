@@ -28,16 +28,37 @@ const session = () => ({
   user,
 })
 const AD_CAMPAIGNS = []
+// « Jouer en visiteur » (signInAnonymously): one anonymous account, the relay's LOCAL_VISITOR.
+const VISITOR = 'd4d4d4d4-0000-4000-8000-000000000004'
+const visitorUser = {
+  ...user,
+  id: VISITOR,
+  email: '',
+  is_anonymous: true,
+  app_metadata: { provider: 'anonymous', providers: [] },
+  user_metadata: { first_name: 'Visiteur' },
+}
+const visitorSession = () => ({
+  access_token: `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: VISITOR, role: 'authenticated', aud: 'authenticated', is_anonymous: true, exp: 4102444800, n: refreshCount })}.c2ln`,
+  refresh_token: 'r-visitor',
+  token_type: 'bearer',
+  expires_in: 3600,
+  expires_at: Math.floor(Date.now() / 1000) + 3600,
+  user: visitorUser,
+})
 const REALTIME_ACCOUNTS = new Set([
   'a1a1a1a1-0000-4000-8000-000000000001',
   'b2b2b2b2-0000-4000-8000-000000000002',
   'c3c3c3c3-0000-4000-8000-000000000003',
+  VISITOR,
 ])
 const REALTIME_BY_REFRESH = {
   'r-ama': 'a1a1a1a1-0000-4000-8000-000000000001',
   'r-kofi': 'b2b2b2b2-0000-4000-8000-000000000002',
   'r-yawa': 'c3c3c3c3-0000-4000-8000-000000000003',
 }
+// Last e-mail a visitor asked to keep their game with (read by the e2e test).
+let visitorKeepEmail = null
 const C1 = 'c1000000-0000-4000-8000-000000000001'
 const C2 = 'c2000000-0000-4000-8000-000000000002'
 const C3 = 'c3000000-0000-4000-8000-000000000003'
@@ -234,6 +255,16 @@ const PROFILES = [
     cooperative_id: C1,
     deleted_at: null,
   })),
+  {
+    id: 'd4d4d4d4-0000-4000-8000-000000000004',
+    email: null,
+    first_name: 'Visiteur',
+    last_name: null,
+    role: 'none',
+    haroo_type: null,
+    cooperative_id: null,
+    deleted_at: null,
+  },
   {
     id: 'b2b2b2b2-0000-4000-8000-000000000002',
     email: 'kofi@test.local',
@@ -681,6 +712,15 @@ http
         try {
           sub = JSON.parse(Buffer.from(bearer.split('.')[1] ?? '', 'base64url').toString()).sub
         } catch {}
+        if (sub === VISITOR) {
+          if (req.method === 'PUT') {
+            try {
+              visitorKeepEmail = JSON.parse(body || '{}').email ?? null
+            } catch {}
+            return send(200, { ...visitorUser, new_email: visitorKeepEmail })
+          }
+          return send(200, visitorUser)
+        }
         if (typeof sub === 'string' && REALTIME_ACCOUNTS.has(sub))
           return send(200, {
             ...user,
@@ -698,6 +738,7 @@ http
         try {
           refresh = JSON.parse(body || '{}').refresh_token ?? ''
         } catch {}
+        if (refresh === 'r-visitor') return send(200, visitorSession())
         const sub = REALTIME_BY_REFRESH[refresh]
         if (sub) {
           const access = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub, role: 'authenticated', aud: 'authenticated', exp: 4102444800, n: refreshCount })}.c2ln`
@@ -713,6 +754,15 @@ http
         return send(200, session())
       }
       if (p === '/auth/v1/verify') return send(200, session())
+      if (p === '/auth/v1/signup') {
+        let email = null
+        try {
+          email = JSON.parse(body || '{}').email ?? null
+        } catch {}
+        // No e-mail: an anonymous sign-in (« Jouer en visiteur »).
+        if (!email) return send(200, visitorSession())
+      }
+      if (p === '/__visitor-keep') return send(200, { email: visitorKeepEmail })
       if (p.startsWith('/auth/v1/')) return send(200, {})
       // Private messages outside the game: run in the local relay's PGlite (the real
       // migrations), as the token's subject, so the dashboard and the game share one database.

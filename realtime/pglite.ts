@@ -33,6 +33,8 @@ export const LOCAL_ACCOUNTS = {
 } as const
 /** The local team account: same id as the mock Supabase's signed-in super_admin. */
 export const LOCAL_MODERATOR = '11111111-1111-4111-8111-111111111111'
+/** A visitor (anonymous account, `is_anonymous` in the token): has a home, reads, cannot write. */
+export const LOCAL_VISITOR = 'd4d4d4d4-0000-4000-8000-000000000004'
 export const LOCAL_CANTONS = {
   be: 'cccccccc-0000-4000-8000-0000000000be',
   kara: 'cccccccc-0000-4000-8000-0000000000ca',
@@ -42,13 +44,13 @@ export const LOCAL_COOPS = {
   c2: 'dddddddd-0000-4000-8000-0000000000c2',
 } as const
 
-const subOf = (token: string): string | null => {
+const claimsOf = (token: string): { sub: string; json: string } | null => {
   try {
     const payload = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8'))
     // Like PostgREST: an expired token is refused.
     if (typeof payload.exp === 'number' && payload.exp * 1000 < Date.now()) return null
     return typeof payload.sub === 'string' && /^[0-9a-f-]{36}$/.test(payload.sub)
-      ? payload.sub
+      ? { sub: payload.sub, json: JSON.stringify(payload) }
       : null
   } catch {
     return null
@@ -104,6 +106,8 @@ export async function pgliteChat(migrationPaths: string | string[]): Promise<Loc
       .join(',')};
     -- The local team account (the mock Supabase's signed-in admin): moderates, does not play.
     INSERT INTO profiles VALUES ('${LOCAL_MODERATOR}','super_admin',NULL,NULL);
+    INSERT INTO profiles VALUES ('${LOCAL_VISITOR}','none',NULL,NULL);
+    INSERT INTO haroolife_residents VALUES ('${LOCAL_VISITOR}','${LOCAL_CANTONS.be}','Visiteur (test)',2,true);
   `)
   for (const path of [migrationPaths].flat()) await db.exec(readFileSync(path, 'utf8'))
   await db.exec('SET ROLE authenticated')
@@ -111,9 +115,13 @@ export async function pgliteChat(migrationPaths: string | string[]): Promise<Loc
   let queue: Promise<unknown> = Promise.resolve()
   const run = <T>(token: string, sql: string, args: unknown[]): Promise<T> => {
     const job = queue.then(async () => {
-      const sub = subOf(token)
-      if (!sub) throw new RepoError('auth_expired', 'Session expirée : reconnexion…')
-      await db.query(`SELECT set_config('request.jwt.claim.sub', $1, false)`, [sub])
+      const claims = claimsOf(token)
+      if (!claims) throw new RepoError('auth_expired', 'Session expirée : reconnexion…')
+      // Like PostgREST: the subject, and the whole token for rules reading other claims.
+      await db.query(
+        `SELECT set_config('request.jwt.claim.sub', $1, false), set_config('request.jwt.claims', $2, false)`,
+        [claims.sub, claims.json],
+      )
       try {
         const res = await db.query(sql, args)
         return Object.values((res.rows[0] ?? {}) as Record<string, unknown>)[0] as T

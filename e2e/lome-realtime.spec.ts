@@ -632,3 +632,75 @@ test('the team moderates a reported message from the admin console', async ({
   expect(team.errors).toEqual([])
   await team.context.close()
 })
+
+test('a visitor enters with one tap, plays and reads the rooms, and keeps the game with an e-mail only', async ({
+  browser,
+}, testInfo) => {
+  test.setTimeout(150_000)
+  test.skip(/mobile/.test(testInfo.project.name), 'opens its own Android context')
+  const run = Date.now().toString(36)
+  // The visitor's anonymous account (mock Supabase signInAnonymously, realtime/pglite.ts).
+  const VISITOR = 'd4d4d4d4-0000-4000-8000-000000000004'
+  const visitorToken = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: VISITOR, role: 'authenticated', aud: 'authenticated', is_anonymous: true, exp: 4102444800 })}.c2ln`
+  const rpc = (token: string, fn: string, args: object) =>
+    fetch(`${SUPABASE}/rest/v1/rpc/${fn}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(args),
+    })
+
+  // Signed out, on a phone: one tap on « Jouer en visiteur », no e-mail, no password.
+  const context = await browser.newContext({
+    ...devices['Pixel 7'],
+    baseURL: 'http://127.0.0.1:3000',
+  })
+  await context.addInitScript(() => localStorage.setItem('haroolife.avatar.chosen', '1'))
+  const page = await context.newPage()
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
+  await page.getByRole('button', { name: 'Jouer en visiteur' }).click()
+  await expect(page.locator('canvas:visible').first()).toBeVisible({ timeout: 30000 })
+  await expect.poll(async () => (await rt(page))?.status, { timeout: 30000 }).toBe('online')
+  expect(await rt(page)).toMatchObject({ me: 'Visiteur (test)' })
+
+  // The visitor reads what the others write.
+  const said = await rpc(tokenOf(ACCOUNTS.ama), 'haroolife_chat_send', {
+    p_room: 'locality:lome',
+    p_body: `bienvenue au visiteur ${run}`,
+    p_client_id: randomUUID(),
+  })
+  expect(said.status).toBe(200)
+  await openChat(page, 'Lomé')
+  await expect(log(page)).toContainText(`bienvenue au visiteur ${run}`)
+  // No message box: keeping the game (an e-mail) instead.
+  await expect(page.getByRole('textbox', { name: 'Écrire dans la discussion' })).toHaveCount(0)
+  const keep = page.getByTestId('keep-game')
+  await expect(keep).toBeVisible()
+
+  // The server refuses a visitor's writing even outside the screen: room, money.
+  const write = await rpc(visitorToken, 'haroolife_chat_send', {
+    p_room: 'locality:lome',
+    p_body: `ecrit quand meme ${run}`,
+    p_client_id: randomUUID(),
+  })
+  expect(write.status).not.toBe(200)
+  const gift = await rpc(visitorToken, 'haroolife_money_send', {
+    p_key: keyOf(ACCOUNTS.ama),
+    p_amount: 500,
+    p_note: null,
+    p_client_id: randomUUID(),
+  })
+  expect(gift.status).not.toBe(200)
+
+  // Keeping the game asks for the e-mail only (same account, confirmed by a link).
+  await keep.getByRole('textbox', { name: 'Ton e-mail' }).fill(`visiteur-${run}@test.local`)
+  await keep.getByRole('button', { name: 'Garder' }).click()
+  await expect(keep).toContainText('Un lien a été envoyé')
+  expect(await (await fetch(`${SUPABASE}/__visitor-keep`)).json()).toEqual({
+    email: `visiteur-${run}@test.local`,
+  })
+  await page.screenshot({ path: testInfo.outputPath('realtime-visitor.png') })
+  expect(errors).toEqual([])
+  await context.close()
+})
