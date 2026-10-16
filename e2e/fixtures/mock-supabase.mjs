@@ -719,6 +719,19 @@ http
         /^\/rest\/v1\/rpc\/(haroolife_dm_inbox|haroolife_dm_read|haroolife_chat_history|haroolife_chat_send|haroolife_money_send|haroolife_money_claim|haroolife_save_get|haroolife_save_put|haroolife_chat_report|haroolife_mod_queue|haroolife_mod_act)$/.exec(
           p,
         )?.[1]
+      // The online save follows the realtime chat's fictional players only: every other test
+      // signs in as the same admin and must start from its own local game, not the last test's.
+      let subject = null
+      try {
+        subject = JSON.parse(
+          Buffer.from(
+            (req.headers.authorization ?? '').replace(/^Bearer /, '').split('.')[1] ?? '',
+            'base64url',
+          ).toString(),
+        ).sub
+      } catch {}
+      if (localRpc?.startsWith('haroolife_save_') && !REALTIME_ACCOUNTS.has(subject))
+        return send(404, { message: 'online save not offered to this test account' })
       if (localRpc) {
         fetch(`http://127.0.0.1:${process.env.HAROOLIFE_LOCAL_RPC_PORT ?? 3002}/rpc/${localRpc}`, {
           method: 'POST',
