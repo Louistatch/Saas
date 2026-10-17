@@ -24,13 +24,15 @@ test('missing photo does not block; missing documents do and are named in the re
   assert.match(a.suggestedReason ?? '', /pièce d’identité/)
 })
 
-test('no faitiere wins over everything and review order puts ready and oldest first', () => {
+test('an independent dossier is ready on its documents alone and uses the same review order', () => {
   const noFaitiere = assessDossier(
     { ...base, faitiere_id: null },
     ['diplome', 'piece_identite'],
     now,
   )
-  assert.equal(noFaitiere.verdict, 'sans_faitiere')
+  assert.equal(noFaitiere.verdict, 'pret')
+  assert.deepEqual(noFaitiere.missing, [])
+  assert.equal(noFaitiere.suggestedReason, null)
   const readyNew = assessDossier(
     { ...base, created_at: '2026-10-11T08:00:00Z' },
     ['diplome', 'piece_identite'],
@@ -39,5 +41,12 @@ test('no faitiere wins over everything and review order puts ready and oldest fi
   const readyOld = assessDossier(base, ['diplome', 'piece_identite'], now)
   const incomplete = assessDossier(base, [], now)
   const sorted = [incomplete, readyNew, noFaitiere, readyOld].sort(compareForReview)
-  assert.deepEqual(sorted, [readyOld, readyNew, incomplete, noFaitiere])
+  assert.deepEqual(sorted, [noFaitiere, readyOld, readyNew, incomplete])
+})
+
+test('requests for documents never demand affiliation from an independent', () => {
+  const a = assessDossier({ ...base, faitiere_id: null, photo_url: null }, [], now)
+  assert.equal(a.verdict, 'incomplet')
+  assert.deepEqual(a.missing, ['diplome', 'piece_identite', 'photo'])
+  assert.doesNotMatch(a.suggestedReason ?? '', /faîtière|organisation/i)
 })

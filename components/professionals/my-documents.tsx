@@ -107,8 +107,8 @@ export function MyProfessionalDocuments() {
     <div className="space-y-3">
       {docs.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          Aucun justificatif. Déposez votre diplôme ou une attestation : l’opérateur officier de
-          votre faîtière en a besoin pour valider votre dossier.
+          Aucun justificatif. Déposez votre diplôme ou une attestation et votre pièce d’identité
+          pour permettre la vérification de votre qualification professionnelle.
         </p>
       ) : (
         <ul className="space-y-1.5 text-sm">

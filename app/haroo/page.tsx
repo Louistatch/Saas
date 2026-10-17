@@ -1,18 +1,18 @@
 'use client'
 
-import { SupportButton } from '@/components/support/support-button'
 import { ProtectedRoute } from '@/app/components/protected-route'
 import { useAuth } from '@/app/context/auth-context'
 import { RequestOrgCard } from '@/components/account/layer-activation'
 import { MarketMissions } from '@/components/haroo/market-missions'
-import { HarooLifeEntry } from '@/components/haroolife/entry'
-import { HarooLifeMessagesCard } from '@/components/haroolife/messages-inbox'
 import { MissionActions } from '@/components/haroo/mission-actions'
 import { HarooProfileEditor } from '@/components/haroo/profile-editor'
 import { PublishAnnouncement } from '@/components/haroo/publish-announcement'
+import { HarooLifeEntry } from '@/components/haroolife/entry'
+import { HarooLifeMessagesCard } from '@/components/haroolife/messages-inbox'
 import { MyProfessionalDocuments } from '@/components/professionals/my-documents'
 import { Spinner } from '@/components/shared/loading'
 import { Logo } from '@/components/shared/logo'
+import { SupportButton } from '@/components/support/support-button'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { performLogout } from '@/lib/auth/logout'
@@ -336,7 +336,9 @@ function MissionCard({
         ) : null}
         {mission.rating ? <span>Avis : {mission.rating}/5</span> : null}
       </div>
-      {mission.review ? <p className="text-xs italic text-muted-foreground">« {mission.review} »</p> : null}
+      {mission.review ? (
+        <p className="text-xs italic text-muted-foreground">« {mission.review} »</p>
+      ) : null}
       {onChanged ? (
         <MissionActions
           missionId={mission.id}
@@ -878,11 +880,11 @@ function HarooSpaceInner() {
 
             {harooRole === 'agronome' && profile && !profile.badge_valide && (
               <p className="mt-4 rounded-lg bg-muted px-4 py-3 text-sm text-foreground">
-                {!profile.faitiere_id
-                  ? 'Étape suivante : choisissez votre faîtière de rattachement avec « Modifier mon profil ». Elle vérifiera votre dossier, puis votre carte sera émise.'
-                  : profile.statut_validation === 'REJETE'
-                    ? 'Votre faîtière demande des compléments : ajoutez les justificatifs manquants ci-dessous.'
-                    : 'Votre faîtière vérifie votre dossier. Votre carte professionnelle sera émise dès la validation : ajoutez vos justificatifs ci-dessous pour accélérer.'}
+                {profile.statut_validation === 'REJETE'
+                  ? 'Des compléments sont demandés : ajoutez les justificatifs manquants ci-dessous pour permettre la reprise de votre dossier.'
+                  : !profile.faitiere_id
+                    ? 'Vous êtes inscrit en indépendant. Ajoutez vos justificatifs ci-dessous : l’équipe FaîtiereHub vérifiera votre qualification avant l’émission de votre carte professionnelle.'
+                    : 'Un opérateur habilité vérifie votre dossier. Votre carte professionnelle sera émise dès la validation : ajoutez vos justificatifs ci-dessous pour accélérer.'}
               </p>
             )}
 
@@ -920,8 +922,8 @@ function HarooSpaceInner() {
         </Card>
 
         {/* Justificatifs du dossier (agronome / technicien / conseiller) :
-            déposés tant que le dossier n'est pas validé, lus par l'opérateur
-            officier de la faîtière via des URL signées. */}
+            déposés tant que le dossier n'est pas validé, lus par l'administration
+            ou l'opérateur habilité via des URL signées. */}
         {harooRole === 'agronome' && profile && (
           <Card className="mb-6">
             <CardHeader>
@@ -930,8 +932,8 @@ function HarooSpaceInner() {
             <CardContent>
               {!profile.faitiere_id && profile.statut_validation !== 'VALIDE' && (
                 <p className="mb-3 text-sm text-amber-700">
-                  Choisissez votre faîtière de rattachement (« Modifier mon profil ») : sans elle,
-                  aucun opérateur officier ne peut instruire votre dossier.
+                  Votre dossier indépendant est instruit par l’administration FaîtiereHub. Vous
+                  pouvez déposer vos pièces sans choisir de faîtière.
                 </p>
               )}
               <MyProfessionalDocuments />
@@ -1130,8 +1132,8 @@ function HarooSpaceInner() {
                   <CardContent className="space-y-4">
                     {demandes.length === 0 && (
                       <p className="text-sm text-muted-foreground">
-                        Aucune demande en attente. Les exploitants vous sollicitent en scannant votre
-                        carte professionnelle.
+                        Aucune demande en attente. Les exploitants vous sollicitent en scannant
+                        votre carte professionnelle.
                       </p>
                     )}
                     {demandes.map((mission) => (

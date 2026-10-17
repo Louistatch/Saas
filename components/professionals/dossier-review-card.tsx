@@ -48,7 +48,6 @@ const REASON_PRESETS = [
 ]
 
 const MISSING_NOUN = {
-  faitiere: 'la faîtière',
   diplome: 'le diplôme',
   piece_identite: 'la pièce d’identité',
   photo: 'la photo',
@@ -68,11 +67,9 @@ function waitingLabel(days: number) {
 export function DossierCard({
   dossier,
   onDone,
-  isSuperAdmin,
 }: {
   dossier: Dossier
   onDone: () => void
-  isSuperAdmin: boolean
 }) {
   const a = dossier.assessment
   const pending = dossier.statut_validation === 'EN_ATTENTE'
@@ -130,14 +127,10 @@ export function DossierCard({
     ? null
     : a.verdict === 'pret'
       ? 'Prêt à valider : les pièces requises sont là.'
-      : a.verdict === 'sans_faitiere'
-        ? isSuperAdmin
-          ? 'Sans faîtière : vous seul pouvez l’instruire. Demandez-lui d’en choisir une.'
-          : 'Sans faîtière : la personne doit en choisir une.'
-        : `Incomplet : il manque ${a.missing
-            .filter((c) => c !== 'photo')
-            .map((c) => MISSING_NOUN[c])
-            .join(' et ')}.`
+      : `Incomplet : il manque ${a.missing
+          .filter((c) => c !== 'photo')
+          .map((c) => MISSING_NOUN[c])
+          .join(' et ')}.`
 
   return (
     <Card className={pending && ready ? 'border-primary/40' : undefined}>
@@ -157,7 +150,7 @@ export function DossierCard({
             </p>
             <p className="text-xs text-muted-foreground">
               {dossier.profession_label ?? 'Ingénieur agronome'},{' '}
-              {dossier.faitiere_name ?? 'sans faîtière'}
+              {dossier.faitiere_name ?? 'professionnel indépendant'}
               {dossier.card_number ? `, carte ${dossier.card_number}` : ''}
             </p>
           </div>
@@ -172,7 +165,7 @@ export function DossierCard({
 
         {pending && a && (
           <>
-            <ul className="grid grid-cols-4 gap-1.5" aria-label="Pièces du dossier">
+            <ul className="grid grid-cols-3 gap-1.5" aria-label="Pièces du dossier">
               {DOSSIER_CHECKS.map((c) => {
                 const ok = a.checks[c]
                 return (

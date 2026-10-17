@@ -158,7 +158,7 @@ function ProfessionalsContent() {
               </div>
             )}
             {shownDossiers.map((d) => (
-              <DossierCard key={d.id} dossier={d} onDone={load} isSuperAdmin={isSuperAdmin} />
+              <DossierCard key={d.id} dossier={d} onDone={load} />
             ))}
           </div>
         )}
