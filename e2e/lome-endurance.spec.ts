@@ -133,6 +133,8 @@ test('20 house visits and 10 trips keep one engine and no growing GPU state', as
     await expect
       .poll(async () => (await live(page))?.chunks ?? 0, { timeout: 30000 })
       .toBeGreaterThan(0)
+    // The coach's own view (a second canvas on board) closes on arrival: one 3D world is left.
+    await expect(page.getByTestId('travel-splash')).toBeHidden()
     expect(await page.locator('canvas').count(), 'one canvas').toBe(1)
   }
   await settle()
