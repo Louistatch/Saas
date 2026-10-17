@@ -131,9 +131,10 @@ test('travel Lomé → Kara → Lomé inside the single 3D world', async ({ page
   expect(kara?.wallet).toBe(wallet - 7500)
   expect(kara?.lastEvent).toMatch(/Arrivée à Kara/)
   expect(kara?.estateBuildings).toBe(estate)
-  expect(await page.locator('canvas').count()).toBe(1)
-  // Once Kara's street is drawn (and the journey seen), the game is back.
+  // Once Kara's street is drawn (and the journey seen), the game is back: the coach's own view
+  // (a second canvas while on board) is gone, one 3D world is left.
   await expect(splash).toBeHidden()
+  expect(await page.locator('canvas').count()).toBe(1)
   // Kara's own places appear in the Explorer sheet, none of Lomé's.
   await openMap()
   await expect(page.getByRole('button', { name: /Grand marché de Kara/ })).toBeVisible()

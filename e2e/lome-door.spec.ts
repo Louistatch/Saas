@@ -92,8 +92,9 @@ test('enter and leave my house with continuous movement, taxi and reload', async
     })
   })
   const door = page.getByTestId('door-action')
-  // The spawn cell on the avenue is the door of an apartment block: offered, by name.
-  await expect(door).toContainText('Immeuble')
+  // The spawn cell on the avenue is the door of the neighbourhood's service station (the plot
+  // nearest the arrival, world.ts): offered, by name.
+  await expect(door).toContainText('Station-service du quartier')
 
   // 1. New game, across the lawn to the west wall of the house (the case that failed).
   const walk = await stick(page, mobile)

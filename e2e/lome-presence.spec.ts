@@ -32,14 +32,15 @@ test('signed-in players see real residents of their canton and can speak on the 
   ])
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
+  // The residents of the canton come with the world API (the HUD now counts players online).
+  const world = page.waitForResponse(
+    (r) => r.url().includes('/api/haroolife/world') && r.status() === 200,
+  )
   await page.goto('/haroolife/territoire/lome', { waitUntil: 'domcontentloaded' })
   const navigation = page.getByRole('navigation', { name: 'Navigation du jeu' })
   await expect(navigation).toBeVisible()
   await expect(page.locator('canvas').first()).toBeVisible({ timeout: 30000 })
-  // Residents of the canton are counted in the HUD once the world API answers.
-  await expect(page.getByTitle(/Habitants de .* présents dans le quartier/)).toBeVisible({
-    timeout: 20000,
-  })
+  await world
 
   // Walk to the market (two buyers stand there in the fixture) and go in: "Ici maintenant" lists them.
   await openPlaces(page)

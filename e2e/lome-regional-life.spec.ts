@@ -3,6 +3,7 @@ import { initialCityLife } from '../lib/haroolife/city/life'
 import { setLocality } from '../lib/haroolife/city/locality'
 import { employerLot } from '../lib/haroolife/city/employment'
 import { landmarks } from '../lib/haroolife/city/world'
+import { AIR_ROUTES } from '../lib/haroolife/togo-social-life'
 
 const key = 'haroolife.lome-city.v1'
 const save = (page: import('@playwright/test').Page) =>
@@ -109,7 +110,8 @@ test('mobile: fictional aviation boards at the terminal, charges once and arrive
   state.insideLot = lot.id
   state.at = lot.door
   state.target = lot.id
-  state.life.wallet = 50000
+  // The fare is the one announced for Lomé–Niamtougou (togo-social-life.ts AIR_ROUTES).
+  state.life.wallet = 100000
   await seed(page, state)
   await page.goto('/haroolife')
   await page.getByRole('button', { name: /Embarquer vers Kara/ }).click({ timeout: 45000 })
@@ -117,10 +119,10 @@ test('mobile: fictional aviation boards at the terminal, charges once and arrive
   await expect(page.getByTestId('travel-splash')).toContainText('de vol')
   await page.screenshot({ path: info.outputPath('aviation.png') })
   await expect(page.getByTestId('travel-splash')).toBeHidden({ timeout: 45000 })
-  expect((await save(page)).life.wallet).toBe(32000)
+  expect((await save(page)).life.wallet).toBe(100000 - AIR_ROUTES['lome>kara'].fare)
   await page.reload()
   await expect.poll(async () => (await save(page)).locality).toBe('kara')
-  expect((await save(page)).life.wallet).toBe(32000)
+  expect((await save(page)).life.wallet).toBe(100000 - AIR_ROUTES['lome>kara'].fare)
 })
 
 test('mobile: visible cars and motos move while the player stays still', async ({ page }, info) => {
@@ -149,8 +151,9 @@ test('mobile: visible cars and motos move while the player stays still', async (
     .toBeGreaterThan(3)
   await page.screenshot({ path: info.outputPath('traffic.png') })
   await page.getByRole('button', { name: 'Voir les joueurs en ligne' }).click()
+  // The panel never invents players: the relay's truth, or that it cannot confirm anyone.
   await expect(page.getByRole('region', { name: 'Joueurs en ligne' })).toContainText(
-    'Aucun statut en ligne ne peut être confirmé',
+    /Les passants du jeu sont des PNJ|Aucun statut en ligne ne peut être confirmé/,
   )
 })
 

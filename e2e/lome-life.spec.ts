@@ -130,7 +130,9 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
     .toContain('"route":0,')
   await navigation.getByRole('button', { name: 'Aménager' }).click()
   await expect(page.getByRole('dialog', { name: 'Marché & commerces' })).toBeVisible()
-  await page.getByRole('button', { name: /Acheter un repas · 650 FCFA/ }).click()
+  // The market sells dishes by name (city/commerce.ts): an akoumé, 650 FCFA, into the bag.
+  const akoume = page.getByTestId('goods-akoume')
+  await akoume.getByRole('button', { name: 'Acheter · 650' }).click()
   // The engine answers every action with a message; the purchase must be the last one.
   await expect
     .poll(() =>
@@ -146,8 +148,8 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
         })
       }),
     )
-    .toContain('repas acheté')
-  await page.getByRole('button', { name: /Manger ·/ }).click()
+    .toContain('Akoumé et sauce acheté')
+  await akoume.getByRole('button', { name: 'Manger', exact: true }).click()
   await page.getByRole('button', { name: 'Fermer', exact: true }).click()
 
   await navigation.getByRole('button', { name: 'Téléphone' }).click()

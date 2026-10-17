@@ -49,15 +49,14 @@ test('20 house visits and 10 trips keep one engine and no growing GPU state', as
   await expect
     .poll(async () => (await live(page))?.chunks ?? 0, { timeout: 30000 })
     .toBeGreaterThan(0)
-  // Fictitious savings for the fares: the first read of the player's own local save gets a
-  // fuller (fictional) wallet; nothing real is involved.
+  // Fictitious savings for the fares: every read of the player's own local save (the entry
+  // screen's summary reads it before the game does) gets a fuller (fictional) wallet; nothing
+  // real is involved.
   await page.addInitScript(() => {
     const get = Storage.prototype.getItem
-    let done = false
     Storage.prototype.getItem = function (key: string) {
       const v = get.call(this, key)
-      if (done || key !== 'haroolife.lome-city.v1' || !v) return v
-      done = true
+      if (key !== 'haroolife.lome-city.v1' || !v) return v
       try {
         const s = JSON.parse(v)
         if (s?.life && s.life.wallet < 50000) s.life.wallet = 100000

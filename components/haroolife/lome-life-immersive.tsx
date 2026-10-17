@@ -1314,6 +1314,18 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
               : moved
           })
           setNearVehicle(c.canEnterVehicle())
+        } else if (ev.type === 'blocked') {
+          // The last cell of a walk to a point is taken (a parked taxi, a moto): arrived beside it.
+          const route = cityLifeRef.current.route
+          const last = route[0]
+          if (
+            route.length === 1 &&
+            !cityLifeRef.current.target &&
+            Math.hypot(last.x - c.pos.x, last.y - c.pos.z) < 1.6
+          ) {
+            c.route = []
+            setCityLife((old) => (old.route.length === 1 ? { ...old, route: [] } : old))
+          }
         } else if (ev.type === 'vehicle') {
           const v = c.vehicle
           setDriving(ev.state === 'entered')

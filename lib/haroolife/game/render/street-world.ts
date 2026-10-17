@@ -532,13 +532,18 @@ export class StreetWorld {
     const rider = peds[riderIndex]
     if (rider?.status === 'fulfilled')
       this.trafficRiderTemplate = { gltf: rider.value, spec: pedSpecs[riderIndex] }
-    // Licensed CC0 models already bundled with the game, no external runtime download.
-    await Promise.allSettled(
-      ['taxi', 'sedan', 'van'].map(async (kind) => {
-        const gltf = await this.load(`/haroolife/vendor/kenney-3d/car-kit/${kind}.glb`)
-        if (!this.disposed) this.trafficTemplates.set(kind, gltf.scene)
-      }),
-    )
+    // Licensed CC0 models already bundled with the game, no external runtime download. Loaded
+    // beside the start, never awaited: a slow model never holds the street back (the traffic
+    // and the other players' cars appear when it lands).
+    for (const kind of ['taxi', 'sedan', 'van'])
+      this.load(`/haroolife/vendor/kenney-3d/car-kit/${kind}.glb`).then(
+        (gltf) => {
+          if (!this.disposed) this.trafficTemplates.set(kind, gltf.scene)
+        },
+        () => {
+          // A model that fails to load: that kind of car stays off the road.
+        },
+      )
     if (this.disposed) return
     this.startAds()
     this.startRemote()
