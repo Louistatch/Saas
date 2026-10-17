@@ -1259,7 +1259,13 @@ export class StreetWorld {
       blockers.push({ ...ctl.vehicle, halfWidth: 0.3, halfLength: 1 })
     this.traffic.step(dt, point.x, point.z, blockers)
     ctl.obstacles = [
-      ...this.traffic.cars.filter((c) => this.trafficModels.has(c.id)),
+      // A car stopped beside the player is waiting for them to pass: it does not block them
+      // in turn (the two used to wait for each other forever on a walk along the road).
+      ...this.traffic.cars.filter(
+        (c) =>
+          this.trafficModels.has(c.id) &&
+          !(c.stopped && Math.hypot(c.x - ctl.pos.x, c.z - ctl.pos.z) < 2),
+      ),
       ...this.walkers
         .filter(
           (w) =>

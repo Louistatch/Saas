@@ -1,4 +1,5 @@
 import { initialCityLife } from '../lib/haroolife/city/life'
+import { landmarks } from '../lib/haroolife/city/world'
 import { expect, openPlaces, test } from './lome-test'
 
 /**
@@ -116,7 +117,13 @@ for (const engine of ['haroo', 'three'])
     })
     const state = initialCityLife()
     state.life.wallet = 5432
-    state.life.inside = 'house'
+    // The gym: house, market and bakery are always drawn by the HarooLife engine
+    // (engine/select.ts rendererForInterior), the other rooms follow ?engine=.
+    const gym = landmarks().find((l) => l.type === 'sport')
+    if (!gym) throw new Error('no gym in Lomé')
+    state.insideLot = gym.id
+    state.at = gym.door
+    state.target = gym.id
     await page.addInitScript(
       ({ state }) => {
         if (sessionStorage.getItem('adult-migration-seeded')) return

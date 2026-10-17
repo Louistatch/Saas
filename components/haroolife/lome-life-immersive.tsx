@@ -1314,9 +1314,10 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
               : moved
           })
           setNearVehicle(c.canEnterVehicle())
-        } else if (ev.type === 'blocked') {
+        } else if (ev.type === 'blocked' && !c.driving) {
           // A walk to a point whose end is taken (a parked taxi, a moto): arrived beside it. The
-          // vehicle may now be in reach without the player crossing into a new cell.
+          // vehicle may now be in reach without the player crossing into a new cell. (At the
+          // wheel, the automatic service handles its own blocked roads.)
           setNearVehicle(c.canEnterVehicle())
           const route = cityLifeRef.current.route
           const last = route[route.length - 1]

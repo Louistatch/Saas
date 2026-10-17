@@ -465,8 +465,12 @@ test('HarooLife street billboards: built near, read, learn more, statistics', as
       { timeout: 60000 },
     )
     .toBe('haroo')
-  // Both supports near the arrival are built, each with its poster, at a small geometric cost.
-  await expect.poll(async () => (await ads())?.built.length ?? 0, { timeout: 15000 }).toBe(2)
+  // The supports near the arrival (the two pilots, and the free ones around) are built, each
+  // with its poster, at a small geometric cost.
+  await expect
+    .poll(async () => (await ads())?.built ?? [], { timeout: 15000 })
+    .toEqual(expect.arrayContaining(['lome-avenue', 'lome-jardin']))
+  const built = (await ads())?.built.length ?? 0
   const own = await page.evaluate(() => {
     const s = (
       window as unknown as { __LOME_SCENE?: import('../lib/haroolife/engine/types').SceneProbe }
@@ -479,7 +483,7 @@ test('HarooLife street billboards: built near, read, learn more, statistics', as
     }
   })
   expect(own.names).toEqual([true, true, true])
-  expect(own.g.matches).toBe(2)
+  expect(own.g.matches).toBe(built)
   expect(own.g.triangles / own.g.matches, 'triangles per support').toBeLessThan(100)
 
   // Walk next to the avenue support: « Lire l'annonce » appears.

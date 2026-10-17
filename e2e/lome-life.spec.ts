@@ -193,7 +193,12 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
 
   await page.getByRole('button', { name: 'Ouvrir les outils de construction' }).click()
   await expect(page.getByRole('dialog', { name: 'Construire' })).toBeVisible()
+  // Touching a construction builds it on the nearest free plot by a road.
   await page.getByRole('button', { name: /Maison.*85 FCFA/ }).click()
+  await expect(page.getByText('Chantier achevé : Maison.')).toBeVisible()
+  // Or the player picks the plot: the hint, then « Terminer ».
+  await page.getByRole('button', { name: 'Ouvrir les outils de construction' }).click()
+  await page.getByRole('button', { name: /Choisir moi-même l’emplacement/ }).click()
   await expect(page.getByText(/Pose Maison en touchant un terrain/)).toBeVisible()
   // Return to free travel; selection is still connected to the existing construction engine.
   await page.getByRole('button', { name: 'Terminer' }).click()
