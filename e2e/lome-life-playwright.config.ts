@@ -104,7 +104,10 @@ export default defineConfig({
     {
       command: 'node e2e/fixtures/mock-supabase.mjs',
       cwd: '..',
-      env: { HAROOLIFE_SUPABASE_PORT: String(authPort) },
+      env: {
+        HAROOLIFE_SUPABASE_PORT: String(authPort),
+        HAROOLIFE_REQUIRE_CAPTCHA: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ? '1' : '0',
+      },
       url: `${authURL}/auth/v1/health`,
       reuseExistingServer: process.env.HAROOLIFE_REUSE_SERVER === '1' && !process.env.CI,
     },

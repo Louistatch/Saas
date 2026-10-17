@@ -22,17 +22,22 @@ export async function startVisit(
   captchaToken?: string | null,
   firstName?: string,
 ): Promise<string | null> {
-  const { error } = await (await supabase()).auth.signInAnonymously({
-    options: {
-      data: { first_name: firstName?.trim().slice(0, 40) || 'Visiteur' },
-      captchaToken: captchaToken ?? undefined,
-    },
-  })
-  if (!error) return null
-  if (/captcha/i.test(error.message)) return 'Vérification anti-robot à refaire : réessaie.'
-  return /anonymous/i.test(error.message)
-    ? 'Le mode visiteur n’est pas encore ouvert. Connecte-toi ou crée un compte.'
-    : 'Impossible d’entrer en visiteur pour le moment. Réessaie dans un instant.'
+  try {
+    const { error } = await (await supabase()).auth.signInAnonymously({
+      options: {
+        data: { first_name: firstName?.trim().slice(0, 40) || 'Visiteur' },
+        captchaToken: captchaToken ?? undefined,
+      },
+    })
+    if (!error) return null
+    if (/captcha/i.test(error.message))
+      return 'Vérification anti-robot à refaire ci-dessous, puis appuie sur « Emménager ». Tes choix sont conservés.'
+    return /anonymous/i.test(error.message)
+      ? 'Le mode visiteur n’est pas encore ouvert. Connecte-toi ou crée un compte.'
+      : 'Impossible d’entrer en visiteur pour le moment. Réessaie dans un instant.'
+  } catch {
+    return 'Connexion interrompue. Réessaie : tes choix sont conservés.'
+  }
 }
 
 /**

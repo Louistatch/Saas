@@ -18,15 +18,19 @@ const phoneSchema = z
 const specialisationsSchema = z.array(z.string().trim().min(1).max(60)).max(10).optional()
 
 /**
- * Inscription Haroo self-service. Pour la famille AGRONOME (agronome,
- * technicien, conseiller), la faîtière de rattachement est OBLIGATOIRE : elle
- * détermine quel Opérateur officier instruit le dossier.
+ * Inscription Haroo indépendante de l'appartenance à une organisation, comme
+ * l'inscription Opérateur. Un éventuel suivi par une faîtière est facultatif
+ * et n'accorde aucun rôle organisationnel. Les anciens clients peuvent encore
+ * transmettre ce choix ; une valeur renseignée reste strictement validée.
  */
 export const harooSignupSchema = z
   .object({
     profileType: z.enum(['OUVRIER', 'ACHETEUR', 'AGRONOME']),
     profession: z.enum(PROFESSIONS).optional(),
-    faitiereId: faitiereIdSchema.optional(),
+    faitiereId: z.preprocess(
+      (value) => (value === null || value === '' ? undefined : value),
+      faitiereIdSchema.optional(),
+    ),
     specialisations: specialisationsSchema,
     firstName: z.string().trim().min(2, 'Le prénom est requis').max(100),
     lastName: z.string().trim().min(2, 'Le nom est requis').max(100),
@@ -35,13 +39,6 @@ export const harooSignupSchema = z
     password: z.string().min(8, 'Le mot de passe doit contenir au moins 8 caractères').max(128),
   })
   .superRefine((v, ctx) => {
-    if (v.profileType === 'AGRONOME' && !v.faitiereId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['faitiereId'],
-        message: 'Choisissez votre faîtière de rattachement',
-      })
-    }
     if (v.profileType !== 'AGRONOME' && v.profession) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

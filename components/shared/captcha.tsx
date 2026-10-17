@@ -1,5 +1,7 @@
 'use client'
 
+import { captchaExceptionCode, captchaFailure } from '@/lib/auth/captcha-failure'
+import { reportClientError } from '@/lib/errors/report-client'
 /**
  * Anti-robot check (Cloudflare Turnstile) for the Supabase Auth calls made from the browser:
  * visitor entry, sign-in, password reset, confirmation e-mail sent again. Off until
@@ -12,6 +14,9 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ''
 const SCRIPT = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+// Turnstile tokens expire after five minutes. Renew a little earlier, including after a tab
+// was suspended (the submit handler reads the timestamp rather than trusting a delayed timer).
+const TOKEN_LIFETIME = 270_000
 
 type Turnstile = {
   render: (el: HTMLElement, opts: Record<string, unknown>) => string
@@ -27,43 +32,95 @@ declare global {
 let loading: Promise<Turnstile> | null = null
 function loadTurnstile(): Promise<Turnstile> {
   if (window.turnstile) return Promise.resolve(window.turnstile)
-  loading ??= new Promise((resolve, reject) => {
+  if (loading) return loading
+  const task = new Promise<Turnstile>((resolve, reject) => {
     const s = document.createElement('script')
+    const fail = (code = 'script-load') => {
+      window.clearTimeout(timer)
+      s.remove()
+      reject(new Error(code))
+    }
+    // A rural mobile connection may need more than 15 seconds to download the real script.
+    const timer = window.setTimeout(() => fail('script-timeout'), 45_000)
     s.src = SCRIPT
     s.async = true
-    s.onload = () => (window.turnstile ? resolve(window.turnstile) : reject(new Error('turnstile')))
-    s.onerror = () => {
-      loading = null
-      reject(new Error('turnstile'))
+    s.onload = () => {
+      window.clearTimeout(timer)
+      if (window.turnstile) resolve(window.turnstile)
+      else fail()
     }
+    s.onerror = () => fail()
     document.head.appendChild(s)
   })
-  return loading
+  loading = task
+  void task.catch(() => {
+    if (loading === task) loading = null
+  })
+  return task
 }
 
 export function useCaptcha(): {
   enabled: boolean
   /** The token to pass as `options.captchaToken` (null when off or not yet solved). */
   token: string | null
-  /** True when the call may go: captcha off, solved, or Cloudflare failing (no token then). */
+  /** Read immediately before Auth: rejects expired tokens even after a suspended tab. */
+  getToken: () => string | null
+  /** True only when CAPTCHA is off or a fresh check succeeded. Errors never bypass it. */
   ready: boolean
-  /** Where the check appears (usually invisible; shows a box only when it needs the person). */
+  /** Visible check and recovery button, mounted where the protected action is submitted. */
   box: ReactNode
   /** A token is single-use: call after each attempt. */
   reset: () => void
 } {
   const [token, setToken] = useState<string | null>(null)
-  // Cloudflare out of reach or refusing this site (script blocked, key or domain wrong): the call
-  // goes without a token and Supabase decides, rather than a button that never wakes up.
   const [failed, setFailed] = useState(false)
+  const [failure, setFailure] = useState<ReturnType<typeof captchaFailure> | null>(null)
+  const reported = useRef(new Set<string>())
+  const fail = useCallback((code: unknown) => {
+    const detail = captchaFailure(code)
+    setFailure(detail)
+    setFailed(true)
+    if (!reported.current.has(detail.code)) {
+      reported.current.add(detail.code)
+      reportClientError(new Error(`Turnstile ${detail.reason}: ${detail.code}`))
+    }
+  }, [])
+  const [attempt, setAttempt] = useState(0)
+  const answer = useRef<{ value: string; at: number } | null>(null)
   // The box may appear long after the hook (the last step of the visitor arrival), and leave
   // again: the check lives exactly as long as its box is on the page.
   const [host, setHost] = useState<HTMLDivElement | null>(null)
   const widget = useRef<string | null>(null)
+  const reset = useCallback(() => {
+    if (!SITE_KEY) return
+    answer.current = null
+    setToken(null)
+    setFailed(false)
+    setFailure(null)
+    if (widget.current && window.turnstile) {
+      try {
+        window.turnstile.reset(widget.current)
+        return
+      } catch {
+        // A missing or unusable widget is recreated; a failed script can be downloaded again.
+      }
+    }
+    setAttempt((n) => n + 1)
+  }, [])
+  const getToken = useCallback(() => {
+    const current = answer.current
+    if (!current) return null
+    if (Date.now() - current.at >= TOKEN_LIFETIME) {
+      reset()
+      return null
+    }
+    return current.value
+  }, [reset])
   useEffect(() => {
     // Fetched ahead, so the check is quick once its box shows.
     if (SITE_KEY) void loadTurnstile().catch(() => {})
   }, [])
+  // biome-ignore lint/correctness/useExhaustiveDependencies: attempt deliberately remounts a failed widget/script
   useEffect(() => {
     if (!SITE_KEY || !host) return
     let alive = true
@@ -73,22 +130,35 @@ export function useCaptcha(): {
         if (!alive) return
         id = t.render(host, {
           sitekey: SITE_KEY,
-          appearance: 'interaction-only',
+          appearance: 'always',
+          size: 'flexible',
           language: 'fr',
           callback: (v: string) => {
+            if (!alive) return
+            answer.current = { value: v, at: Date.now() }
             setFailed(false)
+            setFailure(null)
             setToken(v)
           },
-          'expired-callback': () => setToken(null),
-          'error-callback': () => {
+          'refresh-expired': 'manual',
+          'expired-callback': () => {
+            if (alive) reset()
+          },
+          'refresh-timeout': 'manual',
+          'timeout-callback': () => {
+            if (alive) reset()
+          },
+          'error-callback': (code: string) => {
+            if (!alive) return
+            answer.current = null
             setToken(null)
-            setFailed(true)
+            fail(code)
           },
         })
         widget.current = id
       })
-      .catch(() => {
-        if (alive) setFailed(true)
+      .catch((error: unknown) => {
+        if (alive) fail(captchaExceptionCode(error))
       })
     return () => {
       alive = false
@@ -101,23 +171,44 @@ export function useCaptcha(): {
       }
       if (widget.current === id) widget.current = null
       // A token from a check no longer on the page is never sent (it would expire unseen).
+      answer.current = null
       setToken(null)
       setFailed(false)
+      setFailure(null)
     }
-  }, [host])
-  const reset = useCallback(() => {
-    if (!SITE_KEY) return
-    setToken(null)
-    // Without a widget (Cloudflare unreachable), there is nothing to redo: the call stays open.
-    if (!widget.current) return
-    setFailed(false)
-    window.turnstile?.reset(widget.current)
-  }, [])
+  }, [host, attempt, reset, fail])
+  useEffect(() => {
+    if (!token) return
+    const timer = window.setTimeout(reset, TOKEN_LIFETIME)
+    return () => window.clearTimeout(timer)
+  }, [token, reset])
   return {
     enabled: !!SITE_KEY,
     token,
-    ready: !SITE_KEY || !!token || failed,
-    box: SITE_KEY ? <div ref={setHost} className="flex justify-center" /> : null,
+    getToken,
+    ready: !SITE_KEY || (!!token && !failed),
+    box: SITE_KEY ? (
+      <div data-testid="captcha-check" className="mb-3 space-y-2 text-center text-xs">
+        <div ref={setHost} className="mx-auto w-full max-w-sm" />
+        <output className={`block ${failed ? 'text-red-800' : 'text-emerald-900'}`}>
+          {failed
+            ? failure?.message
+            : token
+              ? 'Vérification anti-robot réussie.'
+              : 'Vérification anti-robot en cours…'}
+        </output>
+        {failure && <p className="text-slate-600">Code du contrôle : {failure.code}</p>}
+        {failed && (
+          <button
+            type="button"
+            onClick={reset}
+            className="min-h-11 rounded-xl border border-emerald-800/25 bg-white px-4 font-semibold text-emerald-900"
+          >
+            Relancer la vérification
+          </button>
+        )}
+      </div>
+    ) : null,
     reset,
   }
 }

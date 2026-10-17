@@ -1,5 +1,5 @@
 // Inscription Haroo (OUVRIER / ACHETEUR / AGRONOME — agronome, technicien ou
-// conseiller, avec faîtière de rattachement obligatoire).
+// conseiller). Aucune appartenance à une organisation n'est exigée.
 //
 // FaîtiereHub ne crée pas le compte lui-même : la logique Haroo vit dans le
 // backend AgriTogo (déjà déployé), qui écrit dans la même base Supabase
@@ -9,10 +9,10 @@
 import { isEmailConfirmationRequired, sendConfirmationEmail } from '@/lib/auth/email-confirmation'
 import { isExistingFaitiere } from '@/lib/professionals/server'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
-import { NextResponse, type NextRequest } from 'next/server'
-import { rateLimit, clientKeyFromHeaders } from '@/lib/utils/rate-limit'
+import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
-import { harooSignupSchema, flattenZodErrors } from '@/lib/validators/schemas'
+import { flattenZodErrors, harooSignupSchema } from '@/lib/validators/schemas'
+import { type NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   // Rate limiting persistant via Upstash (si configuré)
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // Faîtière de rattachement (famille AGRONOME) : vérifiée ICI aussi —
+  // Suivi facultatif par une faîtière (anciens clients) : vérifié ICI aussi —
   // AgriTogo la revérifie, mais on ne relaie pas un identifiant arbitraire.
   if (
     parsed.data.faitiereId &&

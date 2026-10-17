@@ -192,7 +192,7 @@ export function HarooProfileEditor({
     }
     if (harooRole === 'agronome') {
       patch.canton_id = cantonId || null
-      if (canChangeFaitiere && faitiereId) patch.faitiere_id = faitiereId
+      if (canChangeFaitiere) patch.faitiere_id = faitiereId || null
     }
 
     const { error: updateError } = await supabase
@@ -336,14 +336,14 @@ export function HarooProfileEditor({
 
             {canChangeFaitiere && (
               <div className="space-y-2">
-                <Label htmlFor="haroo-faitiere">Faîtière de rattachement</Label>
+                <Label htmlFor="haroo-faitiere">Faîtière de suivi (facultatif)</Label>
                 <select
                   id="haroo-faitiere"
                   className={SELECT_CLASS}
                   value={faitiereId}
                   onChange={(e) => setFaitiereId(e.target.value)}
                 >
-                  <option value="">— Non renseignée —</option>
+                  <option value="">Indépendant — aucune faîtière</option>
                   {faitieres.map((f) => (
                     <option key={f.id} value={f.id}>
                       {f.name}
@@ -351,8 +351,9 @@ export function HarooProfileEditor({
                   ))}
                 </select>
                 <p className="text-xs text-muted-foreground">
-                  Un opérateur officier de cette faîtière instruit votre dossier. Elle ne pourra
-                  plus être changée après validation.
+                  Vous pouvez exercer en indépendant. Ce choix sert uniquement au suivi du dossier
+                  par un opérateur habilité ; il ne vous inscrit pas comme membre de l’organisation.
+                  Il ne pourra plus être changé après validation.
                 </p>
               </div>
             )}

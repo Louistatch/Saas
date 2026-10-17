@@ -1,18 +1,18 @@
 'use client'
 
-import Link from 'next/link'
-import { useState } from 'react'
-import { Logo } from '@/components/shared/logo'
 import { AuthSidePanel } from '@/components/shared/auth-side-panel'
 import { useCaptcha } from '@/components/shared/captcha'
+import { Logo } from '@/components/shared/logo'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ArrowLeft, CheckCircle } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { useGameReturn } from '@/hooks/use-game-return'
 import { withGameReturn } from '@/lib/haroolife/entry'
+import { createClient } from '@/lib/supabase/client'
+import { ArrowLeft, CheckCircle } from 'lucide-react'
+import Link from 'next/link'
+import { useState } from 'react'
 
 export default function ForgotPasswordPage() {
   const gameReturn = useGameReturn()
@@ -25,6 +25,12 @@ export default function ForgotPasswordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (loading) return
+    const captchaToken = captcha.getToken()
+    if (captcha.enabled && !captchaToken) {
+      setError('Terminez la vérification anti-robot ci-dessous avant de renvoyer le lien.')
+      return
+    }
     setError('')
     const trimmedEmail = email.trim().toLowerCase()
     if (!trimmedEmail) {
@@ -36,7 +42,7 @@ export default function ForgotPasswordPage() {
     // [SECURITY FIX - PHANTOM-002] Ne jamais révéler si l'email existe ou non
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
       redirectTo: `${window.location.origin}/auth/reset-password`,
-      captchaToken: captcha.token ?? undefined,
+      captchaToken: captchaToken ?? undefined,
     })
     // Only the anti-robot check is reported (it says nothing about the address).
     if (resetError && /captcha/i.test(resetError.message)) {

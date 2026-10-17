@@ -190,11 +190,19 @@ export default function GameEntry() {
   }
   // « Emménager »: the visitor account (once), then the username, the home and the new game.
   const finishArrival = async (choice: ArrivalChoice) => {
+    if (pending.current) return
+    const token = captcha.getToken()
+    if (!user && captcha.enabled && !token) {
+      setArrivalError({
+        message: 'Termine la vérification anti-robot ci-dessous. Tes choix sont conservés.',
+      })
+      return
+    }
     setArrivalError(null)
     pending.current = { choice, newGame: arriving === 'new' }
     setVisit('busy')
     if (user) return
-    const error = await startVisit(captcha.token, choice.name)
+    const error = await startVisit(token, choice.name)
     if (error) {
       pending.current = null
       setVisit('idle')

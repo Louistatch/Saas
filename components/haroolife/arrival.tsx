@@ -298,7 +298,7 @@ export default function Arrival({
 
       <section
         ref={sheet}
-        className="relative flex-1 overflow-y-auto rounded-t-[32px] bg-white px-5 pb-36 pt-6 shadow-[0_-8px_30px_rgba(19,54,43,0.08)]"
+        className="relative min-h-0 flex-1 overflow-y-auto rounded-t-[32px] bg-white px-5 pb-6 pt-6 shadow-[0_-8px_30px_rgba(19,54,43,0.08)]"
         aria-label={only ? 'Ton nom' : STEPS[step]}
       >
         {step === 0 && (
@@ -626,9 +626,8 @@ export default function Arrival({
         )}
       </section>
 
-      <div className="fixed inset-x-0 bottom-0 z-10 bg-gradient-to-t from-white via-white to-white/0 px-5 pb-[max(18px,env(safe-area-inset-bottom,0px))] pt-6">
-        {/* The anti-robot check, where the account is created: invisible unless it needs the
-            person, and then right above the button it holds. */}
+      <div className="relative z-10 shrink-0 bg-white px-5 pb-[max(18px,env(safe-area-inset-bottom,0px))] pt-3">
+        {/* Keep the check and its retry action visible next to the protected submission. */}
         {step === last && captcha}
         <button
           type="button"
