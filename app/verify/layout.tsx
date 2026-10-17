@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     title: 'Vérification officielle — FaîtiereHub',
     description: 'Page officielle de vérification des cartes membres FENOMAT.',
     siteName: 'FaîtiereHub',
-    url: 'https://www.faitierehub.com/verify',
+    url: 'https://faitierehub.com/verify',
   },
   // Prevent all caching at the HTML level
   other: {

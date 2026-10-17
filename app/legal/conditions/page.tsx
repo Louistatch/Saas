@@ -1,11 +1,7 @@
-import { MarketingLayout } from '@/components/shared/marketing-layout'
-import type { Metadata } from 'next'
+import { publicPageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
-  title: "Conditions d'utilisation — FaîtiereHub",
-  description:
-    "Conditions générales d'utilisation de la plateforme FaîtiereHub : objet, inscription, obligations, propriété intellectuelle, résiliation et droit applicable.",
-}
+export const metadata = publicPageMetadata('/legal/conditions')
+import { MarketingLayout } from '@/components/shared/marketing-layout'
 
 export default function ConditionsPage() {
   return (

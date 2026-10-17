@@ -1,6 +1,11 @@
+import { AgriculturalContext } from '@/components/marketing/agricultural-context'
+import { HarooCardSpecimen } from '@/components/marketing/haroo-card-specimen'
 import { HeroSection } from '@/components/marketing/hero-section'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
 import { Button } from '@/components/ui/button'
+import { publicPageMetadata } from '@/lib/seo'
+import fenomat from '@/public/images/partners/fenomat.webp'
+import showcaseCard from '@/public/showcase-card.webp'
 import {
   ArrowRight,
   BarChart3,
@@ -22,7 +27,10 @@ import {
   Users,
   Zap,
 } from 'lucide-react'
+import Image from 'next/image'
 import Link from 'next/link'
+
+export const metadata = publicPageMetadata('/')
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -192,16 +200,10 @@ export default function Home() {
                   id={`haroo-${type.toLowerCase()}`}
                   className="scroll-mt-24 rounded-2xl border border-amber-200/60 bg-white dark:bg-card shadow-sm overflow-hidden flex flex-col"
                 >
-                  {/* La carte réellement émise, rendue par le moteur de cartes
-                      (/api/haroo/card/preview). Un aplat de couleur dessiné en
-                      HTML ne montrait rien de ce que le titulaire recevra. */}
                   <div className="bg-muted/40 p-4">
-                    <img
-                      src={`/api/haroo/card/preview?type=${type}`}
+                    <HarooCardSpecimen
+                      type={type}
                       alt={`Spécimen de carte professionnelle ${role}`}
-                      width={1180}
-                      height={740}
-                      loading="lazy"
                       className="w-full rounded-lg border border-border shadow-sm"
                     />
                     <div className="mt-3 flex items-center justify-between gap-2">
@@ -415,9 +417,13 @@ export default function Home() {
           </div>
           <div className="flex justify-center">
             <div className="relative group w-full max-w-3xl">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/showcase-card.webp"
+              <Image
+                src={showcaseCard}
+                placeholder="blur"
+                loading="lazy"
+                decoding="async"
+                quality={85}
+                sizes="(max-width: 767px) calc(100vw - 32px), 768px"
                 alt="Carte membre FaîtiereHub — Design premium avec photo, QR code, localité, coopérative"
                 className="w-full rounded-2xl border border-border shadow-2xl transition-transform duration-500 group-hover:scale-[1.02]"
               />
@@ -580,9 +586,11 @@ export default function Home() {
           </p>
           <div className="flex justify-center">
             <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-card/60 px-6 py-6 text-center shadow-sm sm:flex-row sm:gap-8 sm:px-8 sm:text-left">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/images/partners/fenomat.webp"
+              <Image
+                src={fenomat}
+                loading="lazy"
+                placeholder="blur"
+                sizes="64px"
                 alt="Logo FENOMAT — Fédération Nationale des Organisations de Maraîchers du Togo"
                 className="h-14 w-auto object-contain sm:h-16"
               />
@@ -663,6 +671,7 @@ export default function Home() {
           </p>
         </div>
       </section>
+      <AgriculturalContext />
     </MarketingLayout>
   )
 }

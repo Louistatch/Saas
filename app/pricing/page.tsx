@@ -1,7 +1,10 @@
 import { MarketingLayout } from '@/components/shared/marketing-layout'
 import { Button } from '@/components/ui/button'
+import { publicPageMetadata } from '@/lib/seo'
 import { ArrowRight, Check, Network, Users } from 'lucide-react'
 import Link from 'next/link'
+
+export const metadata = publicPageMetadata('/pricing')
 
 const FAITIERE_PLANS = [
   {

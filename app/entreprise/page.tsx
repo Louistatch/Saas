@@ -1,14 +1,10 @@
 import { MarketingLayout } from '@/components/shared/marketing-layout'
 import { Button } from '@/components/ui/button'
+import { publicPageMetadata } from '@/lib/seo'
 import { ArrowRight, Building2, Clock, GraduationCap, Headphones, Puzzle } from 'lucide-react'
-import type { Metadata } from 'next'
 import Link from 'next/link'
 
-export const metadata: Metadata = {
-  title: 'Entreprise — FaîtiereHub | Solutions pour grandes faîtières et fédérations',
-  description:
-    'Solutions entreprise FaîtiereHub : support dédié, SLA garanti, déploiement personnalisé, intégrations sur mesure et formation des équipes terrain.',
-}
+export const metadata = publicPageMetadata('/entreprise')
 
 const enterpriseFeatures = [
   {

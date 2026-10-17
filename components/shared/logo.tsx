@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import Image from 'next/image'
 
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl'
@@ -24,9 +25,12 @@ const textSizes = {
 export function Logo({ size = 'md', showText = true, className, textClassName }: LogoProps) {
   return (
     <span className={cn('flex items-center gap-2', className)}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
         src="/logo.png"
+        width={40}
+        height={40}
+        sizes="40px"
+        loading="eager"
         alt="FaîtiereHub"
         className={cn(sizes[size], 'object-contain rounded-md')}
       />

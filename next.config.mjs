@@ -73,9 +73,10 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   images: {
-    // OPT-05: enable Next.js image optimization. Supabase Storage public URLs
-    // are whitelisted as remote sources. Modern formats served automatically.
-    formats: ['image/avif', 'image/webp'],
+    // WebP avoids AVIF's more expensive first encode on rural mobile requests.
+    // Authenticated card exports/QR codes never pass through this public optimizer.
+    formats: ['image/webp'],
+    qualities: [60, 75, 85],
     remotePatterns: [
       { protocol: 'https', hostname: '*.supabase.co', pathname: '/storage/v1/object/public/**' },
     ],
@@ -116,6 +117,23 @@ const nextConfig = {
   },
   async headers() {
     return [
+      // HTTP protection supplements metadata on private pages and redirects.
+      // robots.txt reduces crawling; only noindex can remove a crawled URL from search.
+      ...[
+        '/auth/:path*', '/admin/:path*', '/dashboard/:path*', '/operator/:path*',
+        '/espace-operateur/:path*', '/mon-espace-haroo/:path*', '/haroo/:path*',
+        '/compte/:path*', '/messages/:path*', '/reports/:path*', '/verify/:path*',
+        '/scan/:path*', '/setup/:path*', '/demo/:path*', '/forbidden/:path*',
+        '/embed/:path*', '/widget/:path*', '/api/:path*',
+        '/marketplace/achat/:path*', '/haroolife/territoire/:path*',
+        '/fournisseurs/:memberId',
+      ].map((source) => ({
+        source,
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+      })),
+      ...(process.env.VERCEL_ENV === 'preview' ? [{
+        source: '/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+      }] : []),
       { source: '/api/verify/:path*', headers: [
         { key: 'Cache-Control', value: 'private, no-store' },
         { key: 'CDN-Cache-Control', value: 'no-store' },
