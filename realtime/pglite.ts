@@ -77,6 +77,9 @@ const LOCAL_RPC: Record<string, string[]> = {
   haroolife_invite_code: [],
   haroolife_invite_accept: ['p_code'],
   haroolife_invite_claim: [],
+  haroolife_username_available: ['p_username'],
+  haroolife_claim_username: ['p_username', 'p_quartier', 'p_pagne'],
+  haroolife_my_username: [],
 }
 
 export type LocalChat = ChatRepository & {
@@ -99,7 +102,8 @@ export async function pgliteChat(migrationPaths: string | string[]): Promise<Loc
     CREATE TABLE cantons(id uuid PRIMARY KEY, name text);
     CREATE TABLE profiles(id uuid PRIMARY KEY, role text, cooperative_id uuid, deleted_at timestamptz);
     CREATE TABLE haroolife_residents(user_id uuid PRIMARY KEY REFERENCES profiles(id), canton_id uuid REFERENCES cantons(id),
-      display_name text, pagne smallint DEFAULT 1, visible boolean DEFAULT true);
+      display_name text, pagne smallint DEFAULT 1, visible boolean DEFAULT true,
+      updated_at timestamptz DEFAULT now());
     INSERT INTO cantons VALUES ('${LOCAL_CANTONS.be}','Bè'),('${LOCAL_CANTONS.kara}','Lama-Kara');
     INSERT INTO profiles VALUES ${accounts
       .map((a) => `('${a.id}','member',${a.coop ? `'${LOCAL_COOPS[a.coop]}'` : 'NULL'},NULL)`)
@@ -119,9 +123,10 @@ export async function pgliteChat(migrationPaths: string | string[]): Promise<Loc
   await db.exec('SET ROLE authenticated')
   // One connection: run each call alone (set the subject, then the function).
   let queue: Promise<unknown> = Promise.resolve()
-  const run = <T>(token: string, sql: string, args: unknown[]): Promise<T> => {
+  const run = <T>(token: string, sql: string, args: unknown[], anonymous = false): Promise<T> => {
     const job = queue.then(async () => {
-      const claims = claimsOf(token)
+      // A public function (checking a username before having an account) runs without subject.
+      const claims = claimsOf(token) ?? (anonymous ? { sub: '', json: '{}' } : null)
       if (!claims) throw new RepoError('auth_expired', 'Session expirée : reconnexion…')
       // Like PostgREST: the subject, and the whole token for rules reading other claims.
       await db.query(
@@ -157,6 +162,7 @@ export async function pgliteChat(migrationPaths: string | string[]): Promise<Loc
         t,
         `SELECT ${fn}(${params})`,
         names.map((n) => args[n] ?? null),
+        fn === 'haroolife_username_available',
       )
     },
     me: (t) => run<Me>(t, 'SELECT haroolife_chat_me()', []),

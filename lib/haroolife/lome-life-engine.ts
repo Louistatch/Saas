@@ -1,6 +1,7 @@
 import { CITIES, type CityId, isCityId } from './lome-districts'
 import { EVENT_IDS, rollEvent } from './lome-events'
 import { TOGO_JOBS, type TogoJobId } from './togo-social-life'
+import { type TraitId, decodeTraits, hasTrait } from './traits'
 /**
  * HarooLife — Lomé life/city gameplay slice, entirely fictitious.
  * Models life needs, real player movement on connected in-game streets,
@@ -74,6 +75,8 @@ export interface LifeState {
   pendingEvent: string | null
   /** Ville dont les quartiers nomment la grille (voir lome-districts.ts). */
   cityId: CityId
+  /** Les deux traits choisis à l'arrivée (voir traits.ts) ; absents des anciennes parties. */
+  traits?: TraitId[]
 }
 export const SALARIES: Record<Career, number> = {
   vendeur: TOGO_JOBS.vendeur.wage,
@@ -315,7 +318,8 @@ export function interact(state: LifeState, action: Action): LifeState {
     if (status === 'hungry') return events(state, 'Mange avant de travailler.')
     if (status === 'away')
       return events(state, `Rejoins d’abord ton lieu de travail : ${jobVenue(state.job)}.`)
-    const salary = SALARIES[state.job]
+    // Débrouillard·e : +10 % sur le salaire.
+    const salary = Math.round(SALARIES[state.job] * (hasTrait(state, 'debrouillard') ? 1.1 : 1))
     if (state.city.coins < salary)
       return events(state, 'La caisse municipale ne peut pas verser le salaire fictif.')
     return events(
@@ -360,7 +364,7 @@ export function interact(state: LifeState, action: Action): LifeState {
         meals: state.meals - 1,
         needs: {
           ...state.needs,
-          hunger: clamp(state.needs.hunger + 45),
+          hunger: clamp(state.needs.hunger + (hasTrait(state, 'gourmand') ? 60 : 45)),
           bladder: clamp(state.needs.bladder - 10),
         },
       },
@@ -384,7 +388,13 @@ export function interact(state: LifeState, action: Action): LifeState {
     if (!nearVenue(state, 'park') && !nearVenue(state, 'market') && !nearVenue(state, 'house'))
       return events(state, 'Va au jardin public ou au marché pour rencontrer quelqu’un.')
     return events(
-      { ...state, needs: { ...state.needs, social: clamp(state.needs.social + 38) } },
+      {
+        ...state,
+        needs: {
+          ...state.needs,
+          social: clamp(state.needs.social + (hasTrait(state, 'bavard') ? 57 : 38)),
+        },
+      },
       'Tu as discuté avec des voisins.',
     )
   }
@@ -392,7 +402,13 @@ export function interact(state: LifeState, action: Action): LifeState {
     if (!nearVenue(state, 'house') && !nearVenue(state, 'park'))
       return events(state, 'Rentre chez toi (télé) ou va au jardin pour te détendre.')
     return events(
-      { ...state, needs: { ...state.needs, fun: clamp(state.needs.fun + 40) } },
+      {
+        ...state,
+        needs: {
+          ...state.needs,
+          fun: clamp(state.needs.fun + (hasTrait(state, 'ambianceur') ? 60 : 40)),
+        },
+      },
       nearVenue(state, 'park')
         ? 'Un moment au jardin : loisir restauré.'
         : 'Un film à la télé : loisir restauré.',
@@ -409,12 +425,14 @@ export function advanceLifeHour(state: LifeState): LifeState {
   const newDay = state.hour === 23
   const hour = (state.hour + 1) % 24
   const destination = state.route[0]
+  // The traits change how fast some needs drop (see traits.ts).
+  const energyDrop = (hour >= 22 || hour <= 5 ? 3 : 2) - (hasTrait(state, 'dormeur') ? 1 : 0)
   const needs: Needs = {
     hunger: clamp(state.needs.hunger - 3),
-    energy: clamp(state.needs.energy - (hour >= 22 || hour <= 5 ? 3 : 2)),
-    hygiene: clamp(state.needs.hygiene - 1),
+    energy: clamp(state.needs.energy - energyDrop),
+    hygiene: clamp(state.needs.hygiene - (hasTrait(state, 'propre') && hour % 2 ? 0 : 1)),
     social: clamp(state.needs.social - 1),
-    fun: clamp(state.needs.fun - 2),
+    fun: clamp(state.needs.fun - (hasTrait(state, 'ambianceur') ? 3 : 2)),
     bladder: clamp(state.needs.bladder - 4),
   }
   let next: LifeState = {
@@ -674,6 +692,9 @@ export function decodeLomeLife(value: unknown): LifeState | null {
   v.needs = { ...v.needs!, fun: v.needs!.fun ?? 70, bladder: v.needs!.bladder ?? 80 }
   v.pendingEvent = v.pendingEvent ?? null
   v.cityId = v.cityId ?? 'lome'
+  const traits = decodeTraits(v.traits)
+  if (traits) v.traits = traits
+  else delete v.traits
   const road = roadNetwork(v.city!.buildings)
   if (!road.has(id(v.pos)) || !v.route.every((p) => p && road.has(id(p)))) return null
   if (v.target && !Number.isInteger(v.target.x)) return null

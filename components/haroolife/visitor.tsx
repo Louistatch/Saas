@@ -17,10 +17,16 @@ async function supabase() {
   return createClient()
 }
 
-/** One tap: an anonymous account, named « Visiteur » until the player picks a name in the game. */
-export async function startVisit(captchaToken?: string | null): Promise<string | null> {
+/** The visitor account (anonymous), named after the name typed at arrival (« Visiteur » else). */
+export async function startVisit(
+  captchaToken?: string | null,
+  firstName?: string,
+): Promise<string | null> {
   const { error } = await (await supabase()).auth.signInAnonymously({
-    options: { data: { first_name: 'Visiteur' }, captchaToken: captchaToken ?? undefined },
+    options: {
+      data: { first_name: firstName?.trim().slice(0, 40) || 'Visiteur' },
+      captchaToken: captchaToken ?? undefined,
+    },
   })
   if (!error) return null
   if (/captcha/i.test(error.message)) return 'Vérification anti-robot à refaire : réessaie.'

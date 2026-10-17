@@ -5,14 +5,18 @@ import { useCaptcha } from '@/components/shared/captcha'
 import { Logo } from '@/components/shared/logo'
 import { useHarooLifeViewport } from '@/hooks/use-haroolife-viewport'
 import { performGameLogout } from '@/lib/auth/logout'
+import { arrivalLife } from '@/lib/haroolife/city/arrival'
+import { AVATAR_CHOSEN_STORAGE, saveAvatar } from '@/lib/haroolife/city/avatar'
 import { LOCALITIES } from '@/lib/haroolife/city/locality'
 import { CITY_STORAGE } from '@/lib/haroolife/city/migrate'
+import { CLOUD_META, type CloudMeta } from '@/lib/haroolife/cloud-save'
 import { GAME_ENTERED, rememberGameReturn, withGameReturn } from '@/lib/haroolife/entry'
 import { INVITE_STORAGE, inviteCodeFrom } from '@/lib/haroolife/invite'
 import { ArrowLeft, ArrowRight, Leaf, ShieldCheck, UserRound } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import Arrival, { type ArrivalChoice } from './arrival'
 import { AccountPrompt, startVisit } from './visitor'
 
 // The world and Three.js are loaded only after a real FaîtiereHub profile and entry consent.
@@ -26,6 +30,45 @@ const World = dynamic(() => import('./lome-life-immersive').then((m) => m.LomeLi
 })
 
 type Summary = { day: number; wallet: number; town: string }
+type ArrivalError = { message: string; step?: number }
+
+/** Takes the username (and, for a newcomer, the home's canton); null when it worked. */
+async function claimUsername(c: ArrivalChoice): Promise<ArrivalError | null> {
+  const res = await fetch('/api/haroolife/username', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username: c.username,
+      quartier: c.home.quartier,
+      pagne: c.avatar.pagne,
+    }),
+  }).catch(() => null)
+  if (res?.ok) return null
+  const data: { error?: string } = res ? await res.json().catch(() => ({})) : {}
+  return {
+    message: data.error ?? 'Connexion interrompue. Réessaie.',
+    step: res?.status === 409 || res?.status === 400 ? 0 : undefined,
+  }
+}
+
+/**
+ * The newcomer's game on this device: look, traits, family and home as chosen. A game already
+ * on the device (another player's, not yet online) is kept aside, never erased.
+ */
+function writeArrival(c: ArrivalChoice, owner: string) {
+  try {
+    const before = localStorage.getItem(CITY_STORAGE)
+    if (before) localStorage.setItem(`${CITY_STORAGE}.before-arrival`, before)
+    localStorage.setItem(CITY_STORAGE, JSON.stringify(arrivalLife(c)))
+    // This game is the newcomer's: the online save keeps it (never a fresh one instead).
+    const meta: CloudMeta = { owner, version: 0, syncedAt: 0, localAt: Date.now(), visitor: true }
+    localStorage.setItem(CLOUD_META, JSON.stringify(meta))
+    saveAvatar(localStorage, c.avatar)
+    localStorage.setItem(AVATAR_CHOSEN_STORAGE, '1')
+  } catch {
+    /* storage refused: the game starts with its default life */
+  }
+}
 function savedSummary(): Summary | null {
   try {
     const saved = JSON.parse(localStorage.getItem(CITY_STORAGE) ?? 'null')
@@ -58,8 +101,13 @@ export default function GameEntry() {
   const [summary, setSummary] = useState<Summary | null>(null)
   const [returnTo, setReturnTo] = useState('/haroolife')
   const [leaving, setLeaving] = useState(false)
-  // « Jouer en visiteur »: one tap, then straight into the game once the account exists.
+  // « Jouer en visiteur »: the arrival steps, then the account, the username and the game.
   const [visit, setVisit] = useState<'idle' | 'busy' | string>('idle')
+  const [arriving, setArriving] = useState<null | 'new' | 'identity'>(null)
+  const [arrivalError, setArrivalError] = useState<ArrivalError | null>(null)
+  const pending = useRef<{ choice: ArrivalChoice; newGame: boolean } | null>(null)
+  // A visitor's username (undefined until known; null: not chosen yet).
+  const [myUsername, setMyUsername] = useState<string | null | undefined>(undefined)
   useEffect(() => {
     // Arrived by a friend's link: the code waits on this phone until the game can accept it.
     const invite = inviteCodeFrom(new URLSearchParams(window.location.search).get('invite'))
@@ -77,8 +125,27 @@ export default function GameEntry() {
       /* entry stays available */
     }
   }, [])
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once the visitor is known
+  useEffect(() => {
+    if (!visitor || !user) return
+    let live = true
+    void fetch('/api/haroolife/username')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { username?: string | null } | null) => {
+        if (live && d) setMyUsername(d.username ?? null)
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [visitor, user?.id])
   const enter = () => {
     if (!user || !isAuthenticated || isLoading) return
+    // Every visitor has a username: one who arrived before it existed picks it first.
+    if (visitor && myUsername === null) {
+      setArriving('identity')
+      return
+    }
     try {
       sessionStorage.setItem(GAME_ENTERED, user.id)
     } catch {
@@ -86,23 +153,68 @@ export default function GameEntry() {
     }
     setEntered(user.id)
   }
-  // biome-ignore lint/correctness/useExhaustiveDependencies: enters once the visitor's account is ready
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once the visitor's account is ready
   useEffect(() => {
-    if (visit === 'busy' && user && isAuthenticated && !isLoading) {
+    if (visit !== 'busy' || !user || !isAuthenticated || isLoading) return
+    const job = pending.current
+    if (!job) {
       setVisit('idle')
       enter()
+      return
     }
+    pending.current = null
+    void claimUsername(job.choice).then((problem) => {
+      setVisit('idle')
+      if (problem) {
+        setArrivalError(problem)
+        return
+      }
+      if (job.newGame) writeArrival(job.choice, user.id)
+      setMyUsername(job.choice.username)
+      setArriving(null)
+      try {
+        sessionStorage.setItem(GAME_ENTERED, user.id)
+      } catch {
+        /* current tab still works */
+      }
+      setEntered(user.id)
+    })
   }, [visit, user, isAuthenticated, isLoading])
   // Anti-robot check before a visitor account is created (off until its key is configured).
   const captcha = useCaptcha()
-  const playAsVisitor = async () => {
+  const playAsVisitor = () => {
+    setArrivalError(null)
+    setArriving('new')
+  }
+  // « Emménager »: the visitor account (once), then the username, the home and the new game.
+  const finishArrival = async (choice: ArrivalChoice) => {
+    setArrivalError(null)
+    pending.current = { choice, newGame: arriving === 'new' }
     setVisit('busy')
-    const error = await startVisit(captcha.token)
+    if (user) return
+    const error = await startVisit(captcha.token, choice.name)
     if (error) {
-      setVisit(error)
+      pending.current = null
+      setVisit('idle')
+      setArrivalError({ message: error })
       captcha.reset()
     }
   }
+  if (arriving)
+    return (
+      <Arrival
+        only={arriving === 'identity' ? 'identity' : undefined}
+        onBack={() => {
+          setArriving(null)
+          setArrivalError(null)
+        }}
+        onFinish={(c) => void finishArrival(c)}
+        busy={visit === 'busy'}
+        error={arrivalError}
+        captcha={user ? undefined : captcha.box}
+        captchaReady={!!user || captcha.ready}
+      />
+    )
   if (!isLoading && isAuthenticated && user && entered === user.id)
     return (
       <World

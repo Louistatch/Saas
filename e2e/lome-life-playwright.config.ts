@@ -43,6 +43,7 @@ export default defineConfig({
     'lome-university.spec.ts',
     'lome-photo.spec.ts',
     'lome-transport.spec.ts',
+    'lome-arrival.spec.ts',
     'lome-housing.spec.ts',
     'lome-regional-life.spec.ts',
   ],

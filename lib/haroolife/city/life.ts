@@ -16,6 +16,8 @@ import {
 import { actionsFor } from './activities'
 export { actionsFor } from './activities'
 import type { Building } from '../townsmen-engine'
+import { hasTrait } from '../traits'
+import { type Tontine, decodeTontine } from './tontine'
 import { type NpcAnim, animFor, layoutFor } from './interiors'
 import { type Commerce, decodeCommerce, emptyCommerce } from './commerce'
 import { type Farm, decodeFarm } from './farm'
@@ -127,6 +129,10 @@ export interface CityLife {
   lecture?: string
   /** The player's home: rent, CEET and TdE bills, the landlord (see housing.ts). */
   housing?: Housing
+  /** The family the player was born into (the birth lottery of arrival.ts). */
+  origin?: string
+  /** An advance from the neighbourhood tontine, repaid each week (see tontine.ts). */
+  tontine?: Tontine
 }
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)))
@@ -237,6 +243,8 @@ export function decodeCityLife(value: unknown): CityLife | null {
     insideLot: v.insideLot ?? null,
     skills: v.skills!,
     housing: decodeHousing(v.housing),
+    origin: typeof v.origin === 'string' && /^[a-z-]{2,20}$/.test(v.origin) ? v.origin : undefined,
+    tontine: decodeTontine(v.tontine),
     lecture:
       typeof v.lecture === 'string' && /^\d{1,6}:[0-3]$/.test(v.lecture) ? v.lecture : undefined,
     visited: v.visited,
@@ -655,7 +663,9 @@ export function cityInteract(s: CityLife, action: CityAction): CityLife {
       const paid = pay(s, 500)
       if (!paid) return note(s, 'Solde insuffisant.')
       if (s.life.needs.energy < 15) return note(s, 'Trop fatigué pour cet exercice.')
-      const gain = action === 'use-weights' ? 8 : action === 'use-treadmill' ? 6 : 4
+      // Sportif·ve : chaque séance compte 50 % de plus.
+      const base = action === 'use-weights' ? 8 : action === 'use-treadmill' ? 6 : 4
+      const gain = hasTrait(s.life, 'sportif') ? Math.round(base * 1.5) : base
       const cost = action === 'use-weights' ? 20 : action === 'use-treadmill' ? 15 : 10
       return note(
         bump(fit(paid, gain), { fun: 15, energy: -cost, hygiene: -10 }),

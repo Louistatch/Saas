@@ -22,13 +22,18 @@ function Turntable({ model, pagne }: { model: string; pagne: string }) {
   )
 }
 
-export default function AvatarPreview({ model, pagne }: { model: string; pagne: string }) {
+export default function AvatarPreview({
+  model,
+  pagne,
+  className = 'h-52 w-full overflow-hidden rounded-2xl bg-[#e4eedd]',
+}: {
+  model: string
+  pagne: string
+  /** Size and backdrop of the preview (the appearance sheet's card by default). */
+  className?: string
+}) {
   return (
-    <div
-      className="h-52 w-full overflow-hidden rounded-2xl bg-[#e4eedd]"
-      aria-label="Aperçu animé du personnage"
-      role="img"
-    >
+    <div className={className} aria-label="Aperçu animé du personnage" role="img">
       <Canvas
         dpr={[1, 1.5]}
         gl={{ antialias: true, alpha: true }}

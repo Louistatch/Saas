@@ -146,6 +146,7 @@ import {
 import { eventById, resolveEvent } from '@/lib/haroolife/lome-events'
 import { claimMoney, sendMoney } from '@/lib/haroolife/money'
 import { debateOfDay, jokeAt, jokeMessage, voteMessage } from '@/lib/haroolife/humour'
+import { settleTontine } from '@/lib/haroolife/city/tontine'
 import { uuid } from '@/lib/haroolife/realtime/client'
 import { type RemoteVehicle, ridePose, vehicleMode } from '@/lib/haroolife/realtime/interpolate'
 import {
@@ -972,10 +973,11 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     },
   ]
   const completion = missions.filter((m) => m.done).length
-  // The home: each new game day brings the month's rent and bills, and the landlord's steps.
+  // The home: each new game day brings the month's rent and bills, and the landlord's steps;
+  // each new week, the tontine's share for a « bébé tontine ».
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per game day
   useEffect(() => {
-    setCityLife((old) => settleHousing(old))
+    setCityLife((old) => settleTontine(settleHousing(old)))
   }, [life.day])
   // « Mon champ » is ripe: said in the game, and on the phone when the player is in another app.
   const ripe = fieldStatus(cityLife)

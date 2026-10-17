@@ -776,7 +776,7 @@ http
       // Private messages outside the game: run in the local relay's PGlite (the real
       // migrations), as the token's subject, so the dashboard and the game share one database.
       const localRpc =
-        /^\/rest\/v1\/rpc\/(haroolife_dm_inbox|haroolife_dm_read|haroolife_chat_history|haroolife_chat_send|haroolife_money_send|haroolife_money_claim|haroolife_save_get|haroolife_save_put|haroolife_chat_report|haroolife_mod_queue|haroolife_mod_act|haroolife_invite_code|haroolife_invite_accept|haroolife_invite_claim)$/.exec(
+        /^\/rest\/v1\/rpc\/(haroolife_dm_inbox|haroolife_dm_read|haroolife_chat_history|haroolife_chat_send|haroolife_money_send|haroolife_money_claim|haroolife_save_get|haroolife_save_put|haroolife_chat_report|haroolife_mod_queue|haroolife_mod_act|haroolife_invite_code|haroolife_invite_accept|haroolife_invite_claim|haroolife_username_available|haroolife_claim_username|haroolife_my_username)$/.exec(
           p,
         )?.[1]
       // The online save follows the realtime chat's fictional players only: every other test

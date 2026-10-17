@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { type Browser, type BrowserContext, type Page, devices } from '@playwright/test'
 import { type Socket, io } from 'socket.io-client'
-import { expect, openPlaces, test } from './lome-test'
+import { arriveAsVisitor, expect, openPlaces, test } from './lome-test'
 
 /**
  * M1 (D4+): real-time chat over the Socket.IO relay with two signed-in people in two browsers
@@ -651,10 +651,11 @@ test('a visitor plays HarooLife without an account, talks with the players, and 
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(e.message))
   await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
-  await page.getByRole('button', { name: 'Jouer en visiteur' }).click()
+  // The arrival steps (name, username, look, traits, family, home), then the game.
+  const { username } = await arriveAsVisitor(page)
   await expect(page.locator('canvas:visible').first()).toBeVisible({ timeout: 30000 })
   await expect.poll(async () => (await rt(page))?.status, { timeout: 30000 }).toBe('online')
-  expect(await rt(page)).toMatchObject({ me: 'Visiteur (test)' })
+  expect(await rt(page)).toMatchObject({ me: username })
 
   // The visitor talks with the players like anyone: Ama hears them live, and answers.
   const ama: Socket = io(RELAY, {
@@ -729,7 +730,7 @@ test('a friend invited by WhatsApp link arrives in one tap, and both get their g
   const errors: string[] = []
   friend.on('pageerror', (e) => errors.push(e.message))
   await friend.goto(`/haroolife?invite=${code}`, { waitUntil: 'domcontentloaded' })
-  await friend.getByRole('button', { name: 'Jouer en visiteur' }).click()
+  const { username } = await arriveAsVisitor(friend)
   await expect(friend.locator('canvas:visible').first()).toBeVisible({ timeout: 30000 })
   await expect(
     friend.getByText('Bienvenue ! Ama (test) t’a invité : +2 000 FCFA de jeu.'),
@@ -749,7 +750,7 @@ test('a friend invited by WhatsApp link arrives in one tap, and both get their g
   await expect(ama.page.getByTestId('invite')).toHaveCount(0)
   await openInvite()
   await expect(
-    ama.page.getByText('Visiteur (test) est arrivé grâce à toi : +2 000 FCFA de jeu.').first(),
+    ama.page.getByText(`${username} est arrivé grâce à toi : +2 000 FCFA de jeu.`).first(),
   ).toBeVisible({ timeout: 30000 })
   await expect(ama.page.getByTestId('invite')).toContainText('ami')
   expect(errors).toEqual([])
