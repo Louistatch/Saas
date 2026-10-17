@@ -722,6 +722,23 @@ http
       }
       if (req.method === 'OPTIONS') return send(204)
       const p = url.pathname
+      // Supabase's CAPTCHA protection (Turnstile): a token that came with the call is checked as
+      // Cloudflare would; Cloudflare's test widget hands out XXXX.DUMMY.TOKEN.XXXX. A token-less
+      // call passes, as with the protection off (lome-captcha.spec.ts checks the token is sent).
+      if (req.method === 'POST' && /^\/auth\/v1\/(signup|token|recover|resend|otp)$/.test(p)) {
+        let captcha = null
+        try {
+          captcha = JSON.parse(body || '{}').gotrue_meta_security?.captcha_token ?? null
+        } catch {}
+        if (captcha !== null && captcha !== 'XXXX.DUMMY.TOKEN.XXXX') {
+          log.push('captcha-refused')
+          return send(400, {
+            code: 400,
+            error_code: 'captcha_failed',
+            msg: 'captcha protection: request disallowed (invalid-input-response)',
+          })
+        }
+      }
       if (p === '/auth/v1/user') {
         // Realtime chat accounts (fictional, see realtime/pglite.ts): answer with the token's
         // subject, so two browsers are two different people for the Socket.IO relay.

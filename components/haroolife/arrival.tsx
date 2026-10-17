@@ -97,6 +97,13 @@ export default function Arrival({
   useEffect(() => {
     if (error?.step !== undefined) setStep(error.step)
   }, [error])
+  // The message shows below a long list on a phone: brought into view, once the step is shown.
+  const alertRef = useRef<HTMLParagraphElement>(null)
+  useEffect(() => {
+    if (!error) return
+    const id = requestAnimationFrame(() => alertRef.current?.scrollIntoView({ block: 'center' }))
+    return () => cancelAnimationFrame(id)
+  }, [error])
   // Availability, checked a moment after typing stops.
   useEffect(() => {
     if (!username || local) {
@@ -605,12 +612,12 @@ export default function Arrival({
                 </button>
               )
             })}
-            {captcha && <div className="pt-2">{captcha}</div>}
           </div>
         )}
 
         {error && (
           <p
+            ref={alertRef}
             role="alert"
             className="mt-4 rounded-2xl bg-[#fbe9e5] p-3 text-sm font-semibold text-[#8f2414]"
           >
@@ -620,6 +627,9 @@ export default function Arrival({
       </section>
 
       <div className="fixed inset-x-0 bottom-0 z-10 bg-gradient-to-t from-white via-white to-white/0 px-5 pb-[max(18px,env(safe-area-inset-bottom,0px))] pt-6">
+        {/* The anti-robot check, where the account is created: invisible unless it needs the
+            person, and then right above the button it holds. */}
+        {step === last && captcha}
         <button
           type="button"
           onClick={next}

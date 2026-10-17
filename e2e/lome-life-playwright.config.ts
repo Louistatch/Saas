@@ -44,6 +44,7 @@ export default defineConfig({
     'lome-photo.spec.ts',
     'lome-transport.spec.ts',
     'lome-arrival.spec.ts',
+    'lome-captcha.spec.ts',
     'lome-housing.spec.ts',
     'lome-regional-life.spec.ts',
   ],

@@ -2,9 +2,9 @@
 
 /**
  * Anti-robot check (Cloudflare Turnstile) for the Supabase Auth calls made from the browser:
- * visitor entry, sign-in, password reset. Off until NEXT_PUBLIC_TURNSTILE_SITE_KEY is set: no
- * script, no widget, `ready` true and `token` null, so the calls are exactly as before. Once the
- * key is deployed, « Enable CAPTCHA protection » in Supabase (Turnstile secret) makes Supabase
+ * visitor entry, sign-in, password reset, confirmation e-mail sent again. Off until
+ * NEXT_PUBLIC_TURNSTILE_SITE_KEY is set: no script, no widget, `ready` true and `token` null, so
+ * the calls are exactly as before. Once the key is deployed, « Enable CAPTCHA protection » in Supabase (Turnstile secret) makes Supabase
  * refuse these calls without a valid token. Server calls made with the service key are not
  * concerned (Supabase skips the check for admin credentials).
  */
@@ -53,15 +53,22 @@ export function useCaptcha(): {
   reset: () => void
 } {
   const [token, setToken] = useState<string | null>(null)
-  const el = useRef<HTMLDivElement>(null)
+  // The box may appear long after the hook (the last step of the visitor arrival), and leave
+  // again: the check lives exactly as long as its box is on the page.
+  const [host, setHost] = useState<HTMLDivElement | null>(null)
   const widget = useRef<string | null>(null)
   useEffect(() => {
-    if (!SITE_KEY || !el.current) return
+    // Fetched ahead, so the check is quick once its box shows.
+    if (SITE_KEY) void loadTurnstile().catch(() => {})
+  }, [])
+  useEffect(() => {
+    if (!SITE_KEY || !host) return
     let alive = true
+    let id: string | null = null
     void loadTurnstile()
       .then((t) => {
-        if (!alive || !el.current) return
-        widget.current = t.render(el.current, {
+        if (!alive) return
+        id = t.render(host, {
           sitekey: SITE_KEY,
           appearance: 'interaction-only',
           language: 'fr',
@@ -69,16 +76,25 @@ export function useCaptcha(): {
           'expired-callback': () => setToken(null),
           'error-callback': () => setToken(null),
         })
+        widget.current = id
       })
       .catch(() => {
         // Script blocked or offline: the button stays waiting; Supabase decides in the end.
       })
     return () => {
       alive = false
-      if (widget.current) window.turnstile?.remove(widget.current)
-      widget.current = null
+      if (id) {
+        try {
+          window.turnstile?.remove(id)
+        } catch {
+          /* already gone with its box */
+        }
+      }
+      if (widget.current === id) widget.current = null
+      // A token from a check no longer on the page is never sent (it would expire unseen).
+      setToken(null)
     }
-  }, [])
+  }, [host])
   const reset = useCallback(() => {
     if (!SITE_KEY) return
     setToken(null)
@@ -88,7 +104,7 @@ export function useCaptcha(): {
     enabled: !!SITE_KEY,
     token,
     ready: !SITE_KEY || !!token,
-    box: SITE_KEY ? <div ref={el} className="flex justify-center" /> : null,
+    box: SITE_KEY ? <div ref={setHost} className="flex justify-center" /> : null,
     reset,
   }
 }
