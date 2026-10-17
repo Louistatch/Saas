@@ -28,7 +28,7 @@ const SERVICE_ACTIONS: Record<
   ],
 }
 /** Actions a lot offers, in display order. */
-export function actionsFor(
+function baseActionsFor(
   t: LotType,
   service?: Lot['service'],
 ): { id: CityAction; label: string; hint: string }[] {
@@ -142,4 +142,12 @@ export function actionsFor(
     default:
       return []
   }
+}
+
+/** Seating is a physical interaction, available only in layouts with an actual chair. */
+export function actionsFor(t: LotType, service?: Lot['service']): { id: CityAction; label: string; hint: string }[] {
+  const actions = baseActionsFor(t, service)
+  return !service && ['house', 'apartment', 'hotel', 'market', 'shop'].includes(t)
+    ? [...actions, { id: 'sit', label: 'S’asseoir', hint: 'Une place libre · Se lever pour repartir' }]
+    : actions
 }

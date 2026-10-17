@@ -62,6 +62,10 @@ export type NpcAnim =
   | 'walk'
   | 'run'
   | 'sit'
+  | 'sit-enter'
+  | 'sit-exit'
+  | 'eat'
+  | 'eat-seated'
   | 'lift'
   | 'talk'
   | 'work'
@@ -290,7 +294,7 @@ const HOUSE: Layout = {
       label: 'Discuter',
       hint: 'Social +38',
     },
-    { id: 'chair-1', kind: 'chair', x: 1.9, z: 1.9, rot: 145 },
+    { id: 'chair-1', kind: 'chair', x: 1.9, z: 1.9, rot: 145, action: 'sit', label: 'S’asseoir' },
     {
       id: 'shower',
       kind: 'shower',
@@ -335,6 +339,9 @@ const MARKET: Layout = {
   wall: '#c65c43',
   trim: '#f4ead8',
   props: [
+    { id: 'meal-table', kind: 'table', x: 3.0, z: 1.7 },
+    { id: 'meal-chair-1', kind: 'chair', x: 2.0, z: 1.7, rot: 90, action: 'sit', label: 'S’asseoir à table' },
+    { id: 'meal-chair-2', kind: 'chair', x: 3.0, z: 2.9, rot: 180, action: 'sit', label: 'S’asseoir à table' },
     {
       id: 'counter',
       kind: 'counter',
@@ -376,8 +383,8 @@ const MARKET: Layout = {
     {
       id: 'shopper-2',
       model: CH[2],
-      x: 2.6,
-      z: 2.6,
+      x: 1.2,
+      z: -0.6,
       rot: 220,
       anim: 'idle',
       role: 'Une cliente attend son tour',

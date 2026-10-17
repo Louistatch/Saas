@@ -65,6 +65,7 @@ export type Interior =
   | 'chapel'
   | 'clinic'
 export type CityAction =
+  | 'sit'
   | 'enter'
   | 'leave'
   | 'train'
@@ -93,6 +94,8 @@ export type CityAction =
 
 export interface CityLife {
   v: 1
+  /** Transient foreground interaction; deliberately not restored by decodeCityLife. */
+  meal?: import('./dining').Meal
   employment?: Employment
   commerce?: Commerce
   social?: SocialLife
@@ -111,7 +114,7 @@ export interface CityLife {
   /** Physical condition 0–100, built up by training. */
   fitness: number
   /** Equipment in use right now (drives the player's animation inside a room). */
-  activity: { prop: string; anim: NpcAnim } | null
+  activity: { prop: string; anim: NpcAnim; mealItem?: import('./dining').MealItem } | null
   /** Continuous position (cell units) and heading of the avatar, when known. */
   pose?: { x: number; z: number; heading: number }
   /** The player's service vehicle, parked in vehicleLocality, or absent. */
@@ -551,6 +554,8 @@ export function cityInteract(s: CityLife, action: CityAction): CityLife {
   const allowed = actionsFor(lot.type, lot.service).some((a) => a.id === action)
   if (!allowed) return note(s, 'Ce lieu ne propose pas cette activité.')
   switch (action) {
+    case 'sit':
+      return note(s, 'Choisis une chaise libre pour t’asseoir.')
     case 'socialize': {
       if (s.socialDays?.[lot.id] === s.life.day)
         return note(s, 'Vous avez déjà discuté aujourd’hui. Parle aussi directement à un habitant.')
@@ -725,6 +730,7 @@ export function useProp(s: CityLife, propId: string): CityLife {
   if (!room) return note(s, 'Entre d’abord dans un lieu.')
   const prop = layoutFor(room, lot ?? undefined, s.life).props.find((p) => p.id === propId)
   if (!prop || !prop.action) return note(s, 'Rien à faire avec cet objet.')
+  if (prop.action === 'sit') return { ...s, activity: { prop: prop.id, anim: 'sit' } }
   const next = cityInteract(s, prop.action as CityAction)
   if (next === s || next.life.lastEvent === s.life.lastEvent) return next
   const refused =

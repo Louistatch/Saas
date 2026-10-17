@@ -65,6 +65,9 @@ export default function HarooRoomView(
           setState('error')
         },
         onFrame: (s) => live.current.onFrame?.(s),
+        onMealReady: (id, seat) => live.current.onMealReady?.(id, seat),
+        onMealFrame: (id, seconds) => live.current.onMealFrame?.(id, seconds),
+        onActivityEnd: () => live.current.onActivityEnd?.(),
       },
     })
     world.current = w
@@ -83,6 +86,9 @@ export default function HarooRoomView(
   useEffect(() => {
     if (state === 'ready') world.current?.setActivity(activity)
   }, [activity, state])
+  useEffect(() => {
+    if (state === 'ready') world.current?.setMeal(props.meal ?? null)
+  }, [props.meal, state])
   useEffect(() => {
     if (approach && state === 'ready') world.current?.approach(approach.prop)
     // biome-ignore lint/correctness/useExhaustiveDependencies: `n` makes each request distinct

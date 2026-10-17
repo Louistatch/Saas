@@ -1,11 +1,3 @@
-import { current } from '@/lib/haroolife/city/locality'
-import { RoadTraffic } from '@/lib/haroolife/city/road-traffic'
-import {
-  type AvatarActor,
-  createAvatarActor,
-  disposeAvatarActor,
-  playAvatarActor,
-} from './avatar-actor'
 import {
   type AdCampaign,
   type AdPlacement,
@@ -18,6 +10,7 @@ import {
 } from '@/lib/haroolife/ads/campaigns'
 import type { ExposureTracker } from '@/lib/haroolife/ads/exposure'
 import { POSTER_H, POSTER_W, drawPoster, loadPosterImage } from '@/lib/haroolife/ads/poster'
+import type { ServiceCustomer } from '@/lib/haroolife/city/automatic-service'
 import { pagneColor } from '@/lib/haroolife/city/avatar'
 /**
  * HarooLife engine — the street (imperative Three.js). Draws the neighbourhood around the player
@@ -35,12 +28,15 @@ import {
   clipFor,
 } from '@/lib/haroolife/city/avatar-catalogue'
 import { type Bank, loadBank } from '@/lib/haroolife/city/bank'
-import { drivingRoute, type VehicleKind } from '@/lib/haroolife/city/fares'
-import type { ServiceCustomer } from '@/lib/haroolife/city/automatic-service'
-import { isCityRoad, isDriveway } from '@/lib/haroolife/city/world'
-import { WALK_SIDE, streetDressing } from '@/lib/haroolife/game/core/sidewalks'
+import type { Meal } from '@/lib/haroolife/city/dining'
+import { type VehicleKind, drivingRoute } from '@/lib/haroolife/city/fares'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
+import { current } from '@/lib/haroolife/city/locality'
 import { DEFAULT_CONFIG, type PlayerController } from '@/lib/haroolife/city/player'
+import { RoadTraffic } from '@/lib/haroolife/city/road-traffic'
+import { isCityRoad, isDriveway } from '@/lib/haroolife/city/world'
+import type { DailyViewProps } from '@/lib/haroolife/engine/types'
+import { WALK_SIDE, streetDressing } from '@/lib/haroolife/game/core/sidewalks'
 import {
   type GroundKind,
   STREET_CELL,
@@ -53,8 +49,8 @@ import {
 import {
   INTERP_DELAY_MS,
   MAX_SHOWN,
-  STALE_MS,
   type RemoteVehicle,
+  STALE_MS,
   type Sample,
   remoteAnim,
   remoteModel,
@@ -66,6 +62,12 @@ import type { Building } from '@/lib/haroolife/townsmen-engine'
 import * as THREE from 'three'
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import {
+  type AvatarActor,
+  createAvatarActor,
+  disposeAvatarActor,
+  playAvatarActor,
+} from './avatar-actor'
 import { DETAIL_CELLS, buildCityGeometry } from './city-models'
 import { createGltfLoader } from './gltf'
 import { type MotoParts, buildMoto } from './moto'
@@ -119,7 +121,7 @@ const GROUND: Record<GroundKind, string> = {
   'estate-road': '#a39c8a',
 }
 
-export interface StreetWorldEvents {
+export interface StreetWorldEvents extends Omit<DailyViewProps, 'meal'> {
   /** The controller's events (cells, arrivals, vehicle), as the PlayCanvas rig sent them. */
   onEvents: (events: ReturnType<PlayerController['drain']>, c: PlayerController) => void
   /** A named place was touched: open its sheet (name, district, trip, cost, Aller). */
@@ -281,6 +283,9 @@ export class StreetWorld {
   private carTag: HTMLButtonElement | null = null
   private moto: MotoParts | null = null
   private fare: StreetFare = { vehicle: 'taxi', hailing: false, passenger: null, dest: null }
+  private meal: Meal | null = null
+  private mealReady: string | null = null
+  private mealSeconds = 0
   private hailed: string | null = null
   private hailTimer = 0
   /** Destination of the fare: a beacon on the ground and its label. */
@@ -906,6 +911,14 @@ export class StreetWorld {
       this.hailed = null
   }
 
+  setMeal(meal: Meal | null): void {
+    this.meal = meal
+    if (!meal) {
+      this.mealReady = null
+      this.mealSeconds = 0
+    }
+  }
+
   private setBeacon(dest: StreetFare['dest']): void {
     if (this.beacon) {
       this.beacon.removeFromParent()
@@ -1275,13 +1288,32 @@ export class StreetWorld {
         pl.root.rotation.y = (ctl.heading * Math.PI) / 180
       }
       const speed = ctl.speed * U
-      const anim: NpcAnim = astride
-        ? 'drive'
-        : ctl.mode === 'run'
-          ? 'run'
-          : ctl.mode === 'walk' && speed > 0.05
-            ? 'walk'
-            : 'idle'
+      if (
+        this.meal &&
+        (!onFoot ||
+          (this.meal.phase === 'eating' && speed > 0.05) ||
+          Math.hypot(ctl.input.x, ctl.input.y) > 0.12)
+      )
+        this.events.onActivityEnd?.()
+      if (
+        this.meal?.phase === 'approach' &&
+        onFoot &&
+        speed <= 0.05 &&
+        this.mealReady !== this.meal.id
+      ) {
+        this.mealReady = this.meal.id
+        this.events.onMealReady?.(this.meal.id, null)
+      }
+      const eating = this.meal?.phase === 'eating' && onFoot && speed <= 0.05
+      const anim: NpcAnim = eating
+        ? 'eat'
+        : astride
+          ? 'drive'
+          : ctl.mode === 'run'
+            ? 'run'
+            : ctl.mode === 'walk' && speed > 0.05
+              ? 'walk'
+              : 'idle'
       this.anim = anim
       this.play(pl, clipFor(pl.spec, anim))
       if (anim === 'walk' || anim === 'run') {
@@ -1291,6 +1323,14 @@ export class StreetWorld {
           ?.setEffectiveTimeScale(Math.min(3, Math.max(0.5, speed / natural)))
       } else pl.actions.get(pl.current)?.setEffectiveTimeScale(1)
       pl.mixer.update(dt)
+      pl.mealProps.show(eating)
+      if (eating && this.meal) {
+        this.mealSeconds += dt
+        if (this.mealSeconds >= 0.2) {
+          this.events.onMealFrame?.(this.meal.id, Math.min(0.25, this.mealSeconds))
+          this.mealSeconds = 0
+        }
+      }
     }
     // The player's taxi, when this town has one: the Kenney model, wheels turning and steering.
     const v = ctl.vehicle

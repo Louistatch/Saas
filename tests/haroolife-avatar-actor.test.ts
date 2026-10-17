@@ -10,6 +10,7 @@ import {
   disposeAvatarActor,
   playAvatarActor,
 } from '../lib/haroolife/game/render/avatar-actor'
+import { plantSeatedFeet } from '../lib/haroolife/game/render/seated-feet'
 
 for (const spec of AVATAR_SPECS)
   test(`${spec.id}: real skeleton, independent instances, bent driving limbs and attached feet`, async () => {
@@ -27,7 +28,7 @@ for (const spec of AVATAR_SPECS)
     const b = createAvatarActor(gltf, spec, 1.75, '#1a7958')
     assert.equal(a.root.children.length, 1, 'only the imported skinned figure, no box wrap')
     assert.ok(a.root.userData.avatar.skinnedMeshes > 0)
-    assert.equal(a.actions.size, 8)
+    assert.equal(a.actions.size, 14)
     assert.equal(
       avatarAnimations(gltf),
       avatarAnimations(gltf),
@@ -83,6 +84,23 @@ for (const spec of AVATAR_SPECS)
       )
     }
     let disposedSharedGeometry = 0
+    playAvatarActor(a, 'HarooSitIdle')
+    a.mixer.update(0.5)
+    a.root.position.y = 0.576 - a.seatContact.y
+    a.root.updateMatrixWorld(true)
+    const body = point(a, 'Body')
+    assert.ok(point(a, 'WristL').z > body.z, 'the A-pose adult’s arms rest in front rather than behind the chair')
+    plantSeatedFeet(a)
+    for (const side of ['L', 'R'] as const) {
+      assert.ok(Math.abs(point(a, `Foot${side}`).y - a.footFloor[side]) < 0.002, 'the seated adult plants both feet on the floor')
+      assert.ok(point(a, `LowerLeg${side}`).z > point(a, `UpperLeg${side}`).z + 0.15, 'real seated legs bend forwards')
+    }
+    assert.ok(point(a, 'Body').distanceTo(body) < 0.001, 'foot planting keeps the pelvis supported by the seat')
+    playAvatarActor(a, 'HarooEatSeated')
+    a.mixer.update(2)
+    const mouth = point(a, 'Head').add(new THREE.Vector3(0.02, -0.12, 0.15).multiplyScalar(1.75 / 1.85))
+    assert.ok(point(a, 'WristR').distanceTo(mouth) < 0.015, 'the spoon hand actually reaches the mouth')
+    assert.ok(point(a, 'Body').distanceTo(body) < 0.015, 'eating does not turn the seated adult into a standing pose')
     gltf.scene.traverse((o) => {
       const mesh = o as THREE.Mesh
       if (mesh.isMesh) mesh.geometry.addEventListener('dispose', () => disposedSharedGeometry++)

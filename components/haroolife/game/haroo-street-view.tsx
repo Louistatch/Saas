@@ -1,12 +1,13 @@
 'use client'
 
+import type { ServiceCustomer } from '@/lib/haroolife/city/automatic-service'
 /**
  * React boundary of the HarooLife engine for the street. The engine (`StreetWorld`) draws the
  * neighbourhood and steps the game's PlayerController; React keeps the HUD and the game state.
  * One engine per mount, disposed on unmount.
  */
 import type { PlayerController } from '@/lib/haroolife/city/player'
-import type { ServiceCustomer } from '@/lib/haroolife/city/automatic-service'
+import type { DailyViewProps } from '@/lib/haroolife/engine/types'
 import {
   type StreetAds,
   type StreetFare,
@@ -18,37 +19,39 @@ import type { PresenceEntry } from '@/lib/haroolife/realtime/protocol'
 import type { Building } from '@/lib/haroolife/townsmen-engine'
 import { useEffect, useRef, useState } from 'react'
 
-export default function HarooStreetView(props: {
-  controller: PlayerController
-  avatarModel: string
-  avatarPagne?: string
-  estate: readonly Building[]
-  pixelRatio: number
-  /** From the quality preset: shadow refresh and multisampling. */
-  shadows?: 'full' | 'throttled' | 'off'
-  antialias?: boolean
-  /** Town on screen (billboard supports are per town). */
-  locality: string
-  /** Street billboards (campaigns, exposure, nearby support); null when switched off. */
-  ads?: StreetAds | null
-  /** Other players in this town (realtime relay). */
-  remoteFeed?: StreetPoseFeed
-  remotePresent?: PresenceEntry[]
-  onPlayerEvents: (events: ReturnType<PlayerController['drain']>, c: PlayerController) => void
-  onLot: (lotId: string) => void
-  onCell: (cell: { x: number; y: number }) => void
-  /** Another player was touched: their sheet (chat, block, report). */
-  onPlayer?: (key: string) => void
-  onFrame?: (s: { drawCalls: number; fps: number }) => void
-  onStats?: (s: StreetStats) => void
-  /** Daylight of the game's hour (sun 0.65 at night to 1 at noon). */
-  light?: { sun: number; sunColor: string }
-  /** The vehicle and the driver's fare (zémidjan or taxi). */
-  fare?: StreetFare | null
-  /** A passer-by close enough to climb on (or null). */
-  onHail?: (customer: ServiceCustomer | null) => void
-  onVehicle?: () => void
-}) {
+export default function HarooStreetView(
+  props: DailyViewProps & {
+    controller: PlayerController
+    avatarModel: string
+    avatarPagne?: string
+    estate: readonly Building[]
+    pixelRatio: number
+    /** From the quality preset: shadow refresh and multisampling. */
+    shadows?: 'full' | 'throttled' | 'off'
+    antialias?: boolean
+    /** Town on screen (billboard supports are per town). */
+    locality: string
+    /** Street billboards (campaigns, exposure, nearby support); null when switched off. */
+    ads?: StreetAds | null
+    /** Other players in this town (realtime relay). */
+    remoteFeed?: StreetPoseFeed
+    remotePresent?: PresenceEntry[]
+    onPlayerEvents: (events: ReturnType<PlayerController['drain']>, c: PlayerController) => void
+    onLot: (lotId: string) => void
+    onCell: (cell: { x: number; y: number }) => void
+    /** Another player was touched: their sheet (chat, block, report). */
+    onPlayer?: (key: string) => void
+    onFrame?: (s: { drawCalls: number; fps: number }) => void
+    onStats?: (s: StreetStats) => void
+    /** Daylight of the game's hour (sun 0.65 at night to 1 at noon). */
+    light?: { sun: number; sunColor: string }
+    /** The vehicle and the driver's fare (zémidjan or taxi). */
+    fare?: StreetFare | null
+    /** A passer-by close enough to climb on (or null). */
+    onHail?: (customer: ServiceCustomer | null) => void
+    onVehicle?: () => void
+  },
+) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const markers = useRef<HTMLDivElement>(null)
   const world = useRef<StreetWorld | null>(null)
@@ -90,6 +93,9 @@ export default function HarooStreetView(props: {
         onStats: (s) => live.current.onStats?.(s),
         onHail: (name) => live.current.onHail?.(name),
         onVehicle: () => live.current.onVehicle?.(),
+        onMealReady: (id, seat) => live.current.onMealReady?.(id, seat),
+        onMealFrame: (id, seconds) => live.current.onMealFrame?.(id, seconds),
+        onActivityEnd: () => live.current.onActivityEnd?.(),
       },
     })
     world.current = w
@@ -116,6 +122,9 @@ export default function HarooStreetView(props: {
   useEffect(() => {
     if (state === 'ready' && fare) world.current?.setFare(fare)
   }, [fare, state])
+  useEffect(() => {
+    if (state === 'ready') world.current?.setMeal(props.meal ?? null)
+  }, [props.meal, state])
 
   return (
     <div className="relative h-full w-full" data-engine="haroo" data-scene="street">

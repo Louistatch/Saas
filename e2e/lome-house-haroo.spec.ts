@@ -121,7 +121,7 @@ test('HarooLife house: walk, eat, sleep, save, leave and come back', async ({ pa
     .toMatch(/Tu es devant|Destination atteinte/)
   await page.getByRole('button', { name: 'Entrer ou sortir' }).click()
   await houseReady(page)
-  await expect(page.locator('[data-hotspot]')).toHaveCount(7)
+  await expect(page.locator('[data-hotspot]')).toHaveCount(8)
   await page.screenshot({ path: testInfo.outputPath('house.png') })
 
   // The room publishes its own frame statistics (diagnostics overlay, performance scenarios).
@@ -197,6 +197,9 @@ test('HarooLife house: walk, eat, sleep, save, leave and come back', async ({ pa
   const fed = (await needs(page)) as Needs
   await page.waitForTimeout(2000)
   expect((await needs(page))?.hunger, 'one meal, one effect').toBe(fed.hunger)
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') || '{}').meal), { timeout: 20000 }).toBeUndefined()
+  await page.getByRole('button', { name: 'Se lever', exact: true }).click()
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __LOME_INTERIOR?: { posture: unknown } }).__LOME_INTERIOR?.posture)).toBeNull()
 
   // Sleep: the 🌙 point walks the player to the bed; energy is restored.
   await page.locator('[data-hotspot="sleep"]').click()
@@ -221,7 +224,7 @@ test('HarooLife house: walk, eat, sleep, save, leave and come back', async ({ pa
     await page.getByRole('button', { name: 'Entrer ou sortir' }).click()
     await houseReady(page)
     expect(await page.locator('canvas').count(), 'one engine at a time: the house only').toBe(1)
-    await expect(page.locator('[data-hotspot]')).toHaveCount(7)
+    await expect(page.locator('[data-hotspot]')).toHaveCount(8)
     gpu.push(
       await page.evaluate(() =>
         JSON.stringify(

@@ -16,3 +16,10 @@ Vehicles reference the included Textures/colormap.png.
 
 CC0 license: https://creativecommons.org/publicdomain/zero/1.0/
 Models are reusable open assets, not proprietary Lagos Life source or extracted game assets.
+
+Daily sitting animations: Quaternius Universal Animation Library Standard (free CC0).
+https://quaternius.itch.io/universal-animation-library
+Sitting_Enter, Sitting_Idle_Loop, Sitting_Exit, Sitting_Talking_Loop retargeted onto the
+existing four adult GLBs. Source licence: quaternius-UAL-CC0.txt.
+Rebuild script and provenance: docs/haroolife-daily-interactions.md.
+Meals are authored on the same rigs; original meshes, materials and locomotion clips remain.

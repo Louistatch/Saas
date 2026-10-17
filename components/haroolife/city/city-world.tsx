@@ -5,6 +5,7 @@ import type { ServiceCustomer } from '@/lib/haroolife/city/automatic-service'
 import type { ExposureTracker } from '@/lib/haroolife/ads/exposure'
 import { type Npc, type NpcAnim, type Prop, layoutFor } from '@/lib/haroolife/city/interiors'
 import type { Interior } from '@/lib/haroolife/city/life'
+import { rendererForInterior } from '@/lib/haroolife/engine/select'
 import { LOCALITIES, type LocalityId } from '@/lib/haroolife/city/locality'
 import { bump } from '@/lib/haroolife/city/perf'
 import type { InputState, PlayerController } from '@/lib/haroolife/city/player'
@@ -95,6 +96,7 @@ export default function CityWorld({
   interiorTitle,
   interiorLot,
   activity,
+  daily,
   onUseProp,
   approach,
   onTalk,
@@ -148,6 +150,7 @@ export default function CityWorld({
   interiorTitle: string
   interiorLot?: Lot
   activity: { prop: string; anim: NpcAnim } | null
+  daily?: import('@/lib/haroolife/engine/types').DailyViewProps
   onUseProp: (p: Prop) => void
   /** HUD activity button: walk to that equipment, then use it (Three interiors). */
   approach?: { prop: string; n: number } | null
@@ -187,7 +190,7 @@ export default function CityWorld({
   const pixelRatio = renderPixelRatio(quality)
   // Interiors walked with the joystick: the HarooLife engine, or React Three Fiber with
   // ?engine=three.
-  const room = !ride && interior ? renderer : null
+  const room = !ride && interior ? rendererForInterior(renderer, interior) : null
 
   return (
     <div
@@ -221,6 +224,7 @@ export default function CityWorld({
       {room === 'haroo' && interior && input && (
         <div className="absolute inset-0" data-renderer="haroo">
           <HarooRoomView
+            {...daily}
             key={`${interior}:${interiorLot?.id ?? 'home'}`}
             interior={interior}
             layout={layoutFor(interior, interiorLot, { day: day ?? 1, hour })}
@@ -243,6 +247,7 @@ export default function CityWorld({
       {room === 'three' && interior && input && (
         <div className="absolute inset-0" data-renderer="three">
           <InteriorThree
+            {...daily}
             layout={layoutFor(interior, interiorLot, { day: day ?? 1, hour })}
             title={interiorTitle}
             angle={camera.angle}
@@ -263,6 +268,7 @@ export default function CityWorld({
       {!ride && !interior && !mapView && (
         <div className="absolute inset-0" data-renderer="haroo">
           <HarooStreetView
+            {...daily}
             controller={controller}
             avatarModel={avatarModel}
             avatarPagne={avatarPagne}

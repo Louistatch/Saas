@@ -47,8 +47,8 @@ describe('avatar appearance', () => {
     assert.equal(clipFor(afi, 'walk'), 'Walk')
     assert.equal(clipFor(afi, 'run'), 'Run')
     assert.equal(clipFor(afi, 'work'), 'Interact')
-    assert.equal(clipFor(afi, 'sit'), 'Idle_Neutral', 'no sit clip in the pack: neutral pose')
-    assert.equal(clipFor(mini, 'sit'), 'Idle_Neutral')
+    assert.equal(clipFor(afi, 'sit'), 'HarooSitIdle', 'the retargeted sitting clip is available')
+    assert.equal(clipFor(mini, 'sit'), 'HarooSitIdle')
     assert.equal(clipFor(mini, 'drive'), 'HarooDrive')
     // V3: the pagne colours a garment (Afi's top), never the hair or the shoes; every other
     // garment has a chosen colour, so no light-grey `White` top is left on screen.

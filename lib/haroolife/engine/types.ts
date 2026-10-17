@@ -8,12 +8,20 @@
  */
 import type { Layout, Npc, NpcAnim, Prop } from '@/lib/haroolife/city/interiors'
 import type { InputState } from '@/lib/haroolife/city/player'
+import type { Meal } from '@/lib/haroolife/city/dining'
+
+export interface DailyViewProps {
+  meal?: Meal | null
+  onMealReady?: (id: string, seat: string | null) => void
+  onMealFrame?: (id: string, seconds: number) => void
+  onActivityEnd?: () => void
+}
 
 /** `haroo`: the HarooLife engine (imperative Three.js, `lib/haroolife/game`) for the interiors. */
 export type RendererId = 'three' | 'haroo'
 
 /** Props every interior renderer takes. */
-export interface InteriorViewProps {
+export interface InteriorViewProps extends DailyViewProps {
   layout: Layout
   title: string
   /** Camera bearing in degrees (the street camera's, so entering keeps the orientation). */

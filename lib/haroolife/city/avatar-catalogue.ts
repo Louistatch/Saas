@@ -50,9 +50,8 @@ export const FIGURE_HEIGHT = 0.66
 const QUATERNIUS = '/haroolife/vendor/quaternius/'
 
 /**
- * Activity → Quaternius clip. Sitting, resting and praying have no clip in this pack:
- * the figure keeps a neutral standing pose beside the furniture (never through it) until a
- * compatible clip is added. Driving uses the shared rig-generated HarooDrive clip.
+ * Shared adult clips. Sitting is retargeted from the CC0 UAL Standard; meals, driving and
+ * cycling are authored on these rigs. Resting and praying still use a neutral pose.
  */
 const QUATERNIUS_CLIPS: Partial<Record<NpcAnim, string>> = {
   idle: 'Idle',
@@ -64,6 +63,11 @@ const QUATERNIUS_CLIPS: Partial<Record<NpcAnim, string>> = {
   talk: 'Wave',
   drive: 'HarooDrive',
   cycle: 'HarooCycle',
+  sit: 'HarooSitIdle',
+  'sit-enter': 'HarooSitEnter',
+  'sit-exit': 'HarooSitExit',
+  eat: 'HarooEat',
+  'eat-seated': 'HarooEatSeated',
 }
 /** Skin tones of the reference (dark to deep), hair near-black. */
 export const SKIN_TONES = ['#6b3e28', '#4b2d20', '#855235', '#593522'] as const

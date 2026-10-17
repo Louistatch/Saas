@@ -85,6 +85,7 @@ export const HOUSE_SCENE: HouseScene = {
     { model: 'televisionModern', x: -4.9, z: 0.7, scale: 1.8, rotation: Math.PI / 2 },
     { model: 'desk', x: -4.9, z: 0.7, scale: 2.4, rotation: Math.PI / 2 },
     { model: 'bookcaseOpen', x: 0.2, z: -4.5, scale: 2.4 },
+    { model: 'chair', x: 3.3, z: 0.8, scale: 2.4 },
     { model: 'lampRoundFloor', x: 1.1, z: 0.2, scale: 2 },
     { model: 'showerRound', x: -5, z: 3.7, scale: 2.2 },
     { model: 'toiletSquare', x: -4.9, z: 2.25, scale: 2 },
@@ -99,8 +100,10 @@ export const HOUSE_SCENE: HouseScene = {
     { x: 0.2, z: -4.5, w: 1.8, d: 0.75 },
     { x: -5, z: 3.7, w: 1.2, d: 1.5 },
     { x: -4.9, z: 2.25, w: 1.1, d: 1 },
+    { x: 3.3, z: 0.8, w: 0.75, d: 0.75 },
   ],
   hotspots: [
+    { id: 'sit', propId: 'chair-1', at: { x: 3.3, z: 1.75 }, faces: { x: 3.3, z: 0.8 }, icon: '🪑', label: 'S’asseoir', markerY: 1.4 },
     {
       id: 'sleep',
       propId: 'bed',

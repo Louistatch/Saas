@@ -204,7 +204,7 @@ export function shapeOf(kind: PropKind): ShapePart[] {
     case 'table':
       return [model('table', [0, 0.1, 0], 1.1)]
     case 'chair':
-      return [model('chair', [0, 0.1, 0], 1)]
+      return [model('chair', [0, 0.1, 0], 1.5)]
     case 'sofa':
       return [model('loungesofa', [0, 0.09, 0], 1.3)]
     case 'tv':
