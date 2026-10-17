@@ -19,14 +19,22 @@ test.skip(
 
 const GOOD = 'XXXX.DUMMY.TOKEN.XXXX'
 
-/** Each check solves itself with the next token of `tokens` (the last one repeats). */
+/**
+ * Each check solves itself with the next token of `tokens` (the last one repeats); « ERROR »
+ * stands for Cloudflare refusing the check (a wrong key or domain).
+ */
 async function stubTurnstile(page: Page, tokens: string[]) {
   const double = `(() => {
     const tokens = ${JSON.stringify(tokens)}
     const t = (window.__turnstile = { renders: 0, resets: 0, removes: 0, live: 0 })
     const widgets = {}
     const solve = (id) =>
-      setTimeout(() => widgets[id] && widgets[id].callback(tokens.shift() ?? ${JSON.stringify(GOOD)}), 300)
+      setTimeout(() => {
+        const w = widgets[id]
+        const next = tokens.length > 1 ? tokens.shift() : tokens[0] ?? ${JSON.stringify(GOOD)}
+        if (w && next === 'ERROR') w['error-callback']('110200')
+        else if (w) w.callback(next)
+      }, 300)
     window.turnstile = {
       render(el, opts) {
         const id = 'w' + ++t.renders
@@ -152,5 +160,24 @@ test('sign-in, password reset and the confirmation e-mail carry the anti-robot t
   await page.getByLabel('Mot de passe', { exact: true }).fill('un-mot-de-passe-de-test')
   await page.getByRole('button', { name: /^Se connecter$/ }).click()
   await expect.poll(() => signIn[0]).toBe(GOOD)
+  await context.close()
+})
+
+test('a Cloudflare failure never locks sign-in: the call goes without a token, Supabase decides', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ baseURL: 'http://127.0.0.1:3000' })
+  const page = await context.newPage()
+  // The widget refuses this site (as with a wrong key or an unlisted domain).
+  await stubTurnstile(page, ['ERROR'])
+  const signIn = sentTokens(page, /^\/auth\/v1\/token$/)
+  await page.goto('/auth/login', { waitUntil: 'domcontentloaded' })
+  await page.getByLabel('Adresse email').fill('kossi@example.tg')
+  await page.getByLabel('Mot de passe', { exact: true }).fill('un-mot-de-passe-de-test')
+  const button = page.getByRole('button', { name: /^Se connecter$/ })
+  await expect(button).toBeEnabled()
+  await button.click()
+  await expect.poll(() => signIn.length).toBe(1)
+  expect(signIn[0]).toBeNull()
   await context.close()
 })
