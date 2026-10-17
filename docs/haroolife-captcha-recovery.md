@@ -26,7 +26,8 @@ permet pas de déterminer l’erreur Cloudflare précise du téléphone.
   l’anti-robot, y compris lors d’une soumission par Entrée.
 - Le contrôle, son état et « Relancer la vérification » restent visibles au-dessus du bouton.
   Le pied de l’assistant occupe sa place dans la mise en page : il ne masque pas les logements.
-- Un téléchargement du script bloqué expire après 15 secondes et peut être retenté.
+- Un téléchargement du script bloqué expire après 45 secondes et peut être retenté. L’ancien
+  délai de 15 secondes pouvait interrompre un chargement légitime sur une connexion lente.
 - Une expiration, un délai de challenge dépassé ou un refus Supabase déclenche un nouveau contrôle.
   Un jeton est aussi renouvelé après 4 min 30 ; sa date est revérifiée juste avant Auth, pour les
   onglets suspendus dont les temporisateurs et callbacks peuvent être retardés.
@@ -36,6 +37,38 @@ permet pas de déterminer l’erreur Cloudflare précise du téléphone.
 
 La connexion, le renvoi de confirmation et le mot de passe oublié utilisent le même contrôle.
 Les comptes déjà connectés n’ont pas à refaire un CAPTCHA pour reprendre leur partie.
+
+## Seconde capture : le fournisseur échoue toujours
+
+La seconde capture montre que le widget échoue avant l’envoi à Supabase. L’amélioration de
+reprise initiale n’a donc pas suffi. Il ne faut pas présenter les tests simulés comme une preuve
+de réussite sur le téléphone concerné.
+
+Le code exact renvoyé par Cloudflare est désormais visible et signalé à `/api/errors`, donc
+consultable dans le suivi administrateur (`app_errors`). Le message ne contient que la catégorie
+et le code public, jamais le jeton, les clés, l’identité ou les choix du joueur. Les répétitions
+du même code dans le même écran sont dédupliquées.
+
+Les codes suivent la documentation officielle :
+<https://developers.cloudflare.com/turnstile/troubleshooting/client-side-errors/error-codes/>.
+
+| Code | Intervention |
+| --- | --- |
+| `110200`, `400021` | Vérifier le domaine autorisé dans le widget Cloudflare. |
+| `110100`, `110110`, `400020`, `400070` | Vérifier la clé publique et l’état du widget. |
+| `200100`, `110600` | Vérifier l’heure du téléphone, le cache et les délais du challenge. |
+| `200500`, `script-load`, `script-timeout` | Vérifier le chargement du script/iframe et les blocages réseau. |
+| `300…`, `600…` | Refus du challenge : étudier le contexte navigateur et la configuration du widget. |
+
+Le blocage n’est pas déclaré résolu tant qu’une vérification réelle du téléphone n’a pas abouti
+ou fourni le code permettant de corriger la configuration concernée. Les options d’affichage du
+client ne rendent pas visible un widget configuré « Invisible » chez Cloudflare : ce mode se
+change dans le tableau de bord Cloudflare, pas en changeant `appearance` dans React.
+
+La bibliothèque Cloudflare réelle a aussi été chargée sur le serveur local, avec la clé publique
+officielle de test : le vrai widget a terminé la vérification et activé le bouton de connexion.
+Aucun formulaire n’a été soumis. Ce contrôle valide le contrat JavaScript réel, mais ne valide
+pas le widget de production ni la connexion du téléphone du joueur.
 
 ## Configuration à conserver
 

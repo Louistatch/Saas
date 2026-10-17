@@ -32,7 +32,7 @@ async function stubTurnstile(page: Page, tokens: string[], failedLoads = 0) {
       setTimeout(() => {
         const w = widgets[id]
         const next = tokens.length > 1 ? tokens.shift() : tokens[0] ?? ${JSON.stringify(GOOD)}
-        if (w && next === 'ERROR') w['error-callback']('110200')
+        if (w && next.startsWith('ERROR')) w['error-callback'](next.split(':')[1] || '110200')
         else if (w && next !== 'PENDING') w.callback(next)
       }, 300)
     window.turnstile = {
@@ -80,8 +80,11 @@ const counts = (page: Page) =>
 function sentTokens(page: Page, endpoint: RegExp) {
   const sent: (string | null)[] = []
   page.on('request', (r) => {
-    const path = new URL(r.url()).pathname
+    const url = new URL(r.url())
+    const path = url.pathname
     if (r.method() !== 'POST' || !endpoint.test(path)) return
+    // Session refresh is exempt from CAPTCHA; only password sign-in is protected at /token.
+    if (path === '/auth/v1/token' && url.searchParams.get('grant_type') !== 'password') return
     const body = r.postDataJSON() as { gotrue_meta_security?: { captcha_token?: string } } | null
     sent.push(body?.gotrue_meta_security?.captcha_token ?? null)
   })
@@ -176,6 +179,11 @@ test('a failed check blocks account creation and can be retried without losing t
   const context = await browser.newContext({ baseURL })
   const page = await context.newPage()
   await stubTurnstile(page, ['ERROR', GOOD])
+  const reports: { message: string; route: string; digest: string | null }[] = []
+  await page.route('**/api/errors', (route) => {
+    reports.push(route.request().postDataJSON())
+    return route.fulfill({ json: { ok: true } })
+  })
   const signups = sentTokens(page, /^\/auth\/v1\/signup$/)
   await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
   await arriveAsVisitor(page, async (step) => {
@@ -185,6 +193,11 @@ test('a failed check blocks account creation and can be retried without losing t
     const retry = page.getByRole('button', { name: 'Relancer la vérification' })
     await expect(retry).toBeVisible()
     await expect(retry).toBeInViewport()
+    await expect(page.getByText('Code du contrôle : 110200')).toBeVisible()
+    await expect(page.getByText(/n’est pas autorisé pour ce site/)).toBeVisible()
+    await expect
+      .poll(() => reports)
+      .toEqual([{ message: 'Turnstile domain: 110200', route: '/haroolife', digest: null }])
     await expect(page.getByRole('button', { name: 'Emménager' })).toBeDisabled()
     expect(signups).toEqual([])
     await retry.click()
@@ -193,6 +206,37 @@ test('a failed check blocks account creation and can be retried without losing t
   })
   await expect(page.getByTestId('arrival')).toHaveCount(0)
   expect(signups).toEqual([GOOD])
+  await context.close()
+})
+
+test('a slow mobile script download is not rejected after only fifteen seconds', async ({
+  browser,
+  baseURL,
+}) => {
+  const context = await browser.newContext({ baseURL })
+  const page = await context.newPage()
+  await page.clock.install()
+  await stubTurnstile(page, [GOOD])
+  let release = () => {}
+  const downloading = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let requested = false
+  await page.route('https://challenges.cloudflare.com/turnstile/**', async (route) => {
+    requested = true
+    await downloading
+    await route.fallback()
+  })
+  await page.goto('/auth/login', { waitUntil: 'domcontentloaded' })
+  await expect.poll(() => requested).toBe(true)
+  await page.clock.fastForward(16_000)
+  await expect(page.getByText('Vérification anti-robot en cours…')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Relancer la vérification' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^Se connecter$/ })).toBeDisabled()
+  release()
+  await expect.poll(async () => (await counts(page))?.live).toBe(1)
+  await page.clock.runFor(400)
+  await expect(page.getByRole('button', { name: /^Se connecter$/ })).toBeEnabled()
   await context.close()
 })
 
@@ -264,9 +308,16 @@ test('a token older than five minutes is rejected even before its expiry callbac
   await expect(button).toBeEnabled()
   await page.evaluate(() => {
     const before = Date.now
-    Date.now = () => before() + 300_001
+    try {
+      Date.now = () => before() + 300_001
+      document
+        .querySelector('form')
+        ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    } finally {
+      // Keep Auth's session refresh clock real; the stale read is the synchronous submit guard.
+      Date.now = before
+    }
   })
-  await button.click()
   await expect(button).toBeDisabled()
   await expect.poll(async () => (await counts(page))?.resets).toBe(1)
   expect(signIn).toEqual([])

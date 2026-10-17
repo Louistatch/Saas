@@ -1,5 +1,7 @@
 'use client'
 
+import { captchaExceptionCode, captchaFailure } from '@/lib/auth/captcha-failure'
+import { reportClientError } from '@/lib/errors/report-client'
 /**
  * Anti-robot check (Cloudflare Turnstile) for the Supabase Auth calls made from the browser:
  * visitor entry, sign-in, password reset, confirmation e-mail sent again. Off until
@@ -33,12 +35,13 @@ function loadTurnstile(): Promise<Turnstile> {
   if (loading) return loading
   const task = new Promise<Turnstile>((resolve, reject) => {
     const s = document.createElement('script')
-    const fail = () => {
+    const fail = (code = 'script-load') => {
       window.clearTimeout(timer)
       s.remove()
-      reject(new Error('turnstile'))
+      reject(new Error(code))
     }
-    const timer = window.setTimeout(fail, 15_000)
+    // A rural mobile connection may need more than 15 seconds to download the real script.
+    const timer = window.setTimeout(() => fail('script-timeout'), 45_000)
     s.src = SCRIPT
     s.async = true
     s.onload = () => {
@@ -46,7 +49,7 @@ function loadTurnstile(): Promise<Turnstile> {
       if (window.turnstile) resolve(window.turnstile)
       else fail()
     }
-    s.onerror = fail
+    s.onerror = () => fail()
     document.head.appendChild(s)
   })
   loading = task
@@ -71,6 +74,17 @@ export function useCaptcha(): {
 } {
   const [token, setToken] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
+  const [failure, setFailure] = useState<ReturnType<typeof captchaFailure> | null>(null)
+  const reported = useRef(new Set<string>())
+  const fail = useCallback((code: unknown) => {
+    const detail = captchaFailure(code)
+    setFailure(detail)
+    setFailed(true)
+    if (!reported.current.has(detail.code)) {
+      reported.current.add(detail.code)
+      reportClientError(new Error(`Turnstile ${detail.reason}: ${detail.code}`))
+    }
+  }, [])
   const [attempt, setAttempt] = useState(0)
   const answer = useRef<{ value: string; at: number } | null>(null)
   // The box may appear long after the hook (the last step of the visitor arrival), and leave
@@ -82,6 +96,7 @@ export function useCaptcha(): {
     answer.current = null
     setToken(null)
     setFailed(false)
+    setFailure(null)
     if (widget.current && window.turnstile) {
       try {
         window.turnstile.reset(widget.current)
@@ -122,6 +137,7 @@ export function useCaptcha(): {
             if (!alive) return
             answer.current = { value: v, at: Date.now() }
             setFailed(false)
+            setFailure(null)
             setToken(v)
           },
           'refresh-expired': 'manual',
@@ -132,17 +148,17 @@ export function useCaptcha(): {
           'timeout-callback': () => {
             if (alive) reset()
           },
-          'error-callback': () => {
+          'error-callback': (code: string) => {
             if (!alive) return
             answer.current = null
             setToken(null)
-            setFailed(true)
+            fail(code)
           },
         })
         widget.current = id
       })
-      .catch(() => {
-        if (alive) setFailed(true)
+      .catch((error: unknown) => {
+        if (alive) fail(captchaExceptionCode(error))
       })
     return () => {
       alive = false
@@ -158,8 +174,9 @@ export function useCaptcha(): {
       answer.current = null
       setToken(null)
       setFailed(false)
+      setFailure(null)
     }
-  }, [host, attempt, reset])
+  }, [host, attempt, reset, fail])
   useEffect(() => {
     if (!token) return
     const timer = window.setTimeout(reset, TOKEN_LIFETIME)
@@ -175,11 +192,12 @@ export function useCaptcha(): {
         <div ref={setHost} className="mx-auto w-full max-w-sm" />
         <output className={`block ${failed ? 'text-red-800' : 'text-emerald-900'}`}>
           {failed
-            ? 'Le contrôle anti-robot n’a pas abouti. Vérifie ta connexion, puis relance-le.'
+            ? failure?.message
             : token
               ? 'Vérification anti-robot réussie.'
               : 'Vérification anti-robot en cours…'}
         </output>
+        {failure && <p className="text-slate-600">Code du contrôle : {failure.code}</p>}
         {failed && (
           <button
             type="button"
