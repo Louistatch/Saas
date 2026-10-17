@@ -159,9 +159,10 @@ test('avatar, joystick, collisions, camera and taxi in the single 3D world', asy
   ).toBeGreaterThan(1.6)
 
   // 2b. Leaving the app (window blur) with the stick held: the avatar stops, no ghost walk.
-  // A passer-by (the officer who has just spoken to the player included) may stand in the way
-  // for a moment: the stick stays held until the avatar walks.
-  await hold(0, 600, 52)
+  // Back the way the run came (screen-down): that path is free, whereas the run may end in a
+  // doorway one cell wide, walled on both sides. A passer-by (the officer who has just spoken to
+  // the player included) may still stand in the way for a moment: the stick stays held.
+  await hold(90, 600, 52)
   await expect
     .poll(async () => ((await player()) as Player).speed)
     .toBeGreaterThan(0.5)
@@ -172,7 +173,7 @@ test('avatar, joystick, collisions, camera and taxi in the single 3D world', asy
   await expect.poll(async () => ((await player()) as Player).speed).toBe(0)
   await release()
   // And the stick answers again right after (no stuck state).
-  await hold(180, 600, 46)
+  await hold(90, 600, 46)
   await expect
     .poll(async () => ((await player()) as Player).speed, { message: 'stick usable after a blur' })
     .toBeGreaterThan(0.5)

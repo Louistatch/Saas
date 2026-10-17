@@ -630,7 +630,22 @@ for (const kind of ['taxi', 'moto'] as const) {
     })
     await leave.click()
     await expect.poll(async () => (await service())?.stopRequested).toBe(true)
-    await expect.poll(async () => (await driver())?.driving, { timeout: 90000 }).toBe(false)
+    // The current fare ends first, through the traffic lights (a red lasts up to 14 s) and the
+    // drop-off: the trip's length depends on the destination, so what is checked is that the
+    // vehicle never stands still for 30 s before the driver gets off.
+    let last = (await driver())?.vehicle ?? null
+    let still = Date.now()
+    for (;;) {
+      const d = await driver()
+      if (!d?.driving) break
+      const v = d.vehicle
+      if (v && (!last || Math.hypot(v.x - last.x, v.z - last.z) > 0.2)) {
+        last = v
+        still = Date.now()
+      }
+      expect(Date.now() - still, 'the vehicle keeps going until the drop-off').toBeLessThan(30000)
+      await page.waitForTimeout(500)
+    }
     await expect.poll(async () => (await lastReceipt())?.gross).toBe(second?.price)
     const secondReceipt = (await lastReceipt())!
     const expected = before + firstNet + secondReceipt.net
