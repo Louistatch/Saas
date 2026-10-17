@@ -133,20 +133,48 @@ test('returning taxi: paid ride, automatic fuel, garage and police stops, then n
     page.evaluate(
       () => (window as unknown as { __LOME_CITY?: { wallet: number } }).__LOME_CITY?.wallet,
     )
+  // Each step crosses traffic lights (a red lasts up to 14 s) and stops of 4 to 6 s: its
+  // length depends on the lights. What is checked is that the service never stalls, the taxi
+  // still and its phase unchanged for 30 s, before the step is done; not a fixed duration.
+  const keepsGoing = async (done: () => Promise<boolean>) => {
+    let mark = ''
+    let since = Date.now()
+    while (!(await done())) {
+      const now = await page.evaluate(() => {
+        const w = window as unknown as {
+          __LOME_PLAYER?: { vehicle: { x: number; z: number } | null }
+          __LOME_FARE?: { service: { phase: string } }
+        }
+        const v = w.__LOME_PLAYER?.vehicle
+        return JSON.stringify([
+          w.__LOME_FARE?.service.phase,
+          v && Math.round(v.x * 5),
+          v && Math.round(v.z * 5),
+        ])
+      })
+      if (now !== mark) {
+        mark = now
+        since = Date.now()
+      }
+      expect(Date.now() - since, `the taxi service keeps going (${now})`).toBeLessThan(30000)
+      await page.waitForTimeout(500)
+    }
+  }
   await page.goto('/haroolife')
   await page
     .getByRole('button', { name: 'Monter dans le taxi', exact: true })
     .click({ timeout: 45000 })
-  await expect
-    .poll(async () => (await probe())?.care.lastReceipt?.net, { timeout: 90000 })
-    .toBeGreaterThan(0)
+  await keepsGoing(async () => ((await probe())?.care.lastReceipt?.net ?? 0) > 0)
   const net = (await probe())!.care.lastReceipt!.net
   await expect.poll(wallet).toBe(100 + net)
-  await expect.poll(async () => (await probe())?.care.refills, { timeout: 90000 }).toBe(1)
+  await keepsGoing(async () => ((await probe())?.care.refills ?? 0) >= 1)
+  expect((await probe())?.care.refills).toBe(1)
   expect(await wallet(), 'the prepaid refill does not debit twice').toBe(100 + net)
-  await expect.poll(async () => (await probe())?.care.services, { timeout: 90000 }).toBe(1)
+  await keepsGoing(async () => ((await probe())?.care.services ?? 0) >= 1)
+  expect((await probe())?.care.services).toBe(1)
   expect(await wallet(), 'the maintenance reserve is not debited twice').toBe(100 + net)
-  await expect.poll(async () => (await probe())?.care.checks, { timeout: 90000 }).toBe(1)
+  await keepsGoing(async () => ((await probe())?.care.checks ?? 0) >= 1)
+  expect((await probe())?.care.checks).toBe(1)
   expect(await wallet(), 'the road-safety check is free').toBe(100 + net)
   await page.screenshot({ path: info.outputPath('automatic-support-complete.png') })
   await expect.poll(async () => (await probe())?.service.phase, { timeout: 60000 }).toBe('trip')

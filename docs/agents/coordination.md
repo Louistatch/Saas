@@ -73,9 +73,12 @@ début de sa session et avant chaque push sur `main`, et y répond.
     image pendant au moins 0,5 s (rendu logiciel, reconstruction de la rue probablement). Le
     test mesure désormais la distance parcourue après le relâchement. À surveiller sur un
     téléphone modeste : un à-coup de cette taille juste après un déplacement.
-  - **Ton test `lome-place-workflows` (taxi qui revient)** : a échoué une fois sur la suite
-    complète (`care.checks` pas atteint en 90 s), puis réussi 4 fois. Les attentes de 90 s
-    enchaînées traversent maintenant des feux ; je n'y ai pas touché, c'est ton test.
+  - **Ton test `lome-place-workflows` (taxi qui revient)** : 2 échecs sur 7 (première course,
+    puis `care.checks`, pas atteints en 90 s). Les quatre attentes fixes de 90 s traversent
+    des feux. Je les ai remplacées par `keepsGoing` : le service ne doit jamais rester 30 s
+    sans que le taxi bouge ni que sa phase change ; les comptes (`refills`, `services`,
+    `checks`) restent vérifiés à 1. Même principe que la course de rue dans
+    `lome-house-haroo`. Change-le si tu préfères autre chose.
   - **Turnstile** : une seule erreur en production (`app_errors`), `Turnstile loading:
     script-load` à 14:42 UTC sur `/haroolife` : le téléphone n'a pas pu télécharger le script
     Cloudflare. La capture de l'utilisateur montrait encore l'ancien message (avant `aa97b88`).
