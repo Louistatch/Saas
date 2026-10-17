@@ -507,12 +507,32 @@ test('debate of the day: a vote is posted in the Togo room for everyone', async 
   const debates = ama.page.getByTestId('debates')
   await expect(debates.getByRole('region', { name: 'Débat du jour' })).toBeVisible()
   await expect(debates.getByRole('region', { name: 'Blague du jour' })).toBeVisible()
+  // The rumour of the day and the Cardinal's Sunday live (a character of the game).
+  await expect(debates.getByRole('region', { name: 'Gbairai du jour' })).toContainText('Gbairai')
+  await expect(debates.getByRole('region', { name: 'La messe du dimanche' })).toBeVisible()
   const first = debates.getByRole('region', { name: 'Débat du jour' }).getByRole('button').first()
   const side = (await first.textContent())?.trim() ?? ''
   await first.click()
   // The vote is in the « Togo » room, which opens.
   await expect(ama.page.getByRole('region', { name: 'Discussions en direct' })).toBeVisible()
   await expect(log(ama.page)).toContainText(`Moi je suis pour : ${side}`)
+
+  // Sunday 20:25 in Lomé: the live is on, three revelations are out; one is shared in the room.
+  await ama.page.clock.setFixedTime(new Date('2026-10-18T20:25:00Z'))
+  await ama.page
+    .getByRole('navigation', { name: 'Navigation du jeu' })
+    .getByRole('button', { name: 'Téléphone' })
+    .click()
+  await ama.page.getByRole('button', { name: /Débats$/ }).click()
+  const messe = ama.page.getByTestId('messe')
+  await expect(messe).toHaveAttribute('data-phase', 'live')
+  await expect(messe).toContainText('EN DIRECT')
+  await expect(messe.getByRole('list', { name: 'Révélations' }).getByRole('listitem')).toHaveCount(
+    3,
+  )
+  await ama.page.screenshot({ path: testInfo.outputPath('messe-live.png') })
+  await messe.getByRole('button', { name: 'Partager la dernière révélation' }).click()
+  await expect(log(ama.page)).toContainText('Le Cardinal a dit :')
   expect(ama.errors).toEqual([])
   await ama.context.close()
 })
