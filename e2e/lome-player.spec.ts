@@ -115,14 +115,18 @@ test('avatar, joystick, collisions, camera and taxi in the single 3D world', asy
   // The body turned towards each direction.
   const headings = new Set(samples.map((p) => Math.round(p.heading / 45)))
   expect(headings.size).toBeGreaterThanOrEqual(4)
-  // Stop: no sliding after release.
-  await page.waitForTimeout(500)
+  // Stop: no sliding after release, measured as a distance. Under software rendering a street
+  // rebuild can hold the frame loop for half a second right after the release, and the probe
+  // still shows the last walking frame meanwhile (seen in the full suite): wall time says
+  // nothing about sliding, the distance covered once released does.
+  const released = (await player()) as Player
+  await expect.poll(async () => ((await player()) as Player).mode).toBe('idle')
   const stopped = (await player()) as Player
-  expect(
-    stopped.mode,
-    `idle after release: ${JSON.stringify({ speed: stopped.speed, police: stopped.policeStopped, route: stopped.walkingRoute?.length, stops })}`,
-  ).toBe('idle')
   expect(stopped.speed).toBe(0)
+  expect(
+    Math.hypot(stopped.x - released.x, stopped.z - released.z),
+    `no slide after release (street rebuild ${await page.evaluate(() => (window as unknown as { __LOME_STREET?: { rebuildMs?: number } }).__LOME_STREET?.rebuildMs)} ms)`,
+  ).toBeLessThan(0.3)
   // Camera follows the avatar.
   expect(stopped.camera.follow).toBe(true)
   expect(Math.hypot(stopped.camera.tx - stopped.x, stopped.camera.tz - stopped.z)).toBeLessThan(3)
