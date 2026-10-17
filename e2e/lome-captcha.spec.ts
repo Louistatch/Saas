@@ -8,9 +8,8 @@ import { arriveAsVisitor, expect, test } from './lome-test'
  *     the arrival, where the account is created; a refused token is replaced by a fresh one and
  *     « Emménager » works again, without starting over;
  *   - sign-in, password reset, confirmation e-mail sent again.
- * challenges.cloudflare.com is out of reach of the test machines: a local double stands in for
- * the Cloudflare script, and the mock Supabase checks the token as Cloudflare would (it accepts
- * the test token XXXX.DUMMY.TOKEN.XXXX only).
+ * A local double keeps CI deterministic; the real library is checked separately with its
+ * official test key. The mock Supabase accepts XXXX.DUMMY.TOKEN.XXXX only.
  */
 test.skip(
   !process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
@@ -23,8 +22,10 @@ const GOOD = 'XXXX.DUMMY.TOKEN.XXXX'
  * Each check solves itself with the next token of `tokens` (the last one repeats); « ERROR »
  * stands for Cloudflare refusing the check (a wrong key or domain).
  */
-async function stubTurnstile(page: Page, tokens: string[], failedLoads = 0) {
+async function stubTurnstile(page: Page, tokens: string[], failedLoads = 0, readyDelay = 0) {
   const double = `(() => {
+    const source = new URL(document.currentScript.src)
+    const initialize = () => {
     const tokens = ${JSON.stringify(tokens)}
     const t = (window.__turnstile = { renders: 0, resets: 0, removes: 0, live: 0 })
     const widgets = {}
@@ -64,11 +65,20 @@ async function stubTurnstile(page: Page, tokens: string[], failedLoads = 0) {
     }
     t.expire = () => Object.values(widgets).forEach(w => w['expired-callback']())
     t.solve = () => Object.values(widgets).forEach(w => w.callback(${JSON.stringify(GOOD)}))
+    const onload = source.searchParams.get('onload')
+    if (onload) window[onload]?.()
+    }
+    if (${readyDelay} > 0) setTimeout(initialize, ${readyDelay})
+    else initialize()
   })()`
   let loads = 0
   await page.route('https://challenges.cloudflare.com/turnstile/**', (route) => {
     if (loads++ < failedLoads) return route.abort('failed')
-    return route.fulfill({ contentType: 'text/javascript', body: double })
+    return route.fulfill({
+      contentType: 'text/javascript',
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: double,
+    })
   })
 }
 
@@ -137,6 +147,52 @@ test('the visitor arrival carries the anti-robot token, and gets a fresh one aft
   // The check left with the arrival.
   await expect.poll(async () => (await counts(page))?.live).toBe(0)
   expect(errors).toEqual([])
+  await context.close()
+})
+
+test('the official ready callback can arrive after the script load event', async ({
+  browser,
+  baseURL,
+}) => {
+  const context = await browser.newContext({ baseURL })
+  const page = await context.newPage()
+  await stubTurnstile(page, [GOOD], 0, 700)
+  await page.goto('/auth/login', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('Vérification anti-robot réussie.')).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Se connecter$/ })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Relancer la vérification' })).toHaveCount(0)
+  expect(await page.locator('script[src*="turnstile/v0/api.js"]').getAttribute('crossorigin')).toBe(
+    'anonymous',
+  )
+  await context.close()
+})
+
+test('a warm scanner worker excludes third-party checks and clears its old cache', async ({
+  browser,
+  baseURL,
+}) => {
+  const context = await browser.newContext({ baseURL })
+  const page = await context.newPage()
+  await stubTurnstile(page, [GOOD])
+  await page.goto('/robots.txt')
+  await page.evaluate(async () => {
+    const old = await caches.open('coopscan-v1')
+    await old.put(
+      'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit',
+      new Response('/* unusable cached script */'),
+    )
+    await caches.open('game-assets-kept')
+    await navigator.serviceWorker.register('/sw.js')
+    await navigator.serviceWorker.ready
+  })
+  await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true)
+  const keys = await page.evaluate(() => caches.keys())
+  expect(keys).not.toContain('coopscan-v1')
+  expect(keys).toContain('game-assets-kept')
+  await page.goto('/auth/login', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('Vérification anti-robot réussie.')).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Se connecter$/ })).toBeEnabled()
+  expect(await page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true)
   await context.close()
 })
 

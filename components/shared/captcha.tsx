@@ -1,6 +1,7 @@
 'use client'
 
 import { captchaExceptionCode, captchaFailure } from '@/lib/auth/captcha-failure'
+import { loadTurnstile } from '@/lib/auth/turnstile-client'
 import { reportClientError } from '@/lib/errors/report-client'
 /**
  * Anti-robot check (Cloudflare Turnstile) for the Supabase Auth calls made from the browser:
@@ -13,51 +14,9 @@ import { reportClientError } from '@/lib/errors/report-client'
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ''
-const SCRIPT = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
 // Turnstile tokens expire after five minutes. Renew a little earlier, including after a tab
 // was suspended (the submit handler reads the timestamp rather than trusting a delayed timer).
 const TOKEN_LIFETIME = 270_000
-
-type Turnstile = {
-  render: (el: HTMLElement, opts: Record<string, unknown>) => string
-  reset: (id: string) => void
-  remove: (id: string) => void
-}
-declare global {
-  interface Window {
-    turnstile?: Turnstile
-  }
-}
-
-let loading: Promise<Turnstile> | null = null
-function loadTurnstile(): Promise<Turnstile> {
-  if (window.turnstile) return Promise.resolve(window.turnstile)
-  if (loading) return loading
-  const task = new Promise<Turnstile>((resolve, reject) => {
-    const s = document.createElement('script')
-    const fail = (code = 'script-load') => {
-      window.clearTimeout(timer)
-      s.remove()
-      reject(new Error(code))
-    }
-    // A rural mobile connection may need more than 15 seconds to download the real script.
-    const timer = window.setTimeout(() => fail('script-timeout'), 45_000)
-    s.src = SCRIPT
-    s.async = true
-    s.onload = () => {
-      window.clearTimeout(timer)
-      if (window.turnstile) resolve(window.turnstile)
-      else fail()
-    }
-    s.onerror = () => fail()
-    document.head.appendChild(s)
-  })
-  loading = task
-  void task.catch(() => {
-    if (loading === task) loading = null
-  })
-  return task
-}
 
 export function useCaptcha(): {
   enabled: boolean

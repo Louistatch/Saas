@@ -14,6 +14,8 @@ test('clock, interaction timeout and loading failures have distinct recovery ins
   assert.equal(captchaFailure('110620').reason, 'interaction-timeout')
   assert.equal(captchaFailure('script-timeout').reason, 'loading')
   assert.equal(captchaFailure('200500').reason, 'loading')
+  assert.equal(captchaFailure('script-api').reason, 'initialization')
+  assert.equal(captchaFailure('script-csp').reason, 'policy')
 })
 
 test('diagnostics never propagate tokens, secrets or raw exceptions as a public code', () => {
@@ -28,4 +30,5 @@ test('diagnostics never propagate tokens, secrets or raw exceptions as a public 
   assert.equal(captchaExceptionCode({ code: 110100, message: 'sensitive' }), '110100')
   assert.equal(captchaExceptionCode({ code: 'sensitive', message: 'sensitive' }), 'render')
   assert.equal(captchaExceptionCode(new Error('script-timeout')), 'script-timeout')
+  assert.equal(captchaExceptionCode(new Error('script-api')), 'script-api')
 })

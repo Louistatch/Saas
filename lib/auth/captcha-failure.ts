@@ -1,6 +1,7 @@
 /** Public diagnostic codes only. Never include a CAPTCHA token, key, or a raw exception. */
 export function captchaExceptionCode(error: unknown): string {
-  if (error instanceof Error && /^script-(load|timeout)$/.test(error.message)) return error.message
+  if (error instanceof Error && /^script-(load|timeout|api|csp)$/.test(error.message))
+    return error.message
   if (error && typeof error === 'object' && 'code' in error) {
     const code = String(error.code)
     if (/^\d{3,6}$/.test(code)) return code
@@ -10,7 +11,8 @@ export function captchaExceptionCode(error: unknown): string {
 
 export function captchaFailure(raw: unknown) {
   const code =
-    typeof raw === 'string' && /^(?:\d{3,6}|script-load|script-timeout|render)$/.test(raw)
+    typeof raw === 'string' &&
+    /^(?:\d{3,6}|script-load|script-timeout|script-api|script-csp|render)$/.test(raw)
       ? raw
       : 'unknown'
   if (code === '110200' || code === '400021')
@@ -19,6 +21,20 @@ export function captchaFailure(raw: unknown) {
       reason: 'domain',
       message:
         'Le contrôle anti-robot n’est pas autorisé pour ce site. Un réglage Cloudflare doit être corrigé par notre équipe.',
+    }
+  if (code === 'script-csp')
+    return {
+      code,
+      reason: 'policy',
+      message:
+        'La sécurité de cette page bloque le contrôle Cloudflare. Notre équipe doit corriger ce réglage.',
+    }
+  if (code === 'script-api')
+    return {
+      code,
+      reason: 'initialization',
+      message:
+        'Le fichier du contrôle a été reçu, mais ne démarre pas. Relance la vérification ; si cela persiste, vérifie le filtrage de scripts du navigateur.',
     }
   if (['110100', '110110', '400020', '400070'].includes(code))
     return {
