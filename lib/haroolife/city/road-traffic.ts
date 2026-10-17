@@ -91,12 +91,24 @@ export class RoadTraffic {
     }
     return null
   }
-  step(dt: number, cx: number, cz: number, blockers: CollisionBody[] = []): void {
+  step(
+    dt: number,
+    cx: number,
+    cz: number,
+    blockers: CollisionBody[] = [],
+    red?: (car: TrafficCar) => boolean,
+  ): void {
     const elapsed = Math.min(0.25, Math.max(0, dt))
     const steps = Math.max(1, Math.ceil(elapsed / 0.05))
-    for (let i = 0; i < steps; i++) this.advance(elapsed / steps, cx, cz, blockers)
+    for (let i = 0; i < steps; i++) this.advance(elapsed / steps, cx, cz, blockers, red)
   }
-  private advance(delta: number, cx: number, cz: number, blockers: CollisionBody[]): void {
+  private advance(
+    delta: number,
+    cx: number,
+    cz: number,
+    blockers: CollisionBody[],
+    red?: (car: TrafficCar) => boolean,
+  ): void {
     for (let id = 0; id < this.count; id++) {
       let car = this.cars.find((c) => c.id === id)
       if (!car || Math.hypot(car.x - cx, car.z - cz) > 17) {
@@ -120,6 +132,7 @@ export class RoadTraffic {
       // Never stop a vehicle from clearing the way: a following taxi is behind it, not an
       // obstacle ahead. Inflating both ends used to freeze the two vehicles permanently.
       car.stopped =
+        !!red?.(car) ||
         blockers.some((body) => approaching(body) && bodiesOverlap(ahead, body, 0.015)) ||
         this.cars.some(
           (body) => body.id !== id && approaching(body) && bodiesOverlap(ahead, body, 0.02),

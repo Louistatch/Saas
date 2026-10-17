@@ -1,4 +1,12 @@
-import { type CollisionBody, touchesBody, bodiesOverlap } from './collisions'
+import { type CollisionBody, bodiesOverlap, touchesBody } from './collisions'
+import {
+  type PavementGraph,
+  PedestrianWatch,
+  mayCross,
+  onCarriageway,
+  pickupRoad,
+  vehicleAtRed,
+} from './pedestrians'
 /**
  * Continuous player controller for the single 3D world: positions in floating cell
  * units, analogue input, acceleration and braking, capsule-against-cells collision,
@@ -28,6 +36,7 @@ export type PlayerEvent =
   | { type: 'cell'; x: number; y: number }
   | { type: 'reached'; x: number; y: number }
   | { type: 'blocked' }
+  | { type: 'pedestrian-stop'; reason: 'outside-crossing' | 'red-light' }
   | { type: 'mode'; mode: Mode }
   | { type: 'vehicle'; state: 'entered' | 'left' }
 
@@ -80,7 +89,8 @@ export const DEFAULT_CONFIG: PlayerConfig = {
   accel: 16,
   decel: 24,
   turnRate: 600,
-  radius: 0.28,
+  // Adult at the street scale: 0.4 scene units wide, fitting a 0.48-unit pavement.
+  radius: 0.1,
   runThreshold: 0.92,
   vehicle: {
     maxSpeed: 9,
@@ -100,6 +110,7 @@ export interface WorldQuery {
   walkable(x: number, y: number): boolean
   /** Where a vehicle may drive. */
   drivable(x: number, y: number): boolean
+  pavement?(x: number, z: number): boolean
 }
 
 const STEP = 1 / 60
@@ -140,6 +151,12 @@ export function cameraBasis(angleDeg: number): { forward: Vec2; right: Vec2 } {
 
 export class PlayerController {
   pos: Vec2
+  pavements: PavementGraph | null = null
+  streetSeconds = 0
+  repairedSignals = false
+  policeStopped = false
+  waitingForSignal = false
+  private readonly pedestrianWatch = new PedestrianWatch()
   /** Visible moving traffic and physical street objects, refreshed by the street renderer. */
   obstacles: CollisionBody[] = []
   vehicleDimensions = { halfWidth: 0.27, halfLength: 0.67 }
@@ -159,13 +176,13 @@ export class PlayerController {
   get shownVehicle() {
     const v = this.vehicle
     if (!v) return null
-    const lane = this.automaticDriving && this.driving ? 0.3 : 0
+    const lane = this.automaticDriving && this.driving ? 0.25 : 0
     const angle = v.heading / DEG
     return { ...v, x: v.x + Math.cos(angle) * lane, z: v.z - Math.sin(angle) * lane }
   }
   private vehicleBlocked(x: number, z: number, heading = this.vehicle?.heading ?? 0) {
     if (!this.vehicle) return false
-    const lane = this.automaticDriving && this.driving ? 0.3 : 0
+    const lane = this.automaticDriving && this.driving ? 0.25 : 0
     const angle = heading / DEG
     const body = {
       x: x + Math.cos(angle) * lane,
@@ -214,7 +231,14 @@ export class PlayerController {
   /** The integer cell the avatar (or the vehicle when driving) stands on. */
   get cell(): { x: number; y: number } {
     const p = this.driving && this.vehicle ? this.vehicle : this.pos
-    return { x: Math.round(p.x), y: Math.round(p.z) }
+    const cell = { x: Math.round(p.x), y: Math.round(p.z) }
+    // The physical pavement overlaps a building plot. Save its road anchor so the next
+    // trip and a reload still start on the walkable network; `pose` keeps the exact feet.
+    if (!this.driving && this.pavements && !this.world.walkable(cell.x, cell.y)) {
+      const road = pickupRoad(p, this.pavements.road)
+      if (road) return { x: road.x, y: road.z }
+    }
+    return cell
   }
   get speed(): number {
     return Math.hypot(this.vel.x, this.vel.z)
@@ -227,6 +251,7 @@ export class PlayerController {
   }
   /** Places the avatar on a cell without animation (loading, leaving a building, travel). */
   teleport(cell: { x: number; y: number }, heading?: number) {
+    this.pedestrianWatch.reset()
     this.pos = { x: cell.x, z: cell.y }
     this.vel = { x: 0, z: 0 }
     this.route = []
@@ -236,6 +261,7 @@ export class PlayerController {
     this.camera.tz = cell.y
   }
   setInside(inside: boolean) {
+    if (!inside && this.mode === 'inside') this.pedestrianWatch.reset()
     const mode: Mode = inside ? 'inside' : 'idle'
     if (inside) {
       this.vel = { x: 0, z: 0 }
@@ -244,6 +270,7 @@ export class PlayerController {
     this.setMode(mode)
   }
   setTravelling(on: boolean) {
+    if (!on && this.mode === 'travel') this.pedestrianWatch.reset()
     this.setMode(on ? 'travel' : 'idle')
   }
   private setMode(m: Mode) {
@@ -258,6 +285,7 @@ export class PlayerController {
     this.acc += Math.min(dt, MAX_DT)
     while (this.acc >= STEP) {
       this.acc -= STEP
+      this.streetSeconds += STEP
       if (this.driving && this.vehicle) this.stepVehicle(STEP)
       else if (this.mode !== 'inside' && this.mode !== 'travel') this.stepWalk(STEP)
     }
@@ -271,6 +299,12 @@ export class PlayerController {
 
   private stepWalk(dt: number) {
     const cfg = this.config
+    this.waitingForSignal = false
+    if (this.policeStopped) {
+      this.vel = { x: 0, z: 0 }
+      this.setMode('idle')
+      return
+    }
     const { forward, right } = cameraBasis(this.camera.angle)
     let want: Vec2 = { x: 0, z: 0 }
     let running = false
@@ -295,9 +329,17 @@ export class PlayerController {
         this.events.push({ type: 'reached', x: next.x, y: next.z })
         if (!this.route.length) this.vel = { x: 0, z: 0 }
       } else {
-        // Guided routes jog (run pace): long enough trips stay short, feet still match.
-        const speed = Math.min(cfg.runSpeed, d / dt)
-        want = { x: (dx / d) * speed, z: (dz / d) * speed }
+        const speed = Math.min(cfg.walkSpeed, d / dt)
+        const probe = { x: this.pos.x + (dx / d) * 0.32, z: this.pos.z + (dz / d) * 0.32 }
+        const road = this.pavements?.road
+        // A pedestrian already crossing keeps going until the opposite kerb.
+        this.waitingForSignal =
+          !!road &&
+          !onCarriageway(this.pos, road) &&
+          onCarriageway(probe, road) &&
+          !mayCross(probe, road, this.streetSeconds, this.repairedSignals)
+        if (!this.waitingForSignal) want = { x: (dx / d) * speed, z: (dz / d) * speed }
+        else this.vel = { x: 0, z: 0 }
       }
     }
     // Accelerate towards the wanted velocity, brake harder than we accelerate.
@@ -323,6 +365,31 @@ export class PlayerController {
         this.events.push({ type: 'blocked' })
       }
     } else this.blockedSince = 0
+    const road = this.pavements?.road
+    if (road && !this.route.length && mag > 0.12) {
+      const reason = this.pedestrianWatch.step(
+        dt,
+        this.pos,
+        moved,
+        road,
+        this.streetSeconds,
+        this.repairedSignals,
+      )
+      if (reason) {
+        this.policeStopped = true
+        this.vel = { x: 0, z: 0 }
+        this.route = []
+        this.events.push({ type: 'pedestrian-stop', reason })
+      }
+    } else
+      this.pedestrianWatch.step(
+        dt,
+        this.pos,
+        false,
+        this.world.drivable,
+        this.streetSeconds,
+        this.repairedSignals,
+      )
     const s = this.speed
     // Standing still, or pushing into a wall, reads as idle; otherwise walk or run.
     this.setMode(!moved || s < 0.05 ? 'idle' : running || s > cfg.walkSpeed + 0.3 ? 'run' : 'walk')
@@ -357,13 +424,22 @@ export class PlayerController {
       touchesBody(x, z, r, { ...this.vehicle, ...this.vehicleDimensions })
     )
       return false
+    if (
+      this.world.pavement &&
+      (this.world.pavement(x, z) || this.world.drivable(Math.round(x), Math.round(z)))
+    )
+      return true
     for (const [ox, oz] of [
       [-r, -r],
       [r, -r],
       [-r, r],
       [r, r],
     ])
-      if (!this.world.walkable(Math.round(x + ox), Math.round(z + oz))) return false
+      if (
+        !this.world.walkable(Math.round(x + ox), Math.round(z + oz)) &&
+        !this.world.pavement?.(x + ox, z + oz)
+      )
+        return false
     return true
   }
 
@@ -404,6 +480,7 @@ export class PlayerController {
     ]
     const spot = candidates.find((c) => this.fits(c.x, c.z)) ?? { x: v.x, z: v.z }
     this.driving = false
+    this.pedestrianWatch.reset()
     this.stopAutomaticDriving()
     this.pos = { ...spot }
     this.heading = v.heading
@@ -518,6 +595,21 @@ export class PlayerController {
   }
 
   private stepAutomaticVehicle(dt: number): void {
+    if (
+      this.vehicle &&
+      this.pavements &&
+      vehicleAtRed(
+        this.shownVehicle ?? this.vehicle,
+        this.vehicle.heading,
+        this.pavements.road,
+        this.streetSeconds,
+        this.repairedSignals,
+      )
+    ) {
+      this.vehicle.speed = 0
+      this.vel = { x: 0, z: 0 }
+      return
+    }
     const v = this.vehicle
     const next = this.drivingRoute[0]
     if (!v || !next) return
@@ -554,7 +646,14 @@ export class PlayerController {
           v.x = nx
           v.z = nz
           v.speed = -0.9
-        } else v.speed = 0
+        } else {
+          v.speed = 0
+          this.trafficWait += dt
+          if (this.trafficWait > 4) {
+            this.trafficWait = 0
+            this.avoidTraffic()
+          }
+        }
         this.pos = { x: v.x, z: v.z }
         this.heading = v.heading
         return

@@ -1,5 +1,10 @@
 'use client'
 
+import PedestrianStop from './pedestrian-stop'
+import { WORLD_W, WORLD_H } from '@/lib/haroolife/city/world'
+import { PavementGraph, guidedCellRoute, onPavement } from '@/lib/haroolife/city/pedestrians'
+import { municipalRepairDone, municipalStatus, pedestrianTicket, type PedestrianReason } from '@/lib/haroolife/city/street-civic'
+
 import { useHarooLifeViewport } from '@/hooks/use-haroolife-viewport'
 import GraphicsBoundary from './graphics-boundary'
 import { EmploymentPanel, AviationPanel, OnlinePlayers } from './regional-services'
@@ -80,6 +85,7 @@ import {
   ensureLocality,
   enterLot,
   freelyWalkable,
+  finishGuidedWalk,
   goToEstate,
   goToLot,
   goToPoint,
@@ -93,7 +99,6 @@ import {
   travelTo,
   tripTo,
   useProp,
-  walkStep,
 } from '@/lib/haroolife/city/life'
 import { LOCALITIES, LOCALITY_IDS, type LocalityId } from '@/lib/haroolife/city/locality'
 import { CITY_STORAGE, loadCityLife } from '@/lib/haroolife/city/migrate'
@@ -400,8 +405,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   const estateRoadsRef = useRef(estateRoads)
   estateRoadsRef.current = estateRoads
   const input = useRef<InputState>({ x: 0, y: 0, run: false }).current
-  // Renderer of the interiors (?engine=three or playcanvas), read once on the client; the
-  // default until then, so the PlayCanvas chunk is never fetched unless it was asked for.
+  // Keep the device’s remembered renderer choice; furnished rooms share the Haroo controller.
   const [renderer, setRenderer] = useState<RendererId>(DEFAULT_RENDERER)
   useEffect(() => setRenderer(currentRenderer()), [])
   const controller = useMemo(() => {
@@ -410,6 +414,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
         walkable: (x, y) =>
           freelyWalkable(x, y, estateRoadsRef.current, cityLifeRef.current.life.city.buildings),
         drivable: (x, y) => isCityRoad(x, y) || isDriveway(x, y),
+        pavement: (x, z) => onPavement({ x, z }, (cx, cz) => isCityRoad(cx, cz) || isDriveway(cx, cz)),
       },
       cityLifeRef.current.at,
       { angle: 35, distance: FOLLOW_DISTANCE },
@@ -420,6 +425,19 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   }, [])
   /** Cell last reported by the controller: a React `at` that differs is a jump (door, travel, load). */
   const reportedCell = useRef('')
+  const [waitingAtSignal, setWaitingAtSignal] = useState(false)
+  useEffect(() => {
+    const id = window.setInterval(() => setWaitingAtSignal(controller.waitingForSignal), 250)
+    return () => window.clearInterval(id)
+  }, [controller])
+  const [policeStop, setPoliceStop] = useState<PedestrianReason | null>(null)
+  const lastGuidedRoute = useRef<CityLife['route'] | null>(null)
+  useEffect(() => {
+    controller.pavements = new PavementGraph((x, z) => isCityRoad(x, z) || isDriveway(x, z), WORLD_W, WORLD_H)
+    controller.policeStopped = false
+    setPoliceStop(null)
+  }, [cityLife.locality, controller])
+  useEffect(() => { controller.repairedSignals = municipalRepairDone(cityLife) }, [cityLife, controller])
   const [nearVehicle, setNearVehicle] = useState(false)
   const [driving, setDriving] = useState(false)
   // Driver's job: the passer-by hailing, the fare on board and its live progress.
@@ -1149,8 +1167,18 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     controller.camera.follow = true
   }, [cityLife.at.x, cityLife.at.y, cityLife.locality, controller, cityLife.at, cityLife.pose])
   useEffect(() => {
-    controller.route = cityLife.route.map((c) => ({ x: c.x, z: c.y }))
-  }, [cityLife.route, controller])
+    if (lastGuidedRoute.current === cityLife.route) return
+    lastGuidedRoute.current = cityLife.route
+    const cells = cityLife.route.map((c) => ({ x: c.x, z: c.y }))
+    if (!cells.length || riding || controller.driving) { controller.route = cells; return }
+    const path = controller.pavements ? guidedCellRoute(controller.pavements, controller.pos, cells) : null
+    if (path) controller.route = path
+    else {
+      controller.route = []
+      setCityLife(old => ({ ...old, route: [] }))
+      setNotice('Aucun chemin piéton sûr vers ce point. Choisis une entrée reliée au trottoir.')
+    }
+  }, [cityLife.route, controller, riding])
   useEffect(() => {
     controller.setInside(insideAny)
   }, [insideAny, controller])
@@ -1215,8 +1243,16 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   }, [loaded, cityLife.vehicle])
   const onPlayerEvents = useCallback(
     (events: ReturnType<PlayerController['drain']>, c: PlayerController) => {
+      const guided = cityLifeRef.current.route.length > 0 && !c.driving && Math.hypot(input.x, input.y) < 0.12
       for (const ev of events) {
-        if (ev.type === 'cell') {
+        if (ev.type === 'pedestrian-stop') {
+          input.x = 0; input.y = 0; input.run = false
+          setCityLife(old => pedestrianTicket(old, ev.reason))
+          setPoliceStop(ev.reason)
+          setPanel(null)
+        } else if (ev.type === 'reached' && !c.route.length && !c.driving) {
+          setCityLife(old => ({ ...finishGuidedWalk(old), pose: { x: c.pos.x, z: c.pos.z, heading: c.heading } }))
+        } else if (ev.type === 'cell') {
           const key = `${cityLifeRef.current.locality}:${ev.x}:${ev.y}`
           reportedCell.current = key
           const v = c.driving ? c.vehicle : null
@@ -1224,9 +1260,8 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
             ? { x: v.x, z: v.z, heading: v.heading }
             : { x: c.pos.x, z: c.pos.z, heading: c.heading }
           setCityLife((old) => {
-            const head = old.route[0]
-            if (head && head.x === ev.x && head.y === ev.y) return { ...walkStep(old), pose }
-            const moved = moveTo(old, { x: ev.x, y: ev.y }, pose)
+            const moved = moveTo(old, { x: ev.x, y: ev.y }, pose, guided)
+
             return v
               ? {
                   ...moved,
@@ -1276,7 +1311,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   // The keyboard walks the player in the street and indoors (every renderer lets them walk).
   useKeyboardInput(
     input,
-    panel === null && !talkNpc && !mapView && !riding && !(driving && cityLife.duty),
+    panel === null && !policeStop && !talkNpc && !mapView && !riding && !(driving && cityLife.duty),
   )
   // Test hooks: walkability of a cell and an automatic walk to the player's taxi.
   useEffect(() => {
@@ -1548,7 +1583,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   // Key E on a PC: the same action as the door button (never while typing in a field).
   const doorKey = useRef<() => void>(() => {})
   doorKey.current = () => {
-    if (panel !== null || talkNpc || riding) return
+    if (panel !== null || policeStop || talkNpc || riding) return
     if (insideAny) action('leave')
     else if (doorRef.current) action('enter')
   }
@@ -1858,6 +1893,11 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     setApproachReq((r) => ({ prop: prop.id, n: (r?.n ?? 0) + 1 }))
   }
   function cityAction(a: CityAction) {
+    if (a === 'timetable') {
+      const lot = cityLife.insideLot ? lotById(cityLife.insideLot) : null
+      if (lot) { setSelectedLot(lot); setPanel('lot') }
+      return
+    }
     if (a === 'browse') {
       setPanel('shop')
       return
@@ -1909,7 +1949,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
       setCityLife(old => ({ ...old, activity: { prop: p.id, anim: 'sit' } }))
       return
     }
-    if (['browse', 'offers', 'coop', 'bank'].includes(p.action)) {
+    if (['browse', 'offers', 'coop', 'bank', 'timetable'].includes(p.action)) {
       cityAction(p.action as CityAction)
       return
     }
@@ -2780,6 +2820,21 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
         />
       )}
 
+      {waitingAtSignal && !insideAny && !policeStop && !mapView && <output className="pointer-events-none absolute inset-x-4 top-[152px] z-20 mx-auto max-w-sm rounded-2xl bg-white/95 p-3 text-center text-sm font-bold text-emerald-950 shadow">🚦 J’attends le vert piéton, puis je traverse.</output>}
+      {policeStop && <PedestrianStop reason={policeStop} message={cityLife.life.lastEvent} onResume={() => {
+        controller.policeStopped = false
+        input.x = 0
+        input.y = 0
+        input.run = false
+        const graph = controller.pavements
+        const n = graph?.nearest(controller.pos)
+        if (graph && n !== undefined && n >= 0) {
+          const p = graph.nodes[n]
+          controller.route = [{ x: p.x, z: p.z }]
+        }
+        setPoliceStop(null)
+        setNotice('Retour au trottoir. Carte → destination → À pied : je marche prudemment pour toi.')
+      }} />}
       {talkNpc && (
         <section
           aria-label="Conversation"
@@ -4288,6 +4343,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                             })}
                           </div>
                         )}
+                        {lot.type === 'townhall' && <output className="block rounded-xl bg-emerald-50 p-3 text-sm text-emerald-950">🚦 {municipalStatus(cityLife)}</output>}
                         {lot.type === 'university' && <Timetable day={life.day} hour={life.hour} />}
                         {lot.type === 'cooperative' && actor && (
                           <p className="text-xs text-slate-600">

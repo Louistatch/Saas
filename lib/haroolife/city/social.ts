@@ -1,5 +1,6 @@
-import { LOCALITIES } from './locality'
 import type { CityLife } from './life'
+import { LOCALITIES } from './locality'
+import { municipalStatus } from './street-civic'
 import type { Lot } from './world'
 export type DialogueMessage = { from: 'me' | 'npc'; text: string }
 export type Contact = { affinity: number; rewardedDay: number; history: DialogueMessage[] }
@@ -34,6 +35,16 @@ export function residentReply(resident: Resident, text: string, s: CityLife): st
     .toLocaleLowerCase('fr')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+  if (resident.lot?.type === 'townhall') {
+    if (/feu|passage|pieton|repar|dossier|signaler/.test(t))
+      return `${municipalStatus(s)} Va au tableau « Signaler les feux en panne ». Dépôt gratuit, équipe sous deux heures de jeu. Les photos d’inauguration ? Après la réparation, promis !`
+    if (/budget|vice|pot|corrupt|promess|retard|maire/.test(t))
+      return 'Moi, maire Agbavi, personnage fictif, j’avais prévu trois discours pour un seul feu ! Le quartier a voté : moins de rubans, plus de boulons. Aucun pot-de-vin : ici on suit le dossier gratuitement au tableau.'
+    return 'Bienvenue à la mairie ! Je suis le maire Agbavi, personnage fictif. Feux en panne, dossiers qui prennent la poussière, promesses à rallonge : on peut en rire et les réparer. Regarde le tableau de signalement ; le service communal reste rémunéré séparément.'
+  }
+  if (resident.lot?.type === 'university') {
+    return 'Bienvenue à l’université ! Ouvre « Objets et personnes » : emploi du temps, place de cours et secrétariat ont chacun leur bulle. Choisis le tableau pour lire les horaires ou la place libre pour suivre le cours. Pas de cours à midi : même le professeur mange !'
+  }
   if (/essence|carburant|entretien|garage|taxi|zem|moto/.test(t))
     return 'En service, l’essence consommée et la réserve d’entretien sont prélevées sur chaque recette. Le véhicule rejoint automatiquement la pompe et le garage quand il en a besoin. Le détail est dans Mes finances. Ici, même le taxi ne roule pas à la bonne humeur !'
   if (
@@ -41,7 +52,7 @@ export function residentReply(resident: Resident, text: string, s: CityLife): st
     resident.lot?.service === 'police' ||
     resident.name.startsWith('Agent')
   )
-    return 'Bonjour ! Casque pour le zémidjan, ceinture en taxi et respect des piétons. Le véhicule de service dispose de ses papiers de jeu. Les contrôles sont automatiques, sans amende arbitraire. Pour signaler un vrai joueur, ouvre son profil et « Signaler ».'
+    return 'Bonjour ! Casque pour le zémidjan, ceinture en taxi et respect des piétons. Le véhicule de service dispose de ses papiers de jeu. À pied, utilise les passages et attends le vert piéton. Premier écart : avertissement ; ensuite 500 FCFA du jeu si ton solde le permet. Choisis « À pied » sur une destination pour marcher automatiquement sur les trottoirs. Pour signaler un vrai joueur, ouvre son profil et « Signaler ».'
   if (/travail|job|metier|argent|salaire|embauch/.test(t))
     return 'Ouvre Métiers. Pour le taxi ou le zémidjan, le véhicule est fourni : monte et les clients, trajets et paiements s’enchaînent. Pour un autre métier, suis la destination indiquée et fais ton service. Le salaire est fictif, mais la pause est bien méritée !'
   if (

@@ -82,7 +82,11 @@ test('each place category has an interior and actions with real consequences', (
   assert.equal(cityInteract(uni, 'learn').skills, 1)
   const broke = { ...uni, life: { ...uni.life, wallet: 10 } }
   assert.match(cityInteract(broke, 'learn').life.lastEvent, /insuffisant/)
-  assert.ok(actionsFor('bank').length === 1 && actionsFor('lot').length === 0)
+  assert.deepEqual(
+    actionsFor('bank').map((a) => a.id),
+    ['bank', 'sit'],
+  )
+  assert.equal(actionsFor('lot').length, 0)
   const hall = cityInteract(arrive(goToLot(s, byName('Hôtel de ville de Lomé'))), 'enter')
   const worked = cityInteract(hall, 'work-city')
   assert.equal(worked.life.wallet, hall.life.wallet + 1500)
@@ -96,7 +100,7 @@ test('a warehouse of the industrial zone leads to a paid odd job, once a day', (
   assert.equal(interiorFor(depot.type), 'hall')
   assert.deepEqual(
     actionsFor(depot.type).map((a) => a.id),
-    ['work-city'],
+    ['work-city', 'sit'],
   )
   const inside = cityInteract(arrive(goToLot(s, depot)), 'enter')
   assert.equal(inside.insideLot, depot.id)

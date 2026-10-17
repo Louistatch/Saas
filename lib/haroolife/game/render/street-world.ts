@@ -32,11 +32,12 @@ import type { Meal } from '@/lib/haroolife/city/dining'
 import { type VehicleKind, drivingRoute } from '@/lib/haroolife/city/fares'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 import { current } from '@/lib/haroolife/city/locality'
+import { mayCross, onCarriageway, pickupRoad, vehicleAtRed } from '@/lib/haroolife/city/pedestrians'
 import { DEFAULT_CONFIG, type PlayerController } from '@/lib/haroolife/city/player'
 import { RoadTraffic } from '@/lib/haroolife/city/road-traffic'
 import { isCityRoad, isDriveway } from '@/lib/haroolife/city/world'
 import type { DailyViewProps } from '@/lib/haroolife/engine/types'
-import { WALK_SIDE, streetDressing } from '@/lib/haroolife/game/core/sidewalks'
+import { streetDressing } from '@/lib/haroolife/game/core/sidewalks'
 import {
   type GroundKind,
   STREET_CELL,
@@ -72,6 +73,7 @@ import { DETAIL_CELLS, buildCityGeometry } from './city-models'
 import { createGltfLoader } from './gltf'
 import { type MotoParts, buildMoto } from './moto'
 import { PerfProbe } from './perf-probe'
+import { StreetSignals } from './street-signals'
 import { fitTaxiModel } from './vehicle-scale'
 
 /**
@@ -248,6 +250,8 @@ interface Walker {
   t: number
   /** A passer-by of the game (not a connected player): their name and tag (shown when near). */
   name: string
+  approachingPolice?: boolean
+  path?: { x: number; z: number }[]
   police?: boolean
   tag: HTMLButtonElement
 }
@@ -255,6 +259,7 @@ interface Walker {
 export class StreetWorld {
   private readonly canvas: HTMLCanvasElement
   private readonly markersRoot: HTMLElement
+  private signals: StreetSignals | null = null
   private readonly controller: PlayerController
   private readonly events: StreetWorldEvents
   private readonly renderer: THREE.WebGLRenderer
@@ -460,6 +465,10 @@ export class StreetWorld {
       person.root.name = `Piéton ${i + 1}`
       this.scene.add(person.root)
       const start = this.randomRoad()
+      const graph = this.controller.pavements
+      const n = graph?.nearest({ x: start.x, z: start.y })
+      if (graph && n !== undefined && n >= 0)
+        person.root.position.set(graph.nodes[n].x * U, 0, graph.nodes[n].z * U)
       const name = PEDESTRIAN_NAMES[i % PEDESTRIAN_NAMES.length]
       const tag = document.createElement('button')
       tag.type = 'button'
@@ -499,6 +508,11 @@ export class StreetWorld {
             w.from = { x: Math.round(v.x) + 1, y: Math.round(v.z) }
             w.to = { ...w.from }
             w.t = 0
+            w.path = undefined
+            const graph = this.controller.pavements
+            const n = graph?.nearest({ x: w.from.x, z: w.from.y })
+            if (graph && n !== undefined && n >= 0)
+              w.person.root.position.set(graph.nodes[n].x * U, 0, graph.nodes[n].z * U)
             return w.name
           }
     } catch {
@@ -643,6 +657,7 @@ export class StreetWorld {
   private clearWindow(): void {
     for (const m of this.markers) m.el.remove()
     this.markers = []
+    this.signals = null
     if (!this.winGroup) return
     this.winGroup.traverse((o) => {
       const im = o as THREE.InstancedMesh
@@ -695,6 +710,14 @@ export class StreetWorld {
       im.receiveShadow = true
       g.add(im)
     }
+    this.signals = new StreetSignals(
+      g,
+      win.roads,
+      (x, z) => isCityRoad(x, z) || isDriveway(x, z),
+      this.unitBox,
+      (c) => this.mat(c),
+      U,
+    )
     // Lane markings on city roads (thin, light).
     const marks = win.cells.filter((cell) => cell.kind === 'road')
     if (marks.length) {
@@ -903,6 +926,11 @@ export class StreetWorld {
         w.from = { x: at.x, y: at.y }
         w.to = this.nextRoad(w.from, w.from)
         w.t = 0
+        w.path = undefined
+        const graph = this.controller.pavements
+        const n = graph?.nearest({ x: at.x, z: at.y })
+        if (graph && n !== undefined && n >= 0)
+          w.person.root.position.set(graph.nodes[n].x * U, 0, graph.nodes[n].z * U)
         w.person.root.visible = true
       }
     }
@@ -973,7 +1001,14 @@ export class StreetWorld {
         if (w.police) continue
         const p = w.person.root.position
         const d = Math.hypot(p.x / U - v.x, p.z / U - v.z)
-        const customer = { name: w.name, x: Math.round(p.x / U), y: Math.round(p.z / U) }
+        // Waiting people stand on the pavement, whose rounded cell belongs to a plot.
+        // Pick up on the nearest road instead of trying to drive onto their feet.
+        const stop = pickupRoad(
+          { x: p.x / U, z: p.z / U },
+          (x, z) => isCityRoad(x, z) || isDriveway(x, z),
+        )
+        if (!stop) continue
+        const customer = { name: w.name, x: stop.x, y: stop.z }
         if (
           (!best || d < best.d) &&
           drivingRoute(v, customer, (x, y) => isCityRoad(x, y) || isDriveway(x, y))
@@ -1101,32 +1136,79 @@ export class StreetWorld {
       }
       w.person.root.visible = true
       this.play(w.person, clipFor(w.person.spec, 'walk'))
-      const dx = (w.to.x - w.from.x) * U
-      const dz = (w.to.y - w.from.y) * U
-      const len = Math.hypot(dx, dz) || 1
-      w.t += (speed * dt) / len
-      if (w.t >= 1) {
-        const prev = w.from
+      const graph = this.controller.pavements
+      const p = w.person.root.position
+      // During a stop a uniformed officer actually walks over to the player.
+      if (w.police && this.controller.policeStopped) {
+        if (!w.approachingPolice) {
+          w.approachingPolice = true
+          w.path = graph?.route({ x: p.x / U, z: p.z / U }, this.controller.pos) ?? []
+        }
+        const target = w.path?.[0] ?? this.controller.pos
+        const dx = target.x * U - p.x
+        const dz = target.z * U - p.z
+        const d = Math.hypot(dx, dz)
+        const near =
+          Math.hypot(this.controller.pos.x * U - p.x, this.controller.pos.z * U - p.z) < 1.4
+        if (near) this.play(w.person, clipFor(w.person.spec, 'talk'))
+        else if (d < 0.06) w.path?.shift()
+        else {
+          const step = Math.min(d, dt * 2.4)
+          p.x += (dx / d) * step
+          p.z += (dz / d) * step
+          w.person.root.rotation.y = Math.atan2(dx, dz)
+        }
+        w.person.mixer.update(dt)
+        continue
+      }
+      if (w.approachingPolice) {
+        w.approachingPolice = false
+        w.path = undefined
+      }
+      const c = this.controller.cell
+      if (Math.abs(w.from.x - c.x) > RADIUS || Math.abs(w.from.y - c.y) > RADIUS) {
+        w.from = this.randomRoad()
+        w.to = this.nextRoad(w.from, w.from)
+        w.path = undefined
+        const n = graph?.nearest({ x: w.from.x, z: w.from.y })
+        if (graph && n !== undefined && n >= 0) p.set(graph.nodes[n].x * U, 0, graph.nodes[n].z * U)
+      }
+      if (!w.path?.length) {
+        const previous = w.from
         w.from = w.to
-        w.to = this.nextRoad(w.from, prev)
-        w.t = 0
-        // Far from the player (the window moved): reappear on a road nearby.
-        const c = this.controller.cell
-        if (Math.abs(w.from.x - c.x) > RADIUS || Math.abs(w.from.y - c.y) > RADIUS) {
-          w.from = this.randomRoad()
-          w.to = this.nextRoad(w.from, w.from)
+        w.to = this.nextRoad(w.from, previous)
+        w.path = graph?.route({ x: p.x / U, z: p.z / U }, { x: w.to.x, z: w.to.y }) ?? []
+        if (!w.path.length && graph) {
+          const n = graph.nearest({ x: w.from.x, z: w.from.y })
+          if (n >= 0) p.set(graph.nodes[n].x * U, 0, graph.nodes[n].z * U)
         }
       }
-      // Walk on the sidewalk to the right of the road; turns are eased (no jump at a corner).
-      const side = WALK_SIDE * U
-      const nx = len ? -dz / len : 0
-      const nz = len ? dx / len : 0
-      const x = w.from.x * U + dx * w.t + nx * side
-      const z = w.from.y * U + dz * w.t + nz * side
-      const p = w.person.root.position
-      const ease = Math.hypot(x - p.x, z - p.z) > 3 ? 1 : Math.min(1, dt * 6)
-      p.set(p.x + (x - p.x) * ease, 0, p.z + (z - p.z) * ease)
-      if (dx || dz) w.person.root.rotation.y = Math.atan2(dx, dz)
+      const next = w.path?.[0]
+      if (next) {
+        const dx = next.x * U - p.x
+        const dz = next.z * U - p.z
+        const d = Math.hypot(dx, dz)
+        const pos = { x: p.x / U, z: p.z / U }
+        const probe = { x: pos.x + (dx / (d || 1)) * 0.32, z: pos.z + (dz / (d || 1)) * 0.32 }
+        const wait =
+          graph &&
+          !onCarriageway(pos, graph.road) &&
+          onCarriageway(probe, graph.road) &&
+          !mayCross(
+            probe,
+            graph.road,
+            this.controller.streetSeconds,
+            this.controller.repairedSignals,
+          )
+        if (d < 0.06) w.path?.shift()
+        else if (wait) this.play(w.person, clipFor(w.person.spec, 'idle'))
+        else {
+          const step = Math.min(d, speed * dt)
+          p.x += (dx / d) * step
+          p.z += (dz / d) * step
+          w.person.root.rotation.y = Math.atan2(dx, dz)
+        }
+      }
       const natural = w.person.spec.pace.walk * FIGURE
       w.person.actions.get(w.person.current)?.setEffectiveTimeScale(Math.max(0.5, speed / natural))
       w.person.mixer.update(dt)
@@ -1179,8 +1261,16 @@ export class StreetWorld {
       {
         ...point,
         heading: ctl.heading,
-        halfWidth: ctl.turning ? 1.05 : ctl.driving ? ctl.vehicleDimensions.halfWidth : 0.3,
-        halfLength: ctl.turning ? 1.05 : ctl.driving ? ctl.vehicleDimensions.halfLength : 0.3,
+        halfWidth: ctl.turning
+          ? 1.05
+          : ctl.driving
+            ? ctl.vehicleDimensions.halfWidth
+            : ctl.config.radius,
+        halfLength: ctl.turning
+          ? 1.05
+          : ctl.driving
+            ? ctl.vehicleDimensions.halfLength
+            : ctl.config.radius,
       },
     ]
     // NPC cars yield to crossing people, including the visible pedestrians.
@@ -1195,7 +1285,15 @@ export class StreetWorld {
         })
     if (!ctl.driving && ctl.vehicle)
       blockers.push({ ...ctl.vehicle, halfWidth: 0.3, halfLength: 1 })
-    this.traffic.step(dt, point.x, point.z, blockers)
+    this.traffic.step(dt, point.x, point.z, blockers, (car) =>
+      vehicleAtRed(
+        car,
+        car.heading,
+        (x, z) => isCityRoad(x, z) || isDriveway(x, z),
+        ctl.streetSeconds,
+        ctl.repairedSignals,
+      ),
+    )
     ctl.obstacles = [
       ...this.traffic.cars.filter((c) => this.trafficModels.has(c.id)),
       ...this.walkers
@@ -1265,6 +1363,7 @@ export class StreetWorld {
     const ctl = this.controller
     this.stepTraffic(dt)
     ctl.update(dt)
+    this.signals?.update(ctl.streetSeconds, ctl.repairedSignals)
     const events = ctl.drain()
     if (events.length) this.events.onEvents(events, ctl)
     const c = ctl.cell
@@ -1831,6 +1930,13 @@ export class StreetWorld {
         stopped: c.stopped,
       })),
       collisions: true,
+      signals: { seconds: ctl.streetSeconds, repaired: ctl.repairedSignals },
+      walkers: this.walkers.map((w) => ({
+        name: w.name,
+        x: w.person.root.position.x / U,
+        z: w.person.root.position.z / U,
+        police: !!w.police,
+      })),
       kenney: Boolean(this.bank),
       rebuildMs: this.rebuildMs,
       tiles: this.tiles.size,
@@ -1882,6 +1988,9 @@ export class StreetWorld {
       hailed: this.hailed,
       passenger: this.fare.passenger,
       astride: !!this.moto && ctl.driving && this.player?.root.visible === true,
+      waitingForSignal: ctl.waitingForSignal,
+      policeStopped: ctl.policeStopped,
+      walkingRoute: ctl.route.map((p) => ({ ...p })),
       driving: ctl.driving,
       automaticDriving: ctl.automaticDriving,
       drivingRouteState: ctl.drivingRouteState,

@@ -92,5 +92,5 @@ test('the house and the market offer reachable seats with free exits and no repe
 test('reference rooms retain their completed interactions with an old remembered R3F preference', () => {
   assert.equal(rendererForInterior('three', 'house'), 'haroo')
   assert.equal(rendererForInterior('three', 'market'), 'haroo')
-  assert.equal(rendererForInterior('three', 'gym'), 'three')
+  assert.equal(rendererForInterior('three', 'gym'), 'haroo')
 })
