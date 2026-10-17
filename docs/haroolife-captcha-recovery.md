@@ -7,10 +7,13 @@ contrôle visible pour récupérer. La configuration de production a été véri
 Supabase exige Turnstile, les connexions anonymes sont autorisées et la clé publique est bien
 présente dans le bundle du site.
 
-Un appel de diagnostic serveur à Siteverify, avec une réponse volontairement invalide et sans
-création de compte, a également renvoyé `invalid-input-secret` : Cloudflare refuse le secret
-actuellement enregistré dans Supabase. Le propriétaire doit y remettre le secret du widget
-correspondant à la clé publique Vercel ; une modification du code ne peut pas remplacer ce secret.
+Un premier diagnostic direct à Siteverify a renvoyé `invalid-input-secret` avec la valeur renvoyée
+par l’API de gestion. Ce résultat n’a pas été retenu : cette valeur n’est pas une preuve du secret
+réellement utilisé par Auth. Le diagnostic fait ensuite par le véritable service Supabase Auth,
+avec un identifiant fictif et un jeton volontairement invalide, a renvoyé le refus attendu
+`captcha_failed / invalid-input-response`. Aucun compte n’a été créé, aucune clé n’a été modifiée.
+Il n’est donc pas établi qu’un changement de secret soit nécessaire. La demande initiale de le
+remplacer a été retirée ; la correction porte sur le cycle de vérification du client.
 
 Le hook client considérait une erreur Cloudflare comme une autorisation de soumettre sans jeton.
 Supabase refusait alors la demande. De plus, un chargement de script en échec ne pouvait pas
