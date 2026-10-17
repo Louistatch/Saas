@@ -133,7 +133,9 @@ export class RoadTraffic {
       // obstacle ahead. Inflating both ends used to freeze the two vehicles permanently.
       car.stopped =
         !!red?.(car) ||
-        blockers.some((body) => approaching(body) && bodiesOverlap(ahead, body, 0.015)) ||
+        // A foot already stopped beside the lane must let a car clear the crossing. Adding
+        // another gap here traps both forever (movement already enforces the capsule radius).
+        blockers.some((body) => approaching(body) && bodiesOverlap(ahead, body)) ||
         this.cars.some(
           (body) => body.id !== id && approaching(body) && bodiesOverlap(ahead, body, 0.02),
         )

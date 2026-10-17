@@ -2,7 +2,7 @@
  * Graphics quality presets. Chosen automatically from the device (memory, cores, screen)
  * and adjustable by the player; persisted locally. Each preset bounds what the renderer
  * does: render resolution (device pixel ratio cap), anti-aliasing, how far detailed chunks
- * reach, and how many animated characters and vehicles may be alive at once.
+ * reach, how many distant characters animate at full rate, and the inactive geometry cache.
  */
 export type Quality = 'eco' | 'balanced' | 'high'
 export interface QualityPreset {
@@ -12,23 +12,17 @@ export interface QualityPreset {
   /** Upper bound on the device pixel ratio used for the canvas. */
   maxPixelRatio: number
   antialias: boolean
-  /** Chunk rings: detailed (baked models), medium (main models only), far (volumes). */
-  nearRing: number
-  midRing: number
+  /** Outer preloading ring of the Three.js street, in half tiles. */
   farRing: number
-  /** Animated (skinned) characters allowed in the city view, and total pedestrians. */
+  /** Full-rate distant actors (near faces/local player are exempt), and ambient cast ceiling. */
   maxAnimated: number
   maxWalkers: number
-  /** Vehicles kept alive around the camera. */
-  vehicleRadius: number
-  /** Second fill light on or off. */
-  fillLight: boolean
-  /** Cells from the camera target with full-detail buildings and props. */
-  detailCells: number
-  /** Cells up to which buildings keep a simplified model (beyond: coloured volumes). */
-  lowCells: number
-  /** Triangles visible per frame the renderer aims to stay under (dynamic detail radius). */
-  triangleBudget: number
+  /** GPU/CPU cache of inactive tiles. Active geometry is never evicted by this budget. */
+  geometryCacheMB: number
+  /** Street engine: preserve the existing eight-cell detailed neighbourhood at every level. */
+  streetDetailCells: number
+  /** Soft CPU deadline for incremental tile work (one indivisible tile at most per frame). */
+  streamBudgetMs: number
 }
 export const PRESETS: Record<Quality, QualityPreset> = {
   eco: {
@@ -37,16 +31,12 @@ export const PRESETS: Record<Quality, QualityPreset> = {
     hint: 'Faible consommation : résolution réduite, moins de personnages.',
     maxPixelRatio: 1,
     antialias: false,
-    nearRing: 1,
-    midRing: 1,
     farRing: 2,
     maxAnimated: 4,
     maxWalkers: 8,
-    vehicleRadius: 16,
-    fillLight: false,
-    detailCells: 9,
-    lowCells: 22,
-    triangleBudget: 160_000,
+    geometryCacheMB: 6,
+    streetDetailCells: 8,
+    streamBudgetMs: 2,
   },
   balanced: {
     id: 'balanced',
@@ -54,16 +44,12 @@ export const PRESETS: Record<Quality, QualityPreset> = {
     hint: 'Fluidité d’abord : résolution limitée à 1,5×, détails à proximité.',
     maxPixelRatio: 1.5,
     antialias: true,
-    nearRing: 1,
-    midRing: 2,
     farRing: 2,
     maxAnimated: 8,
     maxWalkers: 14,
-    vehicleRadius: 22,
-    fillLight: false,
-    detailCells: 13,
-    lowCells: 30,
-    triangleBudget: 320_000,
+    geometryCacheMB: 9,
+    streetDetailCells: 8,
+    streamBudgetMs: 3,
   },
   high: {
     id: 'high',
@@ -71,16 +57,12 @@ export const PRESETS: Record<Quality, QualityPreset> = {
     hint: 'Qualité renforcée : résolution native, plus de personnages et de détails.',
     maxPixelRatio: 2,
     antialias: true,
-    nearRing: 2,
-    midRing: 3,
     farRing: 3,
     maxAnimated: 14,
     maxWalkers: 20,
-    vehicleRadius: 26,
-    fillLight: true,
-    detailCells: 18,
-    lowCells: 40,
-    triangleBudget: 650_000,
+    geometryCacheMB: 12,
+    streetDetailCells: 8,
+    streamBudgetMs: 4,
   },
 }
 export const STORAGE_KEY = 'haroolife.quality'
@@ -165,9 +147,15 @@ export function setSoftwareRendererForTests(value: boolean | null) {
  * Pixel ratio actually used for the canvas: on a software rasterizer the cost is the number
  * of pixels, so every preset renders at half resolution there and the UI stays responsive.
  */
-export function renderPixelRatio(q: Quality, isSoftware = softwareRenderer()): number {
+export function renderPixelRatio(
+  q: Quality,
+  isSoftware = softwareRenderer(),
+  deviceRatio = typeof window === 'undefined'
+    ? PRESETS[q].maxPixelRatio
+    : window.devicePixelRatio || 1,
+): number {
   const cap = PRESETS[q].maxPixelRatio
-  return isSoftware ? Math.min(cap, 0.5) : cap
+  return isSoftware ? Math.min(cap, 0.5) : Math.min(cap, deviceRatio)
 }
 /** One step down (high → balanced → eco), or null when already at the floor. */
 export function lowerQuality(q: Quality): Quality | null {
@@ -199,6 +187,12 @@ export class QualityGovernor {
   ) {}
   /** Returns the preset to switch to, or null to keep the current one. */
   sample(fps: number, current: Quality): Quality | null {
+    // Explicit profiling control; normal sessions retain automatic adaptation.
+    if (
+      typeof window !== 'undefined' &&
+      (window as unknown as { __LOME_PERF_LOCK_QUALITY?: boolean }).__LOME_PERF_LOCK_QUALITY
+    )
+      return null
     if (!(fps > 0)) return null
     this.sinceDown += 1
     const floor = this.software ? 6 : SLOW_FRAME_FPS

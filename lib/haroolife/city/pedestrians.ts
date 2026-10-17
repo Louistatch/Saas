@@ -109,6 +109,12 @@ const id = (p: Vec2) => `${p.x.toFixed(2)}:${p.z.toFixed(2)}`
 export class PavementGraph {
   readonly nodes: Node[] = []
   private readonly index = new Map<string, number>()
+  private readonly spatial = new Map<string, number[]>()
+  /** Serial BFS workspaces, reused by every walker instead of allocating a large Map per route. */
+  private readonly parents: Int32Array
+  private readonly queue: Int32Array
+  private readonly visited: Uint32Array
+  private search = 0
   constructor(
     readonly road: RoadQuery,
     width: number,
@@ -185,10 +191,42 @@ export class PavementGraph {
         }
       }
     }
+    this.parents = new Int32Array(this.nodes.length)
+    this.queue = new Int32Array(this.nodes.length)
+    this.visited = new Uint32Array(this.nodes.length)
+    this.nodes.forEach((p, n) => {
+      const key = `${Math.floor(p.x)}:${Math.floor(p.z)}`
+      const bin = this.spatial.get(key) ?? []
+      bin.push(n)
+      this.spatial.set(key, bin)
+    })
   }
   nearest(p: Vec2): number {
+    if (!Number.isFinite(p.x) || !Number.isFinite(p.z)) return -1
     let best = -1
     let distance = Number.POSITIVE_INFINITY
+    const cx = Math.floor(p.x)
+    const cz = Math.floor(p.z)
+    // Huge imported coordinates cannot make x++/z++ stop advancing in floating point.
+    if (Math.abs(cx) < 1_000_000 && Math.abs(cz) < 1_000_000)
+      for (let x = cx - 2; x <= cx + 2; x++)
+        for (let z = cz - 2; z <= cz + 2; z++) {
+          const bin = this.spatial.get(`${x}:${z}`)
+          if (!bin) continue
+          for (const n of bin) {
+            const at = this.nodes[n]
+            const d = Math.hypot(at.x - p.x, at.z - p.z)
+            // Preserve the original global traversal's deterministic tie breaking.
+            if (d < distance || (d === distance && n < best)) {
+              distance = d
+              best = n
+            }
+          }
+        }
+    // Outside the searched bins every point is at least two cells away.
+    if (distance <= 2) return best
+    best = -1
+    distance = Number.POSITIVE_INFINITY
     for (let n = 0; n < this.nodes.length; n++) {
       const at = this.nodes[n]
       const d = Math.hypot(at.x - p.x, at.z - p.z)
@@ -209,17 +247,28 @@ export class PavementGraph {
       Math.hypot(this.nodes[goal].x - to.x, this.nodes[goal].z - to.z) > 2
     )
       return null
-    const parents = new Map<number, number | null>([[start, null]])
-    const queue = [start]
-    for (let i = 0; i < queue.length; i++) {
+    this.search = (this.search + 1) >>> 0
+    if (this.search === 0) {
+      this.visited.fill(0)
+      this.search = 1
+    }
+    const epoch = this.search
+    const parents = this.parents
+    const queue = this.queue
+    const visited = this.visited
+    parents[start] = -1
+    visited[start] = epoch
+    queue[0] = start
+    let count = 1
+    for (let i = 0; i < count; i++) {
       const n = queue[i]
       if (n === goal) {
         const path: Vec2[] = []
-        let at: number | null = n
-        while (at !== null) {
+        let at = n
+        while (at !== -1) {
           const p: Node = this.nodes[at]
           path.push({ x: p.x, z: p.z })
-          at = parents.get(at) ?? null
+          at = parents[at]
         }
         return path.reverse().filter((p, i, all) => {
           if (i === 0 || i === all.length - 1) return true
@@ -229,9 +278,10 @@ export class PavementGraph {
         })
       }
       for (const next of this.nodes[n].edges)
-        if (!parents.has(next)) {
-          parents.set(next, n)
-          queue.push(next)
+        if (visited[next] !== epoch) {
+          visited[next] = epoch
+          parents[next] = n
+          queue[count++] = next
         }
     }
     return null

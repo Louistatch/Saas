@@ -9,7 +9,7 @@
  */
 import type { Bank } from '@/lib/haroolife/city/bank'
 import { type Extra, buildingFor } from '@/lib/haroolife/city/catalogue'
-import { type Geometry, appendModel } from '@/lib/haroolife/city/pack'
+import type { Geometry, Instance, Model } from '@/lib/haroolife/city/pack'
 import { CELL } from '@/lib/haroolife/city/world'
 import { STREET_CELL, type StreetBuilding } from '@/lib/haroolife/game/core/street'
 import * as THREE from 'three'
@@ -25,6 +25,67 @@ const K = STREET_CELL / CELL
 export const BUILDING_HEIGHT = 1.8
 const HK = K * BUILDING_HEIGHT
 type RGB = [number, number, number]
+
+/** Models are planned first: one allocation per typed buffer, no growing JS arrays of buildings. */
+type Part = { model: Model; instance: Instance }
+function mergedParts(parts: Part[], extras: Geometry): THREE.BufferGeometry {
+  let vertices = extras.pos.length / 3
+  let indices = extras.idx.length
+  for (const p of parts) {
+    vertices += p.model.pos.length / 3
+    indices += p.model.idx.length
+  }
+  const pos = new Float32Array(vertices * 3)
+  const nrm = new Float32Array(vertices * 3)
+  const col = new Float32Array(vertices * 4)
+  const idx = vertices > 65535 ? new Uint32Array(indices) : new Uint16Array(indices)
+  pos.set(extras.pos)
+  nrm.set(extras.nrm)
+  col.set(extras.col)
+  idx.set(extras.idx)
+  let base = extras.pos.length / 3
+  let offset = extras.idx.length
+  for (const { model: m, instance: inst } of parts) {
+    const angle = ((inst.rot ?? 0) * Math.PI) / 180
+    const c = Math.cos(angle)
+    const s = Math.sin(angle)
+    const scale = inst.scale ?? 1
+    const sx = typeof scale === 'number' ? scale : scale[0]
+    const sy = typeof scale === 'number' ? scale : scale[1]
+    const sz = typeof scale === 'number' ? scale : scale[2]
+    const tint = inst.tint ?? [1, 1, 1]
+    for (let i = 0; i < m.pos.length / 3; i++) {
+      const v = (base + i) * 3
+      const px = m.pos[i * 3] * sx
+      const py = m.pos[i * 3 + 1] * sy
+      const pz = m.pos[i * 3 + 2] * sz
+      pos[v] = px * c + pz * s + inst.x
+      pos[v + 1] = py + inst.y
+      pos[v + 2] = -px * s + pz * c + inst.z
+      const nx = m.nrm[i * 3] / sx
+      const ny = m.nrm[i * 3 + 1] / sy
+      const nz = m.nrm[i * 3 + 2] / sz
+      const length = Math.hypot(nx, ny, nz) || 1
+      nrm[v] = (nx / length) * c + (nz / length) * s
+      nrm[v + 1] = ny / length
+      nrm[v + 2] = -(nx / length) * s + (nz / length) * c
+      const ci = (base + i) * 4
+      col[ci] = m.col[i * 3] * tint[0]
+      col[ci + 1] = m.col[i * 3 + 1] * tint[1]
+      col[ci + 2] = m.col[i * 3 + 2] * tint[2]
+      col[ci + 3] = 1
+    }
+    for (let i = 0; i < m.idx.length; i++) idx[offset++] = base + m.idx[i]
+    base += m.pos.length / 3
+  }
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+  g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3))
+  g.setAttribute('color', new THREE.BufferAttribute(col, 4))
+  g.setIndex(new THREE.BufferAttribute(idx, 1))
+  g.computeBoundingSphere()
+  return g
+}
 
 /** The player's own buildings (townsmen-engine types) → models of the same pack. */
 const ESTATE_MODEL: Record<string, string | null> = {
@@ -201,6 +262,7 @@ export function buildCityGeometry(
   detail: boolean,
 ): THREE.BufferGeometry {
   const out: Geometry = { pos: [], nrm: [], col: [], idx: [] }
+  const parts: Part[] = []
   const near = detail
   // `tall`: a building (drawn taller); props (trees, benches, vehicles, fences) keep their size.
   const place = (
@@ -213,13 +275,16 @@ export function buildCityGeometry(
     tint?: RGB,
     tall = false,
   ) =>
-    appendModel(out, near ? bank.model(key) : bank.lowModel(key), {
-      x: cx * U,
-      y: lift * (tall ? HK : K),
-      z: cy * U,
-      rot,
-      scale: tall ? [scale * K, scale * HK, scale * K] : scale * K,
-      tint,
+    parts.push({
+      model: near ? bank.model(key) : bank.lowModel(key),
+      instance: {
+        x: cx * U,
+        y: lift * (tall ? HK : K),
+        z: cy * U,
+        rot,
+        scale: tall ? [scale * K, scale * HK, scale * K] : scale * K,
+        tint,
+      },
     })
   for (const b of buildings) {
     if (b.lot) {
@@ -245,17 +310,10 @@ export function buildCityGeometry(
       (U * 0.9) / Math.max(0.01, model.size[2]),
     )
     const tall = key === 'bush' || key === 'tree' ? fit : fit * BUILDING_HEIGHT
-    appendModel(out, model, { x: b.x * U, y: 0, z: b.y * U, rot: 180, scale: [fit, tall, fit] })
+    parts.push({
+      model,
+      instance: { x: b.x * U, y: 0, z: b.y * U, rot: 180, scale: [fit, tall, fit] },
+    })
   }
-  const g = new THREE.BufferGeometry()
-  g.setAttribute('position', new THREE.Float32BufferAttribute(out.pos, 3))
-  g.setAttribute('normal', new THREE.Float32BufferAttribute(out.nrm, 3))
-  g.setAttribute('color', new THREE.Float32BufferAttribute(out.col, 4))
-  g.setIndex(
-    out.pos.length / 3 > 65535
-      ? new THREE.Uint32BufferAttribute(out.idx, 1)
-      : new THREE.Uint16BufferAttribute(out.idx, 1),
-  )
-  g.computeBoundingSphere()
-  return g
+  return mergedParts(parts, out)
 }

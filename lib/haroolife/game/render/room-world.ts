@@ -872,6 +872,12 @@ export class RoomWorld {
 
   // ── camera, picking, loop ────────────────────────────────────────────────────────────────
 
+  setPixelRatio(pixelRatio: number): void {
+    if (this.renderer.getPixelRatio() === pixelRatio) return
+    this.renderer.setPixelRatio(pixelRatio)
+    this.resize()
+  }
+
   private resize(): void {
     this.width = this.canvas.clientWidth || 1
     this.height = this.canvas.clientHeight || 1

@@ -7,6 +7,7 @@ import type { ServiceCustomer } from '@/lib/haroolife/city/automatic-service'
  * One engine per mount, disposed on unmount.
  */
 import type { PlayerController } from '@/lib/haroolife/city/player'
+import type { Quality } from '@/lib/haroolife/city/quality'
 import type { DailyViewProps } from '@/lib/haroolife/engine/types'
 import type { StreetPlot } from '@/lib/haroolife/game/render/plot-build'
 import {
@@ -27,6 +28,8 @@ export default function HarooStreetView(
     avatarPagne?: string
     estate: readonly Building[]
     pixelRatio: number
+    quality: Quality
+    paused?: boolean
     /** From the quality preset: shadow refresh and multisampling. */
     shadows?: 'full' | 'throttled' | 'off'
     antialias?: boolean
@@ -62,8 +65,17 @@ export default function HarooStreetView(
   const live = useRef(props)
   live.current = props
 
-  const { controller, avatarModel, avatarPagne, pixelRatio, estate, locality, remoteFeed } = props
-  const { shadows, antialias } = props
+  const {
+    controller,
+    avatarModel,
+    avatarPagne,
+    pixelRatio,
+    estate,
+    locality,
+    remoteFeed,
+    quality,
+    paused,
+  } = props
   const { ads, remotePresent, light, fare } = props
   // biome-ignore lint/correctness/useExhaustiveDependencies: the estate is pushed below without remounting
   useEffect(() => {
@@ -78,9 +90,10 @@ export default function HarooStreetView(
       avatarModel,
       pagne: avatarPagne,
       estate: live.current.estate,
-      pixelRatio,
-      shadows,
-      antialias,
+      pixelRatio: live.current.pixelRatio,
+      shadows: live.current.shadows,
+      antialias: live.current.antialias,
+      quality: live.current.quality,
       locality,
       ads: live.current.ads ?? null,
       remote: remoteFeed ? { feed: remoteFeed, present: live.current.remotePresent ?? [] } : null,
@@ -103,13 +116,20 @@ export default function HarooStreetView(
       },
     })
     world.current = w
+    w.setPaused(live.current.paused ?? false)
     if (live.current.light) w.setDaylight(live.current.light)
     w.init().catch(() => setState('error'))
     return () => {
       world.current = null
       w.dispose()
     }
-  }, [controller, avatarModel, avatarPagne, pixelRatio, shadows, antialias, locality, remoteFeed])
+  }, [controller, avatarModel, avatarPagne, locality, remoteFeed])
+  useEffect(() => {
+    world.current?.setQuality(quality, pixelRatio)
+  }, [quality, pixelRatio])
+  useEffect(() => {
+    world.current?.setPaused(paused ?? false)
+  }, [paused])
   useEffect(() => {
     if (state === 'ready') world.current?.setEstate(estate)
   }, [estate, state])

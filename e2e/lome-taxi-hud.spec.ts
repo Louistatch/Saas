@@ -30,6 +30,17 @@ test('taxi shift: a one-line fare and a payment bubble after each fare', async (
   await page.getByTestId('duty-taxi').click()
   const board = page.getByRole('button', { name: 'Monter dans le taxi', exact: true })
   await expect(board).toBeVisible({ timeout: 45000 })
+  const dimensions = await page.evaluate(
+    () =>
+      (
+        window as unknown as {
+          __LOME_PLAYER?: { vehicleSize?: { x: number; y: number; z: number } }
+        }
+      ).__LOME_PLAYER?.vehicleSize,
+  )
+  expect(dimensions, 'a real fitted taxi has loaded').toBeTruthy()
+  expect(Math.max(dimensions!.x, dimensions!.z), 'taxi is at the traffic scale').toBeLessThan(2.3)
+  expect(dimensions!.y).toBeLessThan(0.8)
   if (info.project.name.startsWith('mobile')) await board.tap()
   else await board.click()
 

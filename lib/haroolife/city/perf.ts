@@ -67,6 +67,14 @@ export const bump = (key: string) => {
 export interface PerfSnapshot {
   at: number
   frame: FrameSummary
+  /** CPU work only; WebGL submission is asynchronous, not a GPU timer. */
+  cpu?: { frame: FrameSummary; render: FrameSummary }
+  street?: {
+    tileScans: number
+    tileBuilds: number
+    tileTotalMs: number
+    tileTimes: FrameSummary
+  }
   drawCalls: number
   triangles: number
   /** Entities carrying a render component. */

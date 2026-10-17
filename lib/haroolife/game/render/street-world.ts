@@ -28,14 +28,17 @@ import {
   clipFor,
 } from '@/lib/haroolife/city/avatar-catalogue'
 import { type Bank, loadBank } from '@/lib/haroolife/city/bank'
+import type { CollisionBody } from '@/lib/haroolife/city/collisions'
 import type { Meal } from '@/lib/haroolife/city/dining'
 import { type VehicleKind, drivingRoute } from '@/lib/haroolife/city/fares'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 import { current } from '@/lib/haroolife/city/locality'
 import { mayCross, onCarriageway, pickupRoad, vehicleAtRed } from '@/lib/haroolife/city/pedestrians'
+import { FrameRing } from '@/lib/haroolife/city/perf'
 import { DEFAULT_CONFIG, type PlayerController } from '@/lib/haroolife/city/player'
+import { PRESETS, type Quality, renderPixelRatio } from '@/lib/haroolife/city/quality'
 import { RoadTraffic } from '@/lib/haroolife/city/road-traffic'
-import { isCityRoad, isDriveway, nameOwnedPlot } from '@/lib/haroolife/city/world'
+import { ESTATE, isCityRoad, isDriveway, nameOwnedPlot } from '@/lib/haroolife/city/world'
 import type { DailyViewProps } from '@/lib/haroolife/engine/types'
 import { streetDressing } from '@/lib/haroolife/game/core/sidewalks'
 import {
@@ -75,7 +78,9 @@ import { type MotoParts, buildMoto } from './moto'
 import { PerfProbe } from './perf-probe'
 import { type StreetPlot, buildPlotGroup, signTexture } from './plot-build'
 import { StreetSignals } from './street-signals'
-import { fitTaxiModel } from './vehicle-scale'
+import { TileCache } from './tile-cache'
+import { batchTrafficModel, disposeTrafficModel } from './vehicle-batch'
+import { TRAFFIC_CAR_SCALE, TRAFFIC_LANE_SCALE, fitTaxiModel } from './vehicle-scale'
 
 /**
  * Height of an adult (scene units; a cell is STREET_CELL). With the buildings drawn taller
@@ -192,6 +197,7 @@ export interface StreetWorldOptions {
   antialias?: boolean
   /** The player's plot (« Ma maison ») and its stage, drawn on its lot. */
   plot?: StreetPlot | null
+  quality?: Quality
 }
 
 export interface StreetAds {
@@ -262,6 +268,7 @@ interface Walker {
   path?: { x: number; z: number }[]
   police?: boolean
   tag: HTMLButtonElement
+  body: CollisionBody
 }
 
 export class StreetWorld {
@@ -316,19 +323,61 @@ export class StreetWorld {
   /** Building tiles (Kenney models), cached: key → mesh and level of detail. */
   private tiles = new Map<string, { mesh: THREE.Mesh; detail: boolean; buildings: number }>()
   private tileMs = 0
+  private tileCell = ''
+  private tileQueue: { tx: number; ty: number; detail: boolean }[] = []
+  private readonly dirtyTiles = new Set<string>()
+  private readonly tileCache = new TileCache()
+  private quality: Quality
+  private tileScans = 0
+  private tileBuilds = 0
+  private tileTotalMs = 0
+  private readonly tileTimes = new FrameRing(600)
   private cityMaterial: THREE.MeshStandardMaterial | null = null
   private wheels: { node: THREE.Object3D; front: boolean }[] = []
   private wheelSpin = 0
   /** Camera framing factor (1 on foot, wider at the wheel), eased. */
   private framing = 1
   private walkers: Walker[] = []
-  private readonly shadows: 'full' | 'throttled' | 'off'
+  private shadows: 'full' | 'throttled' | 'off'
+  private paused = false
+  private readonly animationTime = new WeakMap<Person, number>()
+  private readonly fullRateActors = new Set<Person>()
+  private animationBudgetAt = 0
+  private animatedThisFrame = 0
+  private readonly frustum = new THREE.Frustum()
+  private readonly viewProjection = new THREE.Matrix4()
+  private readonly actorBounds = new THREE.Sphere(new THREE.Vector3(), FIGURE * 2.5)
+  private readonly markerStyles = new WeakMap<
+    HTMLElement,
+    { x: number; y: number; visible: boolean }
+  >()
+  private readonly lastCamera = new Float64Array(7).fill(Number.NaN)
+  private roadCells: { x: number; y: number }[] = []
+  private roadKeys = new Set<string>()
   private readonly traffic = new RoadTraffic((x, z) => isCityRoad(x, z) || isDriveway(x, z))
   private readonly trafficModels = new Map<number, THREE.Object3D>()
   private readonly trafficMotos: MotoParts[] = []
+  private trafficMotoSeat = 0
   private readonly trafficRiders = new Map<number, Person>()
   private trafficRiderTemplate: { gltf: GLTF; spec: AvatarSpec } | null = null
   private readonly trafficTemplates = new Map<string, THREE.Object3D>()
+  private readonly trafficSources = new Map<string, THREE.Object3D>()
+  private readonly blockers: CollisionBody[] = []
+  private readonly obstacles: CollisionBody[] = []
+  private readonly playerBody: CollisionBody = {
+    x: 0,
+    z: 0,
+    heading: 0,
+    halfWidth: 0,
+    halfLength: 0,
+  }
+  private readonly parkedBody: CollisionBody = {
+    x: 0,
+    z: 0,
+    heading: 0,
+    halfWidth: 0.3,
+    halfLength: 1,
+  }
   private readonly avatarModel: string
   private readonly pagne?: string
   private readonly locality: string
@@ -354,6 +403,7 @@ export class StreetWorld {
   private last = 0
   private disposed = false
   private frames = 0
+  private shadowFrame = 0
   /** Reused every frame to place the taxi label: no allocation in the loop. */
   private readonly tagPoint = new THREE.Vector3()
   private statsAt = 0
@@ -417,6 +467,8 @@ export class StreetWorld {
     this.estate = o.estate
     this.plot = o.plot ?? null
     nameOwnedPlot(this.plot?.lotId ?? null, this.plot?.name ?? '')
+    this.quality = o.quality ?? 'balanced'
+    this.tileCache.setLimit(PRESETS[this.quality].geometryCacheMB * 1048576)
     this.avatarModel = o.avatarModel
     this.pagne = o.pagne
     this.locality = o.locality
@@ -442,6 +494,7 @@ export class StreetWorld {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.15
     this.scene.name = 'HarooLife rue'
+    this.scene.matrixAutoUpdate = false
     this.scene.background = new THREE.Color(DAY_SKY)
     this.scene.add(this.hemi)
     this.sun.castShadow = this.shadows !== 'off'
@@ -476,8 +529,8 @@ export class StreetWorld {
     this.player.root.name = 'Joueur'
     this.scene.add(this.player.root)
     this.rebuild()
-    this.updateTiles(Number.POSITIVE_INFINITY)
-    for (let i = 0; i < PEDESTRIANS; i++) {
+    this.updateTiles(1)
+    for (let i = 0; i < Math.min(PEDESTRIANS, PRESETS[this.quality].maxWalkers); i++) {
       const r = peds[i % peds.length]
       if (r.status !== 'fulfilled') continue
       const police = i >= 6
@@ -516,6 +569,7 @@ export class StreetWorld {
         name,
         police,
         tag,
+        body: { x: 0, z: 0, heading: 0, halfWidth: 0.07, halfLength: 0.07 },
       })
       this.play(person, clipFor(person.spec, 'walk'))
       person.actions.get(person.current)?.setEffectiveTimeScale(1)
@@ -552,7 +606,9 @@ export class StreetWorld {
     for (const kind of ['taxi', 'sedan', 'van'])
       this.load(`/haroolife/vendor/kenney-3d/car-kit/${kind}.glb`).then(
         (gltf) => {
-          if (!this.disposed) this.trafficTemplates.set(kind, gltf.scene)
+          if (this.disposed) return
+          this.trafficSources.set(kind, gltf.scene)
+          this.trafficTemplates.set(kind, batchTrafficModel(gltf.scene))
         },
         () => {
           // A model that fails to load: that kind of car stays off the road.
@@ -563,7 +619,7 @@ export class StreetWorld {
     this.startRemote()
     this.publishProbe()
     this.last = performance.now()
-    this.raf = requestAnimationFrame(this.frame)
+    if (!this.paused) this.raf = requestAnimationFrame(this.frame)
     this.events.onReady?.()
   }
 
@@ -597,12 +653,59 @@ export class StreetWorld {
 
   /** The player's own buildings changed (construction): redraw the window. */
   setEstate(estate: readonly Building[]): void {
+    if (estate === this.estate) return
+    const signature = (items: readonly Building[]) =>
+      items.map((b) => `${b.x}:${b.y}:${b.type}`).join('|')
+    if (signature(estate) === signature(this.estate)) {
+      this.estate = estate
+      return
+    }
+    const previous = this.estate
     this.estate = estate
     if (!this.player) return
     this.rebuild()
-    // The estate changed (construction): its tiles are drawn again.
-    for (const k of [...this.tiles.keys()]) this.dropTile(k)
-    this.updateTiles(Number.POSITIVE_INFINITY)
+    // Keep old meshes until replacements are ready; unrelated city tiles remain untouched.
+    for (const b of [...previous, ...estate])
+      this.dirtyTiles.add(
+        `${Math.floor((b.x + ESTATE.x0) / TILE)}:${Math.floor((b.y + ESTATE.y0) / TILE)}`,
+      )
+    this.tileCache.clear()
+    this.tileCell = ''
+    this.updateTiles(1)
+  }
+
+  /** DPR/shadows/streaming/animation change in place; a graphics adjustment never reloads the city. */
+  setQuality(quality: Quality, pixelRatio = renderPixelRatio(quality)): void {
+    const changed = quality !== this.quality
+    this.quality = quality
+    this.tileCache.setLimit(PRESETS[quality].geometryCacheMB * 1048576)
+    if (this.renderer.getPixelRatio() !== pixelRatio) {
+      this.renderer.setPixelRatio(pixelRatio)
+      this.resize()
+    }
+    this.shadows = quality === 'eco' ? 'off' : quality === 'balanced' ? 'throttled' : 'full'
+    this.renderer.shadowMap.enabled = this.shadows !== 'off'
+    this.renderer.shadowMap.autoUpdate = this.shadows === 'full'
+    this.renderer.shadowMap.needsUpdate = true
+    this.sun.castShadow = this.shadows !== 'off'
+    if (changed) this.tileCell = ''
+  }
+
+  /** Keep GPU resources while the map covers the street; never step its controller twice. */
+  setPaused(paused: boolean): void {
+    if (this.paused === paused) return
+    this.paused = paused
+    this.last = performance.now()
+    this.perf.pause()
+    this.frames = 0
+    this.statsAt = this.last
+    if (paused) {
+      cancelAnimationFrame(this.raf)
+      this.raf = 0
+    } else {
+      this.lastCamera[0] = Number.NaN
+      if (this.player && !this.disposed) this.raf = requestAnimationFrame(this.frame)
+    }
   }
 
   dispose(): void {
@@ -621,6 +724,7 @@ export class StreetWorld {
     this.signMat?.map?.dispose()
     this.signMat?.dispose()
     for (const k of [...this.tiles.keys()]) this.dropTile(k)
+    this.tileCache.clear()
     this.cityMaterial?.dispose()
     this.unsubscribe?.()
     this.unsubscribe = null
@@ -646,7 +750,9 @@ export class StreetWorld {
       for (const m of moto.materials) m.dispose()
     }
     this.trafficMotos.length = 0
+    for (const model of this.trafficTemplates.values()) disposeTrafficModel(model)
     this.trafficTemplates.clear()
+    this.trafficSources.clear()
     if (this.player) this.disposePerson(this.player)
     this.player = null
     this.dropCar()
@@ -657,16 +763,7 @@ export class StreetWorld {
     this.boardFrames?.removeFromParent()
     this.boardFrames?.dispose()
     for (const m of this.materials.values()) m.dispose()
-    for (const gltf of this.loaded.splice(0))
-      gltf.scene.traverse((o) => {
-        const mesh = o as THREE.Mesh
-        if (!mesh.isMesh) return
-        mesh.geometry.dispose()
-        for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
-          for (const v of Object.values(m)) if (v instanceof THREE.Texture) v.dispose()
-          m.dispose()
-        }
-      })
+    this.freeLoaded()
     this.renderer.dispose()
     this.perf.dispose()
     const w = window as unknown as {
@@ -682,11 +779,25 @@ export class StreetWorld {
 
   // ── construction ─────────────────────────────────────────────────────────────────────────
 
+  private freeLoaded(): void {
+    for (const gltf of this.loaded.splice(0))
+      gltf.scene.traverse((o) => {
+        const mesh = o as THREE.Mesh
+        if (!mesh.isMesh) return
+        mesh.geometry.dispose()
+        for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+          for (const v of Object.values(m)) if (v instanceof THREE.Texture) v.dispose()
+          m.dispose()
+        }
+      })
+  }
+
   private load(url: string): Promise<GLTF> {
     let p = this.gltfCache.get(url)
     if (!p) {
       p = this.loader.loadAsync(url).then((g) => {
         this.loaded.push(g)
+        if (this.disposed) this.freeLoaded()
         return g
       })
       this.gltfCache.set(url, p)
@@ -724,6 +835,8 @@ export class StreetWorld {
     const c = this.controller.cell
     const win = streetWindow(c.x, c.y, RADIUS, this.estate)
     this.win = win
+    this.roadCells = win.roads.filter((p) => isCityRoad(p.x, p.y) || isDriveway(p.x, p.y))
+    this.roadKeys = new Set(this.roadCells.map((p) => `${p.x}:${p.y}`))
     const g = new THREE.Group()
     g.name = 'Quartier'
     // Ground: one instanced mesh per kind (one draw call each).
@@ -845,6 +958,10 @@ export class StreetWorld {
     }
     this.drawPlot(g)
     this.scene.add(g)
+    g.updateMatrixWorld(true)
+    g.traverse((o) => {
+      o.matrixAutoUpdate = false
+    })
     this.winGroup = g
     this.rebuildMs = Math.round(performance.now() - t0)
     // Doors of named places: a marker each (44 px), opening the place's sheet.
@@ -890,6 +1007,72 @@ export class StreetWorld {
     playAvatarActor(p, clip)
   }
 
+  private animate(p: Person, dt: number): void {
+    const position =
+      p.root.parent === this.scene ? p.root.position : p.root.getWorldPosition(this.tagPoint)
+    this.actorBounds.center.copy(position)
+    this.actorBounds.center.y += FIGURE / 2
+    const visible = p.root.visible && this.frustum.intersectsSphere(this.actorBounds)
+    // Only the visual child is culled: the root and its collider keep participating in gameplay.
+    p.root.children[0].visible = visible
+    const elapsed = Math.min(1, (this.animationTime.get(p) ?? 0) + dt)
+    const distance = Math.hypot(
+      position.x / U - this.controller.pos.x,
+      position.z / U - this.controller.pos.z,
+    )
+    const fullRate = p === this.player || distance < 4 || this.fullRateActors.has(p)
+    const interval = fullRate ? 0 : 1 / 15
+    if (visible && elapsed >= interval) {
+      p.mixer.update(elapsed)
+      this.animatedThisFrame++
+      this.animationTime.set(p, 0)
+    } else this.animationTime.set(p, elapsed)
+  }
+
+  /** Rank actors four times a second, never per rendered frame. Near faces always stay smooth. */
+  private updateAnimationBudget(now: number): void {
+    if (now < this.animationBudgetAt) return
+    this.animationBudgetAt = now + 250
+    const candidates = [...this.walkers.map((w) => w.person), ...this.trafficRiders.values()]
+    for (const r of this.remotes.values()) {
+      if (r.person) candidates.push(r.person)
+      if (r.ride?.driver) candidates.push(r.ride.driver)
+    }
+    const cx = this.controller.pos.x * U
+    const cz = this.controller.pos.z * U
+    const ranked = candidates
+      .map((person) => {
+        const p =
+          person.root.parent === this.scene
+            ? person.root.position
+            : person.root.getWorldPosition(this.tagPoint)
+        return { person, distance: Math.hypot(p.x - cx, p.z - cz) }
+      })
+      .sort((a, b) => a.distance - b.distance)
+    this.fullRateActors.clear()
+    for (const r of ranked.slice(0, PRESETS[this.quality].maxAnimated))
+      this.fullRateActors.add(r.person)
+  }
+
+  private placeMarker(el: HTMLElement, x: number, y: number, visible: boolean): void {
+    const px = Math.round(x * 10) / 10
+    const py = Math.round(y * 10) / 10
+    let previous = this.markerStyles.get(el)
+    if (!previous) {
+      previous = { x: Number.NaN, y: Number.NaN, visible: !visible }
+      this.markerStyles.set(el, previous)
+    }
+    if (visible && (previous.x !== px || previous.y !== py)) {
+      el.style.transform = `translate(${px}px,${py}px) translate(-50%,-100%)`
+      previous.x = px
+      previous.y = py
+    }
+    if (previous.visible !== visible) {
+      el.style.visibility = visible ? 'visible' : 'hidden'
+      previous.visible = visible
+    }
+  }
+
   /**
    * Keeps the building tiles around the player: missing ones are built, those whose level of
    * detail changed are rebuilt (at most `budget` per call), those out of range are freed.
@@ -898,52 +1081,79 @@ export class StreetWorld {
     const bank = this.bank
     if (!bank) return
     const c = this.controller.cell
-    const t0x = Math.floor((c.x - TILE_RANGE) / TILE)
-    const t1x = Math.floor((c.x + TILE_RANGE) / TILE)
-    const t0y = Math.floor((c.y - TILE_RANGE) / TILE)
-    const t1y = Math.floor((c.y + TILE_RANGE) / TILE)
-    for (const k of [...this.tiles.keys()]) {
-      const [tx, ty] = k.split(':').map(Number)
-      if (tx < t0x - 1 || tx > t1x + 1 || ty < t0y - 1 || ty > t1y + 1) this.dropTile(k)
+    const cellKey = `${c.x}:${c.y}`
+    const preset = PRESETS[this.quality]
+    // Only movement to another integer cell, construction or a quality change replans the rings.
+    if (cellKey !== this.tileCell) {
+      this.tileCell = cellKey
+      this.tileScans++
+      const range = Math.max(TILE_RANGE, (preset.farRing * TILE) / 2)
+      const t0x = Math.floor((c.x - range) / TILE)
+      const t1x = Math.floor((c.x + range) / TILE)
+      const t0y = Math.floor((c.y - range) / TILE)
+      const t1y = Math.floor((c.y + range) / TILE)
+      for (const k of this.tiles.keys()) {
+        const [tx, ty] = k.split(':').map(Number)
+        if (tx < t0x - 1 || tx > t1x + 1 || ty < t0y - 1 || ty > t1y + 1) this.dropTile(k)
+      }
+      const wanted: { tx: number; ty: number; detail: boolean; d: number }[] = []
+      for (let ty = t0y; ty <= t1y; ty++)
+        for (let tx = t0x; tx <= t1x; tx++) {
+          const d = Math.hypot(tx * TILE + TILE / 2 - c.x, ty * TILE + TILE / 2 - c.y)
+          const detail = d <= Math.max(DETAIL_CELLS, preset.streetDetailCells)
+          if (
+            this.dirtyTiles.has(`${tx}:${ty}`) ||
+            this.tiles.get(`${tx}:${ty}`)?.detail !== detail
+          )
+            wanted.push({ tx, ty, detail, d })
+        }
+      wanted.sort((a, b) => a.d - b.d)
+      this.tileQueue = wanted
     }
-    // Nearest tiles first.
-    const wanted: { tx: number; ty: number; d: number }[] = []
-    for (let ty = t0y; ty <= t1y; ty++)
-      for (let tx = t0x; tx <= t1x; tx++)
-        wanted.push({
-          tx,
-          ty,
-          d: Math.hypot(tx * TILE + TILE / 2 - c.x, ty * TILE + TILE / 2 - c.y),
-        })
-    wanted.sort((a, b) => a.d - b.d)
+    const deadline = performance.now() + preset.streamBudgetMs
     let built = 0
-    for (const w of wanted) {
-      if (built >= budget) break
+    while (this.tileQueue.length && built < budget) {
+      const w = this.tileQueue.shift()!
       const key = `${w.tx}:${w.ty}`
-      const detail = w.d <= DETAIL_CELLS
+      const detail = w.detail
       const have = this.tiles.get(key)
-      if (have && have.detail === detail) continue
+      const dirty = this.dirtyTiles.has(key)
+      if (have && have.detail === detail && !dirty) continue
       const t = performance.now()
       if (!this.cityMaterial)
         this.cityMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })
-      const inTile = buildingsInTile(w.tx, w.ty, this.estate)
-      const mesh = new THREE.Mesh(buildCityGeometry(bank, inTile, detail), this.cityMaterial)
+      const cached = dirty ? null : this.tileCache.take(`${key}:${detail}`)
+      const inTile = cached ? [] : buildingsInTile(w.tx, w.ty, this.estate)
+      const geometry = cached?.geometry ?? buildCityGeometry(bank, inTile, detail)
+      const buildings = cached?.buildings ?? inTile.length
+      const mesh = new THREE.Mesh(geometry, this.cityMaterial)
       mesh.name = `Bâtiments ${key}`
       mesh.castShadow = true
       mesh.receiveShadow = true
-      if (have) this.dropTile(key)
+      mesh.matrixAutoUpdate = false
+      if (have) this.dropTile(key, !dirty)
+      this.dirtyTiles.delete(key)
       this.scene.add(mesh)
-      this.tiles.set(key, { mesh, detail, buildings: inTile.length })
-      this.tileMs = Math.round(performance.now() - t)
+      this.tiles.set(key, { mesh, detail, buildings })
+      const elapsed = performance.now() - t
+      this.tileMs = Math.round(elapsed)
+      if (!cached) {
+        this.tileTimes.push(elapsed)
+        this.tileTotalMs += elapsed
+        this.tileBuilds++
+      }
       built++
+      if (performance.now() >= deadline) break
     }
   }
 
-  private dropTile(key: string): void {
+  private dropTile(key: string, cache = true): void {
     const t = this.tiles.get(key)
     if (!t) return
     t.mesh.removeFromParent()
-    t.mesh.geometry.dispose()
+    if (cache && !this.dirtyTiles.has(key))
+      this.tileCache.put(`${key}:${t.detail}`, t.mesh.geometry, t.buildings)
+    else t.mesh.geometry.dispose()
     this.tiles.delete(key)
   }
 
@@ -1116,7 +1326,7 @@ export class StreetWorld {
         const root = new THREE.Group()
         root.name = 'Taxi du joueur'
         const model = g.scene.clone(true)
-        fitTaxiModel(model, FIGURE, U)
+        fitTaxiModel(model, FIGURE * TRAFFIC_CAR_SCALE, U * TRAFFIC_LANE_SCALE)
         model.traverse((o) => {
           const mesh = o as THREE.Mesh
           if (mesh.isMesh) {
@@ -1136,8 +1346,7 @@ export class StreetWorld {
         // Honest fallback: a yellow volume of the taxi's size, never an invisible car.
         const box = new THREE.Mesh(this.unitBox, this.mat('#f2c230'))
         box.name = 'Taxi du joueur'
-        box.scale.set((1.7 * FIGURE) / 1.75, (1.45 * FIGURE) / 1.75, (4.1 * FIGURE) / 1.75)
-        box.position.y = (0.725 * FIGURE) / 1.75
+        fitTaxiModel(box, FIGURE * TRAFFIC_CAR_SCALE, U * TRAFFIC_LANE_SCALE)
         const root = new THREE.Group()
         root.add(box)
         this.scene.add(root)
@@ -1154,18 +1363,12 @@ export class StreetWorld {
   }
 
   private randomRoad(): { x: number; y: number } {
-    const roads = (this.win?.roads ?? []).filter(
-      (p) => isCityRoad(p.x, p.y) || isDriveway(p.x, p.y),
-    )
+    const roads = this.roadCells
     return roads.length ? roads[Math.floor(this.rand() * roads.length)] : this.controller.cell
   }
 
   private nextRoad(at: { x: number; y: number }, prev: { x: number; y: number }) {
-    const roads = new Set(
-      (this.win?.roads ?? [])
-        .filter((p) => isCityRoad(p.x, p.y) || isDriveway(p.x, p.y))
-        .map((r) => `${r.x}:${r.y}`),
-    )
+    const roads = this.roadKeys
     const options = [
       { x: at.x + 1, y: at.y },
       { x: at.x - 1, y: at.y },
@@ -1183,7 +1386,7 @@ export class StreetWorld {
     for (const w of this.walkers) {
       if (w.name === this.fare.pickup?.name || (this.fare.hailing && w.name === this.hailed)) {
         this.play(w.person, clipFor(w.person.spec, 'idle'))
-        w.person.mixer.update(dt)
+        this.animate(w.person, dt)
         continue
       }
       if (w.name === this.fare.passenger && v) {
@@ -1193,7 +1396,7 @@ export class StreetWorld {
           this.seat(w.person, this.controller.shownVehicle ?? v, this.moto.passengerZ)
           this.play(w.person, clipFor(w.person.spec, 'drive'))
         }
-        w.person.mixer.update(dt)
+        this.animate(w.person, dt)
         continue
       }
       w.person.root.visible = true
@@ -1220,7 +1423,7 @@ export class StreetWorld {
           p.z += (dz / d) * step
           w.person.root.rotation.y = Math.atan2(dx, dz)
         }
-        w.person.mixer.update(dt)
+        this.animate(w.person, dt)
         continue
       }
       if (w.approachingPolice) {
@@ -1273,20 +1476,41 @@ export class StreetWorld {
       }
       const natural = w.person.spec.pace.walk * FIGURE
       w.person.actions.get(w.person.current)?.setEffectiveTimeScale(Math.max(0.5, speed / natural))
-      w.person.mixer.update(dt)
+      this.animate(w.person, dt)
     }
   }
 
   // ── loop ─────────────────────────────────────────────────────────────────────────────────
 
   private resize(): void {
-    this.width = this.canvas.clientWidth || 1
-    this.height = this.canvas.clientHeight || 1
+    const width = this.canvas.clientWidth
+    const height = this.canvas.clientHeight
+    if (!width || !height) return // a map covers this canvas; retain its drawing buffer
+    this.width = width
+    this.height = height
     this.renderer.setSize(this.width, this.height, false)
   }
 
   private updateCamera(): void {
     const c = this.controller.camera
+    const last = this.lastCamera
+    if (
+      last[0] === c.tx &&
+      last[1] === c.tz &&
+      last[2] === c.angle &&
+      last[3] === c.distance &&
+      last[4] === this.framing &&
+      last[5] === this.width &&
+      last[6] === this.height
+    )
+      return
+    last[0] = c.tx
+    last[1] = c.tz
+    last[2] = c.angle
+    last[3] = c.distance
+    last[4] = this.framing
+    last[5] = this.width
+    last[6] = this.height
     const aspect = this.width / this.height
     // The rig's distance (zoom buttons, pinch) sets the framing; 8 is the follow distance.
     // Framed on the person (smaller than the buildings around): a narrower view than before.
@@ -1308,6 +1532,11 @@ export class StreetWorld {
     )
     this.camera.lookAt(tx, 0.5, tz)
     this.camera.updateMatrixWorld()
+    this.viewProjection.multiplyMatrices(
+      this.camera.projectionMatrix,
+      this.camera.matrixWorldInverse,
+    )
+    this.frustum.setFromProjectionMatrix(this.viewProjection)
     this.sun.position.set(tx - 14, 30, tz + 16)
     this.sun.target.position.set(tx, 0, tz)
   }
@@ -1317,36 +1546,40 @@ export class StreetWorld {
     ctl.vehicleDimensions =
       this.fare.vehicle === 'moto'
         ? { halfWidth: 0.12, halfLength: 0.33 }
-        : { halfWidth: 0.27, halfLength: 0.67 }
+        : { halfWidth: 0.205, halfLength: 0.54 }
     const point = ctl.driving && ctl.shownVehicle ? ctl.shownVehicle : ctl.pos
-    const blockers = [
-      {
-        ...point,
-        heading: ctl.heading,
-        halfWidth: ctl.turning
-          ? 1.05
-          : ctl.driving
-            ? ctl.vehicleDimensions.halfWidth
-            : ctl.config.radius,
-        halfLength: ctl.turning
-          ? 1.05
-          : ctl.driving
-            ? ctl.vehicleDimensions.halfLength
-            : ctl.config.radius,
-      },
-    ]
+    const blockers = this.blockers
+    blockers.length = 0
+    const body = this.playerBody
+    body.x = point.x
+    body.z = point.z
+    body.heading = ctl.heading
+    body.halfWidth = ctl.turning
+      ? 1.05
+      : ctl.driving
+        ? ctl.vehicleDimensions.halfWidth
+        : ctl.config.radius
+    body.halfLength = ctl.turning
+      ? 1.05
+      : ctl.driving
+        ? ctl.vehicleDimensions.halfLength
+        : ctl.config.radius
+    blockers.push(body)
     // NPC cars yield to crossing people, including the visible pedestrians.
     for (const w of this.walkers)
-      if (w.person.root.visible)
-        blockers.push({
-          x: w.person.root.position.x / U,
-          z: w.person.root.position.z / U,
-          heading: 0,
-          halfWidth: 0.07,
-          halfLength: 0.07,
-        })
-    if (!ctl.driving && ctl.vehicle)
-      blockers.push({ ...ctl.vehicle, halfWidth: 0.3, halfLength: 1 })
+      if (w.person.root.visible) {
+        w.body.x = w.person.root.position.x / U
+        w.body.z = w.person.root.position.z / U
+        blockers.push(w.body)
+      }
+    if (!ctl.driving && ctl.vehicle) {
+      Object.assign(this.parkedBody, {
+        x: ctl.vehicle.x,
+        z: ctl.vehicle.z,
+        heading: ctl.vehicle.heading,
+      })
+      blockers.push(this.parkedBody)
+    }
     this.traffic.step(dt, point.x, point.z, blockers, (car) =>
       vehicleAtRed(
         car,
@@ -1356,36 +1589,36 @@ export class StreetWorld {
         ctl.repairedSignals,
       ),
     )
-    ctl.obstacles = [
-      // A car stopped beside the player is waiting for them to pass: it does not block them
-      // in turn (the two used to wait for each other forever on a walk along the road).
-      ...this.traffic.cars.filter(
-        (c) =>
-          this.trafficModels.has(c.id) &&
-          !(c.stopped && Math.hypot(c.x - ctl.pos.x, c.z - ctl.pos.z) < 2),
-      ),
-      ...this.walkers
-        .filter(
-          (w) =>
-            w.person.root.visible &&
-            w.name !== this.fare.passenger &&
-            w.name !== this.fare.pickup?.name,
-        )
-        .map((w) => ({
-          x: w.person.root.position.x / U,
-          z: w.person.root.position.z / U,
-          heading: 0,
-          halfWidth: 0.07,
-          halfLength: 0.07,
-        })),
-    ]
+    this.obstacles.length = 0
+    // A car stopped beside the player is waiting for them to pass: it does not block them in
+    // turn (the two used to wait for each other forever on a walk along the road).
+    for (const car of this.traffic.cars)
+      if (
+        this.trafficModels.has(car.id) &&
+        !(car.stopped && Math.hypot(car.x - ctl.pos.x, car.z - ctl.pos.z) < 2)
+      )
+        this.obstacles.push(car)
+    for (const w of this.walkers)
+      if (
+        w.person.root.visible &&
+        w.name !== this.fare.passenger &&
+        w.name !== this.fare.pickup?.name
+      )
+        this.obstacles.push(w.body)
+    ctl.obstacles = this.obstacles
     for (const agent of this.traffic.cars) {
       let model = this.trafficModels.get(agent.id)
       if (!model) {
         if (agent.kind === 'moto') {
-          const moto = buildMoto(FIGURE * 0.85)
-          this.trafficMotos.push(moto)
-          model = moto.root
+          let template = this.trafficTemplates.get('moto')
+          if (!template) {
+            const moto = buildMoto(FIGURE * 0.85)
+            this.trafficMotos.push(moto)
+            this.trafficMotoSeat = moto.seat
+            template = batchTrafficModel(moto.root)
+            this.trafficTemplates.set('moto', template)
+          }
+          model = template.clone(true)
           if (this.trafficRiderTemplate) {
             const rider = this.makePerson(
               this.trafficRiderTemplate.gltf,
@@ -1393,7 +1626,7 @@ export class StreetWorld {
               '#d4a72c',
             )
             rider.root.scale.setScalar(0.85)
-            rider.root.position.y = moto.seat - rider.seatOffset * 0.85
+            rider.root.position.y = this.trafficMotoSeat - rider.seatOffset * 0.85
             this.play(rider, clipFor(rider.spec, 'drive'))
             model.add(rider.root)
             this.trafficRiders.set(agent.id, rider)
@@ -1402,7 +1635,7 @@ export class StreetWorld {
           const template = this.trafficTemplates.get(agent.kind)
           if (!template) continue
           model = template.clone(true)
-          fitTaxiModel(model, FIGURE * 0.78, U * 0.67)
+          fitTaxiModel(model, FIGURE * TRAFFIC_CAR_SCALE, U * TRAFFIC_LANE_SCALE)
           const root = new THREE.Group()
           root.add(model)
           model = root
@@ -1413,21 +1646,24 @@ export class StreetWorld {
       }
       model.position.set(agent.x * U, 0, agent.z * U)
       model.rotation.y = (agent.heading * Math.PI) / 180
-      this.trafficRiders.get(agent.id)?.mixer.update(dt)
+      const rider = this.trafficRiders.get(agent.id)
+      if (rider) this.animate(rider, dt)
     }
   }
 
   private readonly frame = () => {
-    if (this.disposed) return
+    if (this.disposed || this.paused) return
     this.raf = requestAnimationFrame(this.frame)
     const now = performance.now()
     const dt = Math.min((now - this.last) / 1000, 0.25)
     this.last = now
-    if (document.hidden) {
+    if (document.hidden || this.paused) {
       this.perf.pause()
       return
     }
     this.perf.frame(now)
+    this.animatedThisFrame = 0
+    this.updateAnimationBudget(now)
     const ctl = this.controller
     this.stepTraffic(dt)
     ctl.update(dt)
@@ -1435,6 +1671,10 @@ export class StreetWorld {
     const events = ctl.drain()
     if (events.length) this.events.onEvents(events, ctl)
     const c = ctl.cell
+    const wanted = ctl.driving ? 1.35 : 1
+    this.framing += (wanted - this.framing) * Math.min(1, dt * 2.5)
+    if (Math.abs(wanted - this.framing) < 0.0001) this.framing = wanted
+    this.updateCamera()
     if (
       this.win &&
       (Math.abs(c.x - this.win.cx) > REBUILD_AT || Math.abs(c.y - this.win.cy) > REBUILD_AT)
@@ -1489,7 +1729,7 @@ export class StreetWorld {
           .get(pl.current)
           ?.setEffectiveTimeScale(Math.min(3, Math.max(0.5, speed / natural)))
       } else pl.actions.get(pl.current)?.setEffectiveTimeScale(1)
-      pl.mixer.update(dt)
+      this.animate(pl, dt)
       pl.mealProps.show(eating)
       if (eating && this.meal) {
         this.mealSeconds += dt
@@ -1518,12 +1758,9 @@ export class StreetWorld {
       }
     }
     // At the wheel the camera frames wider (the car is faster than a walk), eased both ways.
-    const wanted = ctl.driving ? 1.35 : 1
-    this.framing += (wanted - this.framing) * Math.min(1, dt * 2.5)
     this.stepWalkers(dt)
     this.stepHail(dt)
     this.stepRemotes(dt)
-    this.updateCamera()
     const p = this.tagPoint
     if (this.carTag && this.car) {
       p.copy(this.car.position)
@@ -1531,26 +1768,25 @@ export class StreetWorld {
       p.project(this.camera)
       const x = (p.x * 0.5 + 0.5) * this.width
       const y = (-p.y * 0.5 + 0.5) * this.height
-      this.carTag.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`
-      this.carTag.style.visibility =
+      this.placeMarker(
+        this.carTag,
+        x,
+        y,
         ctl.canEnterVehicle() &&
-        p.z > -1 &&
-        p.z < 1 &&
-        x > 0 &&
-        x < this.width &&
-        y > 80 &&
-        y < this.height - 100
-          ? 'visible'
-          : 'hidden'
+          p.z > -1 &&
+          p.z < 1 &&
+          x > 0 &&
+          x < this.width &&
+          y > 80 &&
+          y < this.height - 100,
+      )
     }
     for (const m of this.markers) {
       p.copy(m.at).project(this.camera)
       const x = (p.x * 0.5 + 0.5) * this.width
       const y = (-p.y * 0.5 + 0.5) * this.height
-      m.el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`
       const near = Math.hypot(m.door.x - c.x, m.door.y - c.y) < 9
-      m.el.style.visibility =
-        near && p.z < 1 && x > 0 && x < this.width && y > 40 ? 'visible' : 'hidden'
+      this.placeMarker(m.el, x, y, near && p.z < 1 && x > 0 && x < this.width && y > 40)
     }
     // Passers-by: their first name when they are near the player (touch to talk).
     for (const w of this.walkers) {
@@ -1560,11 +1796,12 @@ export class StreetWorld {
       p.project(this.camera)
       const x = (p.x * 0.5 + 0.5) * this.width
       const y = (-p.y * 0.5 + 0.5) * this.height
-      w.tag.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`
-      w.tag.style.visibility =
-        near && w.name !== this.fare.passenger && p.z < 1 && x > 0 && x < this.width && y > 40
-          ? 'visible'
-          : 'hidden'
+      this.placeMarker(
+        w.tag,
+        x,
+        y,
+        near && w.name !== this.fare.passenger && p.z < 1 && x > 0 && x < this.width && y > 40,
+      )
     }
     // The fare's destination, labelled over its beacon.
     if (this.beacon && this.beaconTag) {
@@ -1574,8 +1811,7 @@ export class StreetWorld {
       const x = (p.x * 0.5 + 0.5) * this.width
       const y = (-p.y * 0.5 + 0.5) * this.height
       const on = p.z < 1 && x > 0 && x < this.width && y > 40 && y < this.height
-      this.beaconTag.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`
-      this.beaconTag.style.visibility = on ? 'visible' : 'hidden'
+      this.placeMarker(this.beaconTag, x, y, on)
       this.beacon.rotation.y += dt * 1.5
     }
     // Other players' name tags, over their heads.
@@ -1589,13 +1825,13 @@ export class StreetWorld {
       const x = (p.x * 0.5 + 0.5) * this.width
       const y = (-p.y * 0.5 + 0.5) * this.height
       const shown = ride ? ride.root.visible : r.person.root.visible
-      r.tag.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`
-      r.tag.style.visibility =
-        shown && p.z < 1 && x > 0 && x < this.width && y > 40 ? 'visible' : 'hidden'
+      this.placeMarker(r.tag, x, y, shown && p.z < 1 && x > 0 && x < this.width && y > 40)
     }
-    if (this.shadows === 'throttled' && this.frames % 3 === 0)
+    if (this.shadows === 'throttled' && this.shadowFrame++ % 3 === 0)
       this.renderer.shadowMap.needsUpdate = true
+    const renderAt = performance.now()
     this.renderer.render(this.scene, this.camera)
+    this.perf.work(performance.now() - now, performance.now() - renderAt)
     this.frames++
     if (now - this.statsAt >= 500) {
       const fps = (this.frames * 1000) / Math.max(1, now - this.statsAt)
@@ -1641,6 +1877,10 @@ export class StreetWorld {
 
   private tickAds(): void {
     if (this.disposed) return
+    if (this.paused) {
+      this.ads?.tracker.observe(Date.now(), [])
+      return
+    }
     const ctl = this.controller
     const ads = this.ads
     const wanted = ads
@@ -1885,7 +2125,7 @@ export class StreetWorld {
           )
           p.root.rotation.y = h
           p.root.visible = fresh
-          if (ride.driver) ride.driver.mixer.update(dt)
+          if (ride.driver) this.animate(ride.driver, dt)
         } else {
           // In the taxi or the bus, seated out of sight, as the player's own taxi.
           p.root.position.set(s.x * U, 0, s.z * U)
@@ -1905,7 +2145,7 @@ export class StreetWorld {
         const natural = p.spec.pace[anim] * FIGURE
         p.actions.get(p.current)?.setEffectiveTimeScale(Math.min(3, Math.max(0.5, speed / natural)))
       } else p.actions.get(p.current)?.setEffectiveTimeScale(1)
-      p.mixer.update(dt)
+      this.animate(p, dt)
     }
   }
 
@@ -1951,10 +2191,14 @@ export class StreetWorld {
       }
       ride.top = moto.seat + FIGURE * 0.75
     } else {
-      const template = this.trafficTemplates.get(want.vehicle === 'bus' ? 'van' : 'taxi')
+      const template = this.trafficSources.get(want.vehicle === 'bus' ? 'van' : 'taxi')
       if (!template) return null
       const model = template.clone(true)
-      fitTaxiModel(model, FIGURE, U)
+      fitTaxiModel(
+        model,
+        want.vehicle === 'bus' ? FIGURE : FIGURE * TRAFFIC_CAR_SCALE,
+        want.vehicle === 'bus' ? U : U * TRAFFIC_LANE_SCALE,
+      )
       // No bus in the CC0 kit: the van, longer and taller, stands for the SOTRAL bus.
       if (want.vehicle === 'bus') model.scale.multiply(new THREE.Vector3(1.15, 1.3, 1.6))
       root.add(model)
@@ -1996,10 +2240,18 @@ export class StreetWorld {
       tris,
       detailed: Boolean(this.bank),
     })
-    const people = (this.player ? 1 : 0) + this.walkers.length + this.remotes.size
+    const people =
+      (this.player ? 1 : 0) + this.walkers.length + this.remotes.size + this.trafficRiders.size
     this.perf.publish(now, this.renderer, this.scene, {
       animated: people,
+      animating: this.animatedThisFrame,
       assets: this.loaded.length + (this.bank ? 1 : 0),
+      street: {
+        tileScans: this.tileScans,
+        tileBuilds: this.tileBuilds,
+        tileTotalMs: this.tileTotalMs,
+        tileTimes: this.tileTimes.summary(),
+      },
     })
   }
 
@@ -2036,6 +2288,12 @@ export class StreetWorld {
     const w = window as unknown as Record<string, unknown>
     w.__LOME_STREET = {
       engine: 'haroo',
+      quality: this.quality,
+      shadows: this.shadows,
+      contextAntialias: this.renderer.getContext().getContextAttributes()?.antialias ?? null,
+      cachedGeometryBytes: this.tileCache.byteLength,
+      pendingTiles: this.tileQueue.length,
+      rendererId: this.scene.uuid,
       window: this.win ? { cx: this.win.cx, cy: this.win.cy, doors: this.win.doors.length } : null,
       buildings: this.win?.buildings.length ?? 0,
       pedestrians: this.walkers.length,
