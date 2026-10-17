@@ -25,7 +25,12 @@ function VerifyEmailInner() {
   const captcha = useCaptcha()
 
   const handleResend = async () => {
-    if (!email) return
+    if (!email || resending) return
+    const captchaToken = captcha.getToken()
+    if (captcha.enabled && !captchaToken) {
+      setError('Terminez la vérification anti-robot ci-dessous avant de renvoyer l’email.')
+      return
+    }
     setResending(true)
     setError('')
     setMessage('')
@@ -36,7 +41,7 @@ function VerifyEmailInner() {
         email,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback?type=signup${gameReturn ? `&next=${encodeURIComponent(gameReturn)}` : ''}`,
-          captchaToken: captcha.token ?? undefined,
+          captchaToken: captchaToken ?? undefined,
         },
       })
       if (resendError) throw resendError

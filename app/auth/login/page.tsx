@@ -9,8 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { safeInternalPath } from '@/lib/auth/safe-redirect'
 import { useGameReturn } from '@/hooks/use-game-return'
+import { safeInternalPath } from '@/lib/auth/safe-redirect'
 import { clearGameReturn, rememberedGameReturn, withGameReturn } from '@/lib/haroolife/entry'
 import { errorMessage } from '@/lib/utils/errors'
 import { hasOrgLayer, isHarooRole } from '@/lib/utils/permissions'
@@ -55,6 +55,11 @@ function LoginInner() {
     async (e: React.FormEvent) => {
       e.preventDefault()
       if (submitting) return
+      const captchaToken = captcha.getToken()
+      if (captcha.enabled && !captchaToken) {
+        setError('Terminez la vérification anti-robot ci-dessous avant de vous connecter.')
+        return
+      }
 
       setError('')
       setUnconfirmed(false)
@@ -79,7 +84,7 @@ function LoginInner() {
 
       try {
         // SINGLE source of truth: the AuthContext.login() method.
-        const user = await login(parsed.data.email, parsed.data.password, captcha.token)
+        const user = await login(parsed.data.email, parsed.data.password, captchaToken)
 
         clearTimeout(progressTimer)
         clearTimeout(slowTimer)
@@ -88,7 +93,10 @@ function LoginInner() {
 
         // Chemin interne uniquement : « /\evil.com » passait l'ancien contrôle et le navigateur
         // le lit comme « //evil.com ». On résout l'adresse et on exige la même origine.
-        const safeRedirect = safeInternalPath(redirectTo ?? rememberedGameReturn(), window.location.origin)
+        const safeRedirect = safeInternalPath(
+          redirectTo ?? rememberedGameReturn(),
+          window.location.origin,
+        )
         // Un professionnel Haroo ne doit jamais être renvoyé vers le dashboard
         // coopérative, même si ?redirect=/dashboard a été posé par le middleware
         // lors d'une visite déconnectée — son espace est /haroo.
@@ -181,9 +189,13 @@ function LoginInner() {
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
               <ShieldCheck className="h-5 w-5 text-primary" aria-hidden="true" />
             </div>
-            <CardTitle className="text-2xl"><h1>{gameReturn ? 'Retrouvez HarooLife' : 'Bon retour'}</h1></CardTitle>
+            <CardTitle className="text-2xl">
+              <h1>{gameReturn ? 'Retrouvez HarooLife' : 'Bon retour'}</h1>
+            </CardTitle>
             <CardDescription>
-              {gameReturn ? 'Utilisez votre compte FaîtiereHub habituel. Vous reviendrez ensuite à HarooLife.' : 'Connectez-vous pour retrouver votre espace personnel FaîtiereHub.'}
+              {gameReturn
+                ? 'Utilisez votre compte FaîtiereHub habituel. Vous reviendrez ensuite à HarooLife.'
+                : 'Connectez-vous pour retrouver votre espace personnel FaîtiereHub.'}
             </CardDescription>
           </CardHeader>
 
@@ -197,7 +209,10 @@ function LoginInner() {
                   {error}
                   {unconfirmed && (
                     <Link
-                      href={withGameReturn(`/auth/verify-email?email=${encodeURIComponent(email.trim())}`, gameReturn)}
+                      href={withGameReturn(
+                        `/auth/verify-email?email=${encodeURIComponent(email.trim())}`,
+                        gameReturn,
+                      )}
                       className="mt-1 block font-medium underline"
                     >
                       Renvoyer l’e-mail de confirmation
@@ -288,7 +303,10 @@ function LoginInner() {
 
             <p className="mt-6 text-center text-sm text-muted-foreground">
               Vous n&apos;avez pas de compte ?{' '}
-              <Link href={withGameReturn('/auth/signup', gameReturn)} className="text-primary hover:underline font-medium">
+              <Link
+                href={withGameReturn('/auth/signup', gameReturn)}
+                className="text-primary hover:underline font-medium"
+              >
                 S&apos;inscrire
               </Link>
             </p>

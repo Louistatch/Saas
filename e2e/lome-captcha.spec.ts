@@ -23,7 +23,7 @@ const GOOD = 'XXXX.DUMMY.TOKEN.XXXX'
  * Each check solves itself with the next token of `tokens` (the last one repeats); « ERROR »
  * stands for Cloudflare refusing the check (a wrong key or domain).
  */
-async function stubTurnstile(page: Page, tokens: string[]) {
+async function stubTurnstile(page: Page, tokens: string[], failedLoads = 0) {
   const double = `(() => {
     const tokens = ${JSON.stringify(tokens)}
     const t = (window.__turnstile = { renders: 0, resets: 0, removes: 0, live: 0 })
@@ -33,7 +33,7 @@ async function stubTurnstile(page: Page, tokens: string[]) {
         const w = widgets[id]
         const next = tokens.length > 1 ? tokens.shift() : tokens[0] ?? ${JSON.stringify(GOOD)}
         if (w && next === 'ERROR') w['error-callback']('110200')
-        else if (w) w.callback(next)
+        else if (w && next !== 'PENDING') w.callback(next)
       }, 300)
     window.turnstile = {
       render(el, opts) {
@@ -62,10 +62,14 @@ async function stubTurnstile(page: Page, tokens: string[]) {
         delete widgets[id]
       },
     }
+    t.expire = () => Object.values(widgets).forEach(w => w['expired-callback']())
+    t.solve = () => Object.values(widgets).forEach(w => w.callback(${JSON.stringify(GOOD)}))
   })()`
-  await page.route('https://challenges.cloudflare.com/turnstile/**', (route) =>
-    route.fulfill({ contentType: 'text/javascript', body: double }),
-  )
+  let loads = 0
+  await page.route('https://challenges.cloudflare.com/turnstile/**', (route) => {
+    if (loads++ < failedLoads) return route.abort('failed')
+    return route.fulfill({ contentType: 'text/javascript', body: double })
+  })
 }
 
 type Counts = { renders: number; resets: number; removes: number; live: number }
@@ -86,12 +90,13 @@ function sentTokens(page: Page, endpoint: RegExp) {
 
 test('the visitor arrival carries the anti-robot token, and gets a fresh one after a refusal', async ({
   browser,
+  baseURL,
 }, testInfo) => {
   test.setTimeout(150_000)
   const device = /mobile/.test(testInfo.project.name)
     ? { ...devices['Pixel 7'], viewport: { width: 412, height: 915 } }
     : { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } }
-  const context = await browser.newContext({ ...device, baseURL: 'http://127.0.0.1:3000' })
+  const context = await browser.newContext({ ...device, baseURL })
   const page = await context.newPage()
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(e.message))
@@ -134,8 +139,9 @@ test('the visitor arrival carries the anti-robot token, and gets a fresh one aft
 
 test('sign-in, password reset and the confirmation e-mail carry the anti-robot token', async ({
   browser,
+  baseURL,
 }) => {
-  const context = await browser.newContext({ baseURL: 'http://127.0.0.1:3000' })
+  const context = await browser.newContext({ baseURL })
   const page = await context.newPage()
   await stubTurnstile(page, [GOOD])
 
@@ -163,21 +169,111 @@ test('sign-in, password reset and the confirmation e-mail carry the anti-robot t
   await context.close()
 })
 
-test('a Cloudflare failure never locks sign-in: the call goes without a token, Supabase decides', async ({
+test('a failed check blocks account creation and can be retried without losing the arrival choices', async ({
   browser,
+  baseURL,
 }) => {
-  const context = await browser.newContext({ baseURL: 'http://127.0.0.1:3000' })
+  const context = await browser.newContext({ baseURL })
   const page = await context.newPage()
-  // The widget refuses this site (as with a wrong key or an unlisted domain).
-  await stubTurnstile(page, ['ERROR'])
+  await stubTurnstile(page, ['ERROR', GOOD])
+  const signups = sentTokens(page, /^\/auth\/v1\/signup$/)
+  await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
+  await arriveAsVisitor(page, async (step) => {
+    if (step !== '5-logement') return
+    const home = page.locator('[aria-pressed="true"]').filter({ hasText: 'Tu démarres avec' })
+    const before = await home.innerText()
+    const retry = page.getByRole('button', { name: 'Relancer la vérification' })
+    await expect(retry).toBeVisible()
+    await expect(retry).toBeInViewport()
+    await expect(page.getByRole('button', { name: 'Emménager' })).toBeDisabled()
+    expect(signups).toEqual([])
+    await retry.click()
+    await expect(page.getByText('Vérification anti-robot réussie.')).toBeVisible()
+    expect(await home.innerText()).toBe(before)
+  })
+  await expect(page.getByTestId('arrival')).toHaveCount(0)
+  expect(signups).toEqual([GOOD])
+  await context.close()
+})
+
+test('a blocked script can be loaded again and Enter never submits without a token', async ({
+  browser,
+  baseURL,
+}) => {
+  const context = await browser.newContext({ baseURL })
+  const page = await context.newPage()
+  await stubTurnstile(page, [GOOD], 1)
+  const signIn = sentTokens(page, /^\/auth\/v1\/token$/)
+  await page.goto('/auth/login', { waitUntil: 'domcontentloaded' })
+  await page.getByLabel('Adresse email').fill('kossi@example.tg')
+  await page.getByLabel('Mot de passe', { exact: true }).fill('un-mot-de-passe-de-test')
+  const button = page.getByRole('button', { name: /^Se connecter$/ })
+  const retry = page.getByRole('button', { name: 'Relancer la vérification' })
+  await expect(retry).toBeVisible()
+  await expect(button).toBeDisabled()
+  // A native form submission can bypass a disabled button; the handler must guard it too.
+  await page.locator('form').dispatchEvent('submit')
+  await expect(
+    page.getByText('Terminez la vérification anti-robot ci-dessous avant de vous connecter.'),
+  ).toBeVisible()
+  expect(signIn).toEqual([])
+  await retry.click()
+  await expect(button).toBeEnabled()
+  await button.click()
+  await expect.poll(() => signIn.length).toBe(1)
+  expect(signIn).toEqual([GOOD])
+  await context.close()
+})
+
+test('an expired token is renewed before a protected submission', async ({ browser, baseURL }) => {
+  const context = await browser.newContext({ baseURL })
+  const page = await context.newPage()
+  await stubTurnstile(page, [GOOD, 'PENDING'])
+  const recover = sentTokens(page, /^\/auth\/v1\/recover$/)
+  await page.goto('/auth/forgot-password', { waitUntil: 'domcontentloaded' })
+  await page.getByLabel('Adresse email').fill('kossi@example.tg')
+  const button = page.getByRole('button', { name: 'Envoyer le lien de réinitialisation' })
+  await expect(button).toBeEnabled()
+  await page.evaluate(() => {
+    const t = (window as unknown as { __turnstile: { expire: () => void } }).__turnstile
+    t.expire()
+  })
+  await expect(button).toBeDisabled()
+  await expect.poll(async () => (await counts(page))?.resets).toBe(1)
+  expect(recover).toEqual([])
+  await page.evaluate(() => {
+    ;(window as unknown as { __turnstile: { solve: () => void } }).__turnstile.solve()
+  })
+  await button.click()
+  await expect.poll(() => recover).toEqual([GOOD])
+  await context.close()
+})
+
+test('a token older than five minutes is rejected even before its expiry callback runs', async ({
+  browser,
+  baseURL,
+}) => {
+  const context = await browser.newContext({ baseURL })
+  const page = await context.newPage()
+  await stubTurnstile(page, [GOOD, 'PENDING'])
   const signIn = sentTokens(page, /^\/auth\/v1\/token$/)
   await page.goto('/auth/login', { waitUntil: 'domcontentloaded' })
   await page.getByLabel('Adresse email').fill('kossi@example.tg')
   await page.getByLabel('Mot de passe', { exact: true }).fill('un-mot-de-passe-de-test')
   const button = page.getByRole('button', { name: /^Se connecter$/ })
   await expect(button).toBeEnabled()
+  await page.evaluate(() => {
+    const before = Date.now
+    Date.now = () => before() + 300_001
+  })
   await button.click()
-  await expect.poll(() => signIn.length).toBe(1)
-  expect(signIn[0]).toBeNull()
+  await expect(button).toBeDisabled()
+  await expect.poll(async () => (await counts(page))?.resets).toBe(1)
+  expect(signIn).toEqual([])
+  await page.evaluate(() => {
+    ;(window as unknown as { __turnstile: { solve: () => void } }).__turnstile.solve()
+  })
+  await button.click()
+  await expect.poll(() => signIn).toEqual([GOOD])
   await context.close()
 })
