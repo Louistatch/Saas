@@ -15,6 +15,8 @@ L’eau et le savon gardent leur consommation existante ; cette livraison ne pr�
 
 Les quatre GLB adultes, leurs maillages, matériaux, squelettes et six animations originales sont conservés. Quatre animations d’assise sont ajoutées : `HarooSitEnter`, `HarooSitIdle`, `HarooSitExit`, `HarooSitTalk`.
 
+Les URL des personnages portent `?daily=1` : un ancien fichier sans assise peut rester en cache pendant plusieurs jours. Le nouveau code charge donc explicitement la version contenant les nouveaux clips.
+
 Source : [Quaternius Universal Animation Library Standard](https://quaternius.itch.io/universal-animation-library), archive gratuite du 16 juin 2026. Clips d’origine : `Sitting_Enter`, `Sitting_Idle_Loop`, `Sitting_Exit`, `Sitting_Talking_Loop`. Licence CC0 : `public/haroolife/assets/licenses/quaternius-UAL-CC0.txt`.
 
 SHA-256 de l’archive téléchargée : `cc73fc4e495b82958207316596317a3f40b9fa38065bde1027937452da537724`.
@@ -60,3 +62,7 @@ Le catalogue et les clips sont partagés avec le composant R3F. Les transports, 
 Les tests vérifient : paiement et portion uniques, première bouchée, interruption, rechargement, anciens stocks, sortie d’un lieu, pieds au sol, main arrivant à la bouche, absence de régression des rigs de conduite et de vélo, places accessibles et continuité avec les préférences de rendu historiques.
 
 Les scénarios navigateur utilisent les fixtures Supabase locales. Ils n’envoient pas de messages à des utilisateurs réels et ne modifient pas les comptes de production.
+
+Résultats : 30 tests SQL et 334 tests TypeScript réussis ; les quatre personnages testés sur le siège, le repas au marché et dans la rue, et les parcours historiques de maison et de conversation au marché sont validés en format mobile Chromium. Les parcours assise/relevage et commande/repas sont également validés sur Firefox 150.0.2 en format mobile. Le test vérifie que le modèle demandé porte bien sa nouvelle version d’URL.
+
+Dans le cloud sans écran, Firefox ne fournissait pas WebGL2. Ces deux essais utilisent donc un affichage virtuel Xvfb avec Mesa et `PW_FIREFOX_HEADED=1`, sans modifier les règles de l’application ni masquer un échec du rendu.

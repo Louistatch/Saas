@@ -734,7 +734,10 @@ export class RoomWorld {
             this.posture = null
             const next = this.afterStand
             this.afterStand = null
-            if (next) this.walkTo(next)
+            if (this.meal?.phase === 'approach') {
+              this.mealRequest = null
+              this.setMeal(this.meal)
+            } else if (next) this.walkTo(next)
           }
         }
       }

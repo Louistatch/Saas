@@ -14,7 +14,7 @@ import { plantSeatedFeet } from '../lib/haroolife/game/render/seated-feet'
 
 for (const spec of AVATAR_SPECS)
   test(`${spec.id}: real skeleton, independent instances, bent driving limbs and attached feet`, async () => {
-    const data = await readFile(`public${spec.url}`)
+    const data = await readFile(`public${new URL(spec.url, 'https://haroolife.invalid').pathname}`)
     const gltf = await new GLTFLoader().parseAsync(
       data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength),
       '',

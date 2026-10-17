@@ -37,6 +37,10 @@ for (const avatar of ['afi', 'abra', 'kossi', 'koffi'])
   test(`${avatar}: sit on the house chair, stay seated, stand then walk`, async ({
     page,
   }, info) => {
+    const avatarRequests: string[] = []
+    page.on('request', (request) => {
+      if (request.url().includes('/vendor/quaternius/')) avatarRequests.push(request.url())
+    })
     const state = initialCityLife()
     state.life.inside = 'house'
     await seed(page, state, avatar)
@@ -46,6 +50,7 @@ for (const avatar of ['afi', 'abra', 'kossi', 'koffi'])
       .poll(async () => (await interior(page))?.posture?.phase, { timeout: 30000 })
       .toBe('idle')
     await expect.poll(async () => (await interior(page))?.anim).toBe('HarooSitIdle')
+    expect(avatarRequests.some((url) => new URL(url).searchParams.get('daily') === '1')).toBe(true)
     await expect(page.getByRole('button', { name: 'Se lever', exact: true })).toBeVisible()
     const p = await interior(page)
     if (!p) throw new Error('Le personnage n’est pas affiché.')

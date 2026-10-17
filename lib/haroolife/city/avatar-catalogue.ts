@@ -88,7 +88,9 @@ const quaternius = (
   id,
   label,
   hint,
-  url: `${QUATERNIUS}${file}.glb`,
+  // The previous six-clip GLBs can remain in a browser cache for a week. A new URL is
+  // required before a renderer may rely on the added sitting clips.
+  url: `${QUATERNIUS}${file}.glb?daily=1`,
   family: 'quaternius',
   height: 1.85,
   // Measured (V3): the four files face +Z in bind pose and in Idle/Walk/Run/Interact, like
