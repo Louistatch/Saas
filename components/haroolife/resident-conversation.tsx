@@ -1,7 +1,7 @@
 'use client'
+import { type CityAction, type CityLife, actionsFor } from '@/lib/haroolife/city/life'
+import { type Resident, converse } from '@/lib/haroolife/city/social'
 import { useEffect, useRef, useState } from 'react'
-import { actionsFor, type CityAction, type CityLife } from '@/lib/haroolife/city/life'
-import { converse, type Resident } from '@/lib/haroolife/city/social'
 
 /** Fictional dialogue stays local. Real players continue to use the existing private chat. */
 export default function ResidentConversation({
@@ -79,6 +79,9 @@ export default function ResidentConversation({
       <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Sujets de discussion">
         {[
           'Bonjour !',
+          ...(resident.lot?.type === 'townhall'
+            ? ['Les feux en panne ?', 'Les promesses du maire ?']
+            : []),
           'Comment travailler ?',
           'Que peut-on acheter ?',
           'Essence et entretien ?',

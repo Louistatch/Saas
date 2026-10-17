@@ -1,3 +1,4 @@
+import { actionsFor } from './activities'
 /**
  * Interior layouts: furnished rooms for every kind of place, as data. A layout lists
  * equipment and furniture (procedural low-poly props or CC0 Kenney furniture), the
@@ -5,7 +6,6 @@
  * prop triggers. Pure data, so tests can check that a gym really has treadmills.
  */
 import type { Interior } from './life'
-import { actionsFor } from './activities'
 import { nextSession, sessionAt, sessionKey, universityLayout } from './university'
 import type { Lot } from './world'
 
@@ -340,8 +340,24 @@ const MARKET: Layout = {
   trim: '#f4ead8',
   props: [
     { id: 'meal-table', kind: 'table', x: 3.0, z: 1.7 },
-    { id: 'meal-chair-1', kind: 'chair', x: 2.0, z: 1.7, rot: 90, action: 'sit', label: 'S’asseoir à table' },
-    { id: 'meal-chair-2', kind: 'chair', x: 3.0, z: 2.9, rot: 180, action: 'sit', label: 'S’asseoir à table' },
+    {
+      id: 'meal-chair-1',
+      kind: 'chair',
+      x: 2.0,
+      z: 1.7,
+      rot: 90,
+      action: 'sit',
+      label: 'S’asseoir à table',
+    },
+    {
+      id: 'meal-chair-2',
+      kind: 'chair',
+      x: 3.0,
+      z: 2.9,
+      rot: 180,
+      action: 'sit',
+      label: 'S’asseoir à table',
+    },
     {
       id: 'counter',
       kind: 'counter',
@@ -778,6 +794,7 @@ export function layoutFor(
       : { ...p, action: undefined, label: undefined, hint: undefined }
   })
   const kinds: Partial<Record<string, PropKind>> = {
+    sit: 'chair',
     bank: 'atm',
     learn: 'desk',
     coop: 'board',
@@ -789,13 +806,22 @@ export function layoutFor(
     fuel: 'counter',
     maintain: 'desk',
     police: 'reception',
+    'civic-report': 'board',
+    timetable: 'sign',
   }
   const occupied = new Set<string>()
   let extraBoards = 0
   // Give every advertised action an actual walk-to object, using the existing furniture.
   for (const action of actions) {
     if (props.some((p) => p.action === action.id)) continue
-    let prop = props.find((p) => !p.action && !occupied.has(p.id) && p.kind === kinds[action.id])
+    let prop = props.find(
+      (p) =>
+        !p.action &&
+        !occupied.has(p.id) &&
+        p.kind === kinds[action.id] &&
+        (action.id !== 'sit' ||
+          !base.npcs.some((n) => n.anim === 'sit' && Math.hypot(n.x - p.x, n.z - p.z) < 0.75)),
+    )
     prop ??= props.find(
       (p) =>
         !p.action &&
@@ -825,7 +851,7 @@ export function layoutFor(
     station: 'Dodzi · responsable de la gare',
     cooperative: 'Abla · animatrice de coopérative',
     industry: 'Komi · magasinier',
-    townhall: 'Enyonam · agent communal',
+    townhall: 'Maire Agbavi · personnage municipal fictif',
     fuel: 'Yao · pompiste',
     garage: 'Komi · mécanicien',
     police: 'Agent Afi · police du quartier',

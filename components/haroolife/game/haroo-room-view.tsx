@@ -28,6 +28,8 @@ export default function HarooRoomView(
   const markers = useRef<HTMLDivElement>(null)
   const world = useRef<RoomWorld | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [guide, setGuide] = useState(false)
+  const [target, setTarget] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Latest callbacks, read by the engine's events (the engine is created once per mount).
   const live = useRef(props)
@@ -60,6 +62,7 @@ export default function HarooRoomView(
         onLeave: () => live.current.onLeave(),
         onNotice: (msg) => live.current.onNotice?.(msg),
         onReady: () => setState('ready'),
+        onTarget: setTarget,
         onError: (msg) => {
           setError(msg)
           setState('error')
@@ -102,6 +105,47 @@ export default function HarooRoomView(
         aria-label={`${props.title} : scène 3D`}
       />
       <div ref={markers} className="pointer-events-none absolute inset-0 overflow-hidden" />
+      {state === 'ready' && (
+        <div
+          className="pointer-events-auto absolute left-3 right-3 top-[152px] z-10 max-w-sm"
+          data-testid="room-guide"
+        >
+          <button
+            type="button"
+            aria-expanded={guide}
+            onClick={() => setGuide((v) => !v)}
+            className="min-h-11 rounded-2xl bg-white/95 px-4 py-2 text-left text-xs font-bold text-emerald-950 shadow"
+          >
+            🧭 {guide ? 'Fermer le guide' : 'Objets et personnes'} · {scene.hotspots.length - 1}
+          </button>
+          {guide && (
+            <div className="mt-2 max-h-[34vh] space-y-1 overflow-y-auto overscroll-contain rounded-2xl bg-white/95 p-2 shadow-lg">
+              <p className="px-2 py-1 text-xs text-slate-600">
+                Choisis une bulle : tu rejoins son objet avant d’agir.
+              </p>
+              {scene.hotspots.map((h) => (
+                <button
+                  key={h.id}
+                  type="button"
+                  onClick={() => {
+                    setGuide(false)
+                    world.current?.approach(h.id)
+                  }}
+                  className="flex min-h-11 w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-slate-800 hover:bg-emerald-50"
+                >
+                  <span aria-hidden>{h.icon}</span>
+                  <span>{h.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {!guide && target && (
+            <output className="mt-2 block rounded-xl bg-emerald-950/90 px-3 py-2 text-xs font-bold text-white">
+              🚶 {target}
+            </output>
+          )}
+        </div>
+      )}
       {state === 'loading' && (
         <p className="pointer-events-none absolute inset-x-0 top-1/2 text-center text-sm text-[#253834]">
           Chargement : {props.title}…

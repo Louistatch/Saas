@@ -4,6 +4,7 @@ import { PostHogProvider } from '@/app/providers/posthog-provider'
 import { SiteVisitTracker } from '@/components/shared/site-visit-tracker'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
+import { SITE_ORIGIN } from '@/lib/seo'
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
@@ -13,6 +14,9 @@ const geist = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' })
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_ORIGIN),
+  // New application routes are not indexed accidentally. Public pages explicitly opt in.
+  robots: { index: false, follow: true },
   title: 'FaîtiereHub — Plateforme numérique pour coopératives agricoles',
   description:
     "Donnez du pouvoir à vos coopératives agricoles avec des outils numériques pour la gestion des membres, les comptes d'exploitation et les décisions basées sur les données.",

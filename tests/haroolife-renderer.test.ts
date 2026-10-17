@@ -6,7 +6,7 @@ import { SHAPE_MATERIALS, footprintOf, shapeOf } from '../lib/haroolife/city/pro
 import { resolveRenderer } from '../lib/haroolife/engine/select'
 
 describe('renderer selection', () => {
-  it('defaults to the HarooLife engine (house), React Three Fiber for the other interiors', () => {
+  it('defaults to the shared HarooLife engine for furnished interiors', () => {
     assert.deepEqual(resolveRenderer('', null, undefined), {
       renderer: 'haroo',
       remember: null,

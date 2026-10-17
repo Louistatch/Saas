@@ -118,6 +118,11 @@ function baseActionsFor(
     case 'townhall':
       return [
         {
+          id: 'civic-report',
+          label: 'Signaler les feux en panne',
+          hint: 'Gratuit · suivi communal · réparation sous 2 heures de jeu',
+        },
+        {
           id: 'work-city',
           label: 'Service communal',
           hint: '+1 500 FCFA · Énergie −20 · une fois par jour',
@@ -145,9 +150,21 @@ function baseActionsFor(
 }
 
 /** Seating is a physical interaction, available only in layouts with an actual chair. */
-export function actionsFor(t: LotType, service?: Lot['service']): { id: CityAction; label: string; hint: string }[] {
+export function actionsFor(
+  t: LotType,
+  service?: Lot['service'],
+): { id: CityAction; label: string; hint: string }[] {
   const actions = baseActionsFor(t, service)
-  return !service && ['house', 'apartment', 'hotel', 'market', 'shop'].includes(t)
-    ? [...actions, { id: 'sit', label: 'S’asseoir', hint: 'Une place libre · Se lever pour repartir' }]
+  if (!service && t === 'university')
+    actions.push({
+      id: 'timetable',
+      label: 'Consulter l’emploi du temps',
+      hint: 'Cours, horaires et prochain départ · gratuit',
+    })
+  return !service && ['house', 'apartment', 'hotel', 'market', 'shop', 'bank', 'townhall', 'school', 'university', 'station', 'cooperative', 'industry', 'hospital'].includes(t)
+    ? [
+        ...actions,
+        { id: 'sit', label: 'S’asseoir', hint: 'Une place libre · Se lever pour repartir' },
+      ]
     : actions
 }

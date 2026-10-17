@@ -72,6 +72,7 @@ export interface SceneNpc {
   z: number
   /** Heading in radians (0 faces +Z). */
   heading: number
+  seatHeight?: number
   anim: ReturnType<typeof animFor> | Npc['anim']
 }
 
@@ -85,6 +86,8 @@ export interface RoomScene {
   spawn: Point
   /** Heading on spawn (radians, 0 = facing +Z). */
   spawnHeading: number
+  /** Public cutaway rooms retain their native walk-out through the open front. */
+  exitAtFront?: boolean
   models: ModelPlacement[]
   primitives: PrimitivePlacement[]
   obstacles: Obstacle[]
@@ -101,7 +104,10 @@ export interface RoomScene {
   view: { height: number; width: number; follow: boolean }
   /** Where the figure stands while using a machine (gym): prop id → spot and heading. */
   onDevice: Record<string, { x: number; z: number; heading: number; seat?: number }>
-  seats?: Record<string, { x: number; z: number; heading: number; height: number; entry: Point }>
+  seats?: Record<
+    string,
+    { x: number; z: number; heading: number; height: number; entry: Point; mealAllowed?: boolean }
+  >
   palette: {
     background: string
     ground: string
@@ -183,6 +189,10 @@ export const ON_DEVICE: ReadonlySet<PropKind> = new Set(['treadmill', 'bike', 'b
 
 /** Marker icon of an action (the label comes from the Saas prop). */
 const ACTION_ICON: Record<string, string> = {
+  timetable: '📅',
+  'civic-report': '🚦',
+  'work-city': '💼',
+  sit: '🪑',
   sleep: '🌙',
   eat: '🍲',
   relax: '🛋️',
@@ -421,12 +431,19 @@ export function sceneFromLayout(id: string, layout: Layout, s = LAYOUT_SCALE): R
   const seats: NonNullable<RoomScene['seats']> = {}
   for (const prop of layout.props) {
     if (!['chair', 'sofa', 'pew'].includes(prop.kind) || !prop.action) continue
-    const h = hotspots.find(h => h.kind === 'prop' && h.ref === prop.id)
-    const occupied = layout.npcs.some(n => n.anim === 'sit' && Math.hypot(n.x - prop.x, n.z - prop.z) < 0.75)
-    if (h && !occupied && isFree(h.at.x, h.at.z, obstacles, bounds)) seats[prop.id] = {
-      x: prop.x * s, z: prop.z * s, heading: ((prop.rot ?? 0) * Math.PI) / 180,
-      height: (prop.kind === 'chair' ? 0.36 : prop.kind === 'sofa' ? 0.299 : 0.43) * s, entry: h.at,
-    }
+    const h = hotspots.find((h) => h.kind === 'prop' && h.ref === prop.id)
+    const occupied = layout.npcs.some(
+      (n) => n.anim === 'sit' && Math.hypot(n.x - prop.x, n.z - prop.z) < 0.75,
+    )
+    if (h && !occupied && isFree(h.at.x, h.at.z, obstacles, bounds))
+      seats[prop.id] = {
+        x: prop.x * s,
+        z: prop.z * s,
+        heading: ((prop.rot ?? 0) * Math.PI) / 180,
+        height: (prop.kind === 'chair' ? 0.36 : prop.kind === 'sofa' ? 0.299 : 0.43) * s,
+        entry: h.at,
+        mealAllowed: prop.action === 'sit' || prop.action === 'relax',
+      }
   }
   for (const prop of layout.props) {
     if (!ON_DEVICE.has(prop.kind)) continue
@@ -456,6 +473,7 @@ export function sceneFromLayout(id: string, layout: Layout, s = LAYOUT_SCALE): R
     bounds,
     spawn,
     spawnHeading: Math.PI,
+    exitAtFront: true,
     models,
     primitives,
     obstacles: obstacles.map(({ x, z, w: ow, d: od }) => ({ x, z, w: ow, d: od })),
@@ -467,6 +485,19 @@ export function sceneFromLayout(id: string, layout: Layout, s = LAYOUT_SCALE): R
       z: n.z * s,
       heading: ((n.rot ?? 0) * Math.PI) / 180,
       anim: n.anim,
+      seatHeight:
+        n.anim === 'sit'
+          ? (() => {
+              const seat = layout.props.find(
+                (p) =>
+                  ['chair', 'sofa', 'pew'].includes(p.kind) &&
+                  Math.hypot(p.x - n.x, p.z - n.z) < 0.75,
+              )
+              return seat
+                ? (seat.kind === 'chair' ? 0.36 : seat.kind === 'sofa' ? 0.299 : 0.43) * s
+                : undefined
+            })()
+          : undefined,
     })),
     rugs: [],
     plants: [],

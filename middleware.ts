@@ -1,5 +1,6 @@
 import { STALE_SESSION_PARAM, isOrgOnlyPath, safeInternalPath } from '@/lib/auth/safe-redirect'
 import { redirectProductionVercelHost } from '@/lib/routing/vercel-canonical-host'
+import { SITE_ORIGIN } from '@/lib/seo'
 import { createServerClient } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
 
@@ -24,17 +25,14 @@ export async function middleware(request: NextRequest) {
   // NODE_ENV cannot distinguish these because all Vercel builds use production mode.
   if (redirectProductionVercelHost(hostname, process.env.VERCEL_ENV)) {
     const url = new URL(request.url)
-    url.hostname = 'www.faitierehub.com'
+    url.hostname = new URL(SITE_ORIGIN).hostname
     url.port = ''
     url.protocol = 'https:'
     return NextResponse.redirect(url.toString(), { status: 301 })
   }
 
-  if (hostname === 'faitierehub.com') {
-    const url = new URL(request.url)
-    url.hostname = 'www.faitierehub.com'
-    return NextResponse.redirect(url.toString(), { status: 301 })
-  }
+  // The apex/www redirect belongs to Vercel Domains. Do not add the reverse
+  // redirect here while its existing apex -> www rule is active (infinite loop).
 
   // ─── ALWAYS refresh session (keeps cookies alive on every navigation) ───
   let supabaseResponse = NextResponse.next({ request })

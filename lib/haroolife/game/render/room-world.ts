@@ -57,6 +57,7 @@ export interface RoomWorldEvents extends Omit<DailyViewProps, 'meal'> {
   onLeave: () => void
   /** The requested target cannot be reached. */
   onNotice?: (message: string) => void
+  onTarget?: (label: string | null) => void
   /** The world is drawn (assets loaded). */
   onReady?: () => void
   /** Loading failed for the player's avatar (the scene cannot be played). */
@@ -106,13 +107,29 @@ export class RoomWorld {
   private readonly walls: THREE.Mesh[] = []
   private readonly markers: Marker[] = []
   private readonly npcs: Person[] = []
+  private readonly seatedNpcs = new Set<Person>()
   private readonly raycaster = new THREE.Raycaster()
   private readonly ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
   private readonly resizeObserver: ResizeObserver
   private player: Person | null = null
   private readonly avatarModel: string
   private readonly pagne?: string
+  private left = false
   private goal: Goal | null = null
+  private readonly guidanceGeometry = new THREE.BufferGeometry()
+  private readonly guidanceMaterial = new THREE.LineBasicMaterial({
+    color: '#16875e',
+    transparent: true,
+    opacity: 0.8,
+  })
+  private readonly guidance = new THREE.Line(this.guidanceGeometry, this.guidanceMaterial)
+  private readonly targetGeometry = new THREE.RingGeometry(0.32, 0.41, 24)
+  private readonly targetMaterial = new THREE.MeshBasicMaterial({
+    color: '#22b478',
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  })
+  private readonly targetHalo = new THREE.Mesh(this.targetGeometry, this.targetMaterial)
   private performing: { propId: string; anim: NpcAnim } | null = null
   private posture: {
     id: string
@@ -229,10 +246,17 @@ export class RoomWorld {
       // Characters stay where the layout puts them: a walking clip would slide in place.
       const anim = n.anim === 'walk' || n.anim === 'run' ? 'idle' : (n.anim as NpcAnim)
       this.play(npc, clipFor(npc.spec, anim))
+      if (n.anim === 'sit' && n.seatHeight !== undefined) {
+        npc.root.position.y = n.seatHeight - npc.seatContact.y
+        this.seatedNpcs.add(npc)
+      }
       this.stage.add(npc.root)
       this.npcs.push(npc)
     })
     this.buildMarkers()
+    this.targetHalo.name = 'Orientation objet'
+    this.targetHalo.rotation.x = -Math.PI / 2
+    this.stage.add(this.guidance, this.targetHalo)
     this.player = this.makePerson(avatar.value, spec, this.pagne)
     this.player.root.name = 'Joueur'
     this.player.root.position.set(this.def.spawn.x, 0, this.def.spawn.z)
@@ -253,12 +277,17 @@ export class RoomWorld {
     this.canvas.removeEventListener('pointerup', this.onPointerUp)
     this.canvas.removeEventListener('pointercancel', this.onPointerCancel)
     this.resizeObserver.disconnect()
+    this.guidanceGeometry.dispose()
+    this.guidanceMaterial.dispose()
+    this.targetGeometry.dispose()
+    this.targetMaterial.dispose()
     for (const m of this.markers) m.el.remove()
     this.markers.length = 0
     if (this.player) this.disposePerson(this.player)
     this.player = null
     for (const n of this.npcs) this.disposePerson(n)
     this.npcs.length = 0
+    this.seatedNpcs.clear()
     // Everything below was created or loaded by this instance only.
     for (const g of this.geometries.values()) g.dispose()
     for (const m of this.materials.values()) m.dispose()
@@ -287,7 +316,9 @@ export class RoomWorld {
 
   /** Walk to the interaction point of this Saas prop, then use it (HUD activity buttons). */
   approach(propId: string): void {
-    const h = this.def.hotspots.find((x) => x.kind === 'prop' && x.ref === propId)
+    const h = this.def.hotspots.find(
+      (x) => x.id === propId || (x.kind === 'prop' && x.ref === propId),
+    )
     if (!h) {
       this.events.onNotice?.('Cette activité n’est pas disponible ici.')
       return
@@ -333,10 +364,12 @@ export class RoomWorld {
       return
     }
     const pos = this.player.root.position
-    const seats = Object.entries(this.def.seats ?? {}).sort(
-      (a, b) =>
-        Math.hypot(a[1].x - pos.x, a[1].z - pos.z) - Math.hypot(b[1].x - pos.x, b[1].z - pos.z),
-    )
+    const seats = Object.entries(this.def.seats ?? {})
+      .filter(([, seat]) => seat.mealAllowed !== false)
+      .sort(
+        (a, b) =>
+          Math.hypot(a[1].x - pos.x, a[1].z - pos.z) - Math.hypot(b[1].x - pos.x, b[1].z - pos.z),
+      )
     for (const [id, seat] of seats) {
       const h = this.def.hotspots.find((h) => h.kind === 'prop' && h.ref === id)
       if (!h || !isFree(seat.entry.x, seat.entry.z, this.def.obstacles, this.def.bounds)) continue
@@ -641,6 +674,7 @@ export class RoomWorld {
       el.setAttribute('aria-label', h.label)
       el.title = h.label
       el.textContent = h.icon
+      el.dataset.label = h.label
       el.className =
         h.kind === 'npc'
           ? 'pointer-events-auto absolute left-0 top-0 flex h-11 w-11 items-center justify-center rounded-full border-2 border-white bg-[#f7f8f1]/80 text-base shadow'
@@ -688,19 +722,34 @@ export class RoomWorld {
     // The last cell is approximate: end exactly on the interaction point.
     path[path.length - 1] = dest
     this.goal = { ...goal, path }
+    this.guidanceGeometry.dispose()
+    this.guidanceGeometry.deleteAttribute('position')
+    this.guidanceGeometry.setFromPoints(
+      [{ x: pos.x, z: pos.z }, ...path].map((p) => new THREE.Vector3(p.x, 0.035, p.z)),
+    )
+    this.guidanceGeometry.computeBoundingSphere()
+    this.targetHalo.position.set(dest.x, 0.04, dest.z)
+    this.events.onTarget?.('hotspot' in goal ? goal.hotspot.label : 'Emplacement libre')
     this.performing = null
   }
 
   private arrive(): void {
     const g = this.goal
     this.goal = null
+    this.events.onTarget?.(null)
     if (!g || !('hotspot' in g) || !this.player) return
     const h = g.hotspot
     const p = this.player.root.position
     this.player.root.rotation.y = Math.atan2(h.faces.x - p.x, h.faces.z - p.z)
-    if (h.kind === 'exit') this.events.onLeave()
+    if (h.kind === 'exit') this.leave()
     else if (h.kind === 'npc') this.events.onTalk?.(h.ref)
     else this.events.onUse(h.ref)
+  }
+
+  private leave(): void {
+    if (this.left) return
+    this.left = true
+    this.events.onLeave()
   }
 
   private move(dt: number): void {
@@ -747,6 +796,7 @@ export class RoomWorld {
     let running = false
     if (mag > 0.12) {
       // The stick always wins: it cancels a walk towards a target and ends an activity pose.
+      if (this.goal) this.events.onTarget?.(null)
       this.goal = null
       this.performing = null
       if (this.meal) this.events.onActivityEnd?.()
@@ -765,6 +815,7 @@ export class RoomWorld {
       if (isFree(p.x + vx * dt, p.z, this.def.obstacles, b)) p.x += vx * dt
       if (isFree(p.x, p.z + vz * dt, this.def.obstacles, b)) p.z += vz * dt
       moved = Math.hypot(p.x - ox, p.z - oz)
+      if (this.def.exitAtFront && p.z >= b.maxZ - 0.12 && vz > 0.05) this.leave()
       // Face where the stick points, not the residual slide along a wall (that turned the
       // player sideways against furniture).
       this.face(vx, vz, dt)
@@ -920,7 +971,10 @@ export class RoomWorld {
         }
       }
     }
-    for (const n of this.npcs) n.mixer.update(dt)
+    for (const n of this.npcs) {
+      n.mixer.update(dt)
+      if (this.seatedNpcs.has(n)) plantSeatedFeet(n, 1)
+    }
     if (
       this.def.view.follow ||
       this.posture ||
@@ -928,6 +982,9 @@ export class RoomWorld {
       this.performing?.anim === 'eat'
     )
       this.updateCamera(false, dt)
+    this.guidance.visible = !!this.goal
+    this.targetHalo.visible = !!this.goal
+    this.targetHalo.scale.setScalar(1 + Math.sin(now * 0.006) * 0.12)
     this.scene.updateMatrixWorld()
     const v = new THREE.Vector3()
     const projected = this.markers.flatMap((m) => {
@@ -1002,7 +1059,7 @@ export class RoomWorld {
           mealProps: pl.root.getObjectByName('Repas · bol et ayimolou')?.visible ?? false,
           using: this.performing?.propId ?? null,
           goal: g ? ('hotspot' in g ? g.hotspot.ref : 'point') : null,
-          left: false,
+          left: this.left,
         }
       : null
   }

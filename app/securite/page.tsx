@@ -1,12 +1,8 @@
 import { MarketingLayout } from '@/components/shared/marketing-layout'
+import { publicPageMetadata } from '@/lib/seo'
 import { Cloud, DatabaseBackup, Gauge, KeyRound, Lock, Shield } from 'lucide-react'
-import type { Metadata } from 'next'
 
-export const metadata: Metadata = {
-  title: 'Sécurité — FaîtiereHub | Protection de vos données',
-  description:
-    'Découvrez les protections des comptes, les accès aux organisations et les principes de sécurité de FaîtiereHub.',
-}
+export const metadata = publicPageMetadata('/securite')
 
 const securityFeatures = [
   {

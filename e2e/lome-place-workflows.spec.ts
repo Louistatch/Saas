@@ -1,7 +1,7 @@
-import { expect, test } from './lome-test'
 import { initialCityLife } from '../lib/haroolife/city/life'
-import { landmarks } from '../lib/haroolife/city/world'
 import { vehicleCare } from '../lib/haroolife/city/vehicle-economy'
+import { landmarks } from '../lib/haroolife/city/world'
+import { expect, test } from './lome-test'
 
 test.afterEach(async ({ page }, info) => {
   if (info.status === info.expectedStatus) return
@@ -53,7 +53,15 @@ test('market: touch the counter, buy and eat, speak to a resident, preserve the 
   await page.keyboard.press('Escape')
   await expect.poll(async () => (await saved()).meal, { timeout: 20000 }).toBeUndefined()
   await page.getByRole('button', { name: 'Se lever', exact: true }).click()
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __LOME_INTERIOR?: { posture: unknown } }).__LOME_INTERIOR?.posture)).toBeNull()
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as unknown as { __LOME_INTERIOR?: { posture: unknown } }).__LOME_INTERIOR
+            ?.posture,
+      ),
+    )
+    .toBeNull()
   await page.locator('[data-hotspot="npc:seller"]').click()
   const conversation = page.getByLabel('Conversation', { exact: true })
   await expect(conversation).toBeVisible({ timeout: 45000 })
@@ -79,7 +87,7 @@ test('market: touch the counter, buy and eat, speak to a resident, preserve the 
 test('returning taxi: paid ride, automatic fuel, garage and police stops, then next customer', async ({
   page,
 }, info) => {
-  test.setTimeout(360000)
+  test.setTimeout(420000)
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   const state = initialCityLife()
@@ -98,6 +106,8 @@ test('returning taxi: paid ride, automatic fuel, garage and police stops, then n
   state.life.wallet = 100
   state.life.hour = 21
   await page.addInitScript((state) => {
+    // Stable destinations exercise the same complete route through the actual signals.
+    Math.random = () => 0.3
     if (sessionStorage.getItem('support-seeded')) return
     sessionStorage.setItem('support-seeded', '1')
     localStorage.setItem('haroolife.lome-city.v1', JSON.stringify(state))
@@ -148,7 +158,7 @@ test('returning taxi: paid ride, automatic fuel, garage and police stops, then n
           () =>
             (window as unknown as { __LOME_PLAYER?: { driving: boolean } }).__LOME_PLAYER?.driving,
         ),
-      { timeout: 90000 },
+      { timeout: 150000 }, // the passenger is delivered through the traffic lights before exit
     )
     .toBe(false)
   await page.getByRole('button', { name: 'Voir mon argent' }).click()

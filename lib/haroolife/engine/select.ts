@@ -4,7 +4,8 @@
  * choice, then NEXT_PUBLIC_HAROOLIFE_ENGINE, then the default.
  *
  * - `haroo` (default): the HarooLife engine (imperative Three.js) draws every interior.
- * - `three`: React Three Fiber for every interior (the previous default, the way back).
+ * - `three`: legacy R3F preference, kept for compatibility. Furnished game rooms use the
+ *   common interaction controller via `rendererForInterior`; the R3F components stay available.
  * A remembered `playcanvas` choice (engine removed) falls back to the default.
  */
 import type { RendererId } from './types'
@@ -13,10 +14,10 @@ export const ENGINE_STORAGE = 'haroolife.engine'
 /** Renderer used when nothing else decides. */
 export const DEFAULT_RENDERER: RendererId = 'haroo'
 
-/** The reference home/dining workflows use the existing Haroo room controller in either mode.
- * Other rooms retain the optional R3F renderer. Saves and the remembered preference are intact. */
-export function rendererForInterior(renderer: RendererId, interior: string): RendererId {
-  return ['house', 'market', 'bakery'].includes(interior) ? 'haroo' : renderer
+/** All furnished interiors share reachable bubbles, posture and meals. The remembered
+ * renderer choice remains available to the standalone R3F prototype; saves are untouched. */
+export function rendererForInterior(_renderer: RendererId, _interior: string): RendererId {
+  return 'haroo'
 }
 
 const parse = (v: string | null | undefined): RendererId | null =>

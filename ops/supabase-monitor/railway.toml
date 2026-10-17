@@ -1,0 +1,9 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "ops/supabase-monitor/Dockerfile"
+watchPatterns = ["/ops/supabase-monitor/**"]
+
+[deploy]
+startCommand = "node main.mjs"
+cronSchedule = "*/5 * * * *"
+restartPolicyType = "NEVER"

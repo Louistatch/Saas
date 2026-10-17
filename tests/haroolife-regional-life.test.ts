@@ -210,7 +210,7 @@ test('oriented vehicle collisions and continuous movement prevent walking throug
   ctl.obstacles = [body]
   ctl.input = { x: 1, y: 0, run: true }
   for (let i = 0; i < 300; i++) ctl.update(1 / 60)
-  assert.ok(ctl.pos.x < 1.2, `car must stop the capsule: ${ctl.pos.x}`)
+  assert.ok(ctl.pos.x <= body.x - body.halfLength - ctl.config.radius, `car must stop the capsule: ${ctl.pos.x}`)
   ctl.input = { x: 0, y: 1, run: true }
   for (let i = 0; i < 60; i++) ctl.update(1 / 60)
   ctl.input = { x: 1, y: 0, run: true }

@@ -1,0 +1,6 @@
+**
+!ops/
+!ops/supabase-monitor/
+!ops/supabase-monitor/main.mjs
+!ops/supabase-monitor/Dockerfile
+!ops/supabase-monitor/Dockerfile.dockerignore

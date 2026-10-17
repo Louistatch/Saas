@@ -1,5 +1,7 @@
 'use client'
 
+import showcaseCard from '@/public/showcase-card.webp'
+
 import { Logo } from '@/components/shared/logo'
 import { ArrowLeft, BadgeCheck, BookOpenCheck, BriefcaseBusiness } from 'lucide-react'
 import Image from 'next/image'
@@ -262,7 +264,10 @@ function MemberCardVisual() {
     <div className="relative ml-auto w-[310px] rotate-[-3deg] transition-transform duration-500 hover:rotate-0 lg:w-[360px]">
       <div className="absolute inset-2 translate-y-3 rounded-[22px] bg-black/35 blur-xl" />
       <Image
-        src="/showcase-card.webp"
+        src={showcaseCard}
+        loading="lazy"
+        placeholder="blur"
+        quality={85}
         alt="Carte membre vérifiable FaîtiereHub"
         width={1536}
         height={1024}

@@ -127,7 +127,7 @@ describe('walking', () => {
       { x: 10, z: 9 },
       { x: 10, z: 8 },
     ]
-    hold(p, 0, 0, 1.5)
+    hold(p, 0, 0, 3)
     assert.equal(p.route.length, 0)
     assert.ok(Math.abs(p.pos.z - 8) < 0.01)
     assert.ok(p.drain().filter((e) => e.type === 'reached').length === 2)

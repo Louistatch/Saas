@@ -1,12 +1,11 @@
-import { type Employment, decodeEmployment } from './employment'
 import {
   type LifeState,
   TRANSPORT_LABEL,
   TRAVEL_COST,
-  sotralFare,
   type Transport,
   decodeLomeLife,
   initialLomeLife,
+  sotralFare,
 } from '../lome-life-engine'
 /**
  * Life in the city: the player's world position and routes, visits to city lots and their
@@ -14,18 +13,16 @@ import {
  * (`LifeState`, local coordinates, construction rules, saves) without changing it.
  */
 import { actionsFor } from './activities'
+import { type Employment, decodeEmployment } from './employment'
+import { decodeCivic, reportMunicipalSignal } from './street-civic'
 export { actionsFor } from './activities'
-import type { Building } from '../townsmen-engine'
+import { type Building, decodeCity, roadNetwork } from '../townsmen-engine'
 import { hasTrait } from '../traits'
-import { type Tontine, decodeTontine } from './tontine'
-import { type NpcAnim, animFor, layoutFor } from './interiors'
 import { type Commerce, decodeCommerce, emptyCommerce } from './commerce'
 import { type Farm, decodeFarm } from './farm'
-import { type SocialLife, decodeSocial } from './social'
-import { nextSession, sessionAt, sessionKey, whenOf } from './university'
 import { type Housing, decodeHousing } from './housing'
 import { type Plot, decodePlot } from './homebuild'
-import { type Fleet, decodeFleet, manualVehicleService } from './vehicle-economy'
+import { type NpcAnim, animFor, layoutFor } from './interiors'
 import { restoreServiceVehicle } from './jobs'
 import {
   LOCALITIES,
@@ -43,6 +40,10 @@ import {
   nearestWalkable,
   walkable,
 } from './navigation'
+import { type SocialLife, decodeSocial } from './social'
+import { type Tontine, decodeTontine } from './tontine'
+import { nextSession, sessionAt, sessionKey, whenOf } from './university'
+import { type Fleet, decodeFleet, manualVehicleService } from './vehicle-economy'
 import {
   type Lot,
   type LotType,
@@ -66,6 +67,8 @@ export type Interior =
   | 'chapel'
   | 'clinic'
 export type CityAction =
+  | 'timetable'
+  | 'civic-report'
   | 'sit'
   | 'enter'
   | 'leave'
@@ -97,6 +100,7 @@ export interface CityLife {
   v: 1
   /** Transient foreground interaction; deliberately not restored by decodeCityLife. */
   meal?: import('./dining').Meal
+  civic?: import('./street-civic').CivicState
   employment?: Employment
   commerce?: Commerce
   social?: SocialLife
@@ -207,7 +211,32 @@ export function decodeCityLife(value: unknown): CityLife | null {
   if (typeof value !== 'object' || value === null) return null
   const v = value as Partial<CityLife>
   if (v.v !== 1) return null
-  const life = decodeLomeLife(v.life)
+  let life = decodeLomeLife(v.life)
+  // City saves may put the legacy estate cursor on the virtual dirt driveway. It is
+  // walkable in the city but is not a constructed estate road. Repair only that cursor;
+  // the legacy decoder still validates every balance, building and calendar field.
+  if (
+    !life &&
+    v.life?.pos?.y === 12 &&
+    Number.isInteger(v.life.pos.x) &&
+    v.life.pos.x >= 0 &&
+    v.life.pos.x < 9
+  ) {
+    const oldX = v.life.pos.x
+    const city = decodeCity(v.life.city)
+    if (city && estateRoadsOf(city.buildings).has(`${v.life.pos.x}:12`)) {
+      const nearest = [...roadNetwork(city.buildings)]
+        .map((k) => k.split(':').map(Number))
+        .sort(
+          (a, b) =>
+            Math.abs(a[0] - oldX) +
+            Math.abs(a[1] - 12) -
+            Math.abs(b[0] - oldX) -
+            Math.abs(b[1] - 12),
+        )[0]
+      if (nearest) life = decodeLomeLife({ ...v.life, pos: { x: nearest[0], y: nearest[1] } })
+    }
+  }
   if (!life) return null
   // Saves from before the national world have no locality: they are in Lomé.
   const locality: LocalityId = isLocalityId(v.locality) ? v.locality : 'lome'
@@ -226,6 +255,7 @@ export function decodeCityLife(value: unknown): CityLife | null {
   if (v.insideLot !== null && v.insideLot !== undefined && !lotById(v.insideLot)) return null
   return restoreServiceVehicle({
     v: 1,
+    civic: decodeCivic(v.civic),
     employment: decodeEmployment(v.employment, life.day),
     commerce: decodeCommerce(v.commerce, life.spent),
     social: decodeSocial(v.social),
@@ -283,7 +313,8 @@ export function decodeCityLife(value: unknown): CityLife | null {
 function syncEstate(life: LifeState, at: WorldPoint, keepTarget = false): LifeState {
   if (!inEstate(at.x, at.y)) return life
   const l = toLocal(at)
-  const roads = estateRoadsOf(life.city.buildings)
+  // Keep the estate cursor on a constructed road, as required by its original decoder.
+  const roads = roadNetwork(life.city.buildings)
   if (!roads.has(`${l.x}:${l.y}`)) return life
   // Walking a route to a chosen building keeps that choice: the door resolver prefers it.
   return life.pos.x === l.x && life.pos.y === l.y
@@ -560,6 +591,10 @@ export function cityInteract(s: CityLife, action: CityAction): CityLife {
   const allowed = actionsFor(lot.type, lot.service).some((a) => a.id === action)
   if (!allowed) return note(s, 'Ce lieu ne propose pas cette activité.')
   switch (action) {
+    case 'timetable':
+      return note(s, 'Consulte l’emploi du temps : les horaires suivent la semaine du jeu.')
+    case 'civic-report':
+      return reportMunicipalSignal(s)
     case 'sit':
       return note(s, 'Choisis une chaise libre pour t’asseoir.')
     case 'socialize': {
@@ -829,7 +864,12 @@ export function freelyWalkable(
 }
 
 /** The avatar reached another cell on its own (joystick or vehicle): record it, no path check. */
-export function moveTo(s: CityLife, cell: WorldPoint, pose?: CityLife['pose']): CityLife {
+export function moveTo(
+  s: CityLife,
+  cell: WorldPoint,
+  pose?: CityLife['pose'],
+  guided = false,
+): CityLife {
   if (s.at.x === cell.x && s.at.y === cell.y) return pose ? { ...s, pose } : s
   const life = syncEstate(
     {
@@ -838,6 +878,26 @@ export function moveTo(s: CityLife, cell: WorldPoint, pose?: CityLife['pose']): 
       needs: { ...s.life.needs, energy: clamp(s.life.needs.energy - 1) },
     },
     cell,
+    guided,
   )
-  return { ...s, at: { ...cell }, life, route: [], target: null, pose }
+  return {
+    ...s,
+    at: { ...cell },
+    life,
+    route: guided ? s.route : [],
+    target: guided ? s.target : null,
+    pose,
+  }
+}
+
+/** Arrival after the continuous controller has cleared its pavement route. */
+export function finishGuidedWalk(s: CityLife): CityLife {
+  if (!s.route.length) return s
+  const place = s.target ? lotById(s.target) : null
+  return note(
+    { ...s, route: [] },
+    place
+      ? `Tu es arrivé devant ${place.name ?? labelOf(place.type)}. Appuie sur Entrer.`
+      : 'Tu es arrivé à destination. Choisis une bulle pour continuer.',
+  )
 }

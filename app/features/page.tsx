@@ -1,5 +1,7 @@
+import { HarooCardSpecimen } from '@/components/marketing/haroo-card-specimen'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
 import { Button } from '@/components/ui/button'
+import { publicPageMetadata } from '@/lib/seo'
 import {
   ArrowRight,
   BarChart3,
@@ -21,6 +23,8 @@ import {
   Zap,
 } from 'lucide-react'
 import Link from 'next/link'
+
+export const metadata = publicPageMetadata('/features')
 
 const FAITIERE_FEATURES = [
   {
@@ -216,14 +220,9 @@ export default function FeaturesPage() {
                 key={role}
                 className="rounded-2xl border border-amber-200/60 bg-white dark:bg-card p-6 shadow-sm"
               >
-                {/* Spécimen rendu par le moteur de cartes : ce que le titulaire
-                    reçoit réellement, pas une vignette décorative. */}
-                <img
-                  src={`/api/haroo/card/preview?type=${type}`}
+                <HarooCardSpecimen
+                  type={type}
                   alt={`Spécimen de carte professionnelle ${role}`}
-                  width={1180}
-                  height={740}
-                  loading="lazy"
                   className="mb-4 w-full rounded-lg border border-border shadow-sm"
                 />
                 <div
