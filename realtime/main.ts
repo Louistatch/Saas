@@ -32,6 +32,7 @@ async function main(url: string, anonKey: string) {
         resolve('supabase/migrations/20261017_140000_haroolife_push.sql'),
         resolve('supabase/migrations/20261017_160000_haroolife_usernames.sql'),
         resolve('supabase/migrations/20261017_170000_haroolife_username_adult.sql'),
+        resolve('supabase/migrations/20261017_190000_haroolife_board_posts.sql'),
       ])
     : null
   const chat = localChat ?? adapters.chat

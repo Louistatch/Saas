@@ -2,8 +2,11 @@
  * Draws a billboard face on a 2D canvas (browser only): the creative's colours, title, short
  * text, the advertiser, and « Promotion » when sponsored. An optional poster image (allowed
  * host, already validated) is drawn underneath when it loads; any failure keeps the drawn face.
+ * A player's post names who rented it; a support nobody rents reads « Panneau disponible · À
+ * louer », large enough to be read from across the street.
  */
 import { type AdCampaign, isSponsored, safeImage } from './campaigns'
+import { RENT_OPTIONS } from './rental'
 
 export const POSTER_W = 512
 export const POSTER_H = 288
@@ -36,6 +39,10 @@ export function drawPoster(
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   const [bg, fg, accent] = c.creative.palette
+  if (c.advertiser.kind === 'vacant') {
+    drawVacant(ctx, bg, fg, accent)
+    return
+  }
   ctx.fillStyle = bg
   ctx.fillRect(0, 0, POSTER_W, POSTER_H)
   if (image) {
@@ -64,7 +71,13 @@ export function drawPoster(
   }
   ctx.font = '700 18px system-ui, sans-serif'
   ctx.fillStyle = accent
-  ctx.fillText(c.advertiser.name.toUpperCase(), 42, 14)
+  ctx.fillText(
+    c.advertiser.kind === 'player'
+      ? `Annonce de ${c.advertiser.name}`
+      : c.advertiser.name.toUpperCase(),
+    42,
+    14,
+  )
   if (isSponsored(c)) {
     const label = 'Promotion'
     ctx.font = '700 18px system-ui, sans-serif'
@@ -74,6 +87,51 @@ export function drawPoster(
     ctx.fillStyle = '#111827'
     ctx.fillText(label, POSTER_W - w - 4, 15)
   }
+}
+
+/** « Panneau disponible », and an « À louer » band with the price: the call to rent it. */
+function drawVacant(ctx: CanvasRenderingContext2D, bg: string, fg: string, accent: string) {
+  ctx.fillStyle = bg
+  ctx.fillRect(0, 0, POSTER_W, POSTER_H)
+  // Hazard-tape corner, as on the empty frames along Lomé's boulevards.
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(0, 0, POSTER_W, 22)
+  ctx.clip()
+  for (let x = -40; x < POSTER_W + 40; x += 40) {
+    ctx.fillStyle = accent
+    ctx.beginPath()
+    ctx.moveTo(x, 22)
+    ctx.lineTo(x + 20, 0)
+    ctx.lineTo(x + 40, 0)
+    ctx.lineTo(x + 20, 22)
+    ctx.fill()
+  }
+  ctx.restore()
+  ctx.textBaseline = 'top'
+  ctx.fillStyle = fg
+  ctx.font = '900 54px system-ui, sans-serif'
+  ctx.fillText('PANNEAU', 34, 40)
+  ctx.fillText('DISPONIBLE', 34, 98)
+  ctx.fillStyle = accent
+  ctx.fillRect(0, POSTER_H - 96, POSTER_W, 96)
+  ctx.fillStyle = '#ffffff'
+  ctx.font = '900 50px system-ui, sans-serif'
+  ctx.fillText('À LOUER', 34, POSTER_H - 76)
+  ctx.font = '700 22px system-ui, sans-serif'
+  ctx.textAlign = 'right'
+  ctx.fillText(
+    `dès ${RENT_OPTIONS[0].price.toLocaleString('fr-FR')} FCFA`,
+    POSTER_W - 24,
+    POSTER_H - 80,
+  )
+  ctx.fillText('par jour', POSTER_W - 24, POSTER_H - 50)
+  ctx.textAlign = 'left'
+  ctx.fillStyle = fg
+  ctx.globalAlpha = 0.75
+  ctx.font = '600 20px system-ui, sans-serif'
+  ctx.fillText('Touche-le pour y passer ton information', 34, 160)
+  ctx.globalAlpha = 1
 }
 
 /** Loads the creative's image if any (CORS, timeout); resolves null on any problem. */

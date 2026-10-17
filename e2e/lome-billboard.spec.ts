@@ -7,7 +7,12 @@ import { expect, test } from './lome-test'
  * only on « En savoir plus », count exposure and clicks as aggregates, hide expired campaigns, and
  * cost little to render. The partner below is a fictional demo creative injected by the test.
  */
-type Ads = { built: string[]; showing: Record<string, string>; impressions: number }
+type Ads = {
+  built: string[]
+  showing: Record<string, string>
+  impressions: number
+  screen: Record<string, { x: number; y: number; seen: boolean }>
+}
 type Perf = {
   drawCalls: number
   triangles: number
@@ -88,8 +93,11 @@ test('billboards in the street: build, read, learn more, statistics, expiry, cos
   expect((await ads(bare))?.built ?? [], 'kill switch: nothing built').toEqual([])
   await bare.close()
   await open(page, 'demo')
-  await expect.poll(async () => (await ads(page))?.built.length ?? 0, { timeout: 15000 }).toBe(2)
+  await expect
+    .poll(async () => (await ads(page))?.built ?? [], { timeout: 15000 })
+    .toEqual(expect.arrayContaining(['lome-avenue', 'lome-jardin']))
   const on = await settledPerf(page)
+  const built = (await ads(page))?.built.length ?? 0
   testInfo.annotations.push({
     type: 'billboards cost (SwiftShader)',
     description: JSON.stringify({
@@ -100,7 +108,10 @@ test('billboards in the street: build, read, learn more, statistics, expiry, cos
       p95ms: [off.frame.p95, on.frame.p95],
     }),
   })
-  expect(on.drawCalls - off.drawCalls, 'a few draw calls per support').toBeLessThanOrEqual(12)
+  // One draw call per poster; the posts and frames of every support share one instanced mesh.
+  expect(on.drawCalls - off.drawCalls, 'about one draw call per support').toBeLessThanOrEqual(
+    built + 4,
+  )
   // The supports' own geometry, counted exactly (scene totals move with pedestrians and traffic).
   const own = await page.evaluate(() => {
     const scene = (
@@ -110,7 +121,7 @@ test('billboards in the street: build, read, learn more, statistics, expiry, cos
     return { tris: g.triangles, boards: g.matches }
   })
   testInfo.annotations.push({ type: 'billboards own geometry', description: JSON.stringify(own) })
-  expect(own.boards).toBe(2)
+  expect(own.boards).toBe(built)
   expect(own.tris / own.boards, 'triangles per support').toBeLessThan(100)
 
   // Physical supports exist in the scene, with their poster.
@@ -196,6 +207,154 @@ test('billboards in the street: build, read, learn more, statistics, expiry, cos
   testInfo.annotations.push({ type: 'stats batch', description: JSON.stringify(body) })
 
   expect(await page.locator('canvas').count()).toBe(1)
+  expect(errors).toEqual([])
+})
+
+type Post = {
+  id: string
+  placement: string
+  title: string
+  body: string
+  palette: number
+  author: string
+  mine: boolean
+  startsAt: string
+  endsAt: string
+}
+const wallet = (page: Page) =>
+  page.evaluate(
+    () => (window as unknown as { __LOME_CITY?: { wallet: number } }).__LOME_CITY?.wallet ?? 0,
+  )
+/** Built supports on screen whose face is of this kind (`vacant:` or `post:`). */
+const onScreen = async (page: Page, kind: 'vacant:' | 'post:') => {
+  const a = await ads(page)
+  if (!a) return []
+  return a.built.filter((id) => a.showing[id]?.startsWith(kind) && a.screen[id]?.seen)
+}
+async function touch(page: Page, id: string, mobile: boolean) {
+  const box = await page.locator('canvas:visible').first().boundingBox()
+  const at = (await ads(page))?.screen[id]
+  if (!box || !at) throw new Error(`support ${id} not on screen`)
+  if (mobile) await page.touchscreen.tap(box.x + at.x, box.y + at.y)
+  else await page.mouse.click(box.x + at.x, box.y + at.y)
+}
+
+/**
+ * Supports nobody rents read « Panneau disponible · À louer »; any support on screen opens its
+ * sheet when touched, near or far. A player rents a free one with game money and writes their
+ * notice (no phone number, link or e-mail), the street shows it, and another player's notice can
+ * be read and reported. The database is stood in for by the test (its rules, prices and wallet
+ * check run on the real migration in tests/haroolife-board-sql.test.ts).
+ */
+test('free billboards: « À louer », touched from afar, rented with game money, reported', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(240_000)
+  const mobile = /mobile/.test(testInfo.project.name)
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  const state: { posts: Post[]; rented: Record<string, unknown>[]; reported: string[] } = {
+    posts: [],
+    rented: [],
+    reported: [],
+  }
+  await page.route('**/rest/v1/rpc/haroolife_board_posts_live', (route) =>
+    route.fulfill({ json: state.posts }),
+  )
+  await page.route('**/rest/v1/rpc/haroolife_board_rent', async (route) => {
+    const a = route.request().postDataJSON() as Record<string, unknown>
+    state.rented.push(a)
+    const now = Date.now()
+    const post: Post = {
+      id: '9b000000-0000-4000-8000-000000000001',
+      placement: String(a.p_placement),
+      title: String(a.p_title).trim(),
+      body: String(a.p_body).trim(),
+      palette: Number(a.p_palette),
+      author: '@moi_test',
+      mine: true,
+      startsAt: new Date(now).toISOString(),
+      endsAt: new Date(now + Number(a.p_hours) * 3600e3).toISOString(),
+    }
+    state.posts.push(post)
+    return route.fulfill({ json: { ...post, price: 5000, duplicate: false } })
+  })
+  await page.route('**/rest/v1/rpc/haroolife_board_report', async (route) => {
+    state.reported.push(String((route.request().postDataJSON() as { p_reason: string }).p_reason))
+    return route.fulfill({ json: { ok: true, hidden: false } })
+  })
+
+  // First visit: which free supports stand in view of the arrival.
+  await open(page, 'live')
+  await expect
+    .poll(async () => (await onScreen(page, 'vacant:')).length, { timeout: 20000 })
+    .toBeGreaterThanOrEqual(2)
+  const [mineAt, theirsAt] = await onScreen(page, 'vacant:')
+  // Another player rents one of them; the street shows it at the next visit.
+  state.posts.push({
+    id: '9b000000-0000-4000-8000-0000000000aa',
+    placement: theirsAt,
+    title: 'Tontine du quartier',
+    body: 'Réunion dimanche après la messe, chez Tante Ablavi.',
+    palette: 2,
+    author: '@yawa_tokoin',
+    mine: false,
+    startsAt: new Date(Date.now() - 3600e3).toISOString(),
+    endsAt: new Date(Date.now() + 86400e3).toISOString(),
+  })
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect.poll(async () => (await player(page))?.mode ?? null, { timeout: 30000 }).toBe('idle')
+  await expect
+    .poll(async () => (await ads(page))?.showing[theirsAt] ?? '', { timeout: 20000 })
+    .toBe('post:9b000000-0000-4000-8000-0000000000aa')
+  expect((await ads(page))?.showing[mineAt]).toBe(`vacant:${mineAt}`)
+  await expect.poll(async () => (await ads(page))?.screen[mineAt]?.seen ?? false).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath('billboards-for-rent.png') })
+
+  // Touched from where the player stands: the sheet to rent it.
+  await touch(page, mineAt, mobile)
+  const rent = page.getByTestId('board-rent')
+  await expect(rent).toBeVisible()
+  await expect(rent).toContainText('Panneau disponible')
+  const before = await wallet(page)
+  expect(before).toBeGreaterThanOrEqual(5000)
+  await rent.getByLabel('Titre').fill('Maïs de Bè')
+  // A phone number is refused before anything is sent.
+  await rent.getByLabel('Ton information').fill('Appelle-moi au 90 12 34 56')
+  await expect(rent.getByRole('alert')).toContainText('Pas de numéro de téléphone')
+  await expect(rent.getByRole('button', { name: /^Louer pour/ })).toBeDisabled()
+  await rent.getByLabel('Ton information').fill('Je vends mon maïs, passe au marché samedi.')
+  await rent.getByLabel('Couleurs 2').check({ force: true })
+  await expect(rent.getByRole('img', { name: 'Aperçu du panneau : Maïs de Bè' })).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('billboard-rent-sheet.png') })
+  await rent.getByRole('button', { name: /^Louer pour 5\s000 FCFA$/ }).click()
+  await expect(page.getByTestId('board-post')).toContainText('C’est ton panneau')
+  expect(state.rented).toEqual([
+    expect.objectContaining({
+      p_placement: mineAt,
+      p_hours: 24,
+      p_title: 'Maïs de Bè',
+      p_palette: 1,
+    }),
+  ])
+  await expect.poll(() => wallet(page)).toBe(before - 5000)
+  // The street shows the notice at once.
+  await expect
+    .poll(async () => (await ads(page))?.showing[mineAt] ?? '')
+    .toBe('post:9b000000-0000-4000-8000-000000000001')
+  await page.getByRole('button', { name: 'Retour au jeu' }).click()
+  await page.screenshot({ path: testInfo.outputPath('billboard-rented.png') })
+
+  // Another player's notice: read it, and report it.
+  await expect.poll(async () => (await ads(page))?.screen[theirsAt]?.seen ?? false).toBe(true)
+  await touch(page, theirsAt, mobile)
+  const theirs = page.getByTestId('board-post')
+  await expect(theirs).toContainText('Tontine du quartier')
+  await expect(theirs).toContainText('Annonce de @yawa_tokoin')
+  await theirs.getByRole('button', { name: 'Signaler' }).click()
+  await theirs.getByRole('button', { name: 'Arnaque' }).click()
+  await expect(theirs.locator('output')).toContainText('signalement est envoyé')
+  expect(state.reported).toEqual(['arnaque'])
   expect(errors).toEqual([])
 })
 

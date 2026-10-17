@@ -11,10 +11,14 @@ import {
   type AdCampaign,
   type AdPlacement,
   INTERNAL_CAMPAIGNS,
+  isAdFace,
   isSponsored,
   safeHref,
 } from '@/lib/haroolife/ads/campaigns'
 import { ExposureTracker } from '@/lib/haroolife/ads/exposure'
+import { livePosts } from '@/lib/haroolife/ads/board-client'
+import { type BoardPost, RENT_OPTIONS, postFace } from '@/lib/haroolife/ads/rental'
+import BoardSheet from './board-sheet'
 import ResidentConversation from './resident-conversation'
 import GameMarket from './game-market'
 import { GOODS, buyEstateMeal } from '@/lib/haroolife/city/commerce'
@@ -148,6 +152,8 @@ import {
 import { eventById, resolveEvent } from '@/lib/haroolife/lome-events'
 import { claimMoney, sendMoney } from '@/lib/haroolife/money'
 import { debateOfDay, jokeAt, jokeMessage, voteMessage } from '@/lib/haroolife/humour'
+import { messeAnnouncement, weekOf } from '@/lib/haroolife/togo-buzz'
+import TogoBuzzCards from './togo-buzz-cards'
 import { settleTontine } from '@/lib/haroolife/city/tontine'
 import { uuid } from '@/lib/haroolife/realtime/client'
 import { type RemoteVehicle, ridePose, vehicleMode } from '@/lib/haroolife/realtime/interpolate'
@@ -680,6 +686,8 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   const [adFocus, setAdFocus] = useState<{ placement: AdPlacement; campaign: AdCampaign } | null>(
     null,
   )
+  // Supports rented by players (shown first on their support), refreshed every minute.
+  const [boardPosts, setBoardPosts] = useState<BoardPost[]>([])
   const adTracker = useRef<ExposureTracker | null>(null)
   if (!adTracker.current) adTracker.current = new ExposureTracker()
   const adsEnabled = process.env.NEXT_PUBLIC_HAROOLIFE_ADS !== 'off'
@@ -730,9 +738,13 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                                     : panel === 'billboard'
                                       ? 'Panneau publicitaire'
                                       : panel === 'ad'
-                                        ? adFocus && isSponsored(adFocus.campaign)
-                                          ? 'Promotion'
-                                          : 'Information FaîtiereHub'
+                                        ? adFocus?.campaign.advertiser.kind === 'vacant'
+                                          ? 'Panneau à louer'
+                                          : adFocus?.campaign.advertiser.kind === 'player'
+                                            ? 'Annonce d’un joueur'
+                                            : adFocus && isSponsored(adFocus.campaign)
+                                              ? 'Promotion'
+                                              : 'Information FaîtiereHub'
                                         : panel === 'lot'
                                           ? 'Lieu'
                                           : panel === 'cooperative'
@@ -833,6 +845,43 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
       stop = true
     }
   }, [adsEnabled, cityLife.locality])
+  // Sunday evening: the game says once a week that the Cardinal is about to speak (la messe).
+  useEffect(() => {
+    if (!loaded) return
+    const tell = () => {
+      const line = messeAnnouncement(Date.now())
+      if (!line) return
+      const week = String(weekOf(Date.now()))
+      try {
+        if (localStorage.getItem('haroolife.messe.v1') === week) return
+        localStorage.setItem('haroolife.messe.v1', week)
+      } catch {
+        return
+      }
+      setCityLife((old) => ({
+        ...old,
+        life: { ...old.life, lastEvent: line, events: [line, ...old.life.events].slice(0, 8) },
+      }))
+    }
+    tell()
+    const id = window.setInterval(tell, 60_000)
+    return () => window.clearInterval(id)
+  }, [loaded])
+  useEffect(() => {
+    if (!adsEnabled) return
+    let stop = false
+    const locality = cityLife.locality === 'kara' ? 'kara' : 'lome'
+    const load = () =>
+      void livePosts(locality).then((posts) => {
+        if (!stop && posts) setBoardPosts(posts)
+      })
+    load()
+    const id = window.setInterval(load, 60_000)
+    return () => {
+      stop = true
+      window.clearInterval(id)
+    }
+  }, [adsEnabled, cityLife.locality])
   // Aggregated statistics leave every minute and when the page is hidden (counts only).
   useEffect(() => {
     if (!adsEnabled) return
@@ -871,13 +920,40 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     (p: { placement: AdPlacement; campaign: AdCampaign } | null) => setNearAd(p),
     [],
   )
+  // A billboard touched in the street, near or far: its sheet (read it, rent it, report it).
+  const onTapAd = useCallback((p: { placement: AdPlacement; campaign: AdCampaign }) => {
+    setAdFocus(p)
+    setPanel('ad')
+  }, [])
   const adsProp = useMemo(
     () =>
       adsEnabled && adTracker.current
-        ? { campaigns: adCampaigns, tracker: adTracker.current, onNear: onNearAd }
+        ? {
+            campaigns: adCampaigns,
+            posts: boardPosts,
+            tracker: adTracker.current,
+            onNear: onNearAd,
+            onTap: onTapAd,
+          }
         : undefined,
-    [adsEnabled, adCampaigns, onNearAd],
+    [adsEnabled, adCampaigns, boardPosts, onNearAd, onTapAd],
   )
+  function boardRented(post: BoardPost, price: number, duplicate: boolean) {
+    setBoardPosts((old) => [...old.filter((p) => p.id !== post.id), post])
+    if (adFocus) setAdFocus({ placement: adFocus.placement, campaign: postFace(post) })
+    if (duplicate) return
+    const days = RENT_OPTIONS.find((o) => o.price === price)?.label ?? ''
+    const line = `Tu as loué le panneau « ${adFocus?.placement.label ?? post.placement} » pour ${days} : ${money(price)}. Tout le quartier le voit.`
+    setCityLife((old) => ({
+      ...old,
+      life: {
+        ...old.life,
+        wallet: Math.max(0, old.life.wallet - price),
+        lastEvent: line,
+        events: [line, ...old.life.events].slice(0, 8),
+      },
+    }))
+  }
   function readAd() {
     if (!nearAd) return
     setAdFocus(nearAd)
@@ -2694,9 +2770,17 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                   📣
                 </span>
                 <span className="min-w-0 leading-tight">
-                  <span className="block">Lire l’annonce</span>
+                  <span className="block">
+                    {nearAd.campaign.advertiser.kind === 'vacant'
+                      ? 'Louer ce panneau'
+                      : 'Lire l’annonce'}
+                  </span>
                   <span className="block truncate text-[11px] font-semibold text-slate-500">
-                    {isSponsored(nearAd.campaign) ? 'Promotion' : nearAd.campaign.advertiser.name}
+                    {nearAd.campaign.advertiser.kind === 'vacant'
+                      ? `dès ${money(RENT_OPTIONS[0].price)}`
+                      : isSponsored(nearAd.campaign)
+                        ? 'Promotion'
+                        : nearAd.campaign.advertiser.name}
                   </span>
                 </span>
               </button>
@@ -3535,6 +3619,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                             </button>
                           </div>
                         </section>
+                        <TogoBuzzCards origin={cityLife.origin} onShare={say} />
                         {debateNote && (
                           <p role="status" className="text-sm text-slate-600">
                             {debateNote}
@@ -4456,7 +4541,17 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                       pour retrouver votre coopérative, ses membres et ses regroupements.
                     </p>
                   ))}
-                {panel === 'ad' && adFocus && (
+                {panel === 'ad' && adFocus && !isAdFace(adFocus.campaign) && (
+                  <BoardSheet
+                    focus={adFocus}
+                    posts={boardPosts}
+                    wallet={life.wallet}
+                    beforeRent={cloud.flush}
+                    onRented={boardRented}
+                    onClose={() => setPanel(null)}
+                  />
+                )}
+                {panel === 'ad' && adFocus && isAdFace(adFocus.campaign) && (
                   <>
                     <div
                       data-testid="ad-focus"

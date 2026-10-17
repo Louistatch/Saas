@@ -1,8 +1,11 @@
 /**
  * Debates and humour, Togolese style: the debate of the day (two camps, defended by the real
- * players in the « Togo » room) and the joke of the day. Everyday life only: food, transport,
- * the market, family, the weather. Never politics, religion or ethnic groups.
- * Original texts written for the game.
+ * players in the « Togo » room) and the joke of the day. Everyday life and its frustrations,
+ * laughed at by those who live them: food and the single meal of the day, transport, the market,
+ * family, the weather, power cuts, roads and works never finished, the students' bursary, the
+ * dream of leaving. Never a party, a minister, a real person, an ethnic group or a faith.
+ * The rumour of the day and the Sunday live are in ./togo-buzz.ts. Original texts written for
+ * the game.
  */
 
 export interface Debate {
@@ -78,6 +81,36 @@ export const DEBATES: Debate[] = [
     question: 'Pire saison pour la peau ?',
     sides: ['L’harmattan qui sèche tout', 'La chaleur de mars'],
   },
+  {
+    id: 'mayi-essime',
+    question: 'Partir en Europe ou réussir au pays ?',
+    sides: ['Mayi Essimé !', 'On construit ici'],
+  },
+  {
+    id: 'delestage',
+    question: 'Délestage à 20 h. Le programme ?',
+    sides: ['Bougie et histoires de grand-mère', 'Chez le voisin qui a un groupe'],
+  },
+  {
+    id: 'tranche',
+    question: 'La tranche tombe enfin. Premier achat ?',
+    sides: ['Rembourser les amis', 'Un poulet braisé, j’ai souffert'],
+  },
+  {
+    id: 'zero-zero-un',
+    question: 'Un seul repas aujourd’hui : on le prend quand ?',
+    sides: ['À midi, pour tenir', 'Le soir, pour bien dormir'],
+  },
+  {
+    id: 'chantier',
+    question: 'Le boulevard en travaux depuis des années…',
+    sides: ['Il sera fini un jour', 'Mes petits-enfants le verront'],
+  },
+  {
+    id: 'buzz',
+    question: 'Une vidéo du quartier fait le buzz…',
+    sides: ['Je partage tout de suite', 'Je vérifie d’abord'],
+  },
 ]
 
 export const JOKES: string[] = [
@@ -99,6 +132,17 @@ export const JOKES: string[] = [
   'Quand le ballon de la sélection rentre, même les voisins fâchés s’embrassent.',
   'Ma grand-mère n’a pas de téléphone, mais elle connaît toutes les nouvelles avant nous.',
   'À l’harmattan, on ne se reconnaît plus : tout le monde a le même visage gris de poussière.',
+  'Régime 0-0-1 : zéro le matin, zéro à midi, un repas le soir. Le docteur dit « jeûne intermittent », nous on dit « fin du mois ».',
+  'On m’a demandé combien de repas je prends par jour. J’ai répondu : « Tu parles de cette semaine ou de la semaine du 25 ? »',
+  'Mon cousin a crié « Mayi Essimé ! » à tout le quartier. Trois jours après, on l’a vu au marché d’Adawlato. Il dit que c’est l’escale.',
+  'Au Togo il y a trois saisons : la saison sèche, la saison des pluies et la saison des résultats de la DV.',
+  'La CEET coupe juste avant le but. Elle doit soutenir l’autre équipe.',
+  'Chez nous, le congélateur sert surtout à garder la sauce tiède pendant le délestage.',
+  'La route était tellement abîmée que le zém a demandé un supplément « tout-terrain ».',
+  'Le panneau du chantier dit « fin des travaux : 2021 ». Il est poli : il n’a pas précisé quelle année 2021.',
+  'À l’université, on ne demande pas « ça va ? ». On demande : « La tranche est tombée ? »',
+  'Une vidéo de mon quartier a fait le buzz. Tout le monde est célèbre, sauf celui qui a filmé : plus de forfait pour la poster.',
+  'Il a plu vingt minutes. Le caniveau a décidé de devenir une rivière, et le zém un piroguier.',
 ]
 
 /** Same debate and joke for everyone on a given game day. */

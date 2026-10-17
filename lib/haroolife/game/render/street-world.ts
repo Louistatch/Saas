@@ -3,13 +3,13 @@ import {
   type AdPlacement,
   PLACEMENTS,
   ROTATION_MS,
-  campaignFor,
   supportNear,
   supportsSeen,
   supportsToBuild,
 } from '@/lib/haroolife/ads/campaigns'
 import type { ExposureTracker } from '@/lib/haroolife/ads/exposure'
 import { POSTER_H, POSTER_W, drawPoster, loadPosterImage } from '@/lib/haroolife/ads/poster'
+import { type BoardPost, faceFor } from '@/lib/haroolife/ads/rental'
 import type { ServiceCustomer } from '@/lib/haroolife/city/automatic-service'
 import { pagneColor } from '@/lib/haroolife/city/avatar'
 /**
@@ -194,8 +194,12 @@ export interface StreetWorldOptions {
 
 export interface StreetAds {
   campaigns: AdCampaign[]
+  /** Faces rented by players (shown first on their support). */
+  posts?: BoardPost[]
   tracker: ExposureTracker
   onNear: (p: { placement: AdPlacement; campaign: AdCampaign } | null) => void
+  /** A support was touched on screen (any distance): its sheet, to read or rent it. */
+  onTap?: (p: { placement: AdPlacement; campaign: AdCampaign }) => void
 }
 export interface StreetPoseFeed {
   onPose(fn: (s: { key: string; pose: Pose }) => void): () => void
@@ -210,6 +214,7 @@ const BOARD_SCALE = 1.54
 interface Board {
   placement: AdPlacement
   root: THREE.Group
+  poster: THREE.Mesh
   canvas: HTMLCanvasElement
   texture: THREE.CanvasTexture
   material: THREE.MeshBasicMaterial
@@ -269,6 +274,8 @@ export class StreetWorld {
   private readonly unitBox = new THREE.BoxGeometry(1, 1, 1)
   /** Billboard posts and frame, built once and shared by every support. */
   private boardFrame: THREE.BufferGeometry | null = null
+  /** Every support's posts and frame in one draw call (a hidden support is scaled to zero). */
+  private boardFrames: THREE.InstancedMesh | null = null
   private readonly raycaster = new THREE.Raycaster()
   private readonly groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
   private readonly resizeObserver: ResizeObserver
@@ -379,6 +386,15 @@ export class StreetWorld {
     ) {
       this.events.onVehicle?.()
       return
+    }
+    // A billboard under the finger: its sheet (read it, or rent it when it is free).
+    const board = this.boardAt()
+    if (board && this.ads?.onTap) {
+      const campaign = this.showing[board.placement.id]
+      if (campaign) {
+        this.ads.onTap({ placement: board.placement, campaign })
+        return
+      }
     }
     const hit = new THREE.Vector3()
     if (this.raycaster.ray.intersectPlane(this.groundPlane, hit))
@@ -619,6 +635,8 @@ export class StreetWorld {
     ;(window as unknown as { __LOME_SUMMON_WALKER?: unknown }).__LOME_SUMMON_WALKER = undefined
     this.unitBox.dispose()
     this.boardFrame?.dispose()
+    this.boardFrames?.removeFromParent()
+    this.boardFrames?.dispose()
     for (const m of this.materials.values()) m.dispose()
     for (const gltf of this.loaded.splice(0))
       gltf.scene.traverse((o) => {
@@ -1505,10 +1523,8 @@ export class StreetWorld {
     const now = Date.now()
     const m: Record<string, AdCampaign> = {}
     if (this.ads)
-      for (const p of this.supports) {
-        const c = campaignFor(p, this.ads.campaigns, now)
-        if (c) m[p.id] = c
-      }
+      for (const p of this.supports)
+        m[p.id] = faceFor(p, this.ads.campaigns, this.ads.posts ?? [], now)
     this.showing = m
     for (const b of this.boards.values()) this.paint(b)
   }
@@ -1536,11 +1552,22 @@ export class StreetWorld {
         ads.onNear(close ? { placement: close, campaign: this.showing[close.id] } : null)
       }
     }
+    const v = new THREE.Vector3()
+    const screen: Record<string, { x: number; y: number; seen: boolean }> = {}
+    for (const [id, b] of this.boards) {
+      b.poster.getWorldPosition(v).project(this.camera)
+      screen[id] = {
+        x: Math.round((v.x * 0.5 + 0.5) * this.width),
+        y: Math.round((-v.y * 0.5 + 0.5) * this.height),
+        seen: Math.abs(v.x) < 0.9 && Math.abs(v.y) < 0.9 && v.z < 1,
+      }
+    }
     ;(window as unknown as { __LOME_ADS?: unknown }).__LOME_ADS = {
       built: [...this.boards.keys()],
       showing: Object.fromEntries(Object.entries(this.showing).map(([k, v]) => [k, v.id])),
       textures: this.boards.size,
       impressions: this.impressions,
+      screen,
     }
   }
 
@@ -1552,23 +1579,9 @@ export class StreetWorld {
     root.position.set(placement.x * U, 0, placement.y * U)
     root.rotation.y = THREE.MathUtils.degToRad(BOARD_YAW[placement.faces])
     root.scale.setScalar(BOARD_SCALE)
-    // Square steel posts and the frame, merged: one mesh (36 triangles) per support.
-    if (!this.boardFrame) {
-      const parts = (
-        [
-          [-0.72, 0.8, 0.09, 1.6],
-          [0.72, 0.8, 0.09, 1.6],
-          [0, 2.05, 1.95, 1.2],
-        ] as const
-      ).map(([x, y, w, h]) =>
-        new THREE.BoxGeometry(w, h, w === 1.95 ? 0.08 : 0.09).translate(x, y, -0.06),
-      )
-      this.boardFrame = mergeGeometries(parts) ?? new THREE.BoxGeometry(1, 1, 1)
-      for (const g of parts) g.dispose()
-    }
-    const frame = new THREE.Mesh(this.boardFrame, this.mat('#383d45'))
-    frame.castShadow = true
-    root.add(frame)
+    root.updateMatrix()
+    // Square steel posts and the frame (36 triangles): this support's instance of the shared mesh.
+    this.setFrame(placement, root.matrix)
     const canvas = document.createElement('canvas')
     canvas.width = POSTER_W
     canvas.height = POSTER_H
@@ -1583,7 +1596,7 @@ export class StreetWorld {
     poster.position.set(0, 2.05, -0.015)
     root.add(poster)
     this.scene.add(root)
-    const board: Board = { placement, root, canvas, texture, material, shown: null }
+    const board: Board = { placement, root, poster, canvas, texture, material, shown: null }
     this.boards.set(id, board)
     this.paint(board)
   }
@@ -1610,6 +1623,61 @@ export class StreetWorld {
     b.texture.dispose()
     b.material.dispose()
     this.boards.delete(id)
+    this.setFrame(b.placement, null)
+  }
+
+  /** Shows (matrix) or hides (null) a support's posts and frame in the shared instanced mesh. */
+  private setFrame(placement: AdPlacement, matrix: THREE.Matrix4 | null): void {
+    if (!this.boardFrames) {
+      if (!matrix) return
+      if (!this.boardFrame) {
+        const parts = (
+          [
+            [-0.72, 0.8, 0.09, 1.6],
+            [0.72, 0.8, 0.09, 1.6],
+            [0, 2.05, 1.95, 1.2],
+          ] as const
+        ).map(([x, y, w, h]) =>
+          new THREE.BoxGeometry(w, h, w === 1.95 ? 0.08 : 0.09).translate(x, y, -0.06),
+        )
+        this.boardFrame = mergeGeometries(parts) ?? new THREE.BoxGeometry(1, 1, 1)
+        for (const g of parts) g.dispose()
+      }
+      const im = new THREE.InstancedMesh(this.boardFrame, this.mat('#383d45'), this.supports.length)
+      im.name = 'Cadres des panneaux'
+      im.castShadow = true
+      const hidden = new THREE.Matrix4()
+      for (const [i, p] of this.supports.entries())
+        im.setMatrixAt(i, hidden.makeScale(0, 0, 0).setPosition(p.x * U, 0, p.y * U))
+      this.boardFrames = im
+      this.scene.add(im)
+    }
+    const i = this.supports.indexOf(placement)
+    if (i < 0) return
+    const im = this.boardFrames
+    im.setMatrixAt(
+      i,
+      matrix ??
+        new THREE.Matrix4().makeScale(0, 0, 0).setPosition(placement.x * U, 0, placement.y * U),
+    )
+    im.instanceMatrix.needsUpdate = true
+    im.computeBoundingSphere()
+    im.visible = this.boards.size > 0 || matrix !== null
+  }
+
+  /** The built support whose poster or frame is under the last pointer ray, nearest first. */
+  private boardAt(): Board | null {
+    if (!this.boards.size) return null
+    const roots = [...this.boards.values()].map((b) => b.poster)
+    const hits = this.raycaster.intersectObjects(roots, false)
+    // The posts and frame: the instanced mesh tells which support was touched.
+    const frames = this.boardFrames ? this.raycaster.intersectObject(this.boardFrames, false) : []
+    const near = [...hits, ...frames].sort((a, b) => a.distance - b.distance)[0]
+    if (!near) return null
+    if (near.object === this.boardFrames && near.instanceId !== undefined)
+      return this.boards.get(this.supports[near.instanceId]?.id ?? '') ?? null
+    for (const b of this.boards.values()) if (b.poster === near.object) return b
+    return null
   }
 
   // ── other players (realtime relay), interpolated between snapshots ────────────────────────

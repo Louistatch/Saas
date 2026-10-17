@@ -5,7 +5,8 @@
  * le jeu ; ici l'équipe décide : masquer le message, classer sans suite, suspendre l'écriture d'un
  * joueur pour quelques jours (il lit toujours), lever une suspension. Toutes les règles et le
  * journal sont en base (haroolife_mod_queue / haroolife_mod_act) ; l'équipe ne voit que le message
- * signalé, jamais le reste d'une conversation privée.
+ * signalé, jamais le reste d'une conversation privée. Les panneaux loués par les joueurs et
+ * signalés ont leur propre file (haroolife_board_mod_queue / haroolife_board_mod_act).
  */
 import { EmptyState } from '@/components/shared/empty-state'
 import { PageHeader } from '@/components/shared/page-header'
@@ -37,6 +38,25 @@ interface PlayerReport {
   count: number
   last: string
   reasons: string[]
+}
+interface BoardReport {
+  id: string
+  placement: string
+  title: string
+  body: string
+  endsAt: string
+  hidden: boolean
+  hiddenReason: string | null
+  author: Person
+  count: number
+  last: string
+  reasons: string[]
+}
+const REASON: Record<string, string> = {
+  insulte: 'Insulte',
+  arnaque: 'Arnaque',
+  choquant: 'Contenu choquant',
+  autre: 'Autre',
 }
 interface Queue {
   messages: MessageReport[]
@@ -85,17 +105,24 @@ function Who({ p }: { p: Person }) {
 
 export default function HarooLifeModerationPage() {
   const [queue, setQueue] = useState<Queue | null>(null)
+  const [boards, setBoards] = useState<BoardReport[] | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [days, setDays] = useState(3)
 
   const load = useCallback(async () => {
-    const { data, error: e } = await createClient().rpc('haroolife_mod_queue')
+    const supabase = createClient()
+    const [{ data, error: e }, b] = await Promise.all([
+      supabase.rpc('haroolife_mod_queue'),
+      supabase.rpc('haroolife_board_mod_queue'),
+    ])
     if (e) setError('La file de modération n’a pas pu être chargée.')
     else {
       setError('')
       setQueue(data as Queue)
     }
+    // Les panneaux : leur file à part (absente tant que la migration n'est pas appliquée).
+    setBoards(b.error ? null : ((b.data as BoardReport[]) ?? []))
   }, [])
   useEffect(() => {
     void load()
@@ -115,7 +142,19 @@ export default function HarooLifeModerationPage() {
     await load()
   }
 
-  const open = (queue?.messages.length ?? 0) + (queue?.players.length ?? 0)
+  async function actBoard(id: string, action: 'hide' | 'show' | 'dismiss', reason: string) {
+    setBusy(`board:${id}:${action}`)
+    const { error: e } = await createClient().rpc('haroolife_board_mod_act', {
+      p_post: id,
+      p_action: action,
+      p_reason: reason,
+    })
+    setBusy(null)
+    if (e) setError(e.message)
+    await load()
+  }
+
+  const open = (queue?.messages.length ?? 0) + (queue?.players.length ?? 0) + (boards?.length ?? 0)
   return (
     <div className="space-y-6">
       <PageHeader
@@ -207,6 +246,80 @@ export default function HarooLifeModerationPage() {
           </Card>
         ))}
       </section>
+
+      {boards && (
+        <section aria-labelledby="mod-boards" className="space-y-3">
+          <h2 id="mod-boards" className="text-lg font-bold">
+            Panneaux loués signalés
+          </h2>
+          {boards.length === 0 && (
+            <EmptyState
+              title="Aucun panneau à traiter"
+              description="Un panneau signalé par trois joueurs est masqué tout de suite et attend ici."
+            />
+          )}
+          {boards.map((b) => (
+            <Card key={b.id} data-testid="mod-board">
+              <CardContent className="space-y-3 pt-6">
+                <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+                  <Who p={b.author} />
+                  <span className="text-muted-foreground">
+                    {b.placement} · loué jusqu’au {when(b.endsAt)}
+                  </span>
+                </div>
+                <blockquote className="break-words rounded-lg border-l-4 border-orange-500 bg-muted px-3 py-2">
+                  <strong className="block">{b.title}</strong>
+                  {b.body}
+                </blockquote>
+                <p className="text-sm text-muted-foreground">
+                  Signalé {b.count} fois · {b.reasons.map((r) => REASON[r] ?? r).join(' · ')} ·
+                  dernier le {when(b.last)}
+                  {b.hidden ? ` · masqué (${b.hiddenReason ?? 'équipe'})` : ' · visible'}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {b.hidden ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!!busy}
+                      onClick={() => void actBoard(b.id, 'show', 'Pas de manquement')}
+                    >
+                      Rétablir le panneau
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      disabled={!!busy}
+                      onClick={() => void actBoard(b.id, 'hide', REASON[b.reasons[0]] ?? '')}
+                    >
+                      Masquer le panneau
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={!!busy}
+                    onClick={async () => {
+                      await actBoard(b.id, 'hide', REASON[b.reasons[0]] ?? '')
+                      await act('player', b.author.id, 'suspend', 'Panneau signalé')
+                    }}
+                  >
+                    Masquer et suspendre {b.author.name} ({days} j)
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!!busy}
+                    onClick={() => void actBoard(b.id, 'dismiss', 'Pas de manquement')}
+                  >
+                    Classer sans suite
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+      )}
 
       <section aria-labelledby="mod-players" className="space-y-3">
         <h2 id="mod-players" className="text-lg font-bold">

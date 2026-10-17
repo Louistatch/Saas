@@ -3,16 +3,29 @@ import { describe, it } from 'node:test'
 import {
   type AdCampaign,
   INTERNAL_CAMPAIGNS,
+  PILOT_SUPPORTS,
   PLACEMENTS,
   ROTATION_MS,
   campaignFor,
   canMove,
   exposed,
+  isAdFace,
   isSponsored,
   runsOn,
   safeHref,
   safeImage,
+  supportNear,
+  supportsSeen,
 } from '../lib/haroolife/ads/campaigns'
+import {
+  type BoardPost,
+  boardTextProblem,
+  decodePosts,
+  faceFor,
+  postIdOf,
+  rentProblem,
+  untilSaid,
+} from '../lib/haroolife/ads/rental'
 import { setLocality } from '../lib/haroolife/city/locality'
 import { inEstate, isCityRoad, lotAt, terrainAt, worldLots } from '../lib/haroolife/city/world'
 
@@ -54,12 +67,28 @@ describe('HarooLife billboards: placements and campaigns (M2)', () => {
       const d = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] }[p.faces]
       assert.ok(isCityRoad(p.x + d[0], p.y + d[1]), `${p.id} faces its road`)
     }
-    assert.equal(PLACEMENTS.filter((p) => p.locality === 'lome').length, 2)
-    assert.equal(PLACEMENTS.filter((p) => p.locality === 'kara').length, 2)
+    // A support by each market, station, university, hospital and town hall; never two side by side.
+    assert.equal(PLACEMENTS.filter((p) => p.locality === 'lome').length, 12)
+    assert.equal(PLACEMENTS.filter((p) => p.locality === 'kara').length, 8)
+    assert.equal(new Set(PLACEMENTS.map((p) => p.id)).size, PLACEMENTS.length)
+    for (const a of PLACEMENTS)
+      for (const b of PLACEMENTS)
+        if (a !== b && a.locality === b.locality)
+          assert.ok(Math.hypot(a.x - b.x, a.y - b.y) >= 4, `${a.id} / ${b.id}`)
     setLocality('lome')
   })
-  it('internal campaigns run everywhere, unsponsored; a support always shows something', () => {
-    for (const p of PLACEMENTS) assert.ok(campaignFor(p, INTERNAL_CAMPAIGNS, NOW))
+  it('FaîtiereHub notices run on the pilot supports, unsponsored; the others are for rent', () => {
+    for (const p of PLACEMENTS) {
+      const face = faceFor(p, INTERNAL_CAMPAIGNS, [], NOW)
+      if (PILOT_SUPPORTS.includes(p.id)) {
+        assert.equal(face.advertiser.kind, 'internal', p.id)
+        assert.ok(campaignFor(p, INTERNAL_CAMPAIGNS, NOW))
+      } else {
+        assert.equal(face.advertiser.kind, 'vacant', p.id)
+        assert.equal(face.creative.title, 'Panneau disponible')
+        assert.match(face.creative.body, /À louer dès 5\s000 FCFA par jour/)
+      }
+    }
     assert.ok(INTERNAL_CAMPAIGNS.every((c) => !isSponsored(c)))
   })
   it('only active (or approved) campaigns, inside their window, in their town and supports', () => {
@@ -135,6 +164,112 @@ describe('HarooLife billboards: placements and campaigns (M2)', () => {
     assert.equal(exposed(avenue, { x: avenue.x - 6, z: avenue.y, angle: 270 }), false)
     // Too far.
     assert.equal(exposed(avenue, { x: avenue.x + 30, z: avenue.y, angle: 90 }), false)
+  })
+})
+
+const post = (over: Partial<BoardPost> = {}): BoardPost => ({
+  id: '9a000000-0000-4000-8000-000000000001',
+  placement: 'lome-assigame',
+  title: 'Maïs de Bè',
+  body: 'Je vends mon maïs, passe au marché samedi.',
+  palette: 1,
+  author: '@ama_be',
+  mine: false,
+  startsAt: '2026-10-13T08:00:00Z',
+  endsAt: '2026-10-14T08:00:00Z',
+  ...over,
+})
+const assigame = PLACEMENTS.find((p) => p.id === 'lome-assigame') as (typeof PLACEMENTS)[number]
+
+describe('billboards rented by players', () => {
+  it('a rented support shows its post, in its window only, before any campaign', () => {
+    const face = faceFor(assigame, INTERNAL_CAMPAIGNS, [post()], NOW)
+    assert.deepEqual(
+      [face.advertiser, face.creative.title, face.creative.palette[0], postIdOf(face)],
+      [{ name: '@ama_be', kind: 'player' }, 'Maïs de Bè', '#14532d', post().id],
+    )
+    assert.equal(isSponsored(face), false)
+    // A partner on every Lomé support does not push a player who paid out of their window.
+    const everywhere = partner({ placements: [] })
+    assert.equal(faceFor(assigame, [everywhere], [post()], NOW).advertiser.kind, 'player')
+    assert.equal(faceFor(assigame, [everywhere], [], NOW).advertiser.kind, 'partner')
+    // Before its start, after its end, or on another support: « À louer ».
+    for (const p of [
+      post({ startsAt: '2026-10-13T11:00:00Z' }),
+      post({ endsAt: '2026-10-13T10:00:00Z' }),
+      post({ placement: 'lome-marche-be' }),
+    ])
+      assert.equal(faceFor(assigame, INTERNAL_CAMPAIGNS, [p], NOW).advertiser.kind, 'vacant')
+    assert.equal(
+      faceFor(avenue, INTERNAL_CAMPAIGNS, [post({ placement: 'lome-avenue' })], NOW).advertiser
+        .kind,
+      'player',
+    )
+  })
+  it('only campaigns count as ads: a player’s post or « À louer » is never measured', () => {
+    const showing = {
+      'lome-avenue': INTERNAL_CAMPAIGNS[0],
+      'lome-assigame': faceFor(assigame, [], [], NOW),
+      'lome-jardin': faceFor(avenue, [], [post({ placement: 'lome-avenue' })], NOW),
+    }
+    assert.deepEqual(Object.values(showing).map(isAdFace), [true, false, false])
+    const cam = (p: { x: number; y: number }, angle: number) => ({
+      tx: p.x + 6,
+      tz: p.y,
+      distance: 0,
+      angle,
+    })
+    assert.deepEqual(
+      supportsSeen(PLACEMENTS, showing, cam(avenue, 90)).map((s) => s.placement),
+      ['lome-avenue'],
+    )
+    assert.equal(supportsSeen(PLACEMENTS, showing, cam(assigame, 90)).length, 0)
+    // On foot by a free support: the button offers to rent it.
+    assert.equal(
+      supportNear(PLACEMENTS, showing, { x: assigame.x + 1, z: assigame.y }, false)?.id,
+      'lome-assigame',
+    )
+    assert.equal(supportNear(PLACEMENTS, showing, { x: assigame.x + 1, z: assigame.y }, true), null)
+  })
+  it('a notice never carries a phone number, a link or an e-mail (as the database)', () => {
+    for (const ok of [
+      'Je vends mon maïs, 25 000 le sac',
+      'Anniversaire de Kossi samedi à 16 h',
+      'Tontine : 2 000 par semaine, 12 membres',
+      'Cours de maths, 3e et 2nde, Bè.',
+    ])
+      assert.equal(boardTextProblem(ok), null, ok)
+    const bad: [string, string][] = [
+      ['Appelle au 90 12 34 56', 'telephone'],
+      ['+228.90.12.34.56', 'telephone'],
+      ['(228) 90-12-34-56', 'telephone'],
+      ['www.monmais.com', 'lien'],
+      ['Visite monmais.tg ce soir', 'lien'],
+      ['https://x.y', 'lien'],
+      ['écris à ama@mail.tg', 'email'],
+    ]
+    for (const [text, why] of bad) assert.equal(boardTextProblem(text), why, text)
+    assert.equal(rentProblem('Ma', 'Je vends'), 'Titre : de 3 à 32 caractères')
+    assert.equal(rentProblem('Maïs', 'x'.repeat(121)), 'Message : de 3 à 120 caractères')
+    assert.match(rentProblem('Maïs', 'Appelle 90123456') ?? '', /numéro de téléphone/)
+    assert.equal(rentProblem('  Maïs   de Bè ', ' Je vends\tmon maïs '), null)
+  })
+  it('posts from the network are checked field by field', () => {
+    const good = post()
+    const back = decodePosts([
+      good,
+      { ...good, id: 3 },
+      { ...good, endsAt: 'demain' },
+      { ...good, palette: 9, title: 'x'.repeat(80) },
+      null,
+      'texte',
+    ])
+    assert.equal(back.length, 2)
+    assert.deepEqual(back[0], good)
+    assert.equal(back[1].palette, 0)
+    assert.equal(back[1].title.length, 32)
+    assert.deepEqual(decodePosts({ not: 'a list' }), [])
+    assert.equal(untilSaid('2026-10-17T14:00:00Z'), 'jusqu’à samedi 14 h')
   })
 })
 

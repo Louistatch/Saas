@@ -2,10 +2,12 @@
  * HarooLife billboards (D4+, M2): physical supports placed in the 3D towns, campaigns that may
  * run on them, and the rules deciding what a support shows right now. Pure and testable.
  *
- * Nothing here is a sale. Internal campaigns promote FaîtiereHub's own services; a partner
+ * Internal campaigns promote FaîtiereHub's own services on the pilot supports; a partner
  * campaign exists only after a commercial validation outside the game (status `approved`
  * by an admin), and the panel is then marked « Promotion ». List prices stay in
- * lib/haroolife/lome-sponsors.ts as HYPOTHÈSES.
+ * lib/haroolife/lome-sponsors.ts as HYPOTHÈSES. Players rent the others with game money and
+ * post a short notice (supabase/migrations/20261017_190000_haroolife_board_posts.sql); a support
+ * nobody rents says « Panneau disponible · À louer ».
  */
 export type CampaignStatus = 'draft' | 'pending' | 'approved' | 'active' | 'paused' | 'expired'
 export type AdLocality = 'lome' | 'kara'
@@ -34,9 +36,14 @@ export interface AdCreative {
   /** Optional poster image (webp/png, https on an allowed host); a drawn poster otherwise. */
   image?: string | null
 }
+/**
+ * Who fills a face: FaîtiereHub (internal), a validated partner, a player who rented it, or
+ * nobody (vacant, « À louer »). Only internal and partner faces count as ads (exposure, clicks).
+ */
+export type FaceKind = 'internal' | 'partner' | 'player' | 'vacant'
 export interface AdCampaign {
   id: string
-  advertiser: { name: string; kind: 'internal' | 'partner' }
+  advertiser: { name: string; kind: FaceKind }
   creative: AdCreative
   status: CampaignStatus
   locality: AdLocality | 'all'
@@ -50,7 +57,11 @@ export interface AdCampaign {
   version: number
 }
 
-/** Pilot supports: two per town, beside a street near where the player arrives. */
+/**
+ * Supports: the two pilots of each town (beside a street near where the player arrives), then
+ * one by each market, station, university, hospital and town hall, on the park beside its road.
+ * The same ids are listed in private.haroolife_board_locality (SQL); a test keeps them equal.
+ */
 export const PLACEMENTS: AdPlacement[] = [
   {
     id: 'lome-avenue',
@@ -88,7 +99,154 @@ export const PLACEMENTS: AdPlacement[] = [
     faces: 'S',
     label: 'Abords du marché',
   },
+  {
+    id: 'lome-assigame',
+    locality: 'lome',
+    kind: 'market',
+    x: 49,
+    y: 52,
+    faces: 'W',
+    label: 'Grand marché d’Assigamé',
+  },
+  {
+    id: 'lome-universite',
+    locality: 'lome',
+    kind: 'roadside',
+    x: 37,
+    y: 31,
+    faces: 'N',
+    label: 'Devant l’Université de Lomé',
+  },
+  {
+    id: 'lome-chu-tokoin',
+    locality: 'lome',
+    kind: 'roadside',
+    x: 37,
+    y: 23,
+    faces: 'W',
+    label: 'Près du CHU de Tokoin',
+  },
+  {
+    id: 'lome-gare-agoe',
+    locality: 'lome',
+    kind: 'bus-stop',
+    x: 35,
+    y: 5,
+    faces: 'E',
+    label: 'Gare routière d’Agoè',
+  },
+  {
+    id: 'lome-marche-be',
+    locality: 'lome',
+    kind: 'market',
+    x: 91,
+    y: 44,
+    faces: 'W',
+    label: 'Marché de Bè',
+  },
+  {
+    id: 'lome-hotel-de-ville',
+    locality: 'lome',
+    kind: 'square',
+    x: 59,
+    y: 46,
+    faces: 'N',
+    label: 'Place de l’hôtel de ville',
+  },
+  {
+    id: 'lome-stade-kegue',
+    locality: 'lome',
+    kind: 'roadside',
+    x: 82,
+    y: 11,
+    faces: 'N',
+    label: 'Route du stade de Kégué',
+  },
+  {
+    id: 'lome-marche-adidogome',
+    locality: 'lome',
+    kind: 'market',
+    x: 7,
+    y: 46,
+    faces: 'N',
+    label: 'Marché d’Adidogomé',
+  },
+  {
+    id: 'lome-marche-tokoin',
+    locality: 'lome',
+    kind: 'market',
+    x: 32,
+    y: 34,
+    faces: 'S',
+    label: 'Marché de Tokoin',
+  },
+  {
+    id: 'lome-port-be',
+    locality: 'lome',
+    kind: 'roadside',
+    x: 75,
+    y: 67,
+    faces: 'S',
+    label: 'Port de pêche de Bè',
+  },
+  {
+    id: 'kara-grand-marche',
+    locality: 'kara',
+    kind: 'market',
+    x: 47,
+    y: 43,
+    faces: 'E',
+    label: 'Grand marché de Kara',
+  },
+  {
+    id: 'kara-universite',
+    locality: 'kara',
+    kind: 'roadside',
+    x: 7,
+    y: 34,
+    faces: 'S',
+    label: 'Université de Kara',
+  },
+  {
+    id: 'kara-chu',
+    locality: 'kara',
+    kind: 'roadside',
+    x: 28,
+    y: 21,
+    faces: 'N',
+    label: 'Près du CHU de Kara',
+  },
+  {
+    id: 'kara-prefecture',
+    locality: 'kara',
+    kind: 'square',
+    x: 59,
+    y: 21,
+    faces: 'N',
+    label: 'Devant la préfecture de la Kozah',
+  },
+  {
+    id: 'kara-lycee',
+    locality: 'kara',
+    kind: 'roadside',
+    x: 41,
+    y: 43,
+    faces: 'E',
+    label: 'Près du lycée de Kara',
+  },
+  {
+    id: 'kara-marche-kpewa',
+    locality: 'kara',
+    kind: 'market',
+    x: 31,
+    y: 46,
+    faces: 'N',
+    label: 'Marché de Kpéwa',
+  },
 ]
+
+/** The pilot supports, where FaîtiereHub's own notices run when nobody rents them. */
+export const PILOT_SUPPORTS = ['lome-avenue', 'lome-jardin', 'kara-gare', 'kara-marche']
 
 /** FaîtiereHub's own services: always available, offline included. Not sponsored. */
 export const INTERNAL_CAMPAIGNS: AdCampaign[] = [
@@ -104,7 +262,7 @@ export const INTERNAL_CAMPAIGNS: AdCampaign[] = [
     },
     status: 'active',
     locality: 'all',
-    placements: [],
+    placements: PILOT_SUPPORTS,
     startsAt: '2026-01-01T00:00:00Z',
     endsAt: '2099-01-01T00:00:00Z',
     weight: 1,
@@ -122,7 +280,7 @@ export const INTERNAL_CAMPAIGNS: AdCampaign[] = [
     },
     status: 'active',
     locality: 'all',
-    placements: [],
+    placements: PILOT_SUPPORTS,
     startsAt: '2026-01-01T00:00:00Z',
     endsAt: '2099-01-01T00:00:00Z',
     weight: 1,
@@ -196,6 +354,9 @@ export function campaignFor(
 
 /** Sponsored content is labelled « Promotion »; FaîtiereHub's own notices are not ads. */
 export const isSponsored = (c: AdCampaign) => c.advertiser.kind === 'partner'
+/** A campaign (internal or partner), counted in the statistics; not a player's post or « À louer ». */
+export const isAdFace = (c: AdCampaign) =>
+  c.advertiser.kind === 'internal' || c.advertiser.kind === 'partner'
 
 /** Allowed status moves in the admin console (with who may do them). */
 export const TRANSITIONS: Record<CampaignStatus, CampaignStatus[]> = {
@@ -275,7 +436,7 @@ export function supportsSeen(
   const back = cam.distance * 0.55
   const eye = { x: cam.tx + Math.sin(a) * back, z: cam.tz + Math.cos(a) * back, angle: cam.angle }
   return here
-    .filter((b) => showing[b.id] && exposed(b, eye))
+    .filter((b) => showing[b.id] && isAdFace(showing[b.id]) && exposed(b, eye))
     .map((b) => ({ campaign: showing[b.id].id, placement: b.id }))
 }
 

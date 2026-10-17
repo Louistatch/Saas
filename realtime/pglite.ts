@@ -80,6 +80,11 @@ const LOCAL_RPC: Record<string, string[]> = {
   haroolife_username_available: ['p_username'],
   haroolife_take_username: ['p_username', 'p_quartier', 'p_pagne', 'p_adult'],
   haroolife_my_username: [],
+  haroolife_board_posts_live: ['p_locality'],
+  haroolife_board_rent: ['p_placement', 'p_hours', 'p_title', 'p_body', 'p_palette', 'p_client_id'],
+  haroolife_board_report: ['p_post', 'p_reason'],
+  haroolife_board_mod_queue: [],
+  haroolife_board_mod_act: ['p_post', 'p_action', 'p_reason'],
 }
 
 export type LocalChat = ChatRepository & {
@@ -162,7 +167,7 @@ export async function pgliteChat(migrationPaths: string | string[]): Promise<Loc
         t,
         `SELECT ${fn}(${params})`,
         names.map((n) => args[n] ?? null),
-        fn === 'haroolife_username_available',
+        fn === 'haroolife_username_available' || fn === 'haroolife_board_posts_live',
       )
     },
     me: (t) => run<Me>(t, 'SELECT haroolife_chat_me()', []),
