@@ -30,4 +30,6 @@ export const claimSchema = z.object({
   username: z.string().min(1).max(40),
   quartier: z.string().max(20).default('tokoin'),
   pagne: z.number().int().min(1).max(8).default(1),
+  /** « J'ai 18 ans ou plus » (the birth date stays on the phone). */
+  adult: z.literal(true),
 })

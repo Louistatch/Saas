@@ -27,6 +27,25 @@ test('a visitor arrives step by step, with a username, and starts the life they 
   await page.getByLabel('Nom d’utilisateur').fill('ko')
   await expect(page.getByTestId('arrival')).toContainText('Au moins 3 caractères.')
   await expect(page.getByRole('button', { name: 'Continuer' })).toBeDisabled()
+  // Under 18: HarooLife is closed, even with a free name and the box ticked.
+  await page.getByLabel('Ton nom').fill('Petit Kodjo')
+  await page.getByLabel('Nom d’utilisateur').fill(`kid_${Date.now().toString(36).slice(-6)}`)
+  await expect(page.getByTestId('arrival')).toContainText('est libre.')
+  const year = new Date().getFullYear() - 12
+  await page.getByLabel('Jour').selectOption('1')
+  await page.getByLabel('Mois').selectOption('1')
+  await page.getByLabel('Année').selectOption(String(year))
+  await page.getByRole('checkbox', { name: /18 ans ou plus/ }).check()
+  await expect(page.getByTestId('arrival')).toContainText('réservé aux personnes de 18 ans et plus')
+  await expect(page.getByRole('button', { name: 'Continuer' })).toBeDisabled()
+  // The terms and the privacy policy open in their own tab.
+  await expect(page.getByRole('link', { name: 'Conditions d’utilisation' })).toHaveAttribute(
+    'href',
+    '/legal/conditions',
+  )
+  await page.screenshot({
+    path: testInfo.outputPath(`arrival-0-mineur-${testInfo.project.name}.png`),
+  })
   await page.getByRole('button', { name: 'Revenir à l’accueil' }).click()
 
   const shot = (step: string) =>

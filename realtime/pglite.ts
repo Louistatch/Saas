@@ -78,7 +78,7 @@ const LOCAL_RPC: Record<string, string[]> = {
   haroolife_invite_accept: ['p_code'],
   haroolife_invite_claim: [],
   haroolife_username_available: ['p_username'],
-  haroolife_claim_username: ['p_username', 'p_quartier', 'p_pagne'],
+  haroolife_take_username: ['p_username', 'p_quartier', 'p_pagne', 'p_adult'],
   haroolife_my_username: [],
 }
 

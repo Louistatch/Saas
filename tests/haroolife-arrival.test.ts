@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { ageOn, isAdult } from '../lib/haroolife/age'
 import {
   ORIGINS,
   ORIGIN_IDS,
@@ -112,4 +113,20 @@ test('each trait does what its card says, and nothing for the others', () => {
   const twoHours = (l: typeof base) => advanceLifeHour(advanceLifeHour(l)).needs.hygiene
   assert.equal(twoHours(base), base.needs.hygiene - 2)
   assert.equal(twoHours(withTrait(['propre'])), base.needs.hygiene - 1)
+})
+
+test('the 18+ gate: the age on the day, the 18th birthday counted, impossible dates refused', () => {
+  const today = new Date(2026, 9, 17) // 17 octobre 2026
+  assert.equal(ageOn({ day: 17, month: 10, year: 2008 }, today), 18)
+  assert.equal(isAdult({ day: 17, month: 10, year: 2008 }, today), true)
+  // One day short of 18.
+  assert.equal(ageOn({ day: 18, month: 10, year: 2008 }, today), 17)
+  assert.equal(isAdult({ day: 18, month: 10, year: 2008 }, today), false)
+  assert.equal(ageOn({ day: 1, month: 1, year: 1960 }, today), 66)
+  // 31 février, 29 février d'une année non bissextile, une date à venir : refusées.
+  assert.equal(ageOn({ day: 31, month: 2, year: 1990 }, today), null)
+  assert.equal(ageOn({ day: 29, month: 2, year: 2001 }, today), null)
+  assert.equal(ageOn({ day: 29, month: 2, year: 2000 }, today), 26)
+  assert.equal(ageOn({ day: 1, month: 1, year: 2030 }, today), null)
+  assert.equal(isAdult({ day: 31, month: 2, year: 1990 }, today), false)
 })

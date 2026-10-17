@@ -37,6 +37,9 @@ test('nom d’utilisateur : unique, réservé à soi, et il ouvre la maison du v
   await db.exec(`INSERT INTO public.haroolife_residents(user_id, canton_id, display_name)
                  VALUES ('${id(3)}', '10000000-0000-4000-8000-000000000003', 'Kofi')`)
   await db.exec(readFileSync('supabase/migrations/20261017_160000_haroolife_usernames.sql', 'utf8'))
+  await db.exec(
+    readFileSync('supabase/migrations/20261017_170000_haroolife_username_adult.sql', 'utf8'),
+  )
 
   // Avant de créer le compte, n'importe qui vérifie qu'un nom est libre.
   await db.exec('RESET ROLE; SET ROLE anon')
@@ -59,14 +62,29 @@ test('nom d’utilisateur : unique, réservé à soi, et il ouvre la maison du v
       reason,
       name,
     )
-  await assert.rejects(db.query("SELECT haroolife_claim_username('kodjo_lome')"))
+  await assert.rejects(db.query("SELECT haroolife_take_username('kodjo_lome', p_adult => true)"))
 
   // Ama (1), visiteuse sans maison, prend son nom à Agoè : il devient son nom dans le jeu.
+  // Sans la déclaration « 18 ans ou plus », rien n'est pris.
   await as(1)
   assert.equal(await one('SELECT haroolife_my_username()'), null)
-  assert.deepEqual(await one("SELECT haroolife_claim_username('Ama_Agoe', 'agoe', 4)"), {
-    username: 'ama_agoe',
-  })
+  await assert.rejects(db.query("SELECT haroolife_take_username('ama_agoe', 'agoe', 4)"), /18 ans/)
+  // L'ancienne entrée, sans déclaration, refuse toujours.
+  await assert.rejects(
+    db.query("SELECT haroolife_claim_username('ama_agoe', 'agoe', 4)"),
+    /18 ans/,
+  )
+  await assert.rejects(
+    db.query("SELECT haroolife_take_username('ama_agoe', 'agoe', 4, false)"),
+    /18 ans/,
+  )
+  assert.equal(await one('SELECT haroolife_my_username()'), null)
+  assert.deepEqual(
+    await one("SELECT haroolife_take_username('Ama_Agoe', 'agoe', 4, p_adult => true)"),
+    {
+      username: 'ama_agoe',
+    },
+  )
   assert.equal(await one('SELECT haroolife_my_username()'), 'ama_agoe')
   await db.exec('RESET ROLE')
   const home = (
@@ -81,24 +99,30 @@ test('nom d’utilisateur : unique, réservé à soi, et il ouvre la maison du v
   // Le même appel une deuxième fois ne change rien ; changer de nom libère l'ancien (sa maison
   // reste à Agoè) ; elle reprend le premier.
   await as(1)
-  assert.deepEqual(await one("SELECT haroolife_claim_username('ama_agoe', 'agoe')"), {
-    username: 'ama_agoe',
-  })
-  await one("SELECT haroolife_claim_username('ama_bis', 'baguida')")
+  assert.deepEqual(
+    await one("SELECT haroolife_take_username('ama_agoe', 'agoe', p_adult => true)"),
+    {
+      username: 'ama_agoe',
+    },
+  )
+  await one("SELECT haroolife_take_username('ama_bis', 'baguida', p_adult => true)")
   assert.equal(await one('SELECT haroolife_my_username()'), 'ama_bis')
   assert.equal((await one('SELECT haroolife_username_available($1)', ['ama_agoe'])).available, true)
-  await one("SELECT haroolife_claim_username('ama_agoe')")
+  await one("SELECT haroolife_take_username('ama_agoe', p_adult => true)")
 
   // Yawa (2) ne peut pas le prendre, même en majuscules ; il n'est plus libre pour personne.
   await as(2)
-  await assert.rejects(db.query("SELECT haroolife_claim_username('AMA_AGOE')"), /déjà pris/)
+  await assert.rejects(
+    db.query("SELECT haroolife_take_username('AMA_AGOE', p_adult => true)"),
+    /déjà pris/,
+  )
   assert.equal((await one('SELECT haroolife_username_available($1)', ['ama_agoe'])).reason, 'taken')
   // Un quartier inconnu donne Lomé Commune.
-  await one("SELECT haroolife_claim_username('yawa_tokoin', 'nulle-part')")
+  await one("SELECT haroolife_take_username('yawa_tokoin', 'nulle-part', p_adult => true)")
 
   // Kofi (3) garde sa maison de Baguida ; son nom affiché devient son nom d'utilisateur.
   await as(3)
-  await one("SELECT haroolife_claim_username('kofi228', 'agoe')")
+  await one("SELECT haroolife_take_username('kofi228', 'agoe', p_adult => true)")
   await db.exec('RESET ROLE')
   const rows = (
     await db.query(`SELECT user_id, canton_id, display_name FROM public.haroolife_residents
@@ -111,6 +135,25 @@ test('nom d’utilisateur : unique, réservé à soi, et il ouvre la maison du v
       ['1', 'yawa_tokoin'],
       ['3', 'kofi228'],
     ],
+  )
+
+  // La déclaration est datée pour chacun ; la date de naissance n'est jamais stockée.
+  await db.exec('RESET ROLE')
+  const cols = (
+    await db.query(`SELECT column_name FROM information_schema.columns
+                                WHERE table_name = 'haroolife_usernames' ORDER BY 1`)
+  ).rows
+  assert.deepEqual(
+    cols.map((c) => c.column_name),
+    ['adult_confirmed_at', 'created_at', 'user_id', 'username'],
+  )
+  assert.equal(
+    (
+      await db.query(
+        'SELECT count(*)::int AS n FROM public.haroolife_usernames WHERE adult_confirmed_at IS NULL',
+      )
+    ).rows[0].n,
+    0,
   )
 
   // La table reste fermée aux joueurs.

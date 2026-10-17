@@ -41,6 +41,7 @@ async function claimUsername(c: ArrivalChoice): Promise<ArrivalError | null> {
       username: c.username,
       quartier: c.home.quartier,
       pagne: c.avatar.pagne,
+      adult: c.adult,
     }),
   }).catch(() => null)
   if (res?.ok) return null

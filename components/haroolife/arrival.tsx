@@ -1,5 +1,6 @@
 'use client'
 
+import { ADULT_AGE, MONTHS, ageOn } from '@/lib/haroolife/age'
 /**
  * Arriving in HarooLife as a visitor, step by step: who you are (name and a unique username),
  * your look, two personality traits, the birth lottery and your first home in Lomé. Nothing is
@@ -31,6 +32,8 @@ const AvatarPreview = dynamic(() => import('./avatar-preview'), { ssr: false })
 export interface ArrivalChoice {
   name: string
   username: string
+  /** Declared 18 or older (the birth date itself never leaves the phone). */
+  adult: boolean
   avatar: Avatar
   traits: TraitId[]
   origin: OriginId
@@ -38,6 +41,9 @@ export interface ArrivalChoice {
 }
 
 const STEPS = ['Toi', 'Apparence', 'Personnalité', 'Loterie de naissance', 'Logement'] as const
+const DAYS = Array.from({ length: 31 }, (_, i) => i + 1)
+const SELECT =
+  'min-h-14 w-full rounded-2xl bg-[#f3efe6] px-3 text-base outline-none focus:ring-2 focus:ring-[#157a52]'
 const money = (n: number) => `${Math.round(n).toLocaleString('fr-FR')} FCFA`
 const pick = <T,>(list: readonly T[]) => list[Math.floor(Math.random() * list.length)]
 
@@ -67,6 +73,8 @@ export default function Arrival({
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
   const [check, setCheck] = useState<Check>({ state: 'idle' })
+  const [birth, setBirth] = useState({ day: '', month: '', year: '' })
+  const [accepted, setAccepted] = useState(false)
   const [avatar, setAvatar] = useState<Avatar>(DEFAULT_AVATAR)
   const [traits, setTraits] = useState<TraitId[]>([])
   const [origin, setOrigin] = useState<OriginId | null>(null)
@@ -76,6 +84,14 @@ export default function Arrival({
   const sheet = useRef<HTMLDivElement>(null)
   const handle = normalizeUsername(username)
   const local = username ? usernameProblem(username) : null
+  // The 18+ gate: the age of the date typed, on today's date (nothing is sent but « adult »).
+  const thisYear = new Date().getFullYear()
+  const born =
+    birth.day && birth.month && birth.year
+      ? { day: Number(birth.day), month: Number(birth.month), year: Number(birth.year) }
+      : null
+  const age = born ? ageOn(born, new Date()) : null
+  const adult = age !== null && age >= ADULT_AGE
 
   // A failure at the end that concerns the name brings the player back to it.
   useEffect(() => {
@@ -154,7 +170,11 @@ export default function Arrival({
 
   const last = only ? 0 : STEPS.length - 1
   const ready = [
-    !local && check.state === 'free' && (only !== undefined || name.trim().length >= 2),
+    !local &&
+      check.state === 'free' &&
+      (only !== undefined || name.trim().length >= 2) &&
+      adult &&
+      accepted,
     true,
     traits.length === MAX_TRAITS,
     origin !== null && !rolling,
@@ -170,6 +190,7 @@ export default function Arrival({
       onFinish({
         name: name.trim(),
         username: handle,
+        adult,
         avatar,
         traits,
         origin: 'fonctionnaire',
@@ -178,7 +199,15 @@ export default function Arrival({
       return
     }
     if (origin && chosenHome)
-      onFinish({ name: name.trim(), username: handle, avatar, traits, origin, home: chosenHome })
+      onFinish({
+        name: name.trim(),
+        username: handle,
+        adult,
+        avatar,
+        traits,
+        origin,
+        home: chosenHome,
+      })
   }
   const shuffle = () => {
     if (step === 1)
@@ -313,6 +342,95 @@ export default function Arrival({
                     du cyber ne les aime pas 😅
                   </span>
                 )}
+              </span>
+            </label>
+            <fieldset>
+              <legend className="text-sm font-bold">Date de naissance</legend>
+              <div className="mt-1.5 grid grid-cols-[1fr_1.5fr_1.2fr] gap-2">
+                <select
+                  aria-label="Jour"
+                  value={birth.day}
+                  onChange={(e) => setBirth({ ...birth, day: e.target.value })}
+                  className={SELECT}
+                >
+                  <option value="">Jour</option>
+                  {DAYS.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Mois"
+                  value={birth.month}
+                  onChange={(e) => setBirth({ ...birth, month: e.target.value })}
+                  className={SELECT}
+                >
+                  <option value="">Mois</option>
+                  {MONTHS.map((m, i) => (
+                    <option key={m} value={i + 1}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Année"
+                  value={birth.year}
+                  onChange={(e) => setBirth({ ...birth, year: e.target.value })}
+                  className={SELECT}
+                >
+                  <option value="">Année</option>
+                  {Array.from({ length: 100 }, (_, i) => thisYear - i).map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="mt-1.5 text-sm" aria-live="polite">
+                {born && age === null ? (
+                  <span className="text-[#b4321f]">
+                    Cette date n’existe pas, même au calendrier de Lomé.
+                  </span>
+                ) : age !== null && age < ADULT_AGE ? (
+                  <span className="font-semibold text-[#b4321f]">
+                    HarooLife est réservé aux personnes de 18 ans et plus. Reviens dans{' '}
+                    {ADULT_AGE - age} an{ADULT_AGE - age > 1 ? 's' : ''} : Lomé t’attendra.
+                  </span>
+                ) : (
+                  <span className="text-[#13362b]/60">
+                    Elle reste sur ton téléphone : on garde seulement « 18 ans ou plus ».
+                  </span>
+                )}
+              </p>
+            </fieldset>
+            <label className="flex items-start gap-3 rounded-2xl bg-[#f3efe6] p-4">
+              <input
+                type="checkbox"
+                checked={accepted}
+                onChange={(e) => setAccepted(e.target.checked)}
+                className="mt-0.5 h-5 w-5 shrink-0 accent-[#157a52]"
+              />
+              <span className="text-sm leading-snug">
+                J’ai <strong>18 ans ou plus</strong> et j’accepte les{' '}
+                <a
+                  href="/legal/conditions"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-[#157a52] underline"
+                >
+                  Conditions d’utilisation
+                </a>{' '}
+                et la{' '}
+                <a
+                  href="/legal/confidentialite"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-[#157a52] underline"
+                >
+                  Politique de confidentialité
+                </a>
+                . HarooLife est un jeu : l’argent y est fictif.
               </span>
             </label>
           </div>

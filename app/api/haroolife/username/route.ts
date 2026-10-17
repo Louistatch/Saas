@@ -73,11 +73,19 @@ export async function POST(request: NextRequest) {
     )
   const parsed = claimSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success)
-    return NextResponse.json({ error: 'Nom d’utilisateur invalide.' }, { status: 400, headers })
-  const { data, error } = await ctx.supabase.rpc('haroolife_claim_username', {
+    return NextResponse.json(
+      {
+        error: parsed.error.issues.some((i) => i.path[0] === 'adult')
+          ? 'HarooLife est réservé aux personnes de 18 ans et plus.'
+          : 'Nom d’utilisateur invalide.',
+      },
+      { status: 400, headers },
+    )
+  const { data, error } = await ctx.supabase.rpc('haroolife_take_username', {
     p_username: normalizeUsername(parsed.data.username),
     p_quartier: parsed.data.quartier,
     p_pagne: parsed.data.pagne,
+    p_adult: parsed.data.adult,
   })
   if (error) {
     const status =
@@ -96,5 +104,9 @@ export async function POST(request: NextRequest) {
           : error.message
     return NextResponse.json({ error: message }, { status, headers })
   }
-  return NextResponse.json({ ok: true, ...(data as { username: string }) }, { headers })
+  // The database answers with the name it took: anything else is not a success.
+  const taken = (data as { username?: string } | null)?.username
+  if (taken !== normalizeUsername(parsed.data.username))
+    return NextResponse.json({ error: 'Service indisponible. Réessaie.' }, { status: 503, headers })
+  return NextResponse.json({ ok: true, username: taken }, { headers })
 }

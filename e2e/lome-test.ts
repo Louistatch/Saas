@@ -77,6 +77,11 @@ export async function arriveAsVisitor(
   await page.getByLabel('Ton nom').fill('Yao Test')
   await page.getByLabel('Nom d’utilisateur').fill(username)
   await expect(arrival).toContainText(`@${username} est libre.`)
+  // Born in 1995: of age; the box ticked (the conditions and the privacy policy).
+  await page.getByLabel('Jour').selectOption('14')
+  await page.getByLabel('Mois').selectOption('3')
+  await page.getByLabel('Année').selectOption('1995')
+  await page.getByRole('checkbox', { name: /18 ans ou plus/ }).check()
   await shots?.('1-toi')
   const go = page.getByRole('button', { name: /^(Continuer|Choisir où habiter|Emménager)$/ })
   await go.click()
