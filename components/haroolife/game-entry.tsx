@@ -110,6 +110,12 @@ export default function GameEntry() {
   // A visitor's username (undefined until known; null: not chosen yet).
   const [myUsername, setMyUsername] = useState<string | null | undefined>(undefined)
   useEffect(() => {
+    // Refresh an older scanner worker that may still control this tab, without reloading it
+    // or touching the player's local saves and arrival choices.
+    void navigator.serviceWorker
+      ?.getRegistration()
+      .then((registration) => registration?.update())
+      .catch(() => {})
     // Arrived by a friend's link: the code waits on this phone until the game can accept it.
     const invite = inviteCodeFrom(new URLSearchParams(window.location.search).get('invite'))
     if (invite)

@@ -58,6 +58,8 @@ Les codes suivent la documentation officielle :
 | `110100`, `110110`, `400020`, `400070` | Vérifier la clé publique et l’état du widget. |
 | `200100`, `110600` | Vérifier l’heure du téléphone, le cache et les délais du challenge. |
 | `200500`, `script-load`, `script-timeout` | Vérifier le chargement du script/iframe et les blocages réseau. |
+| `script-api` | Le téléchargement finit sans API disponible : vérifier l’initialisation et le filtrage du script. |
+| `script-csp` | La politique de sécurité du document bloque le script Cloudflare. |
 | `300…`, `600…` | Refus du challenge : étudier le contexte navigateur et la configuration du widget. |
 
 Le blocage n’est pas déclaré résolu tant qu’une vérification réelle du téléphone n’a pas abouti
@@ -69,6 +71,31 @@ La bibliothèque Cloudflare réelle a aussi été chargée sur le serveur local,
 officielle de test : le vrai widget a terminé la vérification et activé le bouton de connexion.
 Aucun formulaire n’a été soumis. Ce contrôle valide le contrat JavaScript réel, mais ne valide
 pas le widget de production ni la connexion du téléphone du joueur.
+
+## Retour du téléphone : `script-load`, puis fichier JavaScript accessible
+
+Le journal administrateur confirme `Turnstile loading: script-load` sur `/haroolife`. Le joueur
+peut ouvrir le fichier officiel dans un onglet. La CSP de production l’autorise et le serveur
+Cloudflare répond 200 ; l’accès direct n’établit toutefois pas que le navigateur autorise le
+même fichier comme ressource tierce de la page.
+
+Le chargement attend maintenant le callback officiel `onload` de l’API Cloudflare, déclaré avant
+la création du script, et vérifie les méthodes de l’API avant utilisation. L’événement DOM `load`
+seul n’est plus traité comme une preuve de disponibilité. Le script est demandé anonymement
+avec CORS (Cloudflare renvoie `Access-Control-Allow-Origin: *`), sans cookies tiers dans cette
+requête. Les erreurs de téléchargement, de politique et d’initialisation sont distinctes.
+
+Le service worker du scanner interceptait aussi toutes les ressources tierces et utilisait un
+cache générique. Il laisse désormais les scripts Cloudflare et Supabase au navigateur, ignore
+les mutations, pages privées et réponses RSC, et ne met en cache que ses ressources publiques
+locales et son écran hors ligne. La version `coopscan-v2` supprime les anciens caches du scanner
+en préservant ceux d’autres fonctionnalités. HarooLife demande sa mise à jour sans recharger
+la partie ni modifier les sauvegardes ou les choix du joueur.
+
+Les tests doivent couvrir le callback arrivé après `load`, le navigateur déjà contrôlé par ce
+service worker, la suppression de son ancien cache, le scanner hors ligne et la bibliothèque
+Cloudflare réelle avec sa clé de test. Ces vérifications ne remplacent pas la confirmation de
+réussite avec le widget de production sur le téléphone concerné.
 
 ## Configuration à conserver
 
