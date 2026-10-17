@@ -164,7 +164,10 @@ test('20 house visits and 10 trips keep one engine and no growing GPU state', as
   expect(afterDoors.buffers).toBeLessThanOrEqual(perCycle[0] + 2 * FIGURE_BUFFERS + 4)
   expect(afterDoors.entities).toBeLessThanOrEqual(before.entities * 1.1 + 20)
   expect(afterTrips.textures).toBeLessThanOrEqual(before.textures * 1.25 + 8)
-  expect(afterTrips.buffers).toBeLessThanOrEqual(perCycle[0] * 1.25 + 30)
+  // Back in the Lomé street, compared with the start in that street rather than with the
+  // door cycles: since the traffic lights and the animated residents, the street alone holds
+  // more buffers than the old house-based bound allowed (83 at the start, measured).
+  expect(afterTrips.buffers).toBeLessThanOrEqual(before.buffers + 2 * FIGURE_BUFFERS + 4)
   expect(afterTrips.vramMB.tex).toBeLessThanOrEqual(before.vramMB.tex * 1.25 + 8)
   expect(errors).toEqual([])
 })
