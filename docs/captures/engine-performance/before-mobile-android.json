@@ -1,0 +1,197 @@
+{
+  "phase": "before",
+  "project": "mobile-android",
+  "quality": "balanced",
+  "cpuThrottle": 4,
+  "viewport": {
+    "width": 412,
+    "height": 915
+  },
+  "environment": "Chromium, SwiftShader software WebGL, Android emulated (not physical)",
+  "coldMs": 6020,
+  "idle": {
+    "elapsedMs": 12045,
+    "perf": {
+      "at": 21855,
+      "frame": {
+        "n": 67,
+        "mean": 170.73,
+        "p50": 166.1,
+        "p95": 226.3,
+        "p99": 373.4,
+        "max": 373.4,
+        "fps": 5.86
+      },
+      "cpu": {
+        "frame": {
+          "n": 68,
+          "mean": 24.11,
+          "p50": 21.2,
+          "p95": 48,
+          "p99": 57.4,
+          "max": 57.4,
+          "fps": 41.48
+        },
+        "render": {
+          "n": 68,
+          "mean": 17.44,
+          "p50": 14.6,
+          "p95": 36.9,
+          "p99": 45.9,
+          "max": 45.9,
+          "fps": 57.35
+        }
+      },
+      "street": {
+        "tileScans": 98,
+        "tileBuilds": 32,
+        "tileTotalMs": 677.6999999582767,
+        "tileTimes": {
+          "n": 32,
+          "mean": 21.18,
+          "p50": 13.2,
+          "p95": 66,
+          "p99": 96.1,
+          "max": 96.1,
+          "fps": 47.22
+        }
+      },
+      "drawCalls": 143,
+      "triangles": 178084,
+      "renderEntities": 332,
+      "meshInstances": 332,
+      "animated": 9,
+      "animating": 9,
+      "heapMB": 57,
+      "longTasks": 30,
+      "longTaskMs": 5029,
+      "renders": {
+        "world": 29,
+        "immersive": 58,
+        "chunks": 0,
+        "agents": 0
+      },
+      "assets": 8,
+      "pixelRatio": 0.5,
+      "resolution": [
+        206,
+        457
+      ]
+    },
+    "tileScans": 70,
+    "tileBuilds": 0,
+    "sampledAllocatedBytes": 34856964,
+    "sampledAllocatedMBPerSecond": 2.759833234927129,
+    "heapBefore": {
+      "usedSize": 23377892,
+      "totalSize": 25440256,
+      "embedderHeapUsedSize": 3199264,
+      "backingStorageSize": 35449375
+    },
+    "heapBeforeGC": {
+      "usedSize": 23417176,
+      "totalSize": 30158848,
+      "embedderHeapUsedSize": 2823904,
+      "backingStorageSize": 35449393
+    },
+    "heapAfter": {
+      "usedSize": 23501140,
+      "totalSize": 25702400,
+      "embedderHeapUsedSize": 3175912,
+      "backingStorageSize": 35449393
+    }
+  },
+  "walk": {
+    "elapsedMs": 12144,
+    "perf": {
+      "at": 37280,
+      "frame": {
+        "n": 65,
+        "mean": 181.69,
+        "p50": 179.3,
+        "p95": 249.7,
+        "p99": 294.2,
+        "max": 294.2,
+        "fps": 5.5
+      },
+      "cpu": {
+        "frame": {
+          "n": 66,
+          "mean": 26.05,
+          "p50": 25.3,
+          "p95": 47.5,
+          "p99": 56.5,
+          "max": 56.5,
+          "fps": 38.38
+        },
+        "render": {
+          "n": 66,
+          "mean": 17.25,
+          "p50": 16.2,
+          "p95": 36.4,
+          "p99": 43.9,
+          "max": 43.9,
+          "fps": 57.97
+        }
+      },
+      "street": {
+        "tileScans": 176,
+        "tileBuilds": 33,
+        "tileTotalMs": 679.7999999523163,
+        "tileTimes": {
+          "n": 33,
+          "mean": 20.6,
+          "p50": 13.2,
+          "p95": 66,
+          "p99": 96.1,
+          "max": 96.1,
+          "fps": 48.54
+        }
+      },
+      "drawCalls": 135,
+      "triangles": 172135,
+      "renderEntities": 332,
+      "meshInstances": 332,
+      "animated": 9,
+      "animating": 9,
+      "heapMB": 58,
+      "longTasks": 45,
+      "longTaskMs": 5979,
+      "renders": {
+        "world": 59,
+        "immersive": 117,
+        "chunks": 0,
+        "agents": 0
+      },
+      "assets": 8,
+      "pixelRatio": 0.5,
+      "resolution": [
+        206,
+        457
+      ]
+    },
+    "tileScans": 66,
+    "tileBuilds": 1,
+    "sampledAllocatedBytes": 36038844,
+    "sampledAllocatedMBPerSecond": 2.83014821440806,
+    "heapBefore": {
+      "usedSize": 23925840,
+      "totalSize": 24915968,
+      "embedderHeapUsedSize": 3179584,
+      "backingStorageSize": 35449391
+    },
+    "heapBeforeGC": {
+      "usedSize": 23812420,
+      "totalSize": 29372416,
+      "embedderHeapUsedSize": 3061440,
+      "backingStorageSize": 35449388
+    },
+    "heapAfter": {
+      "usedSize": 23778680,
+      "totalSize": 24915968,
+      "embedderHeapUsedSize": 2906504,
+      "backingStorageSize": 35449388
+    }
+  },
+  "errors": []
+}

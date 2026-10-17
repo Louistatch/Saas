@@ -48,7 +48,7 @@ export default function HarooRoomView(
       input,
       avatarModel: playerModel,
       pagne: playerPagne,
-      pixelRatio,
+      pixelRatio: live.current.pixelRatio,
       scene,
       events: {
         onUse: (propId) => {
@@ -82,7 +82,10 @@ export default function HarooRoomView(
       world.current = null
       w.dispose()
     }
-  }, [scene, playerModel, playerPagne, input, pixelRatio])
+  }, [scene, playerModel, playerPagne, input])
+  useEffect(() => {
+    world.current?.setPixelRatio(pixelRatio)
+  }, [pixelRatio])
 
   // The game's current activity (pose) and the HUD's walk-then-use requests.
   const { activity, approach } = props

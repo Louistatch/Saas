@@ -10,9 +10,22 @@ type PerfWindow = { __LOME_PERF?: PerfSnapshot; __LOME_PERF_RESET?: () => void }
 
 export class PerfProbe {
   private readonly ring = new FrameRing(600)
+  private readonly cpu = new FrameRing(600)
+  private readonly render = new FrameRing(600)
+  private readonly bufferSize = new THREE.Vector2()
   private readonly longTasks = watchLongTasks()
   private prev = 0
-  private readonly reset = () => this.ring.reset()
+  private readonly reset = () => {
+    this.ring.reset()
+    this.cpu.reset()
+    this.render.reset()
+    this.prev = 0
+  }
+
+  work(frameMs: number, renderMs: number): void {
+    this.cpu.push(frameMs)
+    this.render.push(renderMs)
+  }
 
   /** Once per drawn frame. */
   frame(now: number): void {
@@ -30,25 +43,32 @@ export class PerfProbe {
     now: number,
     renderer: THREE.WebGLRenderer,
     scene: THREE.Scene,
-    counts: { animated: number; assets: number },
+    counts: {
+      animated: number
+      animating?: number
+      assets: number
+      street?: PerfSnapshot['street']
+    },
   ): void {
     let meshes = 0
-    scene.traverse((o) => {
-      if ((o as THREE.Mesh).isMesh && o.visible) meshes++
+    scene.traverseVisible((o) => {
+      if ((o as THREE.Mesh).isMesh) meshes++
     })
     const info = renderer.info
     const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory
-    const size = renderer.getDrawingBufferSize(new THREE.Vector2())
+    const size = renderer.getDrawingBufferSize(this.bufferSize)
     const w = window as unknown as PerfWindow
     w.__LOME_PERF = {
       at: Math.round(now),
       frame: this.ring.summary(),
+      cpu: { frame: this.cpu.summary(), render: this.render.summary() },
+      street: counts.street,
       drawCalls: info.render.calls,
       triangles: info.render.triangles,
       renderEntities: meshes,
       meshInstances: meshes,
       animated: counts.animated,
-      animating: counts.animated,
+      animating: counts.animating ?? counts.animated,
       heapMB: mem ? Math.round(mem.usedJSHeapSize / 1048576) : null,
       longTasks: this.longTasks.count(),
       longTaskMs: this.longTasks.totalMs(),

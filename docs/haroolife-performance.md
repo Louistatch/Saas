@@ -1,5 +1,8 @@
 # HarooLife Lomé 3D — performance (jalon 1)
 
+> Historique du moteur précédent (12 octobre). Pour le moteur Three.js actuel et les mesures
+> PC/Android simulé du 17 octobre, voir [l'audit actualisé](haroolife-three-performance-2026-10-17.md).
+
 Mesures prises par `e2e/lome-perf.spec.ts` sur le build de production, dans Chromium headless
 avec SwiftShader (rendu WebGL **logiciel**, sans GPU). Ce n'est **pas** un appareil réel : les
 temps de frame et les FPS de ce banc ne sont pas transposables à un téléphone ; en revanche les

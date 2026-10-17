@@ -176,7 +176,18 @@ export function createAvatarActor(
   figure.traverse((o) => {
     const mesh = o as THREE.Mesh
     if (!mesh.isMesh) return
-    if ((mesh as THREE.SkinnedMesh).isSkinnedMesh) skinned++
+    if ((mesh as THREE.SkinnedMesh).isSkinnedMesh) {
+      skinned++
+      // Three also needs a sphere for render sorting when frustumCulled=false. Otherwise its
+      // first visible frame skins every vertex on the CPU (applyBoneTransform) to compute one.
+      // A conservative bind-geometry envelope avoids that work without changing the mesh/rig.
+      if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere()
+      const sphere = mesh.geometry.boundingSphere?.clone()
+      if (sphere) {
+        sphere.radius += spec.height * 2
+        ;(mesh as THREE.SkinnedMesh).boundingSphere = sphere
+      }
+    }
     mesh.castShadow = true
     mesh.frustumCulled = false
     const paint = (m: THREE.Material) => {

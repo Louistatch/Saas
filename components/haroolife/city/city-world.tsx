@@ -1,16 +1,16 @@
 'use client'
 
 import type { AdCampaign, AdPlacement } from '@/lib/haroolife/ads/campaigns'
-import type { ServiceCustomer } from '@/lib/haroolife/city/automatic-service'
 import type { ExposureTracker } from '@/lib/haroolife/ads/exposure'
+import type { ServiceCustomer } from '@/lib/haroolife/city/automatic-service'
 import { type Npc, type NpcAnim, type Prop, layoutFor } from '@/lib/haroolife/city/interiors'
 import type { Interior } from '@/lib/haroolife/city/life'
-import { rendererForInterior } from '@/lib/haroolife/engine/select'
 import { LOCALITIES, type LocalityId } from '@/lib/haroolife/city/locality'
 import { bump } from '@/lib/haroolife/city/perf'
 import type { InputState, PlayerController } from '@/lib/haroolife/city/player'
 import { PRESETS, type Quality, renderPixelRatio } from '@/lib/haroolife/city/quality'
 import { type Category, ESTATE, type Lot, inEstate, lotById } from '@/lib/haroolife/city/world'
+import { rendererForInterior } from '@/lib/haroolife/engine/select'
 import type { RendererId } from '@/lib/haroolife/engine/types'
 import type {
   StreetFare,
@@ -265,8 +265,8 @@ export default function CityWorld({
           />
         </div>
       )}
-      {!ride && !interior && !mapView && (
-        <div className="absolute inset-0" data-renderer="haroo">
+      {!ride && !interior && (
+        <div className="absolute inset-0" data-renderer="haroo" hidden={mapView}>
           <HarooStreetView
             {...daily}
             controller={controller}
@@ -274,6 +274,8 @@ export default function CityWorld({
             avatarPagne={avatarPagne}
             estate={hasEstate ? city.buildings : []}
             pixelRatio={pixelRatio}
+            quality={quality}
+            paused={mapView}
             shadows={quality === 'eco' ? 'off' : quality === 'balanced' ? 'throttled' : 'full'}
             antialias={PRESETS[quality].antialias}
             locality={locality}
