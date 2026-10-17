@@ -65,6 +65,29 @@ test('avatar, joystick, collisions, camera and taxi in the single 3D world', asy
   const release = async () => {
     await page.mouse.up()
   }
+  // On a failure, say where the avatar stands: the cells around it and who is close by.
+  const surroundings = () =>
+    page.evaluate(() => {
+      const w = window as unknown as {
+        __LOME_PLAYER?: { x: number; z: number; mode: string; policeStopped: boolean }
+        __LOME_WALKABLE?: (x: number, y: number) => boolean
+        __LOME_STREET?: { walkers?: { name: string; x: number; z: number }[] }
+      }
+      const p = w.__LOME_PLAYER
+      if (!p) return null
+      const cx = Math.round(p.x)
+      const cz = Math.round(p.z)
+      const grid: string[] = []
+      for (let z = cz - 2; z <= cz + 2; z++) {
+        let row = ''
+        for (let x = cx - 2; x <= cx + 2; x++) row += w.__LOME_WALKABLE?.(x, z) ? '.' : '#'
+        grid.push(row)
+      }
+      const near = (w.__LOME_STREET?.walkers ?? []).filter(
+        (k) => Math.hypot(k.x - p.x, k.z - p.z) < 1.5,
+      )
+      return { x: p.x, z: p.z, mode: p.mode, police: p.policeStopped, grid, near }
+    })
   const samples: Player[] = []
   // Free walking crosses the carriageway: the pedestrian check stops the player once (a free
   // warning, then 60 s without another). It is answered, and that direction is held again.
@@ -139,7 +162,12 @@ test('avatar, joystick, collisions, camera and taxi in the single 3D world', asy
   // A passer-by (the officer who has just spoken to the player included) may stand in the way
   // for a moment: the stick stays held until the avatar walks.
   await hold(0, 600, 52)
-  await expect.poll(async () => ((await player()) as Player).speed).toBeGreaterThan(0.5)
+  await expect
+    .poll(async () => ((await player()) as Player).speed)
+    .toBeGreaterThan(0.5)
+    .catch(async (e: Error) => {
+      throw new Error(`${e.message}\nAround the avatar: ${JSON.stringify(await surroundings())}`)
+    })
   await page.evaluate(() => window.dispatchEvent(new Event('blur')))
   await expect.poll(async () => ((await player()) as Player).speed).toBe(0)
   await release()
