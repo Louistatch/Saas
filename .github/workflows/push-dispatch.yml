@@ -13,4 +13,4 @@ jobs:
     timeout-minutes: 2
     steps:
       - name: Envoyer les alertes en attente
-        run: curl -fsS -m 30 -X POST https://www.faitierehub.com/api/push/dispatch
+        run: curl -fsSL --max-redirs 3 --proto '=https' --proto-redir '=https' -m 30 -X POST https://faitierehub.com/api/push/dispatch

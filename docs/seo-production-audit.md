@@ -39,6 +39,8 @@ pages publiques de recherche gardent une canonical sans paramètres. Les ressour
 
 - `lib/seo.ts`, `app/layout.tsx`, métadonnées des pages publiques et
   `app/sitemap.ts` : origine, politique d’indexation et sitemap cohérents.
+- `types/next-images.d.ts` charge les types d’images fournis par Next avant le
+  build : le typecheck CI fonctionne aussi dans un clone neuf sans next-env.d.ts.
 - `public/robots.txt`, `next.config.mjs` : exclusions réelles (`/operator`, `/haroo`,
   `/dashboard`, etc.) et alias demandés (`/espace-operateur`, `/mon-espace-haroo`).
 - `app/marche/page.tsx` et `app/marketplace/page.tsx` : introductions SSR ; code
@@ -59,7 +61,7 @@ pages publiques de recherche gardent une canonical sans paramètres. Les ressour
 Les cartes nominatives délivrées, QR de vérification, SVG de rendu et exports PNG
 d’impression conservent leur qualité et leurs règles d’accès. Ils ne passent pas
 par le cache public de l’optimiseur. Les anciens QR imprimés avec www restent
-valides grâce à la future redirection Vercel.
+valides : conserver cet alias au cours de la transition de domaine.
 
 ## Supervision Supabase et Railway
 
@@ -122,13 +124,18 @@ accès Vercel permettant de changer Domains n’est disponible dans cette sessio
 
 1. Déployer ce code qui retire l’ancienne redirection middleware apex → www.
 2. Dans le projet Vercel qui sert réellement `faitierehub.com`, faire servir
-   l’apex en production et configurer **www → apex** en redirection permanente.
-   Ne pas inverser cet ordre : l’ancien middleware créerait une boucle.
-3. Vérifier : apex `/` = 200, www `/` = 301/308 vers apex, un seul saut ; même
-   comportement sur `/produit`, `/robots.txt`, `/sitemap.xml` et un lien QR.
-4. Vérifier les URL de retour autorisées Supabase/Vercel si elles dépendent du
-   domaine d’authentification. Les URL de callback des paiements ne sont pas
-   modifiées par ce patch.
+   l’apex en production **sans redirection vers www**. Conserver www comme alias
+   servi par le même projet pendant la transition : des callbacks de paiement
+   existants peuvent encore l’appeler. Les deux hôtes publient la canonical apex.
+3. Vérifier apex `/` = 200, www `/` = 200 pendant cette transition, aucune boucle ;
+   contrôler aussi `/produit`, `/robots.txt`, `/sitemap.xml` et un ancien lien QR.
+4. Ajouter l’apex aux retours autorisés Supabase, conserver les anciens retours
+   www et mettre `NEXT_PUBLIC_APP_URL=https://faitierehub.com` dans Vercel avant
+   un redéploiement pour les futurs liens de paiement. Migrer les callbacks déjà
+   enregistrés chez les prestataires ; ne pas les faire dépendre d’une redirection
+   HTTP qu’ils ne suivraient pas. Le cron d’alertes du dépôt utilise déjà l’apex,
+   suit au plus trois redirections HTTPS et conserve POST. Après cette migration,
+   une redirection permanente www → apex peut être activée, puis vérifiée.
 5. Soumettre `https://faitierehub.com/sitemap.xml` dans Search Console, inspecter
    l’accueil et les deux catalogues, puis suivre couverture, canonical retenue
    et erreurs serveur. Le crawl et l’indexation restent des décisions de Google.
