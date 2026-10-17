@@ -5,7 +5,7 @@ import { test } from 'node:test'
 
 const ROOT = process.cwd()
 const AVATARS = ['Casual_2', 'Casual_Hoodie', 'Women_Casual', 'Women_Formal']
-const REQUIRED_CLIPS = ['Idle', 'Idle_Neutral', 'Interact', 'Run', 'Walk', 'Wave']
+const REQUIRED_CLIPS = ['Idle', 'Idle_Neutral', 'Interact', 'Run', 'Walk', 'Wave', 'HarooSitEnter', 'HarooSitIdle', 'HarooSitExit', 'HarooSitTalk']
 
 /** Read the JSON chunk from a binary glTF so CI verifies the shipped asset, not its manifest. */
 async function glbJson(file: string): Promise<Record<string, unknown>> {

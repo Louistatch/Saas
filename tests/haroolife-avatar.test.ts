@@ -47,8 +47,8 @@ describe('avatar appearance', () => {
     assert.equal(clipFor(afi, 'walk'), 'Walk')
     assert.equal(clipFor(afi, 'run'), 'Run')
     assert.equal(clipFor(afi, 'work'), 'Interact')
-    assert.equal(clipFor(afi, 'sit'), 'Idle_Neutral', 'no sit clip in the pack: neutral pose')
-    assert.equal(clipFor(mini, 'sit'), 'Idle_Neutral')
+    assert.equal(clipFor(afi, 'sit'), 'HarooSitIdle', 'the retargeted sitting clip is available')
+    assert.equal(clipFor(mini, 'sit'), 'HarooSitIdle')
     assert.equal(clipFor(mini, 'drive'), 'HarooDrive')
     // V3: the pagne colours a garment (Afi's top), never the hair or the shoes; every other
     // garment has a chosen colour, so no light-grey `White` top is left on screen.
@@ -65,7 +65,10 @@ describe('avatar appearance', () => {
     assert.equal(avatarSpec('../../unknown.glb').url, afi.url)
     assert.equal(AVATAR_SPECS.length, 4)
     for (const spec of AVATAR_SPECS) assert.equal(spec.family, 'quaternius')
-    for (const s of AVATAR_SPECS) assert.ok(s.url.startsWith('/haroolife/vendor/'), s.id)
+    for (const s of AVATAR_SPECS) {
+      assert.ok(s.url.startsWith('/haroolife/vendor/'), s.id)
+      assert.equal(new URL(s.url, 'https://haroolife.invalid').searchParams.get('daily'), '1', 'returning browsers must not reuse the old six-clip file')
+    }
   })
   it('faces the move direction: one yaw convention, measured 0 for every file', () => {
     // Both renderers turn the figure to `heading` (0 = +Z, atan2(dx, dz)); every file of the

@@ -101,6 +101,7 @@ export interface RoomScene {
   view: { height: number; width: number; follow: boolean }
   /** Where the figure stands while using a machine (gym): prop id → spot and heading. */
   onDevice: Record<string, { x: number; z: number; heading: number; seat?: number }>
+  seats?: Record<string, { x: number; z: number; heading: number; height: number; entry: Point }>
   palette: {
     background: string
     ground: string
@@ -149,6 +150,10 @@ export const HOUSE_SCENE: RoomScene = {
   door: HOUSE_DATA.door,
   view: { height: 7.7, width: 8.8, follow: false },
   onDevice: {},
+  seats: {
+    'chair-1': { x: 3.3, z: 0.8, heading: 0, height: 0.576, entry: { x: 3.3, z: 1.75 } },
+    sofa: { x: -0.9, z: 0.8, heading: Math.PI, height: 0.598, entry: { x: -2.9, z: 0.9 } },
+  },
   palette: HOUSE_DATA.palette,
 }
 
@@ -413,6 +418,16 @@ export function sceneFromLayout(id: string, layout: Layout, s = LAYOUT_SCALE): R
   })
 
   const onDevice: RoomScene['onDevice'] = {}
+  const seats: NonNullable<RoomScene['seats']> = {}
+  for (const prop of layout.props) {
+    if (!['chair', 'sofa', 'pew'].includes(prop.kind) || !prop.action) continue
+    const h = hotspots.find(h => h.kind === 'prop' && h.ref === prop.id)
+    const occupied = layout.npcs.some(n => n.anim === 'sit' && Math.hypot(n.x - prop.x, n.z - prop.z) < 0.75)
+    if (h && !occupied && isFree(h.at.x, h.at.z, obstacles, bounds)) seats[prop.id] = {
+      x: prop.x * s, z: prop.z * s, heading: ((prop.rot ?? 0) * Math.PI) / 180,
+      height: (prop.kind === 'chair' ? 0.36 : prop.kind === 'sofa' ? 0.299 : 0.43) * s, entry: h.at,
+    }
+  }
   for (const prop of layout.props) {
     if (!ON_DEVICE.has(prop.kind)) continue
     const a = ((prop.rot ?? 0) * Math.PI) / 180
@@ -459,6 +474,7 @@ export function sceneFromLayout(id: string, layout: Layout, s = LAYOUT_SCALE): R
     // Public rooms open in overview: the counter and residents must be discoverable on a phone.
     view: { height: 7.7 * k, width: 8.8 * k, follow: false },
     onDevice,
+    seats,
     palette: {
       ...HOUSE_SCENE.palette,
       floor: layout.floor,

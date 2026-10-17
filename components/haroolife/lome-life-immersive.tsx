@@ -17,7 +17,9 @@ import {
 import { ExposureTracker } from '@/lib/haroolife/ads/exposure'
 import ResidentConversation from './resident-conversation'
 import GameMarket from './game-market'
-import { buyEstateMeal } from '@/lib/haroolife/city/commerce'
+import { GOODS, buyEstateMeal } from '@/lib/haroolife/city/commerce'
+import { type MealItem, advanceMeal, beginMeal, cancelMeal, mealPlace, readyMeal } from '@/lib/haroolife/city/dining'
+import DailyActionHud from './daily-action-hud'
 import {
   VEHICLE_RULES,
   GAME_FUEL_PER_LITRE,
@@ -1072,6 +1074,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
       interiorProps: layout?.props.length ?? 0,
       npcs: layout?.npcs.length ?? 0,
       activity: cityLife.activity,
+      meal: cityLife.meal,
       fitness: cityLife.fitness,
       energy: life.needs.energy,
       hour: life.hour,
@@ -1127,10 +1130,13 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   }, [cityLife.insideLot])
   // An activity animation lasts a few seconds, then the player stands idle again.
   useEffect(() => {
-    if (!cityLife.activity) return
+    if (!cityLife.activity || cityLife.meal || ['sit', 'eat-seated', 'eat'].includes(cityLife.activity.anim)) return
     const id = window.setTimeout(() => setCityLife((old) => stopActivity(old)), 3200)
     return () => window.clearTimeout(id)
-  }, [cityLife.activity])
+  }, [cityLife.activity, cityLife.meal])
+  useEffect(() => {
+    if (cityLife.meal && cityLife.meal.place !== mealPlace(cityLife)) setCityLife(old => ({ ...cancelMeal(old), activity: null }))
+  }, [cityLife.meal, cityLife.locality, cityLife.insideLot, life.inside])
   // Controller ↔ React bridge. React owns the game state (saves, HUD, interactions); the
   // controller owns the continuous pose. A React `at` that the controller did not report is a
   // jump (leaving a building, travelling, loading a save): the avatar is placed there.
@@ -1812,6 +1818,12 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     setPanel(null)
   }
   function action(a: Action) {
+    if (a === 'eat') {
+      const item = life.meals > 0 ? 'estate' : GOODS.find(g => g.id !== 'soap' && g.id !== 'water' && (cityLife.commerce?.inventory[g.id] ?? 0) > 0)?.id
+      if (item) eatMeal(item, false)
+      else { setPanel('shop'); setNotice('Choisis un repas dans ton sac ou chez la vendeuse.') }
+      return
+    }
     if (a === 'work') {
       setCityLife(workCareer)
       return
@@ -1894,6 +1906,11 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   function useEquipment(p: Prop) {
     if (!p.action) return
     setPanel(null)
+    if (p.action === 'eat') { action('eat'); return }
+    if (p.action === 'sit') {
+      setCityLife(old => ({ ...old, activity: { prop: p.id, anim: 'sit' } }))
+      return
+    }
     if (['browse', 'offers', 'coop', 'bank'].includes(p.action)) {
       cityAction(p.action as CityAction)
       return
@@ -1905,6 +1922,14 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     // Estate interiors keep their original actions; the animation plays on the prop.
     action(p.action as Action)
     setCityLife((old) => ({ ...old, activity: { prop: p.id, anim: animFor(p.kind) } }))
+  }
+  function eatMeal(item: MealItem, buy: boolean) {
+    if (riding || driving) { setNotice('Descends du véhicule pour prendre ton repas.'); return }
+    if (mapView) exitMap()
+    controller.route = []
+    setPanel(null)
+    const id = crypto.randomUUID()
+    setCityLife(old => beginMeal({ ...old, route: [] }, item, id, buy))
   }
   /**
    * Starts an activity from the sheet: the first prop in the room that offers it. In a Three
@@ -2174,6 +2199,12 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                 cityLife.insideLot ? (lotById(cityLife.insideLot) ?? undefined) : undefined
               }
               activity={cityLife.activity}
+              daily={{
+                meal: cityLife.meal,
+                onMealReady: (id, seat) => setCityLife(old => readyMeal(old, id, seat)),
+                onMealFrame: (id, seconds) => setCityLife(old => advanceMeal(old, id, seconds)),
+                onActivityEnd: () => setCityLife(old => ({ ...cancelMeal(old), activity: null })),
+              }}
               onUseProp={useEquipment}
               approach={approachReq}
               onTalk={(npc) => {
@@ -2470,6 +2501,9 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
         )}
       </header>
 
+      {!mapView && !riding && panel === null && <DailyActionHud state={cityLife}
+        onStand={() => setCityLife(old => ({ ...cancelMeal(old), activity: null }))}
+        onCancel={() => setCityLife(cancelMeal)} onBag={() => open('shop')} />}
       <div
         className={`pointer-events-none absolute inset-x-0 bottom-[calc(100px+env(safe-area-inset-bottom,0px))] z-20 px-3 sm:px-5 ${mapView || riding ? 'hidden' : ''}`}
       >
@@ -3009,6 +3043,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                     <GameMarket
                       state={cityLife}
                       onChange={setCityLife}
+                      onEat={eatMeal}
                       onGoMarket={() => {
                         const market = landmarks().find((l) => l.type === 'market')
                         if (market) {
@@ -3032,11 +3067,6 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                       <ActionButton
                         title="Acheter au domaine · 650 FCFA"
                         onClick={() => action('buy-meal')}
-                      />
-                      <ActionButton
-                        title="Manger un repas du domaine"
-                        outline
-                        onClick={() => action('eat')}
                       />
                     </details>
                   </>

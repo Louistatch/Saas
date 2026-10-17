@@ -1,8 +1,10 @@
 /** Shared, fully skinned Three.js actor. Sources are CC0 adult GLBs, never primitive people. */
 import * as THREE from 'three'
-import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js'
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { type AvatarSpec, clipFor, recolorMap } from '../../city/avatar-catalogue'
+import { mealAnimations, oneShotClip } from './daily-animations'
+import { createMealProps } from './meal-props'
 
 export interface AvatarActor {
   root: THREE.Group
@@ -13,6 +15,9 @@ export interface AvatarActor {
   owned: THREE.Material[]
   /** Cushion contact below the pelvis, measured on this rig in the neutral pose. */
   seatOffset: number
+  seatContact: THREE.Vector3
+  mealProps: ReturnType<typeof createMealProps>
+  footFloor: { L: number; R: number }
 }
 type AvatarAsset = Pick<GLTF, 'scene' | 'animations'>
 const cachedAnimations = new WeakMap<AvatarAsset, THREE.AnimationClip[]>()
@@ -147,6 +152,7 @@ export function avatarAnimations(gltf: AvatarAsset): THREE.AnimationClip[] {
     ...gltf.animations,
     new THREE.AnimationClip('HarooDrive', 2.4, tracks),
     new THREE.AnimationClip('HarooCycle', 1, cycleTracks),
+    ...mealAnimations(gltf),
   ]
   cachedAnimations.set(gltf, clips)
   return clips
@@ -199,23 +205,58 @@ export function createAvatarActor(
   const hips = figure.getObjectByName('Hips')
   const seatOffset =
     (hips?.getWorldPosition(new THREE.Vector3()).y ?? height * 0.48) - height * 0.04
+  const footFloor = {
+    L: figure.getObjectByName('FootL')?.getWorldPosition(new THREE.Vector3()).y ?? 0.02,
+    R: figure.getObjectByName('FootR')?.getWorldPosition(new THREE.Vector3()).y ?? 0.02,
+  }
   root.userData.avatar = {
     model: spec.id,
     family: spec.family,
     skinnedMeshes: skinned,
     clips: actions.size,
   }
-  return { root, mixer, actions, current, spec, owned, seatOffset }
+  actions.get(current)?.stop()
+  actions.get('HarooSitIdle')?.play()
+  mixer.update(0)
+  root.updateMatrixWorld(true)
+  const seatContact =
+    figure.getObjectByName('Body')?.getWorldPosition(new THREE.Vector3()) ??
+    new THREE.Vector3(0, height * 0.35, 0)
+  seatContact.y -= height * 0.045
+  actions.get('HarooSitIdle')?.stop()
+  actions.get(current)?.reset().play()
+  mixer.update(0)
+  const mealProps = createMealProps(figure)
+  return {
+    root,
+    mixer,
+    actions,
+    current,
+    spec,
+    owned,
+    seatOffset,
+    seatContact,
+    mealProps,
+    footFloor,
+  }
 }
 export function playAvatarActor(actor: AvatarActor, clip: string): void {
   if (clip === actor.current) return
   const next = actor.actions.get(clip)
   if (!next) return
   actor.actions.get(actor.current)?.fadeOut(0.2)
-  next.reset().fadeIn(0.2).play()
+  next
+    .reset()
+    .setLoop(
+      oneShotClip(clip) ? THREE.LoopOnce : THREE.LoopRepeat,
+      oneShotClip(clip) ? 1 : Number.POSITIVE_INFINITY,
+    )
+  next.clampWhenFinished = oneShotClip(clip)
+  next.fadeIn(0.2).play()
   actor.current = clip
 }
 export function disposeAvatarActor(actor: AvatarActor): void {
+  actor.mealProps.dispose()
   actor.mixer.stopAllAction()
   actor.mixer.uncacheRoot(actor.mixer.getRoot())
   actor.root.removeFromParent()

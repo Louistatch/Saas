@@ -1,10 +1,3 @@
-import { placeScreenMarkers } from '../core/screen-markers'
-import {
-  type AvatarActor,
-  createAvatarActor,
-  disposeAvatarActor,
-  playAvatarActor,
-} from './avatar-actor'
 /**
  * HarooLife engine — an interior (imperative Three.js, ported from the « Une vie à Lomé »
  * prototype `scene.js`). One instance owns one WebGL renderer, one animation frame loop, the
@@ -21,16 +14,26 @@ import {
   avatarSpec,
   clipFor,
 } from '@/lib/haroolife/city/avatar-catalogue'
+import type { Meal } from '@/lib/haroolife/city/dining'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 import type { InputState } from '@/lib/haroolife/city/player'
 import { SHAPE_MATERIALS, type ShapeMaterial } from '@/lib/haroolife/city/prop-shapes'
+import type { DailyViewProps } from '@/lib/haroolife/engine/types'
 import { type Point, isFree, pathfind } from '@/lib/haroolife/game/core/pathfind'
 import type { Hotspot, PrimitivePlacement, RoomScene } from '@/lib/haroolife/game/core/scene'
 import * as THREE from 'three'
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { placeScreenMarkers } from '../core/screen-markers'
+import {
+  type AvatarActor,
+  createAvatarActor,
+  disposeAvatarActor,
+  playAvatarActor,
+} from './avatar-actor'
 import { createGltfLoader } from './gltf'
 import { PerfProbe } from './perf-probe'
+import { plantSeatedFeet } from './seated-feet'
 
 /** Walk and run speeds (units/s). The clips play at the rate that keeps the feet planted. */
 export const WALK_SPEED = 1.3
@@ -45,7 +48,7 @@ const CAMERA_ELEVATION = 0.7
 const CAMERA_DISTANCE = 55
 const WALL_HEIGHT = 3.3
 
-export interface RoomWorldEvents {
+export interface RoomWorldEvents extends Omit<DailyViewProps, 'meal'> {
   /** Reached the interaction point of a Saas prop: run its action (once). */
   onUse: (propId: string) => void
   /** Reached a non-player character: open the conversation. */
@@ -82,7 +85,7 @@ interface Marker {
   el: HTMLButtonElement
 }
 
-type Goal = { hotspot: Hotspot; path: Point[] } | { point: Point; path: Point[] }
+type Goal = { hotspot: Hotspot; path: Point[]; meal?: string } | { point: Point; path: Point[] }
 
 export class RoomWorld {
   private readonly canvas: HTMLCanvasElement
@@ -111,11 +114,24 @@ export class RoomWorld {
   private readonly pagne?: string
   private goal: Goal | null = null
   private performing: { propId: string; anim: NpcAnim } | null = null
+  private posture: {
+    id: string
+    phase: 'enter' | 'idle' | 'exit'
+    elapsed: number
+    from: THREE.Vector3
+    to: THREE.Vector3
+    heading: number
+  } | null = null
+  private afterStand: Goal | null = null
+  private meal: Meal | null = null
+  private mealRequest: string | null = null
+  private mealSeconds = 0
   /** Where the player stood before stepping onto a machine (back there on the next move). */
   private offDevice: { x: number; z: number } | null = null
   private width = 1
   private height = 1
   private yaw = CAMERA_YAW
+  private activityFraming = 0
   private raf = 0
   private last = 0
   private disposed = false
@@ -284,6 +300,15 @@ export class RoomWorld {
     this.performing = activity ? { propId: activity.prop, anim: activity.anim } : null
     const pl = this.player
     if (!pl) return
+    if (
+      activity &&
+      ['sit', 'eat-seated'].includes(activity.anim) &&
+      this.def.seats?.[activity.prop]
+    ) {
+      if (!this.posture) this.sit(activity.prop)
+      return
+    }
+    if (!activity && this.posture && this.posture.phase !== 'exit') this.stand()
     const spot = activity ? this.def.onDevice[activity.prop] : undefined
     if (spot && !this.offDevice) {
       // Machines are used standing on them (treadmill, bike, bench, mat).
@@ -291,6 +316,79 @@ export class RoomWorld {
       pl.root.position.set(spot.x, spot.seat === undefined ? 0 : spot.seat - pl.seatOffset, spot.z)
       pl.root.rotation.y = spot.heading
     } else if (!spot) this.stepOff()
+  }
+
+  setMeal(meal: Meal | null): void {
+    this.meal = meal
+    if (!meal) {
+      this.mealRequest = null
+      this.mealSeconds = 0
+      if (this.goal && 'hotspot' in this.goal && this.goal.meal) this.goal = null
+      return
+    }
+    if (meal.phase !== 'approach' || this.mealRequest === meal.id || !this.player) return
+    this.mealRequest = meal.id
+    if (this.posture) {
+      if (this.posture.phase === 'idle') this.events.onMealReady?.(meal.id, this.posture.id)
+      return
+    }
+    const pos = this.player.root.position
+    const seats = Object.entries(this.def.seats ?? {}).sort(
+      (a, b) =>
+        Math.hypot(a[1].x - pos.x, a[1].z - pos.z) - Math.hypot(b[1].x - pos.x, b[1].z - pos.z),
+    )
+    for (const [id, seat] of seats) {
+      const h = this.def.hotspots.find((h) => h.kind === 'prop' && h.ref === id)
+      if (!h || !isFree(seat.entry.x, seat.entry.z, this.def.obstacles, this.def.bounds)) continue
+      if (
+        Math.hypot(pos.x - h.at.x, pos.z - h.at.z) > 0.5 &&
+        !pathfind(pos, h.at, this.def.obstacles, this.def.bounds).length
+      )
+        continue
+      this.walkTo({ hotspot: h, path: [], meal: meal.id })
+      return
+    }
+    this.events.onNotice?.('Aucune place libre accessible. Tu peux manger debout ici.')
+    this.events.onMealReady?.(meal.id, null)
+  }
+
+  private sit(id: string): void {
+    const pl = this.player
+    const seat = this.def.seats?.[id]
+    if (!pl || !seat) return
+    const contact = pl.seatContact.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), seat.heading)
+    this.posture = {
+      id,
+      phase: 'enter',
+      elapsed: 0,
+      from: pl.root.position.clone(),
+      to: new THREE.Vector3(seat.x - contact.x, seat.height - contact.y, seat.z - contact.z),
+      heading: seat.heading,
+    }
+    this.goal = null
+    this.play(pl, 'HarooSitEnter')
+  }
+
+  private stand(): boolean {
+    const p = this.posture
+    const pl = this.player
+    if (!p || !pl || p.phase === 'exit') return false
+    const entry = this.def.seats?.[p.id]?.entry
+    if (!entry || !isFree(entry.x, entry.z, this.def.obstacles, this.def.bounds)) {
+      this.events.onNotice?.('La sortie du siège est occupée. Attends qu’elle se libère.')
+      return false
+    }
+    this.posture = {
+      ...p,
+      phase: 'exit',
+      elapsed: 0,
+      from: pl.root.position.clone(),
+      to: new THREE.Vector3(entry.x, 0, entry.z),
+    }
+    this.performing = null
+    this.play(pl, 'HarooSitExit')
+    this.events.onActivityEnd?.()
+    return true
   }
 
   private stepOff(): void {
@@ -566,6 +664,13 @@ export class RoomWorld {
 
   private walkTo(goal: Goal): void {
     if (!this.player) return
+    if (this.posture) {
+      this.afterStand = goal
+      if (this.posture.phase !== 'exit') this.stand()
+      return
+    }
+    if (this.meal && !('hotspot' in goal && goal.meal === this.meal.id))
+      this.events.onActivityEnd?.()
     this.stepOff()
     const pos = this.player.root.position
     const dest = 'hotspot' in goal ? goal.hotspot.at : goal.point
@@ -605,12 +710,46 @@ export class RoomWorld {
     const ix = this.input.x
     const iy = this.input.y
     const mag = Math.hypot(ix, iy)
+    const seated = this.posture
+    if (seated) {
+      this.speed = 0
+      if (mag > 0.12 && seated.phase !== 'exit') this.stand()
+      const p = this.posture!
+      p.elapsed += dt
+      if (p.phase === 'idle') {
+        this.play(pl, this.performing?.anim === 'eat-seated' ? 'HarooEatSeated' : 'HarooSitIdle')
+      } else {
+        const name = p.phase === 'enter' ? 'HarooSitEnter' : 'HarooSitExit'
+        this.play(pl, name)
+        const duration = pl.actions.get(name)?.getClip().duration ?? 1.3
+        const progress = Math.min(1, p.elapsed / duration)
+        pl.root.position.lerpVectors(p.from, p.to, progress * progress * (3 - 2 * progress))
+        pl.root.rotation.y = p.heading
+        if (progress >= 1) {
+          if (p.phase === 'enter') {
+            p.phase = 'idle'
+            p.elapsed = 0
+            if (this.meal?.phase === 'approach') this.events.onMealReady?.(this.meal.id, p.id)
+          } else {
+            this.posture = null
+            const next = this.afterStand
+            this.afterStand = null
+            if (this.meal?.phase === 'approach') {
+              this.mealRequest = null
+              this.setMeal(this.meal)
+            } else if (next) this.walkTo(next)
+          }
+        }
+      }
+      return
+    }
     let moved = 0
     let running = false
     if (mag > 0.12) {
       // The stick always wins: it cancels a walk towards a target and ends an activity pose.
       this.goal = null
       this.performing = null
+      if (this.meal) this.events.onActivityEnd?.()
       this.stepOff()
       const m = Math.min(1, mag)
       // Walk by default; Shift or a joystick pushed to its rim (it sets `run`) runs.
@@ -694,19 +833,24 @@ export class RoomWorld {
     // Phones (narrow) zoom in a little, as in the prototype.
     const zoom = this.width < 650 ? 1.12 : 1
     const v = this.def.view
-    const size = Math.max(v.height, v.width / aspect) / zoom
+    const focus = Boolean(this.posture || this.performing?.anim === 'eat')
+    this.activityFraming +=
+      ((focus ? 1 : 0) - this.activityFraming) * (snap ? 1 : Math.min(1, dt * 4))
+    const size = (Math.max(v.height, v.width / aspect) / zoom) * (1 - this.activityFraming * 0.55)
     this.camera.left = -size * aspect
     this.camera.right = size * aspect
     this.camera.top = size
     this.camera.bottom = -size
     this.camera.updateProjectionMatrix()
-    if (v.follow && this.player) {
+    if ((v.follow || this.activityFraming > 0.001) && this.player) {
       // Bigger rooms: the camera keeps the player in view, without leaving the room.
       const p = this.player.root.position
       const hw = this.def.room.w / 2
       const hd = this.def.room.d / 2
-      const tx = Math.max(-hw * 0.6, Math.min(hw * 0.6, p.x))
-      const tz = Math.max(-hd * 0.6, Math.min(hd * 0.6, p.z))
+      const tx =
+        Math.max(-hw * 0.85, Math.min(hw * 0.85, p.x)) * (v.follow ? 1 : this.activityFraming)
+      const tz =
+        Math.max(-hd * 0.85, Math.min(hd * 0.85, p.z)) * (v.follow ? 1 : this.activityFraming)
       const k = snap ? 1 : Math.min(1, dt * 4)
       this.target.x += (tx - this.target.x) * k
       this.target.z += (tz - this.target.z) * k
@@ -753,8 +897,37 @@ export class RoomWorld {
     const steps = Math.max(1, Math.ceil(dt / 0.05))
     for (let i = 0; i < steps; i++) this.move(dt / steps)
     this.player?.mixer.update(dt)
+    if (this.player) {
+      if (this.posture) {
+        const p = this.posture
+        const clip = p.phase === 'enter' ? 'HarooSitEnter' : 'HarooSitExit'
+        const progress = Math.min(
+          1,
+          p.elapsed / (this.player.actions.get(clip)?.getClip().duration ?? 1.3),
+        )
+        plantSeatedFeet(
+          this.player,
+          p.phase === 'idle' ? 1 : p.phase === 'enter' ? progress : 1 - progress,
+        )
+      }
+      const eating = this.player.current.startsWith('HarooEat')
+      this.player.mealProps.show(eating)
+      if (eating && this.meal?.phase === 'eating') {
+        this.mealSeconds += dt
+        if (this.mealSeconds >= 0.2) {
+          this.events.onMealFrame?.(this.meal.id, Math.min(0.25, this.mealSeconds))
+          this.mealSeconds = 0
+        }
+      }
+    }
     for (const n of this.npcs) n.mixer.update(dt)
-    if (this.def.view.follow) this.updateCamera(false, dt)
+    if (
+      this.def.view.follow ||
+      this.posture ||
+      this.activityFraming > 0.001 ||
+      this.performing?.anim === 'eat'
+    )
+      this.updateCamera(false, dt)
     this.scene.updateMatrixWorld()
     const v = new THREE.Vector3()
     const projected = this.markers.flatMap((m) => {
@@ -800,6 +973,7 @@ export class RoomWorld {
    * house) mark everything, as in the prototype.
    */
   private markerShown(h: Hotspot): boolean {
+    if (this.posture || this.performing?.anim === 'eat') return h.kind === 'exit'
     if (!this.def.view.follow || h.kind === 'exit') return true
     const g = this.goal
     if (g && 'hotspot' in g && g.hotspot.id === h.id) return true
@@ -823,6 +997,9 @@ export class RoomWorld {
           heading: pl.root.rotation.y,
           speed: this.speed,
           anim: pl.current,
+          posture: this.posture ? { id: this.posture.id, phase: this.posture.phase } : null,
+          y: pl.root.position.y,
+          mealProps: pl.root.getObjectByName('Repas · bol et ayimolou')?.visible ?? false,
           using: this.performing?.propId ?? null,
           goal: g ? ('hotspot' in g ? g.hotspot.ref : 'point') : null,
           left: false,

@@ -9,6 +9,8 @@ import {
   recolorMap,
 } from '@/lib/haroolife/city/avatar-catalogue'
 import { avatarAnimations } from '@/lib/haroolife/game/render/avatar-actor'
+import { oneShotClip } from '@/lib/haroolife/game/render/daily-animations'
+import { createMealProps } from '@/lib/haroolife/game/render/meal-props'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 /**
  * An adult character of the shared CC0 catalogue for the React
@@ -101,6 +103,8 @@ export const Character = forwardRef<
     return cloned
   }, [gltf.scene])
   const mixer = useMemo(() => new THREE.AnimationMixer(figure), [figure])
+  const mealProps = useMemo(() => createMealProps(figure), [figure])
+  useEffect(() => () => mealProps.dispose(), [mealProps])
   const actions = useMemo(() => {
     const map = new Map<string, THREE.AnimationAction>()
     for (const clip of avatarAnimations(gltf)) map.set(clip.name, mixer.clipAction(clip))
@@ -118,7 +122,9 @@ export const Character = forwardRef<
     const next =
       actions.get(clipFor(spec, anim)) ?? actions.get(spec.fallback) ?? actions.get('idle') ?? null
     if (!next || next === current.current) return
-    next.reset().setLoop(THREE.LoopRepeat, Number.POSITIVE_INFINITY).fadeIn(0.15).play()
+    const once = oneShotClip(next.getClip().name)
+    next.reset().setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, once ? 1 : Number.POSITIVE_INFINITY).fadeIn(0.15).play()
+    next.clampWhenFinished = once
     next.timeScale = rateRef.current
     current.current?.fadeOut(0.15)
     current.current = next
@@ -137,7 +143,10 @@ export const Character = forwardRef<
     },
     [mixer, figure],
   )
-  useFrame((_, dt) => mixer.update(Math.min(dt, 0.1)))
+  useFrame((_, dt) => {
+    mixer.update(Math.min(dt, 0.1))
+    mealProps.show(anim === 'eat' || anim === 'eat-seated')
+  })
 
   // Garment, skin and hair colours: cloned materials owned by this figure.
   useEffect(() => recolor(figure, spec, pagne), [figure, spec, pagne])

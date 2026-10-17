@@ -251,9 +251,9 @@ test('the original estate market and bakery retain purchases and meal-objective 
 
 test('all six original estate interiors expose supported actions instead of city-only commands', () => {
   const allowed = {
-    house: ['sleep', 'eat', 'relax', 'socialize', 'wash', 'toilet'],
-    market: ['buy-meal'],
-    bakery: ['buy-meal'],
+    house: ['sleep', 'eat', 'relax', 'socialize', 'wash', 'toilet', 'sit'],
+    market: ['buy-meal', 'sit'],
+    bakery: ['buy-meal', 'sit'],
     hall: ['work', 'bank', 'toilet'],
     well: ['wash'],
     park: ['relax', 'browse'],

@@ -12,11 +12,13 @@ export default function GameMarket({
   onChange,
   onGoMarket,
   onRealOffers,
+  onEat,
 }: {
   state: CityLife
   onChange: (reduce: (s: CityLife) => CityLife) => void
   onGoMarket: () => void
   onRealOffers: () => void
+  onEat?: (item: import('@/lib/haroolife/city/dining').MealItem, buy: boolean) => void
 }) {
   const here = canShop(state)
   return (
@@ -42,6 +44,22 @@ export default function GameMarket({
         <span>{state.life.wallet.toLocaleString('fr-FR')} FCFA disponibles</span>
       </div>
       <div className="space-y-2">
+        {state.life.meals > 0 && (
+          <article
+            className="rounded-2xl border border-amber-100 bg-amber-50 p-3"
+            data-testid="estate-meals"
+          >
+            <h4 className="text-sm font-black">Repas du domaine · {state.life.meals} portion(s)</h4>
+            <button
+              type="button"
+              disabled={Boolean(state.meal)}
+              className="mt-2 min-h-11 w-full rounded-xl bg-white text-sm font-bold disabled:opacity-40"
+              onClick={() => onEat?.('estate', false)}
+            >
+              Manger un repas du domaine
+            </button>
+          </article>
+        )}
         {GOODS.map((item) => {
           const qty = state.commerce?.inventory[item.id] ?? 0
           return (
@@ -65,8 +83,12 @@ export default function GameMarket({
               {here && (
                 <button
                   type="button"
-                  disabled={state.life.wallet < item.price || qty >= 20}
-                  onClick={() => onChange((s) => purchaseAndConsume(s, item.id))}
+                  disabled={Boolean(state.meal) || state.life.wallet < item.price || qty >= 20}
+                  onClick={() =>
+                    item.id === 'soap' || item.id === 'water' || !onEat
+                      ? onChange((s) => purchaseAndConsume(s, item.id))
+                      : onEat(item.id, true)
+                  }
                   className="mt-2 min-h-11 w-full rounded-xl bg-amber-50 px-3 text-xs font-bold text-amber-900 disabled:opacity-40"
                 >
                   {item.id === 'soap'
@@ -88,8 +110,12 @@ export default function GameMarket({
                 </button>
                 <button
                   type="button"
-                  disabled={!qty}
-                  onClick={() => onChange((s) => consume(s, item.id))}
+                  disabled={!qty || Boolean(state.meal)}
+                  onClick={() =>
+                    item.id === 'soap' || item.id === 'water' || !onEat
+                      ? onChange((s) => consume(s, item.id))
+                      : onEat(item.id, false)
+                  }
                   className="min-h-10 flex-1 rounded-xl border border-slate-200 px-3 text-xs font-bold disabled:text-slate-300"
                 >
                   {item.id === 'soap' ? 'Se laver' : item.id === 'water' ? 'Boire' : 'Manger'}

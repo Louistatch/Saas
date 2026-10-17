@@ -13,6 +13,12 @@ export const ENGINE_STORAGE = 'haroolife.engine'
 /** Renderer used when nothing else decides. */
 export const DEFAULT_RENDERER: RendererId = 'haroo'
 
+/** The reference home/dining workflows use the existing Haroo room controller in either mode.
+ * Other rooms retain the optional R3F renderer. Saves and the remembered preference are intact. */
+export function rendererForInterior(renderer: RendererId, interior: string): RendererId {
+  return ['house', 'market', 'bakery'].includes(interior) ? 'haroo' : renderer
+}
+
 const parse = (v: string | null | undefined): RendererId | null =>
   v === 'haroo' || v === 'three' ? v : null
 
