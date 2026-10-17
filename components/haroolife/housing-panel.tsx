@@ -3,13 +3,14 @@
 /**
  * « Mon logement » in the phone: the address, the rent and what the advance still covers, the
  * CEET and TdE bills to pay, the landlord's last word, moving to another quartier, and receiving
- * someone at home. The rules and the sources of every price are in lib/haroolife/city/housing.ts.
+ * someone at home, and building one's own house (house-build.tsx). The rules and the sources of
+ * every price are in lib/haroolife/city/housing.ts and homebuild.ts.
  */
 import {
   type Bill,
+  type HousingKind,
   KINDS,
   KIND_IDS,
-  type HousingKind,
   QUARTIERS,
   electricityBill,
   housingOf,
@@ -21,6 +22,7 @@ import {
 } from '@/lib/haroolife/city/housing'
 import type { CityLife } from '@/lib/haroolife/city/life'
 import { useState } from 'react'
+import HouseBuild from './house-build'
 
 const money = (n: number) => `${Math.round(n).toLocaleString('fr-FR')} FCFA`
 
@@ -36,6 +38,7 @@ export default function HousingPanel({
   onReceive,
   online,
   onInvitePlayer,
+  onBuild,
 }: {
   state: CityLife
   onPay: (bill: Bill) => void
@@ -44,6 +47,8 @@ export default function HousingPanel({
   /** Players connected in the same town, who can be invited by private message. */
   online: OnlineGuest[]
   onInvitePlayer: (guest: OnlineGuest) => Promise<string>
+  /** « Bâtir ma maison »: a change of the game (buy a plot, pay a stage, move in). */
+  onBuild: (change: (s: CityLife) => CityLife) => void
 }) {
   const h = housingOf(state)
   const q = quartierById(h.quartier)
@@ -60,12 +65,18 @@ export default function HousingPanel({
     <div className="space-y-4" data-testid="housing">
       <section className="rounded-3xl bg-[#3b2f2a] p-4 text-white">
         <p className="text-xs font-semibold text-amber-200">
-          {h.evicted ? 'Sans logement' : `${KINDS[h.kind].label} · ${q?.name ?? ''}, Lomé`}
+          {h.evicted
+            ? 'Sans logement'
+            : `${h.owned ? 'Chez toi · ' : ''}${KINDS[h.kind].label} · ${q?.name ?? ''}, Lomé`}
         </p>
         <p className="mt-1 text-lg font-black leading-snug">
-          {h.evicted ? 'Le propriétaire a changé la serrure.' : `Loyer ${money(h.rent)} par mois`}
+          {h.evicted
+            ? 'Le propriétaire a changé la serrure.'
+            : h.owned
+              ? 'Pas de loyer : la maison est à toi.'
+              : `Loyer ${money(h.rent)} par mois`}
         </p>
-        {!h.evicted && (
+        {!h.evicted && !h.owned && (
           <p className="mt-1 text-sm text-amber-100">
             {h.prepaid > 0
               ? `Avance : encore ${h.prepaid} mois payé${h.prepaid > 1 ? 's' : ''}.`
@@ -157,6 +168,8 @@ export default function HousingPanel({
           )}
         </section>
       )}
+
+      <HouseBuild state={state} onBuild={onBuild} />
 
       <section aria-label="Déménager" className="space-y-2">
         <button

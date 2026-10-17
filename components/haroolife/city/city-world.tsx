@@ -11,6 +11,7 @@ import type { InputState, PlayerController } from '@/lib/haroolife/city/player'
 import { PRESETS, type Quality, renderPixelRatio } from '@/lib/haroolife/city/quality'
 import { type Category, ESTATE, type Lot, inEstate, lotById } from '@/lib/haroolife/city/world'
 import type { RendererId } from '@/lib/haroolife/engine/types'
+import type { StreetPlot } from '@/lib/haroolife/game/render/plot-build'
 import type {
   StreetFare,
   StreetPoseFeed,
@@ -106,6 +107,7 @@ export default function CityWorld({
   fare,
   onHail,
   onVehicle,
+  plot,
   filter,
   selectedLot,
   showNames = false,
@@ -163,6 +165,8 @@ export default function CityWorld({
   /** A passer-by close enough to climb on (or null). */
   onHail?: (customer: ServiceCustomer | null) => void
   onVehicle?: () => void
+  /** The player's plot (« Ma maison ») and its stage, drawn in the street. */
+  plot?: StreetPlot | null
   filter: Category | 'all'
   selectedLot: Lot | null
   /** Map view: write every place's name (by priority, without overlaps); off by default. */
@@ -292,6 +296,7 @@ export default function CityWorld({
             fare={fare}
             onHail={onHail}
             onVehicle={onVehicle}
+            plot={plot}
           />
         </div>
       )}

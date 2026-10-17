@@ -46,6 +46,7 @@ export default defineConfig({
     'lome-arrival.spec.ts',
     'lome-captcha.spec.ts',
     'lome-housing.spec.ts',
+    'lome-house-build.spec.ts',
     'lome-regional-life.spec.ts',
   ],
   reporter: [['list'], ['html', { outputFolder: 'test-results/lome-report', open: 'never' }]],

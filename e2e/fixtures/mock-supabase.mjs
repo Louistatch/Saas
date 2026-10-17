@@ -450,6 +450,32 @@ const WORLD = {
   },
 }
 const MARKET = [
+  // Lomé (Maritime): the survey's undated reference prices (« Mon champ » shows them as
+  // indicative) and a price of three months ago (the year's dearest month for maize).
+  {
+    region_id: 'r1',
+    price: 330,
+    unit: 'kg',
+    market_name: null,
+    observed_at: null,
+    cultures: { name: 'Igname', icon: null },
+  },
+  {
+    region_id: 'r1',
+    price: 700,
+    unit: 'kg',
+    market_name: null,
+    observed_at: null,
+    cultures: { name: 'Tomate', icon: null },
+  },
+  {
+    region_id: 'r1',
+    price: 231,
+    unit: 'kg',
+    market_name: 'Lomé',
+    observed_at: new Date(Date.now() - 92 * 24 * 3600 * 1000).toISOString(),
+    cultures: { name: 'Mais', icon: '🌽' },
+  },
   // Lomé (Maritime), with the culture names of the real survey (« Mon champ » sells at these).
   {
     region_id: 'r1',
@@ -671,6 +697,9 @@ function match(row, k, v) {
       .toLowerCase()
       .includes(pat)
   }
+  // Dates and numbers as PostgREST compares them; a missing value never matches.
+  if (v.startsWith('gte.')) return row[k] != null && String(row[k]) >= v.slice(4)
+  if (v.startsWith('lte.')) return row[k] != null && String(row[k]) <= v.slice(4)
   if (v.startsWith('gt.')) return String(row[k]) > v.slice(3)
   if (v.startsWith('lt.')) return String(row[k]) < v.slice(3)
   return true

@@ -226,8 +226,9 @@ import {
   receiveGuest,
   settleHousing,
 } from '@/lib/haroolife/city/housing'
+import { plotLabel, settleBuild } from '@/lib/haroolife/city/homebuild'
 import Timetable from './timetable'
-import { CROPS, fieldStatus } from '@/lib/haroolife/city/farm'
+import { CROPS, fieldStatus, ripeSaid, settleStore } from '@/lib/haroolife/city/farm'
 import { alertIfAway } from '@/lib/haroolife/local-alert'
 import { PhoneDevice } from './phone-device'
 import { HomeDialog } from './residence-dialog'
@@ -974,10 +975,11 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   ]
   const completion = missions.filter((m) => m.done).length
   // The home: each new game day brings the month's rent and bills, and the landlord's steps;
-  // each new week, the tontine's share for a « bébé tontine ».
+  // each new week, the tontine's share for a « bébé tontine »; the granary's losses; the work
+  // on the player's own house.
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per game day
   useEffect(() => {
-    setCityLife((old) => settleTontine(settleHousing(old)))
+    setCityLife((old) => settleBuild(settleStore(settleTontine(settleHousing(old)))))
   }, [life.day])
   // « Mon champ » is ripe: said in the game, and on the phone when the player is in another app.
   const ripe = fieldStatus(cityLife)
@@ -988,7 +990,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     wasRipe.current = ripeCrop
     if (!ripeCrop || before) return
     const c = CROPS[ripeCrop]
-    const msg = `${c.icon} Ton ${c.name.toLowerCase()} est mûr : récolte-le dans Mon champ.`
+    const msg = `${c.icon} ${ripeSaid(ripeCrop)}`
     say(msg)
     void alertIfAway('Ton champ est mûr', msg, 'haroolife.farm')
   }, [ripeCrop])
@@ -2202,6 +2204,16 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
               fare={streetFare}
               onHail={receiveCustomer}
               onVehicle={toggleVehicle}
+              plot={
+                cityLife.plot
+                  ? {
+                      lotId: cityLife.plot.lot,
+                      name: plotLabel(cityLife.plot),
+                      built: cityLife.plot.built,
+                      working: cityLife.plot.work !== null,
+                    }
+                  : null
+              }
               filter={cityFilter}
               selectedLot={selectedLot}
               showNames={showNames}
@@ -3379,6 +3391,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                     onPay={(bill) => setCityLife((old) => payBill(old, bill))}
                     onMove={(q, kind) => setCityLife((old) => moveHome(old, q, kind))}
                     onReceive={(name) => setCityLife((old) => receiveGuest(old, name))}
+                    onBuild={(change) => setCityLife(change)}
                     online={realtime.state.present
                       .filter(
                         (p) => p.locality === cityLife.locality && p.key !== realtime.state.me?.key,

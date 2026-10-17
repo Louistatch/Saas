@@ -442,8 +442,27 @@ export function worldIndex(): WorldIndex {
       for (let j = 0; j < lot.h; j++) byCell.set(key(lot.x + i, lot.y + j), lot)
   }
   const index = { lots, byCell, byId }
+  if (loc.id === 'lome') nameOwned(index)
   caches.set(loc.id, index)
   return index
+}
+
+/**
+ * The one change a world sees after it is built: the player's plot in Lomé (« Ma maison »,
+ * homebuild.ts) carries a name (« Mon terrain », « Mon chantier », « Ma maison »), so the street
+ * marks its door, its sheet is titled, and the place lists show it.
+ */
+let owned: { id: string; name: string } | null = null
+function nameOwned(index: WorldIndex): void {
+  const lot = owned ? index.byId.get(owned.id) : null
+  if (owned && lot?.type === 'lot') lot.name = owned.name
+}
+export function nameOwnedPlot(id: string | null, name: string): void {
+  const lome = caches.get('lome')
+  const before = owned ? lome?.byId.get(owned.id) : null
+  if (before?.type === 'lot') before.name = null
+  owned = id ? { id, name } : null
+  if (lome) nameOwned(lome)
 }
 export const lotAt = (x: number, y: number): Lot | null =>
   worldIndex().byCell.get(key(x, y)) ?? null

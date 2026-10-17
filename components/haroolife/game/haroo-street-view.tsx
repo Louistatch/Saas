@@ -14,6 +14,7 @@ import {
   type StreetStats,
   StreetWorld,
 } from '@/lib/haroolife/game/render/street-world'
+import type { StreetPlot } from '@/lib/haroolife/game/render/plot-build'
 import type { PresenceEntry } from '@/lib/haroolife/realtime/protocol'
 import type { Building } from '@/lib/haroolife/townsmen-engine'
 import { useEffect, useRef, useState } from 'react'
@@ -48,6 +49,8 @@ export default function HarooStreetView(props: {
   /** A passer-by close enough to climb on (or null). */
   onHail?: (customer: ServiceCustomer | null) => void
   onVehicle?: () => void
+  /** The player's plot (« Ma maison ») and its stage. */
+  plot?: StreetPlot | null
 }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const markers = useRef<HTMLDivElement>(null)
@@ -79,6 +82,7 @@ export default function HarooStreetView(props: {
       ads: live.current.ads ?? null,
       remote: remoteFeed ? { feed: remoteFeed, present: live.current.remotePresent ?? [] } : null,
       fare: live.current.fare ?? null,
+      plot: live.current.plot ?? null,
       events: {
         onEvents: (events, ctl) => live.current.onPlayerEvents(events, ctl),
         onLot: (id) => live.current.onLot(id),
@@ -116,6 +120,17 @@ export default function HarooStreetView(props: {
   useEffect(() => {
     if (state === 'ready' && fare) world.current?.setFare(fare)
   }, [fare, state])
+  const { plot } = props
+  const plotLot = plot?.lotId
+  const plotName = plot?.name ?? ''
+  const plotBuilt = plot?.built ?? 0
+  const plotWorking = plot?.working === true
+  useEffect(() => {
+    if (state !== 'ready') return
+    world.current?.setPlot(
+      plotLot ? { lotId: plotLot, name: plotName, built: plotBuilt, working: plotWorking } : null,
+    )
+  }, [plotLot, plotName, plotBuilt, plotWorking, state])
 
   return (
     <div className="relative h-full w-full" data-engine="haroo" data-scene="street">

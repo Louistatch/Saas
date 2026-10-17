@@ -37,7 +37,7 @@ import {
 import { type Bank, loadBank } from '@/lib/haroolife/city/bank'
 import { drivingRoute, type VehicleKind } from '@/lib/haroolife/city/fares'
 import type { ServiceCustomer } from '@/lib/haroolife/city/automatic-service'
-import { isCityRoad, isDriveway } from '@/lib/haroolife/city/world'
+import { isCityRoad, isDriveway, nameOwnedPlot } from '@/lib/haroolife/city/world'
 import { WALK_SIDE, streetDressing } from '@/lib/haroolife/game/core/sidewalks'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 import { DEFAULT_CONFIG, type PlayerController } from '@/lib/haroolife/city/player'
@@ -70,6 +70,7 @@ import { DETAIL_CELLS, buildCityGeometry } from './city-models'
 import { createGltfLoader } from './gltf'
 import { type MotoParts, buildMoto } from './moto'
 import { PerfProbe } from './perf-probe'
+import { type StreetPlot, buildPlotGroup, signTexture } from './plot-build'
 import { fitTaxiModel } from './vehicle-scale'
 
 /**
@@ -185,6 +186,8 @@ export interface StreetWorldOptions {
   shadows?: 'full' | 'throttled' | 'off'
   /** Multisampling of the canvas (off in eco). Default: on. */
   antialias?: boolean
+  /** The player's plot (« Ma maison ») and its stage, drawn on its lot. */
+  plot?: StreetPlot | null
 }
 
 export interface StreetAds {
@@ -270,6 +273,9 @@ export class StreetWorld {
   private readonly sun = new THREE.DirectionalLight('#fff1d6', 3)
   private readonly hemi = new THREE.HemisphereLight('#f2f6ff', '#9aa380', 2.4)
   private estate: readonly Building[]
+  private plot: StreetPlot | null = null
+  private signMat: THREE.MeshBasicMaterial | null = null
+  private plotDrawn: (StreetPlot & { parts: number }) | null = null
   private win: StreetWindow | null = null
   private winGroup: THREE.Group | null = null
   private markers: { door: StreetDoor; el: HTMLButtonElement; at: THREE.Vector3 }[] = []
@@ -383,6 +389,8 @@ export class StreetWorld {
     this.controller = o.controller
     this.events = o.events
     this.estate = o.estate
+    this.plot = o.plot ?? null
+    nameOwnedPlot(this.plot?.lotId ?? null, this.plot?.name ?? '')
     this.avatarModel = o.avatarModel
     this.pagne = o.pagne
     this.locality = o.locality
@@ -531,6 +539,22 @@ export class StreetWorld {
     this.sun.color.set(light.sunColor)
   }
 
+  /** The player's plot was bought or its work moved on: redraw the window. */
+  setPlot(plot: StreetPlot | null): void {
+    const o = this.plot
+    if (
+      o?.lotId === plot?.lotId &&
+      o?.name === plot?.name &&
+      o?.built === plot?.built &&
+      o?.working === plot?.working
+    )
+      return
+    // The lot's name first: the window's doors are read from it.
+    nameOwnedPlot(plot?.lotId ?? null, plot?.name ?? '')
+    this.plot = plot
+    if (this.player) this.rebuild()
+  }
+
   /** The player's own buildings changed (construction): redraw the window. */
   setEstate(estate: readonly Building[]): void {
     this.estate = estate
@@ -554,6 +578,8 @@ export class StreetWorld {
     window.clearTimeout(this.rotationTimer)
     for (const id of [...this.boards.keys()]) this.dropBoard(id)
     this.posterGeometry.dispose()
+    this.signMat?.map?.dispose()
+    this.signMat?.dispose()
     for (const k of [...this.tiles.keys()]) this.dropTile(k)
     this.cityMaterial?.dispose()
     this.unsubscribe?.()
@@ -766,6 +792,7 @@ export class StreetWorld {
         }
       }
     }
+    this.drawPlot(g)
     this.scene.add(g)
     this.winGroup = g
     this.rebuildMs = Math.round(performance.now() - t0)
@@ -786,6 +813,18 @@ export class StreetWorld {
       this.markersRoot.append(el)
       this.markers.push({ door: d, el, at: new THREE.Vector3(d.x * U, 3.2, d.y * U) })
     }
+  }
+
+  /** The player's plot (« Ma maison ») at its stage, when it is in the window. */
+  private drawPlot(g: THREE.Group): void {
+    this.plotDrawn = null
+    const p = this.plot
+    const lot = p ? this.win?.buildings.find((b) => b.id === p.lotId)?.lot : null
+    if (!p || !lot) return
+    this.signMat ??= new THREE.MeshBasicMaterial({ map: signTexture() })
+    const group = buildPlotGroup(lot, p, U, (c) => this.mat(c), this.unitBox, this.signMat)
+    g.add(group)
+    this.plotDrawn = { ...p, parts: group.children.length }
   }
 
   private makePerson(gltf: GLTF, spec: AvatarSpec, pagne?: string): Person {
@@ -1791,6 +1830,8 @@ export class StreetWorld {
         stopped: c.stopped,
       })),
       collisions: true,
+      // The player's plot drawn in this window (« Ma maison »), with its number of parts.
+      plot: this.plotDrawn,
       kenney: Boolean(this.bank),
       rebuildMs: this.rebuildMs,
       tiles: this.tiles.size,

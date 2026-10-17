@@ -20,6 +20,9 @@
  *   the caution pays the debt.
  *
  * A game month is 30 game days.
+ *
+ * A home of one's own (« Ma maison », homebuild.ts) has no rent, no caution and no landlord; its
+ * CEET and TdE bills come each month like any other home's.
  */
 import type { CityLife } from './life'
 
@@ -165,6 +168,8 @@ export interface Housing {
   evicted: boolean
   /** Game day of the last guest received (one evening a day). */
   guestDay?: number
+  /** The player's own house (homebuild.ts): no rent, no landlord. */
+  owned?: true
 }
 
 const note = (s: CityLife, msg: string): CityLife => ({
@@ -190,6 +195,22 @@ export function defaultHousing(day: number): Housing {
     evicted: false,
   }
 }
+/** The player's own house, finished and moved into: the size of a 2 chambres-salon. */
+export function ownedHousing(quartier: string, day: number): Housing {
+  return {
+    quartier,
+    kind: 'deux-chambres',
+    rent: 0,
+    prepaid: 0,
+    caution: 0,
+    month: monthOf(day),
+    debt: { rent: 0, ceet: 0, tde: 0 },
+    lateSince: null,
+    step: 0,
+    evicted: false,
+    owned: true,
+  }
+}
 export const housingOf = (s: CityLife): Housing => s.housing ?? defaultHousing(s.life.day)
 export const totalDebt = (h: Housing) => h.debt.rent + h.debt.ceet + h.debt.tde
 /** Day the next rent is due. */
@@ -209,6 +230,13 @@ export function settleHousing(s: CityLife): CityLife {
       const month = h.month + 1
       const ceet = electricityBill(h.kind)
       const tde = waterBill(h.kind)
+      if (h.owned) {
+        h = { ...h, month, debt: { ...h.debt, ceet: h.debt.ceet + ceet, tde: h.debt.tde + tde } }
+        said.push(
+          `Nouveau mois chez toi : pas de loyer. Factures : CEET ${fcfa(ceet)}, TdE ${fcfa(tde)}.`,
+        )
+        continue
+      }
       const paidAhead = h.prepaid > 0
       h = {
         ...h,
@@ -311,7 +339,7 @@ export function moveTo(s: CityLife, quartier: string, kind: HousingKind): CityLi
   const h = housingOf(s)
   const q = quartierById(quartier)
   if (!q) return note(s, 'Quartier inconnu.')
-  if (!h.evicted && h.quartier === quartier && h.kind === kind)
+  if (!h.evicted && !h.owned && h.quartier === quartier && h.kind === kind)
     return note(s, 'Tu habites déjà ici.')
   if (totalDebt(h) > 0)
     return note(
@@ -408,5 +436,6 @@ export function decodeHousing(v: unknown): Housing | undefined {
     step: h.step === 1 || h.step === 2 || h.step === 3 ? h.step : 0,
     evicted: h.evicted === true,
     ...(int(h.guestDay, 1_000_000) ? { guestDay: h.guestDay as number } : {}),
+    ...(h.owned === true ? { owned: true as const } : {}),
   }
 }

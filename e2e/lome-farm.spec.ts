@@ -51,7 +51,9 @@ test('my field: sow in season, tend, harvest and sell at the real market price',
   await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
   await expect(page.locator('canvas:visible').first()).toBeVisible({ timeout: 30000 })
   let farm = await openFarm()
-  await expect(farm).toContainText('C’est la saison : on sème le maïs et le haricot.')
+  await expect(farm).toContainText(
+    'C’est la saison : on sème le maïs, le haricot, le manioc, la tomate, le piment et le gombo.',
+  )
   const start = (await city())?.wallet ?? 0
   await farm.getByRole('button', { name: /Semer le maïs · 3 000 FCFA/ }).click()
   await expect(farm.getByRole('region', { name: 'Mon champ en culture' })).toContainText(
@@ -78,7 +80,7 @@ test('my field: sow in season, tend, harvest and sell at the real market price',
   await sale.click()
   await expect.poll(async () => (await city())?.wallet).toBe(before + kg * 143)
   await expect(farm.locator('output')).toContainText(`Vendu : ${kg} kg de maïs à 143 FCFA le kg`)
-  await expect(farm.getByRole('region', { name: 'Ma récolte' })).toHaveCount(0)
+  await expect(farm.getByRole('region', { name: 'Mon grenier' })).toHaveCount(0)
   await page.screenshot({ path: testInfo.outputPath('farm-sold.png') })
   expect(errors).toEqual([])
 })
@@ -107,5 +109,66 @@ test('my field: the game says when it is ripe', async ({ page }, info) => {
     { timeout: 90000 },
   )
   await page.screenshot({ path: info.outputPath('farm-ripe.png') })
+  expect(errors).toEqual([])
+})
+
+test('my granary: weevils eat what is left out, a bag protects it, every price says where it comes from', async ({
+  page,
+}, info) => {
+  test.setTimeout(150_000)
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  // Maize harvested on day 2 and left in the open until day 10; yams and coffee just harvested.
+  const save = initialCityLife()
+  save.locality = 'lome'
+  save.life.day = 10
+  save.life.hour = 9
+  save.life.wallet = 20000
+  save.farm = {
+    field: null,
+    stock: { mais: 70, igname: 40, cafe: 10 },
+    since: { mais: 2, igname: 9, cafe: 9 },
+    checked: 2,
+  }
+  await page.addInitScript((save) => {
+    if (sessionStorage.getItem('farm.granary-seeded')) return
+    sessionStorage.setItem('farm.granary-seeded', '1')
+    localStorage.setItem('haroolife.lome-city.v1', JSON.stringify(save))
+  }, save)
+  const city = () =>
+    page.evaluate(() => (window as unknown as { __LOME_CITY?: City }).__LOME_CITY ?? null)
+  await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
+  await expect(page.locator('canvas:visible').first()).toBeVisible({ timeout: 30000 })
+  await page
+    .getByRole('navigation', { name: 'Navigation du jeu' })
+    .getByRole('button', { name: 'Téléphone' })
+    .click()
+  await page.getByRole('button', { name: /Mon champ$/ }).click()
+  const granary = page.getByTestId('farm').getByRole('region', { name: 'Mon grenier' })
+  // Five days past its three days of grace, in the open: 70 → 63 kg.
+  const maize = granary.locator('[data-crop="mais"]')
+  await expect(maize).toContainText('63 kg de maïs')
+  await expect(maize).toContainText('À l’air : les charançons en mangent chaque jour.')
+  await expect(maize.getByRole('button', { name: /Vendre à 143 FCFA\/kg/ })).toBeVisible()
+  // The survey's dearest and cheapest months of the year (mock: 231 three months ago, 143 now).
+  const month = (d: Date) => d.toLocaleDateString('fr-FR', { month: 'long', timeZone: 'UTC' })
+  const then = new Date(Date.now() - 92 * 24 * 3600 * 1000)
+  await expect(maize).toContainText(
+    `jusqu’à 231 FCFA/kg en ${month(then)}, 143 FCFA/kg au plus bas en ${month(new Date())}`,
+  )
+  // No price surveyed lately: the region's reference, then the game's own, each said so.
+  const yams = granary.locator('[data-crop="igname"]')
+  await expect(yams.getByRole('button', { name: /Vendre à 330 FCFA\/kg/ })).toBeVisible()
+  await expect(yams).toContainText('prix de référence de la région, non daté')
+  const coffee = granary.locator('[data-crop="cafe"]')
+  await expect(coffee.getByRole('button', { name: /Vendre à 1200 FCFA\/kg/ })).toBeVisible()
+  await expect(coffee).toContainText('prix indicatif du jeu')
+  // A triple-layer bag: 1 500 FCFA, and the maize is safe.
+  const before = (await city())?.wallet ?? 0
+  await granary.getByRole('button', { name: /Acheter un sac triple fond/ }).click()
+  await expect.poll(async () => (await city())?.wallet).toBe(before - 1500)
+  await expect(maize).toContainText('En sac triple fond : à l’abri des charançons.')
+  await expect(granary.getByTestId('bags')).toContainText('Sacs triple fond : 1 · 100 kg')
+  await page.screenshot({ path: info.outputPath('farm-granary.png') })
   expect(errors).toEqual([])
 })

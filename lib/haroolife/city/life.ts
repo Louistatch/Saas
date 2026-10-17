@@ -24,6 +24,7 @@ import { type Farm, decodeFarm } from './farm'
 import { type SocialLife, decodeSocial } from './social'
 import { nextSession, sessionAt, sessionKey, whenOf } from './university'
 import { type Housing, decodeHousing } from './housing'
+import { type Plot, decodePlot } from './homebuild'
 import { type Fleet, decodeFleet, manualVehicleService } from './vehicle-economy'
 import { restoreServiceVehicle } from './jobs'
 import {
@@ -129,6 +130,8 @@ export interface CityLife {
   lecture?: string
   /** The player's home: rent, CEET and TdE bills, the landlord (see housing.ts). */
   housing?: Housing
+  /** « Ma maison »: the plot bought in Lomé and the house built on it (see homebuild.ts). */
+  plot?: Plot
   /** The family the player was born into (the birth lottery of arrival.ts). */
   origin?: string
   /** An advance from the neighbourhood tontine, repaid each week (see tontine.ts). */
@@ -243,6 +246,7 @@ export function decodeCityLife(value: unknown): CityLife | null {
     insideLot: v.insideLot ?? null,
     skills: v.skills!,
     housing: decodeHousing(v.housing),
+    plot: decodePlot(v.plot),
     origin: typeof v.origin === 'string' && /^[a-z-]{2,20}$/.test(v.origin) ? v.origin : undefined,
     tontine: decodeTontine(v.tontine),
     lecture:
