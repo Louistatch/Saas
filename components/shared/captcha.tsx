@@ -45,7 +45,7 @@ export function useCaptcha(): {
   enabled: boolean
   /** The token to pass as `options.captchaToken` (null when off or not yet solved). */
   token: string | null
-  /** True when the call may go: captcha off, or solved. */
+  /** True when the call may go: captcha off, solved, or Cloudflare failing (no token then). */
   ready: boolean
   /** Where the check appears (usually invisible; shows a box only when it needs the person). */
   box: ReactNode
@@ -53,6 +53,9 @@ export function useCaptcha(): {
   reset: () => void
 } {
   const [token, setToken] = useState<string | null>(null)
+  // Cloudflare out of reach or refusing this site (script blocked, key or domain wrong): the call
+  // goes without a token and Supabase decides, rather than a button that never wakes up.
+  const [failed, setFailed] = useState(false)
   // The box may appear long after the hook (the last step of the visitor arrival), and leave
   // again: the check lives exactly as long as its box is on the page.
   const [host, setHost] = useState<HTMLDivElement | null>(null)
@@ -72,14 +75,20 @@ export function useCaptcha(): {
           sitekey: SITE_KEY,
           appearance: 'interaction-only',
           language: 'fr',
-          callback: (v: string) => setToken(v),
+          callback: (v: string) => {
+            setFailed(false)
+            setToken(v)
+          },
           'expired-callback': () => setToken(null),
-          'error-callback': () => setToken(null),
+          'error-callback': () => {
+            setToken(null)
+            setFailed(true)
+          },
         })
         widget.current = id
       })
       .catch(() => {
-        // Script blocked or offline: the button stays waiting; Supabase decides in the end.
+        if (alive) setFailed(true)
       })
     return () => {
       alive = false
@@ -93,17 +102,21 @@ export function useCaptcha(): {
       if (widget.current === id) widget.current = null
       // A token from a check no longer on the page is never sent (it would expire unseen).
       setToken(null)
+      setFailed(false)
     }
   }, [host])
   const reset = useCallback(() => {
     if (!SITE_KEY) return
     setToken(null)
-    if (widget.current) window.turnstile?.reset(widget.current)
+    // Without a widget (Cloudflare unreachable), there is nothing to redo: the call stays open.
+    if (!widget.current) return
+    setFailed(false)
+    window.turnstile?.reset(widget.current)
   }, [])
   return {
     enabled: !!SITE_KEY,
     token,
-    ready: !SITE_KEY || !!token,
+    ready: !SITE_KEY || !!token || failed,
     box: SITE_KEY ? <div ref={setHost} className="flex justify-center" /> : null,
     reset,
   }
