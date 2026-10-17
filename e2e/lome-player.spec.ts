@@ -16,6 +16,7 @@ type Player = {
   vehicle: { x: number; z: number; heading: number; speed: number } | null
   driving: boolean
   policeStopped: boolean
+  walkingRoute?: unknown[]
 }
 type Live = { locality: string; at: { x: number; y: number }; chunks: number }
 
@@ -94,7 +95,10 @@ test('avatar, joystick, collisions, camera and taxi in the single 3D world', asy
   // Stop: no sliding after release.
   await page.waitForTimeout(500)
   const stopped = (await player()) as Player
-  expect(stopped.mode).toBe('idle')
+  expect(
+    stopped.mode,
+    `idle after release: ${JSON.stringify({ speed: stopped.speed, police: stopped.policeStopped, route: stopped.walkingRoute?.length, stops })}`,
+  ).toBe('idle')
   expect(stopped.speed).toBe(0)
   // Camera follows the avatar.
   expect(stopped.camera.follow).toBe(true)
