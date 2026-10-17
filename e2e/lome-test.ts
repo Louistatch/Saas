@@ -109,3 +109,38 @@ export async function arriveAsVisitor(
   await page.getByRole('button', { name: 'Emménager' }).click()
   return { origin, start, username }
 }
+
+/**
+ * Walking by hand on the carriageway outside a crossing calls the game's pedestrian check
+ * (lib/haroolife/city/pedestrians.ts): a dialog stops the player. The first one is a free
+ * warning, then no other for 60 s. Specs that walk by hand for another purpose answer it as a
+ * player does and carry on. Returns whether a check was answered.
+ */
+export async function answerPedestrianStop(page: import('@playwright/test').Page) {
+  const { expect } = await import('@playwright/test')
+  const stopped = () =>
+    page.evaluate(
+      () =>
+        (window as unknown as { __LOME_PLAYER?: { policeStopped?: boolean } }).__LOME_PLAYER
+          ?.policeStopped ?? false,
+    )
+  if (!(await stopped())) return false
+  await page
+    .getByRole('dialog', { name: 'Contrôle piéton' })
+    .getByRole('button', { name: 'Rejoindre le trottoir', exact: true })
+    .click()
+  await expect.poll(stopped).toBe(false)
+  // The way back to the kerb is walked by the game: wait until it is done.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            (window as unknown as { __LOME_PLAYER?: { walkingRoute?: unknown[] } }).__LOME_PLAYER
+              ?.walkingRoute?.length ?? 0,
+        ),
+      { timeout: 15000 },
+    )
+    .toBe(0)
+  return true
+}

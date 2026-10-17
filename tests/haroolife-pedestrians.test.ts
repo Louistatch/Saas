@@ -212,6 +212,8 @@ test('guided movement preserves the chosen estate door and arrival clears the ro
   assert.deepEqual(arrived.life.target, s.life.target)
   assert.equal(arrived.life.wallet, s.life.wallet)
   assert.match(arrived.life.lastEvent, /arrivé/)
+  // At home, the next step is the door, not a bubble (there is none outside).
+  assert.equal(arrived.life.lastEvent, 'Tu es arrivé devant ta maison. Appuie sur Entrer.')
 })
 
 test('fictional fines warn first, reconcile the wallet and survive reload without creating debt', () => {

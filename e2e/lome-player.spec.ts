@@ -1,4 +1,4 @@
-import { expect, test } from './lome-test'
+import { answerPedestrianStop, expect, test } from './lome-test'
 
 /**
  * The playable slice (Jalon D1/D3): one 3D scene, a visible avatar that walks
@@ -15,6 +15,7 @@ type Player = {
   camera: { tx: number; tz: number; follow: boolean; angle: number; distance: number }
   vehicle: { x: number; z: number; heading: number; speed: number } | null
   driving: boolean
+  policeStopped: boolean
 }
 type Live = { locality: string; at: { x: number; y: number }; chunks: number }
 
@@ -64,14 +65,24 @@ test('avatar, joystick, collisions, camera and taxi in the single 3D world', asy
     await page.mouse.up()
   }
   const samples: Player[] = []
+  // Free walking crosses the carriageway: the pedestrian check stops the player once (a free
+  // warning, then 60 s without another). It is answered, and that direction is held again.
+  let stops = 0
   for (const angle of [270, 315, 0, 45, 90, 135, 180, 225]) {
     await hold(angle, 1500)
-    const p = (await player()) as Player
+    let p = (await player()) as Player
+    if (p.policeStopped) {
+      await release()
+      if (await answerPedestrianStop(page)) stops++
+      await hold(angle, 1500)
+      p = (await player()) as Player
+    }
     samples.push(p)
     expect(p.mode === 'walk' || p.mode === 'run', `moving at ${angle}°`).toBe(true)
     expect(p.speed).toBeGreaterThan(0.5)
     await release()
   }
+  expect(stops, 'one warning, then the 60 s grace').toBeLessThanOrEqual(1)
   // Positions differ between samples: the avatar really travelled, not teleported cell by cell.
   const dists = samples.map((p) => Math.hypot(p.x - start.x, p.z - start.z))
   expect(Math.max(...dists)).toBeGreaterThan(1.5)
@@ -106,6 +117,7 @@ test('avatar, joystick, collisions, camera and taxi in the single 3D world', asy
     topSpeed = Math.max(topSpeed, ((await player()) as Player).speed)
   }
   await release()
+  await answerPedestrianStop(page)
   // On failure, say what was under the finger (an overlay above the stick, a modal…).
   const underFinger = await page.evaluate(
     ([x, y]) => {
@@ -133,6 +145,7 @@ test('avatar, joystick, collisions, camera and taxi in the single 3D world', asy
   // 3. Collision: push north for 6 s; the avatar never ends up on a building or water cell.
   await hold(270, 6000, 52)
   await release()
+  await answerPedestrianStop(page)
   const onWalkable = await page.evaluate(() => {
     const p = (window as unknown as { __LOME_PLAYER?: Player }).__LOME_PLAYER!
     const c = (window as unknown as { __LOME_CITY?: Live }).__LOME_CITY!

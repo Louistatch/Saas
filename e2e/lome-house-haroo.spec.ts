@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { expect, openPlaces, test } from './lome-test'
+import { answerPedestrianStop, expect, openPlaces, test } from './lome-test'
 
 test.afterEach(async ({ page }, info) => {
   if (info.status === info.expectedStatus) return
@@ -118,7 +118,7 @@ test('HarooLife house: walk, eat, sleep, save, leave and come back', async ({ pa
   await page.getByRole('button', { name: 'Rentrer chez moi' }).click()
   await expect
     .poll(async () => (await live(page))?.lastEvent ?? '', { timeout: 60000 })
-    .toMatch(/Tu es devant|Destination atteinte/)
+    .toMatch(/Tu es (arrivé )?devant|Destination atteinte/)
   await page.getByRole('button', { name: 'Entrer ou sortir' }).click()
   await houseReady(page)
   await expect(page.locator('[data-hotspot]')).toHaveCount(8)
@@ -491,6 +491,8 @@ test('HarooLife street billboards: built near, read, learn more, statistics', as
   for (let i = 0; i < 80; i++) {
     const p = await me()
     if (!p) break
+    // The pedestrian check may stop a walk across the carriageway: answer it, go on.
+    if (await answerPedestrianStop(page)) continue
     const dx = 48.1 - p.x
     const dz = 36.2 - p.z
     if (Math.hypot(dx, dz) < 0.35) break

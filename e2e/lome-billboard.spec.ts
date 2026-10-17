@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { type CityLife, initialCityLife } from '../lib/haroolife/city/life'
-import { expect, test } from './lome-test'
+import { answerPedestrianStop, expect, test } from './lome-test'
 
 /**
  * M2 (D4+): billboards stand in the 3D streets of Lomé, show internal notices (offline too) or an
@@ -151,6 +151,8 @@ test('billboards in the street: build, read, learn more, statistics, expiry, cos
     for (let i = 0; i < 80; i++) {
       const p = await player(page)
       if (!p) break
+      // The pedestrian check may stop a walk across the carriageway: answer it, go on.
+      if (await answerPedestrianStop(page)) continue
       const dx = tx - p.x
       const dz = tz - p.z
       if (Math.hypot(dx, dz) < 0.35) break

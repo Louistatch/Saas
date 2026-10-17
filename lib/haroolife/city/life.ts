@@ -894,10 +894,15 @@ export function moveTo(
 export function finishGuidedWalk(s: CityLife): CityLife {
   if (!s.route.length) return s
   const place = s.target ? lotById(s.target) : null
+  // « Rentrer chez moi » and the estate buildings keep their target in `life`, not `target`.
+  const t = s.life.target
+  const building = t && s.life.city.buildings.find((b) => b.x === t.x && b.y === t.y)
   return note(
     { ...s, route: [] },
     place
       ? `Tu es arrivé devant ${place.name ?? labelOf(place.type)}. Appuie sur Entrer.`
-      : 'Tu es arrivé à destination. Choisis une bulle pour continuer.',
+      : building
+        ? `Tu es arrivé devant ${building.type === 'house' ? 'ta maison' : 'un bâtiment du quartier'}. Appuie sur Entrer.`
+        : 'Tu es arrivé à destination. Choisis une bulle pour continuer.',
   )
 }

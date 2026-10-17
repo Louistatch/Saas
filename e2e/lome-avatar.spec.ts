@@ -68,7 +68,7 @@ test('one configurable avatar across street, room and taxi', async ({ page }, te
         ),
       { timeout: 60000 },
     )
-    .toMatch(/Tu es devant|Destination atteinte/)
+    .toMatch(/Tu es (arrivé )?devant|Destination atteinte/)
   await page.getByRole('button', { name: 'Entrer ou sortir' }).click()
   // Indoors the city rig is replaced by the room scene: the game state tells where we are.
   await expect
@@ -117,8 +117,8 @@ for (const engine of ['haroo', 'three'])
     })
     const state = initialCityLife()
     state.life.wallet = 5432
-    // The gym: house, market and bakery are always drawn by the HarooLife engine
-    // (engine/select.ts rendererForInterior), the other rooms follow ?engine=.
+    // Every interior is drawn by the HarooLife engine, a remembered ?engine=three included
+    // (engine/select.ts rendererForInterior): the migration must hold under both choices.
     const gym = landmarks().find((l) => l.type === 'sport')
     if (!gym) throw new Error('no gym in Lomé')
     state.insideLot = gym.id
@@ -145,7 +145,7 @@ for (const engine of ['haroo', 'three'])
           ),
         { timeout: 45000 },
       )
-      .toBe(engine)
+      .toBe('haroo')
     await expect
       .poll(() =>
         page.evaluate(() => JSON.parse(localStorage.getItem('haroolife.avatar.v1') ?? '{}').model),
@@ -167,7 +167,7 @@ for (const engine of ['haroo', 'three'])
           ),
         { timeout: 45000 },
       )
-      .toBe(engine)
+      .toBe('haroo')
     expect(oldAssets).toEqual([])
     expect(errors).toEqual([])
   })

@@ -45,13 +45,29 @@ test('signed-in players see real residents of their canton and can speak on the 
   // Walk to the market (two buyers stand there in the fixture) and go in: "Ici maintenant" lists them.
   await openPlaces(page)
   await page.getByRole('button', { name: /Marché de quartier/ }).click()
+  // Guided walks follow the pavements at walking pace (0.9 cell/s, player.ts) and wait for the
+  // pedestrian green (a 20 s signal cycle, pedestrians.ts): the wait follows the walked path.
+  type Walker = { x: number; z: number; walkingRoute: { x: number; z: number }[] }
+  const walked = () =>
+    page.evaluate(() => {
+      const p = (window as unknown as { __LOME_PLAYER?: Walker }).__LOME_PLAYER
+      let d = 0
+      let at = p ? { x: p.x, z: p.z } : null
+      for (const w of p?.walkingRoute ?? []) {
+        if (at) d += Math.hypot(w.x - at.x, w.z - at.z)
+        at = w
+      }
+      return d
+    })
+  await expect.poll(walked).toBeGreaterThan(0)
+  const walk = await walked()
   await expect
     .poll(
       () =>
         page.evaluate(
           () => (window as unknown as { __LOME_CITY?: { route?: number } }).__LOME_CITY?.route,
         ),
-      { timeout: 15000 },
+      { timeout: (walk / 0.9 + 20 + 5) * 1000 },
     )
     .toBe(0)
   await page.getByRole('button', { name: 'Entrer ou sortir' }).click()
