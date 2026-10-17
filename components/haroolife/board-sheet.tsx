@@ -179,6 +179,7 @@ function RentForm({
           <label className="block text-sm font-bold text-slate-800">
             Titre
             <input
+              aria-label="Titre"
               value={title}
               maxLength={TITLE_MAX}
               onChange={(e) => setTitle(e.target.value)}
@@ -192,6 +193,7 @@ function RentForm({
           <label className="block text-sm font-bold text-slate-800">
             Ton information
             <textarea
+              aria-label="Ton information"
               value={body}
               maxLength={BODY_MAX}
               rows={3}

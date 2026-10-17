@@ -300,9 +300,11 @@ const openCell = (s: CityLife) => {
   const buildings = s.life.city.buildings
   return (x: number, y: number) => freelyWalkable(x, y, roads, buildings)
 }
+/** The way to a place's door, as walking there takes it (open ground included). */
+export const pathToLot = (s: CityLife, lot: Lot) => findPathWhere(s.at, lot.door, openCell(s))
 export function goToLot(s: CityLife, lot: Lot): CityLife {
   if (s.insideLot || s.life.inside) return note(s, 'Sors du bâtiment avant de partir.')
-  const path = findPathWhere(s.at, lot.door, openCell(s))
+  const path = pathToLot(s, lot)
   if (!path) return note(s, 'Aucune route ne mène là-bas pour le moment.')
   return note(
     { ...s, route: path.slice(1), target: lot.id, life: { ...s.life, target: null } },

@@ -91,6 +91,7 @@ import {
   interiorFor,
   lotAtDoor,
   moveTo,
+  pathToLot,
   payRide,
   roadsOf,
   stopActivity,
@@ -102,7 +103,6 @@ import {
 import { LOCALITIES, LOCALITY_IDS, type LocalityId } from '@/lib/haroolife/city/locality'
 import { CITY_STORAGE, loadCityLife } from '@/lib/haroolife/city/migrate'
 import { ESTATE_GATE } from '@/lib/haroolife/city/navigation'
-import { findPath } from '@/lib/haroolife/city/navigation'
 import { bump } from '@/lib/haroolife/city/perf'
 import { FOLLOW_DISTANCE, type InputState, PlayerController } from '@/lib/haroolife/city/player'
 import { serviceVehiclePlacement } from '@/lib/haroolife/city/jobs'
@@ -4288,7 +4288,8 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                     const room = interiorFor(lot.type)
                     const layout = room ? layoutFor(room, lot, life) : null
                     const acts = actionsFor(lot.type, lot.service)
-                    const path = here ? null : findPath(cityLife.at, lot.door, roadsOf(cityLife))
+                    // The same way as the trip itself: from the lawn or a plot too, not only roads.
+                    const path = here ? null : pathToLot(cityLife, lot)
                     const cells = path ? path.length - 1 : null
                     const eta = (perCell: number) =>
                       cells === null

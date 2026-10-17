@@ -128,10 +128,19 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
       { timeout: 15000 },
     )
     .toContain('"route":0,')
+  // Shopping happens inside (city/commerce.ts canShop): through the market's door first.
+  const doorway = page.getByRole('button', { name: 'Entrer ou sortir' })
+  await doorway.click()
   await navigation.getByRole('button', { name: 'Aménager' }).click()
   await expect(page.getByRole('dialog', { name: 'Marché & commerces' })).toBeVisible()
-  // The market sells dishes by name (city/commerce.ts): an akoumé, 650 FCFA, into the bag.
+  // The market sells dishes by name: an akoumé, 650 FCFA, into the bag (eating it, seated or
+  // in the street, is covered by lome-daily-actions.spec.ts).
   const akoume = page.getByTestId('goods-akoume')
+  const purse = () =>
+    page.evaluate(
+      () => (window as unknown as { __LOME_CITY?: { wallet: number } }).__LOME_CITY?.wallet ?? 0,
+    )
+  const beforeMeal = await purse()
   await akoume.getByRole('button', { name: 'Acheter · 650' }).click()
   // The engine answers every action with a message; the purchase must be the last one.
   await expect
@@ -149,35 +158,20 @@ test('immersive 3D Lomé life completes navigation, shopping, meals and work on 
       }),
     )
     .toContain('Akoumé et sauce acheté')
-  await akoume.getByRole('button', { name: 'Manger', exact: true }).click()
+  expect(await purse()).toBe(beforeMeal - 650)
   await page.getByRole('button', { name: 'Fermer', exact: true }).click()
+  await doorway.click()
 
+  // Work: the jobs of the phone are hourly shifts at the kiosks (paid by the hour, covered by
+  // lome-regional-life.spec.ts) and the driver's services.
   await navigation.getByRole('button', { name: 'Téléphone' }).click()
   await page.getByRole('button', { name: 'Métiers' }).click()
-  await page.getByRole('button', { name: 'Faire mon service' }).click()
-  await page.getByRole('button', { name: 'Fermer', exact: true }).click()
-  await page.getByRole('button', { name: 'Voir mon argent' }).click()
-  await expect
-    .poll(async () =>
-      page.evaluate(() => {
-        const save = localStorage.getItem('haroolife.lome-city.v1')
-        const v = save ? JSON.parse(save) : null
-        const c = (window as unknown as { __LOME_CITY?: Record<string, unknown> }).__LOME_CITY
-        return JSON.stringify({
-          wallet: v?.life.wallet,
-          pos: v?.life.pos,
-          at: c?.at,
-          food: v?.life.city.food,
-          earned: v?.life.earned,
-          spent: v?.life.spent,
-          meals: v?.life.meals,
-          lastEvent: v?.life.lastEvent,
-          inside: c?.inside,
-        })
-      }),
-    )
-    .toContain('"wallet":9500,')
-  await page.getByRole('button', { name: 'Fermer', exact: true }).click()
+  await expect(page.getByRole('button', { name: /^Rejoindre Mixx by Yas/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Rejoindre Moov Africa/ })).toBeVisible()
+  await page
+    .getByRole('dialog', { name: 'Travailler & gagner' })
+    .getByLabel('Fermer', { exact: true })
+    .click()
   await navigation.getByRole('button', { name: 'Maison' }).click()
   await page.getByRole('button', { name: 'Entrer', exact: true }).click()
   await expect

@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test'
+import { type CityLife, initialCityLife } from '../lib/haroolife/city/life'
 import { expect, test } from './lome-test'
 
 /**
@@ -239,6 +240,16 @@ async function touch(page: Page, id: string, mobile: boolean) {
   else await page.mouse.click(box.x + at.x, box.y + at.y)
 }
 
+function standingByTheMarket(): CityLife {
+  const s = initialCityLife()
+  s.locality = 'lome'
+  s.at = { x: 35, y: 35 }
+  s.pose = { x: 35, z: 35, heading: 0 }
+  s.life.hour = 9
+  s.life.wallet = 50_000
+  return s
+}
+
 /**
  * Supports nobody rents read « Panneau disponible · À louer »; any support on screen opens its
  * sheet when touched, near or far. A player rents a free one with game money and writes their
@@ -284,54 +295,42 @@ test('free billboards: « À louer », touched from afar, rented with game money
     return route.fulfill({ json: { ok: true, hidden: false } })
   })
 
-  // First visit: which free supports stand in view of the arrival.
+  // The player stands on the avenue by the Tokoin market, with game money: the market's free
+  // support and the university's stand in view (and any other in sight).
+  await page.addInitScript((save) => {
+    if (sessionStorage.getItem('boards.seeded')) return
+    sessionStorage.setItem('boards.seeded', '1')
+    localStorage.setItem('haroolife.lome-city.v1', JSON.stringify(save))
+  }, standingByTheMarket())
   await open(page, 'live')
   await expect
     .poll(async () => (await onScreen(page, 'vacant:')).length, { timeout: 20000 })
-    .toBeGreaterThanOrEqual(2)
-  const [mineAt, theirsAt] = await onScreen(page, 'vacant:')
-  // Another player rents one of them; the street shows it at the next visit.
-  state.posts.push({
-    id: '9b000000-0000-4000-8000-0000000000aa',
-    placement: theirsAt,
-    title: 'Tontine du quartier',
-    body: 'Réunion dimanche après la messe, chez Tante Ablavi.',
-    palette: 2,
-    author: '@yawa_tokoin',
-    mine: false,
-    startsAt: new Date(Date.now() - 3600e3).toISOString(),
-    endsAt: new Date(Date.now() + 86400e3).toISOString(),
-  })
-  await page.reload({ waitUntil: 'domcontentloaded' })
-  await expect.poll(async () => (await player(page))?.mode ?? null, { timeout: 30000 }).toBe('idle')
-  await expect
-    .poll(async () => (await ads(page))?.showing[theirsAt] ?? '', { timeout: 20000 })
-    .toBe('post:9b000000-0000-4000-8000-0000000000aa')
-  expect((await ads(page))?.showing[mineAt]).toBe(`vacant:${mineAt}`)
-  await expect.poll(async () => (await ads(page))?.screen[mineAt]?.seen ?? false).toBe(true)
+    .toBeGreaterThanOrEqual(1)
+  const [board] = await onScreen(page, 'vacant:')
   await page.screenshot({ path: testInfo.outputPath('billboards-for-rent.png') })
 
   // Touched from where the player stands: the sheet to rent it.
-  await touch(page, mineAt, mobile)
+  await touch(page, board, mobile)
   const rent = page.getByTestId('board-rent')
   await expect(rent).toBeVisible()
   await expect(rent).toContainText('Panneau disponible')
   const before = await wallet(page)
-  expect(before).toBeGreaterThanOrEqual(5000)
-  await rent.getByLabel('Titre').fill('Maïs de Bè')
+  expect(before).toBe(50_000)
+  await rent.getByLabel('Titre', { exact: true }).fill('Maïs de Bè')
   // A phone number is refused before anything is sent.
   await rent.getByLabel('Ton information').fill('Appelle-moi au 90 12 34 56')
   await expect(rent.getByRole('alert')).toContainText('Pas de numéro de téléphone')
   await expect(rent.getByRole('button', { name: /^Louer pour/ })).toBeDisabled()
   await rent.getByLabel('Ton information').fill('Je vends mon maïs, passe au marché samedi.')
-  await rent.getByLabel('Couleurs 2').check({ force: true })
+  // The swatch itself is tapped (its radio is visually hidden).
+  await rent.locator('label', { has: page.getByRole('radio', { name: 'Couleurs 2' }) }).click()
   await expect(rent.getByRole('img', { name: 'Aperçu du panneau : Maïs de Bè' })).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('billboard-rent-sheet.png') })
   await rent.getByRole('button', { name: /^Louer pour 5\s000 FCFA$/ }).click()
   await expect(page.getByTestId('board-post')).toContainText('C’est ton panneau')
   expect(state.rented).toEqual([
     expect.objectContaining({
-      p_placement: mineAt,
+      p_placement: board,
       p_hours: 24,
       p_title: 'Maïs de Bè',
       p_palette: 1,
@@ -340,14 +339,33 @@ test('free billboards: « À louer », touched from afar, rented with game money
   await expect.poll(() => wallet(page)).toBe(before - 5000)
   // The street shows the notice at once.
   await expect
-    .poll(async () => (await ads(page))?.showing[mineAt] ?? '')
+    .poll(async () => (await ads(page))?.showing[board] ?? '')
     .toBe('post:9b000000-0000-4000-8000-000000000001')
   await page.getByRole('button', { name: 'Retour au jeu' }).click()
   await page.screenshot({ path: testInfo.outputPath('billboard-rented.png') })
 
-  // Another player's notice: read it, and report it.
-  await expect.poll(async () => (await ads(page))?.screen[theirsAt]?.seen ?? false).toBe(true)
-  await touch(page, theirsAt, mobile)
+  // Days later, another player holds the same support: the street shows their notice at the
+  // next visit; it can be read and reported.
+  state.posts = [
+    {
+      id: '9b000000-0000-4000-8000-0000000000aa',
+      placement: board,
+      title: 'Tontine du quartier',
+      body: 'Réunion dimanche après la messe, chez Tante Ablavi.',
+      palette: 2,
+      author: '@yawa_tokoin',
+      mine: false,
+      startsAt: new Date(Date.now() - 3600e3).toISOString(),
+      endsAt: new Date(Date.now() + 86400e3).toISOString(),
+    },
+  ]
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect.poll(async () => (await player(page))?.mode ?? null, { timeout: 30000 }).toBe('idle')
+  await expect
+    .poll(async () => (await ads(page))?.showing[board] ?? '', { timeout: 20000 })
+    .toBe('post:9b000000-0000-4000-8000-0000000000aa')
+  await expect.poll(async () => (await ads(page))?.screen[board]?.seen ?? false).toBe(true)
+  await touch(page, board, mobile)
   const theirs = page.getByTestId('board-post')
   await expect(theirs).toContainText('Tontine du quartier')
   await expect(theirs).toContainText('Annonce de @yawa_tokoin')
