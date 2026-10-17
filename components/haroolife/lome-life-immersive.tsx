@@ -2665,7 +2665,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
             {!(driving && cityLife.duty) && (
               <Joystick
                 input={input}
-                disabled={panel !== null || riding}
+                disabled={panel !== null || riding || policeStop !== null}
                 onActive={onJoystickActive}
               />
             )}

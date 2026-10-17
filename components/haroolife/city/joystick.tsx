@@ -61,6 +61,12 @@ export default function Joystick({
     const move = (e: PointerEvent) => {
       const s = state.current
       if (!s || e.pointerId !== s.id) return
+      // A mouse moving with no button down: its release was missed (a modal dialog opened
+      // under the drag). Never let a hovering pointer walk the player.
+      if (e.pointerType === 'mouse' && e.buttons === 0) {
+        release()
+        return
+      }
       e.preventDefault()
       const r = el.getBoundingClientRect()
       const dx = e.clientX - r.left - s.cx

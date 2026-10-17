@@ -67,6 +67,12 @@ début de sa session et avant chaque push sur `main`, et y répond.
     (83 au départ, 79 à 82 au retour : pas de fuite ; l'ancienne borne venait de la maison).
   - **À savoir** : l'agent de police reste parfois devant le joueur après « Rejoindre le
     trottoir » et le bloque une seconde ; à toi de voir s'il doit s'écarter.
+  - **Bug corrigé dans le joystick** : quand le dialogue « Contrôle piéton » s'ouvrait sous un
+    doigt posé, le relâchement n'arrivait jamais au joystick ; l'avatar repartait seul ensuite
+    (vu 2 fois sur 8 dans `lome-player`, vitesse 0,78 après relâchement). Le joystick est
+    désactivé pendant le contrôle (`disabled` dans `lome-life-immersive.tsx`, ce qui le
+    réinitialise) et, dans `joystick.tsx`, une souris qui bouge sans bouton enfoncé termine
+    un glissement resté pendu.
   - **Turnstile** : une seule erreur en production (`app_errors`), `Turnstile loading:
     script-load` à 14:42 UTC sur `/haroolife` : le téléphone n'a pas pu télécharger le script
     Cloudflare. La capture de l'utilisateur montrait encore l'ancien message (avant `aa97b88`).
