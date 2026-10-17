@@ -59,7 +59,27 @@ test('taxi shift: a one-line fare and a payment bubble after each fare', async (
   await status.click()
   await expect(page.getByTestId('service-details')).toHaveCount(0)
 
-  await expect.poll(async () => (await fare())?.service.completed, { timeout: 90000 }).toBe(1)
+  // The fare crosses traffic lights (a red lasts up to 14 s): what is checked is that the
+  // service never stalls, the taxi still and its phase unchanged for 30 s, until it is paid.
+  let mark = ''
+  let since = Date.now()
+  while (((await fare())?.service.completed ?? 0) < 1) {
+    const now = await page.evaluate(() => {
+      const w = window as unknown as {
+        __LOME_PLAYER?: { vehicle: { x: number; z: number } | null }
+        __LOME_FARE?: { service: { phase: string } }
+      }
+      const v = w.__LOME_PLAYER?.vehicle
+      return JSON.stringify([w.__LOME_FARE?.service.phase, v && Math.round(v.x * 5), v && Math.round(v.z * 5)])
+    })
+    if (now !== mark) {
+      mark = now
+      since = Date.now()
+    }
+    expect(Date.now() - since, `the taxi service keeps going (${now})`).toBeLessThan(30000)
+    await page.waitForTimeout(500)
+  }
+  expect((await fare())?.service.completed).toBe(1)
   const r = (await fare())?.care?.lastReceipt
   if (!r) throw new Error('a paid fare leaves a receipt')
   const bubble = page.getByTestId('pay-bubble').first()

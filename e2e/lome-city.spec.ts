@@ -65,8 +65,11 @@ test('Lomé Life 3D opens on a dense, explorable city and completes a full outin
   await expect
     .poll(() => stats(page).then((s) => s?.chunks ?? 0), { timeout: 30000 })
     .toBeGreaterThanOrEqual(9)
-  const first = await stats(page)
-  expect(first?.buildings ?? 0).toBeGreaterThanOrEqual(150)
+  // The street starts without waiting for every start tile: they stream in over a few frames,
+  // so the density is awaited, not sampled at the ninth tile.
+  await expect
+    .poll(() => stats(page).then((s) => s?.buildings ?? 0), { timeout: 30000 })
+    .toBeGreaterThanOrEqual(150)
   await expect
     .poll(
       () => stats(page).then((s) => (s as unknown as { detailed?: boolean })?.detailed ?? false),
