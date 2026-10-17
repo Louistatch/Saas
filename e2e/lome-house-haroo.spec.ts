@@ -588,6 +588,24 @@ for (const kind of ['taxi', 'moto'] as const) {
       expect(size?.x).toBeLessThan(1.2)
       expect(size?.z).toBeLessThan(2.8)
     }
+    // A fare runs through the traffic lights (a red lasts up to 14 s), the pickup and the
+    // drop-off: its length depends on the destination. What is checked is that the vehicle
+    // never stands still for 30 s before `done` holds, not a fixed duration.
+    const keepsGoing = async (done: () => Promise<boolean>) => {
+      let last = (await driver())?.vehicle ?? null
+      let still = Date.now()
+      while (!(await done())) {
+        const v = (await driver())?.vehicle ?? null
+        if (v && (!last || Math.hypot(v.x - last.x, v.z - last.z) > 0.2)) {
+          last = v
+          still = Date.now()
+        }
+        expect(Date.now() - still, `the vehicle keeps going (at ${JSON.stringify(last)})`).toBeLessThan(
+          30000,
+        )
+        await page.waitForTimeout(500)
+      }
+    }
     await page.screenshot({ path: info.outputPath(`${kind}-scale.png`) })
     const before = (await wallet()) ?? 0
     if (info.project.name.startsWith('mobile')) await board.tap()
@@ -602,7 +620,7 @@ for (const kind of ['taxi', 'moto'] as const) {
     const first = (await service())?.fare
     expect(first?.price).toBeGreaterThanOrEqual(200)
     await page.screenshot({ path: info.outputPath(`${kind}-automatic-trip.png`) })
-    await expect.poll(async () => (await service())?.completed, { timeout: 90000 }).toBe(1)
+    await keepsGoing(async () => (await service())?.completed === 1)
     const lastReceipt = () =>
       page.evaluate(
         () =>
@@ -630,22 +648,8 @@ for (const kind of ['taxi', 'moto'] as const) {
     })
     await leave.click()
     await expect.poll(async () => (await service())?.stopRequested).toBe(true)
-    // The current fare ends first, through the traffic lights (a red lasts up to 14 s) and the
-    // drop-off: the trip's length depends on the destination, so what is checked is that the
-    // vehicle never stands still for 30 s before the driver gets off.
-    let last = (await driver())?.vehicle ?? null
-    let still = Date.now()
-    for (;;) {
-      const d = await driver()
-      if (!d?.driving) break
-      const v = d.vehicle
-      if (v && (!last || Math.hypot(v.x - last.x, v.z - last.z) > 0.2)) {
-        last = v
-        still = Date.now()
-      }
-      expect(Date.now() - still, 'the vehicle keeps going until the drop-off').toBeLessThan(30000)
-      await page.waitForTimeout(500)
-    }
+    // The current fare ends first, then the driver gets off.
+    await keepsGoing(async () => !(await driver())?.driving)
     await expect.poll(async () => (await lastReceipt())?.gross).toBe(second?.price)
     const secondReceipt = (await lastReceipt())!
     const expected = before + firstNet + secondReceipt.net
