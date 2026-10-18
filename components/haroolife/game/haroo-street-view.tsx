@@ -178,9 +178,11 @@ export default function HarooStreetView(
       <canvas ref={canvas} className="block h-full w-full touch-none" aria-label="Rue : scène 3D" />
       <div ref={markers} className="pointer-events-none absolute inset-0 overflow-hidden" />
       {state === 'loading' && (
-        <p className="pointer-events-none absolute inset-x-0 top-1/2 text-center text-sm text-[#253834]">
-          Chargement du quartier…
-        </p>
+        <output className="hl-loading pointer-events-none absolute inset-x-4 top-1/3 mx-auto max-w-xs text-center text-sm">
+          <span className="hl-loading-brand">HAROOLIFE</span>
+          <strong>Chargement du quartier…</strong>
+          <span>Les rues, les bâtiments et les personnages arrivent progressivement.</span>
+        </output>
       )}
       {state === 'error' && (
         <p

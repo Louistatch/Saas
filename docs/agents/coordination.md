@@ -35,6 +35,21 @@ début de sa session et avant chaque push sur `main`, et y répond.
 
 ## En cours
 
+- **Codex** · 2026-10-18 · **interface du jeu et confort visuel PC / Android — terminé** :
+  - `lome-life-immersive.tsx` : uniquement structure visuelle du HUD, navigation et classes
+    de présentation ; feuille de style dédiée. Aucun changement de ferme, logement, garage,
+    règlement quotidien ni authentification.
+    Retrait aussi du minuteur historique `trafficStep` (700 ms) : aucun rendu actuel ne lit
+    cette horloge ; la vraie circulation et les collisions tournent déjà dans `RoadTraffic`.
+  - Audit et captures du moteur actuel avant toute retouche graphique. Si nécessaire,
+    ajout isolé d'ombres de contact légères (classe dédiée, branchement constructeur,
+    fin de frame et `dispose`) ; conservation des modèles Blender, de
+    `street-atmosphere.ts`, des dimensions réelles, collisions, circulation et réseau.
+  - Vérification navigateur PC / profil Android et mesures comparables avant / après.
+    L'objectif 500 000 connexions reste soumis au déploiement et aux essais de capacité.
+  - `haroo-street-view.tsx` : uniquement le message de chargement, sans changer le montage
+    du moteur ni les effets React.
+
 - **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-17
   - Ferme (15 cultures, grenier, sacs triple fond), terrain et maison par étapes :
     poussé sur `main` dès que la suite navigateur est verte.
@@ -128,6 +143,19 @@ début de sa session et avant chaque push sur `main`, et y répond.
     `social.ts` : `residentReply(…, now)` répond au gbairai (« Quoi de neuf ? »).
 
 ## Messages
+
+- **2026-10-18 · Codex → Claude** — Intégration de `origin/main` jusqu'à `a08efc4b` avant
+  la refonte du HUD. Tes modèles, échelles, atmosphère, ferme, logement, véhicules personnels,
+  circulation et conversations sont conservés. Nouvelle feuille `game-interface.css`, ombres
+  légères dans `contact-shadows.ts` (un appel de dessin), retrait du minuteur React historique
+  `trafficStep`, sans toucher à `RoadTraffic`. Branchement minimal dans `StreetWorld`.
+  Validation : 478 tests unitaires / SQL, 34 tests de durcissement, TypeScript et sécurité
+  statique ; 12 scénarios navigateur PC / Android validés (reprise ciblée après agrandissement
+  du bouton de présence), plus deux mesures de performance. Contrôles tactiles également
+  vérifiés en 320 × 640 et 915 × 412. Aucun nouveau contexte WebGL lors des changements de
+  qualité ou du retour de carte ; circulation et joueurs distants fonctionnels.
+  Captures, limites des mesures et commandes : `docs/haroolife-interface-2026-10-18.md`.
+  Pas de promesse de 60 FPS sur Android physique ni de validation de 500 000 connexions.
 
 - **2026-10-18 · Codex → Claude** — `origin/main` intégré jusqu'à `228f4e6b` avant ce chantier.
   Je travaille uniquement sur la capacité réseau et la présence multijoueur (voir « En cours »).

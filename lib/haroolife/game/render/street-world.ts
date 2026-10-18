@@ -75,6 +75,7 @@ import {
   playAvatarActor,
 } from './avatar-actor'
 import { DETAIL_CELLS, buildCityGeometry } from './city-models'
+import { ContactShadows } from './contact-shadows'
 import { createGltfLoader } from './gltf'
 import { type MotoModel, type MotoParts, buildMoto } from './moto'
 import { PerfProbe } from './perf-probe'
@@ -335,6 +336,7 @@ export class StreetWorld {
   private readonly events: StreetWorldEvents
   private readonly renderer: THREE.WebGLRenderer
   private readonly scene = new THREE.Scene()
+  private readonly contactShadows = new ContactShadows()
   private readonly camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 400)
   private readonly loader = createGltfLoader()
   private readonly loaded: GLTF[] = []
@@ -577,6 +579,7 @@ export class StreetWorld {
     this.sun.shadow.bias = -0.0004
     this.sun.shadow.normalBias = 0.04
     this.scene.add(this.sun, this.sun.target)
+    this.scene.add(this.contactShadows.mesh)
     this.canvas.addEventListener('pointerdown', this.onPointerDown)
     this.canvas.addEventListener('pointerup', this.onPointerUp)
     this.canvas.addEventListener('pointercancel', this.onPointerCancel)
@@ -867,6 +870,7 @@ export class StreetWorld {
     for (const m of this.groundMaterials.values()) m.dispose()
     for (const t of this.grains.values()) t.dispose()
     this.atmosphere.dispose()
+    this.contactShadows.dispose()
     this.freeLoaded()
     this.renderer.dispose()
     this.perf.dispose()
@@ -2093,6 +2097,7 @@ export class StreetWorld {
       const shown = ride ? ride.root.visible : r.person.root.visible
       this.placeMarker(r.tag, x, y, shown && p.z < 1 && x > 0 && x < this.width && y > 40)
     }
+    this.updateContactShadows()
     if (this.shadows === 'throttled' && this.shadowFrame++ % 3 === 0)
       this.renderer.shadowMap.needsUpdate = true
     const renderAt = performance.now()
@@ -2107,6 +2112,36 @@ export class StreetWorld {
       this.publishProbe()
       this.publishPerf(now)
     }
+  }
+
+  /** Reuses one footprint buffer; no new materials, meshes or arrays during movement. */
+  private updateContactShadows(): void {
+    const shadows = this.contactShadows
+    shadows.begin(this.daylight, this.shadows !== 'off')
+    if (this.player?.root.visible && !this.controller.driving)
+      this.contactFootprint(this.player.root, 0.62, 0.5)
+    if (this.car) this.contactFootprint(this.car, this.moto ? 0.58 : 1.4, this.moto ? 1.25 : 2.8)
+    for (const w of this.walkers) this.contactFootprint(w.person.root, 0.55, 0.46)
+    for (const r of this.remotes.values()) {
+      if (r.ride)
+        this.contactFootprint(r.ride.root, r.ride.moto ? 0.58 : 1.4, r.ride.moto ? 1.25 : 2.8)
+      else if (r.person) this.contactFootprint(r.person.root, 0.62, 0.5)
+    }
+    for (const agent of this.traffic.cars) {
+      const model = this.trafficModels.get(agent.id)
+      if (model)
+        this.contactFootprint(model, agent.kind === 'moto' ? 0.55 : 1.4, agent.kind === 'moto' ? 1.2 : 2.8)
+    }
+    shadows.end()
+  }
+
+  private contactFootprint(root: THREE.Object3D, width: number, length: number): void {
+    if (!root.visible) return
+    const { x, z } = root.position
+    const p = this.controller.pos
+    if ((x - p.x * U) ** 2 + (z - p.z * U) ** 2 > (9 * U) ** 2) return
+    const road = isCityRoad(Math.round(x / U), Math.round(z / U)) || isDriveway(Math.round(x / U), Math.round(z / U))
+    this.contactShadows.add(x, z, road ? -0.012 : 0.067, width, length, root.rotation.y)
   }
 
   // ── billboards (same supports, rotation, exposure and « Lire l'annonce » as before) ────────
@@ -2573,6 +2608,7 @@ export class StreetWorld {
       engine: 'haroo',
       quality: this.quality,
       shadows: this.shadows,
+      contactShadows: this.contactShadows.mesh.count,
       contextAntialias: this.renderer.getContext().getContextAttributes()?.antialias ?? null,
       cachedGeometryBytes: this.tileCache.byteLength,
       pendingTiles: this.tileQueue.length,

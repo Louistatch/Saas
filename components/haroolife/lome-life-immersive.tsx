@@ -1,5 +1,6 @@
 'use client'
 
+import './game-interface.css'
 import PedestrianStop from './pedestrian-stop'
 import { WORLD_W, WORLD_H } from '@/lib/haroolife/city/world'
 import { PavementGraph, guidedCellRoute, onPavement } from '@/lib/haroolife/city/pedestrians'
@@ -125,7 +126,6 @@ import {
   renderPixelRatio,
   softwareRenderer,
 } from '@/lib/haroolife/city/quality'
-import { TRAFFIC_STEP_MS } from '@/lib/haroolife/city/traffic'
 import {
   CATEGORY_LABELS,
   CATEGORY_OF,
@@ -204,6 +204,8 @@ import {
   Hammer,
   Home,
   Map as MapIcon,
+  MapPin,
+  Moon,
   Pause,
   Phone,
   Play,
@@ -342,7 +344,7 @@ const NEEDS = [
 ]
 function NeedBar({ value, color }: { value: number; color: string }) {
   return (
-    <span className="block h-[7px] w-full overflow-hidden rounded-full bg-slate-200/80">
+    <span className="hl-need-track block h-[7px] w-full overflow-hidden rounded-full bg-slate-200/80">
       <span
         className={'block h-full rounded-full transition-all duration-200 ' + color}
         style={{ width: value + '%' }}
@@ -1840,19 +1842,9 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     }, ms)
     return () => window.clearTimeout(id)
   }, [riding, cityLife.route.length])
-  // Street traffic keeps moving while the player stands still (only when the tab is visible).
-  useEffect(() => {
-    if (insideAny) return
-    const id = window.setInterval(() => {
-      if (document.visibilityState === 'visible')
-        setCityLife((old) =>
-          old.route.length
-            ? old
-            : { ...old, life: { ...old.life, trafficStep: old.life.trafficStep + 1 } },
-        )
-    }, TRAFFIC_STEP_MS)
-    return () => window.clearInterval(id)
-  }, [insideAny])
+  // StreetWorld's RoadTraffic advances independently of React, including while idle.
+  // The former 700 ms trafficStep timer only dirtied the whole UI and autosave: no
+  // current renderer consumes it. Keep the saved field for legacy save compatibility.
 
   // Starting a trip or a walk, or entering a place, ends the map view (the game camera comes
   // back). Only the start counts: the map can be opened again while a walk is under way.
@@ -2396,6 +2388,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   return (
     <main
       ref={screenRef}
+      data-quality={quality}
       className="haroolife-screen fixed inset-0 z-[95] w-full overflow-hidden bg-[#98b7a8] font-sans text-slate-900"
     >
       {/* The game world remains mounted under overlays. No map or dashboard replaces the canvas. */}
@@ -2548,7 +2541,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
           onDone={endJourney}
         />
       )}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-[#203d49]/40 via-[#203d49]/10 to-transparent" />
+      <div className="hl-world-shade pointer-events-none absolute inset-x-0 top-0" />
       {riding && cityLife.route.length > 0 && !insideAny && webgl !== false && (
         <RideOverlay
           transport={transport}
@@ -2567,7 +2560,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
       )}
 
       {mapView && !insideAny && !riding && webgl !== false && (
-        <div className="pointer-events-auto absolute left-3 right-3 top-[150px] z-10 flex flex-wrap gap-1.5 sm:top-[160px]">
+        <div className="hl-map-actions pointer-events-auto absolute left-3 right-3 top-[150px] z-10 flex flex-wrap gap-1.5 sm:top-[160px]">
           <button
             type="button"
             onClick={exitMap}
@@ -2596,7 +2589,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
         <div
           role="group"
           aria-label="Catégories de lieux"
-          className="pointer-events-auto absolute left-3 right-16 top-[104px] z-10 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] sm:top-[114px]"
+          className="hl-map-categories pointer-events-auto absolute left-3 right-16 top-[104px] z-10 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] sm:top-[114px]"
         >
           {(
             [
@@ -2639,18 +2632,23 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
               open('lot')
             }
           }}
-          className="pointer-events-auto absolute left-3 top-[104px] z-10 rounded-full border border-emerald-700 bg-emerald-700 px-4 py-2 text-xs font-bold text-white shadow sm:top-[114px]"
+          className="hl-venue-activities pointer-events-auto absolute left-3 top-[104px] z-10 rounded-full border border-emerald-700 bg-emerald-700 px-4 py-2 text-xs font-bold text-white shadow sm:top-[114px]"
         >
           Activités · {lotById(cityLife.insideLot)?.name ?? 'ce lieu'}
         </button>
       )}
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-20 px-3 pt-[max(12px,env(safe-area-inset-top,0px))] sm:px-5">
-        <div className="pointer-events-auto mx-auto flex max-w-[900px] items-center gap-2 rounded-[24px] border border-white/65 bg-white/95 p-2 shadow-lg shadow-slate-900/10 backdrop-blur-lg">
-          <div className="flex shrink-0 items-center gap-1 rounded-2xl px-2 text-xs font-bold sm:text-sm">
-            <Sun size={17} className="text-amber-500" />{' '}
+      <header className="hl-header pointer-events-none absolute inset-x-0 top-0 z-20 px-3 pt-[max(12px,env(safe-area-inset-top,0px))] sm:px-5">
+        <div className="hl-context" aria-label={`HarooLife · ${LOCALITIES[cityLife.locality].name} · ${whereAmI}`}>
+          <span className="hl-wordmark"><span aria-hidden>h.</span> HAROOLIFE</span>
+          <span className="hl-location"><MapPin size={12} aria-hidden /> {LOCALITIES[cityLife.locality].name} <span aria-hidden>·</span> {whereAmI}</span>
+        </div>
+        <div className="hl-status pointer-events-auto mx-auto flex max-w-[900px] items-center gap-2 rounded-[24px] border border-white/65 bg-white/95 p-2 shadow-lg shadow-slate-900/10 backdrop-blur-lg">
+          <div className="hl-clock flex shrink-0 items-center gap-1 rounded-2xl px-2 text-xs font-bold sm:text-sm">
+            {life.hour >= 6 && life.hour < 18
+              ? <Sun size={17} className="text-amber-500" aria-hidden />
+              : <Moon size={17} className="text-indigo-500" aria-hidden />}{' '}
             <span>
               J{life.day} · {String(life.hour).padStart(2, '0')}h
-              <span className="hidden text-emerald-800 sm:inline"> · {whereAmI}</span>
             </span>
           </div>
           <span className="h-6 w-px bg-slate-200" />
@@ -2658,7 +2656,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
             type="button"
             onClick={() => open('home')}
             aria-label="Voir mes besoins"
-            className="flex min-w-0 flex-1 items-center justify-center gap-1 truncate rounded-xl py-2 text-xs font-semibold text-emerald-700"
+            className="hl-mood flex min-w-0 flex-1 items-center justify-center gap-1 truncate rounded-xl py-2 text-xs font-semibold text-emerald-700"
           >
             {wellbeing >= 75 ? '🙂' : wellbeing >= 40 ? '😌' : '😟'} {mood}
           </button>
@@ -2666,7 +2664,8 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
             type="button"
             onClick={() => open('online')}
             aria-label="Voir les joueurs en ligne"
-            className="flex shrink-0 items-center gap-1 rounded-xl bg-emerald-50 px-2 py-2 text-[11px] font-bold text-emerald-800"
+            title={online ? 'Joueurs à proximité dans cette instance' : 'Connexion multijoueur en cours'}
+            className="hl-presence flex shrink-0 items-center gap-1 rounded-xl bg-emerald-50 px-2 py-2 text-[11px] font-bold text-emerald-800"
           >
             <Users size={14} />{' '}
             {online
@@ -2679,21 +2678,21 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
             type="button"
             onClick={() => open('wallet')}
             aria-label="Voir mon argent"
-            className="flex shrink-0 items-center gap-1 rounded-2xl bg-slate-100 px-3 py-2 text-[11px] font-black sm:text-sm"
+            className="hl-wallet flex shrink-0 items-center gap-1 rounded-2xl bg-slate-100 px-3 py-2 text-[11px] font-black sm:text-sm"
           >
             {new Intl.NumberFormat('fr-FR').format(life.wallet)}{' '}
-            <span className="hidden sm:inline">FCFA</span>
+            <span className="hl-currency">FCFA</span>
             <Plus size={15} className="rounded-full bg-emerald-600 text-white" />
           </button>
         </div>
-        <div className="pointer-events-auto mx-auto mt-2 flex max-w-[900px] items-start justify-between gap-2">
+        <div className="hl-shortcuts pointer-events-auto mx-auto mt-2 flex max-w-[900px] items-start justify-between gap-2">
           {onDuty ? (
             <span />
           ) : (
             <button
               type="button"
               onClick={() => open('missions')}
-              className="flex max-w-[79%] items-center gap-2 rounded-full border border-white/40 bg-white/85 px-3 py-2 text-left text-xs font-semibold shadow-md backdrop-blur"
+              className="hl-objective flex max-w-[79%] items-center gap-2 rounded-full border border-white/40 bg-white/85 px-3 py-2 text-left text-xs font-semibold shadow-md backdrop-blur"
             >
               <span>🎯</span>
               <span className="truncate">
@@ -2713,7 +2712,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
               aria-label="Ma coopérative"
               title="Ma coopérative"
               onClick={goMyCooperative}
-              className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-700 px-3 py-2 text-xs font-bold text-white shadow-md"
+              className="hl-cooperative flex shrink-0 items-center gap-1 rounded-full bg-emerald-700 px-3 py-2 text-xs font-bold text-white shadow-md"
             >
               🤝 <span className="hidden sm:inline">Ma coopérative</span>
             </button>
@@ -2722,7 +2721,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
             type="button"
             aria-label={playing ? 'Mettre en pause' : 'Faire avancer le temps'}
             onClick={() => setPlaying((p) => !p)}
-            className="rounded-full bg-white/90 p-2.5 shadow-md"
+            className="hl-time-control rounded-full bg-white/90 p-2.5 shadow-md"
           >
             {playing ? <Pause size={17} /> : <Play size={17} />}
           </button>
@@ -2757,20 +2756,20 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
         onStand={() => setCityLife(old => ({ ...cancelMeal(old), activity: null }))}
         onCancel={() => setCityLife(cancelMeal)} onBag={() => { setShopTab('marche'); open('shop') }} />}
       <div
-        className={`pointer-events-none absolute inset-x-0 bottom-[calc(100px+env(safe-area-inset-bottom,0px))] z-20 px-3 sm:px-5 ${mapView || riding ? 'hidden' : ''}`}
+        className={`hl-controls pointer-events-none absolute inset-x-0 bottom-[calc(100px+env(safe-area-inset-bottom,0px))] z-20 px-3 sm:px-5 ${mapView || riding ? 'hidden' : ''}`}
       >
-        <div className="mx-auto flex max-w-[900px] items-end justify-between gap-2">
+        <div className="hl-control-columns mx-auto flex max-w-[900px] items-end justify-between gap-2">
           <div className="flex min-w-0 flex-col items-start gap-2">
             <button
               type="button"
               onClick={() => open('home')}
               aria-label="Afficher les besoins du personnage"
-              className="pointer-events-auto flex min-w-0 max-w-[75%] items-center gap-2 rounded-full border border-white/70 bg-white/90 py-2 pl-2 pr-3 shadow-lg backdrop-blur"
+              className="hl-needs pointer-events-auto flex min-w-0 items-center gap-2 rounded-full border border-white/70 bg-white/90 py-2 pl-2 pr-3 shadow-lg backdrop-blur"
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-800 text-white">
+              <span className="hl-person flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-800 text-white">
                 <UserRound size={21} />
               </span>
-              <span className="grid w-[150px] grid-cols-2 gap-x-2 gap-y-0.5 sm:w-[200px]">
+              <span className="hl-needs-grid grid grid-cols-2 gap-x-2 gap-y-0.5">
                 {NEEDS.map((n) => (
                   <span
                     key={n.key}
@@ -2791,7 +2790,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
               />
             )}
           </div>
-          <div className="pointer-events-auto flex flex-col items-end gap-2">
+          <div className="hl-actions pointer-events-auto flex flex-col items-end gap-2">
             {currentWorkStatus === 'ready' && panel === null && (
               <button
                 type="button"
@@ -3048,12 +3047,12 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
             {hereNow.length > 6 && <span className="text-white">+{hereNow.length - 6}</span>}
           </div>
         )}
-        <div className={`pointer-events-auto mx-auto mt-2 max-w-[900px] ${onDuty ? 'hidden' : ''}`}>
+        <div className={`hl-journal pointer-events-auto mx-auto mt-2 max-w-[900px] ${onDuty ? 'hidden' : ''}`}>
           <button
             type="button"
             onClick={() => open('journal')}
             aria-live="polite"
-            className="max-w-[94%] rounded-2xl bg-slate-950/65 px-3 py-2 text-left text-[11px] font-medium text-white shadow backdrop-blur sm:text-xs"
+            className="hl-journal-entry max-w-[94%] rounded-2xl bg-slate-950/65 px-3 py-2 text-left text-[11px] font-medium text-white shadow backdrop-blur sm:text-xs"
           >
             {status.length > 95 ? status.slice(0, 92) + '…' : status}
           </button>
@@ -3118,9 +3117,9 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
       )}
       <nav
         aria-label="Navigation du jeu"
-        className="absolute inset-x-0 bottom-0 z-30 px-3 pb-[max(10px,env(safe-area-inset-bottom,0px))]"
+        className="hl-navigation absolute inset-x-0 bottom-0 z-30 px-3 pb-[max(10px,env(safe-area-inset-bottom,0px))]"
       >
-        <div className="mx-auto grid max-w-[520px] grid-cols-4 gap-1 rounded-[26px] border border-white/75 bg-white/95 p-2 shadow-2xl backdrop-blur-lg">
+        <div className="hl-dock mx-auto grid max-w-[520px] grid-cols-4 gap-1 rounded-[26px] border border-white/75 bg-white/95 p-2 shadow-2xl backdrop-blur-lg">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon
             return (
@@ -3142,7 +3141,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                   open(item.id)
                 }}
                 className={
-                  'relative flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-[18px] text-[11px] font-semibold transition ' +
+                  'hl-nav-item relative flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-[18px] text-[11px] font-semibold transition ' +
                   ((item.id === 'map' ? mapView || panel === 'map' : panel === item.id)
                     ? 'bg-slate-900 text-white'
                     : 'text-slate-600 hover:bg-slate-100')
@@ -3264,7 +3263,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
             <Drawer.Content
               aria-label={title}
               aria-describedby={undefined}
-              className="fixed inset-x-0 bottom-[calc(var(--haroo-bottom-gap,0px)+85px+env(safe-area-inset-bottom,0px))] z-[120] mx-auto flex max-h-[min(calc(var(--haroo-visible-height,100vh)*0.68),680px)] w-[calc(100%-16px)] max-w-[620px] flex-col overflow-hidden rounded-[30px] border border-white/80 bg-white shadow-2xl outline-none sm:max-h-[calc(var(--haroo-visible-height,100vh)*0.7)]"
+              className="hl-sheet fixed inset-x-0 bottom-[calc(var(--haroo-bottom-gap,0px)+85px+env(safe-area-inset-bottom,0px))] z-[120] mx-auto flex max-h-[min(calc(var(--haroo-visible-height,100vh)*0.68),680px)] w-[calc(100%-16px)] max-w-[620px] flex-col overflow-hidden rounded-[30px] border border-white/80 bg-white shadow-2xl outline-none sm:max-h-[calc(var(--haroo-visible-height,100vh)*0.7)]"
             >
               <Drawer.Handle
                 aria-label="Faire glisser pour fermer"

@@ -115,7 +115,7 @@ export default function Joystick({
       role="application"
       aria-label="Joystick de déplacement"
       data-testid="joystick"
-      className="pointer-events-auto relative h-[150px] w-[150px] select-none touch-none"
+      className="hl-joystick pointer-events-auto relative h-[150px] w-[150px] select-none touch-none"
       style={{ touchAction: 'none' }}
     >
       <div
