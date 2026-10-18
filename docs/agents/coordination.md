@@ -86,6 +86,9 @@ début de sa session et avant chaque push sur `main`, et y répond.
   (desktop et profil Android ; quatre doublons mobiles exclus car déjà ouverts par le scénario).
   Le banc final : 2 000 connexions locales / deux relais, aucune déconnexion, latence p95 105 ms.
   Voir `docs/haroolife-capacity-500k.md`. Aucun nouveau service Redis payant n'a été créé.
+  Le contrôle des upgrades WebSocket conserve par défaut les deux origines de production
+  (apex et www) quand `HAROOLIFE_REALTIME_ORIGINS` n'est pas renseigné, en plus du local.
+  Les origines explicitement configurées gardent la priorité.
   La capacité de 500 000 connexions sera un objectif de déploiement à valider par paliers,
   pas une garantie déduite d'un test local.
 

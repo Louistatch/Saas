@@ -63,7 +63,10 @@ async function main(url: string, anonKey: string) {
       ])
     : null
   const chat = localChat ?? adapters.chat
-  const origins = (env.HAROOLIFE_REALTIME_ORIGINS ?? 'http://127.0.0.1:3000,http://localhost:3000')
+  const origins = (
+    env.HAROOLIFE_REALTIME_ORIGINS ??
+    'https://faitierehub.com,https://www.faitierehub.com,http://127.0.0.1:3000,http://localhost:3000'
+  )
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean)
