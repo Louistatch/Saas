@@ -69,6 +69,15 @@ export interface Pose {
   /** Client sequence number, increasing; the relay keeps the latest only. */
   n: number
 }
+export interface MovementSnapshot {
+  key: string
+  pose: Pose
+  t: number
+}
+export interface ChatActivity {
+  seq: number
+  key: string
+}
 export type Ack<T> = ({ ok: true } & T) | { ok: false; code: ErrorCode; error: string }
 export type ErrorCode =
   | 'invalid'
@@ -79,6 +88,11 @@ export type ErrorCode =
   | 'disabled'
 
 export interface ClientToServer {
+  /** Public channels are streamed while open; DMs and organisation notifications stay live. */
+  'chat:watch': (
+    p: { room: RoomId | null },
+    ack: (r: Ack<{ messages: ChatMessage[] }>) => void,
+  ) => void
   'chat:send': (
     p: { v: 1; room: RoomId; body: string; clientId: string },
     ack: (r: Ack<{ message: ChatMessage }>) => void,
@@ -103,7 +117,7 @@ export interface ClientToServer {
   /** Where the player is now (slow state: locality only, never a position). */
   'presence:join': (
     p: { locality: Locality },
-    ack: (r: Ack<{ present: PresenceEntry[] }>) => void,
+    ack: (r: Ack<{ present: PresenceEntry[]; world?: string }>) => void,
   ) => void
   'player:pose': (p: Pose) => void
   /** Open (or find) the private conversation with a player met in the street, by their key. */
@@ -119,9 +133,15 @@ export interface ServerToClient {
   'chat:edit': (m: ChatMessage) => void
   'chat:delete': (m: ChatMessage) => void
   'chat:typing': (p: { room: RoomId; key: string; name: string }) => void
+  /** Coalesced unread hints for public rooms whose bodies are not being streamed. */
+  'chat:activity': (p: { room: RoomId; events: ChatActivity[] }) => void
   'presence:join': (p: PresenceEntry) => void
   'presence:leave': (p: { key: string; locality: Locality | null }) => void
+  /** Bounded instance roster; periodically reconciles crashed workers and duplicate tabs. */
+  'presence:state': (p: { present: PresenceEntry[] }) => void
   'player:snapshot': (p: { key: string; pose: Pose; t: number }) => void
+  /** Coalesced nearby positions, consumed by the existing interpolation feed (outside React). */
+  'player:batch': (p: MovementSnapshot[]) => void
   'system:error': (p: { code: ErrorCode; error: string }) => void
   'system:hello': (p: { v: number; me: Me }) => void
   /** A private conversation is now open to me (I opened it, or someone met me and did). */

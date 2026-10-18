@@ -96,9 +96,36 @@ export class RealtimeClient {
   private lastTyping = 0
   private locality: Locality | null = null
   private reading: RoomId | null = null
+  private activityCursors: Record<string, number> = {}
   private loadedOnce = false
   private stopped = false
   private flushQueued = false
+  private presenceTimer: number | null = null
+  private retryTimer: number | null = null
+  private retryAttempt = 0
+  private joining = false
+  private joinTimer: number | null = null
+
+  private publishPresence() {
+    if (this.presenceTimer !== null) return
+    this.presenceTimer = window.setTimeout(() => {
+      this.presenceTimer = null
+      if (!this.stopped) this.set({ present: [...this.presentMap.values()] })
+    }, 100)
+  }
+
+  /** Middleware refusal is not retried by Socket.IO; spread retries after a worker restart. */
+  private retryConnection() {
+    if (this.stopped || this.retryTimer !== null) return
+    const delay = Math.min(30_000, 1000 * 2 ** Math.min(this.retryAttempt++, 5))
+    this.retryTimer = window.setTimeout(
+      () => {
+        this.retryTimer = null
+        if (!this.stopped && this.socket && !this.socket.connected) this.socket.connect()
+      },
+      delay * (0.5 + Math.random()),
+    )
+  }
 
   constructor(
     private url: string,
@@ -139,11 +166,12 @@ export class RealtimeClient {
     }
     this.set({ status: 'connecting' })
     const { io } = await import('socket.io-client')
+    if (this.stopped) return
     const socket: IOSocket = io(this.url, {
       // WebSocket only (no long-polling: no sticky sessions, Vercel-compatible).
       transports: ['websocket'],
       auth: (cb) => {
-        void this.token().then((token) => cb({ token: token ?? '' }))
+        void this.token().then((token) => cb({ token: token ?? '', subscriptions: 'focused' }))
       },
       reconnection: true,
       reconnectionDelay: 1000,
@@ -156,6 +184,9 @@ export class RealtimeClient {
       this.health.attempts = n
     })
     socket.on('system:hello', ({ me }) => {
+      this.retryAttempt = 0
+      if (this.retryTimer !== null) window.clearTimeout(this.retryTimer)
+      this.retryTimer = null
       if (this.health.onlineSince || this.health.lastDropAt) this.health.reconnects++
       this.health.attempts = 0
       this.health.onlineSince = Date.now()
@@ -167,8 +198,7 @@ export class RealtimeClient {
       this.health.lastDropAt = Date.now()
       this.health.lastDrop = reason
       // A disconnect decided by the relay is not retried by Socket.IO on its own.
-      if (reason === 'io server disconnect' && !this.stopped)
-        window.setTimeout(() => socket.connect(), 2000)
+      if (reason === 'io server disconnect' && !this.stopped) this.retryConnection()
       this.presentMap.clear()
       this.set({ status: this.stopped ? 'idle' : 'offline', present: [], typing: {} })
     })
@@ -184,13 +214,37 @@ export class RealtimeClient {
           if (!t) {
             socket.disconnect()
             this.set({ status: 'signed-out' })
-          } else this.set({ status: 'offline' })
+          } else {
+            this.set({ status: 'offline' })
+            this.retryConnection()
+          }
         })
-      } else this.set({ status: 'offline' })
+      } else {
+        this.set({ status: 'offline' })
+        if (!socket.active) this.retryConnection()
+      }
     })
     socket.on('chat:new', (m) => this.receive([m], true))
     socket.on('chat:edit', (m) => this.receive([m], false))
     socket.on('chat:delete', (m) => this.receive([m], false))
+    socket.on('chat:activity', ({ room, events }) => {
+      let unread = 0
+      const cursor = this.activityCursors[room] ?? 0
+      for (const event of events) {
+        this.activityCursors[room] = Math.max(this.activityCursors[room] ?? 0, event.seq)
+        if (
+          event.seq > cursor &&
+          event.key !== this.state.me?.key &&
+          this.reading !== room &&
+          !this.state.rooms[room]?.some((message) => message.seq === event.seq)
+        )
+          unread++
+      }
+      if (unread)
+        this.set({
+          unread: { ...this.state.unread, [room]: (this.state.unread[room] ?? 0) + unread },
+        })
+    })
     socket.on('chat:typing', ({ room, key, name }) => {
       if (key === this.state.me?.key) return
       const list = (this.state.typing[room] ?? []).filter((t) => t.key !== key)
@@ -221,15 +275,34 @@ export class RealtimeClient {
       this.set({ me: { ...me, rooms: me.rooms.filter((r) => r !== room) }, rooms, peers })
     })
     socket.on('presence:join', (e) => {
+      if (e.key === this.state.me?.key || e.locality !== this.locality) return
       this.presentMap.set(e.key, e)
-      this.set({ present: [...this.presentMap.values()] })
+      this.publishPresence()
     })
     socket.on('presence:leave', ({ key }) => {
       this.presentMap.delete(key)
-      this.set({ present: [...this.presentMap.values()] })
+      this.publishPresence()
+    })
+    socket.on('presence:state', ({ present }) => {
+      const others = present.filter(
+        (e) => e.key !== this.state.me?.key && e.locality === this.locality,
+      )
+      const changed =
+        others.length !== this.presentMap.size ||
+        others.some((e) => {
+          const old = this.presentMap.get(e.key)
+          return !old || old.name !== e.name || old.pagne !== e.pagne || old.locality !== e.locality
+        })
+      if (!changed) return
+      this.presentMap.clear()
+      for (const e of others) this.presentMap.set(e.key, e)
+      this.publishPresence()
     })
     socket.on('player:snapshot', (s) => {
       for (const fn of this.poseListeners) fn(s)
+    })
+    socket.on('player:batch', (snapshots) => {
+      for (const s of snapshots) for (const fn of this.poseListeners) fn(s)
     })
     socket.on('system:error', ({ error }) => {
       this.set({ status: 'offline' })
@@ -249,6 +322,9 @@ export class RealtimeClient {
 
   stop() {
     this.stopped = true
+    if (this.presenceTimer !== null) window.clearTimeout(this.presenceTimer)
+    if (this.retryTimer !== null) window.clearTimeout(this.retryTimer)
+    if (this.joinTimer !== null) window.clearTimeout(this.joinTimer)
     window.removeEventListener('online', this.onOnline)
     for (const t of this.typingTimers.values()) window.clearTimeout(t)
     this.socket?.disconnect()
@@ -262,13 +338,16 @@ export class RealtimeClient {
     const me = this.state.me
     if (!s || !me) return
     try {
+      if (this.reading) this.watch(this.reading)
       // Who each private conversation is with (names for the phone).
       if (me.rooms.some((r) => r.startsWith('dm:'))) {
         const p = await s.timeout(LIMITS.ackTimeoutMs).emitWithAck('dm:peers', {})
         if (p.ok) this.set({ peers: { ...this.state.peers, ...p.peers } })
       }
       if (!this.loadedOnce) {
-        for (const room of me.rooms) {
+        for (const room of me.rooms
+          .filter((r) => !r.startsWith('world:') && !r.startsWith('locality:'))
+          .slice(-30)) {
           const r = await s
             .timeout(LIMITS.ackTimeoutMs)
             .emitWithAck('chat:history', { room, limit: 30 })
@@ -277,7 +356,10 @@ export class RealtimeClient {
         this.loadedOnce = true
       } else {
         const cursors: Record<RoomId, number> = {}
-        for (const room of me.rooms) cursors[room] = this.cursor(room)
+        for (const room of me.rooms
+          .filter((r) => !r.startsWith('world:') && !r.startsWith('locality:'))
+          .slice(-30))
+          cursors[room] = this.cursor(room)
         const r = await s.timeout(LIMITS.ackTimeoutMs).emitWithAck('sync:resume', { cursors })
         if (r.ok)
           for (const list of Object.values(r.messages) as ChatMessage[][]) this.receive(list, true)
@@ -419,7 +501,30 @@ export class RealtimeClient {
   }
 
   /** The room on screen: its messages count as read. */
+  private watch(room: RoomId | null) {
+    const s = this.socket
+    if (!s?.connected) return
+    void s
+      .timeout(LIMITS.ackTimeoutMs)
+      .emitWithAck('chat:watch', { room })
+      .then((r) => {
+        if (r.ok) this.receive(r.messages, false)
+      })
+      .catch(() => {
+        // Rolling deployment: a previous relay has no chat:watch handler yet.
+        if (room && s.connected && this.reading === room)
+          void s
+            .timeout(LIMITS.ackTimeoutMs)
+            .emitWithAck('chat:history', { room, limit: 30 })
+            .then((r) => {
+              if (r.ok) this.receive(r.messages, false)
+            })
+            .catch(() => {})
+      })
+  }
+
   read(room: RoomId | null) {
+    if (this.reading !== room) this.watch(room)
     this.reading = room
     if (room?.startsWith('dm:')) this.hooks.dmRead?.(room)
     if (room && this.state.unread[room]) this.set({ unread: { ...this.state.unread, [room]: 0 } })
@@ -507,15 +612,35 @@ export class RealtimeClient {
   async join(locality: Locality) {
     this.locality = locality
     const s = this.socket
-    if (!s?.connected) return
-    const r = await s
-      .timeout(LIMITS.ackTimeoutMs)
-      .emitWithAck('presence:join', { locality })
-      .catch(() => null)
-    if (!r?.ok) return
-    this.presentMap.clear()
-    for (const e of r.present) this.presentMap.set(e.key, e)
-    this.set({ present: [...this.presentMap.values()] })
+    if (!s?.connected || this.joining || this.stopped) return
+    this.joining = true
+    try {
+      while (s.connected && !this.stopped) {
+        const requested = this.locality as Locality
+        const r = await s
+          .timeout(LIMITS.ackTimeoutMs)
+          .emitWithAck('presence:join', { locality: requested })
+          .catch(() => null)
+        if (requested !== this.locality) continue
+        if (!r?.ok) {
+          if (this.joinTimer !== null) window.clearTimeout(this.joinTimer)
+          this.joinTimer = window.setTimeout(
+            () => {
+              this.joinTimer = null
+              if (this.locality) void this.join(this.locality)
+            },
+            1000 + Math.random() * 2000,
+          )
+          return
+        }
+        this.presentMap.clear()
+        for (const e of r.present) this.presentMap.set(e.key, e)
+        this.set({ present: [...this.presentMap.values()] })
+        return
+      }
+    } finally {
+      this.joining = false
+    }
   }
 
   /** Close the transport as a lost network would (tests, and « Se reconnecter » in the UI). */

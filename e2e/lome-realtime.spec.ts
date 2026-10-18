@@ -10,7 +10,9 @@ import { arriveAsVisitor, expect, openPlaces, test } from './lome-test'
  * broadcast, canton isolation, unread badge, offline queue then catch-up, persistence after a
  * reload, text never interpreted as HTML, other avatars moving smoothly in the 3D street.
  */
-const RELAY = 'http://127.0.0.1:3001'
+const APP_PORT = Number(process.env.HAROOLIFE_TEST_PORT || 3000)
+const APP_URL = `http://127.0.0.1:${APP_PORT}`
+const RELAY = `http://127.0.0.1:${APP_PORT + 1}`
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url')
 const ACCOUNTS = {
   ama: 'a1a1a1a1-0000-4000-8000-000000000001',
@@ -40,7 +42,7 @@ const rt = (page: Page) =>
 async function signIn(browser: Browser, who: keyof typeof ACCOUNTS, device: object) {
   const context: BrowserContext = await browser.newContext({
     ...device,
-    baseURL: 'http://127.0.0.1:3000',
+    baseURL: APP_URL,
   })
   const sub = ACCOUNTS[who]
   const session = {
@@ -312,7 +314,8 @@ test('two people chat in real time, survive a network cut and a reload, and see 
   // 7. Reload the phone: the conversation is still there (stored, not just broadcast).
   await yawa.page.reload({ waitUntil: 'domcontentloaded' })
   await expect.poll(async () => (await rt(yawa.page))?.status, { timeout: 30000 }).toBe('online')
-  // History is loaded room by room after the connection: wait for Lomé's, then read it.
+  // Public bodies are loaded when the room is opened; durable history survives a full reload.
+  await openChat(yawa.page, 'Lomé')
   await expect
     .poll(() =>
       yawa.page.evaluate(
@@ -322,7 +325,6 @@ test('two people chat in real time, survive a network cut and a reload, and see 
       ),
     )
     .toBeGreaterThan(0)
-  await openChat(yawa.page, 'Lomé')
   await expect(log(yawa.page)).toContainText(`Pendant ta coupure ${run}`)
   await expect(log(yawa.page)).toContainText(`Je suis dans le taxi, j’arrive ${run}`)
 
@@ -347,7 +349,7 @@ test('two people chat in real time, survive a network cut and a reload, and see 
 
 // The database RPCs the dashboard calls, as a given person (through the mock Supabase, which
 // runs them in the relay's PGlite: the real migrations).
-const SUPABASE = 'http://127.0.0.1:54329'
+const SUPABASE = `http://127.0.0.1:${process.env.HAROOLIFE_SUPABASE_PORT || 54329}`
 const keyOf = (sub: string) =>
   createHash('md5').update(`haroolife-author:${sub}`).digest('hex').slice(0, 16)
 const dmOf = (a: string, b: string) => `dm:${[keyOf(a), keyOf(b)].sort().join(':')}`
@@ -648,7 +650,7 @@ test('a visitor plays HarooLife without an account, talks with the players, and 
   // Signed out, on a phone: one tap on « Jouer en visiteur », no e-mail, no password.
   const context = await browser.newContext({
     ...devices['Pixel 7'],
-    baseURL: 'http://127.0.0.1:3000',
+    baseURL: APP_URL,
   })
   await context.addInitScript(() => localStorage.setItem('haroolife.avatar.chosen', '1'))
   const page = await context.newPage()
@@ -727,7 +729,7 @@ test('a friend invited by WhatsApp link arrives in one tap, and both get their g
   // The friend opens the link on a phone, no account: one tap, and the bonus is there.
   const context = await browser.newContext({
     ...devices['Pixel 7'],
-    baseURL: 'http://127.0.0.1:3000',
+    baseURL: APP_URL,
   })
   await context.addInitScript(() => localStorage.setItem('haroolife.avatar.chosen', '1'))
   const friend = await context.newPage()
