@@ -110,6 +110,7 @@ export default function CityWorld({
   onHail,
   onVehicle,
   plot,
+  talkOrigin,
   filter,
   selectedLot,
   showNames = false,
@@ -171,6 +172,8 @@ export default function CityWorld({
   onVehicle?: () => void
   /** The player's plot (« Ma maison ») and its stage, drawn in the street. */
   plot?: StreetPlot | null
+  /** The player's background, for the gbairai the passers-by whisper. */
+  talkOrigin?: string | null
   filter: Category | 'all'
   selectedLot: Lot | null
   /** Map view: write every place's name (by priority, without overlaps); off by default. */
@@ -315,6 +318,7 @@ export default function CityWorld({
             onHail={onHail}
             onVehicle={onVehicle}
             plot={plot}
+            talkOrigin={talkOrigin}
           />
         </div>
       )}

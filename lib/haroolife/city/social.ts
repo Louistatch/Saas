@@ -1,6 +1,7 @@
 import type { CityLife } from './life'
 import { LOCALITIES } from './locality'
 import { municipalStatus } from './street-civic'
+import { STUDENT_LINES, isStudent, streetNews } from './street-talk'
 import type { Lot } from './world'
 export type DialogueMessage = { from: 'me' | 'npc'; text: string }
 export type Contact = { affinity: number; rewardedDay: number; history: DialogueMessage[] }
@@ -30,7 +31,13 @@ export type Resident = {
   role: string
   lot?: Pick<Lot, 'type' | 'service'>
 }
-export function residentReply(resident: Resident, text: string, s: CityLife): string {
+/** `now`: the real time, for the gbairai of the day and the Cardinal's messe (street-talk.ts). */
+export function residentReply(
+  resident: Resident,
+  text: string,
+  s: CityLife,
+  now = Date.now(),
+): string {
   const t = text
     .toLocaleLowerCase('fr')
     .normalize('NFD')
@@ -45,6 +52,10 @@ export function residentReply(resident: Resident, text: string, s: CityLife): st
   if (resident.lot?.type === 'university') {
     return 'Bienvenue à l’université ! Ouvre « Objets et personnes » : emploi du temps, place de cours et secrétariat ont chacun leur bulle. Choisis le tableau pour lire les horaires ou la place libre pour suivre le cours. Pas de cours à midi : même le professeur mange !'
   }
+  if (/gbairai|rumeur|cardinal|messe|quoi de neuf|nouvelle/.test(t))
+    return streetNews(now, s.origin)
+  if (isStudent(resident.name) && /bonjour|salut|coucou|bonsoir|ca va|bourse|etud|partiel/.test(t))
+    return `Bienvenue à ${LOCALITIES[s.locality].name} ! Moi, c’est ${resident.name}, étudiant à l’université. ${STUDENT_LINES[((s.life.day % STUDENT_LINES.length) + STUDENT_LINES.length) % STUDENT_LINES.length]}`
   if (/essence|carburant|entretien|garage|taxi|zem|moto/.test(t))
     return 'En service, l’essence consommée et la réserve d’entretien sont prélevées sur chaque recette. Le véhicule rejoint automatiquement la pompe et le garage quand il en a besoin. Le détail est dans Mes finances. Ici, même le taxi ne roule pas à la bonne humeur !'
   if (
@@ -92,7 +103,12 @@ export function residentReply(resident: Resident, text: string, s: CityLife): st
     'Je connais le quartier : demande-moi où acheter, comment travailler, gérer ton véhicule ou parler à la police. Doucement, on va y arriver !'
   )
 }
-export function converse(s: CityLife, resident: Resident, input: string): CityLife {
+export function converse(
+  s: CityLife,
+  resident: Resident,
+  input: string,
+  now = Date.now(),
+): CityLife {
   const text = input.trim().slice(0, 200)
   if (!text) return s
   const contacts = s.social ?? {}
@@ -104,7 +120,7 @@ export function converse(s: CityLife, resident: Resident, input: string): CityLi
     history: [
       ...c.history,
       { from: 'me' as const, text },
-      { from: 'npc' as const, text: residentReply(resident, text, s) },
+      { from: 'npc' as const, text: residentReply(resident, text, s, now) },
     ].slice(-30),
   }
   const entries = Object.entries({ ...contacts, [resident.key]: contact }).slice(-60)

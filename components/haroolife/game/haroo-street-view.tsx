@@ -8,6 +8,7 @@ import type { ServiceCustomer } from '@/lib/haroolife/city/automatic-service'
  */
 import type { PlayerController } from '@/lib/haroolife/city/player'
 import type { Quality } from '@/lib/haroolife/city/quality'
+import { streetLines } from '@/lib/haroolife/city/street-talk'
 import type { DailyViewProps } from '@/lib/haroolife/engine/types'
 import type { StreetPlot } from '@/lib/haroolife/game/render/plot-build'
 import {
@@ -56,6 +57,8 @@ export default function HarooStreetView(
     onVehicle?: () => void
     /** The player's plot (« Ma maison ») and its stage. */
     plot?: StreetPlot | null
+    /** The player's background: the passers-by whisper its gbairai too (street-talk.ts). */
+    talkOrigin?: string | null
   },
 ) {
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -160,6 +163,15 @@ export default function HarooStreetView(
   useEffect(() => {
     if (state === 'ready') world.current?.setMeal(props.meal ?? null)
   }, [props.meal, state])
+  // What the street says follows the real time of Lomé (the gbairai of the day, the Sunday messe).
+  const { talkOrigin } = props
+  useEffect(() => {
+    if (state !== 'ready') return
+    const say = () => world.current?.setStreetTalk(streetLines(Date.now(), talkOrigin))
+    say()
+    const timer = window.setInterval(say, 60_000)
+    return () => window.clearInterval(timer)
+  }, [talkOrigin, state])
 
   return (
     <div className="relative h-full w-full" data-engine="haroo" data-scene="street">

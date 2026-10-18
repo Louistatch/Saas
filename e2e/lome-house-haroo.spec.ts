@@ -197,9 +197,25 @@ test('HarooLife house: walk, eat, sleep, save, leave and come back', async ({ pa
   const fed = (await needs(page)) as Needs
   await page.waitForTimeout(2000)
   expect((await needs(page))?.hunger, 'one meal, one effect').toBe(fed.hunger)
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') || '{}').meal), { timeout: 20000 }).toBeUndefined()
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') || '{}').meal,
+        ),
+      { timeout: 20000 },
+    )
+    .toBeUndefined()
   await page.getByRole('button', { name: 'Se lever', exact: true }).click()
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __LOME_INTERIOR?: { posture: unknown } }).__LOME_INTERIOR?.posture)).toBeNull()
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as unknown as { __LOME_INTERIOR?: { posture: unknown } }).__LOME_INTERIOR
+            ?.posture,
+      ),
+    )
+    .toBeNull()
 
   // Sleep: the 🌙 point walks the player to the bed; energy is restored.
   await page.locator('[data-hotspot="sleep"]').click()
@@ -341,6 +357,8 @@ test('HarooLife street and clear map: walk, places without overlap, sheet, route
   type Player = { x: number; z: number; heading: number; mode: string; camera: { angle: number } }
   const player = () =>
     page.evaluate(() => (window as unknown as { __LOME_PLAYER?: Player }).__LOME_PLAYER ?? null)
+  // Test hooks on (a passer-by brought beside the player, below).
+  await page.addInitScript(() => localStorage.setItem('haroolife.e2e', '1'))
   await page.goto('/haroolife', { waitUntil: 'domcontentloaded' })
   await expect
     .poll(
@@ -402,6 +420,20 @@ test('HarooLife street and clear map: walk, places without overlap, sheet, route
   await expect(field).toHaveValue('')
   await page.keyboard.press('Escape')
   await expect(npc).toBeHidden()
+
+  // The street talks: a student beside the player (backpack, 🎓 tag); within one bubble cycle
+  // (6 s shown, 5 s of quiet) someone near says the gbairai, the Cardinal's messe or the bourse.
+  expect(
+    await page.evaluate(() =>
+      (
+        window as unknown as { __LOME_SUMMON_WALKER?: (name?: string) => string | null }
+      ).__LOME_SUMMON_WALKER?.('Yao'),
+    ),
+  ).toBe('Yao')
+  await expect(page.locator('button[data-student="Yao"]')).toHaveText('🎓 Yao')
+  const talk = page.locator('[data-street-talk]')
+  await expect(talk).toBeVisible({ timeout: 15000 })
+  await expect(talk).toHaveText(/\S{3}/)
 
   // The clear map: districts, places that never overlap, a sheet with the trip.
   await page
@@ -600,9 +632,10 @@ for (const kind of ['taxi', 'moto'] as const) {
           last = v
           still = Date.now()
         }
-        expect(Date.now() - still, `the vehicle keeps going (at ${JSON.stringify(last)})`).toBeLessThan(
-          30000,
-        )
+        expect(
+          Date.now() - still,
+          `the vehicle keeps going (at ${JSON.stringify(last)})`,
+        ).toBeLessThan(30000)
         await page.waitForTimeout(500)
       }
     }

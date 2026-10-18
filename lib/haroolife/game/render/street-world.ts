@@ -38,6 +38,7 @@ import { FrameRing } from '@/lib/haroolife/city/perf'
 import { DEFAULT_CONFIG, type PlayerController } from '@/lib/haroolife/city/player'
 import { PRESETS, type Quality, renderPixelRatio } from '@/lib/haroolife/city/quality'
 import { RoadTraffic } from '@/lib/haroolife/city/road-traffic'
+import { type Speaker, type StreetLine, isStudent } from '@/lib/haroolife/city/street-talk'
 import { ESTATE, isCityRoad, isDriveway, nameOwnedPlot } from '@/lib/haroolife/city/world'
 import type { DailyViewProps } from '@/lib/haroolife/engine/types'
 import { streetDressing } from '@/lib/haroolife/game/core/sidewalks'
@@ -129,6 +130,16 @@ const PEDESTRIAN_NAMES = [
   'Agent Dodzi',
 ]
 const U = STREET_CELL
+/**
+ * Street talk: a bubble over a passer-by near the player, held TALK_SHOW seconds, then
+ * TALK_GAP seconds of quiet. The first one comes soon after the street appears.
+ */
+const TALK_FIRST = 2.5
+const TALK_SHOW = 6
+const TALK_GAP = 5
+/** Cells around the player where a passer-by may speak (about what the camera frames). */
+const TALK_RANGE = 3.2
+const BACKPACKS = ['#1f4e8c', '#b23a48']
 
 /**
  * Locomotion clip and rate. Speeds stay in cells per second (trips last as long as before the
@@ -310,6 +321,8 @@ interface Walker {
   approachingPolice?: boolean
   path?: { x: number; z: number }[]
   police?: boolean
+  /** A student: backpack and 🎓 tag; speaks of the bourse and the exams. */
+  student?: boolean
   tag: HTMLButtonElement
   body: CollisionBody
 }
@@ -386,6 +399,13 @@ export class StreetWorld {
   /** Camera framing factor (1 on foot, wider at the wheel), eased. */
   private framing = 1
   private walkers: Walker[] = []
+  /** What the passers-by say (street-talk.ts) and who is speaking now, with their bubble. */
+  private talk: readonly StreetLine[] = []
+  private readonly talkTurn: Record<Speaker, number> = { habitant: 0, etudiant: 0, police: 0 }
+  private talkWait = TALK_FIRST
+  private talking: { walker: Walker; left: number } | null = null
+  private lastTalker: Walker | null = null
+  private talkBubble: HTMLElement | null = null
   private shadows: 'full' | 'throttled' | 'off'
   private paused = false
   private readonly animationTime = new WeakMap<Person, number>()
@@ -601,12 +621,17 @@ export class StreetWorld {
       if (graph && n !== undefined && n >= 0)
         person.root.position.set(graph.nodes[n].x * U, 0, graph.nodes[n].z * U)
       const name = PEDESTRIAN_NAMES[i % PEDESTRIAN_NAMES.length]
+      const student = !police && isStudent(name)
       const tag = document.createElement('button')
       tag.type = 'button'
       tag.dataset.pedestrian = name
-      tag.setAttribute('aria-label', `Habitant ${name}`)
-      tag.textContent = police ? `👮🏿 ${name}` : name
+      tag.setAttribute('aria-label', student ? `Habitant ${name}, étudiant` : `Habitant ${name}`)
+      tag.textContent = police ? `👮🏿 ${name}` : student ? `🎓 ${name}` : name
       if (police) tag.dataset.police = name
+      if (student) {
+        tag.dataset.student = name
+        this.addBackpack(person, BACKPACKS[i % BACKPACKS.length])
+      }
       tag.className =
         'pointer-events-auto absolute left-0 top-0 min-h-8 rounded-full border border-white/80 bg-white/85 px-3 text-xs font-semibold text-slate-700 shadow'
       tag.style.visibility = 'hidden'
@@ -622,31 +647,43 @@ export class StreetWorld {
         t: Math.random(),
         name,
         police,
+        student,
         tag,
         body: { x: 0, z: 0, heading: 0, halfWidth: 0.07, halfLength: 0.07 },
       })
       this.play(person, clipFor(person.spec, 'walk'))
       person.actions.get(person.current)?.setEffectiveTimeScale(1)
     }
-    // End-to-end tests only (flag set by the test): bring a passer-by next to the vehicle, as
-    // waiting for one to wander by would make the test depend on chance.
+    // The speech bubble: never touchable (the name tags under it stay the way to talk).
+    const bubble = document.createElement('p')
+    bubble.dataset.streetTalk = ''
+    bubble.className =
+      "pointer-events-none absolute left-0 top-0 w-max max-w-[14rem] rounded-2xl bg-white px-3 py-2 text-xs font-medium leading-snug text-slate-800 shadow-lg after:absolute after:left-1/2 after:top-full after:-translate-x-1/2 after:border-[6px] after:border-transparent after:border-t-white after:content-['']"
+    bubble.style.visibility = 'hidden'
+    this.markersRoot.append(bubble)
+    this.talkBubble = bubble
+    // End-to-end tests only (flag set by the test): bring a passer-by next to the vehicle (or the
+    // player on foot), as waiting for one to wander by would make the test depend on chance.
     try {
       if (localStorage.getItem('haroolife.e2e') === '1')
-        (window as unknown as { __LOME_SUMMON_WALKER?: () => string | null }).__LOME_SUMMON_WALKER =
-          () => {
-            const v = this.controller.vehicle
-            const w = this.walkers.find((x) => x.name !== this.fare.passenger)
-            if (!v || !w) return null
-            w.from = { x: Math.round(v.x) + 1, y: Math.round(v.z) }
-            w.to = { ...w.from }
-            w.t = 0
-            w.path = undefined
-            const graph = this.controller.pavements
-            const n = graph?.nearest({ x: w.from.x, z: w.from.y })
-            if (graph && n !== undefined && n >= 0)
-              w.person.root.position.set(graph.nodes[n].x * U, 0, graph.nodes[n].z * U)
-            return w.name
-          }
+        (
+          window as unknown as { __LOME_SUMMON_WALKER?: (name?: string) => string | null }
+        ).__LOME_SUMMON_WALKER = (name) => {
+          const v = this.controller.vehicle ?? this.controller.pos
+          const w = this.walkers.find((x) =>
+            name ? x.name === name : x.name !== this.fare.passenger,
+          )
+          if (!v || !w) return null
+          w.from = { x: Math.round(v.x) + 1, y: Math.round(v.z) }
+          w.to = { ...w.from }
+          w.t = 0
+          w.path = undefined
+          const graph = this.controller.pavements
+          const n = graph?.nearest({ x: w.from.x, z: w.from.y })
+          if (graph && n !== undefined && n >= 0)
+            w.person.root.position.set(graph.nodes[n].x * U, 0, graph.nodes[n].z * U)
+          return w.name
+        }
     } catch {
       // Storage refused: no test hook.
     }
@@ -800,6 +837,9 @@ export class StreetWorld {
       w.tag.remove()
     }
     this.walkers = []
+    this.talking = null
+    this.talkBubble?.remove()
+    this.talkBubble = null
     this.controller.obstacles = []
     for (const model of this.trafficModels.values()) this.scene.remove(model)
     this.trafficModels.clear()
@@ -890,6 +930,76 @@ export class StreetWorld {
       this.groundMaterials.set(key, m)
     }
     return m
+  }
+
+  /**
+   * A student's backpack, hung on the chest bone so it follows the walk (and the seat on a
+   * zémidjan); placed in the bind pose behind the back, the walker facing +z.
+   */
+  private addBackpack(person: Person, color: string): void {
+    const pack = new THREE.Group()
+    pack.name = 'Sac à dos'
+    const bag = new THREE.Mesh(this.unitBox, this.mat(color))
+    bag.scale.set(0.2, 0.26, 0.09)
+    const pocket = new THREE.Mesh(this.unitBox, this.mat('#2b2f36'))
+    pocket.scale.set(0.15, 0.1, 0.03)
+    pocket.position.set(0, -0.06, -0.055)
+    bag.castShadow = true
+    pack.add(bag, pocket)
+    person.root.add(pack)
+    person.root.updateMatrixWorld(true)
+    const chest = person.root.getObjectByName('Chest')
+    // In the walker's own frame (its root already stands on the pavement).
+    const at = chest && person.root.worldToLocal(chest.getWorldPosition(new THREE.Vector3()))
+    pack.position.set(0, (at ? at.y : FIGURE * 0.72) - 0.08, (at ? at.z : 0) - 0.12)
+    chest?.attach(pack)
+  }
+
+  /** What the passers-by say (street-talk.ts), refreshed by the page every minute. */
+  setStreetTalk(lines: readonly StreetLine[]): void {
+    this.talk = lines
+  }
+
+  /**
+   * One bubble at a time over a passer-by near the player and on screen, in turn: the
+   * neighbours' gbairai and the Cardinal's messe, the students' worries, the police's reminders.
+   */
+  private stepTalk(dt: number): void {
+    const t = this.talking
+    if (t) {
+      t.left -= dt
+      if (t.left > 0 && t.walker.name !== this.fare.passenger) return
+      this.talking = null
+      this.talkWait = TALK_GAP
+      return
+    }
+    this.talkWait -= dt
+    if (this.talkWait > 0 || !this.talk.length || !this.talkBubble) return
+    this.talkWait = 1 // nobody to speak: look again in a second
+    const c = this.controller.pos
+    const p = this.tagPoint
+    let best: { walker: Walker; d: number } | null = null
+    for (const w of this.walkers) {
+      if (w === this.lastTalker || w.name === this.fare.passenger || w.approachingPolice) continue
+      const at = w.person.root.position
+      const d = Math.hypot(at.x / U - c.x, at.z / U - c.z)
+      if (d > TALK_RANGE || (best && d >= best.d)) continue
+      p.copy(at)
+      p.y += FIGURE
+      p.project(this.camera)
+      if (Math.abs(p.x) < 0.85 && p.y > -0.6 && p.y < 0.6) best = { walker: w, d }
+    }
+    if (!best) return
+    const who: Speaker = best.walker.police
+      ? 'police'
+      : best.walker.student
+        ? 'etudiant'
+        : 'habitant'
+    const lines = this.talk.filter((l) => l.who === who)
+    if (!lines.length) return
+    this.talkBubble.textContent = lines[this.talkTurn[who]++ % lines.length].text
+    this.talking = { walker: best.walker, left: TALK_SHOW }
+    this.lastTalker = best.walker
   }
 
   private mat(color: string): THREE.MeshStandardMaterial {
@@ -1903,6 +2013,7 @@ export class StreetWorld {
     this.stepWalkers(dt)
     this.stepHail(dt)
     this.stepRemotes(dt)
+    this.stepTalk(dt)
     const p = this.tagPoint
     if (this.carTag && this.car) {
       p.copy(this.car.position)
@@ -1948,7 +2059,16 @@ export class StreetWorld {
         y,
         near && w.name !== this.fare.passenger && p.z < 1 && x > 0 && x < this.width && y > 40,
       )
+      // The bubble sits above the name tag (about 2 rem high), its tail towards the speaker.
+      if (this.talking?.walker === w && this.talkBubble)
+        this.placeMarker(
+          this.talkBubble,
+          x,
+          y - 40,
+          p.z < 1 && x > 0 && x < this.width && y - 40 > 60 && y < this.height,
+        )
     }
+    if (!this.talking && this.talkBubble) this.placeMarker(this.talkBubble, 0, 0, false)
     // The fare's destination, labelled over its beacon.
     if (this.beacon && this.beaconTag) {
       p.copy(this.beacon.position)

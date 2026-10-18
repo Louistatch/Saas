@@ -114,6 +114,7 @@ import { bump } from '@/lib/haroolife/city/perf'
 import { FOLLOW_DISTANCE, type InputState, PlayerController } from '@/lib/haroolife/city/player'
 import { serviceVehiclePlacement } from '@/lib/haroolife/city/jobs'
 import { garageOf, ownVehicle, vehicleOut } from '@/lib/haroolife/city/garage'
+import { isStudent } from '@/lib/haroolife/city/street-talk'
 import {
   PRESETS,
   type Quality,
@@ -2493,6 +2494,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                     }
                   : null
               }
+              talkOrigin={cityLife.origin}
               filter={cityFilter}
               selectedLot={selectedLot}
               showNames={showNames}
@@ -4344,7 +4346,9 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                       resident={{
                         key: playerKey,
                         name: playerKey.slice(4),
-                        role: 'Habitant du quartier',
+                        role: isStudent(playerKey.slice(4))
+                          ? 'Étudiant à l’université'
+                          : 'Habitant du quartier',
                       }}
                       state={cityLife}
                       onChange={setCityLife}

@@ -82,6 +82,7 @@ export default function ResidentConversation({
           ...(resident.lot?.type === 'townhall'
             ? ['Les feux en panne ?', 'Les promesses du maire ?']
             : []),
+          'Quoi de neuf ?',
           'Comment travailler ?',
           'Que peut-on acheter ?',
           'Essence et entretien ?',

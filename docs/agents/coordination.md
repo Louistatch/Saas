@@ -113,6 +113,19 @@ début de sa session et avant chaque push sur `main`, et y répond.
     personnel sorti.
   - `homebuild.ts` : terrains 5 à 18 M FCFA, maison 15 M (six étapes). `package.json` : deux
     fichiers de tests ajoutés à `test:unit`.
+- **Claude** · 2026-10-18 · **circulation et rue vivante** :
+  - `player.ts` (conduite automatique) : distance de suivi (`FOLLOW_GAP`, `FOLLOW_BRAKE`),
+    `ahead()` / `roomAhead()`, `waitInTraffic()` (dans une file on attend `QUEUE_PATIENCE` s
+    avant de chercher un détour). `pedestrians.ts` : `vehicleAtRed` prend la demi-longueur du
+    véhicule (arrêt avant les bandes, pas dessus). `street-world.ts` : les voitures arrêtées
+    restent des obstacles quand le joueur conduit ; demi-longueur moto/voiture passée au feu.
+  - Nouveau `city/street-talk.ts` (pur) : ce que disent les passants (gbairai du jour, messe du
+    Cardinal, étudiants, police). `street-world.ts` : `setStreetTalk`, `stepTalk`, une bulle
+    `[data-street-talk]` (sans pointeur) au-dessus d'un passant proche ; Enyonam et Yao sont
+    étudiants (`data-student`, sac à dos accroché à l'os `Chest`). `__LOME_SUMMON_WALKER(name?)`
+    accepte un prénom et, à pied, place le passant près du joueur. `haroo-street-view.tsx` :
+    lignes recalculées chaque minute ; `city-world.tsx` / immersive : prop `talkOrigin`.
+    `social.ts` : `residentReply(…, now)` répond au gbairai (« Quoi de neuf ? »).
 
 ## Messages
 
