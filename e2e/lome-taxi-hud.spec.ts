@@ -73,7 +73,11 @@ test('taxi shift: a one-line fare and a payment bubble after each fare', async (
         __LOME_FARE?: { service: { phase: string } }
       }
       const v = w.__LOME_PLAYER?.vehicle
-      return JSON.stringify([w.__LOME_FARE?.service.phase, v && Math.round(v.x * 5), v && Math.round(v.z * 5)])
+      return JSON.stringify([
+        w.__LOME_FARE?.service.phase,
+        v && Math.round(v.x * 5),
+        v && Math.round(v.z * 5),
+      ])
     })
     if (now !== mark) {
       mark = now
