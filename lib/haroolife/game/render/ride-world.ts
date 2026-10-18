@@ -8,18 +8,19 @@
  * Lifecycle as the street and the rooms: one renderer, one frame loop; `dispose()` frees all.
  */
 import { avatarSpec, clipFor } from '@/lib/haroolife/city/avatar-catalogue'
+import type { Transport } from '@/lib/haroolife/lome-life-engine'
+import * as THREE from 'three'
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import {
   type AvatarActor,
   createAvatarActor,
   disposeAvatarActor,
   playAvatarActor,
 } from './avatar-actor'
-import { buildMoto, type MotoParts } from './moto'
-import { fitTaxiModel } from './vehicle-scale'
-import type { Transport } from '@/lib/haroolife/lome-life-engine'
-import * as THREE from 'three'
-import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { createGltfLoader } from './gltf'
+import { type MotoParts, buildMoto } from './moto'
+import { type CarKind, VEHICLE_LENGTH, VEHICLE_URL } from './vehicle-models'
+import { fitVehicleModel } from './vehicle-scale'
 
 const BASE = '/haroolife/vendor/kenney-3d/'
 const LANES = [-2.1, 2.1]
@@ -136,7 +137,7 @@ export class RideWorld {
     const urls = [
       `${BASE}city-kit-roads/light-curved.glb`,
       spec.url,
-      ...new Set(TRAFFIC.map((v) => `${BASE}car-kit/${v.kind}.glb`)),
+      ...new Set(TRAFFIC.map((v) => VEHICLE_URL[v.kind as CarKind])),
     ]
     const results = await Promise.allSettled(urls.map((u) => this.load(u)))
     if (this.disposed) return
@@ -176,7 +177,7 @@ export class RideWorld {
     }
     // Traffic ahead, overtaken.
     TRAFFIC.forEach((v, i) => {
-      const car = place(`${BASE}car-kit/${v.kind}.glb`, [LANES[v.lane], 0, v.z], v.s, 180)
+      const car = place(VEHICLE_URL[v.kind as CarKind], [LANES[v.lane], 0, v.z], v.s, 180)
       if (!car) return
       car.name = `Voiture ${i + 1}`
       this.cars.push({ root: car, z: v.z, i })
@@ -199,10 +200,10 @@ export class RideWorld {
       this.vehicle.add(this.actor.root)
       playAvatarActor(this.actor, clipFor(spec, 'drive'))
     } else {
-      const taxi = model.get(`${BASE}car-kit/taxi.glb`)
+      const taxi = model.get(VEHICLE_URL.taxi)
       if (!taxi) throw new Error('Le taxi 3D n’a pas pu être chargé.')
       this.vehicle = taxi.scene.clone(true)
-      fitTaxiModel(this.vehicle, 1.75, 4.6)
+      fitVehicleModel(this.vehicle, 1.75, 4.6, VEHICLE_LENGTH.taxi)
       this.actor.root.position.set(0.3, 0.22 - this.actor.seatOffset, 0.1)
       // A sibling, so the taxi's non-uniform scale cannot distort the human skeleton.
       const group = new THREE.Group()

@@ -54,8 +54,13 @@ début de sa session et avant chaque push sur `main`, et y répond.
     taxi jaune de Lomé, berline, minibus ; je n'ai pas touché à la moto (`moto.ts`) ;
   - `street-world.ts`, zones précises : URL des modèles de voitures, `fitTaxiModel` par type
     (`vehicle-scale.ts`), ciel/brume/éclairage d'ambiance (`setDaylight` et le constructeur),
-    couleurs et matières du sol (`GROUND`, `rebuild`). Rien dans la circulation, les feux, le
-    contrôle piéton ni les tuiles.
+    couleurs et matières du sol (`GROUND`, `rebuild`). Rien dans la circulation, les feux ni
+    le contrôle piéton.
+  - une seule retouche commune aux tuiles : `cityMaterial` passe par `gradeLomeColours`
+    (`street-atmosphere.ts`), un étalonnage des couleurs dans le shader (palette pastel du kit
+    → crépi et tôle de Lomé). Aucune géométrie ni UV modifiée.
+  - les reflets du ciel (éclairage par image, `scene.environment`) ne sont actifs qu'en
+    qualité « Élevé » : sous rendu logiciel ils doublaient le temps d'image.
   Si tu es dans ces zones, écris-le ici et je m'adapte.
 - **Codex** : _à compléter_
 
