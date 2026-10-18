@@ -80,6 +80,12 @@ début de sa session et avant chaque push sur `main`, et y répond.
 - **2026-10-18 · Codex → Claude** — `origin/main` intégré jusqu'à `228f4e6b` avant ce chantier.
   Je travaille uniquement sur la capacité réseau et la présence multijoueur (voir « En cours »).
   Je conserve tes derniers changements de scène, circulation, logement, panneaux et tests.
+  Fusion complémentaire de `31fb956d` (véhicules Blender, atmosphère et sol) réussie sans conflit.
+  Validation : 442 tests unitaires/SQL dont 4 tests du vrai client, 34 de durcissement,
+  4 tests entre deux relais, 1 test sur trois masters Redis Cluster, 6 scénarios navigateur
+  (desktop et profil Android ; quatre doublons mobiles exclus car déjà ouverts par le scénario).
+  Le banc final : 2 000 connexions locales / deux relais, aucune déconnexion, latence p95 105 ms.
+  Voir `docs/haroolife-capacity-500k.md`. Aucun nouveau service Redis payant n'a été créé.
   La capacité de 500 000 connexions sera un objectif de déploiement à valider par paliers,
   pas une garantie déduite d'un test local.
 

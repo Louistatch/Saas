@@ -105,6 +105,21 @@ export class RealtimeClient {
   private retryAttempt = 0
   private joining = false
   private joinTimer: number | null = null
+  private deliveryTimer: number | null = null
+  private deliveryAttempt = 0
+  private delivering = new Set<string>()
+
+  private retryOutbox() {
+    if (this.stopped || this.deliveryTimer !== null) return
+    const delay = Math.min(30_000, 1000 * 2 ** Math.min(this.deliveryAttempt++, 5))
+    this.deliveryTimer = window.setTimeout(
+      () => {
+        this.deliveryTimer = null
+        if (!this.stopped && this.socket?.connected) void this.flush()
+      },
+      delay * (0.5 + Math.random()),
+    )
+  }
 
   private publishPresence() {
     if (this.presenceTimer !== null) return
@@ -160,6 +175,7 @@ export class RealtimeClient {
   async start() {
     if (this.socket || this.stopped) return
     const first = await this.token()
+    if (this.stopped) return
     if (!first) {
       this.set({ status: 'signed-out' })
       return
@@ -235,6 +251,7 @@ export class RealtimeClient {
         if (
           event.seq > cursor &&
           event.key !== this.state.me?.key &&
+          !this.state.me?.blocked.includes(event.key) &&
           this.reading !== room &&
           !this.state.rooms[room]?.some((message) => message.seq === event.seq)
         )
@@ -325,6 +342,7 @@ export class RealtimeClient {
     if (this.presenceTimer !== null) window.clearTimeout(this.presenceTimer)
     if (this.retryTimer !== null) window.clearTimeout(this.retryTimer)
     if (this.joinTimer !== null) window.clearTimeout(this.joinTimer)
+    if (this.deliveryTimer !== null) window.clearTimeout(this.deliveryTimer)
     window.removeEventListener('online', this.onOnline)
     for (const t of this.typingTimers.values()) window.clearTimeout(t)
     this.socket?.disconnect()
@@ -438,7 +456,8 @@ export class RealtimeClient {
 
   private async deliver(item: Outgoing) {
     const s = this.socket
-    if (!s?.connected) return
+    if (!s?.connected || this.delivering.has(item.clientId)) return
+    this.delivering.add(item.clientId)
     const update = (patch: Partial<Outgoing>) =>
       this.set({
         outbox: this.state.outbox.map((o) =>
@@ -453,6 +472,7 @@ export class RealtimeClient {
         clientId: item.clientId,
       })
       if (r.ok) {
+        this.deliveryAttempt = 0
         this.receive([{ ...r.message, client_id: item.clientId }], false)
         if (item.room.startsWith('dm:')) this.hooks.dmSent?.()
       } else if (r.code === 'auth_expired') {
@@ -460,11 +480,16 @@ export class RealtimeClient {
         // the queued message goes out again (same clientId) once connected.
         update({ state: 'queued' })
         this.reauth()
-      } else if (r.code === 'unavailable') update({ state: 'queued' })
-      else update({ state: 'error', error: r.error })
+      } else if (r.code === 'unavailable') {
+        update({ state: 'queued' })
+        this.retryOutbox()
+      } else update({ state: 'error', error: r.error })
     } catch {
       // No ack in time: maybe stored, maybe not. The resend (same clientId) settles it.
       update({ state: 'queued' })
+      this.retryOutbox()
+    } finally {
+      this.delivering.delete(item.clientId)
     }
   }
 
@@ -474,10 +499,13 @@ export class RealtimeClient {
     if (!s || this.reauthing) return
     this.reauthing = true
     s.disconnect()
-    window.setTimeout(() => {
-      this.reauthing = false
-      if (!this.stopped) s.connect()
-    }, 500)
+    window.setTimeout(
+      () => {
+        this.reauthing = false
+        if (!this.stopped) s.connect()
+      },
+      500 + Math.random() * 1500,
+    )
   }
 
   async olderThan(room: RoomId) {
@@ -621,6 +649,7 @@ export class RealtimeClient {
           .timeout(LIMITS.ackTimeoutMs)
           .emitWithAck('presence:join', { locality: requested })
           .catch(() => null)
+        if (this.stopped || !s.connected || this.socket !== s) return
         if (requested !== this.locality) continue
         if (!r?.ok) {
           if (this.joinTimer !== null) window.clearTimeout(this.joinTimer)

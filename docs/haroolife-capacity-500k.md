@@ -77,6 +77,10 @@ perdu. Après un crash, la visibilité peut prendre environ 45–60 s pour se r�
 n'est pas une présence instantanément exacte. Les clés éphémères cessent aussi de persister
 après l'arrêt total du service (TTL des états et index).
 
+Une erreur temporaire de la base déclenche aussi une reprise automatique de la boîte
+d’envoi, avec délai croissant et le même identifiant client ; aucune reconnexion manuelle
+n’est nécessaire pour relancer un message en attente.
+
 Le chat reste enregistré **avant** diffusion, avec identifiant client idempotent, curseurs de
 reprise et RLS. Le budget Redis limite le salon Togo à 5 messages/s et chaque autre salon à
 20 messages/s pour l'ensemble des relais. Ce sont des plafonds de flux collectif, en plus des
@@ -100,23 +104,24 @@ Les tests d'intégration distincts utilisent de vraies migrations PostgreSQL dan
 | Scénario | Connexions | Relais | Poses reçues par pose émise | Latence d'acheminement p95 |
 |---|---:|---:|---:|---:|
 | Ancien serveur `228f4e6b`, ville entière | 200 | 1 | 181,31 | 15 ms |
-| Première optimisation, secteurs et instances | 200 | 1 | 21,28 | 5 ms |
-| Bus Redis + paquets groupés, essai final | 2 000 | 2 | 20,27 | 115 ms |
+| Optimisation finale, secteurs + instances + paquets groupés | 200 | 1 | 20,03 | 50 ms |
+| Bus Redis + paquets groupés, essai final | 2 000 | 2 | 20,26 | 105 ms |
 
-Le deuxième essai à 200 précède le regroupement final ; ce n'est pas la mesure du binaire final.
-La diminution à périmètre identique est de **88 % des copies de poses** pour ce placement de
-joueurs. Elle vient du filtrage spatial et des instances ; elle ne représente pas un pourcentage
-d'amélioration du FPS. Ne pas comparer les 115 ms avec les 5 ms comme si les charges étaient
+La diminution à 200 joueurs est de **89 % des copies de poses** pour ce placement de
+joueurs. Le regroupement ajoute volontairement jusqu’à 50 ms côté connexion : le p95 local
+passe de 15 à 50 ms, en échange d’un flux borné et d’une réception plus régulière en foule. Elle vient du filtrage spatial et des instances ; elle ne représente pas un pourcentage
+d'amélioration du FPS. Ne pas comparer les 105 ms avec les 50 ms comme si les charges étaient
 identiques : le dernier essai comporte dix fois plus de joueurs et un bus partagé.
 
-Sur l'essai groupé à 2 000 : 30,41 s de mesure, 302 000 poses émises, 6 122 848 positions reçues,
+Sur l'essai groupé à 2 000 : 30,45 s de mesure, 302 000 poses émises, 6 119 506 positions reçues,
 2 000 connexions encore établies, zéro erreur de connexion et zéro déconnexion. Pic RSS observé
-**433,6 Mio par relais**, p95 de boucle événementielle maximale observée **44,37 ms**. Le générateur
-lui-même atteint 56,23 ms de p95 de boucle ; ces chiffres ne mesurent pas la 3G togolaise, le
+**395,9 Mio par relais**, p95 de boucle événementielle maximale observée **44,37 ms**. Le générateur
+lui-même atteint 48,23 ms de p95 de boucle ; ces chiffres ne mesurent pas la 3G togolaise, le
 FPS Android ou une capacité réseau sur Internet. Les histogrammes ont des tranches de 5 ms et
 un plafond explicite de 5 s. Les poses volatiles ne sont pas un transport de livraison garantie.
 
-Les JSON bruts sont dans `docs/captures/realtime-capacity/`. Le budget `maxConnections=5000`
+Les JSON bruts sont dans `docs/captures/realtime-capacity/` (`after-200-initial.json` conserve
+l’essai intermédiaire antérieur au regroupement final). Le budget `maxConnections=5000`
 est un **plafond d'admission**, pas une capacité certifiée par cette mesure. La mémoire et le
 CPU du générateur, de Redis, du système et de TLS ne sont pas compris dans le RSS d'un relais.
 
@@ -134,6 +139,28 @@ Le fixture du banc utilise des comptes fictifs et exclut volontairement les écr
 Il ne faut pas le déployer comme un serveur de jeu. La CI dédiée démarre deux vrais relais,
 un Redis 7 et les migrations SQL ; la qualification de Redis Cluster à trois masters a aussi
 été exécutée localement. Le test à trois masters ne simule pas une réplication ni un failover.
+
+## Validation fonctionnelle
+
+Les contrôles de type, de sécurité statique, le build Next.js et celui du relais passent.
+La suite comporte 442 tests unitaires/SQL, dont 4 tests du vrai client (voyage rapide entre
+villes, badges sans corps de messages et blocage, arrêt pendant une lecture de jeton,
+reprise automatique d’un message après surcharge temporaire). Les 34 tests de durcissement passent. Les 4 tests Redis
+entre deux relais et le test sur trois masters passent également.
+
+Après fusion de `31fb956d`, six scénarios navigateur passent : avatars/taxi/moto distants et
+libération des acteurs périmés sur desktop et profil Android ; discussion entre deux joueurs
+avec coupure réseau et rechargement ; conversation entre le tableau de bord et le jeu ;
+transfert d'argent sans doublon ; reprise de sauvegarde sur un autre appareil avec plafond
+du portefeuille. Quatre doublons de projets mobiles sont exclus explicitement car ces scénarios
+ouvrent déjà leurs propres contextes. La suite complète de tous les parcours du jeu n'a pas
+été relancée dans ce chantier réseau.
+
+```bash
+HAROOLIFE_TEST_PORT=3225 HAROOLIFE_SUPABASE_PORT=54385 PW_CHROMIUM_PATH=/usr/bin/chromium \
+  npx playwright test --config=e2e/lome-realtime-local.config.ts \
+  -g 'real relay|two people chat|a private message is seen|game money sent|the game follows'
+```
 
 ## Activation concrète dans Railway
 
