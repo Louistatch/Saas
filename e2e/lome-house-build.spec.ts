@@ -26,7 +26,7 @@ function standingAtThePlot(): CityLife {
   s.pose = { x: door.x, z: door.y, heading: 0 }
   s.life.day = 5
   s.life.hour = 9
-  s.life.wallet = 3_000_000
+  s.life.wallet = 40_000_000
   s.housing = defaultHousing(5)
   return s
 }
@@ -95,7 +95,7 @@ test('my house: buy a plot, pay the foundations, the street draws the work until
     .first()
     .click()
   await expect(build.locator('output')).toContainText('Ce terrain n’est pas à vendre')
-  await expect.poll(() => wallet(page)).toBe(3_000_000 - tokoin.price)
+  await expect.poll(() => wallet(page)).toBe(40_000_000 - tokoin.price)
   await expect(build).toContainText('Mon terrain · Tokoin')
   // The street: the plot, its sign, a heap of sand; its door named for the player.
   await expect.poll(async () => (await drawn(page))?.lotId, { timeout: 20000 }).toBe(tokoin.lot.id)
@@ -107,7 +107,7 @@ test('my house: buy a plot, pay the foundations, the street draws the work until
 
   // The foundations: paid, the mason at work (scaffolding up), the stage under way.
   await build.getByRole('button', { name: /Payer : Fondations/ }).click()
-  await expect.poll(() => wallet(page)).toBe(3_000_000 - tokoin.price - STAGES[0].cost)
+  await expect.poll(() => wallet(page)).toBe(40_000_000 - tokoin.price - STAGES[0].cost)
   await expect(build.locator('[data-stage="fondations"]')).toHaveAttribute('data-state', 'en-cours')
   await expect.poll(async () => (await drawn(page))?.working).toBe(true)
   await expect(page.locator(`[data-door="${tokoin.lot.id}"]`)).toHaveAttribute(

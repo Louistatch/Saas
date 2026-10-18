@@ -187,9 +187,10 @@ export default function HouseBuild({
       )}
 
       <p className="text-[11px] leading-relaxed text-slate-500">
-        Prix du jeu, à l’échelle de ses salaires : à Lomé, un vrai terrain se vend des dizaines de
-        millions de FCFA (annonces 2024-2026). L’ordre des quartiers est respecté : Agoè le moins
-        cher, Baguida le plus cher.
+        Prix indicatifs, aux ordres de grandeur de Lomé (annonces et estimations publiées en
+        2025-2026) : un demi-lot de 300 m² de 5 à 18 millions de FCFA selon le quartier, une maison
+        simple de deux chambres autour de 15 millions. Ce ne sont pas des devis. Comme au Togo, on
+        construit étape par étape, quand l’argent est là.
       </p>
     </section>
   )

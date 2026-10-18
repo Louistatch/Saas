@@ -46,19 +46,19 @@ test('terrains à vendre : des lots libres de Lomé, Agoè le moins cher, Baguid
 
 test('acheter un terrain : sur place, avec l’argent, une seule fois', () => {
   const offer = plotsForSale(worldLots())[0]
-  const s = buyPlot(rich(1_000_000), offer.lot)
+  const s = buyPlot(rich(20_000_000), offer.lot)
   assert.equal(s.plot?.lot, offer.lot.id)
   assert.equal(s.plot?.built, 0)
-  assert.equal(s.life.wallet, 1_000_000 - offer.price)
+  assert.equal(s.life.wallet, 20_000_000 - offer.price)
   assert.match(s.life.lastEvent, /Ce terrain n’est pas à vendre/)
   assert.equal(plotLabel(s.plot as NonNullable<CityLife['plot']>), 'Mon terrain')
   // Pas deux terrains, pas sans argent, pas depuis Kara, pas un lot déjà bâti.
   assert.equal(buyPlot(s, plotsForSale(worldLots())[1].lot).plot?.lot, offer.lot.id)
   assert.equal(buyPlot(rich(1000), offer.lot).plot, undefined)
-  assert.equal(buyPlot({ ...rich(1_000_000), locality: 'kara' }, offer.lot).plot, undefined)
+  assert.equal(buyPlot({ ...rich(20_000_000), locality: 'kara' }, offer.lot).plot, undefined)
   const house = worldLots().find((l) => l.type === 'house')
   assert.ok(house)
-  assert.equal(buyPlot(rich(1_000_000), house).plot, undefined)
+  assert.equal(buyPlot(rich(20_000_000), house).plot, undefined)
 })
 
 test('le chantier avance étape par étape, quand on paie, et le maçon prend ses jours', () => {
@@ -148,7 +148,8 @@ test('une dette empêche d’emménager tant qu’elle n’est pas payée', () =
 
 test('sauvegarde : le terrain revient, une sauvegarde trafiquée est corrigée', () => {
   const offer = plotsForSale(worldLots())[0]
-  const s = startStage(buyPlot(rich(5_000_000), offer.lot))
+  const s = startStage(buyPlot(rich(offer.price + BUILD_COST), offer.lot))
+  assert.ok(s.plot?.work, 'the plot is bought and the first stage under way')
   const back = decodeCityLife(JSON.parse(JSON.stringify(s)))
   assert.deepEqual(back?.plot, s.plot)
   assert.equal(decodePlot({ ...s.plot, built: 99 }), undefined)

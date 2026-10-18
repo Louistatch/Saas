@@ -4,12 +4,12 @@
  * while it is not. Once the house is finished the player moves in and pays no more rent (the CEET
  * and TdE bills stay). Pure: no React, no network.
  *
- * The amounts are the game's, not the market's. A real lot in Lomé costs tens of millions of FCFA
- * (listings seen in 2024-2026: half a lot of 300 m² for about 10 million in Adidogomé, 600 m² for
- * 45 million in Baguida), out of reach of a game where an hour of work pays 1 200 FCFA. The game
- * keeps the order of the quartiers (Agoè the cheapest, Baguida the dearest) and the order of the
- * work (foundations, walls, roof, openings, plaster, paint), with amounts a player reaches in a
- * few game months. The panel says so.
+ * The amounts follow Lomé's orders of magnitude, in millions of FCFA (listings and published
+ * estimates 2025-2026: a lot of 600 m² from 6 to 15 million in Agoè or Adidogomé, 15 to 50 million
+ * in Baguida and the centre; foundations 2.5-4 million, walls 1.5-2.5 million, roof 1.5-3 million,
+ * a simple house of two bedrooms about 15 million without the land). They are indicative prices,
+ * not quotes. As in Togo, the house rises stage by stage, as the money comes. The order of the
+ * quartiers (Agoè the cheapest, Baguida the dearest) and of the work is kept. The panel says so.
  *
  * The plot is one of the city's « Terrain disponible » lots, so the street draws the work on it
  * (game/render/street-world.ts).
@@ -18,13 +18,13 @@ import { type Housing, housingOf, ownedHousing, quartierById, totalDebt } from '
 import type { CityLife } from './life'
 import type { Lot } from './world'
 
-/** Price of a plot (half a lot) by quartier, in the game's FCFA. */
+/** Price of a plot (half a lot, 300 m²) by quartier, in FCFA. */
 export const PLOT_PRICES: Record<string, number> = {
-  agoe: 450_000,
-  adidogome: 550_000,
-  be: 700_000,
-  tokoin: 850_000,
-  baguida: 1_000_000,
+  agoe: 5_000_000,
+  adidogome: 6_000_000,
+  be: 12_000_000,
+  tokoin: 15_000_000,
+  baguida: 18_000_000,
 }
 
 export interface Stage {
@@ -42,7 +42,7 @@ export const STAGES: Stage[] = [
   {
     id: 'fondations',
     name: 'Fondations',
-    cost: 250_000,
+    cost: 3_000_000,
     days: 3,
     start: 'Le maçon a pris l’avance et promis de commencer « demain matin sans faute ».',
     done: 'Les fondations sont coulées. Le maçon jure que c’est « du solide, même pour un étage plus tard ».',
@@ -50,7 +50,7 @@ export const STAGES: Stage[] = [
   {
     id: 'murs',
     name: 'Élévation des murs',
-    cost: 400_000,
+    cost: 3_500_000,
     days: 5,
     start:
       'Les parpaings arrivent sur un tricycle surchargé. Le chef de chantier compte deux fois.',
@@ -59,7 +59,7 @@ export const STAGES: Stage[] = [
   {
     id: 'toiture',
     name: 'Toiture en tôles',
-    cost: 300_000,
+    cost: 2_500_000,
     days: 3,
     start: 'Le charpentier a choisi les tôles : « bac alu, la meilleure ». Livraison promise.',
     done: 'La toiture est posée. La première pluie a testé les tôles : ça chante, mais ça ne coule pas.',
@@ -67,7 +67,7 @@ export const STAGES: Stage[] = [
   {
     id: 'menuiserie',
     name: 'Portes et fenêtres',
-    cost: 180_000,
+    cost: 1_500_000,
     days: 2,
     start: 'Le menuisier du quartier prend les mesures… et l’avance.',
     done: 'Portes et fenêtres posées : la maison ferme à clé.',
@@ -75,7 +75,7 @@ export const STAGES: Stage[] = [
   {
     id: 'crepi',
     name: 'Crépissage et compteur CEET',
-    cost: 220_000,
+    cost: 2_000_000,
     days: 3,
     start: 'Le crépissage commence ; la CEET promet le branchement « dans les délais ».',
     done: 'Murs crépis, compteur CEET branché. Plus personne ne dira « maison inachevée ».',
@@ -83,7 +83,7 @@ export const STAGES: Stage[] = [
   {
     id: 'finitions',
     name: 'Peinture et carrelage',
-    cost: 200_000,
+    cost: 2_500_000,
     days: 2,
     start: 'Le peintre a choisi la couleur avec toi. Ta tante, elle, voulait du vert.',
     done: 'Peinture et carrelage finis : ta maison est prête. Il ne reste qu’à emménager.',
