@@ -448,9 +448,14 @@ def join(objects, name, parent):
     if len(objects) > 1:
         bpy.ops.object.join()
     merged = bpy.context.view_layer.objects.active
-    world = merged.matrix_world.copy()
+    # Transformations appliquées aux sommets : le nœud glTF garde l'identité sous son parent.
+    # Une caisse restée inclinée (celle d'une pièce posée de biais) gonflait la boîte englobante
+    # que le jeu mesure pour mettre le véhicule à l'échelle.
+    local = parent.matrix_world.inverted() @ merged.matrix_world
     merged.parent = parent
-    merged.matrix_world = world
+    merged.matrix_parent_inverse.identity()
+    merged.data.transform(local)
+    merged.matrix_basis.identity()
     merged.name = name
     return merged
 
