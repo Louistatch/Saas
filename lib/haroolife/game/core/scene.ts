@@ -221,6 +221,7 @@ export const ON_DEVICE: ReadonlySet<PropKind> = new Set(['treadmill', 'bike', 'b
 const ACTION_ICON: Record<string, string> = {
   timetable: '📅',
   'civic-report': '🚦',
+  'public-services': '🚑',
   'work-city': '💼',
   sit: '🪑',
   sleep: '🌙',

@@ -35,6 +35,31 @@ début de sa session et avant chaque push sur `main`, et y répond.
 
 ## En cours
 
+- **Codex** · 2026-10-18 · **ambulance active et interventions du maire — terminé** :
+  - nouveaux modules de mission et rendu de l'ambulance, appel depuis le téléphone,
+    prise en charge dans la rue, transport réel jusqu'à l'hôpital et soins du jeu ;
+  - `lome-life-immersive.tsx`, `city-world.tsx`, `haroo-street-view.tsx` : transmission
+    des missions et de leurs événements, panneau des services publics ;
+  - `street-world.ts` : ambulance mobile, collisions, gyrophare, caméra pendant le transport
+    et chantier municipal léger ; aucun changement de modèles, ferme ou logement ;
+  - `street-civic.ts`, `life.ts`, `activities.ts` : suivi municipal sauvegardé, lancement
+    et fin des travaux ; temps du chantier automatique jusqu'à la réparation des feux.
+    `package.json` : ajout des tests de ce domaine uniquement.
+  - `game-interface.css` : le guide des objets dans une pièce est descendu sous
+    « Activités du lieu », dont le bouton interceptait ses clics depuis la refonte du HUD.
+  - `city-models.ts` : option de cuisson pour retirer uniquement l'ambulance décorative
+    posée au milieu de la voie de l'hôpital. La rue utilise maintenant l'entité mobile,
+    sans ce véhicule fantôme dépourvu de collision. Aucun modèle de bâtiment ne change.
+  - `e2e/lome-life-playwright.config.ts` : inscription des nouveaux parcours de services
+    publics dans la suite navigateur existante ; configuration isolée dédiée pour les
+    vérifier aussi avec le véritable relais SQL local.
+  - `game/core/scene.ts` : pictogramme des bulles du nouveau service public,
+    afin de ne pas laisser de bulle vide dans les pièces.
+  - Vérification : 490 tests unitaires, 34 de durcissement, typecheck et sécurité
+    statique réussis ; 10 parcours navigateur PC / Android réussis avec le vrai relais
+    SQL local (secours, annulation/reprise, mairie, feux et véhicule distant).
+    Guide et captures : `docs/haroolife-public-services.md`.
+
 - **Codex** · 2026-10-18 · **interface du jeu et confort visuel PC / Android — terminé** :
   - `lome-life-immersive.tsx` : uniquement structure visuelle du HUD, navigation et classes
     de présentation ; feuille de style dédiée. Aucun changement de ferme, logement, garage,

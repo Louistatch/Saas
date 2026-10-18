@@ -12,6 +12,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 
 export type PhoneApp =
+  | 'services'
   | 'jobs'
   | 'messages'
   | 'debates'
@@ -27,6 +28,7 @@ export type PhoneApp =
   | 'avatar'
 
 const APPS: { id: PhoneApp | 'settings'; icon: string; name: string; tone: string }[] = [
+  { id: 'services', icon: '🚑', name: 'Services publics', tone: '#be123c' },
   { id: 'jobs', icon: '💼', name: 'Métiers', tone: '#8a5a2b' },
   { id: 'messages', icon: '💬', name: 'Messages', tone: '#2563eb' },
   { id: 'debates', icon: '🎤', name: 'Débats', tone: '#be123c' },

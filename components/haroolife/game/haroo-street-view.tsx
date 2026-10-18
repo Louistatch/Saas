@@ -1,6 +1,7 @@
 'use client'
 
 import type { ServiceCustomer } from '@/lib/haroolife/city/automatic-service'
+import type { EmergencyEvent } from '@/lib/haroolife/city/emergency'
 /**
  * React boundary of the HarooLife engine for the street. The engine (`StreetWorld`) draws the
  * neighbourhood and steps the game's PlayerController; React keeps the HUD and the game state.
@@ -16,6 +17,7 @@ import {
   type StreetFare,
   type StreetPoseFeed,
   type StreetStats,
+  type StreetServices,
   StreetWorld,
 } from '@/lib/haroolife/game/render/street-world'
 import type { PresenceEntry } from '@/lib/haroolife/realtime/protocol'
@@ -59,6 +61,8 @@ export default function HarooStreetView(
     plot?: StreetPlot | null
     /** The player's background: the passers-by whisper its gbairai too (street-talk.ts). */
     talkOrigin?: string | null
+    services?: StreetServices
+    onEmergency?: (event: EmergencyEvent) => void
   },
 ) {
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -102,7 +106,9 @@ export default function HarooStreetView(
       remote: remoteFeed ? { feed: remoteFeed, present: live.current.remotePresent ?? [] } : null,
       fare: live.current.fare ?? null,
       plot: live.current.plot ?? null,
+      services: live.current.services,
       events: {
+        onEmergency: event => live.current.onEmergency?.(event),
         onEvents: (events, ctl) => live.current.onPlayerEvents(events, ctl),
         onLot: (id) => live.current.onLot(id),
         onCell: (cell) => live.current.onCell(cell),
@@ -130,6 +136,9 @@ export default function HarooStreetView(
   useEffect(() => {
     world.current?.setQuality(quality, pixelRatio)
   }, [quality, pixelRatio])
+  useEffect(() => {
+    if (state === 'ready' && props.services) world.current?.setServices(props.services)
+  }, [props.services, state])
   useEffect(() => {
     world.current?.setPaused(paused ?? false)
   }, [paused])

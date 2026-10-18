@@ -814,6 +814,7 @@ export function layoutFor(
     maintain: 'desk',
     police: 'reception',
     'civic-report': 'board',
+    'public-services': 'board',
     timetable: 'sign',
   }
   const occupied = new Set<string>()

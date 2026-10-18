@@ -13,6 +13,7 @@ import {
  * (`LifeState`, local coordinates, construction rules, saves) without changing it.
  */
 import { actionsFor } from './activities'
+import { decodeEmergency } from './emergency'
 import { type Employment, decodeEmployment } from './employment'
 import { decodeCivic, reportMunicipalSignal } from './street-civic'
 export { actionsFor } from './activities'
@@ -69,6 +70,7 @@ export type Interior =
   | 'chapel'
   | 'clinic'
 export type CityAction =
+  | 'public-services'
   | 'timetable'
   | 'civic-report'
   | 'sit'
@@ -103,6 +105,7 @@ export interface CityLife {
   /** Transient foreground interaction; deliberately not restored by decodeCityLife. */
   meal?: import('./dining').Meal
   civic?: import('./street-civic').CivicState
+  emergency?: import('./emergency').EmergencyState
   employment?: Employment
   commerce?: Commerce
   social?: SocialLife
@@ -262,6 +265,7 @@ export function decodeCityLife(value: unknown): CityLife | null {
   return restoreServiceVehicle({
     v: 1,
     civic: decodeCivic(v.civic),
+    emergency: decodeEmergency(v.emergency, locality),
     employment: decodeEmployment(v.employment, life.day),
     commerce: decodeCommerce(v.commerce, life.spent),
     social: decodeSocial(v.social),
@@ -599,6 +603,8 @@ export function cityInteract(s: CityLife, action: CityAction): CityLife {
   const allowed = actionsFor(lot.type, lot.service).some((a) => a.id === action)
   if (!allowed) return note(s, 'Ce lieu ne propose pas cette activité.')
   switch (action) {
+    case 'public-services':
+      return note(s, 'Ouvre les services publics pour joindre l’ambulance ou suivre le chantier du maire.')
     case 'timetable':
       return note(s, 'Consulte l’emploi du temps : les horaires suivent la semaine du jeu.')
     case 'civic-report':

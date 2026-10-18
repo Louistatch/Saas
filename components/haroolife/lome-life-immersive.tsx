@@ -4,7 +4,9 @@ import './game-interface.css'
 import PedestrianStop from './pedestrian-stop'
 import { WORLD_W, WORLD_H } from '@/lib/haroolife/city/world'
 import { PavementGraph, guidedCellRoute, onPavement } from '@/lib/haroolife/city/pedestrians'
-import { municipalRepairDone, municipalStatus, pedestrianTicket, type PedestrianReason } from '@/lib/haroolife/city/street-civic'
+import { municipalPending, municipalRepairDone, municipalStatus, reportMunicipalSignal, pedestrianTicket, type PedestrianReason } from '@/lib/haroolife/city/street-civic'
+import { callAmbulance, cancelAmbulance, emergencyEvent, emergencyOf, type EmergencyEvent } from '@/lib/haroolife/city/emergency'
+import { EmergencyOverlay, PublicServices } from './public-services'
 
 import { useHarooLifeViewport } from '@/hooks/use-haroolife-viewport'
 import GraphicsBoundary from './graphics-boundary'
@@ -268,6 +270,7 @@ import RideOverlay from './ride-overlay'
 // Animated preview of the chosen character (three.js), loaded only when the sheet opens.
 const AvatarPreview = dynamic(() => import('./avatar-preview'), { ssr: false })
 type Sheet =
+  | 'services'
   | 'home'
   | 'shop'
   | 'map'
@@ -603,6 +606,12 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     return () => window.clearInterval(id)
   }, [])
   const insideAny = Boolean(cityLife.insideLot || life.inside)
+  const emergencyActive = !!emergencyOf(cityLife).active
+  const municipalClock = municipalPending(cityLife)
+  const publicServices = useMemo(() => ({
+    emergency: emergencyOf(cityLife).active,
+    worksite: municipalPending(cityLife) ? cityLife.civic?.projects?.[cityLife.locality]?.site ?? null : null,
+  }), [cityLife.emergency, cityLife.civic, cityLife.locality, cityLife.life.day, cityLife.life.hour])
   const interior = cityLife.insideLot
     ? interiorFor(lotById(cityLife.insideLot)?.type ?? 'lot')
     : (life.inside as Interior | null)
@@ -736,7 +745,8 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
       ? `${door.isAccessible ? 'Entrer' : 'Fermé'} — ${door.label}`
       : 'Entrer'
   const title =
-    panel === 'online'
+    panel === 'services' ? 'Services publics'
+    : panel === 'online'
       ? 'Joueurs en ligne'
       : panel === 'home'
         ? 'Mon foyer'
@@ -837,7 +847,8 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
               : controller.heading,
         ),
         mode:
-          along && ride
+          emergencyOf(cityLifeRef.current).active?.phase === 'transport' ? vehicleMode('ride', 'ems')
+          : along && ride
             ? vehicleMode('ride', ride.vehicle)
             : controller.driving
               ? vehicleMode('drive', cityLifeRef.current.duty === 'moto' ? 'moto' : 'taxi')
@@ -1307,8 +1318,8 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     return () => window.clearInterval(id)
   }, [insideAny, webgl, controller])
   useEffect(() => {
-    controller.setTravelling(riding)
-  }, [riding, controller])
+    controller.setTravelling(riding || emergencyActive)
+  }, [riding, emergencyActive, controller])
   useEffect(() => {
     const v = cityLife.locality === (cityLife.vehicleLocality ?? 'lome') ? cityLife.vehicle : null
     if (v) {
@@ -1350,6 +1361,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
         } else if (ev.type === 'reached' && !c.route.length && !c.driving) {
           setCityLife(old => ({ ...finishGuidedWalk(old), pose: { x: c.pos.x, z: c.pos.z, heading: c.heading } }))
         } else if (ev.type === 'cell') {
+          if (emergencyOf(cityLifeRef.current).active) continue
           const key = `${cityLifeRef.current.locality}:${ev.x}:${ev.y}`
           reportedCell.current = key
           const v = c.driving ? c.vehicle : null
@@ -1433,7 +1445,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   // The keyboard walks the player in the street and indoors (every renderer lets them walk).
   useKeyboardInput(
     input,
-    panel === null && !policeStop && !talkNpc && !mapView && !riding && !(driving && cityLife.duty),
+    panel === null && !policeStop && !talkNpc && !mapView && !riding && !emergencyActive && !(driving && cityLife.duty),
   )
   // Test hooks: walkability of a cell and an automatic walk to the player's taxi.
   useEffect(() => {
@@ -1774,7 +1786,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     }
   }, [cityLife.duty, cityLife.fleet, hail, fare, fareLive, serviceState])
   useEffect(() => {
-    if (!playing && !cityLife.employment?.shift) return
+    if (!playing && !cityLife.employment?.shift && !municipalClock) return
     const id = window.setInterval(() => {
       if (document.visibilityState === 'visible')
         setCityLife((old) =>
@@ -1784,7 +1796,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
         )
     }, 11000)
     return () => window.clearInterval(id)
-  }, [playing, !!cityLife.employment?.shift])
+  }, [playing, !!cityLife.employment?.shift, municipalClock])
   useEffect(() => {
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') setPlaying(false)
@@ -1795,7 +1807,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   // Key E on a PC: the same action as the door button (never while typing in a field).
   const doorKey = useRef<() => void>(() => {})
   doorKey.current = () => {
-    if (panel !== null || policeStop || talkNpc || riding) return
+    if (panel !== null || policeStop || talkNpc || riding || emergencyActive) return
     if (insideAny) action('leave')
     else if (doorRef.current) action('enter')
   }
@@ -2095,6 +2107,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     setApproachReq((r) => ({ prop: prop.id, n: (r?.n ?? 0) + 1 }))
   }
   function cityAction(a: CityAction) {
+    if (a === 'public-services') { setPanel('services'); return }
     if (a === 'timetable') {
       const lot = cityLife.insideLot ? lotById(cityLife.insideLot) : null
       if (lot) { setSelectedLot(lot); setPanel('lot') }
@@ -2152,7 +2165,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
       setCityLife(old => ({ ...old, activity: { prop: p.id, anim: 'sit' } }))
       return
     }
-    if (['browse', 'offers', 'coop', 'bank', 'timetable'].includes(p.action)) {
+    if (['browse', 'offers', 'coop', 'bank', 'timetable', 'public-services'].includes(p.action)) {
       cityAction(p.action as CityAction)
       return
     }
@@ -2385,6 +2398,73 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     setPlaying(false)
   }
 
+  function stopEmergency() {
+    const graph = controller.pavements
+    const index = graph?.nearest(controller.pos)
+    const point = graph && index !== undefined && index >= 0 ? graph.nodes[index] : controller.pos
+    setCityLife(old => ({ ...cancelAmbulance(old),
+      at: { x: Math.round(point.x), y: Math.round(point.z) },
+      pose: { x: point.x, z: point.z, heading: controller.heading }, route: [],
+    }))
+  }
+  function requestEmergency() {
+    if (!webgl) { setNotice('Le monde 3D doit être disponible pour envoyer l’ambulance.'); return }
+    if (driving || riding) { setNotice('Descends du véhicule avant de demander une ambulance.'); return }
+    const old = cityLifeRef.current
+    const point = old.insideLot || old.life.inside
+      ? { x: old.at.x, z: old.at.y } : { ...controller.pos }
+    const outside = { ...cancelMeal(old), insideLot: null, activity: null,
+      duty: null, employment: old.employment ? { ...old.employment, shift: null } : undefined,
+      life: { ...old.life, inside: null },
+    }
+    const next = callAmbulance(outside, point, crypto.randomUUID())
+    setCityLife(next)
+    if (!emergencyOf(next).active) { setNotice(next.life.lastEvent); return }
+    input.x = 0; input.y = 0; input.run = false
+    controller.route = []
+    controller.camera.follow = true
+    setTalkNpc(null)
+    setPendingFlight(null)
+    setCoachTo(null)
+    setSelectedLot(null)
+    setPoliceStop(null)
+    controller.policeStopped = false
+    if (mapView) exitMap()
+    setPanel(null)
+    setNotice(null)
+    setPlaying(false)
+  }
+  function onEmergency(event: EmergencyEvent) {
+    if (event.type === 'failed') {
+      setCityLife(old => {
+        const next = emergencyEvent(old, event)
+        if (next === old) return old
+        const graph = controller.pavements
+        const index = graph?.nearest(controller.pos)
+        const p = graph && index !== undefined && index >= 0 ? graph.nodes[index] : controller.pos
+        return { ...next, at: { x: Math.round(p.x), y: Math.round(p.z) },
+          pose: { x: p.x, z: p.z, heading: controller.heading } }
+      })
+    } else setCityLife(old => emergencyEvent(old, event))
+  }
+  function visitMayor() {
+    if (cityLife.insideLot && lotById(cityLife.insideLot)?.type === 'townhall') {
+      setCityLife(reportMunicipalSignal)
+      return
+    }
+    const mayor = landmarks().filter(l => l.type === 'townhall').sort((a, b) =>
+      Math.hypot(a.door.x - cityLife.at.x, a.door.y - cityLife.at.y) - Math.hypot(b.door.x - cityLife.at.x, b.door.y - cityLife.at.y))[0]
+    if (mayor) goService(mayor)
+  }
+  function inspectWorks() {
+    const site = cityLife.civic?.projects?.[cityLife.locality]?.site
+    if (!site) return
+    setCityLife(old => goToPoint({ ...old, insideLot: null, activity: null,
+      life: { ...old.life, inside: null } }, { x: site.x, y: site.z }))
+    controller.camera.follow = true
+    setPanel(null)
+  }
+
   return (
     <main
       ref={screenRef}
@@ -2395,6 +2475,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
       <div
         className="absolute inset-0"
         aria-label={`Monde de jeu 3D de ${LOCALITIES[cityLife.locality].name}`}
+        inert={emergencyActive}
       >
         {webgl === null ? (
           <output className="flex h-full items-center justify-center p-8 text-center text-sm">
@@ -2475,6 +2556,8 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                 setPanel('player')
               }}
               fare={streetFare}
+              services={publicServices}
+              onEmergency={onEmergency}
               onHail={receiveCustomer}
               onVehicle={toggleVehicle}
               plot={
@@ -2637,7 +2720,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
           Activités · {lotById(cityLife.insideLot)?.name ?? 'ce lieu'}
         </button>
       )}
-      <header className="hl-header pointer-events-none absolute inset-x-0 top-0 z-20 px-3 pt-[max(12px,env(safe-area-inset-top,0px))] sm:px-5">
+      <header inert={emergencyActive} className="hl-header pointer-events-none absolute inset-x-0 top-0 z-20 px-3 pt-[max(12px,env(safe-area-inset-top,0px))] sm:px-5">
         <div className="hl-context" aria-label={`HarooLife · ${LOCALITIES[cityLife.locality].name} · ${whereAmI}`}>
           <span className="hl-wordmark"><span aria-hidden>h.</span> HAROOLIFE</span>
           <span className="hl-location"><MapPin size={12} aria-hidden /> {LOCALITIES[cityLife.locality].name} <span aria-hidden>·</span> {whereAmI}</span>
@@ -2751,12 +2834,14 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
           </div>
         )}
       </header>
+      {emergencyActive && <EmergencyOverlay state={cityLife} onCancel={stopEmergency} />}
 
       {!mapView && !riding && panel === null && <DailyActionHud state={cityLife}
         onStand={() => setCityLife(old => ({ ...cancelMeal(old), activity: null }))}
         onCancel={() => setCityLife(cancelMeal)} onBag={() => { setShopTab('marche'); open('shop') }} />}
       <div
         className={`hl-controls pointer-events-none absolute inset-x-0 bottom-[calc(100px+env(safe-area-inset-bottom,0px))] z-20 px-3 sm:px-5 ${mapView || riding ? 'hidden' : ''}`}
+        inert={emergencyActive}
       >
         <div className="hl-control-columns mx-auto flex max-w-[900px] items-end justify-between gap-2">
           <div className="flex min-w-0 flex-col items-start gap-2">
@@ -2785,7 +2870,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
             {!(driving && cityLife.duty) && (
               <Joystick
                 input={input}
-                disabled={panel !== null || riding}
+                disabled={panel !== null || riding || emergencyActive}
                 onActive={onJoystickActive}
               />
             )}
@@ -3117,6 +3202,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
       )}
       <nav
         aria-label="Navigation du jeu"
+        inert={emergencyActive}
         className="hl-navigation absolute inset-x-0 bottom-0 z-30 px-3 pb-[max(10px,env(safe-area-inset-bottom,0px))]"
       >
         <div className="hl-dock mx-auto grid max-w-[520px] grid-cols-4 gap-1 rounded-[26px] border border-white/75 bg-white/95 p-2 shadow-2xl backdrop-blur-lg">
@@ -3163,7 +3249,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
         </div>
       </nav>
 
-      {pending && (
+      {pending && !emergencyActive && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4">
           <section
             role="dialog"
@@ -3298,6 +3384,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                     {notice}
                   </div>
                 )}
+                {panel === 'services' && <PublicServices state={cityLife} onCall={requestEmergency} onMayor={visitMayor} onInspect={inspectWorks} />}
                 {panel === 'home' && (
                   <>
                     <p className="text-sm text-slate-600">

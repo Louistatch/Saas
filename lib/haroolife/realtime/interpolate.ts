@@ -51,8 +51,8 @@ export function sampleAt(samples: Sample[], at: number): Sample | null {
 }
 
 /** A vehicle seen under another player: the one they drive, or the one they ride in. */
-export type RemoteVehicle = 'taxi' | 'moto' | 'bus'
-const VEHICLES: readonly string[] = ['taxi', 'moto', 'bus']
+export type RemoteVehicle = 'taxi' | 'moto' | 'bus' | 'ems'
+const VEHICLES: readonly string[] = ['taxi', 'moto', 'bus', 'ems']
 
 /**
  * The pose mode names the vehicle, so the others draw it: `drive:taxi` at the wheel,

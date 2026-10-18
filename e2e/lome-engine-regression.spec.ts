@@ -121,6 +121,10 @@ test('real relay: a remote avatar, taxi and moto survive culling and graphic cha
         ),
       )
       .toBe(true)
+    mode = 'ride:ems'
+    await expect.poll(async () => (await street(page))?.remotes.some(
+      r => r.vehicle === 'ems' && r.vehicleShown && !r.shown,
+    )).toBe(true)
     mode = 'walk'
     await expect
       .poll(async () => (await street(page))?.remotes.some((r) => r.vehicle === null && r.shown))

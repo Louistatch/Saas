@@ -216,6 +216,11 @@
   max-width: calc(100% - 24px);
 }
 
+/* The room guide follows the venue button instead of sharing its touch target. */
+.haroolife-screen [data-testid="room-guide"] {
+  top: calc(202px + env(safe-area-inset-top, 0px));
+}
+
 .hl-controls {
   padding-inline: var(--hl-edge);
 }
@@ -396,6 +401,9 @@
   }
   .hl-venue-activities {
     top: 108px;
+  }
+  .haroolife-screen [data-testid="room-guide"] {
+    top: 158px;
   }
   .hl-dock {
     padding: 4px;

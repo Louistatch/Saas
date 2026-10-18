@@ -289,6 +289,7 @@ export function buildCityGeometry(
   bank: Bank,
   buildings: readonly StreetBuilding[],
   detail: boolean,
+  liveAmbulance = false,
 ): THREE.BufferGeometry {
   const out: Geometry = { pos: [], nrm: [], col: [], idx: [] }
   const parts: Part[] = []
@@ -328,7 +329,12 @@ export function buildCityGeometry(
       const m = spec.main
       if (m) place(m.model, m.cx, m.cy, m.rot, m.scale, m.lift ?? 0, m.tint, true)
       if (near)
-        for (const p of spec.props) place(p.model, p.cx, p.cy, p.rot, p.scale, p.lift ?? 0, p.tint)
+        for (const p of spec.props) {
+          // Street dispatch owns this vehicle; baking a parked copy into the road would
+          // leave a second, non-colliding ambulance in the way of the moving one.
+          if (liveAmbulance && p.model === 'ambulance') continue
+          place(p.model, p.cx, p.cy, p.rot, p.scale, p.lift ?? 0, p.tint)
+        }
       for (const e of spec.extras) if (e.kind !== 'ground' && e.kind !== 'field') drawExtra(out, e)
       continue
     }

@@ -3,6 +3,7 @@
 import type { AdCampaign, AdPlacement } from '@/lib/haroolife/ads/campaigns'
 import type { ExposureTracker } from '@/lib/haroolife/ads/exposure'
 import type { ServiceCustomer } from '@/lib/haroolife/city/automatic-service'
+import type { EmergencyEvent } from '@/lib/haroolife/city/emergency'
 import { type Npc, type NpcAnim, type Prop, layoutFor } from '@/lib/haroolife/city/interiors'
 import type { Interior } from '@/lib/haroolife/city/life'
 import { LOCALITIES, type LocalityId } from '@/lib/haroolife/city/locality'
@@ -17,6 +18,7 @@ import type {
   StreetFare,
   StreetPoseFeed,
   StreetStats,
+  StreetServices,
 } from '@/lib/haroolife/game/render/street-world'
 import type { Transport } from '@/lib/haroolife/lome-life-engine'
 import type { PresenceEntry } from '@/lib/haroolife/realtime/protocol'
@@ -126,12 +128,16 @@ export default function CityWorld({
   onLeave,
   mapView = false,
   home,
+  services,
+  onEmergency,
 }: {
   city: City
   /** A cell of the player's estate was touched (local coordinates). */
   onTile: (x: number, y: number) => void
   /** The continuous player controller: the street engine steps it and draws the player. */
   controller: PlayerController
+  services?: StreetServices
+  onEmergency?: (event: EmergencyEvent) => void
   onPlayerEvents: (events: ReturnType<PlayerController['drain']>, c: PlayerController) => void
   /** The player's chosen look: Kenney model and pagne colour (also used indoors). */
   avatarModel?: string
@@ -319,6 +325,8 @@ export default function CityWorld({
             onVehicle={onVehicle}
             plot={plot}
             talkOrigin={talkOrigin}
+            services={services}
+            onEmergency={onEmergency}
           />
         </div>
       )}

@@ -30,6 +30,7 @@ import {
 import { type Bank, loadBank } from '@/lib/haroolife/city/bank'
 import type { CollisionBody } from '@/lib/haroolife/city/collisions'
 import type { Meal } from '@/lib/haroolife/city/dining'
+import { AmbulanceMission, type EmergencyOrder, type EmergencyEvent } from '@/lib/haroolife/city/emergency'
 import { type VehicleKind, drivingRoute } from '@/lib/haroolife/city/fares'
 import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 import { current } from '@/lib/haroolife/city/locality'
@@ -39,7 +40,7 @@ import { DEFAULT_CONFIG, type PlayerController } from '@/lib/haroolife/city/play
 import { PRESETS, type Quality, renderPixelRatio } from '@/lib/haroolife/city/quality'
 import { RoadTraffic } from '@/lib/haroolife/city/road-traffic'
 import { type Speaker, type StreetLine, isStudent } from '@/lib/haroolife/city/street-talk'
-import { ESTATE, isCityRoad, isDriveway, nameOwnedPlot } from '@/lib/haroolife/city/world'
+import { ESTATE, isCityRoad, isDriveway, lotById, nameOwnedPlot } from '@/lib/haroolife/city/world'
 import type { DailyViewProps } from '@/lib/haroolife/engine/types'
 import { streetDressing } from '@/lib/haroolife/game/core/sidewalks'
 import {
@@ -79,6 +80,7 @@ import { ContactShadows } from './contact-shadows'
 import { createGltfLoader } from './gltf'
 import { type MotoModel, type MotoParts, buildMoto } from './moto'
 import { PerfProbe } from './perf-probe'
+import { AmbulanceModels, MunicipalWorksite } from './public-service-models'
 import { type StreetPlot, buildPlotGroup, signTexture } from './plot-build'
 import { StreetAtmosphere, gradeLomeColours, groundGrain } from './street-atmosphere'
 import { buildPoles, modelGeometry, polePlaces } from './street-poles'
@@ -200,6 +202,11 @@ export interface StreetWorldEvents extends Omit<DailyViewProps, 'meal'> {
   onHail?: (customer: ServiceCustomer | null) => void
   /** Touching the nearby parked vehicle boards it through the normal game action. */
   onVehicle?: () => void
+  onEmergency?: (event: EmergencyEvent) => void
+}
+export interface StreetServices {
+  emergency: EmergencyOrder | null
+  worksite: { x: number; z: number } | null
 }
 
 /** The driver's job in the street: the vehicle, who is on board, where they go. */
@@ -253,6 +260,7 @@ export interface StreetWorldOptions {
   /** The player's plot (« Ma maison ») and its stage, drawn on its lot. */
   plot?: StreetPlot | null
   quality?: Quality
+  services?: StreetServices
 }
 
 export interface StreetAds {
@@ -337,6 +345,17 @@ export class StreetWorld {
   private readonly renderer: THREE.WebGLRenderer
   private readonly scene = new THREE.Scene()
   private readonly contactShadows = new ContactShadows()
+  private services: StreetServices = { emergency: null, worksite: null }
+  private ambulanceMission: AmbulanceMission | null = null
+  private ambulanceModels: AmbulanceModels | null = null
+  private ambulanceRoot: THREE.Group | null = null
+  private ambulanceMedic: Person | null = null
+  private emergencyCamera: { angle: number; distance: number } | null = null
+  private readonly ambulanceObstacles: CollisionBody[] = []
+  private municipalSite: MunicipalWorksite | null = null
+  private municipalWorker: Person | null = null
+  private municipalWorkerLoad = 0
+  private readonly municipalBody: CollisionBody = { x: 0, z: 0, heading: 0, halfWidth: 0.12, halfLength: 0.12 }
   private readonly camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 400)
   private readonly loader = createGltfLoader()
   private readonly loaded: GLTF[] = []
@@ -546,6 +565,7 @@ export class StreetWorld {
     this.pagne = o.pagne
     this.locality = o.locality
     this.ads = o.ads ?? null
+    this.services = o.services ?? this.services
     if (o.fare) this.fare = { ...o.fare }
     this.supports = PLACEMENTS.filter((p) => p.locality === o.locality)
     if (o.remote) {
@@ -605,6 +625,7 @@ export class StreetWorld {
     this.player = this.makePerson(avatar.value, spec, this.pagne)
     this.player.root.name = 'Joueur'
     this.scene.add(this.player.root)
+    this.setServices(this.services)
     this.rebuild()
     this.updateTiles(1)
     for (let i = 0; i < Math.min(PEDESTRIANS, PRESETS[this.quality].maxWalkers); i++) {
@@ -871,6 +892,13 @@ export class StreetWorld {
     for (const t of this.grains.values()) t.dispose()
     this.atmosphere.dispose()
     this.contactShadows.dispose()
+    this.restoreEmergencyCamera()
+    this.ambulanceRoot?.removeFromParent()
+    this.ambulanceModels?.dispose()
+    if (this.ambulanceMedic) this.disposePerson(this.ambulanceMedic)
+    this.municipalSite?.dispose()
+    this.municipalWorkerLoad++
+    if (this.municipalWorker) this.disposePerson(this.municipalWorker)
     this.freeLoaded()
     this.renderer.dispose()
     this.perf.dispose()
@@ -1356,7 +1384,7 @@ export class StreetWorld {
       }
       const cached = dirty ? null : this.tileCache.take(`${key}:${detail}`)
       const inTile = cached ? [] : buildingsInTile(w.tx, w.ty, this.estate)
-      const geometry = cached?.geometry ?? buildCityGeometry(bank, inTile, detail)
+      const geometry = cached?.geometry ?? buildCityGeometry(bank, inTile, detail, true)
       const buildings = cached?.buildings ?? inTile.length
       const mesh = new THREE.Mesh(geometry, this.cityMaterial)
       mesh.name = `Bâtiments ${key}`
@@ -1816,6 +1844,8 @@ export class StreetWorld {
         ? ctl.vehicleDimensions.halfLength
         : ctl.config.radius
     blockers.push(body)
+    if (this.ambulanceMission) blockers.push(this.ambulanceMission.body)
+    if (this.municipalWorker) blockers.push(this.municipalBody)
     // NPC cars yield to crossing people, including the visible pedestrians.
     for (const w of this.walkers)
       if (w.person.root.visible) {
@@ -1843,24 +1873,36 @@ export class StreetWorld {
       ),
     )
     this.obstacles.length = 0
+    this.ambulanceObstacles.length = 0
     // A car stopped beside a walking player is waiting for them to pass: it does not block them
     // in turn (the two used to wait for each other forever on a walk along the road). At the
     // wheel, a stopped car is an obstacle like any other (the taxi used to drive into the queue
     // at a red light).
-    for (const car of this.traffic.cars)
-      if (
-        this.trafficModels.has(car.id) &&
-        !(!ctl.driving && car.stopped && Math.hypot(car.x - ctl.pos.x, car.z - ctl.pos.z) < 2)
-      )
+    for (const car of this.traffic.cars) {
+      if (!this.trafficModels.has(car.id)) continue
+      // A walking player may pass a yielding car. A medical vehicle must still stop for it,
+      // including when the hidden passenger's position follows the ambulance.
+      this.ambulanceObstacles.push(car)
+      if (!(!ctl.driving && car.stopped && Math.hypot(car.x - ctl.pos.x, car.z - ctl.pos.z) < 2))
         this.obstacles.push(car)
+    }
     for (const w of this.walkers)
       if (
         w.person.root.visible &&
         w.name !== this.fare.passenger &&
         w.name !== this.fare.pickup?.name
-      )
+      ) {
         this.obstacles.push(w.body)
+        this.ambulanceObstacles.push(w.body)
+      }
+    if (this.municipalWorker) {
+      this.obstacles.push(this.municipalBody)
+      this.ambulanceObstacles.push(this.municipalBody)
+    }
     ctl.obstacles = this.obstacles
+    if (this.ambulanceMission?.phase !== 'transport') this.ambulanceObstacles.push(body)
+    if (!ctl.driving && ctl.vehicle) this.ambulanceObstacles.push(this.parkedBody)
+    if (this.ambulanceMission) this.obstacles.push(this.ambulanceMission.body)
     for (const agent of this.traffic.cars) {
       let model = this.trafficModels.get(agent.id)
       if (!model) {
@@ -1927,6 +1969,7 @@ export class StreetWorld {
     const ctl = this.controller
     this.stepTraffic(dt)
     ctl.update(dt)
+    this.stepPublicServices(dt)
     this.signals?.update(ctl.streetSeconds, ctl.repairedSignals)
     const events = ctl.drain()
     if (events.length) this.events.onEvents(events, ctl)
@@ -1947,7 +1990,7 @@ export class StreetWorld {
       const onFoot = !ctl.driving && ctl.mode !== 'inside'
       // On the zémidjan the driver is seen, astride; in the taxi, inside.
       const astride = ctl.driving && !!this.moto && !!ctl.vehicle
-      pl.root.visible = onFoot || astride
+      pl.root.visible = (onFoot && this.ambulanceMission?.phase !== 'transport') || astride
       if (astride && ctl.vehicle && this.moto) {
         this.seat(pl, ctl.shownVehicle ?? ctl.vehicle, this.moto.driverZ)
       } else {
@@ -2121,6 +2164,9 @@ export class StreetWorld {
     if (this.player?.root.visible && !this.controller.driving)
       this.contactFootprint(this.player.root, 0.62, 0.5)
     if (this.car) this.contactFootprint(this.car, this.moto ? 0.58 : 1.4, this.moto ? 1.25 : 2.8)
+    if (this.ambulanceRoot) this.contactFootprint(this.ambulanceRoot, 1.5, 3.6)
+    if (this.ambulanceMedic) this.contactFootprint(this.ambulanceMedic.root, 0.55, 0.46)
+    if (this.municipalWorker) this.contactFootprint(this.municipalWorker.root, 0.55, 0.46)
     for (const w of this.walkers) this.contactFootprint(w.person.root, 0.55, 0.46)
     for (const r of this.remotes.values()) {
       if (r.ride)
@@ -2142,6 +2188,114 @@ export class StreetWorld {
     if ((x - p.x * U) ** 2 + (z - p.z * U) ** 2 > (9 * U) ** 2) return
     const road = isCityRoad(Math.round(x / U), Math.round(z / U)) || isDriveway(Math.round(x / U), Math.round(z / U))
     this.contactShadows.add(x, z, road ? -0.012 : 0.067, width, length, root.rotation.y)
+  }
+
+  /** Service identity and site are compared: a React refresh never rebuilds a running mission. */
+  setServices(services: StreetServices): void {
+    const previous = this.services
+    this.services = services
+    const bank = this.bank
+    if (!bank || this.disposed) return
+    const order = services.emergency
+    if (!order || this.ambulanceMission?.order.id !== order.id) {
+      this.restoreEmergencyCamera()
+      this.ambulanceRoot?.removeFromParent()
+      this.ambulanceRoot = null
+      this.ambulanceMission = null
+      if (this.ambulanceMedic) this.disposePerson(this.ambulanceMedic)
+      this.ambulanceMedic = null
+      if (order && order.locality === this.locality) {
+        if (!bank.sizes.ambulance || lotById(order.hospital)?.type !== 'hospital') {
+          this.events.onEmergency?.({ id: order.id, type: 'failed', message: 'L’ambulance ou son hôpital est indisponible. Tu peux rappeler sans frais.' })
+        } else {
+          this.ambulanceModels ??= new AmbulanceModels(bank)
+          this.ambulanceRoot = this.ambulanceModels.create()
+          this.ambulanceRoot.name = 'Ambulance en intervention'
+          this.scene.add(this.ambulanceRoot)
+          this.ambulanceMission = new AmbulanceMission(order)
+          this.emergencyCamera = { angle: this.controller.camera.angle, distance: this.controller.camera.distance }
+          const spec = avatarSpec('afi')
+          void this.load(spec.url).then(gltf => {
+            if (this.disposed || this.ambulanceMission?.order.id !== order.id) return
+            this.ambulanceMedic = this.makePerson(gltf, spec, '#f5f8ef')
+            this.ambulanceMedic.root.name = 'Soignante de l’ambulance'
+            this.ambulanceMedic.root.visible = false
+            this.scene.add(this.ambulanceMedic.root)
+          }).catch(() => { /* Dispatch continues if the outfit could not be loaded. */ })
+        }
+      }
+    }
+    const site = services.worksite
+    if (!site || !this.municipalSite || previous.worksite?.x !== site.x || previous.worksite?.z !== site.z) {
+      this.municipalSite?.dispose()
+      this.municipalSite = null
+      if (this.municipalWorker) this.disposePerson(this.municipalWorker)
+      this.municipalWorker = null
+      const generation = ++this.municipalWorkerLoad
+      if (site) {
+        this.municipalSite = new MunicipalWorksite(site.x, site.z, U)
+        this.scene.add(this.municipalSite.root)
+        this.municipalBody.x = site.x + 0.72
+        this.municipalBody.z = site.z + 0.72
+        const spec = avatarSpec('koffi')
+        void this.load(spec.url).then(gltf => {
+          if (this.disposed || generation !== this.municipalWorkerLoad) return
+          const person = this.makePerson(gltf, spec, '#ed8a2c')
+          person.root.name = 'Technicien communal'
+          person.root.position.set(this.municipalBody.x * U, 0.06, this.municipalBody.z * U)
+          person.root.rotation.y = Math.PI * 1.25
+          this.play(person, clipFor(person.spec, 'work'))
+          this.municipalWorker = person
+          this.scene.add(person.root)
+        }).catch(() => { /* The cones and the actual repair remain available without the outfit. */ })
+      }
+    }
+  }
+
+  private stepPublicServices(dt: number): void {
+    const mission = this.ambulanceMission
+    if (mission && this.ambulanceRoot) {
+      const c = this.controller
+      const event = mission.update(dt, this.ambulanceObstacles, c.streetSeconds, c.pavements, c.repairedSignals)
+      const position = mission.position
+      this.ambulanceRoot.position.set(position.x * U, 0, position.z * U)
+      this.ambulanceRoot.rotation.y = mission.heading * Math.PI / 180
+      this.ambulanceModels?.flash(this.ambulanceRoot, c.streetSeconds)
+      if (mission.phase !== 'dispatch') {
+        const wanted = (mission.heading + 180) % 360
+        const delta = ((wanted - c.camera.angle + 540) % 360) - 180
+        c.camera.angle = (c.camera.angle + delta * Math.min(1, dt * 3) + 360) % 360
+        c.camera.distance += (5 - c.camera.distance) * Math.min(1, dt * 3)
+      }
+      const medic = this.ambulanceMedic
+      if (medic) {
+        medic.root.visible = mission.phase === 'boarding'
+        const t = mission.medicProgress
+        medic.root.position.set(
+          (position.x + (mission.order.patient.x - position.x) * t) * U,
+          0.06,
+          (position.z + (mission.order.patient.z - position.z) * t) * U,
+        )
+        medic.root.rotation.y = Math.atan2(mission.order.patient.x - position.x, mission.order.patient.z - position.z)
+        this.play(medic, clipFor(medic.spec, t < 1 ? 'walk' : 'work'))
+        this.animate(medic, dt)
+      }
+      if (mission.phase === 'transport') {
+        const v = mission.driver.vehicle
+        if (v) { c.pos.x = v.x; c.pos.z = v.z; c.heading = v.heading }
+        c.camera.follow = true
+        c.camera.tx = c.pos.x
+        c.camera.tz = c.pos.z
+      }
+      if (event) this.events.onEmergency?.(event)
+    }
+    if (this.municipalWorker) this.animate(this.municipalWorker, dt)
+  }
+  private restoreEmergencyCamera(): void {
+    if (!this.emergencyCamera) return
+    this.controller.camera.angle = this.emergencyCamera.angle
+    this.controller.camera.distance = this.emergencyCamera.distance
+    this.emergencyCamera = null
   }
 
   // ── billboards (same supports, rotation, exposure and « Lire l'annonce » as before) ────────
@@ -2420,6 +2574,7 @@ export class StreetWorld {
       const ride = this.remoteRide(r, remoteVehicle(mode))
       const h = (s.heading * Math.PI) / 180
       if (ride) {
+        if (ride.kind === 'ems' && ride.root.children[0]) this.ambulanceModels?.flash(ride.root.children[0], this.controller.streetSeconds)
         // Seen as the player sees their own: the vehicle on the road, the player on or in it.
         ride.root.position.set(s.x * U, 0, s.z * U)
         ride.root.rotation.y = h
@@ -2507,6 +2662,11 @@ export class StreetWorld {
         ride.driver = driver
       }
       ride.top = moto.seat + FIGURE * 0.75
+    } else if (want.vehicle === 'ems') {
+      if (!this.bank?.sizes.ambulance) return null
+      this.ambulanceModels ??= new AmbulanceModels(this.bank)
+      root.add(this.ambulanceModels.create())
+      ride.top = FIGURE * 1.6
     } else {
       const template = this.trafficSources.get(want.vehicle === 'bus' ? 'van' : 'taxi')
       if (!template) return null
@@ -2609,6 +2769,14 @@ export class StreetWorld {
       quality: this.quality,
       shadows: this.shadows,
       contactShadows: this.contactShadows.mesh.count,
+      publicServices: {
+        ambulance: this.ambulanceMission ? { id: this.ambulanceMission.order.id,
+          phase: this.ambulanceMission.phase, ...this.ambulanceMission.position,
+          visible: !!this.ambulanceRoot?.visible } : null,
+        worksite: this.services.worksite,
+        worker: !!this.municipalWorker,
+        medic: !!this.ambulanceMedic?.root.visible,
+      },
       contextAntialias: this.renderer.getContext().getContextAttributes()?.antialias ?? null,
       cachedGeometryBytes: this.tileCache.byteLength,
       pendingTiles: this.tileQueue.length,

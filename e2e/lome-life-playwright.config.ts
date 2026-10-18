@@ -19,6 +19,7 @@ export default defineConfig({
   testMatch: [
     'lome-daily-actions.spec.ts',
     'lome-civic.spec.ts',
+    'lome-public-services.spec.ts',
     'lome-map-native.spec.ts',
     'lome-life.spec.ts',
     'lome-presence.spec.ts',

@@ -10,7 +10,7 @@ import {
 
 test('the pose mode names the vehicle, within the 12 characters the relay forwards', () => {
   for (const role of ['drive', 'ride'] as const)
-    for (const v of ['taxi', 'moto', 'bus'] as const) {
+    for (const v of ['taxi', 'moto', 'bus', 'ems'] as const) {
       const mode = vehicleMode(role, v)
       assert.ok(mode.length <= 12, mode)
       assert.deepEqual(remoteVehicle(mode), { role, vehicle: v })

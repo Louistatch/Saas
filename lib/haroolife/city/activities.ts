@@ -89,6 +89,7 @@ function baseActionsFor(
     case 'hospital':
       return [
         { id: 'care', label: 'Consultation', hint: 'Énergie +30 · Hygiène +20 · 1 500 FCFA' },
+        { id: 'public-services', label: 'Ambulance et services publics', hint: 'Prise en charge et suivi des interventions du jeu' },
         { id: 'toilet', label: 'Toilettes', hint: 'Vessie 100' },
       ]
     case 'school':
@@ -117,6 +118,7 @@ function baseActionsFor(
       return [{ id: 'relax', label: 'Se détendre', hint: 'Loisir +25' }, browse, social]
     case 'townhall':
       return [
+        { id: 'public-services', label: 'Suivre le travail du maire', hint: 'Budget, équipe envoyée et feux réparés' },
         {
           id: 'civic-report',
           label: 'Signaler les feux en panne',
