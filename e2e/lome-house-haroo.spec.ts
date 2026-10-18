@@ -157,25 +157,34 @@ test('HarooLife house: walk, eat, sleep, save, leave and come back', async ({ pa
     [1, -1],
   ]
   for (const [x, y] of dirs) {
-    const a = (await interior(page)) as Interior
+    const label = `stick (${x}, ${y})`
     const release = await press(page, mobile, x, y)
     // The walk clip while the stick is held (sampled once it is pushed, not while pushing).
     await expect
-      .poll(async () => (await interior(page))?.anim, { message: `stick (${x}, ${y}): walk clip` })
+      .poll(async () => (await interior(page))?.anim, {
+        message: `${label}: walk clip`,
+        intervals: [50],
+      })
       .toBe('Walk')
-    await page.waitForTimeout(400)
-    // Facing is read while the stick is held: keys are released one after the other, and in
-    // between the player rightly turns towards the one still pressed.
+    // Direction and facing are read while the stick is held, over a fixed distance rather than
+    // a fixed time: keys are pressed and released one after the other (in between the player
+    // rightly walks towards the one still pressed), and every move covers the same ground as
+    // its opposite whatever the frame rate, so the player never drifts into the furniture.
+    const a = (await interior(page)) as Interior
+    const walked = async () => {
+      const p = await interior(page)
+      return p ? Math.hypot(p.x - a.x, p.z - a.z) : 0
+    }
+    await expect
+      .poll(walked, { message: `${label}: the player moves`, intervals: [50] })
+      .toBeGreaterThan(0.35)
     const held = (await interior(page)) as Interior
     await release()
-    const b = (await interior(page)) as Interior
     const want = { x: RIGHT.x * x + FWD.x * y, z: RIGHT.z * x + FWD.z * y }
     const wl = Math.hypot(want.x, want.z)
-    const dx = b.x - a.x
-    const dz = b.z - a.z
+    const dx = held.x - a.x
+    const dz = held.z - a.z
     const d = Math.hypot(dx, dz)
-    const label = `stick (${x}, ${y})`
-    expect(d, `${label}: the player moves`).toBeGreaterThan(0.15)
     expect(
       (dx * want.x + dz * want.z) / (d * wl),
       `${label}: the way the stick points`,
