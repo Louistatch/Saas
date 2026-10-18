@@ -116,6 +116,12 @@ export interface WorldQuery {
 const STEP = 1 / 60
 const MAX_DT = 0.25 // a 4 FPS frame still advances the world in real time, without a spiral of death
 const DEG = 180 / Math.PI
+/** Following distance kept behind the vehicle ahead (cells, beyond the collision bodies). */
+const FOLLOW_GAP = 0.08
+/** Gentle braking when catching up with traffic (cells/s²), well below the emergency brake. */
+const FOLLOW_BRAKE = 5
+/** How long a queue at a red light is waited out before looking for another way (s). */
+const QUEUE_PATIENCE = 25
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
 /** Shortest signed difference between two angles in degrees. */
 export function angleDelta(from: number, to: number): number {
@@ -594,6 +600,52 @@ export class PlayerController {
     }
   }
 
+  /**
+   * Free length (cells) in front of the vehicle's body, in its lane, up to the nearest
+   * obstacle, and whether that obstacle is a vehicle going the same way (a queue).
+   */
+  private ahead(): { room: number; queue: boolean } {
+    const v = this.vehicle
+    const s = this.shownVehicle
+    if (!v || !s) return { room: Number.POSITIVE_INFINITY, queue: false }
+    const a = v.heading / DEG
+    const fx = Math.sin(a)
+    const fz = Math.cos(a)
+    let room = Number.POSITIVE_INFINITY
+    let queue = false
+    for (const o of this.obstacles) {
+      const rx = o.x - s.x
+      const rz = o.z - s.z
+      const along = rx * fx + rz * fz
+      if (along <= 0) continue
+      const turn = (Math.abs(angleDelta(o.heading, v.heading)) * Math.PI) / 180
+      const c = Math.abs(Math.cos(turn))
+      const n = Math.abs(Math.sin(turn))
+      const across = Math.abs(rx * fz - rz * fx)
+      if (across > this.vehicleDimensions.halfWidth + o.halfLength * n + o.halfWidth * c + 0.02)
+        continue
+      const free = along - this.vehicleDimensions.halfLength - (o.halfLength * c + o.halfWidth * n)
+      if (free < room) {
+        room = free
+        queue = o.halfLength >= 0.25 && turn < Math.PI / 4
+      }
+    }
+    return { room, queue }
+  }
+
+  private roomAhead(): number {
+    return this.ahead().room
+  }
+
+  /** Stuck in traffic: a queue is waited out (a red light ahead), anything else is driven around. */
+  private waitInTraffic(dt: number): void {
+    this.trafficWait += dt
+    if (this.trafficWait > (this.ahead().queue ? QUEUE_PATIENCE : 4)) {
+      this.trafficWait = 0
+      this.avoidTraffic()
+    }
+  }
+
   private stepAutomaticVehicle(dt: number): void {
     if (
       this.vehicle &&
@@ -604,6 +656,8 @@ export class PlayerController {
         this.pavements.road,
         this.streetSeconds,
         this.repairedSignals,
+        // The collision body is twice the drawn vehicle: the front bumper is half of it.
+        this.vehicleDimensions.halfLength / 2,
       )
     ) {
       this.vehicle.speed = 0
@@ -648,11 +702,7 @@ export class PlayerController {
           v.speed = -0.9
         } else {
           v.speed = 0
-          this.trafficWait += dt
-          if (this.trafficWait > 4) {
-            this.trafficWait = 0
-            this.avoidTraffic()
-          }
+          this.waitInTraffic(dt)
         }
         this.pos = { x: v.x, z: v.z }
         this.heading = v.heading
@@ -661,11 +711,7 @@ export class PlayerController {
       if (Math.abs(turn) > 8 && !this.turnClear(v.x, v.z, v.heading, wanted)) {
         this.turning = false
         v.speed = 0
-        this.trafficWait += dt
-        if (this.trafficWait > 4) {
-          this.trafficWait = 0
-          this.avoidTraffic()
-        }
+        this.waitInTraffic(dt)
         return
       }
       this.turning = Math.abs(turn) > 8
@@ -674,11 +720,7 @@ export class PlayerController {
       if (this.vehicleBlocked(v.x, v.z)) {
         v.heading = previousHeading
         v.speed = 0
-        this.trafficWait += dt
-        if (this.trafficWait > 4) {
-          this.trafficWait = 0
-          this.avoidTraffic()
-        }
+        this.waitInTraffic(dt)
         return
       }
       // Turn at the centre of intersections; never cut the corner across a building.
@@ -686,17 +728,30 @@ export class PlayerController {
       else {
         const last = this.drivingRoute.length === 1
         const speed = Math.min(3, Math.sqrt(2 * this.config.vehicle.brake * distance))
-        v.speed = approach(v.speed, last ? speed : 3, this.config.vehicle.accel * dt)
+        // A following distance: never faster than what stops it gently before the vehicle (or
+        // the person) ahead in its lane, like the other drivers.
+        const room = this.roomAhead()
+        const follow = Math.sqrt(2 * FOLLOW_BRAKE * Math.max(0, room - FOLLOW_GAP))
+        const target = Math.min(last ? speed : 3, follow)
+        v.speed = approach(
+          v.speed,
+          target,
+          (target < v.speed ? this.config.vehicle.brake : this.config.vehicle.accel) * dt,
+        )
+        if (follow < 0.05) {
+          // Held up behind someone: wait (patiently in a queue), then look for another way.
+          v.speed = 0
+          this.waitInTraffic(dt)
+          this.pos = { x: v.x, z: v.z }
+          this.heading = v.heading
+          return
+        }
         const step = Math.min(distance, v.speed * dt)
         const nx = v.x + (dx / distance) * step
         const nz = v.z + (dz / distance) * step
         if (this.vehicleBlocked(nx, nz)) {
           v.speed = 0
-          this.trafficWait += dt
-          if (this.trafficWait > 4) {
-            this.trafficWait = 0
-            this.avoidTraffic()
-          }
+          this.waitInTraffic(dt)
           return
         }
         this.trafficWait = 0

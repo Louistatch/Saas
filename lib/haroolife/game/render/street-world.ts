@@ -1724,15 +1724,19 @@ export class StreetWorld {
         (x, z) => isCityRoad(x, z) || isDriveway(x, z),
         ctl.streetSeconds,
         ctl.repairedSignals,
+        // Drawn half length (the collision body is about twice it).
+        car.kind === 'moto' ? 0.13 : 0.27,
       ),
     )
     this.obstacles.length = 0
-    // A car stopped beside the player is waiting for them to pass: it does not block them in
-    // turn (the two used to wait for each other forever on a walk along the road).
+    // A car stopped beside a walking player is waiting for them to pass: it does not block them
+    // in turn (the two used to wait for each other forever on a walk along the road). At the
+    // wheel, a stopped car is an obstacle like any other (the taxi used to drive into the queue
+    // at a red light).
     for (const car of this.traffic.cars)
       if (
         this.trafficModels.has(car.id) &&
-        !(car.stopped && Math.hypot(car.x - ctl.pos.x, car.z - ctl.pos.z) < 2)
+        !(!ctl.driving && car.stopped && Math.hypot(car.x - ctl.pos.x, car.z - ctl.pos.z) < 2)
       )
         this.obstacles.push(car)
     for (const w of this.walkers)

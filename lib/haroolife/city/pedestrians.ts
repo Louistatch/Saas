@@ -83,13 +83,19 @@ export function mayCross(p: Vec2, road: RoadQuery, seconds: number, repaired: bo
   const crossing = crossingAt(p, road)
   return !crossing || !signalWorks(crossing.junction, repaired) || signalPhase(seconds).pedestrian
 }
-/** Stop before the zebra; once committed to a junction, clear it without braking inside. */
+/**
+ * Stop before the zebra; once committed to a junction, clear it without braking inside. The
+ * vehicle's front (`halfLength` ahead of its centre, the drawn car by default) decides: still
+ * before the zebra (0.92 from the junction centre), it stops; already on it when the light
+ * turns, it clears the junction instead of stopping across the crossing.
+ */
 export function vehicleAtRed(
   p: Vec2,
   heading: number,
   road: RoadQuery,
   seconds: number,
   repaired: boolean,
+  halfLength = 0.27,
 ) {
   const a = (heading * Math.PI) / 180
   const dx = Math.sin(a)
@@ -99,7 +105,9 @@ export function vehicleAtRed(
   if (!isJunction(jx, jz, road) || !signalWorks({ x: jx, z: jz }, repaired)) return false
   const ahead = (jx - p.x) * dx + (jz - p.z) * dz
   return (
-    ahead > 0.8 && ahead < 1.55 && signalPhase(seconds)[Math.abs(dx) > 0.5 ? 'x' : 'z'] !== 'green'
+    ahead - halfLength > 0.92 &&
+    ahead < 1.55 &&
+    signalPhase(seconds)[Math.abs(dx) > 0.5 ? 'x' : 'z'] !== 'green'
   )
 }
 
