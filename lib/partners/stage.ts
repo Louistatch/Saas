@@ -96,7 +96,7 @@ export const CERTIFICATION_RESULT_COPY: Record<
 > = {
   success: {
     title: 'Paiement reçu',
-    body: 'Vos frais de certification sont réglés. L’équipe FaîtiereHub active votre compte d’opérateur ; vous recevez un e-mail.',
+    body: 'FedaPay a confirmé votre paiement : vos frais de certification sont réglés.',
     tone: 'ok',
   },
   pending: {
