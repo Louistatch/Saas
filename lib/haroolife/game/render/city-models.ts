@@ -8,26 +8,55 @@
  * radius and scale × STREET_CELL / CELL.
  */
 import type { Bank } from '@/lib/haroolife/city/bank'
-import { type Extra, buildingFor } from '@/lib/haroolife/city/catalogue'
+import { type Extra, buildingFor, isLomeModel } from '@/lib/haroolife/city/catalogue'
 import type { Geometry, Instance, Model } from '@/lib/haroolife/city/pack'
 import { CELL } from '@/lib/haroolife/city/world'
-import { STREET_CELL, type StreetBuilding } from '@/lib/haroolife/game/core/street'
+import { PERSON_CELL, STREET_CELL, type StreetBuilding } from '@/lib/haroolife/game/core/street'
 import * as THREE from 'three'
 
 const U = STREET_CELL
 const K = STREET_CELL / CELL
 /**
- * Height of the buildings against the people. The catalogue fits a model's footprint to its lot
- * (one cell is a few metres), which leaves Kenney's low houses about as tall as a person; the
- * buildings are drawn taller (not wider, so they keep to their lots) so a house storey reads as
- * about 1.7 figures and an apartment block as 3 to 5.
+ * Height of the buildings against their footprint. The catalogue fits a model's footprint to its
+ * lot; Kenney's stylised storeys are squat, so they are drawn a little taller (not wider, so they
+ * keep to their lots): about 3 m a storey against a 1.75 m adult.
  */
-export const BUILDING_HEIGHT = 1.8
+export const BUILDING_HEIGHT = 1.3
 const HK = K * BUILDING_HEIGHT
+/**
+ * Props sized against people (fences, stalls, parasols, lamps) keep the size they had when a
+ * cell was PERSON_CELL units; trees, awnings (fitted to their shop) and industrial props grow
+ * with the city like the buildings.
+ */
+const PK = PERSON_CELL / CELL
+const PERSON_PROPS = new Set([
+  'parasol-a',
+  'parasol-b',
+  'fence-2',
+  'fence-3',
+  'fence-4',
+  'fence-low',
+  'planter',
+  'lamp-curved',
+  'lamp-double',
+  'lamp-square',
+  'cone',
+  'barrier',
+  'road-sign',
+  'display-fruit',
+  'display-bread',
+  'cash-register',
+  'freezer',
+  'shopping-cart',
+])
 type RGB = [number, number, number]
 
-/** Models are planned first: one allocation per typed buffer, no growing JS arrays of buildings. */
-type Part = { model: Model; instance: Instance }
+/**
+ * Models are planned first: one allocation per typed buffer, no growing JS arrays of buildings.
+ * `own`: the model's colours are final (Lomé's models); the vertex alpha tells the street's
+ * colour grade to leave them as they are (it regrades the pastel kit only).
+ */
+type Part = { model: Model; instance: Instance; own?: boolean }
 function mergedParts(parts: Part[], extras: Geometry): THREE.BufferGeometry {
   let vertices = extras.pos.length / 3
   let indices = extras.idx.length
@@ -45,7 +74,7 @@ function mergedParts(parts: Part[], extras: Geometry): THREE.BufferGeometry {
   idx.set(extras.idx)
   let base = extras.pos.length / 3
   let offset = extras.idx.length
-  for (const { model: m, instance: inst } of parts) {
+  for (const { model: m, instance: inst, own } of parts) {
     const angle = ((inst.rot ?? 0) * Math.PI) / 180
     const c = Math.cos(angle)
     const s = Math.sin(angle)
@@ -73,7 +102,7 @@ function mergedParts(parts: Part[], extras: Geometry): THREE.BufferGeometry {
       col[ci] = m.col[i * 3] * tint[0]
       col[ci + 1] = m.col[i * 3 + 1] * tint[1]
       col[ci + 2] = m.col[i * 3 + 2] * tint[2]
-      col[ci + 3] = 1
+      col[ci + 3] = own ? 0 : 1
     }
     for (let i = 0; i < m.idx.length; i++) idx[offset++] = base + m.idx[i]
     base += m.pos.length / 3
@@ -274,18 +303,24 @@ export function buildCityGeometry(
     lift = 0,
     tint?: RGB,
     tall = false,
-  ) =>
+  ) => {
+    const k = !tall && PERSON_PROPS.has(key) ? PK : K
+    // Lomé's models are modelled at real proportions: never drawn taller.
+    const own = isLomeModel(key)
+    const hk = own ? K : HK
     parts.push({
       model: near ? bank.model(key) : bank.lowModel(key),
       instance: {
         x: cx * U,
-        y: lift * (tall ? HK : K),
+        y: lift * (tall ? hk : k),
         z: cy * U,
         rot,
-        scale: tall ? [scale * K, scale * HK, scale * K] : scale * K,
+        scale: tall ? [scale * K, scale * hk, scale * K] : scale * k,
         tint,
       },
+      own,
     })
+  }
   for (const b of buildings) {
     if (b.lot) {
       const spec = buildingFor(b.lot, bank.sizes)

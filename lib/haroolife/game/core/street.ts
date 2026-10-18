@@ -18,13 +18,19 @@ import {
  * renderer draws what this returns; walking, doors, routes and saves stay in the existing
  * PlayerController and CityLife (one source of truth).
  *
- * Units: one city cell = STREET_CELL scene units (the adult avatar of 1.85 units on a road one
- * cell wide reads like the prototype's street). Scene x = cell x × STREET_CELL, scene z = cell y
- * × STREET_CELL; cells and lot ids are never changed.
+ * Units: one city cell = STREET_CELL scene units. Scene x = cell x × STREET_CELL, scene z =
+ * cell y × STREET_CELL; cells and lot ids are never changed.
  */
 import type { Building } from '@/lib/haroolife/townsmen-engine'
 
-export const STREET_CELL = 2
+/**
+ * Real scale: an adult is 1.15 units (1.75 m), so a cell of 5 units is about 7.6 m — a two-lane
+ * street, a plot with its house and yard. Speeds stay in cells per second, so every trip lasts
+ * as long as it did with the former 2-unit cell (houses as wide as a person was tall).
+ */
+export const STREET_CELL = 5
+/** The cell before real scale: props and bodies tuned against people keep their size with it. */
+export const PERSON_CELL = 2
 
 export type GroundKind = 'land' | 'sand' | 'water' | 'hill' | 'road' | 'estate' | 'estate-road'
 

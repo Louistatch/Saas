@@ -134,9 +134,11 @@ export function groundGrain(seed: number, contrast: number, speckles: number): T
 }
 
 /**
- * The city's buildings come from a pastel kit (mint roofs, lavender walls). Lomé's are weathered
- * plaster, ochre and grey sheet metal: the vertex colours are graded in the shader, partly
- * desaturated, warmed and given back some contrast. Pure arithmetic, no texture.
+ * Part of the city's buildings come from a pastel kit (mint roofs, lavender walls). Lomé's are
+ * weathered plaster, ochre and grey sheet metal: those vertex colours are graded in the shader,
+ * partly desaturated, warmed and given back some contrast. Pure arithmetic, no texture. Vertices
+ * with an alpha of 0 (Lomé's own models, already in their real colours) are left as they are; the
+ * material is opaque, so the alpha only carries that flag.
  */
 export function gradeLomeColours(material: THREE.MeshStandardMaterial): void {
   material.onBeforeCompile = (shader) => {
@@ -147,7 +149,9 @@ export function gradeLomeColours(material: THREE.MeshStandardMaterial): void {
         float l = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
         vec3 c = mix(vec3(l), diffuseColor.rgb, 0.42);
         c *= vec3(1.07, 0.97, 0.84);
-        diffuseColor.rgb = clamp((c - 0.45) * 1.12 + 0.43, 0.0, 1.0);
+        c = clamp((c - 0.45) * 1.12 + 0.43, 0.0, 1.0);
+        diffuseColor.rgb = mix(diffuseColor.rgb, c, step(0.5, vColor.a));
+        diffuseColor.a = opacity;
       }`,
     )
   }

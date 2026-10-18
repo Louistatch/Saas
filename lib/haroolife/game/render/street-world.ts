@@ -43,6 +43,7 @@ import type { DailyViewProps } from '@/lib/haroolife/engine/types'
 import { streetDressing } from '@/lib/haroolife/game/core/sidewalks'
 import {
   type GroundKind,
+  PERSON_CELL,
   STREET_CELL,
   type StreetDoor,
   type StreetWindow,
@@ -78,6 +79,7 @@ import { type MotoParts, buildMoto } from './moto'
 import { PerfProbe } from './perf-probe'
 import { type StreetPlot, buildPlotGroup, signTexture } from './plot-build'
 import { StreetAtmosphere, gradeLomeColours, groundGrain } from './street-atmosphere'
+import { buildPoles, modelGeometry, polePlaces } from './street-poles'
 import { StreetSignals } from './street-signals'
 import { TileCache } from './tile-cache'
 import { batchTrafficModel, disposeTrafficModel } from './vehicle-batch'
@@ -90,11 +92,15 @@ import {
 } from './vehicle-scale'
 
 /**
- * Height of an adult (scene units; a cell is STREET_CELL). With the buildings drawn taller
- * (`BUILDING_HEIGHT`), a person is about 1.75 m against houses of one or two storeys and cars of
- * 4.5 m, instead of standing taller than the houses.
+ * Height of an adult (scene units; a cell is STREET_CELL, about 7.6 m): 1.75 m against houses of
+ * one or two storeys on their plots, cars of 4.1 m in a two-lane street.
  */
 const FIGURE = 1.15
+/**
+ * The camera frames a little wider than the old 2-unit street did: the city around the player
+ * is at real scale, so the same framing would show 2.5 times fewer cells.
+ */
+const VIEW = 1.4
 /** Background by day (the prototype's soft green) and at night. */
 /** Cells drawn around the player; the window is rebuilt when the player gets near its edge. */
 const RADIUS = 13
@@ -117,6 +123,20 @@ const PEDESTRIAN_NAMES = [
   'Agent Dodzi',
 ]
 const U = STREET_CELL
+
+/**
+ * Locomotion clip and rate. Speeds stay in cells per second (trips last as long as before the
+ * street grew to real scale), so a brisk walk covers ground at a jog: past 1.6 times the walk
+ * clip's natural pace the run clip plays, at the rate of the ground actually covered.
+ */
+function gait(
+  spec: { pace: { walk: number; run: number } },
+  anim: 'walk' | 'run',
+  speed: number,
+): { anim: 'walk' | 'run'; rate: number } {
+  const clip = anim === 'walk' && speed > spec.pace.walk * FIGURE * 1.6 ? 'run' : anim
+  return { anim: clip, rate: Math.min(3.5, Math.max(0.5, speed / (spec.pace[clip] * FIGURE))) }
+}
 /** The player's taxi (Kenney Car Kit, CC0): front along +Z, as the controller's heading 0. */
 const TAXI_URL = VEHICLE_URL.taxi
 /** Rolling radius of a compact taxi or moto, in the adult avatar's scale. */
@@ -382,6 +402,9 @@ export class StreetWorld {
   private trafficRiderTemplate: { gltf: GLTF; spec: AvatarSpec } | null = null
   private readonly trafficTemplates = new Map<string, THREE.Object3D>()
   private readonly trafficSources = new Map<string, THREE.Object3D>()
+  private poleGeometry: THREE.BufferGeometry | null = null
+  private poleMaterial: THREE.MeshStandardMaterial | null = null
+  private wireMaterial: THREE.LineBasicMaterial | null = null
   private readonly blockers: CollisionBody[] = []
   private readonly obstacles: CollisionBody[] = []
   private readonly playerBody: CollisionBody = {
@@ -753,6 +776,9 @@ export class StreetWorld {
     for (const k of [...this.tiles.keys()]) this.dropTile(k)
     this.tileCache.clear()
     this.cityMaterial?.dispose()
+    this.poleGeometry?.dispose()
+    this.poleMaterial?.dispose()
+    this.wireMaterial?.dispose()
     this.unsubscribe?.()
     this.unsubscribe = null
     for (const r of this.remotes.values()) {
@@ -932,13 +958,20 @@ export class StreetWorld {
       (c) => this.mat(c),
       U,
     )
-    // Lane markings on city roads (thin, light).
-    const marks = win.cells.filter((cell) => cell.kind === 'road')
+    // Lane markings on city roads: a dash along the road, none in the crossroads.
+    const isRoad = (x: number, y: number) => isCityRoad(x, y)
+    const marks = win.cells.flatMap((cell) => {
+      if (cell.kind !== 'road') return []
+      const alongX = isRoad(cell.x - 1, cell.y) || isRoad(cell.x + 1, cell.y)
+      const alongZ = isRoad(cell.x, cell.y - 1) || isRoad(cell.x, cell.y + 1)
+      return alongX === alongZ ? [] : [{ x: cell.x, y: cell.y, alongX }]
+    })
     if (marks.length) {
       const im = new THREE.InstancedMesh(this.unitBox, this.mat('#e9e4d4'), marks.length)
       im.name = 'marquage'
       marks.forEach((cell, i) => {
-        m4.makeScale(0.5, 0.02, 0.12)
+        if (cell.alongX) m4.makeScale(U * 0.4, 0.02, 0.12)
+        else m4.makeScale(0.12, 0.02, U * 0.4)
         m4.setPosition(cell.x * U, -0.03, cell.y * U)
         im.setMatrixAt(i, m4)
       })
@@ -962,6 +995,21 @@ export class StreetWorld {
       })
       im.receiveShadow = true
       g.add(im)
+    }
+    // CEET poles at the kerbs and their wires (Lomé's model of the pack, when it has one).
+    if (this.bank?.sizes['lome-poteau']) {
+      this.poleGeometry ??= modelGeometry(this.bank.model('lome-poteau'))
+      this.poleMaterial ??= new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 })
+      this.wireMaterial ??= new THREE.LineBasicMaterial({ color: '#1d1d1d' })
+      for (const o of buildPoles(
+        polePlaces(win.cells),
+        this.poleGeometry,
+        this.poleMaterial,
+        this.wireMaterial,
+        U,
+        FIGURE / 1.75,
+      ))
+        g.add(o)
     }
     // Buildings: the Kenney models by tiles (updateTiles); boxes only when the pack is missing.
     if (this.bank) {
@@ -1288,13 +1336,13 @@ export class StreetWorld {
     const g = new THREE.Group()
     g.name = `Destination ${dest.name}`
     const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(U * 0.9, U * 0.08, 8, 32),
+      new THREE.TorusGeometry(PERSON_CELL * 0.9, PERSON_CELL * 0.08, 8, 32),
       this.mat('#f59e0b'),
     )
     ring.rotation.x = Math.PI / 2
     ring.position.y = 0.05
     const beam = new THREE.Mesh(
-      new THREE.CylinderGeometry(U * 0.12, U * 0.12, FIGURE * 1.4, 10),
+      new THREE.CylinderGeometry(PERSON_CELL * 0.12, PERSON_CELL * 0.12, FIGURE * 1.4, 10),
       this.mat('#f59e0b'),
     )
     beam.position.y = FIGURE * 0.7
@@ -1574,7 +1622,7 @@ export class StreetWorld {
     // The rig's distance (zoom buttons, pinch) sets the framing; 8 is the follow distance.
     // Framed on the person (smaller than the buildings around): a narrower view than before.
     const zoom = this.width < 650 ? 1.3 : 1
-    const size = (Math.max(4.5, Math.min(40, 7 * (c.distance / 8))) * this.framing) / zoom
+    const size = (Math.max(4.5, Math.min(40, 7 * (c.distance / 8))) * this.framing * VIEW) / zoom
     const half = Math.max(size, (size * 1.15) / aspect)
     this.camera.left = -half * aspect
     this.camera.right = half * aspect
@@ -1786,13 +1834,9 @@ export class StreetWorld {
               ? 'walk'
               : 'idle'
       this.anim = anim
-      this.play(pl, clipFor(pl.spec, anim))
-      if (anim === 'walk' || anim === 'run') {
-        const natural = pl.spec.pace[anim] * FIGURE
-        pl.actions
-          .get(pl.current)
-          ?.setEffectiveTimeScale(Math.min(3, Math.max(0.5, speed / natural)))
-      } else pl.actions.get(pl.current)?.setEffectiveTimeScale(1)
+      const step = anim === 'walk' || anim === 'run' ? gait(pl.spec, anim, speed) : null
+      this.play(pl, clipFor(pl.spec, step?.anim ?? anim))
+      pl.actions.get(pl.current)?.setEffectiveTimeScale(step?.rate ?? 1)
       this.animate(pl, dt)
       pl.mealProps.show(eating)
       if (eating && this.meal) {
@@ -2201,14 +2245,18 @@ export class StreetWorld {
         p.root.visible = fresh
       }
       const anim = remoteAnim(mode)
+      const step =
+        anim === 'walk' || anim === 'run'
+          ? gait(
+              p.spec,
+              anim,
+              (anim === 'run' ? DEFAULT_CONFIG.runSpeed : DEFAULT_CONFIG.walkSpeed) * U,
+            )
+          : null
       // Seated only on a vehicle drawn under them; a bare `drive` (old client) stands.
-      const clip = clipFor(p.spec, anim === 'drive' && !ride?.moto ? 'idle' : anim)
+      const clip = clipFor(p.spec, step?.anim ?? (anim === 'drive' && !ride?.moto ? 'idle' : anim))
       this.play(p, clip)
-      if (anim === 'walk' || anim === 'run') {
-        const speed = (anim === 'run' ? DEFAULT_CONFIG.runSpeed : DEFAULT_CONFIG.walkSpeed) * U
-        const natural = p.spec.pace[anim] * FIGURE
-        p.actions.get(p.current)?.setEffectiveTimeScale(Math.min(3, Math.max(0.5, speed / natural)))
-      } else p.actions.get(p.current)?.setEffectiveTimeScale(1)
+      p.actions.get(p.current)?.setEffectiveTimeScale(step?.rate ?? 1)
       this.animate(p, dt)
     }
   }

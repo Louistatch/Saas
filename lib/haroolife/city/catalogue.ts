@@ -4,6 +4,7 @@
  * (fences, awnings, trees, stalls, lamps). Everything is a pure function of the lot and
  * the deterministic world hash, so a building never changes identity between loads.
  */
+import { SIDEWALK } from '@/lib/haroolife/game/core/sidewalks'
 import { current } from './locality'
 import { CELL, type Lot, type LotType, hash, isCityRoad } from './world'
 
@@ -181,6 +182,18 @@ const TOWERS_WIDE = ['com-m', 'com-n']
 const WAREHOUSES = ['ind-h', 'ind-i', 'ind-j', 'ind-k', 'ind-s']
 const FACTORIES = ['ind-e', 'ind-l', 'ind-m']
 const CONTAINERS = ['container-a', 'container-b', 'container-c']
+/**
+ * Lomé's own buildings (tools/blender/haroolife_lome_buildings.py), modelled in metres at real
+ * proportions: drawn at their true size on the lot (never stretched to fill it), so a door stays
+ * 2.1 m against a 1.75 m adult. One-cell lots, then two-cell lots.
+ */
+const LOME_HOUSES = ['lome-maison-a', 'lome-maison-b', 'lome-maison-c', 'lome-chantier']
+const LOME_HOUSES_WIDE = ['lome-villa', 'lome-maison-large']
+const LOME_SHOPS = ['lome-boutique-a', 'lome-boutique-b', 'lome-boutique-c']
+const LOME_BLOCKS = ['lome-r1', 'lome-r2']
+const LOME_BLOCKS_WIDE = ['lome-r1-large', 'lome-r2-large']
+/** A Lomé model of the pack: real size, own colours (not regraded like the pastel kit). */
+export const isLomeModel = (key: string) => key.startsWith('lome-')
 
 const pick = <T>(arr: T[], r: number) => arr[Math.floor(r * arr.length) % arr.length]
 /** Rotation (degrees around Y) turning a model's +Z front towards the door cell. */
@@ -228,8 +241,29 @@ function doorSide(lot: Lot, dist: number) {
 
 const isMosque = (lot: Lot) => (lot.name ? /mosqu/i.test(lot.name) : hash(lot.x, lot.y, 61) < 0.45)
 
+/**
+ * Lomé's trees (tools/blender), at real size, for the kit's: the coconut palm, the mango tree for
+ * the big shade trees of the yards, the neem for the smaller ones.
+ */
+const LOME_TREES: Record<string, string> = {
+  palm: 'lome-cocotier',
+  oak: 'lome-manguier',
+  'tree-large': 'lome-manguier',
+  tree: 'lome-neem',
+  'tree-small': 'lome-neem',
+}
+
 /** The catalogue entry for a lot. `sizes` are the baked model extents (from the pack manifest). */
 export function buildingFor(lot: Lot, sizes: SizeTable): BuildingSpec {
+  const spec = dressLot(lot, sizes)
+  for (const p of spec.props) {
+    const tree = LOME_TREES[p.model]
+    if (tree && sizes[tree]) p.model = tree
+  }
+  return spec
+}
+
+function dressLot(lot: Lot, sizes: SizeTable): BuildingSpec {
   const r1 = hash(lot.x, lot.y, 71)
   const r2 = hash(lot.x, lot.y, 72)
   const r3 = hash(lot.x, lot.y, 73)
@@ -250,15 +284,23 @@ export function buildingFor(lot: Lot, sizes: SizeTable): BuildingSpec {
     // Preserve every persisted lot and its door. Only its visual footprint changes: ordinary
     // buildings keep a garden/courtyard instead of filling the entire cadastral square.
     const yard = lot.name === null ? 0.78 : 0.9
+    const size = sizes[model] ?? [1, 1, 1]
     return {
       model,
       cx: c.cx,
       cy: c.cy,
       rot,
-      scale: scaleFor(sizes[model] ?? [1, 1, 1], f.w, f.d, rot, lo, hi) * yard,
+      // Lomé's models keep their real size (drawn for the plot within its sidewalks, awnings
+      // over them); only a lot too small for one shrinks it.
+      scale: isLomeModel(model)
+        ? scaleFor(size, lot.w * CELL, lot.h * CELL, rot, 0.1, 1)
+        : scaleFor(size, f.w, f.d, rot, lo, hi) * yard,
       tint,
     }
   }
+  /** The Lomé models when the pack has them (an older cached pack keeps the kit's). */
+  const lome = (models: string[], fallback: string[]) =>
+    models.every((k) => sizes[k]) ? models : fallback
   const palms = (n: number, salt: number) => {
     for (let i = 0; i < n; i++) {
       const ax = lot.x - 0.5 + hash(lot.x, lot.y, salt + i) * lot.w
@@ -288,18 +330,24 @@ export function buildingFor(lot: Lot, sizes: SizeTable): BuildingSpec {
 
   switch (lot.type) {
     case 'house': {
-      const model = lot.w >= 2 ? pick(LARGE_HOUSES, r1) : pick(SMALL_HOUSES, r1)
+      const model =
+        lot.w >= 2
+          ? pick(lome(LOME_HOUSES_WIDE, LARGE_HOUSES), r1)
+          : pick(lome(LOME_HOUSES, SMALL_HOUSES), r1)
       const tint = pick(HOUSE_TINTS, r2)
       const m = main(model, tint, 0.4, lot.w >= 2 ? 1.9 : 1.45, lot.w >= 2 ? 0.9 : 0.3)
-      // Concessions: a low wall with a gate on the door side, a tree and a planter.
-      if (lot.w >= 2 || r3 > 0.45) {
+      // Concessions: a wall with a gate on the door side, a tree and a planter. Around Lomé's
+      // houses it stands behind the sidewalks (a one-cell plot has no room for a yard).
+      const own = isLomeModel(model)
+      if (own ? lot.w >= 2 : lot.w >= 2 || r3 > 0.45) {
         const gap = rot === 0 ? 's' : rot === 180 ? 'n' : rot === 90 ? 'w' : 'e'
+        const inset = own ? 2 * SIDEWALK : 0
         extras.push({
           kind: 'wall',
           cx: c.cx,
           cy: c.cy,
-          w: lot.w,
-          d: lot.h,
+          w: lot.w - inset,
+          d: lot.h - inset,
           h: 0.32,
           gap,
           color: r2 > 0.5 ? rgb('#e9e2d0') : rgb('#d9c7a8'),
@@ -328,7 +376,12 @@ export function buildingFor(lot: Lot, sizes: SizeTable): BuildingSpec {
       const wide = lot.w >= 2
       const model =
         lot.name === null
-          ? pick(wide ? ['com-e', 'com-k', 'sub-f', 'sub-n'] : ['com-c', 'com-b', 'sub-b'], r1)
+          ? pick(
+              wide
+                ? lome(LOME_BLOCKS_WIDE, ['com-e', 'com-k', 'sub-f', 'sub-n'])
+                : lome(LOME_BLOCKS, ['com-c', 'com-b', 'sub-b']),
+              r1,
+            )
           : lot.floors >= 6
             ? pick(wide ? TOWERS_WIDE : TOWERS, r1)
             : lot.floors >= 4
@@ -348,10 +401,28 @@ export function buildingFor(lot: Lot, sizes: SizeTable): BuildingSpec {
     case 'shop': {
       const model =
         lot.floors >= 2
-          ? pick(MID_COMMERCIAL, r1)
-          : pick(lot.w >= 2 ? LOW_WIDE : ['com-c', 'com-a', 'com-d'], r1)
+          ? pick(
+              lot.w >= 2
+                ? lome(LOME_BLOCKS_WIDE, MID_COMMERCIAL)
+                : lome(LOME_BLOCKS, MID_COMMERCIAL),
+              r1,
+            )
+          : pick(
+              lot.w >= 2
+                ? lome(LOME_BLOCKS_WIDE, LOW_WIDE)
+                : lome(LOME_SHOPS, ['com-c', 'com-a', 'com-d']),
+              r1,
+            )
       const tint = pick(SHOP_TINTS, r2)
       const m = main(model, tint, 0.5, 2.2, 0.25)
+      // Lomé's shops carry their own painted sign and sheet-metal awning.
+      if (isLomeModel(model))
+        return {
+          main: m,
+          props,
+          extras,
+          far: far('flat', (sizes[model]?.[1] ?? 0.9) * m.scale, FAR_BODY.shop, rgb('#2f7d4f')),
+        }
       // Awning over the door and a sign board.
       const t = doorSide(lot, -0.08)
       props.push({

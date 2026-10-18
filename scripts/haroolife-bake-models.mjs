@@ -9,6 +9,10 @@
  * <kits-dir> holds one folder per kit (city-commercial, city-suburban, …) with the .glb
  * files and the kit's Textures/colormap.png. Output: kenney-pack.bin + kenney-pack.json.
  * Sources: https://kenney.nl (CC0 1.0), mirrored at github.com/shorepine/kenney.
+ * The `lome` kit is HarooLife's own: Lomé's houses, shops and blocks, modelled at real
+ * proportions by tools/blender/haroolife_lome_buildings.py (colours in the materials, no
+ * texture). With `--reuse-existing`, a <kits-dir> holding only `lome/` re-bakes those and
+ * keeps every Kenney entry as it is.
  */
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
@@ -93,6 +97,28 @@ const MODELS = {
   oak: ['nature', 'tree-oak'],
   tree: ['nature', 'tree-default'],
   bush: ['nature', 'plant-bush'],
+  // HarooLife — Lomé (tools/blender/haroolife_lome_buildings.py)
+  ...Object.fromEntries(
+    [
+      'maison-a',
+      'maison-b',
+      'maison-c',
+      'chantier',
+      'boutique-a',
+      'boutique-b',
+      'boutique-c',
+      'r1',
+      'r2',
+      'villa',
+      'maison-large',
+      'r1-large',
+      'r2-large',
+      'cocotier',
+      'neem',
+      'manguier',
+      'poteau',
+    ].map((n) => [`lome-${n}`, ['lome', `lome-${n}`]]),
+  ),
 }
 
 const textureCache = new Map()
@@ -302,7 +328,11 @@ const prior =
     ? JSON.parse(fs.readFileSync(path.join(outDir, 'kenney-pack.json'), 'utf8'))
     : null
 const priorBin = prior ? fs.readFileSync(path.join(outDir, 'kenney-pack.bin')) : null
-const manifest = { version: 1, license: 'CC0-1.0 (Kenney, kenney.nl)', models: {} }
+const manifest = {
+  version: 1,
+  license: 'CC0-1.0 (Kenney, kenney.nl); lome-*: HarooLife (tools/blender)',
+  models: {},
+}
 const chunks = []
 let offset = 0
 const align = (n) => (n + 3) & ~3

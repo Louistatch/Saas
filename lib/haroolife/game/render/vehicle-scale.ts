@@ -1,7 +1,11 @@
 import * as THREE from 'three'
 
-/** Every compact car, including the player's and remote taxis, uses the traffic scale. */
-export const TRAFFIC_CAR_SCALE = 0.78
+/**
+ * Every compact car, including the player's and remote taxis, uses the traffic scale: real size
+ * since the street is at real scale (it was 0.78 when a road was one 3 m cell wide).
+ */
+export const TRAFFIC_CAR_SCALE = 1
+/** Width of a lane, as a share of the cell: a car is never wider than 60 % of it. */
 export const TRAFFIC_LANE_SCALE = 0.67
 
 /** Compact sedan: 4.1 × 1.7 × 1.45 m against a 1.75 m adult, within one street lane. */

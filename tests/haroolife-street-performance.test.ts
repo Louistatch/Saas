@@ -13,7 +13,9 @@ import {
 import { PavementGraph } from '../lib/haroolife/city/pedestrians'
 import { renderPixelRatio } from '../lib/haroolife/city/quality'
 import { RoadTraffic } from '../lib/haroolife/city/road-traffic'
+import { STREET_CELL } from '../lib/haroolife/game/core/street'
 import { BUILDING_HEIGHT, buildCityGeometry } from '../lib/haroolife/game/render/city-models'
+import { buildPoles, polePlaces } from '../lib/haroolife/game/render/street-poles'
 import { TileCache } from '../lib/haroolife/game/render/tile-cache'
 import { batchTrafficModel, disposeTrafficModel } from '../lib/haroolife/game/render/vehicle-batch'
 import {
@@ -134,11 +136,11 @@ test('typed building buffers preserve the original estate geometry and normals',
     name: null,
   }
   const original: Geometry = { pos: [], nrm: [], col: [], idx: [] }
-  const fit = Math.min(1.8 / m.size[0], 1.8 / m.size[2])
+  const fit = Math.min((STREET_CELL * 0.9) / m.size[0], (STREET_CELL * 0.9) / m.size[2])
   appendModel(original, m, {
-    x: 100,
+    x: 50 * STREET_CELL,
     y: 0,
-    z: 60,
+    z: 30 * STREET_CELL,
     rot: 180,
     scale: [fit, fit * BUILDING_HEIGHT, fit],
   })
@@ -155,9 +157,12 @@ test('typed building buffers preserve the original estate geometry and normals',
 
 test('taxi fits the traffic scale and native device ratio is an upper bound', () => {
   const model = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 6))
-  fitTaxiModel(model, 1.15 * TRAFFIC_CAR_SCALE, 2 * TRAFFIC_LANE_SCALE)
+  fitTaxiModel(model, 1.15 * TRAFFIC_CAR_SCALE, STREET_CELL * TRAFFIC_LANE_SCALE)
   const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3())
-  assert.ok(size.x < 0.81 && size.z < 2.11 && size.y < 0.75)
+  // 4.1 × 1.7 × 1.45 m against a 1.75 m adult of 1.15 units, in a lane of the real-scale street.
+  const m = 1.15 / 1.75
+  assert.ok(Math.abs(size.z - 4.1 * m) < 0.01 && Math.abs(size.x - 1.7 * m) < 0.01)
+  assert.ok(Math.abs(size.y - 1.45 * m) < 0.01)
   assert.equal(new THREE.Box3().setFromObject(model).min.y, 0)
   assert.equal(renderPixelRatio('high', false, 1), 1)
   assert.equal(renderPixelRatio('balanced', false, 3), 1.5)
@@ -224,4 +229,33 @@ test('reused sidewalk searches preserve paths, isolate returned arrays and recov
       })
       assert.equal(graph.nearest({ x, z }), nearest)
     }
+})
+
+test('CEET poles stand at the kerb every three cells, never at a crossroads, wired in a row', () => {
+  // A road along x (y = 9000, far from every lot's door) crossed by a street at x = 9006.
+  const cells: { x: number; y: number; kind: 'road' | 'land' }[] = []
+  for (let x = 9000; x <= 9012; x++)
+    for (let y = 8998; y <= 9002; y++)
+      cells.push({ x, y, kind: y === 9000 || x === 9006 ? 'road' : 'land' })
+  const places = polePlaces(cells)
+  const onAvenue = places.filter((p) => p.y === 9000)
+  assert.deepEqual(
+    [...new Set(onAvenue.map((p) => p.x))].sort((a, b) => a - b),
+    [9000, 9003, 9009, 9012],
+  )
+  assert.ok(onAvenue.every((p) => p.dx === 0 && Math.abs(p.dy) === 1))
+  assert.ok(!places.some((p) => p.x === 9006 && p.y === 9000), 'no pole in the crossroads')
+  const geometry = new THREE.BoxGeometry(1, 1, 1)
+  const material = new THREE.MeshStandardMaterial()
+  const wire = new THREE.LineBasicMaterial()
+  const [poles, wires] = buildPoles(places, geometry, material, wire, STREET_CELL, 1.15 / 1.75)
+  assert.equal((poles as THREE.InstancedMesh).count, places.length)
+  // 9000→9003 and 9009→9012 on both sides, two wires each, six segments per wire.
+  const segments = (wires as THREE.LineSegments).geometry.attributes.position.count / 2
+  assert.equal(segments, 4 * 2 * 6)
+  ;(wires as THREE.LineSegments).geometry.dispose()
+  ;(poles as THREE.InstancedMesh).dispose()
+  geometry.dispose()
+  material.dispose()
+  wire.dispose()
 })

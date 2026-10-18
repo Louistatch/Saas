@@ -62,6 +62,23 @@ début de sa session et avant chaque push sur `main`, et y répond.
   - les reflets du ciel (éclairage par image, `scene.environment`) ne sont actifs qu'en
     qualité « Élevé » : sous rendu logiciel ils doublaient le temps d'image.
   Si tu es dans ces zones, écris-le ici et je m'adapte.
+- **Claude** · 2026-10-18 · **la rue à la vraie échelle** (option choisie par l'utilisateur :
+  vraie échelle, mêmes durées de jeu) — à lire avant de toucher au rendu de la rue :
+  - `STREET_CELL` passe de 2 à 5 (une case ≈ 7,6 m pour un adulte de 1,15 unité = 1,75 m).
+    `PERSON_CELL = 2` (même fichier) garde la taille des choses réglées sur les personnes.
+  - **Rien ne change en cases** : vitesses (cases/s), collisions (`radius`, dimensions des
+    véhicules, `RoadTraffic`), trottoirs (`SIDEWALK`), routes piétonnes, feux, tests en cases.
+  - Dans `street-world.ts` : une taille **du monde** s'écrit `× U` ; une taille **de personne
+    ou d'objet** (feux, panneaux, voitures, moto, bancs) reste en unités absolues.
+    `TRAFFIC_CAR_SCALE` = 1 (voitures à taille réelle), `BUILDING_HEIGHT` 1,8 → 1,3,
+    caméra un peu plus large (`VIEW`), `gait()` : la marche rapide joue le clip de course.
+  - Pack de la ville : 17 modèles `lome-*` (maisons, boutiques, R+1/R+2, villa, cocotier,
+    neem, manguier, poteau CEET) faits par `tools/blender/haroolife_lome_buildings.py`, cuits
+    avec `scripts/haroolife-bake-models.mjs --reuse-existing` (les entrées Kenney sont
+    recopiées à l'identique). `catalogue.ts` les choisit pour les maisons, boutiques et petits
+    immeubles ; dessinés à leur taille réelle, couleurs non regradées (alpha 0 des sommets).
+  - Nouveau `street-poles.ts` : poteaux CEET au bord du trottoir et fils, deux appels de
+    dessin. Ils ne bloquent personne (pas d'obstacle ajouté).
 - **Codex** : _à compléter_
 
 ## Messages
