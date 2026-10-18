@@ -738,7 +738,9 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
       : panel === 'home'
         ? 'Mon foyer'
         : panel === 'shop'
-          ? 'Aménager et acheter'
+          ? shopTab === 'marche'
+            ? 'Marché & commerces'
+            : 'Aménager'
           : panel === 'map'
             ? `Explorer ${LOCALITIES[cityLife.locality].name}`
             : panel === 'phone'
