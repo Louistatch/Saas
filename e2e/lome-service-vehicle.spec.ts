@@ -178,7 +178,7 @@ test('a delayed taxi download cannot replace the moto selected in the meantime',
   const pending = new Promise<void>((resolve) => {
     requested = resolve
   })
-  await page.route('**/car-kit/taxi.glb', async (route) => {
+  await page.route('**/haroolife/vehicles/taxi-lome.glb', async (route) => {
     requested()
     await gate
     await route.continue()
@@ -187,7 +187,7 @@ test('a delayed taxi download cannot replace the moto selected in the meantime',
   await pending
   await startMoto(page)
   await expect.poll(async () => (await player(page))?.vehicleKind).toBe('moto')
-  const delivered = page.waitForResponse('**/car-kit/taxi.glb')
+  const delivered = page.waitForResponse('**/haroolife/vehicles/taxi-lome.glb')
   release()
   await delivered
   // Allow the image decoder and Three.js loader to finish, not just the HTTP download.

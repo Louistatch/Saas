@@ -77,10 +77,17 @@ import { createGltfLoader } from './gltf'
 import { type MotoParts, buildMoto } from './moto'
 import { PerfProbe } from './perf-probe'
 import { type StreetPlot, buildPlotGroup, signTexture } from './plot-build'
+import { StreetAtmosphere, gradeLomeColours, groundGrain } from './street-atmosphere'
 import { StreetSignals } from './street-signals'
 import { TileCache } from './tile-cache'
 import { batchTrafficModel, disposeTrafficModel } from './vehicle-batch'
-import { TRAFFIC_CAR_SCALE, TRAFFIC_LANE_SCALE, fitTaxiModel } from './vehicle-scale'
+import { type CarKind, VEHICLE_LENGTH, VEHICLE_URL } from './vehicle-models'
+import {
+  TRAFFIC_CAR_SCALE,
+  TRAFFIC_LANE_SCALE,
+  fitTaxiModel,
+  fitVehicleModel,
+} from './vehicle-scale'
 
 /**
  * Height of an adult (scene units; a cell is STREET_CELL). With the buildings drawn taller
@@ -89,8 +96,6 @@ import { TRAFFIC_CAR_SCALE, TRAFFIC_LANE_SCALE, fitTaxiModel } from './vehicle-s
  */
 const FIGURE = 1.15
 /** Background by day (the prototype's soft green) and at night. */
-const DAY_SKY = '#c6d9bd'
-const NIGHT_SKY = '#33456b'
 /** Cells drawn around the player; the window is rebuilt when the player gets near its edge. */
 const RADIUS = 13
 const REBUILD_AT = 6
@@ -113,20 +118,30 @@ const PEDESTRIAN_NAMES = [
 ]
 const U = STREET_CELL
 /** The player's taxi (Kenney Car Kit, CC0): front along +Z, as the controller's heading 0. */
-const TAXI_URL = '/haroolife/vendor/kenney-3d/car-kit/taxi.glb'
+const TAXI_URL = VEHICLE_URL.taxi
 /** Rolling radius of a compact taxi or moto, in the adult avatar's scale. */
 const WHEEL_RADIUS = 0.3 * (FIGURE / 1.75)
 /** Front wheels at full steering (radians), drawn from the stick. */
 const MAX_STEER = 0.45
 
+// Lomé on the ground: red-brown laterite and dry grass, pale beach sand, worn dark asphalt.
 const GROUND: Record<GroundKind, string> = {
-  land: '#b9cc9f',
-  sand: '#e6d7a8',
-  water: '#7fb6c2',
-  hill: '#a6b88c',
-  road: '#8d918f',
-  estate: '#c7d6ad',
-  'estate-road': '#a39c8a',
+  land: '#a98a64',
+  sand: '#ddc9a0',
+  water: '#5d8e93',
+  hill: '#8c8a5e',
+  road: '#5d5f61',
+  estate: '#b0966f',
+  'estate-road': '#857a68',
+}
+/** The grain of each ground: seed, contrast, speckles (stones, oil stains, tufts). */
+const GRAIN: Partial<Record<GroundKind, [number, number, number]>> = {
+  land: [11, 0.14, 0.1],
+  sand: [3, 0.07, 0.04],
+  hill: [5, 0.13, 0.1],
+  road: [7, 0.09, 0.08],
+  estate: [13, 0.13, 0.1],
+  'estate-road': [17, 0.1, 0.08],
 }
 
 export interface StreetWorldEvents extends Omit<DailyViewProps, 'meal'> {
@@ -283,6 +298,10 @@ export class StreetWorld {
   private readonly loader = createGltfLoader()
   private readonly loaded: GLTF[] = []
   private readonly materials = new Map<string, THREE.MeshStandardMaterial>()
+  private readonly groundMaterials = new Map<string, THREE.MeshStandardMaterial>()
+  private readonly grains = new Map<GroundKind, THREE.Texture>()
+  private readonly atmosphere: StreetAtmosphere
+  private daylight = 1
   private readonly unitBox = new THREE.BoxGeometry(1, 1, 1)
   /** Billboard posts and frame, built once and shared by every support. */
   private boardFrame: THREE.BufferGeometry | null = null
@@ -291,8 +310,9 @@ export class StreetWorld {
   private readonly raycaster = new THREE.Raycaster()
   private readonly groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
   private readonly resizeObserver: ResizeObserver
-  private readonly sun = new THREE.DirectionalLight('#fff1d6', 3)
-  private readonly hemi = new THREE.HemisphereLight('#f2f6ff', '#9aa380', 2.4)
+  private readonly sun = new THREE.DirectionalLight('#fff1d6', 3.6)
+  // Sky above, the light bounced off the red earth below.
+  private readonly hemi = new THREE.HemisphereLight('#eef3ff', '#8a6a4a', 1.1)
   private estate: readonly Building[]
   private plot: StreetPlot | null = null
   private signMat: THREE.MeshBasicMaterial | null = null
@@ -492,10 +512,13 @@ export class StreetWorld {
     this.renderer.shadowMap.type = THREE.PCFShadowMap
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 1.15
+    this.renderer.toneMappingExposure = 1.0
     this.scene.name = 'HarooLife rue'
     this.scene.matrixAutoUpdate = false
-    this.scene.background = new THREE.Color(DAY_SKY)
+    this.atmosphere = new StreetAtmosphere(this.renderer, this.scene, CAMERA_DISTANCE)
+    this.atmosphere.reflections = this.quality === 'high'
+    this.atmosphere.setDaylight(1)
+    this.hemi.intensity = this.atmosphere.reflections ? 1.1 : 1.9
     this.scene.add(this.hemi)
     this.sun.castShadow = this.shadows !== 'off'
     this.sun.shadow.mapSize.set(1024, 1024)
@@ -603,8 +626,8 @@ export class StreetWorld {
     // Licensed CC0 models already bundled with the game, no external runtime download. Loaded
     // beside the start, never awaited: a slow model never holds the street back (the traffic
     // and the other players' cars appear when it lands).
-    for (const kind of ['taxi', 'sedan', 'van'])
-      this.load(`/haroolife/vendor/kenney-3d/car-kit/${kind}.glb`).then(
+    for (const kind of ['taxi', 'sedan', 'van'] as const)
+      this.load(VEHICLE_URL[kind]).then(
         (gltf) => {
           if (this.disposed) return
           this.trafficSources.set(kind, gltf.scene)
@@ -629,9 +652,11 @@ export class StreetWorld {
    */
   setDaylight(light: { sun: number; sunColor: string }): void {
     const k = Math.max(0, Math.min(1, (light.sun - 0.65) / 0.35))
-    ;(this.scene.background as THREE.Color).set(NIGHT_SKY).lerp(new THREE.Color(DAY_SKY), k)
-    this.hemi.intensity = 2.4 * (0.45 + 0.55 * k)
-    this.sun.intensity = 3 * (0.25 + 0.75 * k)
+    this.atmosphere.setDaylight(k)
+    this.daylight = k
+    // With the sky's image lighting the shadows are filled by it: less flat ambient.
+    this.hemi.intensity = (this.atmosphere.reflections ? 1.1 : 1.9) * (0.45 + 0.55 * k)
+    this.sun.intensity = 3.6 * (0.25 + 0.75 * k)
     this.sun.color.set(light.sunColor)
   }
 
@@ -688,6 +713,8 @@ export class StreetWorld {
     this.renderer.shadowMap.autoUpdate = this.shadows === 'full'
     this.renderer.shadowMap.needsUpdate = true
     this.sun.castShadow = this.shadows !== 'off'
+    this.atmosphere.reflections = quality === 'high'
+    this.hemi.intensity = (this.atmosphere.reflections ? 1.1 : 1.9) * (0.45 + 0.55 * this.daylight)
     if (changed) this.tileCell = ''
   }
 
@@ -763,6 +790,9 @@ export class StreetWorld {
     this.boardFrames?.removeFromParent()
     this.boardFrames?.dispose()
     for (const m of this.materials.values()) m.dispose()
+    for (const m of this.groundMaterials.values()) m.dispose()
+    for (const t of this.grains.values()) t.dispose()
+    this.atmosphere.dispose()
     this.freeLoaded()
     this.renderer.dispose()
     this.perf.dispose()
@@ -803,6 +833,28 @@ export class StreetWorld {
       this.gltfCache.set(url, p)
     }
     return p
+  }
+
+  /** The ground of a kind: its colour with a fine grain (asphalt, laterite, sand); water stays smooth. */
+  private groundMat(kind: GroundKind, color: string): THREE.MeshStandardMaterial {
+    const key = `${kind}:${color}`
+    let m = this.groundMaterials.get(key)
+    if (!m) {
+      const grain = GRAIN[kind]
+      let map = this.grains.get(kind)
+      if (grain && !map) {
+        map = groundGrain(...grain)
+        this.grains.set(kind, map)
+      }
+      m = new THREE.MeshStandardMaterial({
+        color,
+        map: grain ? map : null,
+        roughness: kind === 'water' ? 0.18 : kind === 'road' ? 0.88 : 0.97,
+        metalness: 0,
+      })
+      this.groundMaterials.set(key, m)
+    }
+    return m
   }
 
   private mat(color: string): THREE.MeshStandardMaterial {
@@ -862,7 +914,7 @@ export class StreetWorld {
               : kind === 'hill'
                 ? loc.decor.hill
                 : GROUND[kind]
-      const im = new THREE.InstancedMesh(this.unitBox, this.mat(color), list.length)
+      const im = new THREE.InstancedMesh(this.unitBox, this.groundMat(kind, color), list.length)
       im.name = `sol:${kind}`
       list.forEach((cell, i) => {
         m4.makeScale(U, h, U)
@@ -1120,8 +1172,10 @@ export class StreetWorld {
       const dirty = this.dirtyTiles.has(key)
       if (have && have.detail === detail && !dirty) continue
       const t = performance.now()
-      if (!this.cityMaterial)
+      if (!this.cityMaterial) {
         this.cityMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })
+        gradeLomeColours(this.cityMaterial)
+      }
       const cached = dirty ? null : this.tileCache.take(`${key}:${detail}`)
       const inTile = cached ? [] : buildingsInTile(w.tx, w.ty, this.estate)
       const geometry = cached?.geometry ?? buildCityGeometry(bank, inTile, detail)
@@ -1326,7 +1380,12 @@ export class StreetWorld {
         const root = new THREE.Group()
         root.name = 'Taxi du joueur'
         const model = g.scene.clone(true)
-        fitTaxiModel(model, FIGURE * TRAFFIC_CAR_SCALE, U * TRAFFIC_LANE_SCALE)
+        fitVehicleModel(
+          model,
+          FIGURE * TRAFFIC_CAR_SCALE,
+          U * TRAFFIC_LANE_SCALE,
+          VEHICLE_LENGTH.taxi,
+        )
         model.traverse((o) => {
           const mesh = o as THREE.Mesh
           if (mesh.isMesh) {
@@ -1635,7 +1694,12 @@ export class StreetWorld {
           const template = this.trafficTemplates.get(agent.kind)
           if (!template) continue
           model = template.clone(true)
-          fitTaxiModel(model, FIGURE * TRAFFIC_CAR_SCALE, U * TRAFFIC_LANE_SCALE)
+          fitVehicleModel(
+            model,
+            FIGURE * TRAFFIC_CAR_SCALE,
+            U * TRAFFIC_LANE_SCALE,
+            VEHICLE_LENGTH[agent.kind as CarKind],
+          )
           const root = new THREE.Group()
           root.add(model)
           model = root
@@ -2206,10 +2270,11 @@ export class StreetWorld {
       const template = this.trafficSources.get(want.vehicle === 'bus' ? 'van' : 'taxi')
       if (!template) return null
       const model = template.clone(true)
-      fitTaxiModel(
+      fitVehicleModel(
         model,
         want.vehicle === 'bus' ? FIGURE : FIGURE * TRAFFIC_CAR_SCALE,
         want.vehicle === 'bus' ? U : U * TRAFFIC_LANE_SCALE,
+        want.vehicle === 'bus' ? VEHICLE_LENGTH.van : VEHICLE_LENGTH.taxi,
       )
       // No bus in the CC0 kit: the van, longer and taller, stands for the SOTRAL bus.
       if (want.vehicle === 'bus') model.scale.multiply(new THREE.Vector3(1.15, 1.3, 1.6))

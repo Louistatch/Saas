@@ -16,3 +16,20 @@ export function fitTaxiModel(model: THREE.Object3D, figure: number, streetWidth:
   const fitted = new THREE.Box3().setFromObject(model)
   model.position.y -= fitted.min.y
 }
+
+/**
+ * A real-proportion model (vehicle-models.ts): one uniform scale from its length, so the body
+ * keeps its shape; only the width is narrowed when it would not fit the lane.
+ */
+export function fitVehicleModel(
+  model: THREE.Object3D,
+  figure: number,
+  streetWidth: number,
+  length: number,
+): void {
+  const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3())
+  const s = (length * (figure / 1.75)) / size.z
+  model.scale.set(Math.min(s, (streetWidth * 0.6) / size.x), s, s)
+  const fitted = new THREE.Box3().setFromObject(model)
+  model.position.y -= fitted.min.y
+}
