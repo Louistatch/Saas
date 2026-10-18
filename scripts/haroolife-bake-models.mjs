@@ -25,7 +25,7 @@ if (!kitsDir || !outDir) {
   process.exit(1)
 }
 
-/** key → [kit, file]. Keys are what the catalogue refers to. */
+/** key → [kit, file, unit scale?]. Keys are what the catalogue refers to. */
 const MODELS = {
   // City Kit — Commercial (shops, offices, blocks)
   ...Object.fromEntries(
@@ -117,9 +117,46 @@ const MODELS = {
       'neem',
       'manguier',
       'poteau',
+      'ecole',
+      'dispensaire',
+      'eglise',
+      'mosquee',
+      'banque',
+      'banque-haute',
+      'hotel',
+      'cooperative',
+      'mairie',
+      'universite',
+      'sport',
+      'garage',
+      'entrepot',
+      'gare',
     ].map((n) => [`lome-${n}`, ['lome', `lome-${n}`]]),
   ),
+  // The zémidjan (tools/blender, in metres: lib/haroolife/game/render/moto.ts scales it to the
+  // adult), its body and one wheel (the street turns the wheels).
+  'lome-moto': ['lome', 'lome-moto'],
+  'lome-moto-roue': ['lome', 'lome-moto-roue'],
+  // The street's own vehicles (public/haroolife/vehicles, in metres), parked as props: brought to
+  // the pack's unit (5.63 m) by the third element, a scale.
+  'lome-taxi': ['vehicles', 'taxi-lome', 1 / 5.63],
+  'lome-berline': ['vehicles', 'berline', 1 / 5.63],
+  'lome-minibus': ['vehicles', 'minibus', 1 / 5.63],
 }
+
+/**
+ * Kit models the street no longer draws since Lomé's own buildings, cars and trees (checked by
+ * tests/haroolife-city-catalogue.test.ts, which walks every lot of every town): left out of the
+ * pack to keep it light on Togo's mobile networks. Remove a key from this list to bake it again.
+ */
+const UNUSED = new Set([
+  ...'bcefghijklmn'.split('').map((c) => `com-${c}`),
+  ...'abcde'.split('').map((c) => `sky-${c}`),
+  ...'ehijklms'.split('').map((c) => `ind-${c}`),
+  ...'bcdeghijklmnopqrsu'.split('').map((c) => `sub-${c}`),
+  ...['taxi', 'sedan', 'van', 'suv', 'hatchback', 'delivery', 'police', 'lome-berline'],
+])
+for (const key of UNUSED) delete MODELS[key]
 
 const textureCache = new Map()
 async function colormap(kit) {
@@ -255,7 +292,7 @@ const xformN = (m, x, y, z) => {
   return [v[0] / l, v[1] / l, v[2] / l]
 }
 
-async function bake(kit, name) {
+async function bake(kit, name, unit = 1) {
   const file = path.join(kitsDir, kit, `${name}.glb`)
   const glb = parseGlb(file)
   const tex = await colormap(kit)
@@ -285,7 +322,7 @@ async function bake(kit, name) {
         const base = pos.length / 3
         for (let i = 0; i < P.count; i++) {
           const p = xformP(m, P.data[i * 3], P.data[i * 3 + 1], P.data[i * 3 + 2])
-          pos.push(p[0], p[1], p[2])
+          pos.push(p[0] * unit, p[1] * unit, p[2] * unit)
           const n = N ? xformN(m, N.data[i * 3], N.data[i * 3 + 1], N.data[i * 3 + 2]) : [0, 1, 0]
           nrm.push(n[0], n[1], n[2])
           let c = useTex
@@ -336,7 +373,7 @@ const manifest = {
 const chunks = []
 let offset = 0
 const align = (n) => (n + 3) & ~3
-for (const [key, [kit, name]] of Object.entries(MODELS)) {
+for (const [key, [kit, name, unit]] of Object.entries(MODELS)) {
   if (!fs.existsSync(path.join(kitsDir, kit, `${name}.glb`)) && prior && priorBin) {
     const old = prior.models[key]
     if (!old) throw new Error(`Missing source and existing baked model: ${key}`)
@@ -351,7 +388,7 @@ for (const [key, [kit, name]] of Object.entries(MODELS)) {
     offset += end - old.off
     continue
   }
-  const m = await bake(kit, name)
+  const m = await bake(kit, name, unit)
   const verts = m.pos.length / 3
   const extent = Math.max(...m.min.map(Math.abs), ...m.max.map(Math.abs)) || 1
   const scale = extent / 32767

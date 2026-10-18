@@ -75,7 +75,7 @@ import {
 } from './avatar-actor'
 import { DETAIL_CELLS, buildCityGeometry } from './city-models'
 import { createGltfLoader } from './gltf'
-import { type MotoParts, buildMoto } from './moto'
+import { type MotoModel, type MotoParts, buildMoto } from './moto'
 import { PerfProbe } from './perf-probe'
 import { type StreetPlot, buildPlotGroup, signTexture } from './plot-build'
 import { StreetAtmosphere, gradeLomeColours, groundGrain } from './street-atmosphere'
@@ -1096,6 +1096,13 @@ export class StreetWorld {
     this.plotDrawn = { ...p, parts: group.children.length }
   }
 
+  /** The zémidjan of the city pack (Lomé's model), when the pack has it. */
+  private motoModel(): MotoModel | undefined {
+    const bank = this.bank
+    if (!bank?.sizes['lome-moto'] || !bank.sizes['lome-moto-roue']) return undefined
+    return { body: bank.model('lome-moto'), wheel: bank.model('lome-moto-roue') }
+  }
+
   private makePerson(gltf: GLTF, spec: AvatarSpec, pagne?: string): Person {
     return createAvatarActor(gltf, spec, FIGURE, pagne)
   }
@@ -1412,7 +1419,7 @@ export class StreetWorld {
     this.markersRoot.append(tag)
     this.carTag = tag
     if (this.fare.vehicle === 'moto') {
-      const moto = buildMoto(FIGURE)
+      const moto = buildMoto(FIGURE, this.motoModel())
       this.moto = moto
       moto.root.traverse((o) => {
         if (o.name.startsWith('wheel-'))
@@ -1720,7 +1727,7 @@ export class StreetWorld {
         if (agent.kind === 'moto') {
           let template = this.trafficTemplates.get('moto')
           if (!template) {
-            const moto = buildMoto(FIGURE * 0.85)
+            const moto = buildMoto(FIGURE * 0.85, this.motoModel())
             this.trafficMotos.push(moto)
             this.trafficMotoSeat = moto.seat
             template = batchTrafficModel(moto.root)
@@ -2288,7 +2295,7 @@ export class StreetWorld {
       top: FIGURE + 0.25,
     }
     if (want.vehicle === 'moto') {
-      const moto = buildMoto(FIGURE)
+      const moto = buildMoto(FIGURE, this.motoModel())
       ride.moto = moto
       root.add(moto.root)
       if (want.role === 'ride' && this.trafficRiderTemplate) {

@@ -572,6 +572,303 @@ def villa(name, W, D, rng):
     return p
 
 
+# ------------------------------------------------------------------------- lieux publics
+
+OCRE = mat('ocre', '#c98a3c')
+BLEU_ECOLE = mat('bleu-ecole', '#2f6fa5')
+VERT_SANTE = mat('vert-sante', '#1f8a55')
+ROUGE_CROIX = mat('croix-rouge', '#c8302a')
+VITRAGE = mat('vitrage', '#2b3b48', 0.15, 0.4)
+DOME_VERT = mat('dome-vert', '#2f8f74', 0.4, 0.2)
+BLANC_MUR = mat('blanc-chaux', '#f3f1ea')
+PNEU = mat('pneu', '#1b1b1b', 0.9)
+FUT = mat('fut', '#2c5e8a', 0.5, 0.4)
+HUILE = mat('tache-huile', '#3b342c', 0.3)
+
+
+def columns_row(p, x0, x1, y, z, h, n, material, size=0.3):
+    for i in range(n):
+        x = x0 + (x1 - x0) * i / max(1, n - 1)
+        box('poteau', (size, size, h), (x, y, z), material, p)
+
+
+def ecole(name, W, D, rng):
+    """École primaire publique (EPP) : bloc de classes sous tôle, véranda à poteaux, bandeau ocre,
+    portes bleues et claustras, mât du drapeau devant."""
+    p = empty(name)
+    H = 3.4
+    z0 = 0.3
+    box('dalle-sol', (W + 0.3, D + 0.3, 0.3), (0, 0, 0), BETON, p)
+    rooms = 3
+    openings = []
+    for i in range(rooms):
+        cx = -W / 2 + (i + 0.5) * W / rooms
+        openings += [(cx - W / rooms * 0.28, 0.95, 'porte', 2.2, 0.0), (cx + W / rooms * 0.15, 1.6, 'fenetre', 1.2, 1.0)]
+    front_wall(p, W, D, H, openings, BLANC_MUR, z0, skirt=False)
+    side_walls(p, W, D, H, BLANC_MUR, z0, skirt=False)
+    blind_walls(p, W, D, z0, w=1.4, h=1.2)
+    box('bandeau-ocre', (W + 0.02, 0.03, 1.0), (0, -D / 2 - 0.015, z0), OCRE, p)
+    for cx, w, kind, h, sill in openings:
+        if kind == 'porte':
+            door(p, cx, -D / 2, z0, w, h, BLEU_ECOLE)
+        else:
+            # Claustras : un mur ajouré de petits carrés, l'air passe, pas de vitre.
+            box('claustra-fond', (w, 0.05, h), (cx, -D / 2 + 0.15, z0 + sill), OMBRE, p)
+            for r in range(3):
+                for c in range(5):
+                    box('claustra', (w / 5 - 0.06, 0.06, h / 3 - 0.06),
+                        (cx - w / 2 + (c + 0.5) * w / 5, -D / 2 + 0.06, z0 + sill + r * h / 3 + 0.03), BLANC_MUR, p)
+    # Véranda : dalle, poteaux carrés, la tôle du toit prolongée.
+    box('veranda', (W, 2.2, 0.3), (0, -D / 2 - 1.1, 0), BETON, p)
+    columns_row(p, -W / 2 + 0.2, W / 2 - 0.2, -D / 2 - 2.0, z0, H - 0.1, rooms + 2, BLANC_MUR)
+    box('poutre', (W, 0.25, 0.3), (0, -D / 2 - 2.0, z0 + H - 0.3), BLANC_MUR, p)
+    gable_roof(p, W, D + 4.4, z0 + H, rng, rise=1.0)
+    box('enseigne', (3.2, 0.06, 0.6), (0, -D / 2 - 2.15, z0 + H - 0.9), BLEU_ECOLE, p)
+    text('enseigne-texte', 'EPP', 0.42, (0, -D / 2 - 2.2, z0 + H - 0.6), LETTRES, p)
+    # Mât et drapeau, une poubelle de cour, deux bancs.
+    cyl('mat', 0.04, 7.0, (W / 2 - 1.0, -D / 2 - 4.5, 0), FER, p, sides=6)
+    box('drapeau-vert', (0.02, 1.2, 0.27), (W / 2 - 1.0, -D / 2 - 5.1, 6.4), VERT, p)
+    box('drapeau-jaune', (0.02, 1.2, 0.27), (W / 2 - 1.0, -D / 2 - 5.1, 6.13), JAUNE, p)
+    box('drapeau-rouge', (0.02, 0.5, 0.54), (W / 2 - 1.0, -D / 2 - 4.75, 6.13), ROUGE, p)
+    bench(p, -W / 4, -D / 2 - 4.0)
+    bench(p, W / 6, -D / 2 - 4.0)
+    return p
+
+
+def dispensaire(name, W, D, rng):
+    """Centre de santé à étage : murs blancs, bandeau vert, auvent d'entrée, croix verte."""
+    p = empty(name)
+    FH = 3.3
+    z0 = 0.3
+    box('dalle-sol', (W + 0.3, D + 0.3, 0.3), (0, 0, 0), BETON, p)
+    for f in range(2):
+        z = z0 + f * FH
+        if f == 0:
+            ops = [(0.0, 2.0, 'porte', 2.4, 0.0), (-W * 0.3, 1.4, 'fenetre', 1.2, 1.0), (W * 0.3, 1.4, 'fenetre', 1.2, 1.0)]
+        else:
+            ops = [(x, 1.4, 'fenetre', 1.2, 1.0) for x in (-W * 0.3, 0.0, W * 0.3)]
+        front_wall(p, W, D, FH, ops, BLANC_MUR, z, skirt=False)
+        side_walls(p, W, D, FH, BLANC_MUR, z, skirt=False)
+        blind_walls(p, W, D, z, w=1.2, h=1.2)
+        for cx, w, kind, h, sill in ops:
+            if kind == 'porte':
+                box('porte-vitree', (w, 0.06, h), (cx, -D / 2 + 0.1, z), VITRAGE, p)
+                box('montant', (0.06, 0.08, h), (cx, -D / 2 + 0.06, z), CADRE, p)
+            else:
+                window(p, cx, -D / 2, z + sill, w, h)
+        box('bandeau-vert', (W + 0.04, 0.04, 0.35), (0, -D / 2 - 0.02, z + FH - 0.45), VERT_SANTE, p)
+    flat_roof(p, W, D, z0 + 2 * FH, parapet=0.9, rebar=False, tank=True, rng=rng)
+    # Auvent d'entrée en béton sur deux poteaux, croix verte au-dessus.
+    box('auvent-entree', (3.6, 2.4, 0.2), (0, -D / 2 - 1.2, z0 + 2.7), BETON, p)
+    columns_row(p, -1.6, 1.6, -D / 2 - 2.2, z0, 2.7, 2, BLANC_MUR, 0.25)
+    box('croix-fond', (1.3, 0.1, 1.3), (0, -D / 2 - 0.08, z0 + FH + 1.5), BLANC_MUR, p)
+    box('croix-v', (0.35, 0.12, 1.1), (0, -D / 2 - 0.15, z0 + FH + 1.6), VERT_SANTE, p)
+    box('croix-h', (1.1, 0.12, 0.35), (0, -D / 2 - 0.15, z0 + FH + 1.97), VERT_SANTE, p)
+    bench(p, -W * 0.3, -D / 2 - 1.2, 2.2)
+    return p
+
+
+def eglise(name, W, D, rng):
+    """Église : façade à pignon haut, clocher sur le côté avec sa croix, longue nef sous tôle."""
+    p = empty(name)
+    H = 6.0
+    z0 = 0.4
+    box('parvis', (W + 2.0, 3.0, 0.4), (0, -D / 2 - 1.3, 0), BETON, p)
+    box('dalle-sol', (W + 0.3, D + 0.3, 0.4), (0, 0, 0), BETON, p)
+    ops = [(0.0, 2.2, 'porte', 3.4, 0.0), (-W * 0.32, 1.0, 'fenetre', 2.6, 1.6), (W * 0.32, 1.0, 'fenetre', 2.6, 1.6)]
+    front_wall(p, W, D, H, ops, PEINTURE, z0, skirt=False)
+    side_walls(p, W, D, H, PEINTURE, z0, skirt=False)
+    for s in (-1, 1):
+        side = empty('nef')
+        side.parent = p
+        side.location = (s * W / 2, 0, 0)
+        side.rotation_euler = (0, 0, s * math.pi / 2)
+        for y in (-D * 0.3, 0.0, D * 0.3):
+            box('vitrail', (1.0, 0.04, 2.6), (y, -0.03, z0 + 1.8), BLEU, side)
+            box('vitrail-cadre', (1.2, 0.03, 2.8), (y, -0.015, z0 + 1.7), BLANC_MUR, side)
+    for cx, w, kind, h, sill in ops:
+        if kind == 'porte':
+            door(p, cx, -D / 2, z0, w, h, PORTES[2])
+        else:
+            box('vitrail', (w, 0.06, h), (cx, -D / 2 + 0.12, z0 + sill), BLEU, p)
+    # Pignon de façade dressé au-dessus du toit, avec sa croix.
+    me = bpy.data.meshes.new('pignon-facade')
+    t = 0.25
+    verts = [(-W / 2, -D / 2, z0 + H), (W / 2, -D / 2, z0 + H), (0, -D / 2, z0 + H + 3.0),
+             (-W / 2, -D / 2 + t, z0 + H), (W / 2, -D / 2 + t, z0 + H), (0, -D / 2 + t, z0 + H + 3.0)]
+    me.from_pydata(verts, [], [(0, 1, 2), (3, 5, 4), (0, 3, 4, 1), (1, 4, 5, 2), (2, 5, 3, 0)])
+    me.materials.append(PEINTURE)
+    link(bpy.data.objects.new('pignon-facade', me), p)
+    box('croix-v', (0.15, 0.15, 1.4), (0, -D / 2 + 0.1, z0 + H + 3.0), BLANC_MUR, p)
+    box('croix-h', (0.8, 0.15, 0.15), (0, -D / 2 + 0.1, z0 + H + 3.9), BLANC_MUR, p)
+    # Long toit de tôle sur la nef (faîtage dans l'axe de la nef).
+    roof = empty('toit')
+    roof.parent = p
+    roof.location = (0, 0, 0)
+    roof.rotation_euler = (0, 0, math.pi / 2)
+    gable_roof(roof, D, W, z0 + H, rng, rise=2.4, overhang=0.4)
+    # Clocher : tour carrée, abat-sons, flèche et croix.
+    tx = W / 2 + 1.4
+    box('clocher', (2.6, 2.6, 13.0), (tx, -D / 2 + 1.3, 0), PEINTURE, p)
+    for s in (-1, 1):
+        box('abat-son', (0.9, 0.06, 1.6), (tx + s * 0.55, -D / 2 - 0.02, 9.6), OMBRE, p)
+    me = bpy.data.meshes.new('fleche')
+    bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=4, radius1=1.9, radius2=0.0, depth=4.0)
+    bmesh.ops.translate(bm, vec=(0, 0, 2.0), verts=bm.verts)
+    bm.to_mesh(me)
+    bm.free()
+    me.materials.append(TOLE_SOMBRE)
+    o = bpy.data.objects.new('fleche', me)
+    o.location = (tx, -D / 2 + 1.3, 13.0)
+    o.rotation_euler = (0, 0, math.pi / 4)
+    link(o, p)
+    box('croix-clocher', (0.12, 0.12, 1.4), (tx, -D / 2 + 1.3, 17.0), FER, p)
+    box('croix-clocher-h', (0.7, 0.12, 0.12), (tx, -D / 2 + 1.3, 17.9), FER, p)
+    return p
+
+
+def mosquee(name, W, D, rng):
+    """Mosquée de quartier : murs blancs, arcades, coupole verte sur tambour, minaret."""
+    p = empty(name)
+    H = 4.2
+    z0 = 0.4
+    box('dalle-sol', (W + 0.3, D + 0.3, 0.4), (0, 0, 0), BETON, p)
+    arches = 4
+    ops = [(-W / 2 + (i + 0.5) * W / arches, 1.6, 'porte', 2.8, 0.0) for i in range(arches)]
+    front_wall(p, W, D, H, ops, BLANC_MUR, z0, skirt=False)
+    side_walls(p, W, D, H, BLANC_MUR, z0, skirt=False)
+    blind_walls(p, W, D, z0, sill=1.2, w=1.0, h=1.6)
+    for cx, w, kind, h, sill in ops:
+        box('arcade', (w, 0.05, h), (cx, -D / 2 + 0.6, z0), OMBRE, p)
+        box('arc', (w, 0.2, 0.35), (cx, -D / 2 + 0.1, z0 + h - 0.35), BLANC_MUR, p)
+    box('frise-verte', (W + 0.04, 0.04, 0.3), (0, -D / 2 - 0.02, z0 + H - 0.4), DOME_VERT, p)
+    box('toit', (W, D, 0.2), (0, 0, z0 + H), DALLE, p)
+    cyl('tambour', W * 0.28, 1.2, (0, 0, z0 + H + 0.2), BLANC_MUR, p, sides=16)
+    me = bpy.data.meshes.new('coupole')
+    bm = bmesh.new()
+    bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=8, radius=W * 0.3)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < -0.01], context='VERTS')
+    for f in bm.faces:
+        f.smooth = True
+    bm.to_mesh(me)
+    bm.free()
+    me.materials.append(DOME_VERT)
+    o = bpy.data.objects.new('coupole', me)
+    o.location = (0, 0, z0 + H + 1.4)
+    link(o, p)
+    cyl('croissant', 0.06, 1.0, (0, 0, z0 + H + 1.4 + W * 0.3), FER, p, sides=6)
+    # Minaret : fût, balcon, lanterne et pointe.
+    mx, my = W / 2 + 0.8, -D / 2 + 0.8
+    cyl('minaret', 0.7, 13.0, (mx, my, 0), BLANC_MUR, p, sides=10)
+    cyl('balcon', 1.0, 0.3, (mx, my, 10.5), BLANC_MUR, p, sides=10)
+    cyl('lanterne', 0.5, 2.0, (mx, my, 13.0), DOME_VERT, p, sides=10)
+    me = bpy.data.meshes.new('pointe')
+    bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=10, radius1=0.6, radius2=0.0, depth=1.6)
+    bmesh.ops.translate(bm, vec=(0, 0, 0.8), verts=bm.verts)
+    bm.to_mesh(me)
+    bm.free()
+    me.materials.append(DOME_VERT)
+    o = bpy.data.objects.new('pointe', me)
+    o.location = (mx, my, 15.0)
+    link(o, p)
+    return p
+
+
+def bureau(name, W, D, floors, sign, sign_colour, rng):
+    """Immeuble de bureaux (banque, hôtel, coopérative, mairie) : rez-de-chaussée vitré sous
+    portique, bandeaux de fenêtres aux étages, acrotère, enseigne en bandeau."""
+    p = empty(name)
+    FH = 3.3
+    z0 = 0.3
+    box('dalle-sol', (W + 0.3, D + 0.3, 0.3), (0, 0, 0), BETON, p)
+    # Rez-de-chaussée en retrait derrière un portique de poteaux.
+    box('rdc-vitre', (W - 1.0, 0.1, FH - 0.4), (0, -D / 2 + 1.2, z0), VITRAGE, p)
+    for x in (-W / 2 + 0.6, -W / 6, W / 6, W / 2 - 0.6):
+        box('montant', (0.12, 0.14, FH - 0.4), (x * 0.9, -D / 2 + 1.15, z0), CADRE, p)
+    side_walls(p, W, D, FH, PEINTURE, z0, skirt=False)
+    box('mur-rdc', (W, 0.2, FH), (0, -D / 2 + 1.35, z0), PEINTURE, p)
+    columns_row(p, -W / 2 + 0.25, W / 2 - 0.25, -D / 2 + 0.25, z0, FH - 0.1, 4, PEINTURE, 0.4)
+    box('portes-vitrees', (2.2, 0.08, 2.4), (0, -D / 2 + 1.12, z0), VITRAGE, p)
+    for f in range(1, floors + 1):
+        z = z0 + f * FH
+        box('dalle', (W + 0.2, D + 0.2, 0.25), (0, 0, z - 0.25), BETON, p)
+        front_wall(p, W, D, FH, [(0.0, W - 1.6, 'baie', 1.5, 0.9)], PEINTURE_2 if f % 2 else PEINTURE, z,
+                   skirt=False)
+        side_walls(p, W, D, FH, PEINTURE_2 if f % 2 else PEINTURE, z, skirt=False)
+        blind_walls(p, W, D, z, w=1.2, h=1.3)
+        box('baie-vitree', (W - 1.6, 0.06, 1.5), (0, -D / 2 + 0.12, z + 0.9), VITRAGE, p)
+        for i in range(1, 5):
+            box('meneau', (0.08, 0.1, 1.5), (-(W - 1.6) / 2 + i * (W - 1.6) / 5, -D / 2 + 0.08, z + 0.9), CADRE, p)
+        if rng.random() < 0.7:
+            box('clim', (0.75, 0.25, 0.5), (W / 2 - 0.9, -D / 2 - 0.12, z + 2.55), CLIM, p)
+    top = z0 + (floors + 1) * FH
+    flat_roof(p, W, D, top, parapet=1.0, rebar=False, tank=True, rng=rng)
+    box('enseigne', (W * 0.7, 0.1, 0.8), (0, -D / 2 - 0.05, z0 + FH - 0.05), sign_colour, p)
+    text('enseigne-texte', sign, 0.48, (0, -D / 2 - 0.12, z0 + FH + 0.35), LETTRES, p, width=W * 0.65)
+    return p
+
+
+def garage(name, W, D, rng):
+    """Garage de quartier : hangar de tôle ouvert sur poteaux de fer, pneus empilés, fûts, une
+    voiture sur cales, des taches d'huile ; on répare sur le trottoir."""
+    p = empty(name)
+    box('dalle', (W, D, 0.12), (0, 0, 0), BETON, p)
+    box('taches', (W * 0.6, D * 0.4, 0.01), (0.3, -0.2, 0.12), HUILE, p)
+    box('mur-fond', (W, 0.2, 3.0), (0, D / 2 - 0.1, 0), PARPAING, p)
+    for x in (-W / 2 + 0.1, W / 2 - 0.1):
+        for y in (-D / 2 + 0.1, D / 2 - 0.3):
+            box('poteau-fer', (0.1, 0.1, 3.2), (x, y, 0), FER, p)
+    awning(p, W + 0.4, 3.4, D + 0.3, rng, D / 2, posts=False)
+    box('enseigne', (W * 0.8, 0.06, 0.5), (0, -D / 2 - 0.05, 3.25), ENSEIGNES[3], p)
+    text('enseigne-texte', 'GARAGE', 0.32, (0, -D / 2 - 0.1, 3.5), NOIR, p, width=W * 0.7)
+    # Pneus en piles, fûts, établi, une caisse de voiture sans roues sur des parpaings.
+    for k, (x, y) in enumerate([(-W / 2 + 0.5, -D / 2 - 0.6), (-W / 2 + 1.2, -D / 2 - 0.5)]):
+        for h in range(3 + k):
+            cyl('pneu', 0.32, 0.2, (x, y, h * 0.2), PNEU, p, sides=10)
+    for x in (W / 2 - 0.4, W / 2 - 1.0):
+        cyl('fut', 0.3, 0.88, (x, D / 2 - 0.6, 0.12), FUT, p, sides=10)
+    box('etabli', (1.8, 0.6, 0.9), (-W / 4, D / 2 - 0.6, 0.12), BOIS, p)
+    car = empty('epave')
+    car.parent = p
+    car.location = (0.3, -0.2, 0.42)
+    box('caisse', (1.7, 3.9, 0.7), (0, 0, 0), mat('carrosserie-bleue', '#3a5f86', 0.5, 0.3), car)
+    box('habitacle', (1.5, 2.0, 0.6), (0, 0.2, 0.7), VITRAGE, car)
+    for x in (-0.6, 0.6):
+        for y in (-1.3, 1.3):
+            box('cale', (0.3, 0.3, 0.3), (x, y, -0.3), PARPAING, car)
+    return p
+
+
+def entrepot(name, W, D, rng):
+    """Entrepôt de tôle : bardage, grande porte coulissante, quai, toit à deux pans."""
+    p = empty(name)
+    H = 6.0
+    box('dalle', (W + 0.3, D + 0.3, 0.3), (0, 0, 0), BETON, p)
+    box('quai', (W * 0.5, 2.0, 1.0), (-W * 0.2, -D / 2 - 1.0, 0), BETON, p)
+    for a, b in segments(W, [(W * 0.15, 4.0)]):
+        box('bardage', (b - a, 0.15, H), ((a + b) / 2, -D / 2 + 0.07, 0.3), TOLE, p)
+    box('linteau', (4.0, 0.15, H - 4.5), (W * 0.15, -D / 2 + 0.07, 4.8), TOLE, p)
+    box('porte-coulissante', (4.2, 0.1, 4.5), (W * 0.15 + 1.5, -D / 2 - 0.05, 0.3), TOLE_ROUILLE, p)
+    box('ouverture', (2.5, 0.05, 4.4), (W * 0.15 - 0.8, -D / 2 + 0.6, 0.3), OMBRE, p)
+    box('bardage-arriere', (W, 0.15, H), (0, D / 2 - 0.07, 0.3), TOLE, p)
+    for s in (-1, 1):
+        box('bardage-cote', (0.15, D, H), (s * (W / 2 - 0.07), 0, 0.3), TOLE, p)
+    gable_roof(p, W, D, H + 0.3, rng, rise=1.4, overhang=0.3)
+    for k in range(3):
+        box('sac', (1.0, 0.6, 0.3), (-W * 0.3, -D / 2 - 1.0, 1.0 + k * 0.3), mat('sac-ciment', '#d8d2c4'), p)
+    return p
+
+
+def gare(name, W, D, rng):
+    """Guichet de gare routière : petit bâtiment, auvent, banc d'attente, bagages."""
+    p = boutique(name, W, D, 'GARE ROUTIÈRE', ENSEIGNES[0], rng)
+    for k in range(3):
+        box('bagage', (0.6, 0.4, 0.35), (-W / 2 + 0.4 + k * 0.7, -D / 2 - 2.1, 0), rng.choice([BLEU, ROUGE, mat('raphia', '#c9a46a')]), p)
+    return p
+
+
 # ------------------------------------------------------------------- arbres et poteaux
 
 FEUILLES = [mat('feuillage-sombre', '#2f5a24'), mat('feuillage', '#3f7130'), mat('feuillage-clair', '#5b8a3a')]
@@ -720,6 +1017,89 @@ def poteau_ceet(name):
     return p
 
 
+# ---------------------------------------------------------------------- le zémidjan
+
+MOTO_ROUGE = mat('moto-rouge', '#8e1f1f', 0.4, 0.3)
+MOTO_NOIR = mat('moto-noir', '#1d1f22', 0.7)
+CHROME = mat('chrome', '#c8ccd1', 0.25, 0.9)
+MOTEUR = mat('moteur', '#6b6f73', 0.5, 0.6)
+SELLE = mat('selle', '#2b2420', 0.9)
+PHARE = mat('phare', '#f2efe2', 0.2)
+FEU = mat('feu-arriere', '#b3141b', 0.3)
+
+
+def tube(name, a, b, r, material, parent, sides=6):
+    return branch(name, a, b, r, r, material, parent, sides)
+
+
+def moto_body(name):
+    """Le zémidjan de Lomé, une 125 cm³ de tous les jours : carénage avant et phare, guidon et
+    rétroviseurs, réservoir, longue selle pour le client, porte-bagages, pot chromé, moteur,
+    fourche et amortisseurs, garde-boue, plaque. Les roues sont à part (elles tournent).
+    En mètres, avant vers -Y ; la selle à 0,80 m, le chauffeur à 2 cm en avant du centre."""
+    p = empty(name)
+    r = 0.3
+    yf, yb = -0.64, 0.62
+    # Cadre-poutre, moteur, carter, repose-pieds.
+    tube('cadre', (0, yf + 0.25, 0.85), (0, 0.15, 0.5), 0.045, MOTO_NOIR, p)
+    tube('cadre-arriere', (0, 0.15, 0.55), (0, yb - 0.1, 0.72), 0.035, MOTO_NOIR, p)
+    box('moteur', (0.26, 0.42, 0.3), (0, -0.02, 0.22), MOTEUR, p)
+    box('carter', (0.3, 0.2, 0.18), (0, 0.18, 0.22), MOTEUR, p)
+    box('repose-pieds', (0.6, 0.05, 0.03), (0, 0.0, 0.3), MOTO_NOIR, p)
+    box('repose-pieds-client', (0.56, 0.05, 0.03), (0, 0.38, 0.36), MOTO_NOIR, p)
+    # Fourche, garde-boue avant, carénage, phare, guidon, rétroviseurs.
+    for x in (-0.08, 0.08):
+        tube('fourche', (x, yf, r), (x, yf + 0.2, 0.95), 0.025, CHROME, p)
+    box('garde-boue-av', (0.12, 0.42, 0.04), (0, yf - 0.02, r + 0.33), MOTO_ROUGE, p, rot=(0.15, 0, 0))
+    box('careneage', (0.34, 0.24, 0.38), (0, yf + 0.18, 0.78), MOTO_ROUGE, p, rot=(-0.35, 0, 0))
+    box('phare', (0.2, 0.06, 0.14), (0, yf + 0.04, 0.86), PHARE, p, rot=(-0.35, 0, 0))
+    box('guidon', (0.72, 0.035, 0.035), (0, yf + 0.27, 1.05), MOTO_NOIR, p)
+    for x in (-0.36, 0.36):
+        box('poignee', (0.12, 0.045, 0.045), (x, yf + 0.27, 1.045), SELLE, p)
+        tube('tige-retro', (x * 0.7, yf + 0.28, 1.06), (x * 0.8, yf + 0.3, 1.3), 0.008, CHROME, p, sides=4)
+        box('retroviseur', (0.12, 0.02, 0.08), (x * 0.8, yf + 0.3, 1.3), MOTO_NOIR, p)
+    # Réservoir, flancs, selle longue, porte-bagages, feu, plaque, garde-boue arrière.
+    box('reservoir', (0.3, 0.42, 0.2), (0, -0.2, 0.7), MOTO_ROUGE, p)
+    for x in (-0.14, 0.14):
+        box('flanc', (0.03, 0.4, 0.2), (x, 0.32, 0.58), MOTO_ROUGE, p)
+    box('selle', (0.3, 0.86, 0.1), (0, 0.22, 0.75), SELLE, p)
+    box('porte-bagages', (0.32, 0.34, 0.03), (0, yb - 0.06, 0.8), MOTO_NOIR, p)
+    box('feu', (0.14, 0.05, 0.07), (0, yb + 0.12, 0.74), FEU, p)
+    box('plaque', (0.2, 0.01, 0.12), (0, yb + 0.17, 0.62), mat('plaque', '#f1f1ec', 0.6), p)
+    box('garde-boue-ar', (0.14, 0.4, 0.04), (0, yb + 0.02, r + 0.3), MOTO_NOIR, p, rot=(-0.2, 0, 0))
+    # Bras oscillant, amortisseurs, pot d'échappement chromé à droite.
+    for x in (-0.09, 0.09):
+        tube('bras', (x, 0.2, 0.3), (x, yb, r), 0.022, MOTO_NOIR, p)
+        tube('amortisseur', (x * 1.3, yb - 0.08, r + 0.05), (x * 1.3, yb - 0.25, 0.72), 0.028, CHROME, p)
+    tube('pot', (0.16, 0.0, 0.2), (0.17, yb + 0.05, 0.38), 0.05, CHROME, p, sides=8)
+    return p
+
+
+def moto_wheel(name):
+    """Une roue de 17 pouces à rayons : pneu, jante, moyeu ; axe le long de X, centre à l'origine."""
+    p = empty(name)
+    r = 0.3
+    me = bpy.data.meshes.new('pneu')
+    bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=16, radius1=r, radius2=r, depth=0.09)
+    bm.to_mesh(me)
+    bm.free()
+    me.materials.append(PNEU)
+    o = bpy.data.objects.new('pneu', me)
+    o.rotation_euler = (0, math.pi / 2, 0)
+    link(o, p)
+    cyl('jante', r * 0.78, 0.1, (-0.05, 0, 0), CHROME, p, sides=16, rot=(0, math.pi / 2, 0))
+    cyl('moyeu', 0.06, 0.16, (-0.08, 0, 0), MOTEUR, p, sides=8, rot=(0, math.pi / 2, 0))
+    return p
+
+
+# En mètres (le jeu les met à l'échelle de son adulte) : exportés à part, sans l'échelle du pack.
+VEHICLE_PARTS = {
+    'lome-moto': moto_body,
+    'lome-moto-roue': moto_wheel,
+}
+
+
 # --------------------------------------------------------------------------------- catalogue
 
 BUILDINGS = {
@@ -739,6 +1119,21 @@ BUILDINGS = {
     'lome-maison-large': lambda r: maison_basse('lome-maison-large', 7.8, 6.0, PORTES[0], 'tole', r, veranda=True),
     'lome-r1-large': lambda r: immeuble('lome-r1-large', 10.6, 8.0, 1, 'ALIMENTATION GÉNÉRALE', ENSEIGNES[0], r),
     'lome-r2-large': lambda r: immeuble('lome-r2-large', 10.6, 8.0, 2, 'BOUTIQUE', ENSEIGNES[1], r),
+    # Lieux publics (parcelles de deux à trois cases).
+    'lome-ecole': lambda r: ecole('lome-ecole', 11.0, 6.5, r),
+    'lome-dispensaire': lambda r: dispensaire('lome-dispensaire', 10.0, 8.0, r),
+    'lome-eglise': lambda r: eglise('lome-eglise', 8.0, 11.0, r),
+    'lome-mosquee': lambda r: mosquee('lome-mosquee', 9.0, 9.0, r),
+    'lome-banque': lambda r: bureau('lome-banque', 10.0, 9.0, 2, 'BANQUE', ENSEIGNES[0], r),
+    'lome-banque-haute': lambda r: bureau('lome-banque-haute', 10.0, 9.0, 4, 'BANQUE', ENSEIGNES[0], r),
+    'lome-hotel': lambda r: bureau('lome-hotel', 10.0, 9.0, 4, 'HÔTEL', ENSEIGNES[1], r),
+    'lome-cooperative': lambda r: bureau('lome-cooperative', 12.0, 9.0, 1, 'COOPÉRATIVE', ENSEIGNES[2], r),
+    'lome-mairie': lambda r: bureau('lome-mairie', 10.0, 9.0, 2, 'MAIRIE', ENSEIGNES[0], r),
+    'lome-universite': lambda r: bureau('lome-universite', 16.0, 10.0, 2, 'UNIVERSITÉ', ENSEIGNES[0], r),
+    'lome-sport': lambda r: bureau('lome-sport', 10.0, 9.0, 1, 'SALLE DE SPORT', ENSEIGNES[2], r),
+    'lome-garage': lambda r: garage('lome-garage', 3.9, 3.9, r),
+    'lome-entrepot': lambda r: entrepot('lome-entrepot', 11.0, 9.0, r),
+    'lome-gare': lambda r: gare('lome-gare', 3.9, 3.8, r),
     # Végétation et réseau : à taille réelle, comme les bâtiments.
     'lome-cocotier': lambda r: cocotier('lome-cocotier', 9.0, r),
     'lome-neem': lambda r: feuillu('lome-neem', 7.5, 6.5, 6, r, dark=1),
@@ -747,8 +1142,8 @@ BUILDINGS = {
 }
 
 
-def export(root, path):
-    root.scale = (1 / PACK_UNIT,) * 3
+def export(root, path, unit=1 / PACK_UNIT):
+    root.scale = (unit,) * 3
     bpy.context.view_layer.update()
     bpy.ops.object.select_all(action='DESELECT')
     for o in [root, *root.children_recursive]:
@@ -772,6 +1167,11 @@ for i, (key, build) in enumerate(BUILDINGS.items()):
     roots[key] = root
 for key, root in roots.items():
     export(root, os.path.join(OUT, f'{key}.glb'))
+    print(key, triangles(root), 'triangles')
+for key, build in VEHICLE_PARTS.items():
+    root = build(key)
+    roots[key] = root
+    export(root, os.path.join(OUT, f'{key}.glb'), unit=1.0)
     print(key, triangles(root), 'triangles')
 # La scène complète, les bâtiments alignés, à rouvrir dans Blender.
 x = 0.0

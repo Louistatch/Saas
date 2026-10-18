@@ -1,10 +1,65 @@
 /**
- * The zémidjan: a small moto-taxi built from simple volumes (no model download), about 1.9 m
- * long against a 1.75 m figure, front along +Z like the controller's heading 0. Its wheels are
- * named `wheel-front` / `wheel-back` so the street turns and steers them like the taxi's.
- * The yellow of Lomé's zémidjan drivers is their shirt, not the moto: the body is dark red.
+ * The zémidjan: a 125 cc moto-taxi about 1.9 m long against a 1.75 m figure, front along +Z like
+ * the controller's heading 0. Its wheels are named `wheel-front` / `wheel-back` so the street
+ * turns and steers them like the taxi's. The yellow of Lomé's zémidjan drivers is their shirt,
+ * not the moto: the body is dark red.
+ *
+ * With `parts` (the street's city pack: `lome-moto` and `lome-moto-roue`, modelled in metres by
+ * tools/blender/haroolife_lome_buildings.py) the moto is that model; without (the trip scene, or
+ * a pack without it) it is built from simple volumes, same size and seats.
  */
+import type { Model } from '@/lib/haroolife/city/pack'
 import * as THREE from 'three'
+
+export interface MotoModel {
+  /** Everything but the wheels, in metres, front along +Z. */
+  body: Model
+  /** One wheel centred on its hub, axle along X, in metres. */
+  wheel: Model
+}
+
+/** The model's geometry at the figure's scale (copies: the pack's arrays are shared). */
+function modelGeometry(m: Model, k: number): THREE.BufferGeometry {
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.BufferAttribute(m.pos.slice(), 3))
+  g.setAttribute('normal', new THREE.BufferAttribute(m.nrm.slice(), 3))
+  g.setAttribute('color', new THREE.BufferAttribute(m.col, 3))
+  g.setIndex(new THREE.BufferAttribute(m.idx, 1))
+  g.scale(k, k, k)
+  return g
+}
+
+function modelMoto(figure: number, parts: MotoModel): MotoParts {
+  const k = figure / 1.75
+  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 })
+  const body = modelGeometry(parts.body, k)
+  const wheel = modelGeometry(parts.wheel, k)
+  const root = new THREE.Group()
+  root.name = 'Zémidjan du joueur'
+  const frame = new THREE.Mesh(body, material)
+  frame.castShadow = true
+  root.add(frame)
+  for (const [name, z] of [
+    ['wheel-front', 0.64],
+    ['wheel-back', -0.62],
+  ] as const) {
+    const pivot = new THREE.Group()
+    pivot.name = name
+    pivot.position.set(0, 0.3 * k, z * k)
+    const tyre = new THREE.Mesh(wheel, material)
+    tyre.castShadow = true
+    pivot.add(tyre)
+    root.add(pivot)
+  }
+  return {
+    root,
+    seat: 0.84 * k,
+    driverZ: 0.02 * k,
+    passengerZ: -0.42 * k,
+    geometries: [body, wheel],
+    materials: [material],
+  }
+}
 
 export interface MotoParts {
   root: THREE.Group
@@ -17,7 +72,8 @@ export interface MotoParts {
   materials: THREE.Material[]
 }
 
-export function buildMoto(figure: number): MotoParts {
+export function buildMoto(figure: number, parts?: MotoModel): MotoParts {
+  if (parts) return modelMoto(figure, parts)
   const k = figure / 1.75 // metres → scene units
   const geometries: THREE.BufferGeometry[] = []
   const materials: THREE.Material[] = []

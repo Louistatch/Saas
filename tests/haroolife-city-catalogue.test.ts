@@ -5,6 +5,7 @@ import { test } from 'node:test'
 import { CATALOGUE_MODELS, buildingFor, facing, streetFor } from '../lib/haroolife/city/catalogue'
 import { activitiesOf, animFor, layoutFor } from '../lib/haroolife/city/interiors'
 import { arrive, cityInteract, goToLot, initialCityLife, useProp } from '../lib/haroolife/city/life'
+import { LOCALITY_IDS, setLocality } from '../lib/haroolife/city/locality'
 import { type PackManifest, appendModel, decodeModel, fitScale } from '../lib/haroolife/city/pack'
 import { CELL, isCityRoad, landmarks, worldLots } from '../lib/haroolife/city/world'
 
@@ -39,6 +40,20 @@ test('the baked Kenney pack decodes every model with consistent geometry', () =>
   }
   for (const key of CATALOGUE_MODELS)
     assert.ok(manifest.models[key], `catalogue model ${key} is baked`)
+})
+
+test('every model drawn on any lot of any town is in the pack (kit models left out are unused)', () => {
+  const missing = new Set<string>()
+  for (const id of LOCALITY_IDS) {
+    setLocality(id)
+    for (const lot of worldLots()) {
+      const spec = buildingFor(lot, sizes)
+      for (const key of [spec.main?.model, ...spec.props.map((p) => p.model)])
+        if (key && !manifest.models[key]) missing.add(`${id}:${lot.type}:${key}`)
+    }
+  }
+  setLocality('lome')
+  assert.deepEqual([...missing], [])
 })
 
 test('appendModel transforms geometry and keeps indices valid', () => {
@@ -88,22 +103,30 @@ test('every lot gets a deterministic, footprint-fitting building spec', () => {
   for (const [k, n] of counts) assert.ok(n / total < 0.2, `${k} used ${n}/${total}`)
 })
 
+/** The pack without HarooLife's Lomé models (an older cached pack): the kit dresses every lot. */
+const kitOnly = Object.fromEntries(Object.entries(sizes).filter(([k]) => !k.startsWith('lome-')))
+
 test('landmark types are dressed as what they are', () => {
   const by = (name: RegExp) => landmarks().find((l) => name.test(l.name ?? ''))!
+  // Lomé's models carry their dome and minaret, bell tower, cross or sign themselves; with the
+  // kit alone the catalogue adds them as extras.
   const mosque = buildingFor(by(/Grande mosquée/), sizes)
-  assert.ok(mosque.extras.some((e) => e.kind === 'dome'))
-  assert.ok(mosque.extras.some((e) => e.kind === 'minaret'))
-  const cathedral = buildingFor(by(/Cathédrale/), sizes)
-  assert.ok(cathedral.extras.some((e) => e.kind === 'steeple'))
+  assert.equal(mosque.main?.model, 'lome-mosquee')
+  assert.ok(buildingFor(by(/Grande mosquée/), kitOnly).extras.some((e) => e.kind === 'dome'))
+  assert.ok(buildingFor(by(/Grande mosquée/), kitOnly).extras.some((e) => e.kind === 'minaret'))
+  assert.equal(buildingFor(by(/Cathédrale/), sizes).main?.model, 'lome-eglise')
+  assert.ok(buildingFor(by(/Cathédrale/), kitOnly).extras.some((e) => e.kind === 'steeple'))
   const chu = buildingFor(by(/CHU de Tokoin/), sizes)
-  assert.ok(chu.extras.some((e) => e.kind === 'cross'))
+  assert.equal(chu.main?.model, 'lome-dispensaire')
+  assert.ok(buildingFor(by(/CHU de Tokoin/), kitOnly).extras.some((e) => e.kind === 'cross'))
   assert.ok(chu.props.some((p) => p.model === 'ambulance'))
   const market = buildingFor(by(/Grand marché/), sizes)
   assert.ok(market.extras.filter((e) => e.kind === 'canopy').length >= 6)
   assert.ok(market.props.some((p) => p.model === 'display-fruit'))
   const stadium = buildingFor(by(/Stade de Kégué/), sizes)
   assert.ok(stadium.extras.some((e) => e.kind === 'field' && e.stands))
-  const gym = buildingFor(by(/Salle Fitness Tokoin/), sizes)
+  assert.equal(buildingFor(by(/Salle Fitness Tokoin/), sizes).main?.model, 'lome-sport')
+  const gym = buildingFor(by(/Salle Fitness Tokoin/), kitOnly)
   assert.ok(gym.main && gym.extras.some((e) => e.kind === 'sign'))
 })
 

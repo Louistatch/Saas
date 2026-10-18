@@ -245,8 +245,8 @@ async function touch(page: Page, id: string, mobile: boolean) {
 function standingByTheMarket(): CityLife {
   const s = initialCityLife()
   s.locality = 'lome'
-  s.at = { x: 35, y: 35 }
-  s.pose = { x: 35, z: 35, heading: 0 }
+  s.at = { x: 33, y: 35 }
+  s.pose = { x: 33, z: 35, heading: 0 }
   s.life.hour = 9
   s.life.wallet = 50_000
   return s
@@ -297,8 +297,9 @@ test('free billboards: « À louer », touched from afar, rented with game money
     return route.fulfill({ json: { ok: true, hidden: false } })
   })
 
-  // The player stands on the avenue by the Tokoin market, with game money: the market's free
-  // support and the university's stand in view (and any other in sight).
+  // The player stands on the street by the Tokoin market, with game money: the market's free
+  // support in view, about ten metres away (the street is at real scale: the camera shows
+  // fewer cells, the university's support is out of frame from here).
   await page.addInitScript((save) => {
     if (sessionStorage.getItem('boards.seeded')) return
     sessionStorage.setItem('boards.seeded', '1')

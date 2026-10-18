@@ -253,12 +253,27 @@ const LOME_TREES: Record<string, string> = {
   'tree-small': 'lome-neem',
 }
 
+/** The street's own cars (public/haroolife/vehicles, baked at real size) for the kit's. */
+const LOME_VEHICLES: Record<string, string> = {
+  taxi: 'lome-taxi',
+  sedan: 'lome-berline',
+  hatchback: 'lome-berline',
+  suv: 'lome-berline',
+  van: 'lome-minibus',
+  delivery: 'lome-minibus',
+}
+
 /** The catalogue entry for a lot. `sizes` are the baked model extents (from the pack manifest). */
 export function buildingFor(lot: Lot, sizes: SizeTable): BuildingSpec {
   const spec = dressLot(lot, sizes)
   for (const p of spec.props) {
     const tree = LOME_TREES[p.model]
     if (tree && sizes[tree]) p.model = tree
+    const car = LOME_VEHICLES[p.model]
+    if (car && sizes[car]) {
+      p.model = car
+      p.scale = 1
+    }
   }
   return spec
 }
@@ -301,6 +316,15 @@ function dressLot(lot: Lot, sizes: SizeTable): BuildingSpec {
   /** The Lomé models when the pack has them (an older cached pack keeps the kit's). */
   const lome = (models: string[], fallback: string[]) =>
     models.every((k) => sizes[k]) ? models : fallback
+  /** One Lomé model for a named place, or the kit's when the pack has none. */
+  const own = (model: string, fallback: string) => (sizes[model] ? model : fallback)
+  /** A Lomé public building carries its own sign, cross, bell tower or minaret. */
+  const dressed = (m: Placement, style: RoofStyle, height: number, roofC?: RGB) => ({
+    main: m,
+    props,
+    extras: extras.filter((e) => e.kind === 'flag' || e.kind === 'ground'),
+    far: far(style, height, FAR_BODY[lot.type], roofC ?? roof),
+  })
   const palms = (n: number, salt: number) => {
     for (let i = 0; i < n; i++) {
       const ax = lot.x - 0.5 + hash(lot.x, lot.y, salt + i) * lot.w
@@ -507,8 +531,9 @@ function dressLot(lot: Lot, sizes: SizeTable): BuildingSpec {
       return { main: null, props, extras, far: far('flat', 0.75, FAR_BODY.market, rgb('#c2410c')) }
     }
     case 'school': {
-      const model = lot.w >= 3 ? 'com-k' : pick(['sub-n', 'sub-b', 'com-e'], r1)
-      const m = main(model, [1, 0.97, 0.78], 0.5, 2.4, 0.3)
+      const model = own('lome-ecole', lot.w >= 3 ? 'com-k' : pick(['sub-n', 'sub-b', 'com-e'], r1))
+      const m = main(model, isLomeModel(model) ? undefined : [1, 0.97, 0.78], 0.5, 2.4, 0.3)
+      if (isLomeModel(model)) return dressed(m, 'gable', 1.0)
       const t = doorSide(lot, -0.2)
       extras.push({ kind: 'flag', cx: t.cx + 0.6, cy: t.cy, color: rgb('#1f7a4d') })
       extras.push({
@@ -522,7 +547,7 @@ function dressLot(lot: Lot, sizes: SizeTable): BuildingSpec {
       return { main: m, props, extras, far: far('flat', 1.0, FAR_BODY.school, rgb('#3b82b9')) }
     }
     case 'university': {
-      const m = main('com-j', [0.98, 0.95, 0.86], 0.5, 2.6, 0.3)
+      const m = main(own('lome-universite', 'com-j'), [0.98, 0.95, 0.86], 0.5, 2.6, 0.3)
       extras.push({ kind: 'flag', cx: lot.x - 0.3, cy: lot.y + lot.h - 0.2, color: rgb('#1f7a4d') })
       props.push({
         model: 'oak',
@@ -531,16 +556,20 @@ function dressLot(lot: Lot, sizes: SizeTable): BuildingSpec {
         rot: 0,
         scale: 0.9,
       })
+      if (isLomeModel(m.model)) return dressed(m, 'flat', 1.7, rgb('#6b6b6b'))
       return { main: m, props, extras, far: far('flat', 1.7, FAR_BODY.university, rgb('#6b6b6b')) }
     }
     case 'bank': {
       const m = main(
-        lot.floors >= 4 ? pick(['com-f', 'com-g', 'com-l'], r1) : 'com-a',
+        lot.floors >= 4
+          ? own('lome-banque-haute', pick(['com-f', 'com-g', 'com-l'], r1))
+          : own('lome-banque', 'com-a'),
         [0.86, 0.92, 1],
         0.5,
         2.4,
         0.25,
       )
+      if (isLomeModel(m.model)) return dressed(m, 'parapet', 1.6)
       const t = doorSide(lot, -0.1)
       extras.push({
         kind: 'sign',
@@ -554,12 +583,17 @@ function dressLot(lot: Lot, sizes: SizeTable): BuildingSpec {
     }
     case 'hospital': {
       const m = main(
-        lot.w >= 3 ? 'com-j' : pick(['com-i', 'com-l', 'com-h'], r1),
+        own('lome-dispensaire', lot.w >= 3 ? 'com-j' : pick(['com-i', 'com-l', 'com-h'], r1)),
         [1, 1, 1],
         0.5,
         2.6,
         0.3,
       )
+      if (isLomeModel(m.model)) {
+        // A 5.4 m ambulance at the real-scale street (the kit's is 3.25 units long).
+        props.push({ model: 'ambulance', cx: lot.door.x, cy: lot.door.y, rot: 90, scale: 0.3 })
+        return dressed(m, 'flat', 1.6)
+      }
       extras.push({
         kind: 'cross',
         cx: c.cx,
@@ -575,7 +609,8 @@ function dressLot(lot: Lot, sizes: SizeTable): BuildingSpec {
         extras.push({ kind: 'field', cx: c.cx, cy: c.cy, w: lot.w, d: lot.h, stands: false })
         return { main: null, props, extras, far: far('flat', 0.3, rgb('#4f8c6a'), rgb('#4f8c6a')) }
       }
-      const m = main('com-g', [0.74, 0.88, 1], 0.5, 2.2, 0.25)
+      const m = main(own('lome-sport', 'com-g'), [0.74, 0.88, 1], 0.5, 2.2, 0.25)
+      if (isLomeModel(m.model)) return dressed(m, 'flat', 1.6)
       const t = doorSide(lot, -0.1)
       extras.push({
         kind: 'sign',
@@ -593,6 +628,13 @@ function dressLot(lot: Lot, sizes: SizeTable): BuildingSpec {
     case 'worship': {
       const white: RGB = [1, 1, 1]
       if (isMosque(lot)) {
+        if (sizes['lome-mosquee'])
+          return dressed(
+            main('lome-mosquee', undefined, 0.5, 2.4, 0.4),
+            'dome',
+            1.2,
+            rgb('#2f9e8f'),
+          )
         const m = main('com-c', [1, 0.99, 0.94], 0.5, 2.4, 0.4)
         const h = (sizes['com-c']?.[1] ?? 0.9) * m.scale
         extras.push({ kind: 'dome', cx: c.cx, cy: c.cy, r: 0.42 * lot.w, h, color: rgb('#2f9e8f') })
@@ -615,6 +657,8 @@ function dressLot(lot: Lot, sizes: SizeTable): BuildingSpec {
           })
         return { main: m, props, extras, far: far('dome', h, FAR_BODY.worship, rgb('#2f9e8f')) }
       }
+      if (sizes['lome-eglise'])
+        return dressed(main('lome-eglise', undefined, 0.5, 2.4, 0.4), 'steeple', 1.4)
       const m = main('com-h', [1, 0.98, 0.93], 0.5, 2.4, 0.4)
       const h = (sizes['com-h']?.[1] ?? 1.3) * m.scale
       extras.push({
@@ -663,13 +707,14 @@ function dressLot(lot: Lot, sizes: SizeTable): BuildingSpec {
     }
     case 'hotel': {
       const m = main(
-        lot.floors >= 5 ? pick(TOWERS, r1) : pick(['com-l', 'com-i'], r1),
+        own('lome-hotel', lot.floors >= 5 ? pick(TOWERS, r1) : pick(['com-l', 'com-i'], r1)),
         [1, 0.9, 0.93],
         0.5,
         2.6,
         0.3,
       )
       palms(lot.w >= 2 ? 2 : 1, 90)
+      if (isLomeModel(m.model)) return dressed(m, 'parapet', 2.2)
       const t = doorSide(lot, -0.1)
       extras.push({
         kind: 'sign',
@@ -683,14 +728,16 @@ function dressLot(lot: Lot, sizes: SizeTable): BuildingSpec {
     }
     case 'station': {
       extras.push({ kind: 'ground', cx: c.cx, cy: c.cy, w: lot.w, d: lot.h, color: rgb('#8a8f94') })
-      const m: Placement = {
-        model: 'com-e',
-        cx: lot.x + 0.5,
-        cy: lot.y + 0.1,
-        rot,
-        scale: 1.1,
-        tint: [1, 0.93, 0.8],
-      }
+      const m: Placement = sizes['lome-gare']
+        ? { model: 'lome-gare', cx: lot.x + 0.5, cy: lot.y + 0.1, rot, scale: 1 }
+        : {
+            model: 'com-e',
+            cx: lot.x + 0.5,
+            cy: lot.y + 0.1,
+            rot,
+            scale: 1.1,
+            tint: [1, 0.93, 0.8],
+          }
       props.push({
         model: 'taxi',
         cx: lot.x + lot.w - 0.9,
@@ -734,8 +781,12 @@ function dressLot(lot: Lot, sizes: SizeTable): BuildingSpec {
       // yard, containers or tanks beside it, a water tower on some larger plots.
       extras.push({ kind: 'ground', cx: c.cx, cy: c.cy, w: lot.w, d: lot.h, color: rgb('#a3a39b') })
       const big = lot.w >= 2
+      // Lomé: a mechanic's garage on a one-cell plot, a sheet-metal warehouse on a larger one.
       const m = main(
-        r1 < 0.72 ? pick(WAREHOUSES, r2) : pick(FACTORIES, r2),
+        own(
+          big ? 'lome-entrepot' : 'lome-garage',
+          r1 < 0.72 ? pick(WAREHOUSES, r2) : pick(FACTORIES, r2),
+        ),
         undefined,
         0.5,
         2.4,
@@ -764,7 +815,7 @@ function dressLot(lot: Lot, sizes: SizeTable): BuildingSpec {
       return { main: m, props, extras, far: far('flat', 1.1, FAR_BODY.industry, rgb('#5b6475')) }
     }
     case 'cooperative': {
-      const m = main('com-k', [0.86, 0.98, 0.86], 0.5, 2.6, 0.3)
+      const m = main(own('lome-cooperative', 'com-k'), [0.86, 0.98, 0.86], 0.5, 2.6, 0.3)
       const t = doorSide(lot, -0.2)
       extras.push({ kind: 'flag', cx: t.cx - 0.7, cy: t.cy, color: rgb('#1f7a4d') })
       extras.push({
@@ -782,6 +833,7 @@ function dressLot(lot: Lot, sizes: SizeTable): BuildingSpec {
         rot: 0,
         scale: 0.85,
       })
+      if (isLomeModel(m.model)) return dressed(m, 'parapet', 1.5, rgb('#1f7a4d'))
       return {
         main: m,
         props,
@@ -790,7 +842,7 @@ function dressLot(lot: Lot, sizes: SizeTable): BuildingSpec {
       }
     }
     case 'townhall': {
-      const m = main('com-n', [1, 0.97, 0.9], 0.5, 2.6, 0.3)
+      const m = main(own('lome-mairie', 'com-n'), [1, 0.97, 0.9], 0.5, 2.6, 0.3)
       const t = doorSide(lot, -0.2)
       extras.push({ kind: 'flag', cx: t.cx - 0.6, cy: t.cy, color: rgb('#1f7a4d') })
       extras.push({ kind: 'flag', cx: t.cx + 0.6, cy: t.cy, color: rgb('#f0b429') })
@@ -862,19 +914,16 @@ export function streetFor(x: number, y: number): StreetSpec {
   return { avenue, crosswalk, lamp, tree }
 }
 
-/** Every model key the catalogue may reference (for tests and preloading). */
+/** Model keys the catalogue draws with the Lomé pack (for tests and preloading). */
 export const CATALOGUE_MODELS = [
-  ...SMALL_HOUSES,
-  ...LARGE_HOUSES,
-  ...LOW_WIDE,
-  ...MID_COMMERCIAL,
-  ...TALL_WIDE,
-  ...TOWERS_WIDE,
-  'awning',
-  'awning-wide',
+  ...LOME_HOUSES,
+  ...LOME_HOUSES_WIDE,
+  ...LOME_SHOPS,
+  ...LOME_BLOCKS,
+  ...LOME_BLOCKS_WIDE,
+  ...Object.values(LOME_TREES),
+  ...Object.values(LOME_VEHICLES).filter((k) => k !== 'lome-berline'),
   'planter',
-  'tree-small',
-  'tree-large',
   'fence-low',
   'cone',
   'lamp-curved',
@@ -885,9 +934,6 @@ export const CATALOGUE_MODELS = [
   'cash-register',
   'shopping-cart',
   'ambulance',
-  'taxi',
-  'van',
-  'delivery',
   'truck',
   'palm',
   'oak',
