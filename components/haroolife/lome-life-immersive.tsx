@@ -669,7 +669,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   ])
   const [notice, setNotice] = useState<string | null>(null)
   // « Aménager » : the furniture of the player's own house and the piece being placed.
-  const [shopTab, setShopTab] = useState<'meubles' | 'vehicules' | 'marche'>('meubles')
+  const [shopTab, setShopTab] = useState<'meubles' | 'vehicules' | 'marche'>('marche')
   const furnishing = useHomeFurnishing({
     state: cityLife,
     onChange: setCityLife,
@@ -3132,6 +3132,9 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                     return
                   }
                   if (mapView) exitMap()
+                  // « Aménager » opens on the furniture at home, on the market everywhere else.
+                  if (item.id === 'shop')
+                    setShopTab(life.inside === 'house' && !cityLife.insideLot ? 'meubles' : 'marche')
                   open(item.id)
                 }}
                 className={
