@@ -1916,10 +1916,14 @@ export class StreetWorld {
       const near = Math.hypot(m.door.x - c.x, m.door.y - c.y) < 9
       this.placeMarker(m.el, x, y, near && p.z < 1 && x > 0 && x < this.width && y > 40)
     }
-    // Passers-by: their first name when they are near the player (touch to talk).
+    // Passers-by: their first name when they are near the player (touch to talk); not over the
+    // player's own vehicle (at real scale a name tag would hide a parked zémidjan or taxi).
+    const parked = ctl.shownVehicle ?? ctl.vehicle
     for (const w of this.walkers) {
       p.copy(w.person.root.position)
-      const near = Math.hypot(p.x / U - c.x, p.z / U - c.y) < 5
+      const near =
+        Math.hypot(p.x / U - c.x, p.z / U - c.y) < 5 &&
+        !(parked && Math.hypot(p.x / U - parked.x, p.z / U - parked.z) < 1.2)
       p.y += FIGURE + 0.2
       p.project(this.camera)
       const x = (p.x * 0.5 + 0.5) * this.width

@@ -1019,7 +1019,7 @@ def poteau_ceet(name):
 
 # ---------------------------------------------------------------------- le zémidjan
 
-MOTO_ROUGE = mat('moto-rouge', '#8e1f1f', 0.4, 0.3)
+MOTO_ROUGE = mat('moto-rouge', '#c0261f', 0.35, 0.2)
 MOTO_NOIR = mat('moto-noir', '#1d1f22', 0.7)
 CHROME = mat('chrome', '#c8ccd1', 0.25, 0.9)
 MOTEUR = mat('moteur', '#6b6f73', 0.5, 0.6)
@@ -1059,9 +1059,12 @@ def moto_body(name):
         tube('tige-retro', (x * 0.7, yf + 0.28, 1.06), (x * 0.8, yf + 0.3, 1.3), 0.008, CHROME, p, sides=4)
         box('retroviseur', (0.12, 0.02, 0.08), (x * 0.8, yf + 0.3, 1.3), MOTO_NOIR, p)
     # Réservoir, flancs, selle longue, porte-bagages, feu, plaque, garde-boue arrière.
-    box('reservoir', (0.3, 0.42, 0.2), (0, -0.2, 0.7), MOTO_ROUGE, p)
-    for x in (-0.14, 0.14):
-        box('flanc', (0.03, 0.4, 0.2), (x, 0.32, 0.58), MOTO_ROUGE, p)
+    box('reservoir', (0.34, 0.5, 0.22), (0, -0.2, 0.68), MOTO_ROUGE, p)
+    for x in (-0.15, 0.15):
+        box('flanc', (0.04, 0.5, 0.26), (x, 0.3, 0.52), MOTO_ROUGE, p)
+    # Capot arrière peint sous le porte-bagages, cache-chaîne.
+    box('capot-arriere', (0.26, 0.34, 0.12), (0, yb - 0.1, 0.66), MOTO_ROUGE, p)
+    box('cache-chaine', (0.03, 0.5, 0.1), (-0.12, 0.42, 0.32), MOTO_ROUGE, p)
     box('selle', (0.3, 0.86, 0.1), (0, 0.22, 0.75), SELLE, p)
     box('porte-bagages', (0.32, 0.34, 0.03), (0, yb - 0.06, 0.8), MOTO_NOIR, p)
     box('feu', (0.14, 0.05, 0.07), (0, yb + 0.12, 0.74), FEU, p)
