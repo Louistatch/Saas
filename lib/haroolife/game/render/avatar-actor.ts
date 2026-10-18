@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js'
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { type AvatarSpec, clipFor, recolorMap } from '../../city/avatar-catalogue'
-import { mealAnimations, oneShotClip } from './daily-animations'
+import { homeAnimations, mealAnimations, oneShotClip } from './daily-animations'
 import { createMealProps } from './meal-props'
 
 export interface AvatarActor {
@@ -153,6 +153,7 @@ export function avatarAnimations(gltf: AvatarAsset): THREE.AnimationClip[] {
     new THREE.AnimationClip('HarooDrive', 2.4, tracks),
     new THREE.AnimationClip('HarooCycle', 1, cycleTracks),
     ...mealAnimations(gltf),
+    ...homeAnimations(gltf),
   ]
   cachedAnimations.set(gltf, clips)
   return clips

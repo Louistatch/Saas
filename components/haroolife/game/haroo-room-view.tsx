@@ -100,6 +100,8 @@ export default function HarooRoomView(
     // biome-ignore lint/correctness/useExhaustiveDependencies: `n` makes each request distinct
   }, [approach?.n, state])
 
+  // Seats used only by meals have no bubble: they are not offered in the guide either.
+  const spots = scene.hotspots.filter((h) => !h.hidden)
   return (
     <div className="relative h-full w-full" data-engine="haroo" data-scene={scene.id}>
       <canvas
@@ -119,14 +121,14 @@ export default function HarooRoomView(
             onClick={() => setGuide((v) => !v)}
             className="min-h-11 rounded-2xl bg-white/95 px-4 py-2 text-left text-xs font-bold text-emerald-950 shadow"
           >
-            🧭 {guide ? 'Fermer le guide' : 'Objets et personnes'} · {scene.hotspots.length - 1}
+            🧭 {guide ? 'Fermer le guide' : 'Objets et personnes'} · {spots.length - 1}
           </button>
           {guide && (
             <div className="mt-2 max-h-[34vh] space-y-1 overflow-y-auto overscroll-contain rounded-2xl bg-white/95 p-2 shadow-lg">
               <p className="px-2 py-1 text-xs text-slate-600">
                 Choisis une bulle : tu rejoins son objet avant d’agir.
               </p>
-              {scene.hotspots.map((h) => (
+              {spots.map((h) => (
                 <button
                   key={h.id}
                   type="button"

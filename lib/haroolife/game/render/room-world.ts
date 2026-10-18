@@ -47,6 +47,10 @@ export const CAMERA_YAW = 0.74
 const CAMERA_ELEVATION = 0.7
 const CAMERA_DISTANCE = 55
 const WALL_HEIGHT = 3.3
+/** Lying down or getting up from a bed (seconds). */
+const LIE_SECONDS = 1.1
+/** From the mattress to the spine of a figure lying on its back. */
+const LYING_BACK = 0.07
 
 export interface RoomWorldEvents extends Omit<DailyViewProps, 'meal'> {
   /** Reached the interaction point of a Saas prop: run its action (once). */
@@ -133,12 +137,20 @@ export class RoomWorld {
   private performing: { propId: string; anim: NpcAnim } | null = null
   private posture: {
     id: string
+    /** Lying in a bed rather than sitting on a seat. */
+    bed?: boolean
     phase: 'enter' | 'idle' | 'exit'
     elapsed: number
     from: THREE.Vector3
     to: THREE.Vector3
     heading: number
+    fromHeading?: number
   } | null = null
+  /** Wax-print pagne over the sleeper's legs, and the shower's falling water (lazily built). */
+  private blanket: THREE.Group | null = null
+  private water: { lines: THREE.LineSegments; drops: Float32Array } | null = null
+  private waterMaterial: THREE.LineBasicMaterial | null = null
+  private frosted = false
   private afterStand: Goal | null = null
   private meal: Meal | null = null
   private mealRequest: string | null = null
@@ -291,6 +303,11 @@ export class RoomWorld {
     // Everything below was created or loaded by this instance only.
     for (const g of this.geometries.values()) g.dispose()
     for (const m of this.materials.values()) m.dispose()
+    this.waterMaterial?.dispose()
+    this.blanket?.traverse((o) => {
+      const t = ((o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined)?.map
+      t?.dispose()
+    })
     this.freeLoaded()
     this.renderer.dispose()
     this.perf.dispose()
@@ -331,9 +348,13 @@ export class RoomWorld {
     this.performing = activity ? { propId: activity.prop, anim: activity.anim } : null
     const pl = this.player
     if (!pl) return
+    if (activity?.anim === 'sleep' && this.def.beds?.[activity.prop]) {
+      if (!this.posture) this.lie(activity.prop)
+      return
+    }
     if (
       activity &&
-      ['sit', 'eat-seated'].includes(activity.anim) &&
+      ['sit', 'eat-seated', 'toilet'].includes(activity.anim) &&
       this.def.seats?.[activity.prop]
     ) {
       if (!this.posture) this.sit(activity.prop)
@@ -402,11 +423,37 @@ export class RoomWorld {
     this.play(pl, 'HarooSitEnter')
   }
 
+  /** Lie down on the bed, on the back, the head on the pillow. */
+  private lie(id: string): void {
+    const pl = this.player
+    const bed = this.def.beds?.[id]
+    if (!pl || !bed) return
+    // The figure turns about its feet: they rest half a body below the middle of the mattress.
+    const half = FIGURE * 0.48
+    this.posture = {
+      id,
+      bed: true,
+      phase: 'enter',
+      elapsed: 0,
+      from: pl.root.position.clone(),
+      to: new THREE.Vector3(
+        bed.x - Math.sin(bed.heading) * half,
+        bed.height + LYING_BACK,
+        bed.z - Math.cos(bed.heading) * half,
+      ),
+      // Lying turns the figure's head towards its local -Z: face away from the pillow.
+      heading: bed.heading + Math.PI,
+      fromHeading: pl.root.rotation.y,
+    }
+    this.goal = null
+    this.play(pl, 'HarooSleep')
+  }
+
   private stand(): boolean {
     const p = this.posture
     const pl = this.player
     if (!p || !pl || p.phase === 'exit') return false
-    const entry = this.def.seats?.[p.id]?.entry
+    const entry = p.bed ? this.def.beds?.[p.id]?.entry : this.def.seats?.[p.id]?.entry
     if (!entry || !isFree(entry.x, entry.z, this.def.obstacles, this.def.bounds)) {
       this.events.onNotice?.('La sortie du siège est occupée. Attends qu’elle se libère.')
       return false
@@ -419,7 +466,7 @@ export class RoomWorld {
       to: new THREE.Vector3(entry.x, 0, entry.z),
     }
     this.performing = null
-    this.play(pl, 'HarooSitExit')
+    this.play(pl, p.bed ? 'HarooSleep' : 'HarooSitExit')
     this.events.onActivityEnd?.()
     return true
   }
@@ -661,6 +708,7 @@ export class RoomWorld {
 
   private buildMarkers(): void {
     for (const h of this.def.hotspots) {
+      if (h.hidden) continue
       const anchor = new THREE.Object3D()
       anchor.position.set(h.at.x, h.markerY, h.at.z)
       if (h.kind !== 'exit') {
@@ -766,14 +814,33 @@ export class RoomWorld {
       const p = this.posture!
       p.elapsed += dt
       if (p.phase === 'idle') {
-        this.play(pl, this.performing?.anim === 'eat-seated' ? 'HarooEatSeated' : 'HarooSitIdle')
+        this.play(
+          pl,
+          p.bed
+            ? 'HarooSleep'
+            : this.performing?.anim === 'eat-seated'
+              ? 'HarooEatSeated'
+              : (this.def.seats?.[p.id]?.idle ?? 'HarooSitIdle'),
+        )
       } else {
-        const name = p.phase === 'enter' ? 'HarooSitEnter' : 'HarooSitExit'
+        const name = p.bed ? 'HarooSleep' : p.phase === 'enter' ? 'HarooSitEnter' : 'HarooSitExit'
         this.play(pl, name)
-        const duration = pl.actions.get(name)?.getClip().duration ?? 1.3
+        const duration = p.bed ? LIE_SECONDS : (pl.actions.get(name)?.getClip().duration ?? 1.3)
         const progress = Math.min(1, p.elapsed / duration)
-        pl.root.position.lerpVectors(p.from, p.to, progress * progress * (3 - 2 * progress))
+        const eased = progress * progress * (3 - 2 * progress)
+        pl.root.position.lerpVectors(p.from, p.to, eased)
         pl.root.rotation.y = p.heading
+        if (p.bed) {
+          const lying = p.phase === 'enter' ? eased : 1 - eased
+          this.lay(pl, lying)
+          if (p.phase === 'enter' && p.fromHeading !== undefined) {
+            const turn = Math.atan2(
+              Math.sin(p.heading - p.fromHeading),
+              Math.cos(p.heading - p.fromHeading),
+            )
+            pl.root.rotation.y = p.fromHeading + turn * Math.min(1, eased * 2)
+          }
+        }
         if (progress >= 1) {
           if (p.phase === 'enter') {
             p.phase = 'idle'
@@ -781,6 +848,7 @@ export class RoomWorld {
             if (this.meal?.phase === 'approach') this.events.onMealReady?.(this.meal.id, p.id)
           } else {
             this.posture = null
+            this.lay(pl, 0)
             const next = this.afterStand
             this.afterStand = null
             if (this.meal?.phase === 'approach') {
@@ -851,12 +919,143 @@ export class RoomWorld {
     let anim: NpcAnim = 'idle'
     if (this.speed > 0.05) anim = running && this.speed > WALK_SPEED + 0.2 ? 'run' : 'walk'
     else if (this.performing) anim = this.performing.anim
+    // Lying and toilet clips need their bed or seat: never played standing in the air.
+    if (anim === 'sleep' || anim === 'toilet') anim = 'idle'
     this.play(pl, clipFor(pl.spec, anim))
     if (anim === 'walk' || anim === 'run') {
       const natural = pl.spec.pace[anim] * FIGURE
       const rate = Math.min(3, Math.max(0.5, this.speed / natural))
       pl.actions.get(pl.current)?.setEffectiveTimeScale(rate)
     } else pl.actions.get(pl.current)?.setEffectiveTimeScale(1)
+  }
+
+  /** Tilts the figure from standing (0) to lying on its back (1), and covers its legs. */
+  private lay(pl: Person, lying: number): void {
+    const figure = pl.root.getObjectByName('figure')
+    if (figure) figure.rotation.x = (-Math.PI / 2) * lying
+    const bed = this.posture?.bed ? this.def.beds?.[this.posture.id] : undefined
+    if (!bed || lying < 0.95) {
+      if (this.blanket) this.blanket.visible = false
+      return
+    }
+    if (!this.blanket) this.blanket = this.makeBlanket()
+    const half = FIGURE * 0.48
+    // From the feet to the waist, along the bed.
+    this.blanket.position.set(
+      bed.x - Math.sin(bed.heading) * (half - 0.48),
+      bed.height,
+      bed.z - Math.cos(bed.heading) * (half - 0.48),
+    )
+    this.blanket.rotation.y = bed.heading
+    this.blanket.visible = true
+  }
+
+  private makeBlanket(): THREE.Group {
+    const c = document.createElement('canvas')
+    c.width = 64
+    c.height = 64
+    const g = c.getContext('2d')
+    if (g) {
+      // A wax print: indigo ground, ochre circles, a red border.
+      g.fillStyle = '#28427a'
+      g.fillRect(0, 0, 64, 64)
+      for (const [x, y] of [
+        [16, 16],
+        [48, 16],
+        [16, 48],
+        [48, 48],
+        [32, 32],
+      ]) {
+        g.fillStyle = '#e1a23a'
+        g.beginPath()
+        g.arc(x, y, 9, 0, Math.PI * 2)
+        g.fill()
+        g.fillStyle = '#b8322a'
+        g.beginPath()
+        g.arc(x, y, 4, 0, Math.PI * 2)
+        g.fill()
+      }
+    }
+    const texture = new THREE.CanvasTexture(c)
+    texture.colorSpace = THREE.SRGBColorSpace
+    texture.wrapS = THREE.RepeatWrapping
+    texture.wrapT = THREE.RepeatWrapping
+    texture.repeat.set(3, 2)
+    const geometry = new THREE.CylinderGeometry(0.36, 0.36, 1.2, 18, 1, false, Math.PI / 2, Math.PI)
+    const material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.9 })
+    this.geometries.set('blanket', geometry)
+    this.materials.set('blanket', material)
+    const mesh = new THREE.Mesh(geometry, material)
+    // The cylinder's axis along the bed, its rounded half up, flattened onto the legs.
+    mesh.rotation.x = Math.PI / 2
+    mesh.scale.set(1, 1, 0.78)
+    mesh.castShadow = true
+    const group = new THREE.Group()
+    group.name = 'Pagne (couverture)'
+    group.add(mesh)
+    this.stage.add(group)
+    return group
+  }
+
+  /** Water falling from the shower head onto the player, while they wash. */
+  private stepWater(dt: number): void {
+    const spot = this.performing?.anim === 'shower' && this.offDevice ? this.player : null
+    this.frostShower(Boolean(spot))
+    if (!spot) {
+      if (this.water) this.water.lines.visible = false
+      return
+    }
+    if (!this.water) {
+      const count = 70
+      const drops = new Float32Array(count * 6)
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(drops, 3))
+      const material = new THREE.LineBasicMaterial({
+        color: '#d5efff',
+        transparent: true,
+        opacity: 0.75,
+      })
+      this.geometries.set('water', geometry)
+      const lines = new THREE.LineSegments(geometry, material)
+      lines.name = 'Eau de la douche'
+      lines.frustumCulled = false
+      this.stage.add(lines)
+      this.water = { lines, drops }
+      for (let i = 0; i < count; i++) drops[i * 6 + 1] = Math.random() * 2.3
+      this.waterMaterial = material
+    }
+    const { lines, drops } = this.water
+    const p = spot.root.position
+    for (let i = 0; i < drops.length; i += 6) {
+      let y = drops[i + 1] - dt * 5.5
+      if (y < 0.05) {
+        y = 2.35
+        const a = Math.random() * Math.PI * 2
+        const r = Math.sqrt(Math.random()) * 0.32
+        drops[i] = p.x + Math.cos(a) * r
+        drops[i + 2] = p.z + Math.sin(a) * r
+      }
+      drops[i + 1] = y
+      drops[i + 3] = drops[i]
+      drops[i + 4] = y + 0.16
+      drops[i + 5] = drops[i + 2]
+    }
+    lines.geometry.attributes.position.needsUpdate = true
+    lines.visible = true
+  }
+
+  /** The cubicle turns to frosted glass while someone washes in it (otherwise it hides them). */
+  private frostShower(on: boolean): void {
+    if (this.frosted === on) return
+    this.frosted = on
+    this.stage.getObjectByName('meuble:showerRound')?.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined
+      if (!m || !(o as THREE.Mesh).isMesh) return
+      m.transparent = on
+      m.opacity = on ? 0.32 : 1
+      m.depthWrite = !on
+      m.needsUpdate = true
+    })
   }
 
   private face(x: number, z: number, dt: number): void {
@@ -890,7 +1089,9 @@ export class RoomWorld {
     // Phones (narrow) zoom in a little, as in the prototype.
     const zoom = this.width < 650 ? 1.12 : 1
     const v = this.def.view
-    const focus = Boolean(this.posture || this.performing?.anim === 'eat')
+    const focus = Boolean(
+      this.posture || this.performing?.anim === 'eat' || this.performing?.anim === 'shower',
+    )
     this.activityFraming +=
       ((focus ? 1 : 0) - this.activityFraming) * (snap ? 1 : Math.min(1, dt * 4))
     const size = (Math.max(v.height, v.width / aspect) / zoom) * (1 - this.activityFraming * 0.55)
@@ -954,8 +1155,9 @@ export class RoomWorld {
     const steps = Math.max(1, Math.ceil(dt / 0.05))
     for (let i = 0; i < steps; i++) this.move(dt / steps)
     this.player?.mixer.update(dt)
+    this.stepWater(dt)
     if (this.player) {
-      if (this.posture) {
+      if (this.posture && !this.posture.bed) {
         const p = this.posture
         const clip = p.phase === 'enter' ? 'HarooSitEnter' : 'HarooSitExit'
         const progress = Math.min(
@@ -969,6 +1171,7 @@ export class RoomWorld {
       }
       const eating = this.player.current.startsWith('HarooEat')
       this.player.mealProps.show(eating)
+      this.player.mealProps.phone(this.player.current === 'HarooToilet')
       if (eating && this.meal?.phase === 'eating') {
         this.mealSeconds += dt
         if (this.mealSeconds >= 0.2) {
@@ -985,7 +1188,8 @@ export class RoomWorld {
       this.def.view.follow ||
       this.posture ||
       this.activityFraming > 0.001 ||
-      this.performing?.anim === 'eat'
+      this.performing?.anim === 'eat' ||
+      this.performing?.anim === 'shower'
     )
       this.updateCamera(false, dt)
     this.guidance.visible = !!this.goal

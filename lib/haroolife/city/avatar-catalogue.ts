@@ -50,8 +50,9 @@ export const FIGURE_HEIGHT = 0.66
 const QUATERNIUS = '/haroolife/vendor/quaternius/'
 
 /**
- * Shared adult clips. Sitting is retargeted from the CC0 UAL Standard; meals, driving and
- * cycling are authored on these rigs. Resting and praying still use a neutral pose.
+ * Shared adult clips. Sitting is retargeted from the CC0 UAL Standard; meals, sleeping, washing,
+ * the toilet, driving and cycling are authored on these rigs. Resting (hospital) and praying
+ * still use a neutral pose.
  */
 const QUATERNIUS_CLIPS: Partial<Record<NpcAnim, string>> = {
   idle: 'Idle',
@@ -68,6 +69,9 @@ const QUATERNIUS_CLIPS: Partial<Record<NpcAnim, string>> = {
   'sit-exit': 'HarooSitExit',
   eat: 'HarooEat',
   'eat-seated': 'HarooEatSeated',
+  sleep: 'HarooSleep',
+  shower: 'HarooShower',
+  toilet: 'HarooToilet',
 }
 /** Skin tones of the reference (dark to deep), hair near-black. */
 export const SKIN_TONES = ['#6b3e28', '#4b2d20', '#855235', '#593522'] as const

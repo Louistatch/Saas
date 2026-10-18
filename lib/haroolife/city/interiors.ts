@@ -71,6 +71,9 @@ export type NpcAnim =
   | 'work'
   | 'pray'
   | 'rest'
+  | 'sleep'
+  | 'shower'
+  | 'toilet'
   | 'cycle'
   | 'drive'
   | 'enter'
@@ -295,6 +298,10 @@ const HOUSE: Layout = {
       hint: 'Social +38',
     },
     { id: 'chair-1', kind: 'chair', x: 1.9, z: 1.9, rot: 145, action: 'sit', label: 'S’asseoir' },
+    // The dining corner: no button of its own, the meal walks the player there.
+    { id: 'dining-table', kind: 'table', x: -1.6, z: -1.3 },
+    { id: 'dining-1', kind: 'chair', x: -2.1, z: -2.0, action: 'sit' },
+    { id: 'dining-2', kind: 'chair', x: -1.1, z: -2.0, action: 'sit' },
     {
       id: 'shower',
       kind: 'shower',
@@ -894,6 +901,11 @@ export function animFor(kind: PropKind): NpcAnim {
     case 'dumbbell-rack':
       return 'lift'
     case 'bed':
+      return 'sleep'
+    case 'shower':
+      return 'shower'
+    case 'toilet':
+      return 'toilet'
     case 'hospital-bed':
       return 'rest'
     case 'altar':

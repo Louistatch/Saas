@@ -28,7 +28,8 @@ for (const spec of AVATAR_SPECS)
     const b = createAvatarActor(gltf, spec, 1.75, '#1a7958')
     assert.equal(a.root.children.length, 1, 'only the imported skinned figure, no box wrap')
     assert.ok(a.root.userData.avatar.skinnedMeshes > 0)
-    assert.equal(a.actions.size, 14)
+    // File clips, sitting, driving, cycling, meals, then sleeping, washing and the toilet.
+    assert.equal(a.actions.size, 17)
     a.root.traverse((o) => {
       const mesh = o as THREE.SkinnedMesh
       if (!mesh.isSkinnedMesh) return

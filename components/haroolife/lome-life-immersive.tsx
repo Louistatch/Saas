@@ -1222,10 +1222,12 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     setSelectedLot(lot)
     setPanel(lot.employer ? 'jobs' : 'lot')
   }, [cityLife.insideLot])
-  // An activity animation lasts a few seconds, then the player stands idle again.
+  // An activity animation lasts a few seconds, then the player stands idle again. Sitting,
+  // eating and sleeping last until the player moves; washing and the toilet take a while.
   useEffect(() => {
-    if (!cityLife.activity || cityLife.meal || ['sit', 'eat-seated', 'eat'].includes(cityLife.activity.anim)) return
-    const id = window.setTimeout(() => setCityLife((old) => stopActivity(old)), 3200)
+    if (!cityLife.activity || cityLife.meal || ['sit', 'eat-seated', 'eat', 'sleep'].includes(cityLife.activity.anim)) return
+    const seconds = ['shower', 'toilet'].includes(cityLife.activity.anim) ? 9 : 3.2
+    const id = window.setTimeout(() => setCityLife((old) => stopActivity(old)), seconds * 1000)
     return () => window.clearTimeout(id)
   }, [cityLife.activity, cityLife.meal])
   useEffect(() => {

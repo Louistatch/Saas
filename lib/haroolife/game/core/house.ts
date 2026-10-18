@@ -13,6 +13,8 @@ import type { Bounds, Obstacle, Point } from './pathfind'
 export interface FurniturePlacement {
   /** File name (without extension) under HAROO_ASSETS.furniture. */
   model: string
+  /** Full URL when the model comes from another kit. */
+  url?: string
   x: number
   z: number
   /** Uniform scale of the model. */
@@ -35,6 +37,8 @@ export interface Hotspot {
   label: string
   /** Height of the marker above the floor. */
   markerY: number
+  /** No marker on screen: the point is only used by the game (a seat for meals). */
+  hidden?: boolean
 }
 
 export interface Rug {
@@ -89,6 +93,16 @@ export const HOUSE_SCENE: HouseScene = {
     { model: 'lampRoundFloor', x: 1.1, z: 0.2, scale: 2 },
     { model: 'showerRound', x: -5, z: 3.7, scale: 2.2 },
     { model: 'toiletSquare', x: -4.9, z: 2.25, scale: 2 },
+    // The dining corner by the kitchen: meals are eaten at the table, facing the room.
+    {
+      model: 'tableDining',
+      url: '/haroolife/vendor/kenney-3d/furniture-kit/table.glb',
+      x: -2.2,
+      z: -1.35,
+      scale: 2.2,
+    },
+    { model: 'chair', x: -2.7, z: -2.2, scale: 2.4 },
+    { model: 'chair', x: -1.7, z: -2.2, scale: 2.4 },
   ],
   obstacles: [
     { x: 3.4, z: -2.05, w: 2.1, d: 2.45 },
@@ -101,9 +115,20 @@ export const HOUSE_SCENE: HouseScene = {
     { x: -5, z: 3.7, w: 1.2, d: 1.5 },
     { x: -4.9, z: 2.25, w: 1.1, d: 1 },
     { x: 3.3, z: 0.8, w: 0.75, d: 0.75 },
+    { x: -2.2, z: -1.35, w: 1.95, d: 1.05 },
+    { x: -2.7, z: -2.2, w: 0.7, d: 0.7 },
+    { x: -1.7, z: -2.2, w: 0.7, d: 0.7 },
   ],
   hotspots: [
-    { id: 'sit', propId: 'chair-1', at: { x: 3.3, z: 1.75 }, faces: { x: 3.3, z: 0.8 }, icon: '🪑', label: 'S’asseoir', markerY: 1.4 },
+    {
+      id: 'sit',
+      propId: 'chair-1',
+      at: { x: 3.3, z: 1.75 },
+      faces: { x: 3.3, z: 0.8 },
+      icon: '🪑',
+      label: 'S’asseoir',
+      markerY: 1.4,
+    },
     {
       id: 'sleep',
       propId: 'bed',
@@ -157,6 +182,26 @@ export const HOUSE_SCENE: HouseScene = {
       icon: '🚽',
       label: 'Toilettes',
       markerY: 1.2,
+    },
+    {
+      id: 'dining-1',
+      propId: 'dining-1',
+      at: { x: -3.55, z: -2.2 },
+      faces: { x: -2.7, z: -2.2 },
+      icon: '🪑',
+      label: 'Table à manger',
+      markerY: 1.4,
+      hidden: true,
+    },
+    {
+      id: 'dining-2',
+      propId: 'dining-2',
+      at: { x: -0.85, z: -2.2 },
+      faces: { x: -1.7, z: -2.2 },
+      icon: '🪑',
+      label: 'Table à manger',
+      markerY: 1.4,
+      hidden: true,
     },
     {
       id: 'exit',

@@ -40,6 +40,8 @@ export interface Hotspot {
   label: string
   /** Height of the marker above the floor. */
   markerY: number
+  /** No marker on screen: the point is only used by the game (a seat for meals). */
+  hidden?: boolean
 }
 
 /** A GLB model placed on the floor, centred on (x, z), bottom at y. */
@@ -106,8 +108,22 @@ export interface RoomScene {
   onDevice: Record<string, { x: number; z: number; heading: number; seat?: number }>
   seats?: Record<
     string,
-    { x: number; z: number; heading: number; height: number; entry: Point; mealAllowed?: boolean }
+    {
+      x: number
+      z: number
+      heading: number
+      height: number
+      entry: Point
+      mealAllowed?: boolean
+      /** Clip played once seated (default: sitting, or eating during a meal). */
+      idle?: string
+    }
   >
+  /**
+   * Beds the player lies down on: prop id → middle of the mattress, direction of the pillow
+   * (radians, 0 = +Z), mattress height and where to stand up.
+   */
+  beds?: Record<string, { x: number; z: number; heading: number; height: number; entry: Point }>
   palette: {
     background: string
     ground: string
@@ -131,7 +147,7 @@ export const HOUSE_SCENE: RoomScene = {
   spawn: HOUSE_DATA.spawn,
   spawnHeading: HOUSE_DATA.spawnHeading,
   models: HOUSE_DATA.furniture.map((f) => ({
-    url: `${ASSET_BASE.furniture}${f.model}.glb`,
+    url: f.url ?? `${ASSET_BASE.furniture}${f.model}.glb`,
     x: f.x,
     z: f.z,
     scale: f.scale,
@@ -149,17 +165,31 @@ export const HOUSE_SCENE: RoomScene = {
     icon: h.icon,
     label: h.label,
     markerY: h.markerY,
+    ...(h.hidden ? { hidden: true } : {}),
   })),
   npcs: [],
   rugs: HOUSE_DATA.rugs,
   plants: HOUSE_DATA.plants,
   door: HOUSE_DATA.door,
   view: { height: 7.7, width: 8.8, follow: false },
-  onDevice: {},
+  // Under the shower head, facing out of the cubicle.
+  onDevice: { shower: { x: -5, z: 3.7, heading: Math.PI / 2 } },
   seats: {
     'chair-1': { x: 3.3, z: 0.8, heading: 0, height: 0.576, entry: { x: 3.3, z: 1.75 } },
     sofa: { x: -0.9, z: 0.8, heading: Math.PI, height: 0.598, entry: { x: -2.9, z: 0.9 } },
+    'dining-1': { x: -2.7, z: -2.2, heading: 0, height: 0.576, entry: { x: -3.55, z: -2.2 } },
+    'dining-2': { x: -1.7, z: -2.2, heading: 0, height: 0.576, entry: { x: -0.85, z: -2.2 } },
+    toilet: {
+      x: -4.82,
+      z: 2.25,
+      heading: Math.PI / 2,
+      height: 0.5,
+      entry: { x: -4.1, z: 2.1 },
+      mealAllowed: false,
+      idle: 'HarooToilet',
+    },
   },
+  beds: { bed: { x: 3.4, z: -2.0, heading: Math.PI, height: 0.62, entry: { x: 1.85, z: -1.65 } } },
   palette: HOUSE_DATA.palette,
 }
 

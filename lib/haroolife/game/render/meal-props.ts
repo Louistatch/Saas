@@ -33,10 +33,21 @@ export function createMealProps(figure: THREE.Object3D) {
   const tip = mesh(new THREE.SphereGeometry(0.025, 8, 5), '#c4d0d7', spoon)
   tip.scale.set(0.7, 0.25, 1)
   tip.position.z = 0.14
+  // A phone for the toilet (scrolling WhatsApp), screen lit.
+  const phone = new THREE.Group()
+  phone.name = 'Téléphone'
+  mesh(new THREE.BoxGeometry(0.075, 0.012, 0.15), '#1d2329', phone)
+  const screen = mesh(new THREE.PlaneGeometry(0.066, 0.135), '#9fd4ff', phone)
+  screen.rotation.x = -Math.PI / 2
+  screen.position.y = 0.0065
+  ;(screen.material as THREE.MeshStandardMaterial).emissive.set('#5aa9e6')
+  phone.position.set(-0.04, 0.02, 0.05)
   left?.add(bowl)
   right?.add(spoon)
+  right?.add(phone)
   bowl.visible = false
   spoon.visible = false
+  phone.visible = false
   return {
     show(visible: boolean) {
       bowl.visible = visible
@@ -46,7 +57,15 @@ export function createMealProps(figure: THREE.Object3D) {
       left?.updateWorldMatrix(true, false)
       if (left) bowl.quaternion.copy(left.getWorldQuaternion(new THREE.Quaternion()).invert())
     },
+    phone(visible: boolean) {
+      phone.visible = visible
+      if (!visible) return
+      // Screen up, towards the lowered face: level in world space like the bowl.
+      right?.updateWorldMatrix(true, false)
+      if (right) phone.quaternion.copy(right.getWorldQuaternion(new THREE.Quaternion()).invert())
+    },
     dispose() {
+      phone.removeFromParent()
       bowl.removeFromParent()
       spoon.removeFromParent()
       for (const m of owned) {
