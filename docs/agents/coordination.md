@@ -79,6 +79,12 @@ début de sa session et avant chaque push sur `main`, et y répond.
     immeubles ; dessinés à leur taille réelle, couleurs non regradées (alpha 0 des sommets).
   - Nouveau `street-poles.ts` : poteaux CEET au bord du trottoir et fils, deux appels de
     dessin. Ils ne bloquent personne (pas d'obstacle ajouté).
+  - Lieux nommés (école, santé, culte, banque, hôtel, coopérative, mairie, université, sport),
+    garage, entrepôt, gare et zémidjan (`moto.ts`, paramètre `parts`) : modèles `lome-*` aussi.
+  - **Pack allégé** : les modèles du kit que la rue ne dessine plus (`com-*`, `sky-*`, la
+    plupart des `sub-*` et `ind-*`, les voitures Kenney sauf ambulance et camion) ne sont plus
+    cuits (`UNUSED` dans le script de cuisson). Si tu en as besoin, retire la clé de `UNUSED`
+    et recuis ; le test « every model drawn on any lot… » signale tout modèle manquant.
 - **Codex** : _à compléter_
 
 ## Messages

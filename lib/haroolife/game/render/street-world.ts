@@ -110,6 +110,12 @@ const TILE_RANGE = 11
 const CAMERA_ELEVATION = 0.7
 const CAMERA_DISTANCE = 80
 const PEDESTRIANS = 8
+/**
+ * Passers-by live around the player: at real scale the camera shows about three cells each way,
+ * so they walk within WALKER_RANGE cells and, past WALKER_LEAVE, come back from just out of view.
+ */
+const WALKER_RANGE = 6
+const WALKER_LEAVE = 9
 const PEDESTRIAN_MODELS = ['afi', 'koffi', 'abra', 'kossi']
 /** First names of the passers-by (game characters, never real people), one per model. */
 const PEDESTRIAN_NAMES = [
@@ -1477,9 +1483,15 @@ export class StreetWorld {
     return this.seed / 2147483647
   }
 
-  private randomRoad(): { x: number; y: number } {
-    const roads = this.roadCells
-    return roads.length ? roads[Math.floor(this.rand() * roads.length)] : this.controller.cell
+  /** A road cell around the player: within WALKER_RANGE, at least `from` cells away. */
+  private randomRoad(from = 0): { x: number; y: number } {
+    const c = this.controller.cell
+    const near = this.roadCells.filter((p) => {
+      const d = Math.max(Math.abs(p.x - c.x), Math.abs(p.y - c.y))
+      return d <= WALKER_RANGE && d >= from
+    })
+    const roads = near.length ? near : this.roadCells
+    return roads.length ? roads[Math.floor(this.rand() * roads.length)] : c
   }
 
   private nextRoad(at: { x: number; y: number }, prev: { x: number; y: number }) {
@@ -1546,8 +1558,8 @@ export class StreetWorld {
         w.path = undefined
       }
       const c = this.controller.cell
-      if (Math.abs(w.from.x - c.x) > RADIUS || Math.abs(w.from.y - c.y) > RADIUS) {
-        w.from = this.randomRoad()
+      if (Math.abs(w.from.x - c.x) > WALKER_LEAVE || Math.abs(w.from.y - c.y) > WALKER_LEAVE) {
+        w.from = this.randomRoad(4)
         w.to = this.nextRoad(w.from, w.from)
         w.path = undefined
         const n = graph?.nearest({ x: w.from.x, z: w.from.y })
