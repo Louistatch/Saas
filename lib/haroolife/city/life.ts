@@ -21,6 +21,7 @@ import { hasTrait } from '../traits'
 import { type Commerce, decodeCommerce, emptyCommerce } from './commerce'
 import { type Farm, decodeFarm } from './farm'
 import { type Furnishing, decodeFurnishing } from './furnishing'
+import { type Garage, decodeGarage } from './garage'
 import { type Plot, decodePlot } from './homebuild'
 import { type Housing, decodeHousing } from './housing'
 import { type NpcAnim, animFor, layoutFor } from './interiors'
@@ -142,6 +143,8 @@ export interface CityLife {
   plot?: Plot
   /** Furniture and appliances bought for the home, placed or still in their box. */
   furnishing?: Furnishing
+  /** The player's own moto or car (« Aménager », see garage.ts), and the one out in the street. */
+  garage?: Garage
   /** The family the player was born into (the birth lottery of arrival.ts). */
   origin?: string
   /** An advance from the neighbourhood tontine, repaid each week (see tontine.ts). */
@@ -284,6 +287,7 @@ export function decodeCityLife(value: unknown): CityLife | null {
     housing: decodeHousing(v.housing),
     plot: decodePlot(v.plot),
     furnishing: decodeFurnishing(v.furnishing),
+    garage: decodeGarage(v.garage),
     origin: typeof v.origin === 'string' && /^[a-z-]{2,20}$/.test(v.origin) ? v.origin : undefined,
     tontine: decodeTontine(v.tontine),
     lecture:

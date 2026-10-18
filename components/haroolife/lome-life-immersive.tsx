@@ -27,6 +27,7 @@ import BoardSheet from './board-sheet'
 import ResidentConversation from './resident-conversation'
 import GameMarket from './game-market'
 import { FurnitureShop, useHomeFurnishing } from './home-furnishing'
+import VehicleShop from './vehicle-shop'
 import { GOODS, buyEstateMeal } from '@/lib/haroolife/city/commerce'
 import { type MealItem, advanceMeal, beginMeal, cancelMeal, mealPlace, readyMeal } from '@/lib/haroolife/city/dining'
 import DailyActionHud from './daily-action-hud'
@@ -112,6 +113,7 @@ import { ESTATE_GATE } from '@/lib/haroolife/city/navigation'
 import { bump } from '@/lib/haroolife/city/perf'
 import { FOLLOW_DISTANCE, type InputState, PlayerController } from '@/lib/haroolife/city/player'
 import { serviceVehiclePlacement } from '@/lib/haroolife/city/jobs'
+import { garageOf, ownVehicle, vehicleOut } from '@/lib/haroolife/city/garage'
 import {
   PRESETS,
   type Quality,
@@ -667,7 +669,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   ])
   const [notice, setNotice] = useState<string | null>(null)
   // « Aménager » : the furniture of the player's own house and the piece being placed.
-  const [shopTab, setShopTab] = useState<'meubles' | 'marche'>('meubles')
+  const [shopTab, setShopTab] = useState<'meubles' | 'vehicules' | 'marche'>('meubles')
   const furnishing = useHomeFurnishing({
     state: cityLife,
     onChange: setCityLife,
@@ -1387,6 +1389,16 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
             pose: { x: c.pos.x, z: c.pos.z, heading: c.heading },
           }))
           const moto = cityLifeRef.current.duty === 'moto'
+          // The player's own moto or car: driven with the joystick, no job, no fare.
+          const own = vehicleOut(cityLifeRef.current)
+          if (own) {
+            setNotice(
+              ev.state === 'entered'
+                ? `Tu conduis ${own.kind === 'moto' ? 'ta moto' : 'ta voiture'} : le joystick pour rouler, relâche pour freiner.`
+                : `Tu es descendu de ${own.kind === 'moto' ? 'ta moto' : 'ta voiture'}.`,
+            )
+            continue
+          }
           if (ev.state === 'left') automaticService.stop()
           else {
             const kind = cityLifeRef.current.duty ?? 'taxi'
@@ -1437,7 +1449,14 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     }
   }, [controller])
   function toggleVehicle() {
-    const what = cityLife.duty === 'moto' ? 'ton zémidjan' : 'du taxi'
+    const mine = vehicleOut(cityLife)
+    const what = mine
+      ? mine.kind === 'moto'
+        ? 'de ta moto'
+        : 'de ta voiture'
+      : cityLife.duty === 'moto'
+        ? 'ton zémidjan'
+        : 'du taxi'
     if (controller.driving) {
       if (cityLife.duty) {
         automaticService.requestStop()
@@ -1445,22 +1464,98 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
       } else if (!controller.exitVehicle()) setNotice(`Freine avant de descendre ${what}.`)
     } else if (!controller.enterVehicle())
       setNotice(
-        cityLife.duty === 'moto' ? 'Approche-toi de ta moto.' : 'Approche-toi du taxi pour monter.',
+        mine
+          ? `Approche-toi de ${mine.kind === 'moto' ? 'ta moto' : 'ta voiture'}.`
+          : cityLife.duty === 'moto'
+            ? 'Approche-toi de ta moto.'
+            : 'Approche-toi du taxi pour monter.',
       )
   }
+  /** The player's own vehicle, parked on the nearest road beside them (no job). */
+  function takeOutVehicle(id: string) {
+    const v = ownVehicle(id)
+    if (!v) return
+    if (controller.driving) {
+      setNotice('Descends du véhicule avant d’en sortir un autre.')
+      return
+    }
+    if (insideAny) {
+      setNotice(`Sors du bâtiment : ${v.kind === 'moto' ? 'ta moto' : 'ta voiture'} t’attend dans la rue.`)
+      return
+    }
+    const placement = serviceVehiclePlacement(
+      controller.pos,
+      (x, z) => isCityRoad(x, z) || isDriveway(x, z),
+    )
+    if (!placement) {
+      setNotice('Aucune route accessible pour garer ton véhicule ici.')
+      return
+    }
+    automaticService.stop()
+    setServiceState(automaticService.snapshot())
+    const { approach, vehicle: parked } = placement
+    const vehicle = { x: parked.x, z: parked.z, heading: controller.heading }
+    controller.vehicle = { ...vehicle, speed: 0 }
+    const close = Math.hypot(approach.x - controller.pos.x, approach.z - controller.pos.z) <= 0.5
+    setNearVehicle(close)
+    const what = v.kind === 'moto' ? 'Ta moto' : 'Ta voiture'
+    const message = close
+      ? `${what} est garée juste devant toi. Appuie sur « Monter ».`
+      : `${what} est garée sur la route : tu y vas automatiquement.`
+    setCityLife((old) => {
+      const ready = {
+        ...old,
+        duty: null,
+        garage: { ...garageOf(old), out: id },
+        vehicle,
+        vehicleLocality: old.locality,
+      }
+      const moving = close ? ready : goToPoint(ready, { x: approach.x, y: approach.z })
+      return {
+        ...moving,
+        life: { ...moving.life, lastEvent: message, events: [message, ...moving.life.events].slice(0, 8) },
+      }
+    })
+    setPanel(null)
+    if (mapView) exitMap()
+    controller.camera.follow = true
+    setNotice(message)
+  }
+  function putAwayVehicle() {
+    if (controller.driving) {
+      setNotice('Descends du véhicule avant de le ranger.')
+      return
+    }
+    controller.vehicle = null
+    setNearVehicle(false)
+    setCityLife((old) => ({ ...old, garage: { ...garageOf(old), out: null }, vehicle: null }))
+    setNotice('Véhicule rangé au garage.')
+  }
   // ── Driver's job (zémidjan or taxi): pick up, drive, drop off, get paid ──
-  const vehicleKind = cityLife.duty === 'moto' ? 'moto' : 'taxi'
+  const ownOut = vehicleOut(cityLife)
+  const vehicleKind =
+    cityLife.duty === 'moto'
+      ? 'moto'
+      : cityLife.duty
+        ? 'taxi'
+        : ownOut
+          ? ownOut.kind === 'moto'
+            ? 'moto'
+            : 'car'
+          : 'taxi'
   const streetFare = useMemo(
     () => ({
       vehicle: vehicleKind,
+      own: Boolean(ownOut),
       hailing: !!cityLife.duty && driving && serviceState.phase === 'searching',
       passenger: fare?.passenger ?? null,
       pickup: serviceState.phase === 'pickup' ? serviceState.customer : null,
       dest: fare ? { x: fare.to.x, y: fare.to.y, name: fare.to.name } : null,
     }),
-    [vehicleKind, cityLife.duty, driving, fare, serviceState.phase, serviceState.customer],
+    [vehicleKind, ownOut, cityLife.duty, driving, fare, serviceState.phase, serviceState.customer],
   ) as {
-    vehicle: 'moto' | 'taxi'
+    vehicle: 'moto' | 'taxi' | 'car'
+    own: boolean
     hailing: boolean
     passenger: string | null
     pickup: ServiceCustomer | null
@@ -1538,7 +1633,14 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
       ? `${duty === 'moto' ? 'Ton zémidjan' : 'Ton taxi'} est garé juste devant toi. Appuie sur « Monter ».`
       : `${duty === 'moto' ? 'Ton zémidjan' : 'Ton taxi'} est prêt sur la route : tu y vas automatiquement.`
     setCityLife((old) => {
-      const ready = { ...old, duty, vehicle, vehicleLocality: old.locality }
+      const ready = {
+        ...old,
+        duty,
+        vehicle,
+        vehicleLocality: old.locality,
+        // The job's vehicle replaces the player's own one in the street.
+        garage: old.garage ? { ...old.garage, out: null } : undefined,
+      }
       const moving = close ? ready : goToPoint(ready, { x: approach.x, y: approach.z })
       return {
         ...moving,
@@ -2793,6 +2895,15 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                 )}
               </output>
             )}
+            {!insideAny && ownOut && !nearVehicle && !driving && panel === null && (
+              <button
+                type="button"
+                onClick={() => takeOutVehicle(ownOut.id)}
+                className="min-h-12 max-w-[12rem] rounded-2xl bg-amber-400 px-3 py-2 text-xs font-black shadow"
+              >
+                {ownOut.kind === 'moto' ? '🏍️ Retrouver ma moto' : '🚗 Retrouver ma voiture'}
+              </button>
+            )}
             {!insideAny && cityLife.duty && !nearVehicle && !driving && panel === null && (
               <button
                 type="button"
@@ -2806,13 +2917,21 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
               <button
                 type="button"
                 aria-label={
-                  vehicleKind === 'moto'
-                    ? driving
-                      ? 'Descendre du zémidjan'
-                      : 'Monter sur le zémidjan'
-                    : driving
-                      ? 'Descendre du taxi'
-                      : 'Monter dans le taxi'
+                  ownOut
+                    ? ownOut.kind === 'moto'
+                      ? driving
+                        ? 'Descendre de ma moto'
+                        : 'Monter sur ma moto'
+                      : driving
+                        ? 'Descendre de ma voiture'
+                        : 'Monter dans ma voiture'
+                    : vehicleKind === 'moto'
+                      ? driving
+                        ? 'Descendre du zémidjan'
+                        : 'Monter sur le zémidjan'
+                      : driving
+                        ? 'Descendre du taxi'
+                        : 'Monter dans le taxi'
                 }
                 onClick={toggleVehicle}
                 disabled={serviceState.stopRequested}
@@ -2826,7 +2945,9 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                       ? 'Descendre'
                       : vehicleKind === 'moto'
                         ? '🏍️ Monter'
-                        : '🚕 Monter'}
+                        : vehicleKind === 'car'
+                          ? '🚗 Monter'
+                          : '🚕 Monter'}
               </button>
             )}
             {nearAd && !insideAny && !driving && panel === null && (
@@ -3208,8 +3329,8 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                   </>
                 )}
                 {panel === 'shop' && (
-                  <div role="tablist" aria-label="Aménager" className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1">
-                    {([['meubles', 'Meubles et appareils'], ['marche', 'Marché et repas']] as const).map(([id, label]) => (
+                  <div role="tablist" aria-label="Aménager" className="grid grid-cols-3 gap-1 rounded-2xl bg-slate-100 p-1">
+                    {([['meubles', 'Meubles'], ['vehicules', 'Véhicules'], ['marche', 'Marché']] as const).map(([id, label]) => (
                       <button
                         key={id}
                         type="button"
@@ -3225,6 +3346,15 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                 )}
                 {panel === 'shop' && shopTab === 'meubles' && (
                   <FurnitureShop state={cityLife} onChange={setCityLife} onPlace={furnishing.start} />
+                )}
+                {panel === 'shop' && shopTab === 'vehicules' && (
+                  <VehicleShop
+                    state={cityLife}
+                    onChange={setCityLife}
+                    onTakeOut={takeOutVehicle}
+                    onPutAway={putAwayVehicle}
+                    driving={driving}
+                  />
                 )}
                 {panel === 'shop' && shopTab === 'marche' && (
                   <>

@@ -1,3 +1,4 @@
+import { vehicleOut } from './garage'
 import type { CityLife } from './life'
 import { isCityRoad, isDriveway } from './world'
 
@@ -66,9 +67,12 @@ export function serviceVehicleSpot(
   candidates.sort((a, b) => Math.hypot(a.x - at.x, a.z - at.z) - Math.hypot(b.x - at.x, b.z - at.z))
   return candidates[0] ?? null
 }
-/** Older saves may leave a driver inside their parked moto or keep a Lomé vehicle in Kara. */
+/**
+ * Older saves may leave a driver inside their parked moto or keep a Lomé vehicle in Kara. The
+ * player's own vehicle out in the street is parked again the same way.
+ */
 export function restoreServiceVehicle(state: CityLife): CityLife {
-  if (!state.duty) return state
+  if (!state.duty && !vehicleOut(state)) return state
   const vehicle = state.vehicle
   const at = state.pose ?? { x: state.at.x, z: state.at.y }
   const drivable = (x: number, z: number) => isCityRoad(x, z) || isDriveway(x, z)

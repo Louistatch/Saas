@@ -192,7 +192,9 @@ export interface StreetWorldEvents extends Omit<DailyViewProps, 'meal'> {
 
 /** The driver's job in the street: the vehicle, who is on board, where they go. */
 export interface StreetFare {
-  vehicle: VehicleKind
+  /** The job's zémidjan or taxi, or the player's own moto or car (`own`). */
+  vehicle: VehicleKind | 'car'
+  own?: boolean
   /** Passers-by may hail the driver (the job is on and nobody is on board). */
   hailing: boolean
   passenger: string | null
@@ -1306,7 +1308,7 @@ export class StreetWorld {
   setFare(fare: StreetFare): void {
     const was = this.fare
     this.fare = { ...fare }
-    if (was.vehicle !== fare.vehicle) this.dropCar()
+    if (was.vehicle !== fare.vehicle || was.own !== fare.own) this.dropCar()
     if (was.passenger && was.passenger !== fare.passenger) {
       const w = this.walkers.find((x) => x.name === was.passenger)
       const at = was.dest ?? this.controller.cell
@@ -1419,7 +1421,13 @@ export class StreetWorld {
     tag.dataset.serviceVehicle = this.fare.vehicle
     tag.className =
       'pointer-events-auto absolute left-0 top-0 whitespace-nowrap rounded-full border-2 border-amber-300 bg-white px-3 py-1 text-xs font-bold text-slate-900 shadow-md'
-    tag.textContent = this.fare.vehicle === 'moto' ? '🏍️ Zémidjan · Monter' : '🚕 Taxi · Monter'
+    tag.textContent = this.fare.own
+      ? this.fare.vehicle === 'moto'
+        ? '🏍️ Ma moto · Monter'
+        : '🚗 Ma voiture · Monter'
+      : this.fare.vehicle === 'moto'
+        ? '🏍️ Zémidjan · Monter'
+        : '🚕 Taxi · Monter'
     tag.style.visibility = 'hidden'
     tag.addEventListener('click', () => this.events.onVehicle?.())
     this.markersRoot.append(tag)
@@ -1436,17 +1444,19 @@ export class StreetWorld {
       this.carLoading = false
       return
     }
-    this.load(TAXI_URL)
+    // The taxi of the job, or the player's own sedan.
+    const sedan = this.fare.vehicle === 'car'
+    this.load(sedan ? VEHICLE_URL.sedan : TAXI_URL)
       .then((g) => {
         if (this.disposed || loadId !== this.carLoadId) return
         const root = new THREE.Group()
-        root.name = 'Taxi du joueur'
+        root.name = sedan ? 'Voiture du joueur' : 'Taxi du joueur'
         const model = g.scene.clone(true)
         fitVehicleModel(
           model,
           FIGURE * TRAFFIC_CAR_SCALE,
           U * TRAFFIC_LANE_SCALE,
-          VEHICLE_LENGTH.taxi,
+          VEHICLE_LENGTH[sedan ? 'sedan' : 'taxi'],
         )
         model.traverse((o) => {
           const mesh = o as THREE.Mesh
@@ -2511,7 +2521,13 @@ export class StreetWorld {
       camera: { ...ctl.camera },
       vehicle: ctl.vehicle ? { ...ctl.vehicle } : null,
       vehicleKind:
-        this.car?.parent === this.scene ? (this.car === this.moto?.root ? 'moto' : 'taxi') : null,
+        this.car?.parent === this.scene
+          ? this.car === this.moto?.root
+            ? 'moto'
+            : this.fare.vehicle === 'car'
+              ? 'car'
+              : 'taxi'
+          : null,
       vehicleScreen,
       vehicleSize,
       hailed: this.hailed,
