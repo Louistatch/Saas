@@ -100,7 +100,7 @@ const FIGURE = 1.15
  * The camera frames a little wider than the old 2-unit street did: the city around the player
  * is at real scale, so the same framing would show 2.5 times fewer cells.
  */
-const VIEW = 1.4
+const VIEW = 1.25
 /** Background by day (the prototype's soft green) and at night. */
 /** Cells drawn around the player; the window is rebuilt when the player gets near its edge. */
 const RADIUS = 13
@@ -869,7 +869,8 @@ export class StreetWorld {
       const grain = GRAIN[kind]
       let map = this.grains.get(kind)
       if (grain && !map) {
-        map = groundGrain(...grain)
+        // Two repeats a cell (whole numbers: the grain stays seamless from cell to cell).
+        map = groundGrain(...grain, Math.max(1, Math.floor(U / PERSON_CELL)))
         this.grains.set(kind, map)
       }
       m = new THREE.MeshStandardMaterial({

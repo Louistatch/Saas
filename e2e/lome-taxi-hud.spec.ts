@@ -39,8 +39,11 @@ test('taxi shift: a one-line fare and a payment bubble after each fare', async (
       ).__LOME_PLAYER?.vehicleSize,
   )
   expect(dimensions, 'a real fitted taxi has loaded').toBeTruthy()
-  expect(Math.max(dimensions!.x, dimensions!.z), 'taxi is at the traffic scale').toBeLessThan(2.3)
-  expect(dimensions!.y).toBeLessThan(0.8)
+  // Real scale: a 4.1 m sedan, 1.75 m tall with its roof sign, against a 1.75 m (1.15-unit) adult.
+  expect(dimensions!.z, 'taxi is about 4.1 m long').toBeGreaterThan(2.5)
+  expect(dimensions!.z, 'taxi is about 4.1 m long').toBeLessThan(2.9)
+  expect(dimensions!.x).toBeLessThan(1.2)
+  expect(dimensions!.y).toBeLessThan(1.15)
   if (info.project.name.startsWith('mobile')) await board.tap()
   else await board.click()
 

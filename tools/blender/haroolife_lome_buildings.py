@@ -224,6 +224,29 @@ def window(p, x, y, z, w, h):
     box('appui', (w + 0.12, 0.12, 0.05), (x, y - 0.03, z - 0.05), BETON, p)
 
 
+def plain_window(p, x, y, z, w, h):
+    """Fenêtre posée sur un mur plein (pignon, arrière) : cadre, persiennes, barreaux, appui,
+    en saillie de quelques centimètres ; plus légère que celle de la façade."""
+    box('fenetre-cadre', (w + 0.08, 0.03, h + 0.08), (x, y - 0.015, z - 0.04), CADRE, p)
+    box('persienne', (w - 0.04, 0.02, h - 0.04), (x, y - 0.035, z + 0.02), PERSIENNE, p)
+    for i in range(3):
+        box('barreau', (0.022, 0.022, h), (x - w / 2 + (i + 0.5) * w / 3, y - 0.07, z), BARREAU, p)
+    box('appui', (w + 0.12, 0.1, 0.05), (x, y - 0.05, z - 0.07), BETON, p)
+
+
+def blind_walls(p, W, D, z, sill=1.0, h=1.15, w=0.9):
+    """Des fenêtres sur les pignons et le mur arrière d'un niveau : la caméra tourne autour."""
+    faces = [((0, D / 2, 0), math.pi, W), ((W / 2, 0, 0), math.pi / 2, D), ((-W / 2, 0, 0), -math.pi / 2, D)]
+    for loc, rot, length in faces:
+        side = empty('mur')
+        side.parent = p
+        side.location = loc
+        side.rotation_euler = (0, 0, rot)
+        xs = [0.0] if length < 5 else [-length / 4, length / 4]
+        for x in xs:
+            plain_window(side, x, 0, z + sill, w, h)
+
+
 def front_wall(p, W, D, H, openings, paint, z0=0.0, skirt=True, thickness=0.2):
     """La façade (y = -D/2) percée de ses ouvertures, linteaux et allèges compris.
     `openings` : (centre x, largeur, type, hauteur, allège)."""
@@ -399,13 +422,8 @@ def maison_basse(name, W, D, paint_door, roof, rng, veranda=False, tank=False):
         else:
             window(p, cx, -D / 2, z0 + sill, w, h)
     meter(p, W / 2 - 0.45, -D / 2, z0 + H)
-    # Une fenêtre sur chaque pignon : la caméra voit aussi les côtés.
-    for s in (-1, 1):
-        side = empty('cote')
-        side.parent = p
-        side.location = (s * W / 2, 0, 0)
-        side.rotation_euler = (0, 0, -s * math.pi / 2)
-        window(side, 0, -0.01, z0 + 1.0, 1.0, 1.15)
+    # Des fenêtres sur les pignons et à l'arrière : la caméra voit aussi ces côtés.
+    blind_walls(p, W, D, z0)
     if roof == 'tole':
         gable_roof(p, W, D, z0 + H, rng)
     else:
@@ -453,6 +471,7 @@ def boutique(name, W, D, sign, sign_colour, rng, roof='dalle'):
     openings = [(-W / 2 + 0.25 + sw / 2, sw, 'boutique', 2.4, 0.0), (W / 2 - 0.7, 0.9, 'porte', 2.15, 0.0)]
     front_wall(p, W, D, H, openings, PEINTURE, z0)
     side_walls(p, W, D, H, PEINTURE, z0)
+    blind_walls(p, W, D, z0)
     shop_front(p, openings[0][0], -D / 2, sw, 2.4, rng, sign, sign_colour, z0=z0)
     door(p, openings[1][0], -D / 2, z0, 0.9, 2.15, rng.choice(PORTES))
     if roof == 'tole':
@@ -485,6 +504,7 @@ def immeuble(name, W, D, floors, sign, sign_colour, rng):
         shops = [(-W / 2 + 0.25 + sw / 2, sw, 'boutique', 2.3, 0.0), (W / 2 - 0.7, 0.9, 'porte', 2.15, 0.0)]
     front_wall(p, W, D, FH, shops, PEINTURE, z0)
     side_walls(p, W, D, FH, PEINTURE, z0)
+    blind_walls(p, W, D, z0, sill=1.1)
     for i, (cx, w, kind, h, sill) in enumerate(shops):
         if kind == 'boutique':
             shop_front(p, cx, -D / 2, w, h, rng, sign if i == 0 else None, sign_colour, z0=z0)
@@ -498,6 +518,7 @@ def immeuble(name, W, D, floors, sign, sign_colour, rng):
                (W * 0.32, ww, 'fenetre', 1.2, 1.0)]
         front_wall(p, W, D, FH, win, PEINTURE_2 if f % 2 else PEINTURE, z, skirt=False)
         side_walls(p, W, D, FH, PEINTURE_2 if f % 2 else PEINTURE, z, skirt=False)
+        blind_walls(p, W, D, z, w=1.1, h=1.2)
         for cx, w, kind, h, sill in win:
             if kind == 'porte':
                 door(p, cx, -D / 2, z, w, h, PORTES[rng.randrange(len(PORTES))])
@@ -532,6 +553,7 @@ def villa(name, W, D, rng):
                 (W * 0.3, 1.5, 'fenetre', 1.3, 0.9)]
     front_wall(p, W, D, H, openings, PEINTURE, z0, skirt=False)
     side_walls(p, W, D, H, PEINTURE, z0, skirt=False)
+    blind_walls(p, W, D, z0, sill=0.9, w=1.3, h=1.3)
     for cx, w, kind, h, sill in openings:
         if kind == 'porte':
             door(p, cx, -D / 2, z0, w, h, PORTES[2])

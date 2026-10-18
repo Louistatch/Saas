@@ -99,11 +99,17 @@ export class StreetAtmosphere {
 }
 
 /**
- * A tileable grain for the ground: soft patches of dust, dry grass or worn asphalt. Tiny (16 px,
- * smoothed by the texture filter), drawn once per kind; the cell repeats it.
+ * A tileable grain for the ground: soft patches of dust, dry grass or worn asphalt. Tiny (32 px,
+ * smoothed by the texture filter), drawn once per kind; repeated `repeat` times across a cell, so
+ * a texel stays about 12 cm on the real-scale street.
  */
-export function groundGrain(seed: number, contrast: number, speckles: number): THREE.CanvasTexture {
-  const size = 16
+export function groundGrain(
+  seed: number,
+  contrast: number,
+  speckles: number,
+  repeat = 1,
+): THREE.CanvasTexture {
+  const size = 32
   const c = document.createElement('canvas')
   c.width = size
   c.height = size
@@ -128,6 +134,7 @@ export function groundGrain(seed: number, contrast: number, speckles: number): T
   const t = new THREE.CanvasTexture(c)
   t.wrapS = THREE.RepeatWrapping
   t.wrapT = THREE.RepeatWrapping
+  t.repeat.set(repeat, repeat)
   t.colorSpace = THREE.SRGBColorSpace
   t.anisotropy = 2
   return t
