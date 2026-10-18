@@ -71,3 +71,57 @@ export const STAGE_COPY: Record<OperatorStage, { state: string; next: string }> 
     next: 'Écrivez à l’équipe FaîtiereHub pour plus d’informations.',
   },
 }
+
+/**
+ * Retour de la page de paiement FedaPay (/operator?certification=…&ref=…). Le serveur a déjà relu
+ * la transaction auprès de FedaPay ; ce mot ne fait que choisir le message. Pur.
+ */
+export type CertificationResult = 'success' | 'pending' | 'failed' | 'unknown'
+
+export function parseCertificationResult(
+  search: string,
+): { result: CertificationResult; ref: string | null } | null {
+  const params = new URLSearchParams(search)
+  const raw = params.get('certification')
+  if (!raw) return null
+  const result: CertificationResult =
+    raw === 'success' || raw === 'pending' || raw === 'failed' ? raw : 'unknown'
+  const ref = params.get('ref')
+  return { result, ref: ref && /^[0-9a-f-]{36}$/i.test(ref) ? ref : null }
+}
+
+export const CERTIFICATION_RESULT_COPY: Record<
+  CertificationResult,
+  { title: string; body: string; tone: 'ok' | 'wait' | 'error' }
+> = {
+  success: {
+    title: 'Paiement reçu',
+    body: 'Vos frais de certification sont réglés. L’équipe FaîtiereHub active votre compte d’opérateur ; vous recevez un e-mail.',
+    tone: 'ok',
+  },
+  pending: {
+    title: 'Paiement en attente de confirmation',
+    body: 'FedaPay n’a pas encore confirmé votre paiement. Validez-le sur votre téléphone si on vous le demande, puis vérifiez à nouveau.',
+    tone: 'wait',
+  },
+  failed: {
+    title: 'Le paiement n’a pas abouti',
+    body: 'Vos frais ne sont pas réglés. Vous pouvez réessayer ci-dessous.',
+    tone: 'error',
+  },
+  unknown: {
+    title: 'Paiement introuvable',
+    body: 'Si votre compte Mobile Money a été débité, écrivez à l’équipe FaîtiereHub avec le reçu.',
+    tone: 'error',
+  },
+}
+
+/**
+ * Statut après le règlement des frais de certification : 'certified' pour un dossier encore en
+ * formation ou en évaluation ; un dossier actif, suspendu, expiré ou retiré garde le sien. Pur.
+ */
+export function statusAfterCertificationPaid(status: PartnerStatus): PartnerStatus {
+  return status === 'candidate' || status === 'training' || status === 'exam_pending'
+    ? 'certified'
+    : status
+}

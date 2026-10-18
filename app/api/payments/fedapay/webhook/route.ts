@@ -1,9 +1,14 @@
 import { settlePurchase } from '@/lib/fiches/purchases'
+import {
+  certificationIntentForTransaction,
+  settleCertificationIntent,
+} from '@/lib/partners/certification-payment'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { type NextRequest, NextResponse } from 'next/server'
 
 /**
- * POST /api/payments/fedapay/webhook — notification FedaPay (transaction.*).
+ * POST /api/payments/fedapay/webhook — notification FedaPay (transaction.*) : achats de comptes
+ * d'exploitation et frais de certification Opérateur.
  *
  * Le corps n'est jamais cru sur parole : on n'en tire que l'identifiant de la
  * transaction, l'achat correspondant est ensuite réglé d'après FedaPay lui-même.
@@ -22,5 +27,10 @@ export async function POST(request: NextRequest) {
     .eq('provider_transaction_id', String(txId))
     .maybeSingle<{ id: string }>()
   if (data) await settlePurchase(data.id)
+  else {
+    // Frais de certification Opérateur (même relecture auprès de FedaPay).
+    const intentId = await certificationIntentForTransaction(String(txId))
+    if (intentId) await settleCertificationIntent(intentId)
+  }
   return NextResponse.json({ ok: true })
 }

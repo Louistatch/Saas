@@ -28,7 +28,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { performLogout } from '@/lib/auth/logout'
-import { STAGE_COPY, STAGE_STEP, operatorStage } from '@/lib/partners/stage'
+import {
+  CERTIFICATION_RESULT_COPY,
+  type CertificationResult,
+  STAGE_COPY,
+  STAGE_STEP,
+  operatorStage,
+  parseCertificationResult,
+} from '@/lib/partners/stage'
 import type { PartnerLedgerEntryType, PartnerStatus } from '@/types/domain'
 import {
   ArrowDownCircle,
@@ -131,7 +138,8 @@ function OperatorCard({ status, firstName }: { status: PartnerStatusResponse; fi
 /**
  * Bouton de paiement de certification — n'apparaît que si formation et examen
  * sont déjà validés (§9, §24 du plan). Redirige vers la page de paiement
- * hébergée CinetPay ; le statut ne changera qu'au retour du callback.
+ * hébergée FedaPay ; le statut ne change qu'une fois la transaction relue
+ * auprès de FedaPay (retour ou notification).
  */
 function CertificationPayment({ eligible }: { eligible: boolean }) {
   const [phone, setPhone] = useState('')
@@ -142,7 +150,7 @@ function CertificationPayment({ eligible }: { eligible: boolean }) {
 
   const pay = async () => {
     if (!phone.trim()) {
-      setError('Indiquez le numéro mobile money à utiliser.')
+      setError('Indiquez votre numéro de téléphone.')
       return
     }
     setSubmitting(true)
@@ -170,10 +178,10 @@ function CertificationPayment({ eligible }: { eligible: boolean }) {
     <div className="space-y-3 rounded-xl border border-amber-300/60 bg-amber-50/40 p-4">
       <p className="text-sm font-medium text-foreground">
         Formation et évaluation validées. Il reste les frais de certification, 15 000 XOF, à régler
-        par mobile money.
+        par Mobile Money ou carte bancaire sur la page de paiement sécurisée FedaPay.
       </p>
       <div className="space-y-2">
-        <Label htmlFor="cert-phone">Numéro mobile money</Label>
+        <Label htmlFor="cert-phone">Votre numéro de téléphone</Label>
         <Input
           id="cert-phone"
           value={phone}
@@ -185,6 +193,44 @@ function CertificationPayment({ eligible }: { eligible: boolean }) {
       <Button onClick={pay} disabled={submitting} className="w-full">
         {submitting ? <Spinner className="h-4 w-4" /> : 'Payer 15 000 XOF'}
       </Button>
+    </div>
+  )
+}
+
+/**
+ * Message au retour de la page de paiement FedaPay. Le paramètre est retiré de l'adresse pour
+ * qu'un rechargement ne réaffiche pas un résultat périmé.
+ */
+function CertificationResultBanner({
+  value,
+  onClose,
+}: {
+  value: { result: CertificationResult; ref: string | null }
+  onClose: () => void
+}) {
+  const copy = CERTIFICATION_RESULT_COPY[value.result]
+  const tone =
+    copy.tone === 'ok'
+      ? 'border-primary/40 bg-primary/5'
+      : copy.tone === 'wait'
+        ? 'border-amber-300/60 bg-amber-50/40'
+        : 'border-destructive/40 bg-destructive/5'
+  return (
+    <div aria-live="polite" className={`mt-6 space-y-2 rounded-xl border p-4 ${tone}`}>
+      <p className="text-sm font-semibold text-foreground">{copy.title}</p>
+      <p className="text-sm text-muted-foreground">{copy.body}</p>
+      <div className="flex flex-wrap gap-2 pt-1">
+        {value.result === 'pending' && value.ref && (
+          <Button size="sm" asChild>
+            <a href={`/api/payments/fedapay/return?certification=${value.ref}`}>
+              Vérifier le paiement
+            </a>
+          </Button>
+        )}
+        <Button size="sm" variant="ghost" onClick={onClose}>
+          Fermer
+        </Button>
+      </div>
     </div>
   )
 }
@@ -548,6 +594,14 @@ function OperatorPageContent() {
 
   useEffect(load, [])
 
+  const [payResult, setPayResult] = useState<ReturnType<typeof parseCertificationResult>>(null)
+  useEffect(() => {
+    const parsed = parseCertificationResult(window.location.search)
+    if (!parsed) return
+    setPayResult(parsed)
+    window.history.replaceState(null, '', window.location.pathname)
+  }, [])
+
   const closed =
     status?.status === 'revoked' || status?.status === 'suspended' || status?.status === 'expired'
   const paymentDue =
@@ -566,6 +620,10 @@ function OperatorPageContent() {
             <div className={enter(0)}>
               <OperatorCard status={status} firstName={user?.firstName ?? ''} />
             </div>
+
+            {payResult && (
+              <CertificationResultBanner value={payResult} onClose={() => setPayResult(null)} />
+            )}
 
             {closed ? (
               <p className={`mt-6 flex items-start gap-2 text-sm text-destructive ${enter(1)}`}>

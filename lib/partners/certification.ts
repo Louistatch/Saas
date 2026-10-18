@@ -18,6 +18,7 @@
  * planifiée) aura sa propre autorisation, différente de celle d'un admin.
  */
 import 'server-only'
+import { statusAfterCertificationPaid } from '@/lib/partners/stage'
 import type { PartnerStatus } from '@/types/domain'
 import type { Database } from '@/types/supabase'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -63,7 +64,7 @@ async function loadState(admin: AdminClient, partnerId: string) {
 async function writeAuditLog(
   admin: AdminClient,
   params: {
-    validatorId: string
+    validatorId: string | null
     action: string
     partnerId: string
     previousState: Record<string, unknown>
@@ -232,6 +233,65 @@ export async function recordPartnerExamResult(
   })
 
   return { ok: true, exam_score: params.examScore, exam_passed_at: examPassedAt }
+}
+
+/**
+ * Enregistre les frais de certification comme réglés : `certified_at` est posé et le dossier
+ * passe en 'certified'. Deux appelants : le paiement FedaPay confirmé
+ * (lib/partners/certification-payment.ts) et, en secours, un super_admin qui a constaté un
+ * règlement hors ligne. Exige une évaluation réussie ; idempotent (la date de règlement ne
+ * glisse pas) ; ne fait jamais reculer un dossier déjà actif, suspendu ou retiré.
+ */
+export async function recordCertificationFeePaid(
+  admin: AdminClient,
+  params: {
+    partnerId: string
+    validatorId: string | null
+    method: 'fedapay' | 'manual'
+    note?: string
+  },
+): Promise<CertificationActionResult> {
+  const { certification, partner } = await loadState(admin, params.partnerId)
+  if (!certification || !partner) {
+    return { ok: false, error: 'Candidature Opérateur introuvable' }
+  }
+  if (!certification.exam_passed_at) {
+    return { ok: false, error: 'L’évaluation pratique doit être réussie avant les frais' }
+  }
+  if (certification.certified_at) return { ok: true, partner_status: partner.status }
+
+  const now = new Date().toISOString()
+  const { data: written, error } = await admin
+    .from('partner_certifications')
+    .update({ certified_at: now, updated_at: now })
+    .eq('partner_id', params.partnerId)
+    .is('certified_at', null)
+    .select('partner_id')
+  if (error) return { ok: false, error: 'Écriture impossible' }
+  // Un appel concurrent a déjà enregistré le règlement : rien d'autre à faire.
+  if (!written?.length) return { ok: true, partner_status: partner.status }
+
+  const nextStatus = statusAfterCertificationPaid(partner.status)
+  if (nextStatus !== partner.status) {
+    await admin
+      .from('partners')
+      .update({ status: nextStatus, updated_at: now })
+      .eq('id', params.partnerId)
+  }
+
+  await writeAuditLog(admin, {
+    validatorId: params.validatorId,
+    action:
+      params.method === 'manual'
+        ? 'partner_certification_marked_paid'
+        : 'partner_certification_paid',
+    partnerId: params.partnerId,
+    previousState: { certified_at: null, status: partner.status },
+    newState: { certified_at: now, status: nextStatus, method: params.method },
+    note: params.note,
+  })
+
+  return { ok: true, partner_status: nextStatus }
 }
 
 /**
