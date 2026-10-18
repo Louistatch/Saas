@@ -8,9 +8,10 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import type { AcademyQuizPublic } from '@/types/domain'
 import { ArrowLeft, ArrowRight, CheckCircle2, Clock, XCircle } from 'lucide-react'
 /**
- * Quiz : une question à la fois, progression visible, confirmation avant l'envoi, puis retour
- * détaillé (bonne réponse, explication) question par question. La clé de correction n'arrive
- * qu'avec le résultat d'une tentative corrigée côté serveur (lib/academy/operator-training.ts).
+ * Quiz : une question à la fois, progression visible, confirmation avant l'envoi. Après une
+ * réussite, retour détaillé (bonne réponse, explication) question par question ; après un échec,
+ * le score seulement. La clé de correction n'arrive qu'avec une tentative réussie, corrigée côté
+ * serveur (lib/academy/operator-training.ts, revealCorrections).
  * Un quiz réussi ne se rejoue pas ; la limite de tentatives par 24 h vient du serveur.
  */
 import { useRouter } from 'next/navigation'
@@ -159,57 +160,65 @@ export function QuizForm({ quiz, history }: { quiz: AcademyQuizPublic; history: 
               Déposez le cas pratique ci-dessous pour valider la leçon.
             </p>
           )}
-          <ol className="space-y-4">
-            {questions.map((q, i) => {
-              const f = byId.get(q.id)
-              const chosen = new Set(f?.selectedOptionIds ?? answers[q.id] ?? [])
-              const good = new Set(f?.correctOptionIds ?? [])
-              return (
-                <li key={q.id} className="rounded-lg border border-border p-3">
-                  <p className="text-sm font-medium text-foreground">
-                    {i + 1}. {q.prompt}
-                    {f && !f.pending && (
-                      <span
-                        className={`ml-2 text-xs ${f.correct ? 'text-primary' : 'text-destructive'}`}
-                      >
-                        {f.earned} / {f.points} pt
-                      </span>
-                    )}
-                  </p>
-                  {q.question_type === 'case' ? (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Question ouverte : en attente de correction, hors score.
+          {!result.passed && (
+            <p className="text-sm text-muted-foreground">
+              Les bonnes réponses ne s’affichent qu’après la réussite du quiz. Relisez la leçon,
+              puis réessayez.
+            </p>
+          )}
+          {result.passed && (
+            <ol className="space-y-4">
+              {questions.map((q, i) => {
+                const f = byId.get(q.id)
+                const chosen = new Set(f?.selectedOptionIds ?? answers[q.id] ?? [])
+                const good = new Set(f?.correctOptionIds ?? [])
+                return (
+                  <li key={q.id} className="rounded-lg border border-border p-3">
+                    <p className="text-sm font-medium text-foreground">
+                      {i + 1}. {q.prompt}
+                      {f && !f.pending && (
+                        <span
+                          className={`ml-2 text-xs ${f.correct ? 'text-primary' : 'text-destructive'}`}
+                        >
+                          {f.earned} / {f.points} pt
+                        </span>
+                      )}
                     </p>
-                  ) : (
-                    <ul className="mt-2 space-y-1 text-sm">
-                      {q.options.map((o) => {
-                        const isGood = good.has(o.id)
-                        const isChosen = chosen.has(o.id)
-                        return (
-                          <li
-                            key={o.id}
-                            className={
-                              isGood
-                                ? 'font-medium text-primary'
-                                : isChosen
-                                  ? 'text-destructive line-through'
-                                  : 'text-muted-foreground'
-                            }
-                          >
-                            {isGood ? '✓ ' : isChosen ? '✗ ' : '· '}
-                            {o.label}
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  )}
-                  {f?.explanation && (
-                    <p className="mt-2 text-xs text-foreground/80">{f.explanation}</p>
-                  )}
-                </li>
-              )
-            })}
-          </ol>
+                    {q.question_type === 'case' ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Question ouverte : en attente de correction, hors score.
+                      </p>
+                    ) : (
+                      <ul className="mt-2 space-y-1 text-sm">
+                        {q.options.map((o) => {
+                          const isGood = good.has(o.id)
+                          const isChosen = chosen.has(o.id)
+                          return (
+                            <li
+                              key={o.id}
+                              className={
+                                isGood
+                                  ? 'font-medium text-primary'
+                                  : isChosen
+                                    ? 'text-destructive line-through'
+                                    : 'text-muted-foreground'
+                              }
+                            >
+                              {isGood ? '✓ ' : isChosen ? '✗ ' : '· '}
+                              {o.label}
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )}
+                    {f?.explanation && (
+                      <p className="mt-2 text-xs text-foreground/80">{f.explanation}</p>
+                    )}
+                  </li>
+                )
+              })}
+            </ol>
+          )}
           {!result.passed &&
             (result.attemptsLeft == null || result.attemptsLeft > 0 ? (
               <Button onClick={retry} variant="outline" className="min-h-11 w-full">

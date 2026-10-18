@@ -144,3 +144,12 @@ export function stableShuffle<T>(items: T[], seed: string): T[] {
   })
   return keyed.sort((a, b) => a.key - b.key).map((k) => k.item)
 }
+
+/**
+ * Correction détaillée (bonnes réponses, explications) : seulement après une réussite. Montrée après
+ * un échec, elle permettait de recopier les réponses à la tentative suivante, et le quiz ne
+ * mesurait plus rien. Après un échec, la personne voit son score et relit la leçon.
+ */
+export function revealCorrections(passed: boolean, showFeedback: boolean): boolean {
+  return showFeedback && passed
+}

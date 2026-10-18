@@ -96,7 +96,7 @@ export default function OperatorSignupPage() {
         benefits={[
           'Formation professionnelle gratuite',
           'Évaluation pratique obligatoire',
-          'Certification vérifiable',
+          'Certification FaîtiereHub après évaluation',
           'Accès aux missions après validation',
         ]}
       />

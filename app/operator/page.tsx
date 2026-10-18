@@ -19,7 +19,7 @@
 
 import { ProtectedRoute } from '@/app/components/protected-route'
 import { useAuth } from '@/app/context/auth-context'
-import { Journey, STATUS_STEP, journeySteps } from '@/components/operator/journey'
+import { Journey, journeySteps } from '@/components/operator/journey'
 import { ShareTraining } from '@/components/operator/share-training'
 import { Spinner } from '@/components/shared/loading'
 import { Logo } from '@/components/shared/logo'
@@ -28,6 +28,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { performLogout } from '@/lib/auth/logout'
+import { STAGE_COPY, STAGE_STEP, operatorStage } from '@/lib/partners/stage'
 import type { PartnerLedgerEntryType, PartnerStatus } from '@/types/domain'
 import {
   ArrowDownCircle,
@@ -74,42 +75,6 @@ interface WalletResponse {
   ledger: WalletLedgerRow[]
 }
 
-/** Où en est le dossier, en une phrase, et ce qu'il y a à faire maintenant. */
-const STATUS_COPY: Record<PartnerStatus, { state: string; next: string }> = {
-  candidate: {
-    state: 'Candidature enregistrée',
-    next: 'Suivez la formation en ligne, gratuite, à votre rythme.',
-  },
-  training: {
-    state: 'Formation en cours',
-    next: 'Terminez les leçons pour passer à l’évaluation pratique.',
-  },
-  exam_pending: {
-    state: 'Formation terminée',
-    next: 'Un opérateur de l’équipe vous contacte pour l’évaluation sur le terrain.',
-  },
-  certified: {
-    state: 'Évaluation réussie',
-    next: 'Réglez les frais de certification (15 000 XOF) pour devenir opérateur actif.',
-  },
-  active: {
-    state: 'Opérateur actif',
-    next: 'Validez les dossiers de votre zone et imprimez les cartes commandées.',
-  },
-  suspended: {
-    state: 'Compte suspendu',
-    next: 'Écrivez à l’équipe FaîtiereHub pour connaître la suite.',
-  },
-  expired: {
-    state: 'Certification expirée',
-    next: 'Écrivez à l’équipe FaîtiereHub pour la renouveler.',
-  },
-  revoked: {
-    state: 'Certification retirée',
-    next: 'Écrivez à l’équipe FaîtiereHub pour plus d’informations.',
-  },
-}
-
 /** Entrée de page orchestrée : chaque bloc arrive dans l'ordre de lecture (skill ui-motion). */
 const enter = (rank: number) =>
   `motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:fill-mode-both motion-safe:duration-300 motion-safe:ease-out motion-safe:[animation-delay:${rank * 70}ms]`
@@ -130,7 +95,9 @@ function OperatorHeader() {
  * la console de validation installée sur le téléphone (operator.webmanifest).
  */
 function OperatorCard({ status, firstName }: { status: PartnerStatusResponse; firstName: string }) {
-  const copy = status.status ? STATUS_COPY[status.status] : null
+  const copy = status.status
+    ? STAGE_COPY[operatorStage({ ...status, status: status.status })]
+    : null
   return (
     <section
       aria-labelledby="operator-card-title"
@@ -612,7 +579,7 @@ function OperatorPageContent() {
                   Votre parcours
                 </h2>
                 <Journey
-                  current={STATUS_STEP[status.status]}
+                  current={STAGE_STEP[operatorStage({ ...status, status: status.status })]}
                   steps={journeySteps({
                     status: status.status,
                     training_completed_at: status.training_completed_at,

@@ -56,20 +56,6 @@ export function LabFrame({
             <span aria-hidden="true" className="h-2 w-2 rounded-full bg-(--ac-gold)" />
             Données d’exercice, rien n’est enregistré
           </span>
-          <p
-            aria-label="Mode d’affichage"
-            className="m-0 inline-flex overflow-hidden rounded-full border border-(--ac-ground)/30"
-          >
-            <span aria-current="true" className="bg-(--ac-ground) px-3.5 py-2 text-(--ac-ink)">
-              Vue 2D
-            </span>
-            <span
-              className="px-3.5 py-2 text-(--ac-pale)"
-              title="La vue 3D arrive au jalon J5 ; la vue 2D est l’alternative accessible."
-            >
-              Vue 3D : bientôt
-            </span>
-          </p>
         </div>
       </header>
 
@@ -79,9 +65,8 @@ export function LabFrame({
           className="flex flex-col gap-4 bg-[linear-gradient(180deg,#1C4A2E_0%,#143A24_55%,#0F2C1C_100%)] p-4 sm:p-7"
         >
           <p className="max-w-[60ch] text-sm leading-relaxed text-(--ac-pale)">
-            Un bureau de coopérative fictif. Choisissez un objet pour avancer dans la mission ; la
-            version 3D du même bureau arrivera au jalon suivant, avec cette même liste comme
-            alternative accessible.
+            Un bureau de coopérative fictif. Choisissez un objet pour avancer dans la mission, étape
+            par étape.
           </p>
           <ol className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2">
             {objects.map((object, i) => {
@@ -180,7 +165,7 @@ export function LabFrame({
                 className="rounded-full bg-(--ac-mist) px-4 py-3 text-center text-sm font-bold text-(--ac-emerald) motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-200"
                 aria-live="polite"
               >
-                Mission parcourue. La simulation interactive arrive au jalon J5.
+                Mission parcourue. Revenez à la leçon pour passer à l’évaluation.
               </p>
             ) : (
               <button

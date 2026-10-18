@@ -9,7 +9,8 @@ import { type NextRequest, NextResponse, after } from 'next/server'
 import { z } from 'zod'
 
 const bodySchema = z.object({
-  contentText: z.string().trim().min(1).max(10_000).optional(),
+  // Même seuil que le formulaire : un cas pratique se rédige (20 caractères au moins).
+  contentText: z.string().trim().min(20).max(10_000).optional(),
   attachmentUrl: z.string().url().optional(),
 })
 

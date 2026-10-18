@@ -6,6 +6,7 @@
 import 'server-only'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import type { AcademyModuleWithLessons } from '@/types/domain'
+import { lessonCount } from './catalogue'
 import { type LearnerLesson, displayTitle, learnerLessons, resumeLesson } from './learner-view'
 import {
   OPERATOR_MODULE_ID,
@@ -32,7 +33,7 @@ export async function loadLearnerPage(userId: string): Promise<LearnerPageData |
     admin.from('profiles').select('first_name').eq('id', userId).maybeSingle(),
     admin
       .from('academy_modules')
-      .select('id')
+      .select('id, academy_lessons(id)')
       .eq('is_published', true)
       .neq('id', OPERATOR_MODULE_ID),
   ])
@@ -54,6 +55,7 @@ export async function loadLearnerPage(userId: string): Promise<LearnerPageData |
     lessons,
     resume: resumeLesson(lessons),
     firstName: profile.data?.first_name ?? null,
-    otherPublishedModules: others.data?.length ?? 0,
+    // Seulement les vraies formations : un module publié sans leçon n'en est pas une.
+    otherPublishedModules: (others.data ?? []).filter((m) => lessonCount(m) > 0).length,
   }
 }

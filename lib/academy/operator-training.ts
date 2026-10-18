@@ -20,13 +20,14 @@ import type {
 } from '@/types/domain'
 import type { Database } from '@/types/supabase'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { attemptGate, gradeQuiz, stableShuffle } from './assessment-policy'
+import { attemptGate, gradeQuiz, revealCorrections, stableShuffle } from './assessment-policy'
+import { OPERATOR_COURSE_ID } from './catalogue'
 import { isLessonCompleted, missingForLesson } from './completion-policy'
 
 type AdminClient = SupabaseClient<Database>
 
-/** Module pilote « Opérateur certifié FaîtiereHub — Pilote V1 », déjà seedé en base. */
-export const OPERATOR_MODULE_ID = '2482e523-500e-4178-8102-1018af290c82'
+/** Module « Opérateur certifié FaîtiereHub », déjà seedé en base (id partagé : catalogue.ts). */
+export const OPERATOR_MODULE_ID = OPERATOR_COURSE_ID
 
 export interface ProgressResult {
   ok: boolean
@@ -495,7 +496,7 @@ export async function submitQuizAttempt(
   if (error || !attempt) return { ok: false, error: 'Écriture de la tentative impossible' }
 
   const explanationById = new Map(questionRows.map((q) => [q.id, q.explanation]))
-  const feedback = quiz.show_feedback
+  const feedback = revealCorrections(grade.passed, quiz.show_feedback)
     ? grade.questions.map((g) => ({
         questionId: g.questionId,
         earned: g.earned,

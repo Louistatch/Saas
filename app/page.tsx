@@ -82,7 +82,7 @@ const FAITIERE_FEATURES = [
     color: 'bg-teal-50 text-teal-700',
     title: 'AgriAcademy',
     description:
-      'Modules de formation certifiante pour vos membres — irrigation, cultures, bonnes pratiques.',
+      'Formation certifiante des Opérateurs de terrain : leçons, quiz, cas pratiques corrigés et évaluation sur le terrain.',
   },
   {
     icon: Handshake,
@@ -505,7 +505,7 @@ export default function Home() {
               <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <CheckCircle className="h-5 w-5" />
               </div>
-              <h3 className="font-bold text-foreground mb-2">Certification reconnue</h3>
+              <h3 className="font-bold text-foreground mb-2">Certification FaîtiereHub</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Après la formation, une évaluation pratique. Les frais de certification (15 000 XOF)
                 ne sont dus qu&apos;une fois l&apos;examen validé — jamais avant, jamais pour
@@ -542,8 +542,8 @@ export default function Home() {
 
           <p className="mx-auto mt-4 max-w-2xl text-center text-sm text-muted-foreground">
             La formation Opérateur s&apos;ouvre dès la création du compte, et le tableau de bord
-            Opérateur une fois les frais de certification réglés. Membres de coopérative et profils
-            Haroo ont leurs propres formations dans AgriAcademy.
+            Opérateur une fois les frais de certification réglés et le compte activé par
+            l&apos;équipe.
           </p>
         </div>
       </section>

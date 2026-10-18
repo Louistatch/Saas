@@ -16,18 +16,6 @@ export interface JourneyStep {
   action?: ReactNode
 }
 
-/** Étape en cours (1 à 5) pour chaque statut ; 0 quand le parcours est fermé. */
-export const STATUS_STEP: Record<PartnerStatus, number> = {
-  candidate: 2,
-  training: 2,
-  exam_pending: 3,
-  certified: 4,
-  active: 5,
-  suspended: 4,
-  expired: 4,
-  revoked: 0,
-}
-
 const day = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }) : null
 

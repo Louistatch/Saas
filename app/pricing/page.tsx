@@ -39,7 +39,7 @@ const FAITIERE_PLANS = [
       'Membres illimités',
       'AgriMarket — place de marché avancée',
       'AgriCredit — crédit agricole avec scoring',
-      'AgriAcademy — modules de formation',
+      'AgriAcademy — formations publiées par votre organisation',
       'Carte agricole interactive',
       'Matching producteurs / acheteurs',
       'Intégration KoboToolbox complète',

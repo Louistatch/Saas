@@ -128,7 +128,7 @@ const ADVANCED = [
     icon: GraduationCap,
     title: 'AgriAcademy',
     description:
-      'Modules de formation certifiante pour vos membres — irrigation FAO-56, pratiques culturales, agrobusiness et bonnes pratiques terrain.',
+      'Formation certifiante des Opérateurs de terrain : 12 leçons, quiz, cas pratiques corrigés par l’équipe et évaluation pratique.',
   },
   {
     icon: Users,

@@ -312,7 +312,7 @@ export default function AdminPartnersPage() {
     <div className="space-y-6">
       <PageHeader
         title="Opérateurs"
-        description="Validation manuelle de la certification — mécanisme pilote, en attendant le moteur d'examen AgriAcademy."
+        description="Candidatures, formation, évaluation pratique, frais de certification et activation des Opérateurs."
       />
 
       <Card>
