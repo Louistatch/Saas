@@ -2493,6 +2493,8 @@ export class StreetWorld {
       heading: ctl.heading,
       speed: ctl.speed,
       mode: ctl.mode,
+      // The stick as this frame read it (0 once a release has been taken into account).
+      input: Math.hypot(ctl.input.x, ctl.input.y),
       cell: ctl.cell,
       camera: { ...ctl.camera },
       vehicle: ctl.vehicle ? { ...ctl.vehicle } : null,

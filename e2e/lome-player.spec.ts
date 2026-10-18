@@ -11,6 +11,7 @@ type Player = {
   heading: number
   speed: number
   mode: string
+  input: number
   cell: { x: number; y: number }
   camera: { tx: number; tz: number; follow: boolean; angle: number; distance: number }
   vehicle: { x: number; z: number; heading: number; speed: number } | null
@@ -115,10 +116,11 @@ test('avatar, joystick, collisions, camera and taxi in the single 3D world', asy
   // The body turned towards each direction.
   const headings = new Set(samples.map((p) => Math.round(p.heading / 45)))
   expect(headings.size).toBeGreaterThanOrEqual(4)
-  // Stop: no sliding after release, measured as a distance. Under software rendering a street
-  // rebuild can hold the frame loop for half a second right after the release, and the probe
-  // still shows the last walking frame meanwhile (seen in the full suite): wall time says
-  // nothing about sliding, the distance covered once released does.
+  // Stop: no sliding after release, measured as a distance from the first frame that read the
+  // released stick. Under software rendering a frame lasts 100–250 ms (and a street rebuild can
+  // hold one for half a second): until the game has taken the release, the avatar still walks
+  // on the stick it held, which says nothing about sliding.
+  await expect.poll(async () => ((await player()) as Player).input).toBe(0)
   const released = (await player()) as Player
   await expect.poll(async () => ((await player()) as Player).mode).toBe('idle')
   const stopped = (await player()) as Player
