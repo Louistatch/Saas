@@ -91,7 +91,7 @@ export async function settlePurchase(purchaseId: string): Promise<PurchaseRow | 
         lines: [
           'Bonjour,',
           `Nous confirmons la réception de votre paiement de ${p.amount.toLocaleString('fr-FR')} ${p.currency}.`,
-          `Achat : fiche technique « ${fiche?.title ?? 'fiche technique'} »`,
+          `Achat : compte d’exploitation « ${fiche?.title ?? 'compte d’exploitation'} »`,
           `Référence : ${p.provider_transaction_id}`,
           'Merci pour votre confiance.',
         ],

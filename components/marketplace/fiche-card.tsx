@@ -1,9 +1,10 @@
 'use client'
 
-import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Download, FileText, Sprout, MapPin } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
 import type { PublicFiche } from '@/hooks/use-fiches-public'
+import { labelTypeAgriculture } from '@/lib/fiches/types'
+import { Download, FileText, MapPin, Sprout } from 'lucide-react'
 
 interface FicheCardProps {
   fiche: PublicFiche
@@ -40,7 +41,7 @@ export function FicheCard({ fiche, cultureIcon, onAccess }: FicheCardProps) {
               <Sprout className="h-3 w-3" />
               <span className="truncate">{fiche.culture}</span>
               <span aria-hidden="true">•</span>
-              <span className="capitalize truncate">{fiche.type_agriculture}</span>
+              <span className="truncate">{labelTypeAgriculture(fiche.type_agriculture)}</span>
             </div>
           </div>
         </div>
@@ -90,7 +91,11 @@ export function FicheCard({ fiche, cultureIcon, onAccess }: FicheCardProps) {
               {fiche.download_count}{' '}
               {fiche.download_count === 1 ? 'téléchargement' : 'téléchargements'}
             </span>
-            <span className="font-semibold text-foreground">{fiche.price_non_member} FCFA</span>
+            <span className="font-semibold text-foreground">
+              {fiche.price_non_member > 0
+                ? `${fiche.price_non_member.toLocaleString('fr-FR')} FCFA`
+                : 'Gratuit'}
+            </span>
           </div>
           <Button
             className="w-full gap-2 bg-primary hover:bg-primary/90"
@@ -98,7 +103,7 @@ export function FicheCard({ fiche, cultureIcon, onAccess }: FicheCardProps) {
             onClick={() => onAccess(fiche)}
           >
             <FileText className="h-4 w-4" />
-            {fiche.price_non_member > 0 ? 'Acheter / accéder' : 'Accéder à la fiche'}
+            {fiche.price_non_member > 0 ? 'Acheter / accéder' : 'Télécharger gratuitement'}
           </Button>
           {fiche.is_free_for_members ? (
             <p className="text-[10px] text-center text-muted-foreground mt-2">

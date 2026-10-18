@@ -1,9 +1,10 @@
-import { type NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
+import { type FicheFile, TYPE_AGRICULTURE_KEYS } from '@/lib/fiches/types'
 import { assertRole } from '@/lib/security/assert-access'
+import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/utils/logger'
-import { TYPE_AGRICULTURE_KEYS, type FicheFile } from '@/lib/fiches/types'
+import { type NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 
 const log = createLogger('api:fiches:manage')
 
@@ -21,7 +22,10 @@ const patchSchema = z.object({
     .url()
     .max(500)
     .refine(
-      (u) => u.startsWith(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/fiches-covers/`),
+      (u) =>
+        u.startsWith(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/fiches-covers/`,
+        ),
       'Image hors du stockage FaîtiereHub',
     )
     .nullable()
@@ -32,10 +36,7 @@ const patchSchema = z.object({
 })
 
 /** PATCH /api/fiches/[id] — corriger un prix, dépublier, reclasser. */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await assertRole('super_admin')
   if (!guard.ok) return guard.response
 
@@ -108,15 +109,34 @@ export async function DELETE(
       return NextResponse.json({ error: 'Fiche introuvable' }, { status: 404 })
     }
 
+    // Les achats (réglés, en attente ou refusés) sont la trace des paiements : une fiche qui en
+    // a ne se supprime pas, on la retire de la vente. La base le refuse aussi (ON DELETE
+    // RESTRICT) ; le dire avant évite d'effacer les fichiers d'une fiche qu'on ne peut pas retirer.
+    const { count: sales } = await createAdminClient()
+      .from('purchases')
+      .select('id', { count: 'exact', head: true })
+      .eq('fiche_id', id)
+    if ((sales ?? 0) > 0) {
+      return NextResponse.json(
+        {
+          error: `Ce compte a ${sales} achat(s) enregistré(s), même en attente : retirez-le de la vente au lieu de le supprimer. Les acheteurs gardent leur fichier.`,
+        },
+        { status: 409 },
+      )
+    }
+
     const paths = ((fiche.files as unknown as FicheFile[]) ?? [])
-      .map((f) => (f.url?.includes('/fiches-techniques/') ? f.url.split('/fiches-techniques/')[1] : f.url))
+      .map((f) =>
+        f.url?.includes('/fiches-techniques/') ? f.url.split('/fiches-techniques/')[1] : f.url,
+      )
       .filter((p): p is string => Boolean(p))
 
     if (paths.length > 0) {
       const { error: storageError } = await supabase.storage.from('fiches-techniques').remove(paths)
       // Un fichier déjà absent ne doit pas empêcher de retirer la fiche du
       // catalogue : on le note et on continue.
-      if (storageError) log.warn('Fiche files removal failed', { id, message: storageError.message })
+      if (storageError)
+        log.warn('Fiche files removal failed', { id, message: storageError.message })
     }
 
     const { error } = await supabase.from('fiches_techniques').delete().eq('id', id)

@@ -12,15 +12,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const limited = await applyRateLimit(request, 'marketplace')
   if (limited) return limited
   const { id } = await params
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ error: 'Achat invalide' }, { status: 400 })
+  if (!/^[0-9a-f-]{36}$/i.test(id))
+    return NextResponse.json({ error: 'Achat invalide' }, { status: 400 })
   const refresh = new URL(request.url).searchParams.get('refresh') === '1'
   const p = refresh ? await settlePurchase(id) : null
   const { data } = await createAdminClient()
     .from('purchases')
-    .select('id, fiche_id, amount, payment_status, access_granted, paid_at, fiches_techniques(title)')
+    .select(
+      'id, fiche_id, amount, payment_status, access_granted, paid_at, fiches_techniques(title)',
+    )
     .eq('id', id)
     .maybeSingle()
-  if (!data && !p) return NextResponse.json({ error: 'Achat introuvable' }, { status: 404 })
+  if (!data) return NextResponse.json({ error: 'Achat introuvable' }, { status: 404 })
   const row = data as unknown as {
     id: string
     fiche_id: string

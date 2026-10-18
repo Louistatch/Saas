@@ -1,9 +1,10 @@
-import { type NextRequest, NextResponse } from 'next/server'
+import { ficheAccessRoutes } from '@/lib/fiches/access-policy'
 import { requirePrivateCard } from '@/lib/security/card-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/utils/logger'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
+import { type NextRequest, NextResponse } from 'next/server'
 
 const log = createLogger('api:fiches:access')
 
@@ -29,19 +30,15 @@ async function signFiles(
   )
 }
 
-
 /**
  * POST /api/fiches/[id]/access
  * Check if a user has access to download a fiche.
  * - Members (card_number) → free access (fiches are locality-based, any valid member gets access)
  * - Non-members → must have a completed purchase
- * 
+ *
  * Returns signed download URLs if access is granted.
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   // Rate limiting to prevent card_number brute-force
   const clientKey = clientKeyFromHeaders(request.headers)
   const limit = rateLimit(`fiches-access:${clientKey}`, 20, 60_000)
@@ -64,23 +61,35 @@ export async function POST(
   try {
     const supabase = await createClient()
 
-    // Get the fiche with locality info
-    const { data: fiche, error: ficheError } = await supabase
+    // Lu avec le client de service : une fiche retirée de la vente (archived) n'est plus
+    // visible du public, mais ceux qui l'ont payée gardent leur fichier. Les portes ouvertes
+    // selon le statut et le prix sont décidées par ficheAccessRoutes.
+    const { data: fiche, error: ficheError } = await createAdminClient()
       .from('fiches_techniques')
-      .select('id, title, culture, files, cooperative_id, is_free_for_members, price_non_member, download_count, canton_id, prefecture_id, region_id')
+      .select(
+        'id, title, culture, files, cooperative_id, status, is_free_for_members, price_non_member, download_count, canton_id, prefecture_id, region_id',
+      )
       .eq('id', ficheId)
-      .eq('status', 'published')
       .single()
 
-    if (ficheError || !fiche) {
+    const routes = fiche ? ficheAccessRoutes(fiche) : null
+    if (ficheError || !fiche || !routes || (!routes.free && !routes.member && !routes.purchase)) {
       return NextResponse.json({ error: 'Fiche non trouvée' }, { status: 404 })
+    }
+    if (!routes.free && !routes.member && !body.purchase_id) {
+      // Retirée de la vente, sans achat présenté.
+      if (fiche.status !== 'published')
+        return NextResponse.json(
+          { error: 'Ce compte d’exploitation n’est plus en vente.' },
+          { status: 404 },
+        )
     }
 
     // Gratuit au lancement : un prix nul vaut accès libre, sans carte ni achat.
     // Le choix est porté par la DONNÉE (price_non_member), pas par une variable
     // d'environnement : la gratuité se lève fiche par fiche le jour où la vente
     // démarre, sans redéploiement et sans code mort à retirer.
-    if ((fiche.price_non_member ?? 0) <= 0) {
+    if (routes.free) {
       const { error: rpcError } = await supabase.rpc('increment_download_count', {
         target_fiche_id: ficheId,
       })
@@ -105,7 +114,7 @@ export async function POST(
 
     // Check access: MEMBER (free) — fiches are locality-based
     // Any valid active member card grants free access to published fiches
-    if (body.card_number) {
+    if (body.card_number && routes.member) {
       const cardNumber = body.card_number.trim()
       if (cardNumber.length < 5) {
         return NextResponse.json({ error: 'Numéro de carte invalide' }, { status: 400 })
@@ -124,43 +133,47 @@ export async function POST(
       }
       const card = access.card
 
-      // Fiches are locality-based: any valid member gets free access
-      if (fiche.is_free_for_members) {
-        // Log download
-        await access.supabase.from('member_access_logs').insert({
-          card_number: cardNumber,
-          member_id: card.member_id,
-          cooperative_id: card.cooperative_id,
-          fiche_id: ficheId,
-          action: 'download',
-        })
+      // Une carte valide ouvre les fiches gratuites pour les membres (routes.member).
+      // Log download
+      await access.supabase.from('member_access_logs').insert({
+        card_number: cardNumber,
+        member_id: card.member_id,
+        cooperative_id: card.cooperative_id,
+        fiche_id: ficheId,
+        action: 'download',
+      })
 
-        // Increment download count atomically
-        const { error: rpcError } = await supabase.rpc('increment_download_count', { target_fiche_id: ficheId })
-        if (rpcError) {
-          // Fallback if RPC fails
-          await supabase
-            .from('fiches_techniques')
-            .update({ download_count: (fiche.download_count ?? 0) + 1 })
-            .eq('id', ficheId)
-        }
-
-        const signedFiles = await signFiles(supabase, (fiche.files as never) ?? [])
-
-        return NextResponse.json({
-          access: 'granted',
-          reason: 'member',
-          fiche: { id: fiche.id, title: fiche.title, culture: fiche.culture },
-          files: signedFiles,
-        })
+      // Increment download count atomically
+      const { error: rpcError } = await supabase.rpc('increment_download_count', {
+        target_fiche_id: ficheId,
+      })
+      if (rpcError) {
+        // Fallback if RPC fails
+        await supabase
+          .from('fiches_techniques')
+          .update({ download_count: (fiche.download_count ?? 0) + 1 })
+          .eq('id', ficheId)
       }
+
+      const signedFiles = await signFiles(supabase, (fiche.files as never) ?? [])
+
+      return NextResponse.json({
+        access: 'granted',
+        reason: 'member',
+        fiche: { id: fiche.id, title: fiche.title, culture: fiche.culture },
+        files: signedFiles,
+      })
     }
 
     // Check access: PURCHASE (non-member)
-    if (body.purchase_id) {
+    if (body.purchase_id && routes.purchase) {
       const purchaseId = body.purchase_id.trim()
       // Validate UUID format
-      if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(purchaseId)) {
+      if (
+        !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
+          purchaseId,
+        )
+      ) {
         return NextResponse.json({ error: 'ID achat invalide' }, { status: 400 })
       }
 
@@ -175,7 +188,10 @@ export async function POST(
         .single()
 
       if (!purchase || !purchase.access_granted) {
-        return NextResponse.json({ error: 'Achat non trouvé ou paiement en attente' }, { status: 403 })
+        return NextResponse.json(
+          { error: 'Achat non trouvé ou paiement en attente' },
+          { status: 403 },
+        )
       }
 
       const signedFiles = await signFiles(supabase, (fiche.files as never) ?? [])
@@ -189,13 +205,17 @@ export async function POST(
     }
 
     // No access — return pricing info
-    return NextResponse.json({
-      access: 'denied',
-      price: fiche.price_non_member,
-      currency: 'XOF',
-      message: `Accès à cette fiche: ${fiche.price_non_member} FCFA. Utilisez votre carte membre pour un accès gratuit.`,
-    }, { status: 402 })
-
+    return NextResponse.json(
+      {
+        access: 'denied',
+        price: fiche.price_non_member,
+        currency: 'XOF',
+        message: routes.member
+          ? `Accès : ${fiche.price_non_member} FCFA, gratuit avec votre carte membre.`
+          : `Accès à ce compte d’exploitation : ${fiche.price_non_member} FCFA.`,
+      },
+      { status: 402 },
+    )
   } catch (error) {
     log.error('Fiche access error', error)
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })

@@ -13,6 +13,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { PublicFiche } from '@/hooks/use-fiches-public'
+import { labelTypeAgriculture } from '@/lib/fiches/types'
 import { FEDAPAY_PROVIDERS } from '@/lib/payments/fedapay-providers'
 import { AlertCircle, CheckCircle2, CreditCard, Download, ShoppingCart } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
@@ -140,6 +141,29 @@ export function FicheAccessDialog({ fiche, open, onOpenChange }: FicheAccessDial
     [cardNumber, fiche],
   )
 
+  // Prix nul : accès libre, sans carte ni achat (le serveur le décide d'après la fiche).
+  const handleFree = useCallback(async () => {
+    if (!fiche) return
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/fiches/${fiche.id}/access`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (res.ok && json.access === 'granted' && Array.isArray(json.files)) {
+        setFiles(json.files)
+        setSuccess(true)
+      } else setError(json.error ?? 'Téléchargement indisponible pour le moment.')
+    } catch {
+      setError('Erreur réseau. Réessayez.')
+    } finally {
+      setLoading(false)
+    }
+  }, [fiche])
+
   const handleBuy = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault()
@@ -178,7 +202,16 @@ export function FicheAccessDialog({ fiche, open, onOpenChange }: FicheAccessDial
 
   if (!fiche) return null
   const paid = fiche.price_non_member > 0
+  // La carte membre n'ouvre que les fiches gratuites pour les membres ; ailleurs, la proposer
+  // promettrait un accès qui n'existe pas.
+  const memberAccess = paid && fiche.is_free_for_members
   const busy = loading || buying
+  const errorBox = error ? (
+    <div className="flex items-start gap-2 p-2 bg-destructive/10 border border-destructive/20 rounded-lg">
+      <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+      <p className="text-xs text-destructive">{error}</p>
+    </div>
+  ) : null
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -186,7 +219,7 @@ export function FicheAccessDialog({ fiche, open, onOpenChange }: FicheAccessDial
         <DialogHeader>
           <DialogTitle>{fiche.title}</DialogTitle>
           <DialogDescription>
-            {fiche.culture} • {fiche.type_agriculture}
+            {fiche.culture} • {labelTypeAgriculture(fiche.type_agriculture)}
             {fiche.campaign ? ` • ${fiche.campaign}` : ''}
           </DialogDescription>
         </DialogHeader>
@@ -203,7 +236,7 @@ export function FicheAccessDialog({ fiche, open, onOpenChange }: FicheAccessDial
                 </div>
                 <Button asChild className="w-full gap-2">
                   <a href={`/marketplace/achat/${checkout.purchaseId}`}>
-                    <Download className="h-4 w-4" /> Télécharger ma fiche
+                    <Download className="h-4 w-4" /> Télécharger mon compte d’exploitation
                   </a>
                 </Button>
               </div>
@@ -244,6 +277,17 @@ export function FicheAccessDialog({ fiche, open, onOpenChange }: FicheAccessDial
                 <p className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Spinner className="h-3 w-3" /> Validez le paiement sur votre téléphone : cette
                   fenêtre se met à jour toute seule.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Gardez ce lien pour retrouver votre achat si vous fermez la fenêtre :{' '}
+                  <a
+                    href={`/marketplace/achat/${checkout.purchaseId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline"
+                  >
+                    suivre mon achat
+                  </a>
                 </p>
                 {checkout.url ? (
                   <a
@@ -388,58 +432,88 @@ export function FicheAccessDialog({ fiche, open, onOpenChange }: FicheAccessDial
                   {buying ? <Spinner className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
                   Payer {fiche.price_non_member.toLocaleString('fr-FR')} FCFA
                 </Button>
+                <p className="text-center text-xs text-muted-foreground">
+                  En payant, vous acceptez les{' '}
+                  <a
+                    href="/legal/conditions#achats"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline"
+                  >
+                    conditions d’achat
+                  </a>
+                  .
+                </p>
+                {memberAccess ? null : errorBox}
               </form>
-            ) : null}
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <CreditCard className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
-                <div className="text-xs text-blue-900 space-y-1">
-                  <p className="font-medium">
-                    {fiche.is_free_for_members ? 'Membres : accès gratuit' : 'Déjà membre ?'}
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <Download className="h-5 w-5 text-green-700 shrink-0 mt-0.5" />
+                  <p className="text-xs text-green-900">
+                    Ce compte d’exploitation est gratuit : téléchargez-le directement.
                   </p>
-                  <p>Entrez le numéro de votre carte membre pour télécharger cette fiche.</p>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="card_number">Numéro de carte membre</Label>
-                <Input
-                  id="card_number"
-                  placeholder="FH-2025-0001"
-                  value={cardNumber}
-                  onChange={(e) => setCardNumber(e.target.value)}
-                  disabled={busy}
-                  autoComplete="off"
-                />
-              </div>
-
-              {error ? (
-                <div className="flex items-start gap-2 p-2 bg-destructive/10 border border-destructive/20 rounded-lg">
-                  <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-                  <p className="text-xs text-destructive">{error}</p>
-                </div>
-              ) : null}
-
-              <DialogFooter>
+                {errorBox}
                 <Button
                   type="button"
-                  variant="outline"
-                  onClick={() => handleClose(false)}
+                  className="w-full gap-2 bg-primary hover:bg-primary/90"
+                  onClick={handleFree}
                   disabled={busy}
                 >
-                  Annuler
-                </Button>
-                <Button
-                  type="submit"
-                  className="bg-primary hover:bg-primary/90 gap-2"
-                  disabled={loading || cardNumber.trim().length < 5}
-                >
                   {loading ? <Spinner className="h-4 w-4" /> : <Download className="h-4 w-4" />}
-                  Vérifier et accéder
+                  Télécharger gratuitement
                 </Button>
-              </DialogFooter>
-            </form>
+              </div>
+            )}
+
+            {memberAccess ? (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <CreditCard className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+                  <div className="text-xs text-blue-900 space-y-1">
+                    <p className="font-medium">Membres de la coopérative : accès gratuit</p>
+                    <p>
+                      Entrez le numéro de votre carte membre. Il faut être connecté avec votre
+                      compte ou votre carte.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="card_number">Numéro de carte membre</Label>
+                  <Input
+                    id="card_number"
+                    placeholder="FH-2025-0001"
+                    value={cardNumber}
+                    onChange={(e) => setCardNumber(e.target.value)}
+                    disabled={busy}
+                    autoComplete="off"
+                  />
+                </div>
+
+                {errorBox}
+
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleClose(false)}
+                    disabled={busy}
+                  >
+                    Annuler
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="bg-primary hover:bg-primary/90 gap-2"
+                    disabled={loading || cardNumber.trim().length < 5}
+                  >
+                    {loading ? <Spinner className="h-4 w-4" /> : <Download className="h-4 w-4" />}
+                    Vérifier et accéder
+                  </Button>
+                </DialogFooter>
+              </form>
+            ) : null}
           </div>
         )}
       </DialogContent>

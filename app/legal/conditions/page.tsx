@@ -10,7 +10,7 @@ export default function ConditionsPage() {
         <h1 className="text-4xl font-bold tracking-tight text-foreground mb-4">
           Conditions générales d&apos;utilisation
         </h1>
-        <p className="text-muted-foreground mb-12">Dernière mise à jour : 20 septembre 2026</p>
+        <p className="text-muted-foreground mb-12">Dernière mise à jour : 18 octobre 2026</p>
 
         <div className="prose prose-neutral dark:prose-invert max-w-none space-y-10">
           {/* Objet */}
@@ -106,9 +106,53 @@ export default function ConditionsPage() {
             </p>
           </div>
 
+          {/* Achats en ligne */}
+          <div className="space-y-4" id="achats">
+            <h2 className="text-2xl font-bold text-foreground">
+              5. Achats en ligne : comptes d&apos;exploitation et certification Opérateur
+            </h2>
+            <p className="text-muted-foreground leading-relaxed">
+              La Plateforme vend des comptes d&apos;exploitation (fichiers PDF, Word ou Excel) et
+              perçoit les frais de certification des Opérateurs (15 000 FCFA, dus une seule fois,
+              après la réussite de l&apos;évaluation pratique). Le prix est affiché en francs CFA
+              (XOF) avant le paiement.
+            </p>
+            <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
+              <li>
+                <strong>Paiement.</strong> Il passe par FedaPay (Mobile Money ou carte). FaîtiereHub
+                ne conserve aucune donnée de carte. L&apos;achat n&apos;est confirmé qu&apos;après
+                validation du paiement par FedaPay.
+              </li>
+              <li>
+                <strong>Livraison.</strong> Un compte d&apos;exploitation se télécharge dès la
+                confirmation, depuis la page de l&apos;achat (lien envoyé par e-mail quand une
+                adresse est fournie). Chaque lien de téléchargement vaut une heure et se renouvelle
+                depuis cette page. L&apos;accès reste ouvert à l&apos;acheteur même si le compte est
+                ensuite retiré de la vente.
+              </li>
+              <li>
+                <strong>Nature des documents.</strong> Un compte d&apos;exploitation est
+                prévisionnel : il repose sur des hypothèses de rendement, de prix et de coûts. Il
+                aide à décider ; il ne garantit aucun résultat.
+              </li>
+              <li>
+                <strong>Remboursement.</strong> Un contenu numérique fourni immédiatement ne peut
+                plus être retourné une fois téléchargé. Si le paiement a été débité sans accès au
+                fichier, ou si le fichier est illisible, écrivez à support@faitierehub.com dans les
+                14 jours : nous fournissons le fichier ou remboursons. Un paiement en double est
+                remboursé. Les frais de certification ne sont plus remboursables une fois la
+                certification délivrée.
+              </li>
+              <li>
+                <strong>Usage.</strong> Le document est destiné à l&apos;acheteur et à son
+                organisation. Sa revente ou sa diffusion publique est interdite.
+              </li>
+            </ul>
+          </div>
+
           {/* Résiliation */}
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-foreground">5. Résiliation</h2>
+            <h2 className="text-2xl font-bold text-foreground">6. Résiliation</h2>
             <p className="text-muted-foreground leading-relaxed">
               L&apos;utilisateur peut résilier son compte à tout moment depuis les paramètres de son
               espace personnel ou en adressant une demande à support@faitierehub.com.
@@ -132,7 +176,7 @@ export default function ConditionsPage() {
           {/* Droit applicable */}
           <div className="space-y-4">
             <h2 className="text-2xl font-bold text-foreground">
-              6. Droit applicable et juridiction
+              7. Droit applicable et juridiction
             </h2>
             <p className="text-muted-foreground leading-relaxed">
               Les présentes CGU sont régies par le droit togolais. Tout litige relatif à leur
@@ -149,7 +193,7 @@ export default function ConditionsPage() {
 
           {/* Contact */}
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-foreground">7. Contact</h2>
+            <h2 className="text-2xl font-bold text-foreground">8. Contact</h2>
             <div className="rounded-lg border border-border bg-muted/30 p-6 space-y-2">
               <p className="text-foreground font-medium">FaîtiereHub</p>
               <p className="text-sm text-muted-foreground">TATCHIDA Louis — Fondateur</p>
