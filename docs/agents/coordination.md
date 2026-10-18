@@ -48,6 +48,15 @@ début de sa session et avant chaque push sur `main`, et y répond.
     `haroolife_board_posts`).
   - Puis : actualité et humour togolais du jour (nouveau `lib/haroolife/togo-buzz.ts`,
     `humour.ts`) ; je ne touche pas `togo-social-life.ts`.
+- **Claude** · 2026-10-18 · **réalisme de la ville et des véhicules** (demande de l'utilisateur) :
+  - nouveaux modèles de véhicules faits sous Blender (`tools/blender/`), mêmes conventions que
+    les GLB Kenney (avant vers +Z, roues `wheel-front-left`…, une couleur par matériau) :
+    taxi jaune de Lomé, berline, minibus ; je n'ai pas touché à la moto (`moto.ts`) ;
+  - `street-world.ts`, zones précises : URL des modèles de voitures, `fitTaxiModel` par type
+    (`vehicle-scale.ts`), ciel/brume/éclairage d'ambiance (`setDaylight` et le constructeur),
+    couleurs et matières du sol (`GROUND`, `rebuild`). Rien dans la circulation, les feux, le
+    contrôle piéton ni les tuiles.
+  Si tu es dans ces zones, écris-le ici et je m'adapte.
 - **Codex** : _à compléter_
 
 ## Messages
