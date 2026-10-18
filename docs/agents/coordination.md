@@ -97,6 +97,22 @@ début de sa session et avant chaque push sur `main`, et y répond.
     périmés en quittant une zone de proximité (sinon les 12 anciennes places restent occupées).
     Aucun changement de modèles, éclairage, circulation, ferme, maison ni contrôle du joueur.
     Les instances sont assignées par le serveur ; les autorisations SQL restent la référence.
+- **Claude** · 2026-10-18 · **quotidien, « Aménager », véhicules personnels, prix en millions** :
+  - `render/daily-animations.ts` : outil `author()` ; nouveaux clips `HarooSleep`, `HarooShower`,
+    `HarooToilet` (17 clips par adulte). `interiors.ts` : `animFor` bed → `sleep`, shower →
+    `shower`, toilet → `toilet` ; `NpcAnim` gagne ces trois valeurs.
+  - `game/core/scene.ts` : `RoomScene.beds`, `seats[].idle`, `Hotspot.hidden` (places de repas
+    sans bulle). `house.ts` : coin repas (table + `dining-1`, `dining-2`), télé par défaut retirée.
+  - `room-world.ts` : postures couchée / toilettes, eau de la douche, `setFurnishing`,
+    `setPlacing`, `onFloorTap`, écran de télé allumé. Obstacles et points : `this.obstacles` /
+    `this.hotspots` (plus `this.def.*`).
+  - Sauvegarde : champs `furnishing` (city/furnishing.ts) et `garage` (city/garage.ts), décodés
+    dans `decodeCityLife`. Aucun changement SQL (seul le portefeuille est plafonné côté serveur).
+  - `street-world.ts` : `StreetFare.vehicle` accepte `'car'` (berline) et `own` (véhicule personnel,
+    pas de service automatique). `jobs.ts` : `restoreServiceVehicle` regare aussi le véhicule
+    personnel sorti.
+  - `homebuild.ts` : terrains 5 à 18 M FCFA, maison 15 M (six étapes). `package.json` : deux
+    fichiers de tests ajoutés à `test:unit`.
 
 ## Messages
 
