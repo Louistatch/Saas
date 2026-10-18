@@ -26,6 +26,7 @@ import { type BoardPost, RENT_OPTIONS, postFace } from '@/lib/haroolife/ads/rent
 import BoardSheet from './board-sheet'
 import ResidentConversation from './resident-conversation'
 import GameMarket from './game-market'
+import { FurnitureShop, useHomeFurnishing } from './home-furnishing'
 import { GOODS, buyEstateMeal } from '@/lib/haroolife/city/commerce'
 import { type MealItem, advanceMeal, beginMeal, cancelMeal, mealPlace, readyMeal } from '@/lib/haroolife/city/dining'
 import DailyActionHud from './daily-action-hud'
@@ -665,6 +666,15 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     },
   ])
   const [notice, setNotice] = useState<string | null>(null)
+  // « Aménager » : the furniture of the player's own house and the piece being placed.
+  const [shopTab, setShopTab] = useState<'meubles' | 'marche'>('meubles')
+  const furnishing = useHomeFurnishing({
+    state: cityLife,
+    onChange: setCityLife,
+    inHouse: life.inside === 'house' && !cityLife.insideLot,
+    onNotice: setNotice,
+    closePanel: () => setPanel(null),
+  })
   // The game saved online (another phone, a cleared browser), the wallet capped by the server.
   const cloud = useCloudSave({
     loaded,
@@ -726,7 +736,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
       : panel === 'home'
         ? 'Mon foyer'
         : panel === 'shop'
-          ? 'Marché & commerces'
+          ? 'Aménager et acheter'
           : panel === 'map'
             ? `Explorer ${LOCALITIES[cityLife.locality].name}`
             : panel === 'phone'
@@ -1226,7 +1236,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   // eating and sleeping last until the player moves; washing and the toilet take a while.
   useEffect(() => {
     if (!cityLife.activity || cityLife.meal || ['sit', 'eat-seated', 'eat', 'sleep'].includes(cityLife.activity.anim)) return
-    const seconds = ['shower', 'toilet'].includes(cityLife.activity.anim) ? 9 : 3.2
+    const seconds = cityLife.activity.prop === 'tv' ? 12 : ['shower', 'toilet'].includes(cityLife.activity.anim) ? 9 : 3.2
     const id = window.setTimeout(() => setCityLife((old) => stopActivity(old)), seconds * 1000)
     return () => window.clearTimeout(id)
   }, [cityLife.activity, cityLife.meal])
@@ -1949,7 +1959,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
     if (a === 'eat') {
       const item = life.meals > 0 ? 'estate' : GOODS.find(g => g.id !== 'soap' && g.id !== 'water' && (cityLife.commerce?.inventory[g.id] ?? 0) > 0)?.id
       if (item) eatMeal(item, false)
-      else { setPanel('shop'); setNotice('Choisis un repas dans ton sac ou chez la vendeuse.') }
+      else { setShopTab('marche'); setPanel('shop'); setNotice('Choisis un repas dans ton sac ou chez la vendeuse.') }
       return
     }
     if (a === 'work') {
@@ -1994,6 +2004,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
       return
     }
     if (a === 'browse') {
+      setShopTab('marche')
       setPanel('shop')
       return
     }
@@ -2400,10 +2411,12 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
               renderer={renderer}
               input={input}
               onLeave={() => action('leave')}
+              home={furnishing.home}
             />
           </GraphicsBoundary>
         )}
       </div>
+      {furnishing.bar}
       {journey && (
         <TravelSplash
           from={journey.from}
@@ -2636,7 +2649,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
 
       {!mapView && !riding && panel === null && <DailyActionHud state={cityLife}
         onStand={() => setCityLife(old => ({ ...cancelMeal(old), activity: null }))}
-        onCancel={() => setCityLife(cancelMeal)} onBag={() => open('shop')} />}
+        onCancel={() => setCityLife(cancelMeal)} onBag={() => { setShopTab('marche'); open('shop') }} />}
       <div
         className={`pointer-events-none absolute inset-x-0 bottom-[calc(100px+env(safe-area-inset-bottom,0px))] z-20 px-3 sm:px-5 ${mapView || riding ? 'hidden' : ''}`}
       >
@@ -3195,6 +3208,25 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                   </>
                 )}
                 {panel === 'shop' && (
+                  <div role="tablist" aria-label="Aménager" className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1">
+                    {([['meubles', 'Meubles et appareils'], ['marche', 'Marché et repas']] as const).map(([id, label]) => (
+                      <button
+                        key={id}
+                        type="button"
+                        role="tab"
+                        aria-selected={shopTab === id}
+                        onClick={() => setShopTab(id)}
+                        className={`min-h-11 rounded-xl text-xs font-bold ${shopTab === id ? 'bg-white text-emerald-800 shadow' : 'text-slate-600'}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {panel === 'shop' && shopTab === 'meubles' && (
+                  <FurnitureShop state={cityLife} onChange={setCityLife} onPlace={furnishing.start} />
+                )}
+                {panel === 'shop' && shopTab === 'marche' && (
                   <>
                     <GameMarket
                       state={cityLife}

@@ -86,7 +86,6 @@ export const HOUSE_SCENE: HouseScene = {
     { model: 'kitchenStove', x: -2.5, z: -4.35, scale: 2.2 },
     { model: 'loungeSofa', x: -0.9, z: 0.8, scale: 2.6, rotation: Math.PI },
     { model: 'tableCoffee', x: -0.9, z: 2.45, scale: 2.4 },
-    { model: 'televisionModern', x: -4.9, z: 0.7, scale: 1.8, rotation: Math.PI / 2 },
     { model: 'desk', x: -4.9, z: 0.7, scale: 2.4, rotation: Math.PI / 2 },
     { model: 'bookcaseOpen', x: 0.2, z: -4.5, scale: 2.4 },
     { model: 'chair', x: 3.3, z: 0.8, scale: 2.4 },

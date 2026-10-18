@@ -20,6 +20,7 @@ import { type Building, decodeCity, roadNetwork } from '../townsmen-engine'
 import { hasTrait } from '../traits'
 import { type Commerce, decodeCommerce, emptyCommerce } from './commerce'
 import { type Farm, decodeFarm } from './farm'
+import { type Furnishing, decodeFurnishing } from './furnishing'
 import { type Plot, decodePlot } from './homebuild'
 import { type Housing, decodeHousing } from './housing'
 import { type NpcAnim, animFor, layoutFor } from './interiors'
@@ -139,6 +140,8 @@ export interface CityLife {
   housing?: Housing
   /** « Ma maison »: the plot bought in Lomé and the house built on it (see homebuild.ts). */
   plot?: Plot
+  /** Furniture and appliances bought for the home, placed or still in their box. */
+  furnishing?: Furnishing
   /** The family the player was born into (the birth lottery of arrival.ts). */
   origin?: string
   /** An advance from the neighbourhood tontine, repaid each week (see tontine.ts). */
@@ -280,6 +283,7 @@ export function decodeCityLife(value: unknown): CityLife | null {
     skills: v.skills!,
     housing: decodeHousing(v.housing),
     plot: decodePlot(v.plot),
+    furnishing: decodeFurnishing(v.furnishing),
     origin: typeof v.origin === 'string' && /^[a-z-]{2,20}$/.test(v.origin) ? v.origin : undefined,
     tontine: decodeTontine(v.tontine),
     lecture:

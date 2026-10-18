@@ -19,7 +19,8 @@ import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 import type { InputState } from '@/lib/haroolife/city/player'
 import { SHAPE_MATERIALS, type ShapeMaterial } from '@/lib/haroolife/city/prop-shapes'
 import type { DailyViewProps } from '@/lib/haroolife/engine/types'
-import { type Point, isFree, pathfind } from '@/lib/haroolife/game/core/pathfind'
+import type { PlacedFurniture } from '@/lib/haroolife/game/core/furnish'
+import { type Obstacle, type Point, isFree, pathfind } from '@/lib/haroolife/game/core/pathfind'
 import type { Hotspot, PrimitivePlacement, RoomScene } from '@/lib/haroolife/game/core/scene'
 import * as THREE from 'three'
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
@@ -68,6 +69,18 @@ export interface RoomWorldEvents extends Omit<DailyViewProps, 'meal'> {
   onError?: (message: string) => void
   /** Rendering statistics, about twice a second (diagnostics overlay). */
   onFrame?: (s: { drawCalls: number; fps: number }) => void
+  /** A tap on the floor while a piece of furniture is being placed (instead of walking). */
+  onFloorTap?: (p: Point) => void
+}
+
+/** The preview of a piece of furniture being placed: green where it fits, red elsewhere. */
+export interface PlacingGhost {
+  url: string
+  scale: number
+  x: number
+  z: number
+  rotation: number
+  valid: boolean
 }
 
 export interface RoomWorldOptions {
@@ -151,6 +164,17 @@ export class RoomWorld {
   private water: { lines: THREE.LineSegments; drops: Float32Array } | null = null
   private waterMaterial: THREE.LineBasicMaterial | null = null
   private frosted = false
+  /** The house's obstacles and interaction points, plus those of the furniture bought. */
+  private obstacles: readonly Obstacle[]
+  private hotspots: Hotspot[]
+  private readonly furniture = new THREE.Group()
+  private furnitureKey = ''
+  private furnitureVersion = 0
+  /** Television screens (material `ecran`), lit while the player watches. */
+  private readonly screens = new Set<THREE.MeshStandardMaterial>()
+  private placing: PlacingGhost | null = null
+  private ghost: { url: string; group: THREE.Group; material: THREE.MeshStandardMaterial } | null =
+    null
   private afterStand: Goal | null = null
   private meal: Meal | null = null
   private mealRequest: string | null = null
@@ -179,7 +203,8 @@ export class RoomWorld {
     this.down = null
     if (!start || Math.hypot(e.clientX - start.x, e.clientY - start.y) > 12) return
     const p = this.screenToFloor(e.clientX, e.clientY)
-    if (p) this.walkTo({ point: p, path: [] })
+    if (p && this.placing) this.events.onFloorTap?.(p)
+    else if (p) this.walkTo({ point: p, path: [] })
   }
   private readonly onPointerCancel = () => {
     this.down = null
@@ -191,6 +216,8 @@ export class RoomWorld {
     this.input = o.input
     this.events = o.events
     this.def = o.scene
+    this.obstacles = o.scene.obstacles
+    this.hotspots = [...o.scene.hotspots]
     this.avatarModel = o.avatarModel
     this.pagne = o.pagne
     this.renderer = new THREE.WebGLRenderer({
@@ -218,6 +245,8 @@ export class RoomWorld {
     this.scene.add(sun, sun.target)
     this.stage.name = this.def.title
     this.scene.add(this.stage)
+    this.furniture.name = 'Meubles achetés'
+    this.stage.add(this.furniture)
     this.canvas.addEventListener('pointerdown', this.onPointerDown)
     this.canvas.addEventListener('pointerup', this.onPointerUp)
     this.canvas.addEventListener('pointercancel', this.onPointerCancel)
@@ -304,6 +333,7 @@ export class RoomWorld {
     for (const g of this.geometries.values()) g.dispose()
     for (const m of this.materials.values()) m.dispose()
     this.waterMaterial?.dispose()
+    this.ghost?.material.dispose()
     this.blanket?.traverse((o) => {
       const t = ((o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined)?.map
       t?.dispose()
@@ -333,9 +363,7 @@ export class RoomWorld {
 
   /** Walk to the interaction point of this Saas prop, then use it (HUD activity buttons). */
   approach(propId: string): void {
-    const h = this.def.hotspots.find(
-      (x) => x.id === propId || (x.kind === 'prop' && x.ref === propId),
-    )
+    const h = this.hotspots.find((x) => x.id === propId || (x.kind === 'prop' && x.ref === propId))
     if (!h) {
       this.events.onNotice?.('Cette activité n’est pas disponible ici.')
       return
@@ -370,6 +398,105 @@ export class RoomWorld {
     } else if (!spot) this.stepOff()
   }
 
+  /**
+   * The furniture bought and placed in this room: drawn, walked around, and a television adds its
+   * « Regarder la télé » point (`spots`). Unchanged lists are ignored.
+   */
+  setFurnishing(list: readonly PlacedFurniture[], spots: readonly Hotspot[]): void {
+    const key = JSON.stringify([
+      list.map((p) => [p.uid, p.item.id, p.x, p.z, p.rotation]),
+      spots.map((h) => [h.id, h.at.x, h.at.z]),
+    ])
+    if (key === this.furnitureKey) return
+    this.furnitureKey = key
+    const version = ++this.furnitureVersion
+    this.furniture.clear()
+    this.screens.clear()
+    this.obstacles = [
+      ...this.def.obstacles,
+      ...list.map((p) => ({ x: p.x, z: p.z, w: p.w, d: p.d })),
+    ]
+    for (const m of [...this.markers]) {
+      if (this.def.hotspots.includes(m.hotspot)) continue
+      m.el.remove()
+      m.anchor.removeFromParent()
+      this.markers.splice(this.markers.indexOf(m), 1)
+    }
+    this.hotspots = [...this.def.hotspots, ...spots]
+    for (const h of spots) this.addMarker(h)
+    for (const p of list)
+      this.load(p.item.url)
+        .then((gltf) => {
+          if (this.disposed || version !== this.furnitureVersion) return
+          const anchor = this.modelAnchor(gltf, p.item.scale)
+          anchor.name = `achat:${p.item.id}`
+          anchor.position.set(p.x, 0, p.z)
+          anchor.rotation.y = p.rotation
+          anchor.traverse((o) => {
+            const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined
+            if ((o as THREE.Mesh).isMesh && m?.name === 'ecran') this.screens.add(m)
+          })
+          this.furniture.add(anchor)
+        })
+        .catch(() => this.events.onNotice?.(`${p.item.name} : le modèle n’a pas pu être chargé.`))
+    // A piece set down where the player stands: step aside to the nearest free floor.
+    const pl = this.player?.root.position
+    if (pl && !this.posture && !isFree(pl.x, pl.z, this.obstacles, this.def.bounds)) {
+      for (let r = 0.25; r < 4; r += 0.25)
+        for (let a = 0; a < 12; a++) {
+          const x = pl.x + Math.cos((a * Math.PI) / 6) * r
+          const z = pl.z + Math.sin((a * Math.PI) / 6) * r
+          if (isFree(x, z, this.obstacles, this.def.bounds)) {
+            pl.x = x
+            pl.z = z
+            return
+          }
+        }
+    }
+  }
+
+  /** Shows (or hides) the preview of the piece being placed. */
+  setPlacing(p: PlacingGhost | null): void {
+    this.placing = p
+    if (!p) {
+      if (this.ghost) {
+        this.ghost.group.removeFromParent()
+        this.ghost.material.dispose()
+        this.ghost = null
+      }
+      return
+    }
+    if (this.ghost?.url !== p.url) {
+      if (this.ghost) {
+        this.ghost.group.removeFromParent()
+        this.ghost.material.dispose()
+      }
+      const material = new THREE.MeshStandardMaterial({
+        transparent: true,
+        opacity: 0.6,
+        depthWrite: false,
+      })
+      const group = new THREE.Group()
+      group.name = 'Meuble à placer'
+      this.ghost = { url: p.url, group, material }
+      this.stage.add(group)
+      this.load(p.url).then((gltf) => {
+        if (this.ghost?.group !== group || this.disposed) return
+        const anchor = this.modelAnchor(gltf, this.placing?.scale ?? p.scale)
+        anchor.traverse((o) => {
+          if ((o as THREE.Mesh).isMesh) {
+            ;(o as THREE.Mesh).material = material
+            o.castShadow = false
+          }
+        })
+        group.add(anchor)
+      })
+    }
+    this.ghost.material.color.set(p.valid ? '#2fbf71' : '#e0453a')
+    this.ghost.group.position.set(p.x, 0.01, p.z)
+    this.ghost.group.rotation.y = p.rotation
+  }
+
   setMeal(meal: Meal | null): void {
     this.meal = meal
     if (!meal) {
@@ -392,11 +519,11 @@ export class RoomWorld {
           Math.hypot(a[1].x - pos.x, a[1].z - pos.z) - Math.hypot(b[1].x - pos.x, b[1].z - pos.z),
       )
     for (const [id, seat] of seats) {
-      const h = this.def.hotspots.find((h) => h.kind === 'prop' && h.ref === id)
-      if (!h || !isFree(seat.entry.x, seat.entry.z, this.def.obstacles, this.def.bounds)) continue
+      const h = this.hotspots.find((h) => h.kind === 'prop' && h.ref === id)
+      if (!h || !isFree(seat.entry.x, seat.entry.z, this.obstacles, this.def.bounds)) continue
       if (
         Math.hypot(pos.x - h.at.x, pos.z - h.at.z) > 0.5 &&
-        !pathfind(pos, h.at, this.def.obstacles, this.def.bounds).length
+        !pathfind(pos, h.at, this.obstacles, this.def.bounds).length
       )
         continue
       this.walkTo({ hotspot: h, path: [], meal: meal.id })
@@ -454,7 +581,7 @@ export class RoomWorld {
     const pl = this.player
     if (!p || !pl || p.phase === 'exit') return false
     const entry = p.bed ? this.def.beds?.[p.id]?.entry : this.def.seats?.[p.id]?.entry
-    if (!entry || !isFree(entry.x, entry.z, this.def.obstacles, this.def.bounds)) {
+    if (!entry || !isFree(entry.x, entry.z, this.obstacles, this.def.bounds)) {
       this.events.onNotice?.('La sortie du siège est occupée. Attends qu’elle se libère.')
       return false
     }
@@ -684,56 +811,64 @@ export class RoomWorld {
   private placeModels(url: string, gltf: GLTF): void {
     for (const f of this.def.models) {
       if (f.url !== url) continue
-      const anchor = new THREE.Group()
+      const anchor = this.modelAnchor(gltf, f.scale)
       anchor.name = f.name ?? url
       anchor.position.set(f.x, f.y ?? 0, f.z)
       anchor.rotation.y = f.rotation ?? 0
-      // Clones share the loaded geometry and materials (owned by this world, disposed once).
-      const mesh = gltf.scene.clone(true)
-      mesh.scale.setScalar(f.scale)
-      mesh.updateMatrixWorld(true)
-      const b = new THREE.Box3().setFromObject(mesh)
-      const c = b.getCenter(new THREE.Vector3())
-      mesh.position.set(-c.x, -b.min.y, -c.z)
-      anchor.add(mesh)
-      anchor.traverse((o) => {
-        if ((o as THREE.Mesh).isMesh) {
-          o.castShadow = true
-          o.receiveShadow = true
-        }
-      })
       this.stage.add(anchor)
     }
   }
 
-  private buildMarkers(): void {
-    for (const h of this.def.hotspots) {
-      if (h.hidden) continue
-      const anchor = new THREE.Object3D()
-      anchor.position.set(h.at.x, h.markerY, h.at.z)
-      if (h.kind !== 'exit') {
-        // Above the object itself, not above the spot where the player stands.
-        anchor.position.set((h.at.x + h.faces.x) / 2, h.markerY, (h.at.z + h.faces.z) / 2)
+  /** A clone of a loaded model, scaled, centred on its anchor with its base on the floor. */
+  private modelAnchor(gltf: GLTF, scale: number): THREE.Group {
+    const anchor = new THREE.Group()
+    // Clones share the loaded geometry and materials (owned by this world, disposed once).
+    const mesh = gltf.scene.clone(true)
+    mesh.scale.setScalar(scale)
+    mesh.updateMatrixWorld(true)
+    const b = new THREE.Box3().setFromObject(mesh)
+    const c = b.getCenter(new THREE.Vector3())
+    mesh.position.set(-c.x, -b.min.y, -c.z)
+    anchor.add(mesh)
+    anchor.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) {
+        o.castShadow = true
+        o.receiveShadow = true
       }
-      this.stage.add(anchor)
-      const el = document.createElement('button')
-      el.type = 'button'
-      el.dataset.hotspot = h.id
-      el.setAttribute('aria-label', h.label)
-      el.title = h.label
-      el.textContent = h.icon
-      el.dataset.label = h.label
-      el.className =
-        h.kind === 'npc'
-          ? 'pointer-events-auto absolute left-0 top-0 flex h-11 w-11 items-center justify-center rounded-full border-2 border-white bg-[#f7f8f1]/80 text-base shadow'
-          : 'pointer-events-auto absolute left-0 top-0 flex h-11 w-11 items-center justify-center rounded-full border-2 border-white bg-white/90 text-lg shadow-md'
-      el.addEventListener('click', (e) => {
-        e.stopPropagation()
-        this.walkTo({ hotspot: h, path: [] })
-      })
-      this.markersRoot.append(el)
-      this.markers.push({ hotspot: h, anchor, el })
+    })
+    return anchor
+  }
+
+  private buildMarkers(): void {
+    for (const h of this.def.hotspots) this.addMarker(h)
+  }
+
+  private addMarker(h: Hotspot): void {
+    if (h.hidden) return
+    const anchor = new THREE.Object3D()
+    anchor.position.set(h.at.x, h.markerY, h.at.z)
+    if (h.kind !== 'exit') {
+      // Above the object itself, not above the spot where the player stands.
+      anchor.position.set((h.at.x + h.faces.x) / 2, h.markerY, (h.at.z + h.faces.z) / 2)
     }
+    this.stage.add(anchor)
+    const el = document.createElement('button')
+    el.type = 'button'
+    el.dataset.hotspot = h.id
+    el.setAttribute('aria-label', h.label)
+    el.title = h.label
+    el.textContent = h.icon
+    el.dataset.label = h.label
+    el.className =
+      h.kind === 'npc'
+        ? 'pointer-events-auto absolute left-0 top-0 flex h-11 w-11 items-center justify-center rounded-full border-2 border-white bg-[#f7f8f1]/80 text-base shadow'
+        : 'pointer-events-auto absolute left-0 top-0 flex h-11 w-11 items-center justify-center rounded-full border-2 border-white bg-white/90 text-lg shadow-md'
+    el.addEventListener('click', (e) => {
+      e.stopPropagation()
+      this.walkTo({ hotspot: h, path: [] })
+    })
+    this.markersRoot.append(el)
+    this.markers.push({ hotspot: h, anchor, el })
   }
 
   private makePerson(gltf: GLTF, spec: AvatarSpec, pagne?: string): Person {
@@ -756,7 +891,7 @@ export class RoomWorld {
     this.stepOff()
     const pos = this.player.root.position
     const dest = 'hotspot' in goal ? goal.hotspot.at : goal.point
-    const path = pathfind({ x: pos.x, z: pos.z }, dest, this.def.obstacles, this.def.bounds)
+    const path = pathfind({ x: pos.x, z: pos.z }, dest, this.obstacles, this.def.bounds)
     if (path.length === 0) {
       if (Math.hypot(pos.x - dest.x, pos.z - dest.z) < 0.6) {
         this.goal = { ...goal, path: [] }
@@ -880,8 +1015,8 @@ export class RoomWorld {
       const ox = p.x
       const oz = p.z
       const b = this.def.bounds
-      if (isFree(p.x + vx * dt, p.z, this.def.obstacles, b)) p.x += vx * dt
-      if (isFree(p.x, p.z + vz * dt, this.def.obstacles, b)) p.z += vz * dt
+      if (isFree(p.x + vx * dt, p.z, this.obstacles, b)) p.x += vx * dt
+      if (isFree(p.x, p.z + vz * dt, this.obstacles, b)) p.z += vz * dt
       moved = Math.hypot(p.x - ox, p.z - oz)
       if (this.def.exitAtFront && p.z >= b.maxZ - 0.12 && vz > 0.05) this.leave()
       // Face where the stick points, not the residual slide along a wall (that turned the
@@ -1156,6 +1291,15 @@ export class RoomWorld {
     for (let i = 0; i < steps; i++) this.move(dt / steps)
     this.player?.mixer.update(dt)
     this.stepWater(dt)
+    if (this.screens.size) {
+      // A lit, flickering screen while the player watches; dark otherwise.
+      const on = this.performing?.propId === 'tv'
+      const t = now * 0.001
+      for (const m of this.screens)
+        if (on)
+          m.emissive.setHSL((t * 0.05) % 1, 0.55, 0.32 + 0.08 * Math.sin(t * 7) * Math.sin(t * 2.3))
+        else m.emissive.setRGB(0, 0, 0)
+    }
     if (this.player) {
       if (this.posture && !this.posture.bed) {
         const p = this.posture

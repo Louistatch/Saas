@@ -124,6 +124,7 @@ export default function CityWorld({
   input,
   onLeave,
   mapView = false,
+  home,
 }: {
   city: City
   /** A cell of the player's estate was touched (local coordinates). */
@@ -187,6 +188,12 @@ export default function CityWorld({
   /** Leave the current building (walking out of the door in the Three interiors). */
   onLeave?: () => void
   mapView?: boolean
+  /** The player's own house: its furniture and the piece being placed (« Aménager »). */
+  home?: {
+    furniture: readonly import('@/lib/haroolife/game/core/furnish').PlacedFurniture[]
+    placing: import('@/lib/haroolife/game/render/room-world').PlacingGhost | null
+    onFloorTap: (p: { x: number; z: number }) => void
+  }
 }) {
   bump('world')
   const hasEstate = LOCALITIES[locality].estate !== null
@@ -245,6 +252,9 @@ export default function CityWorld({
             onLeave={onLeave ?? (() => {})}
             onFrame={onFrame}
             pixelRatio={pixelRatio}
+            furniture={home?.furniture}
+            placing={home?.placing}
+            onFloorTap={home?.onFloorTap}
           />
         </div>
       )}

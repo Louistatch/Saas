@@ -12,8 +12,10 @@
  * effect and saves it.
  */
 import type { InteriorViewProps } from '@/lib/haroolife/engine/types'
+import { type PlacedFurniture, furnitureHotspots } from '@/lib/haroolife/game/core/furnish'
+import type { Point } from '@/lib/haroolife/game/core/pathfind'
 import { sceneFor } from '@/lib/haroolife/game/core/scene'
-import { RoomWorld } from '@/lib/haroolife/game/render/room-world'
+import { type PlacingGhost, RoomWorld } from '@/lib/haroolife/game/render/room-world'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 export default function HarooRoomView(
@@ -22,6 +24,11 @@ export default function HarooRoomView(
     interior: string
     pixelRatio: number
     onFrame?: (s: { drawCalls: number; fps: number }) => void
+    /** The furniture bought and placed in the player's house (« Aménager »). */
+    furniture?: readonly PlacedFurniture[]
+    /** The piece being placed, previewed in green or red; taps on the floor then move it. */
+    placing?: PlacingGhost | null
+    onFloorTap?: (p: Point) => void
   },
 ) {
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -71,6 +78,7 @@ export default function HarooRoomView(
         onMealReady: (id, seat) => live.current.onMealReady?.(id, seat),
         onMealFrame: (id, seconds) => live.current.onMealFrame?.(id, seconds),
         onActivityEnd: () => live.current.onActivityEnd?.(),
+        onFloorTap: (p) => live.current.onFloorTap?.(p),
       },
     })
     world.current = w
@@ -87,6 +95,20 @@ export default function HarooRoomView(
     world.current?.setPixelRatio(pixelRatio)
   }, [pixelRatio])
 
+  // The furniture of the house, and the preview of the piece being placed.
+  const furniture = props.furniture
+  const furnitureSpots = useMemo(
+    () => (furniture?.length ? furnitureHotspots(furniture, scene) : []),
+    [furniture, scene],
+  )
+  useEffect(() => {
+    if (state === 'ready') world.current?.setFurnishing(furniture ?? [], furnitureSpots)
+  }, [furniture, furnitureSpots, state])
+  const placing = props.placing ?? null
+  useEffect(() => {
+    if (state === 'ready') world.current?.setPlacing(placing)
+  }, [placing, state])
+
   // The game's current activity (pose) and the HUD's walk-then-use requests.
   const { activity, approach } = props
   useEffect(() => {
@@ -101,7 +123,7 @@ export default function HarooRoomView(
   }, [approach?.n, state])
 
   // Seats used only by meals have no bubble: they are not offered in the guide either.
-  const spots = scene.hotspots.filter((h) => !h.hidden)
+  const spots = [...scene.hotspots, ...furnitureSpots].filter((h) => !h.hidden)
   return (
     <div className="relative h-full w-full" data-engine="haroo" data-scene={scene.id}>
       <canvas

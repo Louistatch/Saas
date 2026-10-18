@@ -23,3 +23,9 @@ Sitting_Enter, Sitting_Idle_Loop, Sitting_Exit, Sitting_Talking_Loop retargeted 
 existing four adult GLBs. Source licence: quaternius-UAL-CC0.txt.
 Rebuild script and provenance: docs/haroolife-daily-interactions.md.
 Meals are authored on the same rigs; original meshes, materials and locomotion clips remain.
+Sleeping, washing and toilet gestures are authored the same way at load time
+(lib/haroolife/game/render/daily-animations.ts): no external clip.
+
+Furniture lome-*.glb (furniture/): HarooLife's own models, made with
+tools/blender/haroolife_furniture.py (TV and stand, standing fan, plastic chair and table,
+column speaker, generator, wardrobe, chest freezer). Plain colours, no texture.
