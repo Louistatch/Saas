@@ -1,54 +1,88 @@
-/**
- * Production adapters: Supabase Auth checks the token; the chat functions run through PostgREST
- * WITH THE PERSON'S TOKEN (auth.uid() = them). No service_role key in the relay.
- */
-import { type SupabaseClient, createClient } from '@supabase/supabase-js'
+/** Production: verified identity, then every durable RPC AS the person, never service_role. */
+import { createClient } from '@supabase/supabase-js'
 import type { ChatMessage, Me } from '../lib/haroolife/realtime/protocol'
 import { type ChatRepository, type RealtimeAuth, RepoError } from './core'
-
-const opts = { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
+import { WorkGate } from './work-gate'
 
 export function supabaseAdapters(
   url: string,
   anonKey: string,
+  options: { claims?: boolean; maxRequests?: number; fetch?: typeof fetch } = {},
 ): { auth: RealtimeAuth; chat: ChatRepository } {
-  const anon = createClient(url, anonKey, opts)
-  // A small cache of per-token clients (tokens live one hour; bounded memory).
-  const clients = new Map<string, SupabaseClient>()
-  const as = (token: string) => {
-    let c = clients.get(token)
-    if (!c) {
-      c = createClient(url, anonKey, {
-        ...opts,
-        global: { headers: { Authorization: `Bearer ${token}` } },
-      })
-      clients.set(token, c)
-      if (clients.size > 500) clients.delete(clients.keys().next().value as string)
+  const gate = new WorkGate(options.maxRequests ?? 64)
+  const base = url.replace(/\/$/, '')
+  const request: typeof fetch = (input, init) =>
+    (options.fetch ?? fetch)(input, {
+      ...init,
+      signal: init?.signal
+        ? AbortSignal.any([init.signal, AbortSignal.timeout(8000)])
+        : AbortSignal.timeout(8000),
+    })
+  const anon = createClient(base, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: { fetch: request },
+  })
+  const bounded = async <T>(work: () => Promise<T>): Promise<T> => {
+    try {
+      return await gate.run(work)
+    } catch (e) {
+      if (e instanceof RepoError) throw e
+      throw new RepoError('unavailable', 'Service momentanément indisponible.')
     }
-    return c
   }
+  // One HTTP request per RPC; no SupabaseClient instance or retained JWT for every connection.
   async function rpc<T>(token: string, fn: string, args: Record<string, unknown>): Promise<T> {
-    const { data, error, status } = await as(token).rpc(fn, args)
-    if (!error) return data as T
-    if (status === 401 || error.code === 'PGRST301' || /jwt/i.test(error.message))
-      throw new RepoError('auth_expired', 'Session expirée : reconnexion…')
-    if (error.code === '42501') throw new RepoError('forbidden', error.message)
-    if (error.code === '22023')
-      throw new RepoError(
-        /Trop de (nouvelles conversations|messages)/.test(error.message)
-          ? 'rate_limited'
-          : 'invalid',
-        error.message,
-      )
-    if (error.code === '23514') throw new RepoError('invalid', 'Salon inconnu.')
-    throw new RepoError('unavailable', 'Base de données momentanément indisponible.')
+    return bounded(async () => {
+      const response = await request(`${base}/rest/v1/rpc/${fn}`, {
+        method: 'POST',
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(args),
+      })
+      const data = await response.json().catch(() => null)
+      if (response.ok) return data as T
+      const code = typeof data?.code === 'string' ? data.code : ''
+      const message = typeof data?.message === 'string' ? data.message : ''
+      if (response.status === 401 || code === 'PGRST301' || /jwt/i.test(message))
+        throw new RepoError('auth_expired', 'Session expirée : reconnexion…')
+      if (code === '42501') throw new RepoError('forbidden', message)
+      if (code === '22023')
+        throw new RepoError(
+          /Trop de (nouvelles conversations|messages)/.test(message) ? 'rate_limited' : 'invalid',
+          message,
+        )
+      if (code === '23514') throw new RepoError('invalid', 'Salon inconnu.')
+      throw new RepoError('unavailable', 'Base de données momentanément indisponible.')
+    })
   }
   return {
     auth: {
-      async verify(token) {
-        const { data, error } = await anon.auth.getUser(token)
-        return error || !data.user ? null : { userId: data.user.id }
-      },
+      verify: (token) =>
+        bounded(async () => {
+          if (options.claims) {
+            // Supabase verifies the signature against cached JWKS (legacy HS256 falls back to Auth).
+            // Never derive permissions from claims: chat_me reads profiles/RLS on every connection.
+            const result = await anon.auth.getClaims(token).catch(() => null)
+            const data = result?.data
+            const error = result?.error
+            const c = data?.claims
+            const aud = c?.aud
+            return !error &&
+              c &&
+              c.iss === `${base}/auth/v1` &&
+              (aud === 'authenticated' || (Array.isArray(aud) && aud.includes('authenticated'))) &&
+              typeof c.sub === 'string' &&
+              typeof c.exp === 'number' &&
+              c.exp * 1000 > Date.now()
+              ? { userId: c.sub }
+              : null
+          }
+          const { data, error } = await anon.auth.getUser(token)
+          return error || !data.user ? null : { userId: data.user.id }
+        }),
     },
     chat: {
       me: (t) => rpc<Me>(t, 'haroolife_chat_me', {}),

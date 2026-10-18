@@ -779,9 +779,9 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   const needs = life.needs
   const wellbeing = Math.round(NEED_KEYS.reduce((sum, k) => sum + needs[k], 0) / NEED_KEYS.length)
   const pending = eventById(life.pendingEvent)
-  const presence = usePresence()
   // Live discussions and other players (Socket.IO relay), when configured; see use-realtime.
   const realtime = useRealtime()
+  const presence = usePresence(realtime.state.status === 'online' ? 300_000 : 60_000)
   // Diagnostic panel for real-phone testing (?diag=1 or the phone settings).
   const [diag, setDiag] = useState(false)
   useEffect(() => setDiag(initialDiag()), [])
@@ -2551,7 +2551,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
             {online
               ? realtime.state.present.filter((p) => p.locality === cityLife.locality).length + 1
               : '—'}
-            <span className="hidden sm:inline">{online ? ' en ligne' : ' connexion…'}</span>
+            <span className="hidden sm:inline">{online ? ' à proximité' : ' connexion…'}</span>
           </button>
           <span className="h-6 w-px bg-slate-200" />
           <button

@@ -1,0 +1,16 @@
+# Railway service root: repository root. Config file: /ops/haroolife-realtime/railway.toml
+# Configure private Redis 7+, Supabase, origins and HAROOLIFE_REALTIME_DISTRIBUTED=true first.
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm ci && npm run realtime:build"
+
+[deploy]
+startCommand = "npm run realtime:start"
+numReplicas = 2
+healthcheckPath = "/ready"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
+sleepApplication = false
+overlapSeconds = 15
+drainingSeconds = 30

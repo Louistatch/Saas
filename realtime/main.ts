@@ -10,13 +10,40 @@
  */
 import { resolve } from 'node:path'
 import { createRealtime } from './core'
+import { connectRedis } from './redis'
 import { supabaseAdapters } from './supabase'
+import { WORLD_CAPACITY, memoryWorlds } from './worlds'
 
 const env = process.env
 const say = (line: string) => process.stdout.write(`[realtime] ${line}\n`)
 
+function integer(name: string, fallback: number, min: number, max: number) {
+  const n = Number(env[name] ?? fallback)
+  if (!Number.isInteger(n) || n < min || n > max) throw new Error(`Invalid ${name}`)
+  return n
+}
+
 async function main(url: string, anonKey: string) {
-  const adapters = supabaseAdapters(url, anonKey)
+  const adapters = supabaseAdapters(url, anonKey, {
+    claims: env.HAROOLIFE_REALTIME_AUTH_MODE === 'claims',
+    maxRequests: integer('HAROOLIFE_REALTIME_MAX_DB_REQUESTS', 64, 1, 512),
+  })
+  const redisUrl = env.HAROOLIFE_REDIS_URL
+  const clusterUrls = env.HAROOLIFE_REDIS_CLUSTER_URLS?.split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  if (env.HAROOLIFE_REALTIME_DISTRIBUTED === 'true' && !redisUrl && !clusterUrls?.length)
+    throw new Error('Distributed mode requires HAROOLIFE_REDIS_URL or HAROOLIFE_REDIS_CLUSTER_URLS')
+  const cluster =
+    redisUrl || clusterUrls?.length
+      ? await connectRedis({
+          url: redisUrl,
+          clusterUrls,
+          prefix: env.HAROOLIFE_REALTIME_POOL ?? 'haroolife',
+          capacity: integer('HAROOLIFE_REALTIME_WORLD_CAPACITY', WORLD_CAPACITY, 2, 256),
+          onError: () => say('Redis unavailable (details redacted)'),
+        })
+      : null
   const local = env.HAROOLIFE_REALTIME_REPO === 'pglite'
   // PGlite (local and tests only) is loaded on demand: production never needs it installed.
   const pglite = local ? await import('./pglite') : null
@@ -36,7 +63,10 @@ async function main(url: string, anonKey: string) {
       ])
     : null
   const chat = localChat ?? adapters.chat
-  const origins = (env.HAROOLIFE_REALTIME_ORIGINS ?? 'http://127.0.0.1:3000,http://localhost:3000')
+  const origins = (
+    env.HAROOLIFE_REALTIME_ORIGINS ??
+    'https://faitierehub.com,https://www.faitierehub.com,http://127.0.0.1:3000,http://localhost:3000'
+  )
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean)
@@ -44,6 +74,16 @@ async function main(url: string, anonKey: string) {
     auth: adapters.auth,
     chat,
     origins,
+    adapter: cluster?.adapter,
+    motion: cluster?.motion,
+    activity: cluster?.activity,
+    worlds:
+      cluster?.worlds ??
+      memoryWorlds(integer('HAROOLIFE_REALTIME_WORLD_CAPACITY', WORLD_CAPACITY, 2, 256)),
+    allowChat: cluster?.allowChat,
+    ready: cluster?.ready,
+    maxConnections: integer('HAROOLIFE_REALTIME_MAX_CONNECTIONS', 5000, 1, 50_000),
+    maxAuthenticating: integer('HAROOLIFE_REALTIME_MAX_AUTHENTICATING', 32, 1, 512),
     disabled: () => env.HAROOLIFE_REALTIME_DISABLED === 'true',
     log:
       env.HAROOLIFE_REALTIME_LOG === '1'
@@ -58,7 +98,21 @@ async function main(url: string, anonKey: string) {
     await pglite.serveLocalRpc(localChat, port + 1)
     say(`local rpc on 127.0.0.1:${port + 1}`)
   }
-  const stop = () => void relay.close().then(() => process.exit(0))
+  let stopping = false
+  const stop = () => {
+    if (stopping) return
+    stopping = true
+    relay.drain()
+    // Let the load balancer observe /ready=503 before clients reconnect elsewhere.
+    const deadline = setTimeout(() => process.exit(1), 25_000)
+    deadline.unref()
+    setTimeout(() => {
+      void relay
+        .close()
+        .then(() => cluster?.close())
+        .then(() => process.exit(0))
+    }, 2000)
+  }
   process.on('SIGTERM', stop)
   process.on('SIGINT', stop)
 }
@@ -69,5 +123,11 @@ if (!url || !anonKey) {
   process.stderr.write('[realtime] SUPABASE_URL and SUPABASE_ANON_KEY are required.\n')
   process.exit(1)
 } else {
-  void main(url, anonKey)
+  void main(url, anonKey).catch(() => {
+    // Provider errors may contain URLs/tokens. Keep credentials out of platform logs.
+    process.stderr.write(
+      '[realtime] Startup failed; check database, Redis and capacity configuration.\n',
+    )
+    process.exit(1)
+  })
 }

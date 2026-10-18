@@ -2176,6 +2176,7 @@ export class StreetWorld {
         this.remotes.delete(k)
       }
     for (const k of this.buffers.keys()) if (!keys.has(k)) this.buffers.delete(k)
+    for (const k of this.modes.keys()) if (!keys.has(k)) this.modes.delete(k)
   }
 
   private startRemote(): void {
@@ -2229,6 +2230,17 @@ export class StreetWorld {
     for (const r of this.remotes.values()) {
       const p = r.person
       const list = this.buffers.get(r.key)
+      // AOI updates intentionally stop outside nearby sectors. Release their slots so the next
+      // neighbours can appear, including when a GLB was still loading as the person left.
+      if (list?.length && now - list[list.length - 1].at >= STALE_MS) {
+        if (p) this.disposePerson(p)
+        this.dropRemoteRide(r)
+        r.tag?.remove()
+        this.remotes.delete(r.key)
+        this.buffers.delete(r.key)
+        this.modes.delete(r.key)
+        continue
+      }
       if (!p || !list?.length) continue
       // Forget samples older than the bracket still needed.
       while (list.length > 2 && list[1].at < at) list.shift()

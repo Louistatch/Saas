@@ -9,7 +9,7 @@ import {
 /**
  * Keeps the player's game saved online (haroolife_save_get / haroolife_save_put), next to the
  * local save that keeps working offline. On opening, the right copy is chosen (lib/haroolife/
- * cloud-save.ts); while playing, the game is saved every 15 s when it changed and when the app is
+ * cloud-save.ts); while playing, the game is saved every 12–18 s when it changed and when the app is
  * hidden. The server caps the wallet (see supabase/migrations/20261016_120000_haroolife_saves.sql):
  * a capped wallet comes back and replaces the local one. Signed out, or the server unreachable:
  * the local save alone, as before.
@@ -199,7 +199,19 @@ export function useCloudSave({
     const tick = () => {
       if (dirty.current && !busy.current) void flush()
     }
-    const id = window.setInterval(tick, 15_000)
+    // Spread automatic saves after a mass reconnect; explicit flush/hide still saves immediately.
+    let id = 0
+    let stopped = false
+    const schedule = () => {
+      id = window.setTimeout(
+        () => {
+          if (document.visibilityState === 'visible') tick()
+          if (!stopped) schedule()
+        },
+        12_000 + Math.random() * 6000,
+      )
+    }
+    schedule()
     const onHide = () => {
       if (meta.current) writeMeta(meta.current)
       if (document.visibilityState === 'hidden') tick()
@@ -207,7 +219,8 @@ export function useCloudSave({
     document.addEventListener('visibilitychange', onHide)
     window.addEventListener('pagehide', onHide)
     return () => {
-      window.clearInterval(id)
+      stopped = true
+      window.clearTimeout(id)
       document.removeEventListener('visibilitychange', onHide)
       window.removeEventListener('pagehide', onHide)
     }

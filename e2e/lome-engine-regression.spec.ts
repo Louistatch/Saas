@@ -125,6 +125,14 @@ test('real relay: a remote avatar, taxi and moto survive culling and graphic cha
     await expect
       .poll(async () => (await street(page))?.remotes.some((r) => r.vehicle === null && r.shown))
       .toBe(true)
+    clearInterval(timer)
+    timer = undefined
+    await expect.poll(async () => (await street(page))?.remotes.length, { timeout: 15000 }).toBe(0)
+    timer = setInterval(
+      () => socket.emit('player:pose', { x: at.x + 1, z: at.z + 1, heading: 0, mode, n: ++n }),
+      200,
+    )
+    await expect.poll(async () => (await street(page))?.remotes.some((r) => r.shown)).toBe(true)
   } finally {
     if (timer) clearInterval(timer)
     socket.disconnect()
