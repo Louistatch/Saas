@@ -1,8 +1,10 @@
-import { type NextRequest, NextResponse } from 'next/server'
+import { accentInsensitivePattern, searchLikePattern } from '@/lib/fiches/culture'
+import type { FicheFile } from '@/lib/fiches/types'
 import { createClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/utils/logger'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
+import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
 const log = createLogger('api:fiches:public')
@@ -14,7 +16,8 @@ const log = createLogger('api:fiches:public')
  * Used by the public marketplace page to show available fiches with filters.
  *
  * Query params:
- *   - q (search)
+ *   - id (une seule fiche : lien « Voir dans la boutique », /marketplace?fiche=<id>)
+ *   - q (search, coupée à 100 caractères)
  *   - culture
  *   - type_agriculture
  *   - region_id, prefecture_id, canton_id
@@ -27,8 +30,9 @@ const log = createLogger('api:fiches:public')
  * Security:
  *   - Rate limited (120 req/min/IP)
  *   - Only returns status='published'
- *   - Files URLs are storage paths (not signed) — full download requires
- *     POST /api/fiches/[id]/access with card_number or purchase_id
+ *   - Aucun chemin ni nom de stockage : seul un résumé du contenu vendu
+ *     (files_summary [{type, size}], files_count). Le téléchargement exige
+ *     POST /api/fiches/[id]/access (gratuité, carte ou achat).
  */
 export async function GET(request: NextRequest) {
   const persistentBlock = await applyRateLimit(request, 'marketplace')
@@ -47,6 +51,7 @@ export async function GET(request: NextRequest) {
   const regionId = searchParams.get('region_id')
   const cooperativeId = searchParams.get('cooperative_id')
   const search = searchParams.get('q')
+  const ficheId = searchParams.get('id')
   const page = Math.max(1, Number.parseInt(searchParams.get('page') ?? '1'))
   const pageSize = Math.min(Number.parseInt(searchParams.get('limit') ?? '20'), 50)
 
@@ -57,7 +62,7 @@ export async function GET(request: NextRequest) {
       .from('fiches_techniques')
       .select(
         `id, title, description, culture, type_agriculture, campaign,
-         price_non_member, is_free_for_members, download_count, created_at, cooperative_id, cover_url,
+         price_non_member, is_free_for_members, download_count, created_at, cooperative_id, cover_url, files,
          cooperatives(name, faitiere_name),
          region:region_id(id, name), prefecture:prefecture_id(id, name), canton:canton_id(id, name)`,
         { count: 'exact' },
@@ -65,25 +70,31 @@ export async function GET(request: NextRequest) {
       .eq('status', 'published')
       .order('created_at', { ascending: false })
 
-    if (culture) query = query.eq('culture', culture)
+    // Culture sans accent ni casse : « Mais » trouve « Maïs » (opérateur
+    // PostgREST imatch, expression ancrée et échappée).
+    if (culture) {
+      const parsedCulture = z.string().trim().min(1).max(100).safeParse(culture)
+      if (!parsedCulture.success)
+        return NextResponse.json({ error: 'Invalid culture parameter' }, { status: 400 })
+      query = query.filter('culture', 'imatch', accentInsensitivePattern(parsedCulture.data))
+    }
+    if (ficheId) {
+      if (!z.string().uuid().safeParse(ficheId).success)
+        return NextResponse.json({ error: 'Invalid id parameter' }, { status: 400 })
+      query = query.eq('id', ficheId)
+    }
     if (typeAgriculture) query = query.eq('type_agriculture', typeAgriculture)
     if (cantonId) query = query.eq('canton_id', cantonId)
     if (prefectureId) query = query.eq('prefecture_id', prefectureId)
     if (regionId) query = query.eq('region_id', regionId)
     if (cooperativeId) query = query.eq('cooperative_id', cooperativeId)
 
-    if (search) {
-      const searchSchema = z.string().min(1).max(100).trim()
-      const parsed = searchSchema.safeParse(search)
-      if (!parsed.success) {
-        return NextResponse.json({ error: 'Invalid search parameter' }, { status: 400 })
-      }
-      // Escape ILIKE wildcards and PostgREST separators
-      const sanitized = parsed.data
-        .replace(/[%_\\]/g, '\\$&')
-        .replace(/[,()[\]]/g, '')
+    // Jokers échappés, séparateurs PostgREST remplacés par `_` (un titre avec
+    // virgules se retrouve), texte coupé à 100 caractères : lib/fiches/culture.
+    if (search?.trim()) {
+      const pattern = searchLikePattern(search)
       query = query.or(
-        `title.ilike.%${sanitized}%,description.ilike.%${sanitized}%,culture.ilike.%${sanitized}%`,
+        `title.ilike.${pattern},description.ilike.${pattern},culture.ilike.${pattern}`,
       )
     }
 
@@ -97,8 +108,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
     }
 
+    const fiches = (data ?? []).map((row) => {
+      const { files, ...rest } = row as typeof row & { files: FicheFile[] | null }
+      const list = Array.isArray(files) ? files : []
+      return {
+        ...rest,
+        files_count: list.length,
+        files_summary: list.map((f) => ({
+          type: String(f.type ?? '').toLowerCase(),
+          size: typeof f.size === 'number' ? f.size : null,
+        })),
+      }
+    })
+
     return NextResponse.json(
-      { fiches: data ?? [], total: count ?? 0, page, pageSize },
+      { fiches, total: count ?? 0, page, pageSize },
       {
         headers: {
           'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=120',

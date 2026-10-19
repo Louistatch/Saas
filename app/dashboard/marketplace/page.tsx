@@ -1,24 +1,15 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useAuth } from '@/app/context/auth-context'
+import { useCooperative } from '@/app/context/cooperative-context'
+import { FieldError } from '@/components/marketplace/field-error'
+import { useConfirm } from '@/components/shared/confirm-dialog'
+import { EmptyState } from '@/components/shared/empty-state'
+import { LoadingBlock, Spinner } from '@/components/shared/loading'
+import { PageHeader } from '@/components/shared/page-header'
+import { PaginationBar } from '@/components/shared/pagination'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Plus,
-  Upload,
-  Search,
-  FileText,
-  Download,
-  Trash2,
-  Eye,
-  EyeOff,
-  ChevronDown,
-  ChevronRight,
-  MapPin,
-  List,
-} from 'lucide-react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -27,24 +18,59 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { createClient } from '@/lib/supabase/client'
-import { useCooperative } from '@/app/context/cooperative-context'
-import { useAuth } from '@/app/context/auth-context'
-import { useToast } from '@/hooks/use-toast'
-import { useDebounced } from '@/hooks/use-debounced'
-import { LoadingBlock, Spinner } from '@/components/shared/loading'
-import { EmptyState } from '@/components/shared/empty-state'
-import { PageHeader } from '@/components/shared/page-header'
-import { PaginationBar } from '@/components/shared/pagination'
-import { useConfirm } from '@/components/shared/confirm-dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
-  TYPE_AGRICULTURE_KEYS,
+  type UseCascadingLocationsOptions,
+  useCascadingLocations,
+} from '@/hooks/use-cascading-locations'
+import { useDebounced } from '@/hooks/use-debounced'
+import { useResetPageOnChange } from '@/hooks/use-reset-page'
+import { useToast } from '@/hooks/use-toast'
+import {
+  FAITIERE_DRAFT_FIELDS,
+  type FaitiereDraftField,
+  faitiereDraftErrors,
+} from '@/lib/fiches/admin-form'
+import {
+  MEMBER_FREE_CHECKBOX_LABEL,
+  dashboardPriceLabel,
+  memberFreeBadge,
+} from '@/lib/fiches/member-label'
+import { FICHE_LIMITS } from '@/lib/fiches/schema'
+import {
   TYPES_AGRICULTURE as TYPES_AGRICULTURE_LABELS,
+  TYPE_AGRICULTURE_KEYS,
+  formatFileSize,
+  labelFicheStatus,
   labelTypeAgriculture,
 } from '@/lib/fiches/types'
-import { errorMessage } from '@/lib/utils/errors'
-import { useCascadingLocations } from '@/hooks/use-cascading-locations'
-import { useResetPageOnChange } from '@/hooks/use-reset-page'
+import { UPLOAD_ACCEPT, checkUploadFile, serverFieldErrors } from '@/lib/fiches/upload'
+import {
+  apiErrorText,
+  ficheApi,
+  ficheRoot,
+  reasonOf,
+  uploadFicheFiles,
+} from '@/lib/fiches/upload-client'
+import { createClient } from '@/lib/supabase/client'
+import {
+  ChevronDown,
+  ChevronRight,
+  Download,
+  Eye,
+  EyeOff,
+  FileText,
+  List,
+  MapPin,
+  Plus,
+  RotateCcw,
+  Search,
+  Trash2,
+  Upload,
+} from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 interface FicheTechnique {
   id: string
@@ -99,6 +125,13 @@ type PrefectureMap = Record<string, CantonMap>
 type RegionTree = Record<string, PrefectureMap>
 
 const PAGE_SIZE = 15
+// Constante de module : le hook ne dépend plus de l'identité de ses options
+// (voir hooks/cascading-locations-core.ts), mais rien ne sert de les recréer.
+const FICHE_LOCATION_OPTIONS: UseCascadingLocationsOptions = {
+  levels: ['region_id', 'prefecture_id', 'canton_id'],
+  mode: 'prefetch-filter',
+  prefetchLevels: ['region_id', 'prefecture_id'],
+}
 // Trois systèmes de production, et rien d'autre.
 //
 // La liste précédente en mélangeait trois : des systèmes (conventionnel,
@@ -125,11 +158,35 @@ function fileIcon(type: string) {
   return FILE_ICON[type] ?? '📎'
 }
 
+/** Niveaux de localité de la fenêtre, pour dire laquelle n'a pas pu être lue. */
+const LOCATION_LIST_LABEL: Partial<Record<string, string>> = {
+  region_id: 'régions',
+  prefecture_id: 'préfectures',
+  canton_id: 'cantons',
+}
+
+/** Défilement doux, sauf si l'utilisateur a demandé moins d'animations. */
+const smoothScroll = (): ScrollBehavior =>
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+
+const EMPTY_FORM = {
+  title: '',
+  description: '',
+  culture: '',
+  type_agriculture: 'agroecologique',
+  campaign: '',
+  price_non_member: 500,
+  is_free_for_members: true,
+  // Brouillon par défaut : la mise en vente est un choix explicite.
+  publish: false,
+}
+
 export default function MarketplacePage() {
   const { currentCooperative, cooperatives, switchCooperative } = useCooperative()
   const { user } = useAuth()
   const { toast } = useToast()
   const { confirm, confirmNode } = useConfirm()
+  const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -141,11 +198,9 @@ export default function MarketplacePage() {
     setLevel: setLocationLevel,
     setSelection: setLocationSelection,
     options: locationOptions,
-  } = useCascadingLocations({
-    levels: ['region_id', 'prefecture_id', 'canton_id'],
-    mode: 'prefetch-filter',
-    prefetchLevels: ['region_id', 'prefecture_id'],
-  })
+    failedLevels: failedLocationLevels,
+    retry: retryLocations,
+  } = useCascadingLocations(FICHE_LOCATION_OPTIONS)
   const regions = locationOptions.region_id
   const prefectures = locationOptions.prefecture_id
   const cantons = locationOptions.canton_id
@@ -167,18 +222,18 @@ export default function MarketplacePage() {
   // Dialog state
   const [showAdd, setShowAdd] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [uploadingFiles, setUploadingFiles] = useState(false)
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    culture: '',
-    type_agriculture: 'agroecologique',
-    campaign: '',
-    price_non_member: 500,
-  })
-  const [pendingFiles, setPendingFiles] = useState<
-    { name: string; url: string; type: string; size: number }[]
-  >([])
+  const [progress, setProgress] = useState<string | null>(null)
+  const [form, setForm] = useState(EMPTY_FORM)
+  // Prix saisi tel quel : un champ vidé ne vaut ni 0 ni 500 (voir handleSave).
+  const [priceText, setPriceText] = useState(String(EMPTY_FORM.price_non_member))
+  // Fichiers gardés dans le navigateur jusqu'à l'enregistrement : ils ne sont
+  // envoyés qu'une fois le brouillon accepté par le serveur (aucun orphelin).
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  // Champs manquants, affichés sous chaque champ après un clic sur le bouton
+  // (qui n'est jamais grisé en silence).
+  const [formErrors, setFormErrors] = useState<Partial<Record<FaitiereDraftField, string>>>({})
+  const clearFormError = (field: FaitiereDraftField) =>
+    setFormErrors((e) => (e[field] ? { ...e, [field]: undefined } : e))
 
   // Only show faitieres in the cooperative switcher for super_admin
   const faitiereCooperatives = useMemo(() => {
@@ -333,155 +388,195 @@ export default function MarketplacePage() {
     })
   }
 
-  // Download file via signed URL
+  // Téléchargement : lien signé par le serveur (GET /api/admin/fiches/[id]/files),
+  // réservé au vendeur. Le bucket n'a aucune politique SELECT pour le navigateur.
   const handleDownload = useCallback(
-    async (file: FicheFile) => {
-      const { data, error } = await supabase.storage
-        .from('fiches-techniques')
-        .createSignedUrl(file.url, 3600)
-      if (error || !data?.signedUrl) {
-        toast({
-          title: 'Erreur de téléchargement',
-          description: error?.message ?? 'Lien expiré',
-          variant: 'destructive',
-        })
-        return
-      }
-      const a = document.createElement('a')
-      a.href = data.signedUrl
-      a.download = file.name
-      a.click()
-    },
-    [supabase, toast],
-  )
-
-  // File upload
-  const handleFileUpload = async (files: FileList) => {
-    if (!currentCooperative) {
-      toast({
-        title: 'Erreur',
-        description: 'Aucune coopérative sélectionnée',
-        variant: 'destructive',
-      })
-      return
-    }
-    if (user?.role !== 'super_admin' && currentCooperative.level !== 'faitiere') {
-      toast({
-        title: 'Accès refusé',
-        description: 'Seules les faîtières peuvent uploader des fiches',
-        variant: 'destructive',
-      })
-      return
-    }
-    setUploadingFiles(true)
-    const uploaded: typeof pendingFiles = []
-    for (const file of Array.from(files)) {
-      if (file.size > 20 * 1024 * 1024) {
-        toast({
-          title: `Fichier trop volumineux: ${file.name}`,
-          description: 'Maximum 20 Mo',
-          variant: 'destructive',
-        })
-        continue
-      }
-      const ext = file.name.split('.').pop()?.toLowerCase() ?? 'bin'
-      if (!['pdf', 'docx', 'doc', 'xlsx', 'xls'].includes(ext)) {
-        toast({
-          title: `Type non supporté: ${file.name}`,
-          description: 'Formats acceptés: PDF, DOCX, XLSX',
-          variant: 'destructive',
-        })
-        continue
-      }
-      const path = `${currentCooperative.id}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`
+    async (ficheId: string, index: number) => {
       try {
-        const { error } = await supabase.storage
-          .from('fiches-techniques')
-          .upload(path, file, { cacheControl: '3600', upsert: false })
-        if (error) {
+        const res = await fetch(`/api/admin/fiches/${ficheId}/files`, { cache: 'no-store' })
+        const d = (await res.json().catch(() => ({}))) as {
+          files?: { url: string | null; name: string }[]
+          error?: string
+        }
+        const file = d.files?.[index]
+        if (!res.ok || !file?.url) {
           toast({
-            title: `Échec upload: ${file.name}`,
-            description: error.message || 'Erreur de téléversement',
+            title: 'Téléchargement impossible',
+            description:
+              res.status === 403
+                ? 'Seul le vendeur de ce compte peut ouvrir ses fichiers.'
+                : file && !file.url
+                  ? 'Fichier introuvable dans le stockage : déposez-le à nouveau.'
+                  : (d.error ?? 'Réessayez dans un instant.'),
             variant: 'destructive',
           })
-          continue
+          return
         }
-        uploaded.push({ name: file.name, url: path, type: ext, size: file.size })
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Erreur réseau'
-        toast({ title: `Échec upload: ${file.name}`, description: msg, variant: 'destructive' })
+        const a = document.createElement('a')
+        a.href = file.url
+        a.download = file.name
+        a.click()
+      } catch {
+        toast({
+          title: 'Téléchargement impossible',
+          description: 'Pas de réseau. Réessayez.',
+          variant: 'destructive',
+        })
       }
+    },
+    [toast],
+  )
+
+  // Fichiers choisis : contrôlés tout de suite (format, taille), envoyés à l'enregistrement.
+  const handleFileUpload = (files: FileList) => {
+    const picked = Array.from(files)
+    for (const file of picked) {
+      const problem = checkUploadFile(file)
+      if (problem) toast({ title: 'Fichier refusé', description: problem, variant: 'destructive' })
     }
-    setPendingFiles((prev) => [...prev, ...uploaded])
-    setUploadingFiles(false)
-    if (uploaded.length > 0) toast({ title: `${uploaded.length} fichier(s) uploadé(s)` })
-    else if (Array.from(files).length > 0)
-      toast({
-        title: 'Aucun fichier uploadé',
-        description: 'Vérifiez le format et la taille',
-        variant: 'destructive',
-      })
+    const ok = picked.filter((f) => checkUploadFile(f) === null)
+    if (ok.length > 0) clearFormError('files')
+    setPendingFiles((prev) => [...prev, ...ok.filter((n) => !prev.some((p) => p.name === n.name))])
   }
 
-  // Save fiche
-  const handleSave = async () => {
-    if (!currentCooperative) return
-    if (!form.title || !form.culture) {
-      toast({ title: 'Titre et culture sont obligatoires', variant: 'destructive' })
-      return
-    }
-    if (pendingFiles.length === 0) {
-      toast({ title: 'Ajoutez au moins un fichier', variant: 'destructive' })
-      return
-    }
-    setSaving(true)
-    const { error } = await supabase.from('fiches_techniques').insert({
-      cooperative_id: currentCooperative.id,
-      title: form.title,
-      description: form.description || null,
-      culture: form.culture,
-      type_agriculture: form.type_agriculture,
-      canton_id: location.canton_id || null,
-      prefecture_id: location.prefecture_id || null,
-      region_id: location.region_id || null,
-      campaign: form.campaign || null,
-      price_non_member: form.price_non_member,
-      files: pendingFiles,
-      status: 'published',
-      is_free_for_members: true,
-    })
-    setSaving(false)
-    if (error) {
-      toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })
-      return
-    }
-    toast({ title: 'Fiche publiée', description: form.title })
-    setShowAdd(false)
-    setForm({
-      title: '',
-      description: '',
-      culture: '',
-      type_agriculture: 'agroecologique',
-      campaign: '',
-      price_non_member: 500,
-    })
+  const resetForm = () => {
+    setForm(EMPTY_FORM)
+    setPriceText(String(EMPTY_FORM.price_non_member))
     setLocationSelection({ region_id: '', prefecture_id: '', canton_id: '' })
     setPendingFiles([])
-    fetchFiches()
-    if (viewMode === 'locality') fetchLocalityFiches()
+    setFormErrors({})
   }
 
-  const toggleStatus = async (fiche: FicheTechnique) => {
-    const newStatus = fiche.status === 'published' ? 'archived' : 'published'
-    const { error } = await supabase
-      .from('fiches_techniques')
-      .update({ status: newStatus })
-      .eq('id', fiche.id)
-    if (error) {
-      toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })
+  // Enregistrement par les routes serveur : brouillon (POST, champs validés),
+  // fichiers dans `<faîtière>/<id>/`, puis PATCH. En cas d'échec, le brouillon
+  // est supprimé. Le serveur décide des droits et son message est affiché tel quel.
+  const handleSave = async () => {
+    if (!currentCooperative) return
+    // Champ vidé ou illisible : on garde le prix précédent, jamais 0 ni 500 en silence.
+    const n = Number.parseInt(priceText, 10)
+    const price = Number.isFinite(n) ? Math.max(0, n) : form.price_non_member
+    setPriceText(String(price))
+    // Ce qui manque est dit sous chaque champ ; le premier reçoit le focus
+    // (sur mobile, Titre et Culture sont hors de l'écran, au-dessus du bouton).
+    const errs = faitiereDraftErrors({
+      title: form.title,
+      culture: form.culture,
+      publish: form.publish,
+      fileCount: pendingFiles.length,
+    })
+    setFormErrors(errs)
+    const first = FAITIERE_DRAFT_FIELDS.find((f) => errs[f])
+    if (first) {
+      const el = document.getElementById(`dash-${first}`)
+      el?.focus({ preventScroll: true })
+      el?.scrollIntoView({ block: 'center', behavior: smoothScroll() })
       return
     }
-    toast({ title: newStatus === 'published' ? 'Publiée' : 'Archivée' })
+    if (form.publish && price === 0) {
+      const ok = await confirm({
+        title: 'Mettre en vente gratuitement ?',
+        description: 'Ce compte deviendra téléchargeable gratuitement par tout le monde.',
+        confirmLabel: 'Mettre en vente',
+      })
+      if (!ok) return
+    }
+    setSaving(true)
+    let ficheId: string | null = null
+    const fail = (description: string) =>
+      toast({ title: 'Fiche non enregistrée', description, variant: 'destructive' })
+    try {
+      setProgress('Enregistrement du brouillon…')
+      const draft = await ficheApi('/api/fiches', 'POST', {
+        title: form.title.trim(),
+        description: form.description.trim() || undefined,
+        culture: form.culture,
+        type_agriculture: form.type_agriculture,
+        canton_id: location.canton_id || undefined,
+        prefecture_id: location.prefecture_id || undefined,
+        region_id: location.region_id || undefined,
+        campaign: form.campaign.trim() || undefined,
+        price_non_member: price,
+        is_free_for_members: form.is_free_for_members,
+        files: [],
+        status: 'draft',
+      })
+      if (!draft.ok) {
+        const fields = serverFieldErrors(draft.data.details)
+        setFormErrors({ title: fields.title, culture: fields.culture, files: fields.files })
+        fail(Object.values(fields)[0] ?? apiErrorText(draft, 'Enregistrement impossible'))
+        return
+      }
+      const created = draft.data.fiche as { id: string; cooperative_id?: string | null }
+      ficheId = created.id
+
+      if (pendingFiles.length > 0) {
+        const uploaded = await uploadFicheFiles(supabase.storage, {
+          root: ficheRoot(created.cooperative_id),
+          ficheId,
+          files: pendingFiles,
+          onProgress: (i, total, name) => setProgress(`Envoi ${i}/${total} : ${name}`),
+        })
+        setProgress('Vérification des fichiers…')
+        const r = await ficheApi(`/api/fiches/${ficheId}`, 'PATCH', {
+          files: uploaded,
+          status: form.publish ? 'published' : 'draft',
+        })
+        if (!r.ok)
+          throw new Error(
+            serverFieldErrors(r.data.details).files ?? apiErrorText(r, 'Fichiers refusés'),
+          )
+      }
+
+      toast({
+        title: form.publish ? 'Fiche mise en vente' : 'Brouillon enregistré',
+        description: form.title.trim(),
+      })
+      setShowAdd(false)
+      resetForm()
+      fetchFiches()
+      if (viewMode === 'locality') fetchLocalityFiches()
+    } catch (e) {
+      let tail = ''
+      if (ficheId) {
+        const del = await ficheApi(`/api/fiches/${ficheId}`, 'DELETE')
+        tail = del.ok
+          ? ' Rien n’a été mis en ligne.'
+          : ' Le brouillon reste visible dans la liste : demandez sa suppression à FaîtiereHub.'
+        if (!del.ok) fetchFiches()
+      }
+      // Raison sans point final : jamais « réessayez.. Rien n’a été… ».
+      fail(`${reasonOf(e)}.${tail}`)
+    } finally {
+      setSaving(false)
+      setProgress(null)
+    }
+  }
+
+  // Statut et suppression : routes serveur. Un refus est affiché tel quel,
+  // jamais un faux « Archivée » ou « Fiche supprimée ».
+  const toggleStatus = async (fiche: FicheTechnique) => {
+    const newStatus = fiche.status === 'published' ? 'archived' : 'published'
+    if (newStatus === 'archived') {
+      const ok = await confirm({
+        title: 'Retirer cette fiche de la vente ?',
+        description: 'Elle n’est plus proposée à la vente. Les acheteurs gardent leur accès.',
+        confirmLabel: 'Retirer de la vente',
+      })
+      if (!ok) return
+    }
+    const r = await ficheApi(`/api/fiches/${fiche.id}`, 'PATCH', { status: newStatus })
+    if (!r.ok) {
+      toast({
+        title: newStatus === 'published' ? 'Mise en vente refusée' : 'Retrait refusé',
+        description:
+          serverFieldErrors(r.data.details).files ?? apiErrorText(r, 'Modification impossible'),
+        variant: 'destructive',
+      })
+      return
+    }
+    toast({
+      title: newStatus === 'published' ? 'Fiche mise en vente' : 'Fiche retirée de la vente',
+    })
     fetchFiches()
     if (viewMode === 'locality') fetchLocalityFiches()
   }
@@ -489,20 +584,40 @@ export default function MarketplacePage() {
   const handleDelete = async (fiche: FicheTechnique) => {
     const ok = await confirm({
       title: 'Supprimer cette fiche ?',
-      description: `"${fiche.title}" sera définitivement supprimée avec ses fichiers.`,
+      description: `« ${fiche.title} » sera définitivement supprimée avec ses fichiers. Uniquement possible si elle n’a jamais été vendue.`,
       destructive: true,
       confirmLabel: 'Supprimer',
     })
     if (!ok) return
-    const paths = fiche.files.map((f) => f.url)
-    if (paths.length > 0) await supabase.storage.from('fiches-techniques').remove(paths)
-    await supabase.from('fiches_techniques').delete().eq('id', fiche.id)
+    const r = await ficheApi(`/api/fiches/${fiche.id}`, 'DELETE')
+    if (!r.ok) {
+      toast({
+        title: 'Suppression refusée',
+        description: apiErrorText(r, 'Suppression impossible'),
+        variant: 'destructive',
+      })
+      return
+    }
     toast({ title: 'Fiche supprimée' })
     fetchFiches()
     if (viewMode === 'locality') fetchLocalityFiches()
   }
 
   const isAdmin = user?.role === 'super_admin' || currentCooperative?.level === 'faitiere'
+  // POST /api/fiches rattache la fiche à l'organisation de l'AUTEUR, jamais à
+  // la faîtière sélectionnée : un super-admin charge donc les comptes vendus
+  // par FaîtiereHub dans l'administration, où ils apparaissent.
+  const openAdd = () => {
+    if (user?.role === 'super_admin') {
+      router.push('/admin/comptes-exploitation')
+      return
+    }
+    // Régions ou préfectures en échec au chargement de la page : relues ici,
+    // sans attendre un rechargement.
+    retryLocations()
+    setShowAdd(true)
+  }
+  const unavailableLists = failedLocationLevels.flatMap((l) => LOCATION_LIST_LABEL[l] ?? [])
 
   return (
     <div className="space-y-8">
@@ -511,10 +626,7 @@ export default function MarketplacePage() {
         description="Fiches techniques et itinéraires de culture classés par canton, préfecture et région"
         action={
           isAdmin ? (
-            <Button
-              className="gap-2 bg-primary hover:bg-primary/90"
-              onClick={() => setShowAdd(true)}
-            >
+            <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={openAdd}>
               <Plus className="h-4 w-4" />
               Nouvelle fiche
             </Button>
@@ -625,10 +737,7 @@ export default function MarketplacePage() {
             description="Les comptes d'exploitation apparaîtront ici organisés par région, préfecture et canton."
             action={
               isAdmin ? (
-                <Button
-                  className="gap-2 bg-primary hover:bg-primary/90"
-                  onClick={() => setShowAdd(true)}
-                >
+                <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={openAdd}>
                   <Upload className="h-4 w-4" />
                   Ajouter une fiche
                 </Button>
@@ -653,7 +762,7 @@ export default function MarketplacePage() {
                     <button
                       type="button"
                       onClick={() => toggleRegion(region)}
-                      className="w-full flex items-center justify-between px-5 py-4 bg-muted/40 hover:bg-muted/60 transition-colors text-left"
+                      className="w-full flex items-center justify-between px-4 py-4 bg-muted/40 sm:px-5 hover:bg-muted/60 transition-colors text-left"
                     >
                       <div className="flex items-center gap-3">
                         <div className="p-1.5 rounded-lg bg-primary/10">
@@ -688,7 +797,7 @@ export default function MarketplacePage() {
                                 <button
                                   type="button"
                                   onClick={() => togglePrefecture(prefKey)}
-                                  className="w-full flex items-center justify-between px-6 py-3 bg-background hover:bg-muted/20 transition-colors text-left"
+                                  className="w-full flex items-center justify-between px-4 py-3 bg-background sm:px-6 hover:bg-muted/20 transition-colors text-left"
                                 >
                                   <div className="flex items-center gap-2">
                                     <ChevronRight
@@ -705,7 +814,7 @@ export default function MarketplacePage() {
 
                                 {/* Cantons + fiches */}
                                 {isPrefOpen && (
-                                  <div className="px-8 pb-4 pt-2 bg-background space-y-5">
+                                  <div className="px-4 pb-4 pt-2 bg-background space-y-5 sm:px-8">
                                     {Object.entries(cantonMap)
                                       .sort(([a], [b]) => a.localeCompare(b, 'fr'))
                                       .map(([canton, fichesInCanton]) => (
@@ -733,18 +842,22 @@ export default function MarketplacePage() {
                                                       <span className="font-medium text-foreground text-sm">
                                                         {fiche.title}
                                                       </span>
-                                                      {fiche.is_free_for_members ? (
+                                                      <span
+                                                        className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${fiche.price_non_member > 0 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}
+                                                      >
+                                                        {dashboardPriceLabel(
+                                                          fiche.price_non_member,
+                                                        )}
+                                                      </span>
+                                                      {memberFreeBadge(fiche) && (
                                                         <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
-                                                          Gratuit membres
-                                                        </span>
-                                                      ) : (
-                                                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
-                                                          {fiche.price_non_member} FCFA
+                                                          {memberFreeBadge(fiche)}
                                                         </span>
                                                       )}
                                                     </div>
                                                     <p className="text-xs text-muted-foreground mt-0.5">
-                                                      {fiche.culture} · {labelTypeAgriculture(fiche.type_agriculture)}
+                                                      {fiche.culture} ·{' '}
+                                                      {labelTypeAgriculture(fiche.type_agriculture)}
                                                       {fiche.campaign
                                                         ? ` · Campagne ${fiche.campaign}`
                                                         : ''}
@@ -755,11 +868,13 @@ export default function MarketplacePage() {
                                                       </p>
                                                     )}
                                                     <div className="flex flex-wrap gap-1.5 mt-2">
-                                                      {fiche.files.map((f) => (
+                                                      {fiche.files.map((f, i) => (
                                                         <button
                                                           type="button"
                                                           key={f.url}
-                                                          onClick={() => handleDownload(f)}
+                                                          onClick={() =>
+                                                            handleDownload(fiche.id, i)
+                                                          }
                                                           className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors font-medium"
                                                         >
                                                           <Download className="h-3 w-3" />
@@ -794,13 +909,13 @@ export default function MarketplacePage() {
       {/* ── LIST VIEW ──────────────────────────────────────────────── */}
       {viewMode === 'list' && (
         <Card className="border-border">
-          <CardHeader>
+          <CardHeader className="px-4 sm:px-6">
             <CardTitle className="text-foreground">Fiches techniques</CardTitle>
             <CardDescription>
               Comptes d'exploitation et itinéraires techniques uploadés
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 sm:px-6">
             {isLoading ? (
               <LoadingBlock />
             ) : fiches.length === 0 ? (
@@ -814,10 +929,7 @@ export default function MarketplacePage() {
                 }
                 action={
                   !search && isAdmin ? (
-                    <Button
-                      className="gap-2 bg-primary hover:bg-primary/90"
-                      onClick={() => setShowAdd(true)}
-                    >
+                    <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={openAdd}>
                       <Upload className="h-4 w-4" />
                       Ajouter une fiche
                     </Button>
@@ -827,77 +939,101 @@ export default function MarketplacePage() {
             ) : (
               <>
                 <div className="space-y-3">
-                  {fiches.map((fiche) => (
-                    <div
-                      key={fiche.id}
-                      className="flex items-start gap-4 p-4 border border-border rounded-lg hover:bg-accent/5 transition-colors"
-                    >
-                      <div className="text-3xl shrink-0">
-                        {cultures.find((c) => c.name === fiche.culture)?.icon ?? '🌿'}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-semibold text-foreground">{fiche.title}</h3>
-                          <span
-                            className={`text-xs px-2 py-0.5 rounded-full ${fiche.status === 'published' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}
-                          >
-                            {fiche.status === 'published' ? 'Publiée' : 'Archivée'}
-                          </span>
-                          {fiche.is_free_for_members && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                              Gratuit membres
-                            </span>
-                          )}
+                  {fiches.map((fiche) => {
+                    const toggleLabel =
+                      fiche.status === 'published' ? 'Retirer de la vente' : 'Mettre en vente'
+                    return (
+                      // Téléphone : fiche empilée, prix en haut, actions en pied
+                      // sur toute la largeur. À partir de sm : actions à droite.
+                      <div
+                        key={fiche.id}
+                        className="flex flex-col gap-3 p-3 border border-border rounded-lg hover:bg-accent/5 transition-colors sm:flex-row sm:items-start sm:gap-4 sm:p-4"
+                      >
+                        <div className="flex items-start gap-3 flex-1 min-w-0 sm:gap-4">
+                          <div className="text-2xl shrink-0 sm:text-3xl" aria-hidden="true">
+                            {cultures.find((c) => c.name === fiche.culture)?.icon ?? '🌿'}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-semibold text-foreground break-words">
+                                {fiche.title}
+                              </h3>
+                              <span
+                                className={`text-xs px-2 py-0.5 rounded-full ${fiche.status === 'published' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}
+                              >
+                                {labelFicheStatus(fiche.status)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap mt-1.5">
+                              <span
+                                className={`text-xs px-2 py-0.5 rounded-full font-medium ${fiche.price_non_member > 0 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}
+                              >
+                                {dashboardPriceLabel(fiche.price_non_member)}
+                              </span>
+                              {memberFreeBadge(fiche) && (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                                  {memberFreeBadge(fiche)}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {fiche.culture} • {labelTypeAgriculture(fiche.type_agriculture)}
+                              {fiche.campaign ? ` • ${fiche.campaign}` : ''}
+                            </p>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {fiche.files.map((f, i) => (
+                                <button
+                                  type="button"
+                                  key={f.url}
+                                  onClick={() => handleDownload(fiche.id, i)}
+                                  title={`Télécharger ${f.name}`}
+                                  className="inline-flex max-w-full min-w-0 items-center gap-1 text-xs bg-secondary/50 px-2 py-1 rounded hover:bg-primary/10 hover:text-primary transition-colors"
+                                >
+                                  <Download className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">
+                                    {fileIcon(f.type)} {f.name}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              {fiche.download_count} téléchargement
+                              {fiche.download_count > 1 ? 's' : ''}
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-sm text-muted-foreground mt-0.5">
-                          {fiche.culture} • {labelTypeAgriculture(fiche.type_agriculture)}
-                          {fiche.campaign ? ` • ${fiche.campaign}` : ''}
-                        </p>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {fiche.files.map((f) => (
-                            <button
-                              type="button"
-                              key={f.url}
-                              onClick={() => handleDownload(f)}
-                              className="inline-flex items-center gap-1 text-xs bg-secondary/50 px-2 py-1 rounded hover:bg-primary/10 hover:text-primary transition-colors"
+                        {isAdmin && (
+                          <div className="flex gap-2 border-t border-border pt-3 sm:shrink-0 sm:border-0 sm:pt-0">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 gap-1.5 sm:flex-none"
+                              onClick={() => toggleStatus(fiche)}
+                              title={toggleLabel}
+                              aria-label={toggleLabel}
                             >
-                              <Download className="h-3 w-3" />
-                              {fileIcon(f.type)} {f.name}
-                            </button>
-                          ))}
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          {fiche.download_count} téléchargement
-                          {fiche.download_count !== 1 ? 's' : ''} • {fiche.price_non_member} FCFA
-                          (non-membres)
-                        </p>
+                              {fiche.status === 'published' ? (
+                                <EyeOff className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                              <span className="sm:sr-only">{toggleLabel}</span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-destructive hover:bg-destructive/10"
+                              onClick={() => handleDelete(fiche)}
+                              title="Supprimer la fiche"
+                              aria-label="Supprimer la fiche"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
-                      {isAdmin && (
-                        <div className="flex gap-2 shrink-0">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => toggleStatus(fiche)}
-                            title={fiche.status === 'published' ? 'Archiver' : 'Publier'}
-                          >
-                            {fiche.status === 'published' ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-destructive hover:bg-destructive/10"
-                            onClick={() => handleDelete(fiche)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
                 <PaginationBar
                   page={page}
@@ -923,25 +1059,39 @@ export default function MarketplacePage() {
 
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>
+              <Label htmlFor="dash-title">
                 Titre <span className="text-destructive">*</span>
               </Label>
               <Input
+                id="dash-title"
                 value={form.title}
-                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                placeholder="Compte d'exploitation Tomate — Canton Tsévié"
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, title: e.target.value }))
+                  clearFormError('title')
+                }}
+                placeholder="Compte d'exploitation Tomate, canton de Tsévié"
+                maxLength={FICHE_LIMITS.titleMax}
+                aria-invalid={formErrors.title ? true : undefined}
+                aria-describedby={formErrors.title ? 'dash-title-err' : undefined}
               />
+              <FieldError id="dash-title-err" text={formErrors.title} />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>
+                <Label htmlFor="dash-culture">
                   Culture <span className="text-destructive">*</span>
                 </Label>
                 <select
-                  className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
+                  id="dash-culture"
+                  className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm aria-[invalid=true]:border-destructive"
                   value={form.culture}
-                  onChange={(e) => setForm((f) => ({ ...f, culture: e.target.value }))}
+                  onChange={(e) => {
+                    setForm((f) => ({ ...f, culture: e.target.value }))
+                    clearFormError('culture')
+                  }}
+                  aria-invalid={formErrors.culture ? true : undefined}
+                  aria-describedby={formErrors.culture ? 'dash-culture-err' : undefined}
                 >
                   <option value="">— Choisir —</option>
                   {cultures.map((c) => (
@@ -950,6 +1100,7 @@ export default function MarketplacePage() {
                     </option>
                   ))}
                 </select>
+                <FieldError id="dash-culture-err" text={formErrors.culture} />
               </div>
               <div className="space-y-2">
                 <Label>Type d'agriculture</Label>
@@ -1019,6 +1170,27 @@ export default function MarketplacePage() {
                   </select>
                 </div>
               </div>
+              {unavailableLists.length > 0 ? (
+                <div
+                  role="alert"
+                  className="flex flex-wrap items-center gap-2 text-xs font-medium text-destructive"
+                >
+                  <span>
+                    {unavailableLists.length === 1
+                      ? `Liste des ${unavailableLists[0]} non chargée : vérifiez votre connexion.`
+                      : `Listes des ${unavailableLists.join(' et des ')} non chargées : vérifiez votre connexion.`}
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1 text-foreground"
+                    onClick={retryLocations}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" /> Réessayer
+                  </Button>
+                </div>
+              ) : null}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -1028,20 +1200,28 @@ export default function MarketplacePage() {
                   value={form.campaign}
                   onChange={(e) => setForm((f) => ({ ...f, campaign: e.target.value }))}
                   placeholder="2025-2026"
+                  maxLength={FICHE_LIMITS.campaignMax}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Prix non-membre (FCFA)</Label>
+                <Label htmlFor="dash-price">Prix non-membre (FCFA)</Label>
                 <Input
-                  type="number"
-                  value={form.price_non_member}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      price_non_member: Number.parseInt(e.target.value) || 500,
-                    }))
-                  }
+                  id="dash-price"
+                  inputMode="numeric"
+                  value={priceText}
+                  onChange={(e) => setPriceText(e.target.value.replace(/\D/g, '').slice(0, 7))}
+                  onBlur={() => {
+                    // Champ vidé : on revient au prix précédent ; 0 reste possible (gratuit).
+                    const n = Number.parseInt(priceText, 10)
+                    const price = Number.isFinite(n) ? Math.max(0, n) : form.price_non_member
+                    setPriceText(String(price))
+                    setForm((f) => ({ ...f, price_non_member: price }))
+                  }}
+                  aria-describedby="dash-price-hint"
                 />
+                <p id="dash-price-hint" className="text-xs text-muted-foreground">
+                  0 = téléchargement gratuit pour tous.
+                </p>
               </div>
             </div>
 
@@ -1052,37 +1232,46 @@ export default function MarketplacePage() {
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 placeholder="Description de la fiche technique…"
+                maxLength={FICHE_LIMITS.descriptionMax}
               />
             </div>
 
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.is_free_for_members}
+                onChange={(e) => setForm((f) => ({ ...f, is_free_for_members: e.target.checked }))}
+              />
+              {MEMBER_FREE_CHECKBOX_LABEL.faitiere}
+            </label>
+
             <div className="space-y-2">
-              <Label>
-                Fichiers <span className="text-destructive">*</span>
+              {/* Un brouillon s'enregistre sans fichier : obligatoire seulement pour la vente. */}
+              <Label htmlFor="dash-files">
+                Fichiers {form.publish ? <span className="text-destructive">*</span> : null}
               </Label>
               <button
+                id="dash-files"
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingFiles}
-                className="w-full border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary hover:bg-accent/5 transition-colors cursor-pointer disabled:opacity-50"
+                disabled={saving}
+                aria-invalid={formErrors.files ? true : undefined}
+                aria-describedby={formErrors.files ? 'dash-files-err' : undefined}
+                className="w-full border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary hover:bg-accent/5 transition-colors cursor-pointer disabled:opacity-50 aria-[invalid=true]:border-destructive"
               >
-                {uploadingFiles ? (
-                  <Spinner className="h-6 w-6 mx-auto" />
-                ) : (
-                  <>
-                    <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-foreground font-medium">
-                      Cliquez pour ajouter des fichiers
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      DOCX, Excel (.xlsx), PDF — max 20 Mo
-                    </p>
-                  </>
-                )}
+                <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-foreground font-medium">
+                  Cliquez pour ajouter des fichiers
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  PDF, Excel (.xlsx), Word (.docx), 20 Mo max. Envoyés à l’enregistrement.
+                </p>
               </button>
+              <FieldError id="dash-files-err" text={formErrors.files} />
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".docx,.xlsx,.xls,.pdf,.doc"
+                accept={UPLOAD_ACCEPT}
                 multiple
                 className="sr-only"
                 onChange={(e) => {
@@ -1092,23 +1281,25 @@ export default function MarketplacePage() {
               />
               {pendingFiles.length > 0 && (
                 <div className="space-y-2 mt-3">
-                  {pendingFiles.map((f, i) => (
+                  {pendingFiles.map((f) => (
                     <div
-                      key={f.url}
+                      key={f.name}
                       className="flex items-center justify-between p-2 bg-secondary/30 rounded-lg"
                     >
-                      <div className="flex items-center gap-2">
-                        <span>{fileIcon(f.type)}</span>
-                        <span className="text-sm text-foreground">{f.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          ({(f.size / 1024).toFixed(0)} Ko)
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span>{fileIcon(f.name.split('.').pop()?.toLowerCase() ?? '')}</span>
+                        <span className="text-sm text-foreground truncate">{f.name}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          ({formatFileSize(f.size)})
                         </span>
                       </div>
                       <Button
                         size="sm"
                         variant="ghost"
                         className="h-6 w-6 p-0 text-destructive"
-                        onClick={() => setPendingFiles((prev) => prev.filter((_, j) => j !== i))}
+                        aria-label={`Retirer ${f.name}`}
+                        disabled={saving}
+                        onClick={() => setPendingFiles((prev) => prev.filter((x) => x !== f))}
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
@@ -1117,19 +1308,34 @@ export default function MarketplacePage() {
                 </div>
               )}
             </div>
+
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.publish}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, publish: e.target.checked }))
+                  if (!e.target.checked) clearFormError('files')
+                }}
+              />
+              Mettre en vente tout de suite
+            </label>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="items-center">
+            {progress ? (
+              <output className="mr-auto text-sm text-muted-foreground">{progress}</output>
+            ) : null}
             <Button variant="outline" onClick={() => setShowAdd(false)} disabled={saving}>
               Annuler
             </Button>
             <Button
               className="bg-primary hover:bg-primary/90 gap-2"
               onClick={handleSave}
-              disabled={saving || !form.title || !form.culture || pendingFiles.length === 0}
+              disabled={saving}
             >
               {saving ? <Spinner className="h-4 w-4" /> : <Upload className="h-4 w-4" />}
-              Publier la fiche
+              {form.publish ? 'Mettre en vente' : 'Enregistrer le brouillon'}
             </Button>
           </DialogFooter>
         </DialogContent>

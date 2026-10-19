@@ -1,8 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useReferenceData } from './use-reference-data'
 import type { MarketplaceFilters } from './use-marketplace-filters'
+import { useReferenceData } from './use-reference-data'
 
 export interface PublicFiche {
   id: string
@@ -26,6 +26,9 @@ export interface PublicFiche {
   region: { id: string; name: string } | null
   prefecture: { id: string; name: string } | null
   canton: { id: string; name: string } | null
+  /** Contenu vendu, sans chemin de stockage : nombre et type/taille des fichiers. */
+  files_count?: number
+  files_summary?: { type: string; size: number | null }[]
 }
 
 interface FichesResult {
@@ -36,12 +39,15 @@ interface FichesResult {
 }
 
 const PAGE_SIZE = 20
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /**
  * Fetches public fiches techniques (comptes d'exploitation) with filters.
  * Used by the public marketplace page.
+ *
+ * `ficheId` (lien /marketplace?fiche=<id>) : cette fiche seule, filtres ignorés.
  */
-export function useFichesPublic(filters: MarketplaceFilters) {
+export function useFichesPublic(filters: MarketplaceFilters, ficheId?: string | null) {
   const [data, setData] = useState<FichesResult | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -52,7 +58,7 @@ export function useFichesPublic(filters: MarketplaceFilters) {
   const cacheRef = useRef<Map<string, { data: FichesResult; ts: number }>>(new Map())
   const abortRef = useRef<AbortController | null>(null)
 
-  const cacheKey = useMemo(() => JSON.stringify(filters), [filters])
+  const cacheKey = useMemo(() => JSON.stringify([filters, ficheId ?? null]), [filters, ficheId])
 
   const fetchFiches = useCallback(async () => {
     const cached = cacheRef.current.get(cacheKey)
@@ -65,19 +71,30 @@ export function useFichesPublic(filters: MarketplaceFilters) {
     abortRef.current?.abort()
     abortRef.current = new AbortController()
 
+    // Lien abîmé (id tronqué) : aucune fiche, sans requête ni « erreur réseau ».
+    if (ficheId && !UUID_RE.test(ficheId)) {
+      setData({ fiches: [], total: 0, page: 1, pageSize: PAGE_SIZE })
+      setError(null)
+      setIsLoading(false)
+      return
+    }
+
     setIsLoading(true)
     setError(null)
 
     try {
       const params = new URLSearchParams()
-      if (filters.search) params.set('q', filters.search)
-      if (filters.culture) params.set('culture', filters.culture)
-      if (filters.region_id) params.set('region_id', filters.region_id)
-      if (filters.prefecture_id) params.set('prefecture_id', filters.prefecture_id)
-      if (filters.canton_id) params.set('canton_id', filters.canton_id)
-      if (filters.cooperative_id) params.set('cooperative_id', filters.cooperative_id)
-      if (filters.producer_type) params.set('type_agriculture', filters.producer_type)
-      params.set('page', String(filters.page))
+      if (ficheId) params.set('id', ficheId)
+      else if (filters.search) params.set('q', filters.search)
+      if (!ficheId) {
+        if (filters.culture) params.set('culture', filters.culture)
+        if (filters.region_id) params.set('region_id', filters.region_id)
+        if (filters.prefecture_id) params.set('prefecture_id', filters.prefecture_id)
+        if (filters.canton_id) params.set('canton_id', filters.canton_id)
+        if (filters.cooperative_id) params.set('cooperative_id', filters.cooperative_id)
+        if (filters.producer_type) params.set('type_agriculture', filters.producer_type)
+      }
+      params.set('page', ficheId ? '1' : String(filters.page))
       params.set('limit', String(PAGE_SIZE))
 
       const res = await fetch(`/api/fiches/public?${params.toString()}`, {
@@ -99,7 +116,7 @@ export function useFichesPublic(filters: MarketplaceFilters) {
     } finally {
       setIsLoading(false)
     }
-  }, [filters, cacheKey])
+  }, [filters, ficheId, cacheKey])
 
   useEffect(() => {
     fetchFiches()

@@ -6,9 +6,11 @@ import { type NextRequest, NextResponse } from 'next/server'
  * POST /api/payments/fedapay/webhook — notification FedaPay (transaction.*).
  *
  * Le corps n'est jamais cru sur parole : on n'en tire que l'identifiant de la
- * transaction, l'achat correspondant est ensuite réglé d'après FedaPay lui-même.
- * Une notification forgée ne peut donc rien ouvrir. Répond 200 pour que FedaPay
- * ne réessaie pas indéfiniment une transaction inconnue.
+ * transaction, l'achat correspondant est ensuite réglé d'après FedaPay lui-même
+ * (GET /transactions/{id}). Une notification forgée ne peut donc rien ouvrir.
+ * Vaut aussi pour un achat déjà en échec : un « transaction.approved » arrivé
+ * après un refus est relu, et l'achat réglé s'il correspond (settlePurchase).
+ * Répond 200 pour que FedaPay ne réessaie pas indéfiniment une transaction inconnue.
  */
 export async function POST(request: NextRequest) {
   // biome-ignore lint/suspicious/noExplicitAny: événement FedaPay, seul l'id est lu

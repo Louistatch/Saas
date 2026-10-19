@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/weather-sync",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/purchases-reconcile",
+      "schedule": "20 7 * * *"
     }
   ]
 }

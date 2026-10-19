@@ -5,6 +5,7 @@
 import { execSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { FEDAPAY_PROVIDERS, parseDisabledProviders } from '../lib/payments/fedapay-providers'
 
 /**
  * Simple recursive glob for .ts/.tsx files.
@@ -276,6 +277,33 @@ if (fs.existsSync(syncRoutePath)) {
     '[KOBO-18] Sync route existe',
     false,
     'Fichier manquant: app/api/integrations/kobo/sync/route.ts',
+  )
+}
+
+// =========================================================
+// PAIEMENT FEDAPAY : toujours sur le site (FEDAPAY-1, FEDAPAY-2)
+// =========================================================
+
+// FEDAPAY-1 : aucun cadre FedaPay autorisé par la CSP (l'acheteur ne voit jamais de page FedaPay).
+const nextConfigPath = path.join(rootDir, 'next.config.mjs')
+const frameSrc =
+  (fs.existsSync(nextConfigPath) ? fs.readFileSync(nextConfigPath, 'utf-8') : '').match(
+    /frame-src[^"'`]*/,
+  )?.[0] ?? ''
+check(
+  '[FEDAPAY-1] CSP : aucun cadre FedaPay (frame-src)',
+  !/fedapay/i.test(frameSrc),
+  'Retirer fedapay.com de frame-src dans next.config.mjs : le paiement ne sort jamais du site',
+)
+
+// FEDAPAY-2 : l'interrupteur d'urgence FEDAPAY_DISABLED_PROVIDERS ne contient que des
+// opérateurs reconnus (une valeur inconnue ne masque rien, en silence).
+if (!process.argv.includes('--static')) {
+  const { unknown } = parseDisabledProviders(process.env.FEDAPAY_DISABLED_PROVIDERS)
+  check(
+    '[FEDAPAY-2] FEDAPAY_DISABLED_PROVIDERS : opérateurs reconnus',
+    unknown.length === 0,
+    `Valeur(s) non reconnue(s) : ${unknown.join(', ')}. Admis : ${FEDAPAY_PROVIDERS.map((p) => (p.id === p.live ? p.id : `${p.id} ou ${p.live}`)).join(', ')}`,
   )
 }
 

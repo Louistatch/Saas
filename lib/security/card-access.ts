@@ -35,6 +35,13 @@ interface PrivateCardRow {
   expiry_date: string | null
 }
 
+/** Compte connecté qui a ouvert la carte (null pour une session de carte). */
+export interface PrivateCardUser {
+  id: string
+  email: string | null
+  emailConfirmed: boolean
+}
+
 /**
  * Session de carte : le cookie signé émis par /api/auth/card/verify après le
  * code SMS. Renvoie le membre qu'elle autorise pour CETTE carte, sinon `null`.
@@ -79,7 +86,7 @@ async function loadCardForSession(
  * `card.cooperative_id`), jamais à une valeur venue du client. Les sept routes
  * qui appellent cette fonction le font déjà explicitement.
  *
- * `userId` vaut `null` pour une session de carte : il n'y a pas de profil.
+ * `userId` (et `user`) valent `null` pour une session de carte : il n'y a pas de profil.
  */
 export async function requirePrivateCard(value: string) {
   const number = normalizedCardNumber(value)
@@ -117,6 +124,13 @@ export async function requirePrivateCard(value: string) {
         supabase,
         userId: user.id as string | null,
         via: 'account' as 'account' | 'card',
+        // Lire une carte ne prouve pas qu'on en est le titulaire (administrateur,
+        // partenaire) : de quoi le vérifier, d'après le serveur d'authentification.
+        user: {
+          id: user.id,
+          email: user.email ?? null,
+          emailConfirmed: !!user.email_confirmed_at,
+        } as PrivateCardUser | null,
       }
     }
     // Un compte connecté mais sans droit sur cette carte n'exclut pas que son
@@ -137,6 +151,7 @@ export async function requirePrivateCard(value: string) {
           supabase: createAdminClient() as unknown as typeof supabase,
           userId: null as string | null,
           via: 'card' as 'account' | 'card',
+          user: null as PrivateCardUser | null,
         }
       }
     }

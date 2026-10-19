@@ -28,7 +28,8 @@ const securityHeaders = [
       "worker-src 'self'",
       "manifest-src 'self'",
       "frame-ancestors 'none'",
-      "frame-src 'self' https://*.vercel.app https://*.fedapay.com",
+      // Aucun cadre FedaPay : le paiement Mobile Money se fait toujours sur le site.
+      "frame-src 'self' https://*.vercel.app",
       "base-uri 'self'",
       "form-action 'self'",
       "upgrade-insecure-requests",
