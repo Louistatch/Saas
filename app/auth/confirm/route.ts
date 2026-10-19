@@ -6,10 +6,11 @@
  * jamais vers une URL venue de la requête (pas de redirection ouverte).
  */
 
-import { accountHomeUrl } from '@/lib/account/journey'
+import { confirmedHomePath } from '@/lib/account/confirmed-home'
 import { createClient } from '@/lib/supabase/server'
 import type { EmailOtpType } from '@supabase/supabase-js'
 import { type NextRequest, NextResponse } from 'next/server'
+import { GAME_RETURN_COOKIE, resolveGameReturn } from '@/lib/haroolife/entry'
 
 const TYPES: EmailOtpType[] = ['signup', 'email', 'recovery', 'magiclink', 'invite', 'email_change']
 
@@ -31,13 +32,16 @@ export async function GET(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.redirect(`${base}/auth/login?confirmed=1`)
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, haroo_type')
-    .eq('id', user.id)
-    .maybeSingle()
-  const home = profile
-    ? accountHomeUrl({ role: profile.role, harooType: profile.haroo_type })
-    : '/compte'
+  const gameReturn = resolveGameReturn(
+    request.nextUrl.searchParams.get('next'),
+    request.cookies.get(GAME_RETURN_COOKIE)?.value,
+  )
+  if (gameReturn) {
+    const response = NextResponse.redirect(new URL(gameReturn, base))
+    response.cookies.delete(GAME_RETURN_COOKIE)
+    return response
+  }
+  // Organisation, Haroo ou dossier Opérateur : la personne arrive dans SON espace.
+  const home = await confirmedHomePath(supabase, user.id)
   return NextResponse.redirect(`${base}${home}?confirmed=1`)
 }

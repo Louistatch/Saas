@@ -1,11 +1,7 @@
-import type { Metadata } from 'next'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
+import { publicPageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
-  title: 'Politique cookies — FaîtiereHub',
-  description:
-    'Politique d\'utilisation des cookies sur FaîtiereHub : types de cookies, cookies essentiels, analytics et gestion de vos préférences.',
-}
+export const metadata = publicPageMetadata('/legal/cookies')
 
 export default function CookiesPage() {
   return (
@@ -14,24 +10,24 @@ export default function CookiesPage() {
         <h1 className="text-4xl font-bold tracking-tight text-foreground mb-4">
           Politique cookies
         </h1>
-        <p className="text-muted-foreground mb-12">
-          Dernière mise à jour : 1er janvier 2025
-        </p>
+        <p className="text-muted-foreground mb-12">Dernière mise à jour : 1er janvier 2025</p>
 
         <div className="prose prose-neutral dark:prose-invert max-w-none space-y-10">
           {/* Introduction */}
           <div className="space-y-4">
             <p className="text-muted-foreground leading-relaxed">
               La plateforme FaîtiereHub utilise des cookies et technologies similaires pour assurer
-              son bon fonctionnement, améliorer l&apos;expérience utilisateur et analyser l&apos;utilisation
-              du service. Cette politique vous informe sur les cookies que nous utilisons et comment
-              les gérer.
+              son bon fonctionnement, améliorer l&apos;expérience utilisateur et analyser
+              l&apos;utilisation du service. Cette politique vous informe sur les cookies que nous
+              utilisons et comment les gérer.
             </p>
           </div>
 
           {/* Qu'est-ce qu'un cookie */}
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-foreground">1. Qu&apos;est-ce qu&apos;un cookie ?</h2>
+            <h2 className="text-2xl font-bold text-foreground">
+              1. Qu&apos;est-ce qu&apos;un cookie ?
+            </h2>
             <p className="text-muted-foreground leading-relaxed">
               Un cookie est un petit fichier texte déposé sur votre appareil (ordinateur, tablette,
               smartphone) lors de la visite d&apos;un site web. Il permet au site de mémoriser des
@@ -62,7 +58,8 @@ export default function CookiesPage() {
               </ul>
               <div className="mt-3 rounded bg-muted/50 p-3">
                 <p className="text-xs text-muted-foreground">
-                  <strong>Durée :</strong> Session ou 30 jours maximum<br />
+                  <strong>Durée :</strong> Session ou 30 jours maximum
+                  <br />
                   <strong>Base légale :</strong> Intérêt légitime (fonctionnement du service)
                 </p>
               </div>
@@ -86,8 +83,10 @@ export default function CookiesPage() {
               </ul>
               <div className="mt-3 rounded bg-muted/50 p-3">
                 <p className="text-xs text-muted-foreground">
-                  <strong>Outil :</strong> Vercel Analytics (respectueux de la vie privée)<br />
-                  <strong>Durée :</strong> 12 mois maximum<br />
+                  <strong>Outil :</strong> Vercel Analytics (respectueux de la vie privée)
+                  <br />
+                  <strong>Durée :</strong> 12 mois maximum
+                  <br />
                   <strong>Base légale :</strong> Consentement
                 </p>
               </div>
@@ -109,7 +108,8 @@ export default function CookiesPage() {
               </ul>
               <div className="mt-3 rounded bg-muted/50 p-3">
                 <p className="text-xs text-muted-foreground">
-                  <strong>Durée :</strong> 12 mois maximum<br />
+                  <strong>Durée :</strong> 12 mois maximum
+                  <br />
                   <strong>Base légale :</strong> Consentement
                 </p>
               </div>
@@ -125,17 +125,20 @@ export default function CookiesPage() {
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
               <li>
                 <strong className="text-foreground">Via votre navigateur :</strong> la plupart des
-                navigateurs vous permettent de refuser ou supprimer les cookies dans leurs paramètres.
-                Consultez l&apos;aide de votre navigateur pour les instructions spécifiques.
+                navigateurs vous permettent de refuser ou supprimer les cookies dans leurs
+                paramètres. Consultez l&apos;aide de votre navigateur pour les instructions
+                spécifiques.
               </li>
               <li>
-                <strong className="text-foreground">Via notre bandeau cookies :</strong> lors de votre
-                première visite, un bandeau vous permet d&apos;accepter ou refuser les cookies non essentiels.
-                Vous pouvez modifier ce choix à tout moment.
+                <strong className="text-foreground">Via notre bandeau cookies :</strong> lors de
+                votre première visite, un bandeau vous permet d&apos;accepter ou refuser les cookies
+                non essentiels. Vous pouvez modifier ce choix à tout moment.
               </li>
             </ul>
             <div className="rounded-lg border border-border bg-muted/30 p-6 space-y-3">
-              <p className="text-sm font-medium text-foreground">Liens utiles pour gérer les cookies :</p>
+              <p className="text-sm font-medium text-foreground">
+                Liens utiles pour gérer les cookies :
+              </p>
               <ul className="list-disc pl-6 space-y-1 text-sm text-muted-foreground">
                 <li>Chrome : Paramètres &gt; Confidentialité et sécurité &gt; Cookies</li>
                 <li>Firefox : Options &gt; Vie privée et sécurité &gt; Cookies</li>
@@ -144,9 +147,9 @@ export default function CookiesPage() {
               </ul>
             </div>
             <p className="text-muted-foreground leading-relaxed">
-              <strong className="text-foreground">Note :</strong> la désactivation des cookies essentiels
-              peut empêcher le bon fonctionnement de la Plateforme et rendre certaines fonctionnalités
-              inaccessibles.
+              <strong className="text-foreground">Note :</strong> la désactivation des cookies
+              essentiels peut empêcher le bon fonctionnement de la Plateforme et rendre certaines
+              fonctionnalités inaccessibles.
             </p>
           </div>
 
@@ -154,7 +157,8 @@ export default function CookiesPage() {
           <div className="space-y-4">
             <h2 className="text-2xl font-bold text-foreground">4. Contact</h2>
             <p className="text-muted-foreground leading-relaxed">
-              Pour toute question relative à notre utilisation des cookies, vous pouvez nous contacter :
+              Pour toute question relative à notre utilisation des cookies, vous pouvez nous
+              contacter :
             </p>
             <div className="rounded-lg border border-border bg-muted/30 p-6 space-y-2">
               <p className="text-sm text-muted-foreground">Email : dpo@faitierehub.com</p>

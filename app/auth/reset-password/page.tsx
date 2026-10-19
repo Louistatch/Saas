@@ -12,10 +12,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ArrowLeft, CheckCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { errorMessage } from '@/lib/utils/errors'
+import { useGameReturn } from '@/hooks/use-game-return'
+import { withGameReturn } from '@/lib/haroolife/entry'
 
 type SessionState = 'checking' | 'valid' | 'invalid'
 
 export default function ResetPasswordPage() {
+  const gameReturn = useGameReturn()
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const [password, setPassword] = useState('')
@@ -78,7 +81,7 @@ export default function ResetPasswordPage() {
       setDone(true)
       // Invalidate everywhere, then send the user to log in with the new password.
       await supabase.auth.signOut()
-      setTimeout(() => router.push('/auth/login'), 2000)
+      setTimeout(() => router.push(withGameReturn('/auth/login', gameReturn)), 2000)
     }
     setLoading(false)
   }
@@ -101,7 +104,7 @@ export default function ResetPasswordPage() {
         <div className="md:hidden w-full max-w-sm mb-6 space-y-4">
           <div className="flex items-center justify-between">
             <Link
-              href="/auth/login"
+              href={withGameReturn('/auth/login', gameReturn)}
               className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />

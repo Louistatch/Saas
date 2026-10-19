@@ -7,6 +7,7 @@ import {
   validateFichePath,
   verifyStoredFiles,
 } from '@/lib/fiches/files'
+import { canManageFiche } from '@/lib/fiches/publishing'
 import {
   CONFIRM_FREE_REQUIRED,
   PUBLISH_NEEDS_FILE,
@@ -33,25 +34,8 @@ interface ManagedFiche {
   cover_url: string | null
 }
 
-/**
- * Qui gère une fiche : le super_admin (toutes, dont celles de la plateforme),
- * ou l'admin de la faîtière PROPRIÉTAIRE (même règle que POST /api/fiches et
- * GET /api/admin/fiches/[id]/files). Sans cela, une faîtière créait son
- * brouillon puis ne pouvait ni y joindre ses fichiers, ni le publier, ni le
- * retirer, ni le supprimer.
- */
-function canManageFiche(
-  ctx: { role: string | null; cooperativeId: string | null; cooperativeLevel: string | null },
-  fiche: Pick<ManagedFiche, 'cooperative_id'>,
-): boolean {
-  if (ctx.role === 'super_admin') return true
-  return (
-    ctx.role === 'cooperative_admin' &&
-    ctx.cooperativeLevel === 'faitiere' &&
-    fiche.cooperative_id !== null &&
-    ctx.cooperativeId === fiche.cooperative_id
-  )
-}
+// Qui gère une fiche : lib/fiches/publishing.ts (super_admin ; faîtière propriétaire seulement
+// si la publication des faîtières est rouverte).
 
 const forbidden = () => NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
@@ -288,7 +272,7 @@ export async function DELETE(
     if ((count ?? 0) > 0) {
       return NextResponse.json(
         {
-          error: 'Ce compte a des ventes : retirez-le de la vente au lieu de le supprimer',
+          error: `Ce compte a ${count} achat(s) enregistré(s), même en attente : retirez-le de la vente au lieu de le supprimer. Les acheteurs gardent leur fichier.`,
           purchases: count,
         },
         { status: 409 },

@@ -84,7 +84,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       { suppliers, total: count ?? 0, page, pageSize },
-      { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } },
+      // The list depends on who asks (RLS on members): never shared by the CDN between visitors.
+      { headers: { 'Cache-Control': 'private, no-store' } },
     )
   } catch (error) {
     log.error('Fournisseurs API error', error)

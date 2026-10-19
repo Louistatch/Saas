@@ -1,3 +1,7 @@
+import { assertTenantAccess } from '@/lib/security/assert-access'
+import { cardPrefix, generateUniqueCardNumber } from '@/lib/utils/card-number'
+import { createLogger } from '@/lib/utils/logger'
+import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 /**
  * POST /api/cards/generate-number  (SEC-02)
  *
@@ -11,10 +15,6 @@
  * @security rate limited via the 'auth' bucket (cheap anti-spam)
  */
 import { type NextRequest, NextResponse } from 'next/server'
-import { assertTenantAccess } from '@/lib/security/assert-access'
-import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
-import { cardPrefix, generateUniqueCardNumber } from '@/lib/utils/card-number'
-import { createLogger } from '@/lib/utils/logger'
 import { z } from 'zod'
 
 const log = createLogger('api:cards:generate-number')
@@ -43,6 +43,13 @@ export async function POST(request: NextRequest) {
   // Authn + tenant access (also yields the user-scoped supabase client).
   const tenant = await assertTenantAccess(cooperativeId)
   if (!tenant.ok) return tenant.response
+  // Émettre une carte est réservé à l'opérateur (super_admin) : la coopérative consulte.
+  if (tenant.ctx.role !== 'super_admin') {
+    return NextResponse.json(
+      { error: 'Les cartes sont émises par l’opérateur de votre zone.' },
+      { status: 403 },
+    )
+  }
   const { supabase } = tenant.ctx
 
   // Resolve a prefix from the cooperative (or its faitiere) name.

@@ -62,9 +62,11 @@ test-results/
 
 # Tooling caches
 .turbo/
-# .claude/ reste ignoré, sauf les skills du projet (versionnés, cf. skills-lock.json)
+# .claude/ reste ignoré, sauf les skills et les sous-agents du projet (versionnés)
 .claude/*
 !.claude/skills/
+!.claude/agents/
 
 # Supabase CLI cache
 supabase/.temp/
+/dist-realtime

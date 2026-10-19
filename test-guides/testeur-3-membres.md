@@ -11,7 +11,7 @@
 | | |
 |---|---|
 | **Email** | `coop-admin@demo.local` |
-| **Mot de passe** | `Demo123!CoopAdmin` |
+| **Mot de passe** | `<secret retiré — voir gestionnaire de mots de passe>` |
 | **Rôle** | Admin de la coopérative HAROFEMA |
 
 ---
@@ -56,7 +56,7 @@ Tester la **gestion des membres** : ajout, modification, suppression, et vérifi
 ### 6. Isolation des données (IMPORTANT)
 - [ ] Vérifier que vous ne voyez QUE les membres de HAROFEMA
 - [ ] Se déconnecter
-- [ ] Se reconnecter avec `fermes-admin@demo.local` / `Demo123!FarmesAdmin`
+- [ ] Se reconnecter avec `fermes-admin@demo.local` / `<secret retiré — voir gestionnaire de mots de passe>`
 - [ ] Vérifier : les membres sont DIFFÉRENTS (coopérative COOMARA)
 - [ ] Les membres de HAROFEMA ne sont PAS visibles
 

@@ -42,12 +42,12 @@ import {
   CheckCircle2,
   Download,
   IdCard,
+  KeyRound,
   Plus,
   Printer,
   QrCode,
   RefreshCw,
   Search,
-  KeyRound,
   Trash2,
   Users,
 } from 'lucide-react'
@@ -67,6 +67,9 @@ export default function CardsPage() {
   const { user } = useAuth()
   // Seul le super-administrateur émet les PIN : les opérateurs n'en voient pas le bouton.
   const canIssuePin = user?.role === 'super_admin'
+  // Émettre ou commander des cartes est le travail de l'opérateur (et du super-administrateur) :
+  // la coopérative consulte, télécharge et imprime les cartes de ses membres.
+  const canIssue = user?.role === 'super_admin'
   const { toast } = useToast()
   const { confirm, confirmNode } = useConfirm()
   const supabase = useMemo(() => createClient(), [])
@@ -641,8 +644,18 @@ export default function CardsPage() {
     <div className="space-y-8">
       <PageHeader
         title="Cartes membres"
-        description="Générer et gérer les cartes numériques avec codes QR. Offre gratuite : 10 cartes par coopérative."
+        description={
+          canIssue
+            ? 'Générer et gérer les cartes numériques avec codes QR. Offre gratuite : 10 cartes par coopérative.'
+            : 'Les cartes de vos membres, avec leur code QR, à consulter, télécharger et imprimer.'
+        }
       />
+      {!canIssue && (
+        <p className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-foreground">
+          Les cartes sont émises par l’opérateur de votre zone. Pour une nouvelle carte ou une
+          commande de cartes physiques, utilisez le bouton « Écrire à l’équipe ».
+        </p>
+      )}
 
       <Tabs defaultValue="generated" className="w-full">
         <TabsList className="grid w-full max-w-lg grid-cols-3 border-b border-border bg-transparent">
@@ -652,18 +665,22 @@ export default function CardsPage() {
           >
             Cartes ({cards.length})
           </TabsTrigger>
-          <TabsTrigger
-            value="template"
-            className="border-b-2 border-transparent data-[state=active]:border-primary"
-          >
-            Modèle
-          </TabsTrigger>
-          <TabsTrigger
-            value="settings"
-            className="border-b-2 border-transparent data-[state=active]:border-primary"
-          >
-            Paramètres
-          </TabsTrigger>
+          {canIssue && (
+            <TabsTrigger
+              value="template"
+              className="border-b-2 border-transparent data-[state=active]:border-primary"
+            >
+              Modèle
+            </TabsTrigger>
+          )}
+          {canIssue && (
+            <TabsTrigger
+              value="settings"
+              className="border-b-2 border-transparent data-[state=active]:border-primary"
+            >
+              Paramètres
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="generated" className="space-y-6 mt-6">
@@ -704,27 +721,31 @@ export default function CardsPage() {
                   Imprimer A4
                 </Button>
               </Link>
-              <Link href="/dashboard/cards/print-orders">
-                <Button variant="outline" className="gap-2 border-border">
-                  <IdCard className="h-4 w-4" />
-                  Commander des cartes physiques
-                </Button>
-              </Link>
-              <Button
-                variant="outline"
-                className="gap-2 border-border"
-                onClick={() => setShowBulk(true)}
-              >
-                <Users className="h-4 w-4" />
-                Génération en masse
-              </Button>
-              <Button
-                className="gap-2 bg-primary hover:bg-primary/90"
-                onClick={() => setShowGenerate(true)}
-              >
-                <Plus className="h-4 w-4" />
-                Générer une carte
-              </Button>
+              {canIssue && (
+                <>
+                  <Link href="/dashboard/cards/print-orders">
+                    <Button variant="outline" className="gap-2 border-border">
+                      <IdCard className="h-4 w-4" />
+                      Commander des cartes physiques
+                    </Button>
+                  </Link>
+                  <Button
+                    variant="outline"
+                    className="gap-2 border-border"
+                    onClick={() => setShowBulk(true)}
+                  >
+                    <Users className="h-4 w-4" />
+                    Génération en masse
+                  </Button>
+                  <Button
+                    className="gap-2 bg-primary hover:bg-primary/90"
+                    onClick={() => setShowGenerate(true)}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Générer une carte
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
@@ -760,10 +781,12 @@ export default function CardsPage() {
                   description={
                     search
                       ? 'Essayez un autre nom ou numéro de carte'
-                      : "Générez des cartes pour vos membres afin d'activer l'accès aux comptes d'exploitation"
+                      : canIssue
+                        ? "Générez des cartes pour vos membres afin d'activer l'accès aux comptes d'exploitation"
+                        : 'L’opérateur de votre zone émettra les cartes de vos membres.'
                   }
                   action={
-                    !search ? (
+                    !search && canIssue ? (
                       <Button
                         className="gap-2 bg-primary hover:bg-primary/90"
                         onClick={() => setShowGenerate(true)}

@@ -1,13 +1,16 @@
-import { submitAssignment } from '@/lib/academy/operator-training'
+import { settleOperatorTraining } from '@/lib/academy/operator-completion'
+import { notifyTrainingCompleted } from '@/lib/academy/operator-notify'
+import { evaluateLessonCompletion, submitAssignment } from '@/lib/academy/operator-training'
 import { assertOperatorCandidate } from '@/lib/security/assert-partner-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { clientKeyFromHeaders, isUuid, rateLimit } from '@/lib/utils/rate-limit'
 // Dépôt d'un devoir Opérateur — écrit via submitAssignment avec l'identifiant authentifié.
-import { type NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse, after } from 'next/server'
 import { z } from 'zod'
 
 const bodySchema = z.object({
-  contentText: z.string().trim().min(1).max(10_000).optional(),
+  // Même seuil que le formulaire : un cas pratique se rédige (20 caractères au moins).
+  contentText: z.string().trim().min(20).max(10_000).optional(),
   attachmentUrl: z.string().url().optional(),
 })
 
@@ -20,6 +23,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const guard = await assertOperatorCandidate()
   if (!guard.ok) return guard.response
+  if (guard.ctx.partnerIds.length === 0) {
+    return NextResponse.json(
+      { error: 'Consultation seulement : aucun dossier Opérateur' },
+      { status: 403 },
+    )
+  }
 
   const { id } = await params
   if (!isUuid(id)) {
@@ -44,5 +53,27 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!result.ok) {
     return NextResponse.json({ error: result.error ?? 'Dépôt impossible' }, { status: 422 })
   }
-  return NextResponse.json(result)
+  let lessonCompleted = false
+  let training: {
+    lessonsCompleted: number
+    lessonsTotal: number
+    trainingCompleted: boolean
+  } | null = null
+  if (result.lessonId && result.moduleId) {
+    const lesson = await evaluateLessonCompletion(admin, {
+      profileId: guard.ctx.userId,
+      moduleId: result.moduleId,
+      lessonId: result.lessonId,
+    })
+    lessonCompleted = lesson.completed
+    const settlement = await settleOperatorTraining(admin, guard.ctx.userId, result.moduleId)
+    training = {
+      lessonsCompleted: settlement.lessonsCompleted,
+      lessonsTotal: settlement.lessonsTotal,
+      trainingCompleted: settlement.trainingCompleted,
+    }
+    const userId = guard.ctx.userId
+    after(() => notifyTrainingCompleted(userId, settlement))
+  }
+  return NextResponse.json({ ...result, lessonCompleted, training })
 }

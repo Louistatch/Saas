@@ -1,25 +1,36 @@
 'use client'
 
-import { Suspense, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
-import Link from 'next/link'
-import { Logo } from '@/components/shared/logo'
 import { AuthSidePanel } from '@/components/shared/auth-side-panel'
+import { useCaptcha } from '@/components/shared/captcha'
+import { Logo } from '@/components/shared/logo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ArrowLeft, MailCheck, RefreshCw } from 'lucide-react'
+import { useGameReturn } from '@/hooks/use-game-return'
+import { withGameReturn } from '@/lib/haroolife/entry'
 import { createClient } from '@/lib/supabase/client'
 import { errorMessage } from '@/lib/utils/errors'
+import { ArrowLeft, MailCheck, RefreshCw } from 'lucide-react'
+import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import { Suspense, useState } from 'react'
 
 function VerifyEmailInner() {
+  const gameReturn = useGameReturn()
   const searchParams = useSearchParams()
   const email = searchParams?.get('email') ?? ''
   const [resending, setResending] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  // Anti-robot check (off until NEXT_PUBLIC_TURNSTILE_SITE_KEY is configured).
+  const captcha = useCaptcha()
 
   const handleResend = async () => {
-    if (!email) return
+    if (!email || resending) return
+    const captchaToken = captcha.getToken()
+    if (captcha.enabled && !captchaToken) {
+      setError('Terminez la vérification anti-robot ci-dessous avant de renvoyer l’email.')
+      return
+    }
     setResending(true)
     setError('')
     setMessage('')
@@ -28,7 +39,10 @@ function VerifyEmailInner() {
       const { error: resendError } = await supabase.auth.resend({
         type: 'signup',
         email,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback?type=signup` },
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback?type=signup${gameReturn ? `&next=${encodeURIComponent(gameReturn)}` : ''}`,
+          captchaToken: captchaToken ?? undefined,
+        },
       })
       if (resendError) throw resendError
       setMessage('Email renvoyé. Vérifiez votre boîte de réception.')
@@ -36,6 +50,7 @@ function VerifyEmailInner() {
       setError(errorMessage(err))
     } finally {
       setResending(false)
+      captcha.reset()
     }
   }
 
@@ -53,12 +68,15 @@ function VerifyEmailInner() {
           <p className="text-sm text-muted-foreground">
             Nous avons envoyé un lien de confirmation
             {email ? (
-              <> à <strong className="text-foreground">{email}</strong></>
+              <>
+                {' '}
+                à <strong className="text-foreground">{email}</strong>
+              </>
             ) : (
               <> à votre adresse email</>
             )}
-            . Cliquez dessus pour activer votre compte et finaliser la création de votre
-            coopérative.
+            . Cliquez dessus pour activer votre compte et finaliser la création de votre compte
+            FaîtiereHub.
           </p>
 
           {message && (
@@ -72,17 +90,18 @@ function VerifyEmailInner() {
             </div>
           )}
 
+          {captcha.box}
           <Button
             variant="outline"
             className="w-full border-border gap-2"
             onClick={handleResend}
-            disabled={resending || !email}
+            disabled={resending || !email || !captcha.ready}
           >
             <RefreshCw className={`h-4 w-4 ${resending ? 'animate-spin' : ''}`} />
             {resending ? 'Envoi…' : "Renvoyer l'email"}
           </Button>
 
-          <Link href="/auth/login">
+          <Link href={withGameReturn('/auth/login', gameReturn)}>
             <Button variant="ghost" className="w-full gap-2 text-muted-foreground">
               <ArrowLeft className="h-4 w-4" />
               Retour à la connexion

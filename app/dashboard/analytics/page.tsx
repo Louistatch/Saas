@@ -93,7 +93,7 @@ function buildMonthlySeries(dates: string[], months: number): TimeSeriesPoint[] 
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     const label = FR_MONTHS[d.getMonth()]
-    const count = dates.filter((iso) => iso.startsWith(key)).length
+    const count = dates.filter((iso) => iso?.startsWith(key)).length
     series.push({ month: label, value: count })
   }
 
@@ -115,7 +115,7 @@ function buildDailySeries(dates: string[], days: number): { day: string; value: 
     d.setDate(d.getDate() - i)
     const key = d.toISOString().slice(0, 10) // YYYY-MM-DD
     const label = `${d.getDate()}/${d.getMonth() + 1}`
-    const count = dates.filter((iso) => iso.startsWith(key)).length
+    const count = dates.filter((iso) => iso?.startsWith(key)).length
     series.push({ day: label, value: count })
   }
 

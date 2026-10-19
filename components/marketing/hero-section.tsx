@@ -1,6 +1,5 @@
-'use client'
-
 import { Button } from '@/components/ui/button'
+import heroImage from '@/public/hero-farmer-app.webp'
 import { ArrowRight, CheckCircle, CreditCard, Network, QrCode, ScanLine } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -93,7 +92,7 @@ export function HeroSection() {
               </div>
 
               <h1
-                className="hero-a2 mb-3 text-[28px] font-extrabold leading-[1.12] tracking-tight sm:text-4xl lg:text-[3.25rem] lg:leading-[1.1]"
+                className="mb-3 text-[28px] font-extrabold leading-[1.12] tracking-tight sm:text-4xl lg:text-[3.25rem] lg:leading-[1.1]"
                 style={{ color: '#0d1f0e' }}
               >
                 L'écosystème numérique des{' '}
@@ -152,7 +151,7 @@ export function HeroSection() {
                 Pas de cartouche en surimpression : l'image les porte déjà.
                 Sur mobile, le cadrage bas privilégie le téléphone et la carte —
                 le bandeau du haut redouble le logo de la navigation. ── */}
-            <div className="hero-a5 relative mx-auto w-full max-w-[460px] lg:ml-auto lg:mr-0 lg:max-w-[464px]">
+            <div className="relative mx-auto w-full max-w-[460px] lg:ml-auto lg:mr-0 lg:max-w-[464px]">
               <div
                 className="pointer-events-none absolute inset-0 rounded-3xl"
                 style={{
@@ -164,12 +163,13 @@ export function HeroSection() {
               />
               <div className="relative overflow-hidden rounded-2xl lg:rounded-3xl">
                 <Image
-                  src="/hero-farmer-app.png"
+                  src={heroImage}
+                  placeholder="blur"
                   alt="Agricultrice consultant le tableau de bord FaîtiereHub, à côté d'une carte membre vérifiable par QR code"
                   width={1122}
                   height={1402}
                   priority
-                  sizes="(max-width: 1023px) 100vw, 464px"
+                  sizes="(max-width: 491px) calc(100vw - 32px), (max-width: 1023px) 460px, 464px"
                   className="h-[284px] w-full object-cover object-[50%_72%] sm:h-[430px] sm:object-[50%_68%] lg:h-[580px] lg:object-center"
                 />
               </div>

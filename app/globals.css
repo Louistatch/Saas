@@ -1,7 +1,17 @@
-@import 'tailwindcss';
-@import 'tw-animate-css';
+@import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
+
+/* Explicit fallbacks also cover Firefox Android with a visible address/navigation toolbar. */
+.haroolife-screen {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  height: 100svh;
+  height: 100dvh;
+}
 
 :root {
   --background: oklch(0.98 0.001 70);
@@ -75,8 +85,8 @@
 }
 
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-sans: "Geist", "Geist Fallback";
+  --font-mono: "Geist Mono", "Geist Mono Fallback";
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -121,5 +131,94 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Parcours en étapes (skill ui-motion) : la ligne se trace jusqu'à l'étape en cours, le point
+   de l'étape en cours respire. Sans mouvement, tout est dessiné d'emblée. */
+@keyframes route-draw {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+@keyframes pulse-soft {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+.route-line {
+  transform-origin: top;
+  animation: route-draw 800ms ease-out 200ms both;
+}
+.route-now::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 9999px;
+  border: 2px solid var(--primary);
+  animation: pulse-soft 2.4s ease-out 1s infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .route-line,
+  .route-now::after {
+    animation: none;
+  }
+}
+
+/* AgriAcademy (J3) : jetons de l'école, limités à l'espace de formation. L'or signifie
+   « validé » ou « l'action à faire maintenant », jamais une décoration. */
+.academy {
+  --ac-ground: #f6f7f1;
+  --ac-ink: #10261a;
+  --ac-emerald: #0d3d22;
+  --ac-green: #1b7a46;
+  --ac-gold: #c9a227;
+  --ac-line: #dce3db;
+  --ac-muted: #6b7a70;
+  --ac-mist: #e6efe8;
+  --ac-sand: #fbf3da;
+  --ac-pale: #b9cbbf;
+  font-family: var(--font-academy-body), system-ui, sans-serif;
+  color: var(--ac-ink);
+  background: var(--ac-ground);
+}
+.academy-display {
+  font-family: var(--font-academy-display), Georgia, serif;
+  letter-spacing: -0.015em;
+}
+/* Segments du parcours : chaque segment validé se révèle à son tour (route-draw, horizontal). */
+@keyframes segment-draw {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.academy-segment {
+  transform-origin: left;
+  animation: segment-draw 260ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .academy-segment {
+    animation: none;
+  }
+}
+/* En salle d'évaluation, aucune bulle ne recouvre les réponses. */
+body:has(.academy-focus) [data-support-button] {
+  display: none;
+}
+/* Sur téléphone, le bouton de messagerie flotte au-dessus de la barre d'onglets d'AgriAcademy. */
+@media (max-width: 767px) {
+  body:has(.academy) [data-support-button] {
+    bottom: calc(84px + env(safe-area-inset-bottom));
   }
 }

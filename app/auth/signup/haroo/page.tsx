@@ -1,5 +1,6 @@
 'use client'
 
+import { useAuth } from '@/app/context/auth-context'
 import { AuthSidePanel } from '@/components/shared/auth-side-panel'
 import { Spinner } from '@/components/shared/loading'
 import { Logo } from '@/components/shared/logo'
@@ -7,14 +8,15 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useGameReturn } from '@/hooks/use-game-return'
+import { accountJourney, harooAction } from '@/lib/account/journey'
+import { withGameReturn } from '@/lib/haroolife/entry'
 import type { Profession } from '@/lib/professionals/core'
 import { flattenZodErrors, harooSignupSchema } from '@/lib/validators/schemas'
-import { useAuth } from '@/app/context/auth-context'
-import { accountJourney, harooAction } from '@/lib/account/journey'
 import { ArrowLeft, CheckCircle2, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useState } from 'react'
 
 /**
  * Choix affichés. Technicien et conseiller sont des professions de la
@@ -75,6 +77,7 @@ const SPECIALITES = [
  * ensuite sur /auth/login comme pour tout utilisateur de la plateforme.
  */
 function HarooSignupForm() {
+  const gameReturn = useGameReturn()
   const { user } = useAuth()
   const journey = accountJourney(user)
   // Le profil choisi à l'étape 1 de /auth/signup arrive par ?type= : sans
@@ -88,7 +91,6 @@ function HarooSignupForm() {
 
   const [formData, setFormData] = useState({
     profileType: initialType as string,
-    faitiereId: '',
     specialisations: [] as string[],
     firstName: '',
     lastName: '',
@@ -100,18 +102,9 @@ function HarooSignupForm() {
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
-  const [faitieres, setFaitieres] = useState<{ id: string; name: string }[] | null>(null)
 
   const profession = ADVISOR_PROFESSION[formData.profileType as ChoiceValue]
   const isAdvisor = profession !== undefined
-
-  useEffect(() => {
-    if (!isAdvisor || faitieres !== null) return
-    fetch('/api/faitieres')
-      .then((r) => (r.ok ? r.json() : { faitieres: [] }))
-      .then((d: { faitieres?: { id: string; name: string }[] }) => setFaitieres(d.faitieres ?? []))
-      .catch(() => setFaitieres([]))
-  }, [isAdvisor, faitieres])
 
   const toggleSpecialite = (value: string) =>
     setFormData((f) => ({
@@ -132,7 +125,6 @@ function HarooSignupForm() {
       ...(isAdvisor
         ? {
             profession,
-            faitiereId: formData.faitiereId || undefined,
             specialisations: formData.specialisations,
           }
         : {}),
@@ -162,7 +154,12 @@ function HarooSignupForm() {
       } = await res.json().catch(() => ({}))
       if (data.fields) setFieldErrors(data.fields)
       if (res.ok && data.success && data.verify_email) {
-        window.location.assign(`/auth/verify-email?email=${encodeURIComponent(parsed.data.email)}`)
+        window.location.assign(
+          withGameReturn(
+            `/auth/verify-email?email=${encodeURIComponent(parsed.data.email)}`,
+            gameReturn,
+          ),
+        )
       } else if (res.ok && data.success) {
         setSubmitted(true)
       } else {
@@ -188,7 +185,7 @@ function HarooSignupForm() {
               mot de passe pour accéder aux services Haroo.
             </p>
             <div className="pt-4">
-              <Link href="/auth/login">
+              <Link href={withGameReturn('/auth/login', gameReturn)}>
                 <Button className="w-full">Se connecter</Button>
               </Link>
             </div>
@@ -279,65 +276,38 @@ function HarooSignupForm() {
                     )}
                   </div>
 
-                  {isAdvisor && (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="faitiereId">Faîtière de rattachement *</Label>
-                        <select
-                          id="faitiereId"
-                          value={formData.faitiereId}
-                          onChange={(e) =>
-                            setFormData((f) => ({ ...f, faitiereId: e.target.value }))
-                          }
-                          aria-invalid={!!fieldErrors.faitiereId}
-                          required
-                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        >
-                          <option value="">
-                            {faitieres === null ? 'Chargement…' : '— Choisissez votre faîtière —'}
-                          </option>
-                          {(faitieres ?? []).map((f) => (
-                            <option key={f.id} value={f.id}>
-                              {f.name}
-                            </option>
-                          ))}
-                        </select>
-                        <p className="text-xs text-muted-foreground">
-                          Un opérateur officier de cette faîtière vérifiera votre dossier avant
-                          l’émission de votre carte professionnelle.
-                        </p>
-                        {fieldErrors.faitiereId && (
-                          <p className="text-xs text-destructive">{fieldErrors.faitiereId}</p>
-                        )}
-                      </div>
+                  <p className="rounded-lg bg-primary/5 px-3 py-2 text-sm text-muted-foreground">
+                    Inscrivez-vous en indépendant : aucune appartenance à une coopérative ou à une
+                    faîtière n’est exigée.
+                  </p>
 
-                      <fieldset className="space-y-2">
-                        <legend className="text-sm font-medium">Spécialités</legend>
-                        <div className="flex flex-wrap gap-2">
-                          {SPECIALITES.map((spec) => {
-                            const active = formData.specialisations.includes(spec)
-                            return (
-                              <button
-                                key={spec}
-                                type="button"
-                                aria-pressed={active}
-                                onClick={() => toggleSpecialite(spec)}
-                                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                                  active
-                                    ? 'border-primary bg-primary/10 text-primary'
-                                    : 'border-border text-muted-foreground hover:bg-muted'
-                                }`}
-                              >
-                                {spec}
-                              </button>
-                            )
-                          })}
-                        </div>
-                        {fieldErrors.specialisations && (
-                          <p className="text-xs text-destructive">{fieldErrors.specialisations}</p>
-                        )}
-                      </fieldset>
-                    </>
+                  {isAdvisor && (
+                    <fieldset className="space-y-2">
+                      <legend className="text-sm font-medium">Spécialités</legend>
+                      <div className="flex flex-wrap gap-2">
+                        {SPECIALITES.map((spec) => {
+                          const active = formData.specialisations.includes(spec)
+                          return (
+                            <button
+                              key={spec}
+                              type="button"
+                              aria-pressed={active}
+                              onClick={() => toggleSpecialite(spec)}
+                              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                                active
+                                  ? 'border-primary bg-primary/10 text-primary'
+                                  : 'border-border text-muted-foreground hover:bg-muted'
+                              }`}
+                            >
+                              {spec}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {fieldErrors.specialisations && (
+                        <p className="text-xs text-destructive">{fieldErrors.specialisations}</p>
+                      )}
+                    </fieldset>
                   )}
 
                   <div className="grid grid-cols-2 gap-3">
@@ -439,13 +409,19 @@ function HarooSignupForm() {
               <div className="mt-6 text-center space-y-2">
                 <p className="text-sm text-muted-foreground">
                   Vous avez déjà un compte ?{' '}
-                  <Link href="/auth/login" className="text-primary font-medium hover:underline">
+                  <Link
+                    href={withGameReturn('/auth/login', gameReturn)}
+                    className="text-primary font-medium hover:underline"
+                  >
                     Se connecter
                   </Link>
                 </p>
                 <p className="text-sm text-muted-foreground">
                   Vous êtes une coopérative ?{' '}
-                  <Link href="/auth/signup" className="text-primary font-medium hover:underline">
+                  <Link
+                    href={withGameReturn('/auth/signup', gameReturn)}
+                    className="text-primary font-medium hover:underline"
+                  >
                     Demander un accès
                   </Link>
                 </p>

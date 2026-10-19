@@ -1,0 +1,277 @@
+{
+  "project": "mobile-android",
+  "browser": "chromium",
+  "emulation": "headless Chromium, SwiftShader (software WebGL); not a real device",
+  "userAgent": "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Mobile Safari/537.36",
+  "A_cold_open": {
+    "canvasVisibleMs": 1006,
+    "cityDetailedMs": 2225,
+    "navigation": {
+      "ttfb": 27,
+      "domContentLoaded": 145,
+      "load": 404
+    },
+    "transferBytes": 7544296,
+    "requests": 42,
+    "byType": {
+      "document": 32927,
+      "font": 52396,
+      "stylesheet": 275980,
+      "script": 3564595,
+      "image": 8729,
+      "other": 2015,
+      "ping": 0,
+      "fetch": 2300352,
+      "xhr": 1307302
+    },
+    "perf": {
+      "at": 6900,
+      "frame": {
+        "n": 24,
+        "mean": 114.7,
+        "p50": 107.9,
+        "p95": 193.4,
+        "p99": 203.6,
+        "max": 203.6,
+        "fps": 8.72
+      },
+      "drawCalls": 13,
+      "triangles": 871168,
+      "renderEntities": 118,
+      "meshInstances": 155,
+      "animated": 5,
+      "animating": 5,
+      "heapMB": 194,
+      "longTasks": 10,
+      "longTaskMs": 1589,
+      "renders": {
+        "world": 16,
+        "immersive": 30,
+        "chunks": 16,
+        "agents": 10
+      },
+      "assets": 176,
+      "pixelRatio": 0.5,
+      "resolution": [
+        206,
+        457
+      ]
+    },
+    "city": {
+      "chunks": 25,
+      "buildings": 1389,
+      "tris": 835089,
+      "detailed": true,
+      "drawCalls": 9,
+      "fps": 5.31,
+      "quality": "eco",
+      "at": {
+        "x": 48,
+        "y": 34
+      },
+      "route": 0,
+      "inside": null,
+      "interiorProps": 0,
+      "npcs": 0,
+      "activity": null,
+      "fitness": 0,
+      "energy": 85,
+      "hour": 8,
+      "actor": null,
+      "myCoopLot": null,
+      "camera": {
+        "tx": -15.525,
+        "tz": -7.425000000000001,
+        "distance": 12,
+        "angle": 35
+      },
+      "riding": false,
+      "transport": "walk",
+      "panel": null,
+      "wallet": 8000,
+      "lastEvent": "Choisis un lieu, rejoins-le et interagis avec lui.",
+      "estateBuildings": 19,
+      "locality": "lome"
+    }
+  },
+  "B_tokoin_aerial": {
+    "perf": {
+      "at": 10766,
+      "frame": {
+        "n": 32,
+        "mean": 109.93,
+        "p50": 107.7,
+        "p95": 168.5,
+        "p99": 191.2,
+        "max": 191.2,
+        "fps": 9.1
+      },
+      "drawCalls": 13,
+      "triangles": 872053,
+      "renderEntities": 119,
+      "meshInstances": 156,
+      "animated": 5,
+      "animating": 5,
+      "heapMB": 200,
+      "longTasks": 10,
+      "longTaskMs": 1589,
+      "renders": {
+        "world": 22,
+        "immersive": 42,
+        "chunks": 22,
+        "agents": 16
+      },
+      "assets": 213,
+      "pixelRatio": 0.5,
+      "resolution": [
+        206,
+        457
+      ]
+    }
+  },
+  "C_zoom_max": {
+    "perf": {
+      "at": 17853,
+      "frame": {
+        "n": 37,
+        "mean": 107.95,
+        "p50": 105,
+        "p95": 197.1,
+        "p99": 268.5,
+        "max": 268.5,
+        "fps": 9.26
+      },
+      "drawCalls": 13,
+      "triangles": 870514,
+      "renderEntities": 119,
+      "meshInstances": 156,
+      "animated": 6,
+      "animating": 5,
+      "heapMB": 106,
+      "longTasks": 10,
+      "longTaskMs": 1589,
+      "renders": {
+        "world": 37,
+        "immersive": 72,
+        "chunks": 37,
+        "agents": 26
+      },
+      "assets": 213,
+      "pixelRatio": 0.5,
+      "resolution": [
+        206,
+        457
+      ]
+    }
+  },
+  "D_camera_move": {
+    "perf": {
+      "at": 22635,
+      "frame": {
+        "n": 22,
+        "mean": 160.3,
+        "p50": 151,
+        "p95": 313.1,
+        "p99": 317.9,
+        "max": 317.9,
+        "fps": 6.24
+      },
+      "drawCalls": 28,
+      "triangles": 873862,
+      "renderEntities": 119,
+      "meshInstances": 156,
+      "animated": 5,
+      "animating": 5,
+      "heapMB": 120,
+      "longTasks": 11,
+      "longTaskMs": 1827,
+      "renders": {
+        "world": 50,
+        "immersive": 98,
+        "chunks": 50,
+        "agents": 33
+      },
+      "assets": 213,
+      "pixelRatio": 0.5,
+      "resolution": [
+        206,
+        457
+      ]
+    }
+  },
+  "E_gym": {
+    "enterMs": 3287,
+    "transferBytes": 335388,
+    "perf": {
+      "at": 32255,
+      "frame": {
+        "n": 62,
+        "mean": 47.72,
+        "p50": 46.3,
+        "p95": 73,
+        "p99": 75.4,
+        "max": 75.4,
+        "fps": 20.96
+      },
+      "drawCalls": 292,
+      "triangles": 15026,
+      "renderEntities": 154,
+      "meshInstances": 166,
+      "animated": 7,
+      "animating": 7,
+      "heapMB": 114,
+      "longTasks": 16,
+      "longTaskMs": 3188,
+      "renders": {
+        "world": 67,
+        "immersive": 125,
+        "chunks": 67,
+        "agents": 40
+      },
+      "assets": 304,
+      "pixelRatio": 0.5,
+      "resolution": [
+        206,
+        457
+      ]
+    }
+  },
+  "F_back_to_city": {
+    "backMs": 153,
+    "perf": {
+      "at": 35484,
+      "frame": {
+        "n": 17,
+        "mean": 180.65,
+        "p50": 191.4,
+        "p95": 353.6,
+        "p99": 353.6,
+        "max": 353.6,
+        "fps": 5.54
+      },
+      "drawCalls": 22,
+      "triangles": 923411,
+      "renderEntities": 115,
+      "meshInstances": 152,
+      "animated": 5,
+      "animating": 5,
+      "heapMB": 137,
+      "longTasks": 16,
+      "longTaskMs": 3188,
+      "renders": {
+        "world": 72,
+        "immersive": 135,
+        "chunks": 72,
+        "agents": 45
+      },
+      "assets": 304,
+      "pixelRatio": 0.5,
+      "resolution": [
+        206,
+        457
+      ]
+    }
+  },
+  "G_cooperative": "non mesuré : jalon 2",
+  "H_multi_actors": "non mesuré : jalon 2"
+}

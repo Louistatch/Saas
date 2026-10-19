@@ -1,53 +1,49 @@
 'use client'
 
-import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
-  BarChart3,
-  ShoppingCart,
-  ShoppingBag,
-  BookOpen,
-  Handshake,
-  Map as MapIcon,
-  GraduationCap,
-  Users,
-  Settings,
-  LogOut,
-  Menu,
-  Home,
-  Leaf,
-  FolderOpen,
-  Zap,
-  Shield,
-  Smartphone,
-  Banknote,
-  Code,
-  PhoneCall,
-  IdCard,
-  ChevronDown,
-} from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { Logo } from '@/components/shared/logo'
-import { useAuth } from '@/app/context/auth-context'
-import { performLogout } from '@/lib/auth/logout'
-import { isHarooRole, hasOrgLayer } from '@/lib/utils/permissions'
-import { useCooperative } from '@/app/context/cooperative-context'
 import { ProtectedRoute } from '@/app/components/protected-route'
+import { useAuth } from '@/app/context/auth-context'
+import { useCooperative } from '@/app/context/cooperative-context'
+import { Logo } from '@/components/shared/logo'
 import { NotificationBell } from '@/components/shared/notification-bell'
 import { ServiceLauncher } from '@/components/shared/service-launcher'
+import { SupportButton } from '@/components/support/support-button'
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
+import { performLogout } from '@/lib/auth/logout'
+import { hasOrgLayer, isHarooRole } from '@/lib/utils/permissions'
+import {
+  Banknote,
+  BarChart3,
+  BookOpen,
+  ChevronDown,
+  Code,
+  FolderOpen,
+  GraduationCap,
+  Handshake,
+  Home,
+  IdCard,
+  Leaf,
+  LogOut,
+  type LucideIcon,
+  Map as MapIcon,
+  Menu,
+  MoreHorizontal,
+  PhoneCall,
+  Settings,
+  Shield,
+  ShoppingBag,
+  ShoppingCart,
+  Smartphone,
+  Users,
+  Zap,
+} from 'lucide-react'
+import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 
 interface NavItem {
   href: string
   label: string
-  icon: React.ElementType
+  icon: LucideIcon
   roles: string[]
 }
 
@@ -157,7 +153,7 @@ const NAV_SECTIONS: NavSection[] = [
         href: '/dashboard/templates',
         label: 'Modèles',
         icon: FolderOpen,
-        roles: ['super_admin', 'cooperative_admin'],
+        roles: ['super_admin'],
       },
       {
         href: '/dashboard/techniciens',
@@ -200,27 +196,50 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
   const { user } = useAuth()
-  const { currentCooperative, cooperatives, switchCooperative } = useCooperative()
+  const { currentCooperative, cooperatives } = useCooperative()
   const [gestionOpen, setGestionOpen] = useState(false)
 
   // Un compte peut porter les deux couches : on ne renvoie vers /haroo que
   // les profils Haroo SANS couche organisationnelle. Sinon un membre de
   // coopérative qui active Haroo serait expulsé de son propre dashboard.
   const harooOnly = !!user && !hasOrgLayer(user.role) && isHarooRole(user.role, user.harooType)
+  // Ni organisation ni Haroo : peut-être un candidat Opérateur arrivé ici par un ancien lien
+  // ou un favori. Son dossier (partner_memberships) n'est pas dans le profil : on le demande.
+  const layerless = !!user && !hasOrgLayer(user.role) && !isHarooRole(user.role, user.harooType)
+  const [operatorOnly, setOperatorOnly] = useState(false)
 
   useEffect(() => {
     if (harooOnly) router.replace('/haroo')
   }, [harooOnly, router])
+  useEffect(() => {
+    if (!layerless) return
+    let cancelled = false
+    fetch('/api/account/partner-status')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((status: { has_applied?: boolean } | null) => {
+        if (cancelled || status?.has_applied !== true) return
+        setOperatorOnly(true)
+        router.replace('/operator')
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [layerless, router])
 
   const isActive = (href: string) =>
     href === '/dashboard' ? pathname === href : pathname.startsWith(href)
 
-  if (harooOnly) {
+  if (harooOnly || operatorOnly) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="space-y-4 text-center">
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground text-sm">Redirection vers votre espace Haroo…</p>
+          <p className="text-muted-foreground text-sm">
+            {harooOnly
+              ? 'Redirection vers votre espace Haroo…'
+              : 'Redirection vers votre espace Opérateur…'}
+          </p>
         </div>
       </div>
     )
@@ -263,18 +282,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         )}
         {/* Cooperative switcher for super_admin */}
         {user?.role === 'super_admin' && cooperatives.length > 1 && (
-          <Select value={currentCooperative?.id || ''} onValueChange={switchCooperative}>
-            <SelectTrigger className="mt-2 h-7 text-xs">
-              <SelectValue placeholder="Choisir une coopérative" />
-            </SelectTrigger>
-            <SelectContent>
-              {cooperatives.map((c) => (
-                <SelectItem key={c.id} value={c.id} className="text-xs">
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <CoopSwitcher className="mt-2 h-8 w-full text-xs" />
         )}
       </div>
 
@@ -375,27 +383,74 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   )
 }
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+/**
+ * Choix de l'organisation affichée (super_admin). Liste native : sur téléphone, la liste
+ * personnalisée pouvait choisir l'élément situé sous le doigt à l'ouverture et changer
+ * d'organisation sans le vouloir.
+ */
+function CoopSwitcher({ className }: { className: string }) {
   const { currentCooperative, cooperatives, switchCooperative } = useCooperative()
+  return (
+    <select
+      aria-label="Organisation affichée"
+      value={currentCooperative?.id ?? ''}
+      onChange={(e) => {
+        if (e.target.value) switchCooperative(e.target.value)
+      }}
+      className={`rounded-md border border-border bg-background px-2 text-foreground ${className}`}
+    >
+      {!currentCooperative && <option value="">Choisir une organisation</option>}
+      {cooperatives.map((c) => (
+        <option key={c.id} value={c.id}>
+          {c.name}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+/** Rappel permanent pour le super_admin : quel espace il regarde, et le retour à l'admin. */
+function ViewAsBanner() {
+  const { user } = useAuth()
+  const { currentCooperative } = useCooperative()
+  if (user?.role !== 'super_admin' || !currentCooperative) return null
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-violet-200 bg-violet-50 px-4 py-2 text-sm text-violet-950 print:hidden">
+      <span>
+        Vous voyez l’espace de <strong>{currentCooperative.name}</strong>
+      </span>
+      <Link href="/admin" className="font-medium underline underline-offset-2">
+        Retour à l’admin
+      </Link>
+    </div>
+  )
+}
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const { currentCooperative, cooperatives } = useCooperative()
   const { user } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const pathname = usePathname()
+
+  const mobileTabs = [
+    { href: '/dashboard', label: 'Accueil', icon: Home },
+    { href: '/dashboard/members', label: 'Membres', icon: Users },
+    { href: '/dashboard/cards', label: 'Cartes', icon: IdCard },
+    { href: '/dashboard/agrimarket', label: 'Activités', icon: BarChart3 },
+  ]
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen flex bg-background">
+      <div className="min-h-screen flex bg-[#f7f8f3]">
         {/* Desktop sidebar — fixed */}
-        <aside className="hidden md:flex md:flex-col md:w-60 lg:w-64 shrink-0 border-r border-border bg-card sticky top-0 h-screen">
+        <aside className="hidden xl:flex xl:flex-col xl:w-72 shrink-0 border-r border-border bg-card sticky top-0 h-screen">
           <SidebarContent />
         </aside>
 
         {/* Mobile: Sheet overlay */}
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild>
-            <button
-              type="button"
-              aria-label="Ouvrir le menu"
-              className="md:hidden fixed top-3 left-3 z-50 flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background shadow-sm text-muted-foreground hover:text-foreground"
-            >
+            <button type="button" aria-label="Ouvrir le menu" className="hidden">
               <Menu className="h-5 w-5" />
             </button>
           </SheetTrigger>
@@ -407,45 +462,66 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Main content */}
         <main className="flex-1 flex flex-col min-w-0 overflow-auto">
           {/* Top bar */}
-          <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-background/80 backdrop-blur-sm px-4 md:px-6 py-3">
-            {/* Mobile: spacer for hamburger button */}
-            <div className="md:hidden w-9" />
-
+          <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between border-b border-border bg-background/90 px-4 py-3 backdrop-blur-md sm:px-6">
             {/* Desktop: cooperative name */}
-            <div className="hidden md:block">
+            <div className="hidden xl:block">
               <p className="text-sm font-semibold text-foreground">
                 {currentCooperative?.name || 'Tableau de bord'}
               </p>
             </div>
 
             {/* Mobile: logo centered */}
-            <div className="md:hidden flex-1 flex justify-center">
+            <div className="flex min-w-0 items-center gap-3 xl:hidden">
               <Logo size="sm" />
+              <span className="hidden h-7 w-px bg-border sm:block" />
+              <p className="hidden max-w-56 truncate text-sm font-medium text-muted-foreground sm:block">
+                {currentCooperative?.name || 'Tableau de bord'}
+              </p>
             </div>
 
             {/* Right: cooperative switcher + notification bell */}
             <div className="flex items-center gap-2">
               {user?.role === 'super_admin' && cooperatives.length > 1 && (
-                <Select value={currentCooperative?.id || ''} onValueChange={switchCooperative}>
-                  <SelectTrigger className="hidden md:flex h-8 text-xs w-44">
-                    <SelectValue placeholder="Coopérative" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {cooperatives.map((c) => (
-                      <SelectItem key={c.id} value={c.id} className="text-xs">
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CoopSwitcher className="hidden h-8 w-44 text-xs xl:block" />
               )}
               <ServiceLauncher role={user?.role} />
               {currentCooperative && <NotificationBell cooperativeId={currentCooperative.id} />}
             </div>
           </header>
+          <ViewAsBanner />
 
           {/* Page content */}
-          <div className="flex-1 p-4 md:p-6 lg:p-8">{children}</div>
+          <div className="flex-1 px-4 pb-28 pt-5 sm:px-6 lg:px-8 xl:pb-10 xl:pt-8">{children}</div>
+          <SupportButton />
+
+          <nav
+            aria-label="Navigation principale"
+            className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-5 rounded-2xl border border-border bg-white/95 p-1.5 shadow-[0_12px_40px_rgba(15,23,42,0.18)] backdrop-blur-xl xl:hidden"
+          >
+            {mobileTabs.map((tab) => {
+              const Icon = tab.icon
+              const active =
+                tab.href === '/dashboard' ? pathname === tab.href : pathname.startsWith(tab.href)
+              return (
+                <Link
+                  key={tab.href}
+                  href={tab.href}
+                  className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-medium transition-all active:scale-95 ${active ? 'bg-emerald-50 text-emerald-800' : 'text-slate-500'}`}
+                >
+                  <Icon className="h-5 w-5" />
+                  {tab.label}
+                </Link>
+              )
+            })}
+            <button
+              type="button"
+              onClick={() => setMobileOpen(true)}
+              className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-medium text-slate-500 transition-all active:scale-95"
+            >
+              <MoreHorizontal className="h-5 w-5" />
+              Plus
+            </button>
+          </nav>
         </main>
       </div>
     </ProtectedRoute>

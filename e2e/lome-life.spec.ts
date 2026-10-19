@@ -1,0 +1,211 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import { expect, openPlaces, test } from './lome-test'
+
+test('immersive 3D Lomé life completes navigation, shopping, meals and work on desktop and Android', async ({
+  page,
+}, testInfo) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.goto('/haroolife/territoire/lome', { waitUntil: 'domcontentloaded' })
+  const navigation = page.getByRole('navigation', { name: 'Navigation du jeu' })
+  await expect(navigation).toBeVisible()
+  await expect(navigation.getByRole('button', { name: 'Maison' })).toBeVisible()
+  await expect(navigation.getByRole('button', { name: 'Aménager' })).toBeVisible()
+  await expect(navigation.getByRole('button', { name: 'Carte' })).toBeVisible()
+  await expect(navigation.getByRole('button', { name: 'Téléphone' })).toBeVisible()
+  const webgl2 = await page.evaluate(() => !!document.createElement('canvas').getContext('webgl2'))
+  expect(webgl2, 'Chromium QA must provide a true WebGL2 device').toBe(true)
+  await expect(page.locator('canvas').first()).toBeVisible({ timeout: 30000 })
+
+  // Direct control: holding a direction walks the character continuously along the road
+  // (the joystick on screen, the arrow keys here); the save follows the cell it reaches.
+  const savedAt = () =>
+    page.evaluate(() => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? '{}').at)
+  // The first autosave lands 400 ms after the game state initialises: on a slow runner the
+  // canvas is visible before it exists, and a missing `before` made the walk below meaningless.
+  await expect.poll(savedAt, { timeout: 30000 }).toBeTruthy()
+  const before = await savedAt()
+  await page.keyboard.down('ArrowDown')
+  await expect.poll(savedAt).not.toEqual(before)
+  await page.keyboard.up('ArrowDown')
+  const south = await savedAt()
+  expect(south.y).toBeGreaterThan(before.y)
+  await page.keyboard.down('ArrowUp')
+  await expect.poll(async () => (await savedAt()).y).toBeLessThan(south.y)
+  await page.keyboard.up('ArrowUp')
+
+  // Paid rides: the travel scene opens on the boulevard; "Passer" lands at destination.
+  // First a taxi to a distant place from its sheet (the ride starts at once), then "Chez
+  // moi" from there: the way home is long enough for the map's zémidjan button to find a
+  // route still in progress whatever the pace of the machine.
+  await openPlaces(page)
+  await page.getByRole('button', { name: /Grand marché d’Assigamé/ }).click()
+  await page.getByRole('dialog', { name: 'Lieu' }).getByRole('button', { name: /Taxi/ }).click()
+  await page.getByRole('button', { name: 'Confirmer le trajet' }).click()
+  await expect(page.getByLabel('Trajet en cours')).toBeVisible()
+  await page
+    .getByLabel('Trajet en cours')
+    .getByRole('button', { name: /Passer/ })
+    .click({ timeout: 15000, force: true })
+    .catch(() => undefined)
+  await expect(page.getByLabel('Trajet en cours')).toBeHidden()
+  await openPlaces(page)
+  await page.getByRole('button', { name: /Chez moi/ }).click()
+  await openPlaces(page)
+  await page.getByRole('button', { name: /Moto/ }).click()
+  const ride = page.getByLabel('Trajet en cours')
+  await expect(ride).toBeVisible()
+  await expect(ride.getByText('Boulevard du Mono')).toBeVisible()
+  await expect(page.locator('canvas').first()).toBeVisible({ timeout: 20000 })
+  await page.waitForTimeout(1500)
+  const rideShot = path.join('test-results', 'lome-visual', testInfo.project.name + '-ride.png')
+  fs.mkdirSync(path.dirname(rideShot), { recursive: true })
+  await page.screenshot({ path: rideShot })
+  // Short ride: under heavy CPU load it can end by itself before the click lands (the overlay
+  // unmounts), and the boulevard label re-centres the button row while it is shown.
+  await ride
+    .getByRole('button', { name: /Passer/ })
+    .click({ timeout: 15000, force: true })
+    .catch(() => undefined)
+  await expect(ride).toBeHidden()
+  await openPlaces(page)
+  await expect(page.getByRole('dialog', { name: 'Explorer Lomé' })).toBeVisible()
+  // Named city: filters narrow the destinations, districts are listed.
+  await page
+    .getByRole('group', { name: 'Filtrer la carte' })
+    .getByRole('button', { name: 'Commerces' })
+    .click()
+  await expect(page.getByRole('button', { name: /Chez moi/ })).toBeHidden()
+  await page
+    .getByRole('group', { name: 'Filtrer la carte' })
+    .getByRole('button', { name: 'Tout' })
+    .click()
+  await expect(page.getByText(/Les quartiers de Lomé/)).toBeVisible()
+  await expect(page.getByRole('dialog').getByText('Tokoin').first()).toBeVisible()
+  // The other towns are reached by travelling on the Togo map (lome-travel.spec.ts), not renamed.
+  await expect(page.getByTestId('national-map').getByText(/OpenStreetMap/)).toBeVisible()
+  await expect(page.getByRole('button', { name: /Voyager vers Kara/ }).first()).toBeVisible()
+  // Monetisation surfaces: a billboard sheet from the map, partner slots in the phone.
+  await page.getByRole('button', { name: /Adidogomé · Disponible/ }).click()
+  await expect(page.getByRole('dialog', { name: 'Panneau publicitaire' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Réserver ce panneau' })).toHaveAttribute(
+    'href',
+    /contact/,
+  )
+  await page.getByRole('button', { name: 'Fermer', exact: true }).click()
+  await navigation.getByRole('button', { name: 'Téléphone' }).click()
+  await expect(page.getByText('Services et partenaires')).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: /Partenaire.*50 000 FCFA\/mois/ }).first(),
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'Fermer', exact: true }).click()
+  await openPlaces(page)
+  await page.getByRole('button', { name: /Marché de quartier/ }).click()
+  // Automatic road movement must reach market without pressing +1 hour per tile.
+  await expect
+    .poll(
+      async () => {
+        return page.evaluate(() => {
+          const save = localStorage.getItem('haroolife.lome-city.v1')
+          const c = (window as unknown as { __LOME_CITY?: Record<string, unknown> }).__LOME_CITY
+          // One string so a failure prints the whole state (riding, transport, inside…).
+          // The route comes from the live state: the autosave is throttled, so the save may
+          // still hold the previous (empty) route when the walk has just started.
+          return JSON.stringify({
+            route: c?.route ?? 99,
+            saved: save ? JSON.parse(save).route.length : 99,
+            riding: c?.riding,
+            transport: c?.transport,
+            inside: c?.inside,
+            panel: c?.panel,
+            at: c?.at,
+            walk: (window as unknown as { __LOME_WALK?: unknown }).__LOME_WALK,
+            visible: document.visibilityState,
+          })
+        })
+      },
+      { timeout: 15000 },
+    )
+    .toContain('"route":0,')
+  // Shopping happens inside (city/commerce.ts canShop): through the market's door first.
+  const doorway = page.getByRole('button', { name: 'Entrer ou sortir' })
+  await doorway.click()
+  await navigation.getByRole('button', { name: 'Aménager' }).click()
+  await expect(page.getByRole('dialog', { name: 'Marché & commerces' })).toBeVisible()
+  // The market sells dishes by name: an akoumé, 650 FCFA, into the bag (eating it, seated or
+  // in the street, is covered by lome-daily-actions.spec.ts).
+  const akoume = page.getByTestId('goods-akoume')
+  const purse = () =>
+    page.evaluate(
+      () => (window as unknown as { __LOME_CITY?: { wallet: number } }).__LOME_CITY?.wallet ?? 0,
+    )
+  const beforeMeal = await purse()
+  await akoume.getByRole('button', { name: 'Acheter · 650' }).click()
+  // The engine answers every action with a message; the purchase must be the last one.
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const v = JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? 'null')
+        const c = (window as unknown as { __LOME_CITY?: Record<string, unknown> }).__LOME_CITY
+        return JSON.stringify({
+          last: v?.life.lastEvent,
+          pos: v?.life.pos,
+          inside: v?.life.inside,
+          memWallet: c?.wallet,
+          memLast: c?.lastEvent,
+        })
+      }),
+    )
+    .toContain('Akoumé et sauce acheté')
+  expect(await purse()).toBe(beforeMeal - 650)
+  await page.getByRole('button', { name: 'Fermer', exact: true }).click()
+  await doorway.click()
+
+  // Work: the jobs of the phone are hourly shifts at the kiosks (paid by the hour, covered by
+  // lome-regional-life.spec.ts) and the driver's services.
+  await navigation.getByRole('button', { name: 'Téléphone' }).click()
+  await page.getByRole('button', { name: 'Métiers' }).click()
+  await expect(page.getByRole('button', { name: /^Rejoindre Mixx by Yas/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Rejoindre Moov Africa/ })).toBeVisible()
+  await page
+    .getByRole('dialog', { name: 'Travailler & gagner' })
+    .getByLabel('Fermer', { exact: true })
+    .click()
+  await navigation.getByRole('button', { name: 'Maison' }).click()
+  await page.getByRole('button', { name: 'Entrer', exact: true }).click()
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const save = localStorage.getItem('haroolife.lome-city.v1')
+        return save ? JSON.parse(save).life.inside : null
+      }),
+    )
+    .toBe('market')
+  // Indoors the room renderer draws (Three by default): one visible canvas, whichever engine.
+  await expect(page.locator('canvas').filter({ visible: true }).first()).toBeVisible()
+  await page.waitForTimeout(1200)
+  const indoors = path.join('test-results', 'lome-visual', testInfo.project.name + '-interior.png')
+  fs.mkdirSync(path.dirname(indoors), { recursive: true })
+  await page.screenshot({ path: indoors, fullPage: true })
+  await navigation.getByRole('button', { name: 'Maison' }).click()
+  await page.getByRole('button', { name: 'Sortir', exact: true }).click()
+
+  await page.getByRole('button', { name: 'Ouvrir les outils de construction' }).click()
+  await expect(page.getByRole('dialog', { name: 'Construire' })).toBeVisible()
+  // Touching a construction builds it on the nearest free plot by a road.
+  await page.getByRole('button', { name: /Maison.*85 FCFA/ }).click()
+  await expect(page.getByText('Chantier achevé : Maison.')).toBeVisible()
+  // Or the player picks the plot: the hint, then « Terminer ».
+  await page.getByRole('button', { name: 'Ouvrir les outils de construction' }).click()
+  await page.getByRole('button', { name: /Choisir moi-même l’emplacement/ }).click()
+  await expect(page.getByText(/Pose Maison en touchant un terrain/)).toBeVisible()
+  // Return to free travel; selection is still connected to the existing construction engine.
+  await page.getByRole('button', { name: 'Terminer' }).click()
+
+  await expect(page.locator('canvas').first()).toBeVisible()
+  const screenshot = path.join('test-results', 'lome-visual', testInfo.project.name + '.png')
+  fs.mkdirSync(path.dirname(screenshot), { recursive: true })
+  await page.screenshot({ path: screenshot, fullPage: true })
+  expect(errors, 'No uncaught client runtime errors').toEqual([])
+})

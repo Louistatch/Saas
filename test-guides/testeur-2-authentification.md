@@ -10,9 +10,9 @@
 
 | Rôle | Email | Mot de passe |
 |------|-------|-------------|
-| Super Admin | `admin@demo.local` | `Demo123!SuperAdmin` |
-| Admin Coopérative | `coop-admin@demo.local` | `Demo123!CoopAdmin` |
-| Membre | `member1@demo.local` | `Demo123!Member1` |
+| Super Admin | `admin@demo.local` | `<secret retiré — voir gestionnaire de mots de passe>` |
+| Admin Coopérative | `coop-admin@demo.local` | `<secret retiré — voir gestionnaire de mots de passe>` |
+| Membre | `member1@demo.local` | `<secret retiré — voir gestionnaire de mots de passe>` |
 
 ---
 
@@ -26,7 +26,7 @@ Tester la **connexion, déconnexion, et changement de compte**. Vérifier qu'il 
 
 ### 1. Connexion Super Admin
 - [ ] Aller sur https://faitierehub.com/auth/login
-- [ ] Entrer `admin@demo.local` / `Demo123!SuperAdmin`
+- [ ] Entrer `admin@demo.local` / `<secret retiré — voir gestionnaire de mots de passe>`
 - [ ] Cliquer "Se connecter"
 - [ ] Vérifier : redirigé vers /admin (panneau administrateur)
 - [ ] Le nom "Admin" apparaît dans la sidebar
@@ -37,13 +37,13 @@ Tester la **connexion, déconnexion, et changement de compte**. Vérifier qu'il 
 - [ ] Vérifier : impossible d'accéder à /admin sans se reconnecter
 
 ### 3. Connexion Admin Coopérative
-- [ ] Se connecter avec `coop-admin@demo.local` / `Demo123!CoopAdmin`
+- [ ] Se connecter avec `coop-admin@demo.local` / `<secret retiré — voir gestionnaire de mots de passe>`
 - [ ] Vérifier : redirigé vers /dashboard (pas /admin)
 - [ ] Le nom de la coopérative "HAROFEMA" apparaît
 
 ### 4. Changement de compte
 - [ ] Se déconnecter
-- [ ] Se reconnecter avec `member1@demo.local` / `Demo123!Member1`
+- [ ] Se reconnecter avec `member1@demo.local` / `<secret retiré — voir gestionnaire de mots de passe>`
 - [ ] Vérifier : les données affichées sont différentes (pas celles de l'admin)
 - [ ] Les menus admin ne sont PAS visibles
 

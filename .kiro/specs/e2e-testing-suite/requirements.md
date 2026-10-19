@@ -53,9 +53,9 @@ This document defines the requirements for an automated End-to-End (E2E) testing
 
 #### Acceptance Criteria
 
-1. WHEN valid credentials for the super_admin Demo_Account (admin@demo.local / Demo123!SuperAdmin) are submitted, THE Test_Suite SHALL verify successful redirect to /admin
-2. WHEN valid credentials for the cooperative_admin Demo_Account (coop-admin@demo.local / Demo123!CoopAdmin) are submitted, THE Test_Suite SHALL verify successful redirect to /dashboard
-3. WHEN valid credentials for the member Demo_Account (member1@demo.local / Demo123!Member1) are submitted, THE Test_Suite SHALL verify successful redirect to /dashboard
+1. WHEN valid credentials for the super_admin Demo_Account (admin@demo.local / <secret retiré — voir gestionnaire de mots de passe>) are submitted, THE Test_Suite SHALL verify successful redirect to /admin
+2. WHEN valid credentials for the cooperative_admin Demo_Account (coop-admin@demo.local / <secret retiré — voir gestionnaire de mots de passe>) are submitted, THE Test_Suite SHALL verify successful redirect to /dashboard
+3. WHEN valid credentials for the member Demo_Account (member1@demo.local / <secret retiré — voir gestionnaire de mots de passe>) are submitted, THE Test_Suite SHALL verify successful redirect to /dashboard
 4. WHEN invalid credentials are submitted, THE Test_Suite SHALL verify an error message is displayed and no redirect occurs
 5. WHEN a user logs out via /auth/signout, THE Test_Suite SHALL verify the session is cleared and the user is redirected to the login page
 6. WHEN an unauthenticated user attempts to access /dashboard, THE Test_Suite SHALL verify the user is redirected to /auth/login

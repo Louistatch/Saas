@@ -1,0 +1,20 @@
+{
+  "name": "FaîtiereHub — Console de validation",
+  "short_name": "Validation",
+  "description": "Dossiers à valider, activité HarooLife et alertes en temps réel.",
+  "id": "/operator/professionals",
+  "start_url": "/operator/professionals",
+  "scope": "/operator/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0d3d22",
+  "background_color": "#f6f7ef",
+  "lang": "fr",
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

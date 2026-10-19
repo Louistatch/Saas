@@ -1,23 +1,20 @@
-import type { Metadata } from 'next'
-import Link from 'next/link'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
 import { Button } from '@/components/ui/button'
-import { Target, Eye, Users, Handshake, Network, ArrowRight } from 'lucide-react'
+import { publicPageMetadata } from '@/lib/seo'
+import founder from '@/public/founder.jpeg'
+import fenomat from '@/public/images/partners/fenomat.webp'
+import { ArrowRight, Eye, Handshake, Network, Target, Users } from 'lucide-react'
+import Image from 'next/image'
+import Link from 'next/link'
 
-export const metadata: Metadata = {
-  title: "À propos — FaîtiereHub | Notre mission pour l'agriculture africaine",
-  description:
-    "FaîtiereHub a pour mission de digitaliser les faîtières agricoles africaines. Notre vision : chaque coopérative connectée, chaque membre identifié, chaque acteur du terrain valorisé.",
-}
+export const metadata = publicPageMetadata('/a-propos')
 
-const teamMembers = [
-  { name: 'TATCHIDA Louis', role: 'Fondateur & CEO', initials: 'TL' },
-]
+const teamMembers = [{ name: 'TATCHIDA Louis', role: 'Fondateur & CEO', initials: 'TL' }]
 
 const partners = [
   {
     name: 'FENOMAT',
-    logo: '/images/partners/fenomat.png',
+    logo: '/images/partners/fenomat.webp',
     description: 'Fédération Nationale des Organisations de Maraîchers du Togo',
   },
 ]
@@ -26,12 +23,12 @@ const VALUES = [
   {
     title: 'Ancrage terrain',
     description:
-      "Chaque fonctionnalité est conçue avec et pour les acteurs réels — coopératives, maraîchers, ouvriers agricoles, agronomes. Nous ne développons pas en chambre.",
+      'Chaque fonctionnalité est conçue avec et pour les acteurs réels — coopératives, maraîchers, ouvriers agricoles, agronomes. Nous ne développons pas en chambre.',
   },
   {
     title: 'Transparence',
     description:
-      "Données isolées par coopérative, sécurité enterprise, aucune revente de données. Vos membres vous appartiennent.",
+      'Données isolées par coopérative, sécurité enterprise, aucune revente de données. Vos membres vous appartiennent.',
   },
   {
     title: 'Accessibilité',
@@ -41,14 +38,13 @@ const VALUES = [
   {
     title: 'Complémentarité',
     description:
-      "FaîtiereHub structure les organisations. Haroo valorise les personnes. Un même écosystème, deux expériences pensées ensemble.",
+      'FaîtiereHub structure les organisations. Haroo valorise les personnes. Un même écosystème, deux expériences pensées ensemble.',
   },
 ]
 
 export default function AProposPage() {
   return (
     <MarketingLayout>
-
       {/* Hero */}
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
         <div className="max-w-3xl">
@@ -56,9 +52,9 @@ export default function AProposPage() {
             À propos de FaîtiereHub
           </h1>
           <p className="mt-6 text-lg text-muted-foreground leading-relaxed">
-            Nous construisons la technologie qui permet aux organisations agricoles africaines
-            de se structurer, se digitaliser et prospérer. Et nous donnons une identité
-            professionnelle aux acteurs du terrain qui les font vivre.
+            Nous construisons la technologie qui permet aux organisations agricoles africaines de se
+            structurer, se digitaliser et prospérer. Et nous donnons une identité professionnelle
+            aux acteurs du terrain qui les font vivre.
           </p>
         </div>
       </section>
@@ -103,8 +99,8 @@ export default function AProposPage() {
               Un écosystème, deux expériences
             </h2>
             <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
-              FaîtiereHub et Haroo partagent la même base de données, le même scanner QR
-              et les mêmes valeurs — mais servent des besoins complémentaires.
+              FaîtiereHub et Haroo partagent la même base de données, le même scanner QR et les
+              mêmes valeurs — mais servent des besoins complémentaires.
             </p>
           </div>
           <div className="grid gap-6 md:grid-cols-2">
@@ -112,11 +108,14 @@ export default function AProposPage() {
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary mb-5">
                 <Users className="h-5 w-5 text-white" />
               </div>
-              <div className="text-xs font-bold uppercase tracking-wider text-primary mb-2">FaîtiereHub</div>
+              <div className="text-xs font-bold uppercase tracking-wider text-primary mb-2">
+                FaîtiereHub
+              </div>
               <h3 className="text-xl font-bold text-foreground mb-3">Couche organisationnelle</h3>
               <p className="text-muted-foreground text-sm leading-relaxed mb-4">
-                Structurez votre organisation en faîtière, unions et coopératives. Gérez vos membres,
-                leurs cotisations, leurs exploitations et leur accès aux services agricoles.
+                Structurez votre organisation en faîtière, unions et coopératives. Gérez vos
+                membres, leurs cotisations, leurs exploitations et leur accès aux services
+                agricoles.
               </p>
               <div className="text-sm font-medium text-primary">
                 Coopératives · Membres · Données · Gestion
@@ -126,11 +125,16 @@ export default function AProposPage() {
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-600 mb-5">
                 <Network className="h-5 w-5 text-white" />
               </div>
-              <div className="text-xs font-bold uppercase tracking-wider text-amber-700 mb-2">Haroo</div>
-              <h3 className="text-xl font-bold text-foreground mb-3">Couche humaine &amp; réseau</h3>
+              <div className="text-xs font-bold uppercase tracking-wider text-amber-700 mb-2">
+                Haroo
+              </div>
+              <h3 className="text-xl font-bold text-foreground mb-3">
+                Couche humaine &amp; réseau
+              </h3>
               <p className="text-muted-foreground text-sm leading-relaxed mb-4">
                 Donnez une identité professionnelle aux acteurs du terrain. Ouvriers, acheteurs et
-                agronomes accèdent à des opportunités dans leur région via leur carte professionnelle.
+                agronomes accèdent à des opportunités dans leur région via leur carte
+                professionnelle.
               </p>
               <div className="text-sm font-medium text-amber-700">
                 Ouvriers · Acheteurs · Agronomes · Réseau
@@ -144,13 +148,14 @@ export default function AProposPage() {
       <section className="bg-card/50 py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-extrabold tracking-tight text-foreground">
-              Nos valeurs
-            </h2>
+            <h2 className="text-3xl font-extrabold tracking-tight text-foreground">Nos valeurs</h2>
           </div>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {VALUES.map(({ title, description }) => (
-              <div key={title} className="rounded-xl border border-border bg-background p-6 space-y-3">
+              <div
+                key={title}
+                className="rounded-xl border border-border bg-background p-6 space-y-3"
+              >
                 <h3 className="font-bold text-foreground">{title}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
               </div>
@@ -168,7 +173,8 @@ export default function AProposPage() {
             </div>
             <h2 className="text-3xl font-extrabold tracking-tight text-foreground">Notre équipe</h2>
             <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
-              Une équipe passionnée par l&apos;agriculture et la technologie, basée en Afrique de l&apos;Ouest.
+              Une équipe passionnée par l&apos;agriculture et la technologie, basée en Afrique de
+              l&apos;Ouest.
             </p>
           </div>
           <div className="flex justify-center">
@@ -178,9 +184,11 @@ export default function AProposPage() {
                 className="rounded-2xl border border-border bg-background p-8 text-center space-y-3 max-w-xs w-full"
               >
                 <div className="h-24 w-24 mx-auto rounded-full overflow-hidden border-2 border-primary/20">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/founder.jpeg"
+                  <Image
+                    src={founder}
+                    loading="lazy"
+                    placeholder="blur"
+                    sizes="96px"
                     alt={member.name}
                     className="w-full h-full object-cover"
                   />
@@ -201,7 +209,9 @@ export default function AProposPage() {
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
               <Handshake className="h-6 w-6 text-primary" />
             </div>
-            <h2 className="text-3xl font-extrabold tracking-tight text-foreground">Nos partenaires</h2>
+            <h2 className="text-3xl font-extrabold tracking-tight text-foreground">
+              Nos partenaires
+            </h2>
             <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
               Nous collaborons avec des institutions de référence pour maximiser notre impact.
             </p>
@@ -212,9 +222,11 @@ export default function AProposPage() {
                 key={partner.name}
                 className="rounded-2xl border border-border bg-background p-10 flex items-center gap-8 hover:shadow-lg hover:border-primary/20 transition-all duration-300"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={partner.logo}
+                <Image
+                  src={fenomat}
+                  loading="lazy"
+                  placeholder="blur"
+                  sizes="64px"
                   alt={`Logo ${partner.name}`}
                   className="h-16 w-auto object-contain"
                 />
@@ -235,8 +247,8 @@ export default function AProposPage() {
             Rejoignez l&apos;écosystème
           </h2>
           <p className="text-lg text-muted-foreground mb-8">
-            Que vous soyez une coopérative agricole, un ouvrier, un acheteur ou un agronome —
-            il y a une place pour vous dans l&apos;écosystème FaîtiereHub.
+            Que vous soyez une coopérative agricole, un ouvrier, un acheteur ou un agronome — il y a
+            une place pour vous dans l&apos;écosystème FaîtiereHub.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
             <Link href="/auth/signup">
@@ -245,7 +257,11 @@ export default function AProposPage() {
               </Button>
             </Link>
             <Link href="/auth/signup/haroo">
-              <Button size="lg" variant="outline" className="gap-2 border-amber-200 text-amber-700 hover:bg-amber-50 w-full sm:w-auto">
+              <Button
+                size="lg"
+                variant="outline"
+                className="gap-2 border-amber-200 text-amber-700 hover:bg-amber-50 w-full sm:w-auto"
+              >
                 <Network className="h-4 w-4" /> Rejoindre Haroo
               </Button>
             </Link>

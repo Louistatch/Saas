@@ -198,7 +198,9 @@ const fiche = {
   platform: true,
 }
 
-test('POST /api/fiches : faîtière qui déclare un fichier de la plateforme → 400', async () => {
+test('POST /api/fiches : faîtière (publication fermée, lib/fiches/publishing.ts) → 403, rien écrit', async () => {
+  // Depuis 40c06ee (main), seul le super_admin publie. Le contrôle du dossier d'un fichier
+  // déclaré par une faîtière reste couvert par validateFichePath (ci-dessus).
   state.ctx = {
     userId: 'u-f',
     role: 'cooperative_admin',
@@ -210,8 +212,7 @@ test('POST /api/fiches : faîtière qui déclare un fichier de la plateforme →
     ...fiche,
     files: [{ name: 'vol.xlsx', url: 'plateforme/1790984748604-ecx2ed.xlsx' }],
   })
-  assert.equal(res.status, 400)
-  assert.deepEqual((await res.json()).details.files, ['Fichier « vol.xlsx » invalide ou absent'])
+  assert.equal(res.status, 403)
   assert.equal(state.store.rows('fiches_techniques').length, 0)
   assert.equal(state.store.bucket('fiches-techniques').size, 1)
 })

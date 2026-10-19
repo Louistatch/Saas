@@ -1,19 +1,34 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { useAuth } from '@/app/context/auth-context'
 import { useCooperative } from '@/app/context/cooperative-context'
-import { BookOpen, Play, HelpCircle, CheckSquare, Plus, Clock } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Progress } from '@/components/ui/progress'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import { OPERATOR_COURSE_ID, catalogueModules } from '@/lib/academy/catalogue'
+import { BookOpen, CheckSquare, Clock, HelpCircle, type LucideIcon, Play, Plus } from 'lucide-react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useState } from 'react'
 
 interface AcademyModule {
   id: string
@@ -25,7 +40,14 @@ interface AcademyModule {
   culture?: string
   is_published: boolean
   order_index: number
-  academy_lessons?: Array<{ id: string; title: string; content_type: string; content_body?: string; duration_min?: number; order_index: number }>
+  academy_lessons?: Array<{
+    id: string
+    title: string
+    content_type: string
+    content_body?: string
+    duration_min?: number
+    order_index: number
+  }>
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -49,14 +71,26 @@ const LEVEL_BADGE: Record<string, string> = {
   intermediaire: 'bg-yellow-100 text-yellow-800',
   avance: 'bg-red-100 text-red-800',
 }
-const CONTENT_ICON: Record<string, React.ElementType> = {
-  text: BookOpen, video: Play, quiz: HelpCircle, checklist: CheckSquare,
+const CONTENT_ICON: Record<string, LucideIcon> = {
+  text: BookOpen,
+  video: Play,
+  quiz: HelpCircle,
+  checklist: CheckSquare,
 }
-const CATEGORIES = ['tous','agronomie','phytosanitaire','gestion','commerce','numerique','autre']
+const CATEGORIES = [
+  'tous',
+  'agronomie',
+  'phytosanitaire',
+  'gestion',
+  'commerce',
+  'numerique',
+  'autre',
+]
 
 export default function AgriAcademyPage() {
   const { user } = useAuth()
   const { currentCooperative } = useCooperative()
+  const router = useRouter()
   const [modules, setModules] = useState<AcademyModule[]>([])
   const [category, setCategory] = useState('tous')
   const [level, setLevel] = useState('')
@@ -67,23 +101,42 @@ export default function AgriAcademyPage() {
   const [formError, setFormError] = useState('')
   const [moduleDialog, setModuleDialog] = useState(false)
   const [lessonDialog, setLessonDialog] = useState(false)
-  const [moduleForm, setModuleForm] = useState({ title: '', description: '', category: 'agronomie', level: 'debutant', culture: '', duration_min: '' })
-  const [lessonForm, setLessonForm] = useState({ title: '', content_type: 'text', content_body: '', duration_min: '' })
+  const [moduleForm, setModuleForm] = useState({
+    title: '',
+    description: '',
+    category: 'agronomie',
+    level: 'debutant',
+    culture: '',
+    duration_min: '',
+  })
+  const [lessonForm, setLessonForm] = useState({
+    title: '',
+    content_type: 'text',
+    content_body: '',
+    duration_min: '',
+  })
 
   const load = useCallback(async () => {
     const params = new URLSearchParams()
     if (category !== 'tous') params.set('category', category)
     if (level) params.set('level', level)
     const res = await fetch(`/api/academy/modules?${params}`)
-    if (res.ok) { const d = await res.json(); setModules(d.modules) }
+    if (res.ok) {
+      const d = await res.json()
+      setModules(d.modules)
+    }
   }, [category, level])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    void load()
+  }, [load])
 
   const loadDetail = async (mod: AcademyModule) => {
     const res = await fetch(`/api/academy/modules/${mod.id}`)
-    if (res.ok) { const d = await res.json(); setSelected(d.module) }
-    else setSelected(mod)
+    if (res.ok) {
+      const d = await res.json()
+      setSelected(d.module)
+    } else setSelected(mod)
   }
 
   /** Envoi commun : bouton bloqué pendant l'envoi, erreur affichée sinon. */
@@ -91,7 +144,11 @@ export default function AgriAcademyPage() {
     setSaving(true)
     setFormError('')
     try {
-      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
       if (res.ok) return true
       const d = await res.json().catch(() => ({}))
       setFormError(d.error ?? 'Enregistrement impossible. Réessayez.')
@@ -109,8 +166,15 @@ export default function AgriAcademyPage() {
       setFormError('Le titre est obligatoire.')
       return
     }
-    const ok = await submit('/api/academy/modules', { ...moduleForm, duration_min: moduleForm.duration_min ? Number(moduleForm.duration_min) : null, cooperative_id: currentCooperative.id })
-    if (ok) { setModuleDialog(false); void load() }
+    const ok = await submit('/api/academy/modules', {
+      ...moduleForm,
+      duration_min: moduleForm.duration_min ? Number(moduleForm.duration_min) : null,
+      cooperative_id: currentCooperative.id,
+    })
+    if (ok) {
+      setModuleDialog(false)
+      void load()
+    }
   }
 
   const createLesson = async () => {
@@ -118,8 +182,14 @@ export default function AgriAcademyPage() {
       setFormError('Le titre est obligatoire.')
       return
     }
-    const ok = await submit(`/api/academy/modules/${selected.id}/lessons`, { ...lessonForm, duration_min: lessonForm.duration_min ? Number(lessonForm.duration_min) : null })
-    if (ok) { setLessonDialog(false); void loadDetail(selected) }
+    const ok = await submit(`/api/academy/modules/${selected.id}/lessons`, {
+      ...lessonForm,
+      duration_min: lessonForm.duration_min ? Number(lessonForm.duration_min) : null,
+    })
+    if (ok) {
+      setLessonDialog(false)
+      void loadDetail(selected)
+    }
   }
 
   return (
@@ -127,104 +197,247 @@ export default function AgriAcademyPage() {
       <PageHeader
         title="AgriAcademy"
         description="Formations agricoles pour coopérateurs"
-        action={isAdmin ? (
-          <Dialog open={moduleDialog} onOpenChange={setModuleDialog}>
-            <DialogTrigger asChild><Button className="gap-2"><Plus className="h-4 w-4" /> Créer un module</Button></DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Nouveau module</DialogTitle></DialogHeader>
-              <div className="space-y-3">
-                <Input placeholder="Titre" value={moduleForm.title} onChange={e => setModuleForm(f => ({ ...f, title: e.target.value }))} />
-                <Textarea placeholder="Description" value={moduleForm.description} onChange={e => setModuleForm(f => ({ ...f, description: e.target.value }))} />
-                <Select value={moduleForm.category} onValueChange={v => setModuleForm(f => ({ ...f, category: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{CATEGORIES.filter(c => c !== 'tous').map(c => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}</SelectContent>
-                </Select>
-                <Select value={moduleForm.level} onValueChange={v => setModuleForm(f => ({ ...f, level: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="debutant">Débutant</SelectItem><SelectItem value="intermediaire">Intermédiaire</SelectItem><SelectItem value="avance">Avancé</SelectItem></SelectContent>
-                </Select>
-                <Input placeholder="Culture (optionnel)" value={moduleForm.culture} onChange={e => setModuleForm(f => ({ ...f, culture: e.target.value }))} />
-                <Input type="number" placeholder="Durée (minutes)" value={moduleForm.duration_min} onChange={e => setModuleForm(f => ({ ...f, duration_min: e.target.value }))} />
-                {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
-                <Button onClick={createModule} className="w-full" disabled={saving}>Créer</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        ) : undefined}
+        action={
+          isAdmin ? (
+            <Dialog open={moduleDialog} onOpenChange={setModuleDialog}>
+              <DialogTrigger asChild>
+                <Button className="gap-2">
+                  <Plus className="h-4 w-4" /> Créer un module
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Nouveau module</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <Input
+                    placeholder="Titre"
+                    value={moduleForm.title}
+                    onChange={(e) => setModuleForm((f) => ({ ...f, title: e.target.value }))}
+                  />
+                  <Textarea
+                    placeholder="Description"
+                    value={moduleForm.description}
+                    onChange={(e) => setModuleForm((f) => ({ ...f, description: e.target.value }))}
+                  />
+                  <Select
+                    value={moduleForm.category}
+                    onValueChange={(v) => setModuleForm((f) => ({ ...f, category: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIES.filter((c) => c !== 'tous').map((c) => (
+                        <SelectItem key={c} value={c} className="capitalize">
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={moduleForm.level}
+                    onValueChange={(v) => setModuleForm((f) => ({ ...f, level: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="debutant">Débutant</SelectItem>
+                      <SelectItem value="intermediaire">Intermédiaire</SelectItem>
+                      <SelectItem value="avance">Avancé</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    placeholder="Culture (optionnel)"
+                    value={moduleForm.culture}
+                    onChange={(e) => setModuleForm((f) => ({ ...f, culture: e.target.value }))}
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Durée (minutes)"
+                    value={moduleForm.duration_min}
+                    onChange={(e) => setModuleForm((f) => ({ ...f, duration_min: e.target.value }))}
+                  />
+                  {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+                  <Button onClick={createModule} className="w-full" disabled={saving}>
+                    Créer
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          ) : undefined
+        }
       />
 
       {/* Filters */}
       <div className="space-y-2">
         <div className="flex gap-1 flex-wrap">
-          {CATEGORIES.map(c => (
-            <Button key={c} size="sm" variant={category === c ? 'default' : 'outline'} onClick={() => setCategory(c)} className="capitalize text-xs">{c}</Button>
+          {CATEGORIES.map((c) => (
+            <Button
+              key={c}
+              size="sm"
+              variant={category === c ? 'default' : 'outline'}
+              onClick={() => setCategory(c)}
+              className="capitalize text-xs"
+            >
+              {c}
+            </Button>
           ))}
         </div>
         <div className="flex gap-1">
-          {[{ v: '', l: 'Tous niveaux' }, { v: 'debutant', l: 'Débutant' }, { v: 'intermediaire', l: 'Intermédiaire' }, { v: 'avance', l: 'Avancé' }].map(({ v, l }) => (
-            <Button key={v} size="sm" variant={level === v ? 'secondary' : 'ghost'} onClick={() => setLevel(v)} className="text-xs">{l}</Button>
+          {[
+            { v: '', l: 'Tous niveaux' },
+            { v: 'debutant', l: 'Débutant' },
+            { v: 'intermediaire', l: 'Intermédiaire' },
+            { v: 'avance', l: 'Avancé' },
+          ].map(({ v, l }) => (
+            <Button
+              key={v}
+              size="sm"
+              variant={level === v ? 'secondary' : 'ghost'}
+              onClick={() => setLevel(v)}
+              className="text-xs"
+            >
+              {l}
+            </Button>
           ))}
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {modules.map(mod => {
+        {catalogueModules(modules, isAdmin).map((mod) => {
           const lessons = mod.academy_lessons ?? []
+          const operator = mod.id === OPERATOR_COURSE_ID
+          const draft = lessons.length === 0
           const completedCount = 0 // would need progress data per user
-          const progress = lessons.length > 0 ? Math.round((completedCount / lessons.length) * 100) : 0
+          const progress =
+            lessons.length > 0 ? Math.round((completedCount / lessons.length) * 100) : 0
           const borderColor = CATEGORY_COLORS[mod.category] ?? 'border-t-gray-400'
           return (
-            <Card key={mod.id} className={`border-t-4 ${borderColor} cursor-pointer hover:shadow-md transition-shadow`} onClick={() => loadDetail(mod)}>
+            <Card
+              key={mod.id}
+              className={`border-t-4 ${borderColor} cursor-pointer hover:shadow-md transition-shadow`}
+              onClick={() => (operator ? router.push('/operator/training') : loadDetail(mod))}
+            >
               <CardContent className="pt-4 space-y-3">
                 <div className="flex gap-2 flex-wrap">
-                  <Badge className={`text-xs ${CATEGORY_BADGE[mod.category] ?? ''}`}>{mod.category}</Badge>
+                  <Badge className={`text-xs ${CATEGORY_BADGE[mod.category] ?? ''}`}>
+                    {mod.category}
+                  </Badge>
                   <Badge className={`text-xs ${LEVEL_BADGE[mod.level] ?? ''}`}>{mod.level}</Badge>
-                  {mod.duration_min && <Badge variant="outline" className="text-xs gap-1"><Clock className="h-3 w-3" />{mod.duration_min} min</Badge>}
+                  {mod.duration_min && (
+                    <Badge variant="outline" className="text-xs gap-1">
+                      <Clock className="h-3 w-3" />
+                      {mod.duration_min} min
+                    </Badge>
+                  )}
+                  {draft && (
+                    <Badge variant="outline" className="text-xs">
+                      Brouillon : aucune leçon, invisible des membres
+                    </Badge>
+                  )}
                 </div>
                 <div>
                   <div className="font-semibold text-sm line-clamp-1">{mod.title}</div>
-                  {mod.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{mod.description}</p>}
+                  {mod.description && (
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                      {mod.description}
+                    </p>
+                  )}
                 </div>
-                {lessons.length > 0 && (
-                  <div><Progress value={progress} className="h-1.5" /><div className="text-xs text-muted-foreground mt-1">{completedCount}/{lessons.length} leçons</div></div>
+                {lessons.length > 0 && !operator && (
+                  <div>
+                    <Progress value={progress} className="h-1.5" />
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {completedCount}/{lessons.length} leçons
+                    </div>
+                  </div>
                 )}
-                {mod.culture && <Badge variant="outline" className="text-xs">🌱 {mod.culture}</Badge>}
-                <Button size="sm" className="w-full" onClick={e => { e.stopPropagation(); void loadDetail(mod) }}>
-                  {progress === 100 ? '✓ Terminé' : progress > 0 ? 'Continuer' : 'Commencer'}
-                </Button>
+                {operator && (
+                  <p className="text-xs text-muted-foreground">
+                    {lessons.length} leçons, quiz et cas pratiques corrigés : le parcours certifiant
+                    des Opérateurs.
+                  </p>
+                )}
+                {mod.culture && (
+                  <Badge variant="outline" className="text-xs">
+                    🌱 {mod.culture}
+                  </Badge>
+                )}
+                {operator ? (
+                  <Button size="sm" className="w-full" asChild onClick={(e) => e.stopPropagation()}>
+                    <Link href="/operator/training">Ouvrir la formation</Link>
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    variant={draft ? 'outline' : 'default'}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      void loadDetail(mod)
+                    }}
+                  >
+                    {draft
+                      ? 'Ajouter des leçons'
+                      : progress === 100
+                        ? '✓ Terminé'
+                        : progress > 0
+                          ? 'Continuer'
+                          : 'Commencer'}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )
         })}
-        {modules.length === 0 && (
-          <div className="col-span-3 py-12 text-center text-muted-foreground">Aucun module disponible pour ce filtre</div>
+        {catalogueModules(modules, isAdmin).length === 0 && (
+          <div className="col-span-3 py-12 text-center text-muted-foreground">
+            Aucune formation publiée pour ce filtre
+          </div>
         )}
       </div>
 
       {/* Module detail dialog */}
       {selected && (
-        <Dialog open={!!selected} onOpenChange={open => { if (!open) setSelected(null) }}>
+        <Dialog
+          open={!!selected}
+          onOpenChange={(open) => {
+            if (!open) setSelected(null)
+          }}
+        >
           <DialogContent className="max-w-2xl max-h-[80vh]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Badge className={CATEGORY_BADGE[selected.category] ?? ''}>{selected.category}</Badge>
+                <Badge className={CATEGORY_BADGE[selected.category] ?? ''}>
+                  {selected.category}
+                </Badge>
                 {selected.title}
               </DialogTitle>
             </DialogHeader>
-            {selected.description && <p className="text-sm text-muted-foreground">{selected.description}</p>}
+            {selected.description && (
+              <p className="text-sm text-muted-foreground">{selected.description}</p>
+            )}
             <ScrollArea className="h-64">
               <div className="space-y-2 pr-4">
-                {(selected.academy_lessons ?? []).map(lesson => {
+                {(selected.academy_lessons ?? []).map((lesson) => {
                   const Icon = CONTENT_ICON[lesson.content_type] ?? BookOpen
                   return (
                     <div key={lesson.id} className="border rounded-lg p-3 space-y-2">
                       <div className="flex items-center gap-2">
                         <Icon className="h-4 w-4 text-muted-foreground" />
                         <span className="text-sm font-medium flex-1">{lesson.title}</span>
-                        {lesson.duration_min && <span className="text-xs text-muted-foreground">{lesson.duration_min} min</span>}
+                        {lesson.duration_min && (
+                          <span className="text-xs text-muted-foreground">
+                            {lesson.duration_min} min
+                          </span>
+                        )}
                       </div>
                       {lesson.content_body && (
-                        <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-sans bg-muted/50 rounded p-2 max-h-24 overflow-auto">{lesson.content_body}</pre>
+                        <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-sans bg-muted/50 rounded p-2 max-h-24 overflow-auto">
+                          {lesson.content_body}
+                        </pre>
                       )}
                       {/* « Marquer comme terminé » retiré : il envoyait l'identifiant du
                           compte comme member_id (fiche membre ≠ compte), et chaque
@@ -233,24 +446,64 @@ export default function AgriAcademyPage() {
                     </div>
                   )
                 })}
-                {(selected.academy_lessons?.length ?? 0) === 0 && <div className="text-sm text-muted-foreground py-4 text-center">Aucune leçon pour ce module</div>}
+                {(selected.academy_lessons?.length ?? 0) === 0 && (
+                  <div className="text-sm text-muted-foreground py-4 text-center">
+                    Aucune leçon pour ce module
+                  </div>
+                )}
               </div>
             </ScrollArea>
             {isAdmin && (
               <Dialog open={lessonDialog} onOpenChange={setLessonDialog}>
-                <DialogTrigger asChild><Button variant="outline" size="sm" className="gap-1"><Plus className="h-3.5 w-3.5" /> Ajouter une leçon</Button></DialogTrigger>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1">
+                    <Plus className="h-3.5 w-3.5" /> Ajouter une leçon
+                  </Button>
+                </DialogTrigger>
                 <DialogContent>
-                  <DialogHeader><DialogTitle>Nouvelle leçon</DialogTitle></DialogHeader>
+                  <DialogHeader>
+                    <DialogTitle>Nouvelle leçon</DialogTitle>
+                  </DialogHeader>
                   <div className="space-y-3">
-                    <Input placeholder="Titre de la leçon" value={lessonForm.title} onChange={e => setLessonForm(f => ({ ...f, title: e.target.value }))} />
-                    <Select value={lessonForm.content_type} onValueChange={v => setLessonForm(f => ({ ...f, content_type: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent><SelectItem value="text">Texte</SelectItem><SelectItem value="video">Vidéo (URL)</SelectItem><SelectItem value="quiz">Quiz</SelectItem><SelectItem value="checklist">Checklist</SelectItem></SelectContent>
+                    <Input
+                      placeholder="Titre de la leçon"
+                      value={lessonForm.title}
+                      onChange={(e) => setLessonForm((f) => ({ ...f, title: e.target.value }))}
+                    />
+                    <Select
+                      value={lessonForm.content_type}
+                      onValueChange={(v) => setLessonForm((f) => ({ ...f, content_type: v }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="text">Texte</SelectItem>
+                        <SelectItem value="video">Vidéo (URL)</SelectItem>
+                        <SelectItem value="quiz">Quiz</SelectItem>
+                        <SelectItem value="checklist">Checklist</SelectItem>
+                      </SelectContent>
                     </Select>
-                    <Textarea placeholder="Contenu (texte, URL vidéo, JSON quiz...)" value={lessonForm.content_body} onChange={e => setLessonForm(f => ({ ...f, content_body: e.target.value }))} rows={4} />
-                    <Input type="number" placeholder="Durée estimée (minutes)" value={lessonForm.duration_min} onChange={e => setLessonForm(f => ({ ...f, duration_min: e.target.value }))} />
+                    <Textarea
+                      placeholder="Contenu (texte, URL vidéo, JSON quiz...)"
+                      value={lessonForm.content_body}
+                      onChange={(e) =>
+                        setLessonForm((f) => ({ ...f, content_body: e.target.value }))
+                      }
+                      rows={4}
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Durée estimée (minutes)"
+                      value={lessonForm.duration_min}
+                      onChange={(e) =>
+                        setLessonForm((f) => ({ ...f, duration_min: e.target.value }))
+                      }
+                    />
                     {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
-                    <Button onClick={createLesson} className="w-full" disabled={saving}>Ajouter</Button>
+                    <Button onClick={createLesson} className="w-full" disabled={saving}>
+                      Ajouter
+                    </Button>
                   </div>
                 </DialogContent>
               </Dialog>

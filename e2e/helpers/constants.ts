@@ -31,25 +31,25 @@ export const ROUTES = {
 export const ACCOUNTS = {
   superAdmin: {
     email: process.env.E2E_ADMIN_EMAIL || 'admin@demo.local',
-    password: process.env.E2E_ADMIN_PASSWORD || 'Demo123!SuperAdmin',
+    password: process.env.E2E_ADMIN_PASSWORD || '',
     role: 'super_admin' as const,
     storageState: '.auth/super-admin.json',
   },
   coopAdmin: {
     email: process.env.E2E_COOP_EMAIL || 'coop-admin@demo.local',
-    password: process.env.E2E_COOP_PASSWORD || 'Demo123!CoopAdmin',
+    password: process.env.E2E_COOP_PASSWORD || '',
     role: 'cooperative_admin' as const,
     storageState: '.auth/coop-admin.json',
   },
   fenomatAdmin: {
     email: process.env.E2E_FENOMAT_EMAIL || 'fenomat@demo.local',
-    password: process.env.E2E_FENOMAT_PASSWORD || 'Demo123!CoopAdmin',
+    password: process.env.E2E_FENOMAT_PASSWORD || '',
     role: 'cooperative_admin' as const,
     storageState: '.auth/fenomat-admin.json',
   },
   member: {
     email: process.env.E2E_MEMBER_EMAIL || 'member1@demo.local',
-    password: process.env.E2E_MEMBER_PASSWORD || 'Demo123!Member1',
+    password: process.env.E2E_MEMBER_PASSWORD || '',
     role: 'member' as const,
     storageState: '.auth/member.json',
   },
@@ -72,6 +72,6 @@ export const PUBLIC_PAGES = [
   { path: ROUTES.about, heading: '' }, // Will check for 200 status
   { path: ROUTES.contact, heading: '' },
   { path: ROUTES.blog, heading: '' },
-  { path: ROUTES.marketplace, heading: 'Comptes d\'exploitation agricole' },
+  { path: ROUTES.marketplace, heading: "Comptes d'exploitation agricole" },
   { path: ROUTES.login, heading: '' },
 ] as const

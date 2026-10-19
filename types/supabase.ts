@@ -4220,7 +4220,7 @@ export type Database = {
           cooperative_id: string | null
           created_at: string | null
           deleted_at: string | null
-          email: string
+          email: string | null
           first_name: string | null
           haroo_activated_at: string | null
           haroo_type: Database["public"]["Enums"]["haroo_profile_type"] | null
@@ -4235,7 +4235,7 @@ export type Database = {
           cooperative_id?: string | null
           created_at?: string | null
           deleted_at?: string | null
-          email: string
+          email?: string | null
           first_name?: string | null
           haroo_activated_at?: string | null
           haroo_type?: Database["public"]["Enums"]["haroo_profile_type"] | null
@@ -4250,7 +4250,7 @@ export type Database = {
           cooperative_id?: string | null
           created_at?: string | null
           deleted_at?: string | null
-          email?: string
+          email?: string | null
           first_name?: string | null
           haroo_activated_at?: string | null
           haroo_type?: Database["public"]["Enums"]["haroo_profile_type"] | null

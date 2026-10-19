@@ -57,6 +57,9 @@ export async function assertPartnerAuthenticated() {
   return { ok: true as const, ctx }
 }
 
+/** Dossiers Opérateur qui n'avancent plus : la formation leur est fermée. */
+const CLOSED_PARTNER_STATUSES = new Set(['suspended', 'revoked', 'expired'])
+
 /**
  * Garde du parcours de formation Opérateur. Une simple session ne suffit pas :
  * le compte doit avoir créé son dossier Opérateur et posséder une adhésion
@@ -91,16 +94,27 @@ export async function assertOperatorCandidate() {
 
   const { data: certification } = await result.ctx.supabase
     .from('partner_certifications')
-    .select('id')
+    .select('id, partners(status)')
     .eq('user_id', result.ctx.userId)
     .not('partner_id', 'is', null)
-    .maybeSingle<{ id: string }>()
+    .maybeSingle<{ id: string; partners: { status: string } | null }>()
 
   if (!certification) {
     return {
       ok: false as const,
       response: NextResponse.json(
         { error: 'Dossier de formation Opérateur introuvable' },
+        { status: 403 },
+      ),
+    }
+  }
+
+  // Un dossier suspendu, retiré ou expiré ne suit plus la formation (ni quiz ni dépôt).
+  if (CLOSED_PARTNER_STATUSES.has(certification.partners?.status ?? '')) {
+    return {
+      ok: false as const,
+      response: NextResponse.json(
+        { error: 'Ce dossier Opérateur est fermé : écrivez à l’équipe FaîtiereHub.' },
         { status: 403 },
       ),
     }

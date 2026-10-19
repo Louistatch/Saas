@@ -1,0 +1,12 @@
+Kenney game assets (www.kenney.nl)
+
+License: Creative Commons Zero, CC0 1.0 Universal
+https://creativecommons.org/publicdomain/zero/1.0/
+
+This content is free to use in personal, educational and commercial projects,
+including redistribution. Crediting Kenney or www.kenney.nl is appreciated but
+not required.
+
+Used in HarooLife: see docs/haroolife-open-source.md for the kits and the
+source of each copy (Mini Characters, Furniture Kit, City Kit, Car Kit,
+Suburban, Commercial, Nature, Sketch Town).

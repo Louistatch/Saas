@@ -128,6 +128,67 @@ function ExamDialog({
   )
 }
 
+type PaidDialogState = { partnerId: string; displayName: string } | null
+
+/**
+ * Secours quand les frais n'ont pas transité par FedaPay (espèces, dépôt Mobile Money constaté) :
+ * la note dit comment ils ont été réglés et part dans le journal d'audit.
+ */
+function MarkPaidDialog({
+  state,
+  onClose,
+  onSubmit,
+}: {
+  state: PaidDialogState
+  onClose: () => void
+  onSubmit: (note: string) => Promise<void>
+}) {
+  const [note, setNote] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (state) setNote('')
+  }, [state])
+
+  const submit = async () => {
+    if (note.trim().length < 3) return
+    setSubmitting(true)
+    await onSubmit(note.trim())
+    setSubmitting(false)
+  }
+
+  return (
+    <Dialog open={!!state} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Frais de certification réglés — {state?.displayName}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2 py-2">
+          <Label htmlFor="paid-note">Comment les frais ont-ils été réglés ?</Label>
+          <Input
+            id="paid-note"
+            placeholder="Ex. : espèces au bureau de Lomé, reçu n° 12"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            À utiliser seulement si le paiement n'est pas passé par FedaPay. Le dossier passe en «
+            Certifié » ; il reste à l'activer.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>
+            Annuler
+          </Button>
+          <Button onClick={submit} disabled={submitting || note.trim().length < 3}>
+            Marquer payé
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 type AssignDialogState = { partnerId: string; displayName: string } | null
 
 const ASSIGNABLE_SCOPE_LABEL: Record<PartnerAccessScope, string> = {
@@ -254,6 +315,7 @@ export default function AdminPartnersPage() {
   const [actingId, setActingId] = useState<string | null>(null)
   const [examDialog, setExamDialog] = useState<ExamDialogState>(null)
   const [assignDialog, setAssignDialog] = useState<AssignDialogState>(null)
+  const [paidDialog, setPaidDialog] = useState<PaidDialogState>(null)
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -278,7 +340,7 @@ export default function AdminPartnersPage() {
   const callAction = async (
     partnerId: string,
     body: {
-      action: 'mark_training_completed' | 'record_exam' | 'activate'
+      action: 'mark_training_completed' | 'record_exam' | 'mark_paid' | 'activate'
       exam_score?: number
       note?: string
     },
@@ -312,7 +374,7 @@ export default function AdminPartnersPage() {
     <div className="space-y-6">
       <PageHeader
         title="Opérateurs"
-        description="Validation manuelle de la certification — mécanisme pilote, en attendant le moteur d'examen AgriAcademy."
+        description="Candidatures, formation, évaluation pratique, frais de certification et activation des Opérateurs."
       />
 
       <Card>
@@ -418,6 +480,18 @@ export default function AdminPartnersPage() {
                                 Enregistrer évaluation
                               </Button>
                             )}
+                            {cert?.exam_passed_at && !cert.certified_at && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={acting}
+                                onClick={() =>
+                                  setPaidDialog({ partnerId: p.id, displayName: p.display_name })
+                                }
+                              >
+                                Marquer payé
+                              </Button>
+                            )}
                             {cert?.certified_at && p.status !== 'active' && (
                               <Button
                                 size="sm"
@@ -462,6 +536,16 @@ export default function AdminPartnersPage() {
             note: note || undefined,
           })
           setExamDialog(null)
+        }}
+      />
+
+      <MarkPaidDialog
+        state={paidDialog}
+        onClose={() => setPaidDialog(null)}
+        onSubmit={async (note) => {
+          if (!paidDialog) return
+          await callAction(paidDialog.partnerId, { action: 'mark_paid', note })
+          setPaidDialog(null)
         }}
       />
 

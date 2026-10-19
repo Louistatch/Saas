@@ -1,7 +1,10 @@
 import { MarketingLayout } from '@/components/shared/marketing-layout'
 import { Button } from '@/components/ui/button'
+import { publicPageMetadata } from '@/lib/seo'
 import { ArrowRight, Check, Network, Users } from 'lucide-react'
 import Link from 'next/link'
+
+export const metadata = publicPageMetadata('/pricing')
 
 const FAITIERE_PLANS = [
   {
@@ -36,7 +39,7 @@ const FAITIERE_PLANS = [
       'Membres illimités',
       'AgriMarket — place de marché avancée',
       'AgriCredit — crédit agricole avec scoring',
-      'AgriAcademy — modules de formation',
+      'AgriAcademy — formations publiées par votre organisation',
       'Carte agricole interactive',
       'Matching producteurs / acheteurs',
       'Intégration KoboToolbox complète',

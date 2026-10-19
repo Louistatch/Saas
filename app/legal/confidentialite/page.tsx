@@ -1,11 +1,7 @@
-import { MarketingLayout } from '@/components/shared/marketing-layout'
-import type { Metadata } from 'next'
+import { publicPageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
-  title: 'Politique de confidentialité — FaîtiereHub',
-  description:
-    'Politique de confidentialité de FaîtiereHub : données collectées, utilisation, stockage, droits des utilisateurs et contact du DPO.',
-}
+export const metadata = publicPageMetadata('/legal/confidentialite')
+import { MarketingLayout } from '@/components/shared/marketing-layout'
 
 export default function ConfidentialitePage() {
   return (

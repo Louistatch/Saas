@@ -5,6 +5,7 @@
 // pour un candidat dont le Partenaire est encore au statut 'candidate' —
 // exactement le cas que /operator doit pouvoir afficher.
 
+import { OPERATOR_MODULE_ID } from '@/lib/academy/operator-training'
 import { getAccessContext } from '@/lib/security/assert-access'
 import type { PartnerStatus } from '@/types/domain'
 import { NextResponse } from 'next/server'
@@ -41,8 +42,24 @@ export async function GET() {
       certified_at: string | null
     }>()
 
+  // Avancement de la formation (lecture sous RLS : ses propres lignes seulement).
+  const [{ count: lessonsTotal }, { count: lessonsCompleted }] = await Promise.all([
+    ctx.supabase
+      .from('academy_lessons')
+      .select('id', { count: 'exact', head: true })
+      .eq('module_id', OPERATOR_MODULE_ID),
+    ctx.supabase
+      .from('academy_profile_progress')
+      .select('id', { count: 'exact', head: true })
+      .eq('profile_id', ctx.userId)
+      .eq('module_id', OPERATOR_MODULE_ID)
+      .eq('status', 'completed')
+      .not('lesson_id', 'is', null),
+  ])
+
   return NextResponse.json({
     has_applied: true,
+    training: { lessons_completed: lessonsCompleted ?? 0, lessons_total: lessonsTotal ?? 0 },
     partner_id: membership.partner_id,
     partner_code: membership.partners.partner_code,
     display_name: membership.partners.display_name,

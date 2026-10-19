@@ -1,0 +1,11 @@
+Quaternius — Ultimate Modular Men Pack / Ultimate Modular Women Pack
+https://quaternius.com/packs/ultimatemodularcharacters.html
+https://quaternius.com/packs/ultimatemodularwomen.html
+
+Licence : CC0 1.0 Universal (domaine public). https://creativecommons.org/publicdomain/zero/1.0/
+
+Fichiers : Casual_2.glb, Casual_Hoodie.glb, Women_Casual.glb, Women_Formal.glb
+Variante optimisée (clips Idle, Idle_Neutral, Interact, Run, Walk, Wave ; ~1,85 unité de haut)
+récupérée le 14 octobre 2026 depuis le miroir public
+https://github.com/martian56/ufazien/tree/main/frontend/public/avatars (commit main du jour).
+Aucun fichier n'est chargé depuis le miroir pendant une partie : les modèles sont servis par ce dépôt.

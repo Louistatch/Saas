@@ -20,29 +20,60 @@ import type {
 } from '@/types/domain'
 import type { Database } from '@/types/supabase'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { attemptGate, gradeQuiz, revealCorrections, stableShuffle } from './assessment-policy'
+import { OPERATOR_COURSE_ID } from './catalogue'
+import { isLessonCompleted, missingForLesson } from './completion-policy'
 
 type AdminClient = SupabaseClient<Database>
 
-/** Module pilote « Opérateur certifié FaîtiereHub — Pilote V1 », déjà seedé en base. */
-export const OPERATOR_MODULE_ID = '2482e523-500e-4178-8102-1018af290c82'
+/** Module « Opérateur certifié FaîtiereHub », déjà seedé en base (id partagé : catalogue.ts). */
+export const OPERATOR_MODULE_ID = OPERATOR_COURSE_ID
 
 export interface ProgressResult {
   ok: boolean
   error?: string
 }
 
+export interface QuestionFeedback {
+  questionId: string
+  earned: number
+  points: number
+  correct: boolean
+  pending: boolean
+  correctOptionIds: string[]
+  selectedOptionIds: string[]
+  explanation: string | null
+}
+
 export interface QuizAttemptResult {
   ok: boolean
   error?: string
+  /** Quand la tentative est refusée : pourquoi, et à partir de quand réessayer. */
+  reason?: 'already_passed' | 'limit_reached'
+  retryAt?: string
   score?: number
   passed?: boolean
   attemptId?: string
+  lessonId?: string | null
+  moduleId?: string
+  attemptsLeft?: number | null
+  /** Retour détaillé (`show_feedback`) : bonne réponse et explication par question. */
+  feedback?: QuestionFeedback[]
 }
 
 export interface AssignmentSubmissionResult {
   ok: boolean
   error?: string
   submissionId?: string
+  lessonId?: string
+  moduleId?: string
+}
+
+export interface LessonCompletionResult {
+  completed: boolean
+  /** Ce qui manque encore ('quiz', 'assignment'). */
+  missing: string[]
+  bestScore: number | null
 }
 
 export interface ProfileProgressSummary {
@@ -52,6 +83,7 @@ export interface ProfileProgressSummary {
     status: AcademyProgressStatus
     progress_percent: number
     score: number | null
+    last_viewed_at: string | null
   }[]
   latest_quiz_attempts: {
     quiz_id: string
@@ -59,12 +91,17 @@ export interface ProfileProgressSummary {
     score: number | null
     passed: boolean | null
     submitted_at: string | null
+    /** Nombre total de tentatives, et vrai si l'une a réussi. */
+    attempts: number
+    any_passed: boolean
   }[]
   submissions: {
     assignment_id: string
     lesson_id: string
     status: string
     score: number | null
+    feedback: string | null
+    reviewed_at: string | null
   }[]
 }
 
@@ -77,6 +114,8 @@ export interface ProfileProgressSummary {
 export async function getModuleWithLessons(
   admin: AdminClient,
   moduleId: string,
+  /** Graine de l'ordre des questions (`randomize_questions`) : la même personne voit le même ordre. */
+  orderSeed?: string,
 ): Promise<AcademyModuleWithLessons | null> {
   const { data: module_ } = await admin
     .from('academy_modules')
@@ -172,7 +211,10 @@ export async function getModuleWithLessons(
             passing_score: quiz.passing_score,
             max_attempts: quiz.max_attempts,
             is_required: quiz.is_required,
-            questions: (questionsByQuiz.get(quiz.id) ?? []).map((question) => ({
+            questions: (quiz.randomize_questions && orderSeed
+              ? stableShuffle(questionsByQuiz.get(quiz.id) ?? [], `${orderSeed}:${quiz.id}`)
+              : (questionsByQuiz.get(quiz.id) ?? [])
+            ).map((question) => ({
               id: question.id,
               question_type: question.question_type as AcademyQuestionType,
               prompt: question.prompt,
@@ -192,34 +234,172 @@ export async function getModuleWithLessons(
   return { ...module_, lessons: lessonsOut }
 }
 
-/** Upsert de progression sur la clé unique (profile_id, module_id, lesson_id). */
-export async function upsertProgress(
+/**
+ * Ouverture d'une leçon par la personne elle-même : la ligne de progression passe (ou reste)
+ * `in_progress`, `started_at` n'est posé qu'une fois, `last_viewed_at` suit chaque visite.
+ * Une leçon déjà validée n'est jamais rétrogradée. Idempotent : un double envoi ne change rien.
+ */
+export async function recordLessonOpened(
   admin: AdminClient,
-  params: {
-    profileId: string
-    moduleId: string
-    lessonId: string | null
-    status: AcademyProgressStatus
-    progressPercent: number
-  },
+  params: { profileId: string; moduleId: string; lessonId: string },
 ): Promise<ProgressResult> {
   const now = new Date().toISOString()
-  const { error } = await admin.from('academy_profile_progress').upsert(
-    {
+  const { data: existing } = await admin
+    .from('academy_profile_progress')
+    .select('id, status, started_at')
+    .eq('profile_id', params.profileId)
+    .eq('module_id', params.moduleId)
+    .eq('lesson_id', params.lessonId)
+    .maybeSingle()
+  if (!existing) {
+    const { error } = await admin.from('academy_profile_progress').insert({
       profile_id: params.profileId,
       module_id: params.moduleId,
       lesson_id: params.lessonId,
-      status: params.status,
-      progress_percent: params.progressPercent,
+      status: 'in_progress',
+      progress_percent: 0,
+      started_at: now,
       last_viewed_at: now,
-      started_at: params.status !== 'not_started' ? now : null,
-      completed_at: params.status === 'completed' ? now : null,
       updated_at: now,
-    },
-    { onConflict: 'profile_id,module_id,lesson_id' },
-  )
+    })
+    // Deux ouvertures simultanées : la seconde insertion heurte la clé unique, la première a
+    // déjà tout écrit.
+    if (error && error.code !== '23505')
+      return { ok: false, error: 'Écriture de la progression impossible' }
+    return { ok: true }
+  }
+  const { error } = await admin
+    .from('academy_profile_progress')
+    .update({
+      status: existing.status === 'completed' ? 'completed' : 'in_progress',
+      started_at: existing.started_at ?? now,
+      last_viewed_at: now,
+      updated_at: now,
+    })
+    .eq('id', existing.id)
   if (error) return { ok: false, error: 'Écriture de la progression impossible' }
   return { ok: true }
+}
+
+/**
+ * Recalcule l'état d'une leçon à partir des preuves en base (tentatives corrigées côté serveur,
+ * dépôts) selon lib/academy/completion-policy.ts, et persiste `completed` quand tout y est.
+ * `completed_at` n'est posé qu'une fois ; `started_at` est conservé. Appelée après chaque
+ * tentative de quiz et chaque dépôt : rejouable sans effet de bord supplémentaire.
+ */
+export async function evaluateLessonCompletion(
+  admin: AdminClient,
+  params: { profileId: string; moduleId: string; lessonId: string },
+): Promise<LessonCompletionResult> {
+  const [{ data: quiz }, { data: assignment }] = await Promise.all([
+    admin
+      .from('academy_quizzes')
+      .select('id, is_required')
+      .eq('lesson_id', params.lessonId)
+      .maybeSingle(),
+    admin
+      .from('academy_assignments')
+      .select('id, is_required')
+      .eq('lesson_id', params.lessonId)
+      .maybeSingle(),
+  ])
+
+  let quizPassed = false
+  let bestScore: number | null = null
+  if (quiz) {
+    const { data: attempts } = await admin
+      .from('academy_quiz_attempts')
+      .select('score, passed')
+      .eq('quiz_id', quiz.id)
+      .eq('profile_id', params.profileId)
+    for (const attempt of attempts ?? []) {
+      if (attempt.passed) quizPassed = true
+      if (attempt.score != null && (bestScore == null || attempt.score > bestScore))
+        bestScore = attempt.score
+    }
+  }
+  let assignmentSubmitted = false
+  if (assignment) {
+    const { count } = await admin
+      .from('academy_assignment_submissions')
+      .select('id', { count: 'exact', head: true })
+      .eq('assignment_id', assignment.id)
+      .eq('profile_id', params.profileId)
+    assignmentSubmitted = (count ?? 0) > 0
+  }
+
+  const requirements = {
+    quizRequired: Boolean(quiz?.is_required),
+    assignmentRequired: Boolean(assignment?.is_required),
+  }
+  const evidence = { quizPassed, assignmentSubmitted }
+  const completed = isLessonCompleted(requirements, evidence)
+  const missing = missingForLesson(requirements, evidence)
+  if (!completed) return { completed: false, missing, bestScore }
+
+  const now = new Date().toISOString()
+  const { data: existing } = await admin
+    .from('academy_profile_progress')
+    .select('id, status, started_at, completed_at')
+    .eq('profile_id', params.profileId)
+    .eq('module_id', params.moduleId)
+    .eq('lesson_id', params.lessonId)
+    .maybeSingle()
+  if (!existing) {
+    await admin.from('academy_profile_progress').insert({
+      profile_id: params.profileId,
+      module_id: params.moduleId,
+      lesson_id: params.lessonId,
+      status: 'completed',
+      progress_percent: 100,
+      score: bestScore,
+      started_at: now,
+      completed_at: now,
+      last_viewed_at: now,
+      updated_at: now,
+    })
+  } else if (existing.status !== 'completed' || existing.completed_at == null) {
+    await admin
+      .from('academy_profile_progress')
+      .update({
+        status: 'completed',
+        progress_percent: 100,
+        score: bestScore,
+        started_at: existing.started_at ?? now,
+        completed_at: existing.completed_at ?? now,
+        updated_at: now,
+      })
+      .eq('id', existing.id)
+  } else if (bestScore != null) {
+    // Déjà validée : on garde la date, on relève seulement le meilleur score.
+    await admin
+      .from('academy_profile_progress')
+      .update({ score: bestScore, updated_at: now })
+      .eq('id', existing.id)
+  }
+  return { completed: true, missing: [], bestScore }
+}
+
+/** Leçons validées / leçons du module pour une personne. */
+export async function countCompletedLessons(
+  admin: AdminClient,
+  profileId: string,
+  moduleId: string,
+): Promise<{ completed: number; total: number }> {
+  const [{ count: total }, { count: completed }] = await Promise.all([
+    admin
+      .from('academy_lessons')
+      .select('id', { count: 'exact', head: true })
+      .eq('module_id', moduleId),
+    admin
+      .from('academy_profile_progress')
+      .select('id', { count: 'exact', head: true })
+      .eq('profile_id', profileId)
+      .eq('module_id', moduleId)
+      .eq('status', 'completed')
+      .not('lesson_id', 'is', null),
+  ])
+  return { completed: completed ?? 0, total: total ?? 0 }
 }
 
 /**
@@ -238,14 +418,38 @@ export async function submitQuizAttempt(
 ): Promise<QuizAttemptResult> {
   const { data: quiz } = await admin
     .from('academy_quizzes')
-    .select('id, passing_score')
+    .select('id, passing_score, lesson_id, module_id, max_attempts, show_feedback')
     .eq('id', params.quizId)
     .maybeSingle()
   if (!quiz) return { ok: false, error: 'Quiz introuvable' }
 
+  // Tentatives passées de la personne : un quiz réussi ne se rejoue pas, la limite par 24 h
+  // s'applique (assessment-policy.ts).
+  const { data: previous } = await admin
+    .from('academy_quiz_attempts')
+    .select('created_at, passed')
+    .eq('quiz_id', params.quizId)
+    .eq('profile_id', params.profileId)
+  const gate = attemptGate(
+    (previous ?? []).map((a) => ({ createdAt: a.created_at, passed: a.passed })),
+    quiz.max_attempts,
+  )
+  if (!gate.allowed) {
+    return {
+      ok: false,
+      reason: gate.reason,
+      retryAt: gate.retryAt,
+      attemptsLeft: gate.attemptsLeft,
+      error:
+        gate.reason === 'already_passed'
+          ? 'Ce quiz est déjà réussi.'
+          : 'Nombre de tentatives atteint pour aujourd’hui. Relisez la leçon et réessayez demain.',
+    }
+  }
+
   const { data: questions } = await admin
     .from('academy_quiz_questions')
-    .select('id, question_type, points')
+    .select('id, question_type, points, explanation')
     .eq('quiz_id', params.quizId)
   const questionRows = questions ?? []
   if (questionRows.length === 0) return { ok: false, error: 'Quiz sans questions' }
@@ -257,30 +461,24 @@ export async function submitQuizAttempt(
       'question_id',
       questionRows.map((q) => q.id),
     )
-  const optionsByQuestion = new Map<string, { id: string; is_correct: boolean }[]>()
+  const correctByQuestion = new Map<string, string[]>()
   for (const option of options ?? []) {
-    const list = optionsByQuestion.get(option.question_id) ?? []
-    list.push({ id: option.id, is_correct: option.is_correct })
-    optionsByQuestion.set(option.question_id, list)
+    if (!option.is_correct) continue
+    const list = correctByQuestion.get(option.question_id) ?? []
+    list.push(option.id)
+    correctByQuestion.set(option.question_id, list)
   }
 
-  let earned = 0
-  let total = 0
-  for (const question of questionRows) {
-    total += question.points
-    if (question.question_type === 'case') continue // non noté automatiquement
-
-    const questionOptions = optionsByQuestion.get(question.id) ?? []
-    const correctIds = new Set(questionOptions.filter((o) => o.is_correct).map((o) => o.id))
-    const selectedIds = new Set(params.answers[question.id] ?? [])
-
-    const isCorrect =
-      correctIds.size === selectedIds.size && [...correctIds].every((id) => selectedIds.has(id))
-    if (isCorrect) earned += question.points
-  }
-
-  const score = total > 0 ? Math.round((earned / total) * 100) : 0
-  const passed = score >= quiz.passing_score
+  const grade = gradeQuiz(
+    questionRows.map((q) => ({
+      id: q.id,
+      type: q.question_type as 'single_choice' | 'multiple_choice' | 'true_false' | 'case',
+      points: q.points,
+      correctOptionIds: correctByQuestion.get(q.id) ?? [],
+    })),
+    params.answers,
+    quiz.passing_score,
+  )
   const now = new Date().toISOString()
 
   const { data: attempt, error } = await admin
@@ -289,15 +487,40 @@ export async function submitQuizAttempt(
       quiz_id: params.quizId,
       profile_id: params.profileId,
       answers: params.answers,
-      score,
-      passed,
+      score: grade.score,
+      passed: grade.passed,
       submitted_at: now,
     })
     .select('id')
     .single()
   if (error || !attempt) return { ok: false, error: 'Écriture de la tentative impossible' }
 
-  return { ok: true, score, passed, attemptId: attempt.id }
+  const explanationById = new Map(questionRows.map((q) => [q.id, q.explanation]))
+  const feedback = revealCorrections(grade.passed, quiz.show_feedback)
+    ? grade.questions.map((g) => ({
+        questionId: g.questionId,
+        earned: g.earned,
+        points: g.points,
+        correct: g.correct,
+        pending: g.pending,
+        correctOptionIds: correctByQuestion.get(g.questionId) ?? [],
+        selectedOptionIds: params.answers[g.questionId] ?? [],
+        explanation: explanationById.get(g.questionId) ?? null,
+      }))
+    : undefined
+  const attemptsLeft =
+    gate.attemptsLeft == null ? null : grade.passed ? 0 : Math.max(0, gate.attemptsLeft - 1)
+
+  return {
+    ok: true,
+    score: grade.score,
+    passed: grade.passed,
+    attemptId: attempt.id,
+    lessonId: quiz.lesson_id,
+    moduleId: quiz.module_id,
+    attemptsLeft,
+    feedback,
+  }
 }
 
 /** Dépôt d'un devoir — statut initial 'submitted', jamais 'draft' (pas d'édition en place côté V1). */
@@ -310,6 +533,12 @@ export async function submitAssignment(
     attachmentUrl: string | null
   },
 ): Promise<AssignmentSubmissionResult> {
+  const { data: assignment } = await admin
+    .from('academy_assignments')
+    .select('id, lesson_id, academy_lessons(module_id)')
+    .eq('id', params.assignmentId)
+    .maybeSingle<{ id: string; lesson_id: string; academy_lessons: { module_id: string } | null }>()
+  if (!assignment) return { ok: false, error: 'Devoir introuvable' }
   const now = new Date().toISOString()
   const { data, error } = await admin
     .from('academy_assignment_submissions')
@@ -324,7 +553,12 @@ export async function submitAssignment(
     .select('id')
     .single()
   if (error || !data) return { ok: false, error: 'Dépôt du devoir impossible' }
-  return { ok: true, submissionId: data.id }
+  return {
+    ok: true,
+    submissionId: data.id,
+    lessonId: assignment.lesson_id,
+    moduleId: assignment.academy_lessons?.module_id,
+  }
 }
 
 /** Vue d'ensemble « ma formation » : progression par leçon + dernière tentative par quiz + statut de devoirs. */
@@ -341,7 +575,7 @@ export async function getProfileProgressSummary(
 
   const { data: progress } = await admin
     .from('academy_profile_progress')
-    .select('lesson_id, status, progress_percent, score')
+    .select('lesson_id, status, progress_percent, score, last_viewed_at')
     .eq('profile_id', profileId)
     .eq('module_id', moduleId)
 
@@ -370,8 +604,12 @@ export async function getProfileProgressSummary(
     created_at: string
   }
   const latestByQuiz = new Map<string, AttemptRow>()
+  const countByQuiz = new Map<string, number>()
+  const passedByQuiz = new Set<string>()
   for (const attempt of (attempts ?? []) as AttemptRow[]) {
     if (!latestByQuiz.has(attempt.quiz_id)) latestByQuiz.set(attempt.quiz_id, attempt)
+    countByQuiz.set(attempt.quiz_id, (countByQuiz.get(attempt.quiz_id) ?? 0) + 1)
+    if (attempt.passed) passedByQuiz.add(attempt.quiz_id)
   }
 
   const { data: assignments } = await admin
@@ -384,7 +622,7 @@ export async function getProfileProgressSummary(
     assignmentIds.length > 0
       ? await admin
           .from('academy_assignment_submissions')
-          .select('assignment_id, status, score, created_at')
+          .select('assignment_id, status, score, created_at, feedback, reviewed_at')
           .eq('profile_id', profileId)
           .in('assignment_id', assignmentIds)
           .order('created_at', { ascending: false })
@@ -395,6 +633,8 @@ export async function getProfileProgressSummary(
     status: string
     score: number | null
     created_at: string
+    feedback: string | null
+    reviewed_at: string | null
   }
   const latestByAssignment = new Map<string, SubmissionRow>()
   for (const submission of (submissions ?? []) as SubmissionRow[]) {
@@ -412,6 +652,7 @@ export async function getProfileProgressSummary(
       status: p.status as AcademyProgressStatus,
       progress_percent: p.progress_percent,
       score: p.score,
+      last_viewed_at: p.last_viewed_at,
     })),
     latest_quiz_attempts: [...latestByQuiz.entries()].map(([quizId, attempt]) => ({
       quiz_id: quizId,
@@ -419,12 +660,16 @@ export async function getProfileProgressSummary(
       score: attempt.score,
       passed: attempt.passed,
       submitted_at: attempt.submitted_at,
+      attempts: countByQuiz.get(quizId) ?? 0,
+      any_passed: passedByQuiz.has(quizId),
     })),
     submissions: [...latestByAssignment.entries()].map(([assignmentId, submission]) => ({
       assignment_id: assignmentId,
       lesson_id: assignmentLessonById.get(assignmentId) ?? '',
       status: submission.status,
       score: submission.score,
+      feedback: submission.feedback,
+      reviewed_at: submission.reviewed_at,
     })),
   }
 }

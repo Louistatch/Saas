@@ -1,20 +1,17 @@
-// Paiement des frais de certification Opérateur (15 000 XOF, §9 du plan).
+// Paiement des frais de certification Opérateur (15 000 XOF, §9 du plan), par FedaPay.
 //
-// Gardé sur la formation ET l'examen réussis — même si rien ne pose encore
-// `training_completed_at`/`exam_passed_at` aujourd'hui (le parcours
-// formation/examen est un chantier produit séparé, pas dans ce PR). Le garde
-// reste honnête : tant qu'aucun mécanisme d'examen n'existe, personne ne
-// peut passer ces deux colonnes à non-null, donc personne ne peut payer —
-// ce qui est le comportement correct, pas une fonctionnalité manquante
-// déguisée en succès.
+// Gardé sur la formation ET l'évaluation pratique réussies : la formation pose
+// training_completed_at (12 leçons validées), l'équipe pose exam_passed_at
+// (évaluation sur le terrain). La certification n'est enregistrée qu'après relecture
+// de la transaction auprès de FedaPay (lib/partners/certification-payment.ts).
 
-import { NextResponse, type NextRequest } from 'next/server'
-import { z } from 'zod'
+import { startCertificationPayment } from '@/lib/partners/certification-payment'
+import { isFedaPayConfigured } from '@/lib/payments/fedapay'
 import { getAccessContext } from '@/lib/security/assert-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
-import { initiateCinetPayPayment } from '@/lib/payments/cinetpay'
-import { generatePaymentReference } from '@/lib/payments/orange-money'
-import { rateLimit, clientKeyFromHeaders } from '@/lib/utils/rate-limit'
+import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
+import { type NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 
 const bodySchema = z.object({
   phone: z.string().trim().min(8).max(40),
@@ -78,59 +75,29 @@ export async function POST(request: NextRequest) {
   if (!rule) {
     return NextResponse.json({ error: 'Tarif de certification indisponible' }, { status: 502 })
   }
-
-  let reference = generatePaymentReference('CERT')
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const { data: clash } = await admin
-      .from('partner_payment_intents')
-      .select('id')
-      .eq('provider_reference', reference)
-      .maybeSingle()
-    if (!clash) break
-    reference = generatePaymentReference('CERT')
-  }
-
-  const { data: intent, error: insertError } = await admin
-    .from('partner_payment_intents')
-    .insert({
-      partner_id: certification.partner_id,
-      purpose: 'certification',
-      amount_fcfa: rule.price_xof,
-      provider: 'cinetpay',
-      provider_reference: reference,
-      phone,
-      created_by: ctx.userId,
-    })
-    .select('id')
-    .single()
-
-  if (insertError || !intent) {
+  if (!isFedaPayConfigured()) {
     return NextResponse.json(
-      { error: 'Création du paiement de certification impossible' },
-      { status: 502 },
+      { error: 'Le paiement en ligne n’est pas encore ouvert. Écrivez à l’équipe FaîtiereHub.' },
+      { status: 503 },
     )
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
-  const result = await initiateCinetPayPayment({
-    transactionId: reference,
+  const { data: profile } = await admin
+    .from('profiles')
+    .select('first_name, last_name, email')
+    .eq('id', ctx.userId)
+    .maybeSingle<{ first_name: string | null; last_name: string | null; email: string | null }>()
+  const name = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || 'Opérateur'
+
+  const result = await startCertificationPayment({
+    partnerId: certification.partner_id,
+    userId: ctx.userId,
     amount: rule.price_xof,
-    description: `Certification Opérateur FaîtiereHub — réf. ${reference}`,
-    customerPhone: phone,
-    notifyUrl: `${baseUrl}/api/partner/payments/cinetpay-callback`,
-    returnUrl: `${baseUrl}/operator?certification=${reference}`,
+    phone,
+    customer: { name, email: profile?.email ?? null },
+    appUrl: (process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin).replace(/\/$/, ''),
   })
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: 502 })
 
-  if (!result.success) {
-    await admin
-      .from('partner_payment_intents')
-      .update({ status: 'failed', updated_at: new Date().toISOString() })
-      .eq('id', intent.id)
-    return NextResponse.json(
-      { error: result.error ?? 'Initialisation du paiement impossible' },
-      { status: 502 },
-    )
-  }
-
-  return NextResponse.json({ success: true, payment_url: result.paymentUrl, reference })
+  return NextResponse.json({ success: true, payment_url: result.url, reference: result.intentId })
 }

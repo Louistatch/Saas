@@ -583,7 +583,10 @@ test('U15 : nouvelle demande explicite — jamais de reprise ; reprise seulement
   assert.ok(
     grid.includes('startFresh={selectedFiche !== null && freshFicheId === selectedFiche.id}'),
   )
-  const market = readFileSync(path.join(__dirname, '..', 'app', 'marketplace', 'page.tsx'), 'utf8')
+  const market = readFileSync(
+    path.join(__dirname, '..', 'app', 'marketplace', 'marketplace-content.tsx'),
+    'utf8',
+  )
   assert.ok(market.includes("searchParams.get('nouvel_achat') === '1'"))
 })
 

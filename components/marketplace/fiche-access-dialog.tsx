@@ -928,7 +928,16 @@ export function FicheAccessDialog({
                     </Button>
                     <p className="text-center text-xs text-muted-foreground">
                       Vous validez sur votre téléphone, sans quitter cette page. Des frais
-                      d’opérateur peuvent s’ajouter.
+                      d’opérateur peuvent s’ajouter. En payant, vous acceptez les{' '}
+                      <a
+                        href="/legal/conditions#achats"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline"
+                      >
+                        conditions d’achat
+                      </a>
+                      .
                     </p>
                   </>
                 ) : null}

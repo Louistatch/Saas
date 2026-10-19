@@ -2,12 +2,16 @@
 
 import { useAuth } from '@/app/context/auth-context'
 import { AuthSidePanel } from '@/components/shared/auth-side-panel'
+import { useCaptcha } from '@/components/shared/captcha'
 import { Spinner } from '@/components/shared/loading'
 import { Logo } from '@/components/shared/logo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useGameReturn } from '@/hooks/use-game-return'
+import { safeInternalPath } from '@/lib/auth/safe-redirect'
+import { clearGameReturn, rememberedGameReturn, withGameReturn } from '@/lib/haroolife/entry'
 import { errorMessage } from '@/lib/utils/errors'
 import { hasOrgLayer, isHarooRole } from '@/lib/utils/permissions'
 import { flattenZodErrors, loginSchema } from '@/lib/validators/schemas'
@@ -31,6 +35,9 @@ import { Suspense, useCallback, useState } from 'react'
 function LoginInner() {
   const searchParams = useSearchParams()
   const { login } = useAuth()
+  // Anti-robot check (off until NEXT_PUBLIC_TURNSTILE_SITE_KEY is configured).
+  const captcha = useCaptcha()
+  const gameReturn = useGameReturn()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -48,6 +55,11 @@ function LoginInner() {
     async (e: React.FormEvent) => {
       e.preventDefault()
       if (submitting) return
+      const captchaToken = captcha.getToken()
+      if (captcha.enabled && !captchaToken) {
+        setError('Terminez la vérification anti-robot ci-dessous avant de vous connecter.')
+        return
+      }
 
       setError('')
       setUnconfirmed(false)
@@ -72,14 +84,19 @@ function LoginInner() {
 
       try {
         // SINGLE source of truth: the AuthContext.login() method.
-        const user = await login(parsed.data.email, parsed.data.password)
+        const user = await login(parsed.data.email, parsed.data.password, captchaToken)
 
         clearTimeout(progressTimer)
         clearTimeout(slowTimer)
 
         setProgress('Redirection…')
 
-        const safeRedirect = redirectTo && /^\/[^/]/.test(redirectTo) ? redirectTo : null
+        // Chemin interne uniquement : « /\evil.com » passait l'ancien contrôle et le navigateur
+        // le lit comme « //evil.com ». On résout l'adresse et on exige la même origine.
+        const safeRedirect = safeInternalPath(
+          redirectTo ?? rememberedGameReturn(),
+          window.location.origin,
+        )
         // Un professionnel Haroo ne doit jamais être renvoyé vers le dashboard
         // coopérative, même si ?redirect=/dashboard a été posé par le middleware
         // lors d'une visite déconnectée — son espace est /haroo.
@@ -115,6 +132,7 @@ function LoginInner() {
         // suspendu sur l'écran « Chargement… » si le jeton vient d'être posé ou
         // si le cache du routeur garde une redirection périmée. Un vrai
         // chargement envoie les cookies frais et repart d'un état propre.
+        clearGameReturn()
         window.location.assign(target)
       } catch (err: unknown) {
         clearTimeout(progressTimer)
@@ -122,15 +140,18 @@ function LoginInner() {
         const raw = err instanceof Error ? err.message : ''
         if (/email not confirmed/i.test(raw)) {
           setUnconfirmed(true)
-          setError('Votre adresse e-mail n’est pas encore confirmée. Ouvrez le lien reçu par e-mail.')
+          setError(
+            'Votre adresse e-mail n’est pas encore confirmée. Ouvrez le lien reçu par e-mail.',
+          )
         } else {
           setError(errorMessage(err))
         }
         setSubmitting(false)
         setProgress('')
+        captcha.reset()
       }
     },
-    [email, password, login, redirectTo, submitting],
+    [email, password, login, redirectTo, submitting, captcha],
   )
 
   return (
@@ -168,9 +189,13 @@ function LoginInner() {
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
               <ShieldCheck className="h-5 w-5 text-primary" aria-hidden="true" />
             </div>
-            <CardTitle className="text-2xl">Bon retour</CardTitle>
+            <CardTitle className="text-2xl">
+              <h1>{gameReturn ? 'Retrouvez HarooLife' : 'Bon retour'}</h1>
+            </CardTitle>
             <CardDescription>
-              Connectez-vous pour retrouver votre espace personnel FaîtiereHub.
+              {gameReturn
+                ? 'Utilisez votre compte FaîtiereHub habituel. Vous reviendrez ensuite à HarooLife.'
+                : 'Connectez-vous pour retrouver votre espace personnel FaîtiereHub.'}
             </CardDescription>
           </CardHeader>
 
@@ -184,7 +209,10 @@ function LoginInner() {
                   {error}
                   {unconfirmed && (
                     <Link
-                      href={`/auth/verify-email?email=${encodeURIComponent(email.trim())}`}
+                      href={withGameReturn(
+                        `/auth/verify-email?email=${encodeURIComponent(email.trim())}`,
+                        gameReturn,
+                      )}
                       className="mt-1 block font-medium underline"
                     >
                       Renvoyer l’e-mail de confirmation
@@ -222,7 +250,7 @@ function LoginInner() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <Label htmlFor="password">Mot de passe</Label>
                   <Link
-                    href="/auth/forgot-password"
+                    href={withGameReturn('/auth/forgot-password', gameReturn)}
                     className="text-xs text-primary hover:underline"
                   >
                     Mot de passe oublié ?
@@ -262,10 +290,11 @@ function LoginInner() {
                 )}
               </div>
 
+              {captcha.box}
               <Button
                 type="submit"
                 className="h-12 w-full bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
-                disabled={submitting}
+                disabled={submitting || !captcha.ready}
               >
                 {submitting ? <Spinner className="h-4 w-4" /> : null}
                 {submitting ? progress || 'Connexion…' : 'Se connecter'}
@@ -274,7 +303,10 @@ function LoginInner() {
 
             <p className="mt-6 text-center text-sm text-muted-foreground">
               Vous n&apos;avez pas de compte ?{' '}
-              <Link href="/auth/signup" className="text-primary hover:underline font-medium">
+              <Link
+                href={withGameReturn('/auth/signup', gameReturn)}
+                className="text-primary hover:underline font-medium"
+              >
                 S&apos;inscrire
               </Link>
             </p>

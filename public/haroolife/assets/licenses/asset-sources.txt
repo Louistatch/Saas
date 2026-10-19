@@ -1,0 +1,31 @@
+Reused 3D assets — source and licensing
+
+Character models: Quaternius Ultimate Modular Men Pack and Ultimate Modular Women Pack, CC0 1.0.
+Primary source: https://quaternius.com/packs/ultimatemodularcharacters.html
+Primary source: https://quaternius.com/packs/ultimatemodularwomen.html
+Public optimized GLB mirror: https://github.com/martian56/ufazien/tree/main/frontend/public/avatars
+Mirror conversion provenance: https://github.com/martian56/ufazien/blob/main/frontend/scripts/build-avatars.mjs
+Models include original Idle, Idle_Neutral, Interact, Run, Walk, Wave clips, with no textures or decoder dependency.
+
+Furniture: Kenney Furniture Kit, Creative Commons CC0.
+https://kenney.nl/assets/furniture-kit
+
+Vehicles: Kenney Car Kit, Creative Commons CC0.
+https://kenney.nl/assets/car-kit
+Vehicles reference the included Textures/colormap.png.
+
+CC0 license: https://creativecommons.org/publicdomain/zero/1.0/
+Models are reusable open assets, not proprietary Lagos Life source or extracted game assets.
+
+Daily sitting animations: Quaternius Universal Animation Library Standard (free CC0).
+https://quaternius.itch.io/universal-animation-library
+Sitting_Enter, Sitting_Idle_Loop, Sitting_Exit, Sitting_Talking_Loop retargeted onto the
+existing four adult GLBs. Source licence: quaternius-UAL-CC0.txt.
+Rebuild script and provenance: docs/haroolife-daily-interactions.md.
+Meals are authored on the same rigs; original meshes, materials and locomotion clips remain.
+Sleeping, washing and toilet gestures are authored the same way at load time
+(lib/haroolife/game/render/daily-animations.ts): no external clip.
+
+Furniture lome-*.glb (furniture/): HarooLife's own models, made with
+tools/blender/haroolife_furniture.py (TV and stand, standing fan, plastic chair and table,
+column speaker, generator, wardrobe, chest freezer). Plain colours, no texture.

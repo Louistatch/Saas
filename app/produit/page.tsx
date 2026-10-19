@@ -1,5 +1,7 @@
+import { HarooCardSpecimen } from '@/components/marketing/haroo-card-specimen'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
 import { Button } from '@/components/ui/button'
+import { publicPageMetadata } from '@/lib/seo'
 import {
   ArrowRight,
   BarChart3,
@@ -18,14 +20,9 @@ import {
   Users,
   Zap,
 } from 'lucide-react'
-import type { Metadata } from 'next'
 import Link from 'next/link'
 
-export const metadata: Metadata = {
-  title: 'Produit — FaîtiereHub | Plateforme tout-en-un pour faîtières agricoles',
-  description:
-    "Découvrez FaîtiereHub : gestion des membres, cartes numériques, comptes d'exploitation, AgriMarket, AgriCredit, AgriAcademy et l'écosystème Haroo.",
-}
+export const metadata = publicPageMetadata('/produit')
 
 const CORE = [
   {
@@ -131,7 +128,7 @@ const ADVANCED = [
     icon: GraduationCap,
     title: 'AgriAcademy',
     description:
-      'Modules de formation certifiante pour vos membres — irrigation FAO-56, pratiques culturales, agrobusiness et bonnes pratiques terrain.',
+      'Formation certifiante des Opérateurs de terrain : 12 leçons, quiz, cas pratiques corrigés par l’équipe et évaluation pratique.',
   },
   {
     icon: Users,
@@ -333,12 +330,9 @@ export default function ProduitPage() {
                 </p>
                 {/* Carte réelle, rendue par le moteur de cartes : la liste de
                     préfixes seule ne dit pas à quoi ressemble une carte. */}
-                <img
-                  src="/api/haroo/card/preview?type=OUVRIER"
+                <HarooCardSpecimen
+                  type="OUVRIER"
                   alt="Spécimen de carte professionnelle Haroo"
-                  width={1180}
-                  height={740}
-                  loading="lazy"
                   className="w-full rounded-lg border border-border shadow-sm"
                 />
                 <div className="space-y-2 text-left">

@@ -14,6 +14,8 @@ import { effectiveHarooType } from '@/lib/utils/permissions'
 
 export interface AccessContext {
   userId: string
+  /** A HarooLife visitor (only with `allowVisitor`). */
+  isVisitor: boolean
   role: UserRole
   harooType: HarooType | null
   cooperativeId: string | null
@@ -25,10 +27,19 @@ export interface AccessContext {
  * Authenticate the current request and return the user's access context.
  * Returns null if not authenticated.
  */
-export async function getAccessContext(): Promise<AccessContext | null> {
+export async function getAccessContext(
+  opts: {
+    /**
+     * Also accept a HarooLife visitor (anonymous account, no e-mail). Only the game's own
+     * endpoints pass it: for the rest of FaîtiereHub a visitor is signed out.
+     */
+    allowVisitor?: boolean
+  } = {},
+): Promise<AccessContext | null> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
+  if (user.is_anonymous && !opts.allowVisitor) return null
 
   // `profiles` est la seule source de vérité pour l'autorisation. Les claims
   // du JWT ne servent qu'au routage côté edge : ils peuvent être périmés
@@ -54,6 +65,7 @@ export async function getAccessContext(): Promise<AccessContext | null> {
 
   return {
     userId: user.id,
+    isVisitor: !!user.is_anonymous,
     role: profile.role as AccessContext['role'],
     harooType: effectiveHarooType(
       profile.role as UserRole,

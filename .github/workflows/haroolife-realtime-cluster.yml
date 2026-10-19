@@ -1,0 +1,50 @@
+name: HarooLife distributed relay
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'realtime/**'
+      - 'lib/haroolife/realtime/**'
+      - 'tests/haroolife-realtime-*'
+      - 'tests/helpers/realtime-fixture.ts'
+      - 'package*.json'
+      - '.github/workflows/haroolife-realtime-cluster.yml'
+  pull_request:
+    paths:
+      - 'realtime/**'
+      - 'lib/haroolife/realtime/**'
+      - 'tests/haroolife-realtime-*'
+      - 'tests/helpers/realtime-fixture.ts'
+      - 'package*.json'
+      - '.github/workflows/haroolife-realtime-cluster.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: realtime-cluster-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  cluster:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      redis:
+        image: redis:7.4.8-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run realtime:build
+      - name: Two workers, real Redis, SQL/RLS, crash leases and private conversations
+        run: npm run test:realtime:cluster
+        env:
+          HAROOLIFE_TEST_REDIS_URL: redis://127.0.0.1:6379

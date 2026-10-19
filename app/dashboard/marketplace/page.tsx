@@ -37,6 +37,7 @@ import {
   dashboardPriceLabel,
   memberFreeBadge,
 } from '@/lib/fiches/member-label'
+import { FAITIERE_PUBLISHING } from '@/lib/fiches/publishing'
 import { FICHE_LIMITS } from '@/lib/fiches/schema'
 import {
   TYPES_AGRICULTURE as TYPES_AGRICULTURE_LABELS,
@@ -603,7 +604,12 @@ export default function MarketplacePage() {
     if (viewMode === 'locality') fetchLocalityFiches()
   }
 
-  const isAdmin = user?.role === 'super_admin' || currentCooperative?.level === 'faitiere'
+  // Publication des comptes d'exploitation : super_admin seulement depuis le 11/10 (40c06ee,
+  // RLS operator_only_issuance appliquée) ; le parcours faîtière reste derrière
+  // FAITIERE_PUBLISHING (lib/fiches/publishing.ts).
+  const isAdmin =
+    user?.role === 'super_admin' ||
+    (FAITIERE_PUBLISHING && currentCooperative?.level === 'faitiere')
   // POST /api/fiches rattache la fiche à l'organisation de l'AUTEUR, jamais à
   // la faîtière sélectionnée : un super-admin charge donc les comptes vendus
   // par FaîtiereHub dans l'administration, où ils apparaissent.

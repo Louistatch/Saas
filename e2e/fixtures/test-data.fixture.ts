@@ -1,9 +1,9 @@
 import { test as base } from '@playwright/test'
 import {
-  createTestMember,
-  createTestCard,
-  createExpiredTestCard,
   cleanupTestData,
+  createExpiredTestCard,
+  createTestCard,
+  createTestMember,
   getCooperativeForUser,
 } from '../helpers/supabase.helper'
 

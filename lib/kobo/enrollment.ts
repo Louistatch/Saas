@@ -10,15 +10,13 @@
  */
 import 'server-only'
 
-import { createClient } from '@/lib/supabase/admin'
-import { createLogger } from '@/lib/utils/logger'
+import { ORG_MATCH, ORG_REVIEW, bestOrganizationMatch, samePerson } from '@/lib/dedup/names'
 import { isAllowedKoboAttachmentUrl } from '@/lib/kobo/attachment-url'
 import { processPhotoFaceCrop } from '@/lib/photos/process-photo'
-import {
-  cooperativeNameSchema,
-  escapeIlike,
-} from '@/lib/validators/kobo'
+import { createClient } from '@/lib/supabase/admin'
 import { cardPrefix, generateUniqueCardNumber } from '@/lib/utils/card-number'
+import { createLogger } from '@/lib/utils/logger'
+import { cooperativeNameSchema, escapeIlike } from '@/lib/validators/kobo'
 
 const log = createLogger('kobo:enrollment')
 
@@ -26,20 +24,13 @@ const log = createLogger('kobo:enrollment')
 // Internal helpers
 // =========================================================
 
-function getPayloadField(
-  payload: Record<string, unknown>,
-  path: string,
-): string | null {
+function getPayloadField(payload: Record<string, unknown>, path: string): string | null {
   if (path in payload && typeof payload[path] === 'string') {
     return (payload[path] as string).trim()
   }
   for (const [key, value] of Object.entries(payload)) {
     if (key === path && typeof value === 'string') return value.trim()
-    if (
-      key.endsWith(`/${path.split('/').pop()}`) &&
-      typeof value === 'string'
-    )
-      return value.trim()
+    if (key.endsWith(`/${path.split('/').pop()}`) && typeof value === 'string') return value.trim()
   }
   return null
 }
@@ -57,41 +48,19 @@ export async function enrollNewMemberFromSubmission(
   const supabase = createClient()
 
   const prenomField =
-    getPayloadField(payload, 'S1/prenom') ??
-    getPayloadField(payload, 'prenom') ??
-    ''
-  const nomField =
-    getPayloadField(payload, 'S1/nom') ??
-    getPayloadField(payload, 'nom') ??
-    ''
+    getPayloadField(payload, 'S1/prenom') ?? getPayloadField(payload, 'prenom') ?? ''
+  const nomField = getPayloadField(payload, 'S1/nom') ?? getPayloadField(payload, 'nom') ?? ''
   const nomCompletField =
-    getPayloadField(payload, 'S1/nom_complet') ??
-    getPayloadField(payload, 'nom_complet') ??
-    ''
+    getPayloadField(payload, 'S1/nom_complet') ?? getPayloadField(payload, 'nom_complet') ?? ''
   const telephone =
-    getPayloadField(payload, 'S1/telephone') ??
-    getPayloadField(payload, 'telephone') ??
-    ''
-  const email =
-    getPayloadField(payload, 'S1/email') ??
-    getPayloadField(payload, 'email') ??
-    null
-  const region =
-    getPayloadField(payload, 'S3/region') ??
-    getPayloadField(payload, 'region') ??
-    null
+    getPayloadField(payload, 'S1/telephone') ?? getPayloadField(payload, 'telephone') ?? ''
+  const email = getPayloadField(payload, 'S1/email') ?? getPayloadField(payload, 'email') ?? null
+  const region = getPayloadField(payload, 'S3/region') ?? getPayloadField(payload, 'region') ?? null
   const prefecture =
-    getPayloadField(payload, 'S3/prefecture') ??
-    getPayloadField(payload, 'prefecture') ??
-    null
-  const canton =
-    getPayloadField(payload, 'S3/canton') ??
-    getPayloadField(payload, 'canton') ??
-    null
+    getPayloadField(payload, 'S3/prefecture') ?? getPayloadField(payload, 'prefecture') ?? null
+  const canton = getPayloadField(payload, 'S3/canton') ?? getPayloadField(payload, 'canton') ?? null
   const village =
-    getPayloadField(payload, 'S3/village') ??
-    getPayloadField(payload, 'village') ??
-    null
+    getPayloadField(payload, 'S3/village') ?? getPayloadField(payload, 'village') ?? null
   const nomCooperative =
     getPayloadField(payload, 'S2/nom_cooperative') ??
     getPayloadField(payload, 'nom_cooperative') ??
@@ -128,41 +97,41 @@ export async function enrollNewMemberFromSubmission(
   if (nomCooperative) {
     const parsedName = cooperativeNameSchema.safeParse(nomCooperative)
     if (parsedName.success) {
-      const safeName = escapeIlike(parsedName.data)
-
-      const { data: accessible } = await supabase.rpc(
-        'get_cooperative_descendants',
-        { p_root_id: faitiereId },
-      )
+      const { data: accessible } = await supabase.rpc('get_cooperative_descendants', {
+        p_root_id: faitiereId,
+      })
       const allowedIds: string[] = Array.isArray(accessible)
         ? (accessible as { id: string }[]).map((r) => r.id)
         : [faitiereId]
 
-      // Try exact ILIKE match first, then fall back to unaccented/normalized comparison
+      // Rapprochement intelligent (accents, graphies locales ou/w, mots génériques, nom court
+      // contenu dans un nom long) : « Kpelouwai » retrouve « Espoir de Kpèlèwouaï » au lieu
+      // d'en créer une troisième. Sous le seuil, on crée, et la page Doublons le signale.
       let coop: { id: string } | null = null
-      const { data: ilikeCoop } = await supabase
+      const { data: allCoops } = await supabase
         .from('cooperatives')
-        .select('id')
-        .ilike('name', `%${safeName}%`)
+        .select('id, name')
         .in('id', allowedIds)
-        .limit(1)
-        .maybeSingle()
-      coop = ilikeCoop
-
-      if (!coop) {
-        // Normalize: strip accents, lowercase, keep only alphanum
-        const normalize = (s: string) =>
-          s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
-        const normalizedInput = normalize(parsedName.data)
-
-        const { data: allCoops } = await supabase
-          .from('cooperatives')
-          .select('id, name')
-          .in('id', allowedIds)
-
-        coop = (allCoops as { id: string; name: string }[] | null)?.find((c) =>
-          normalize(c.name).includes(normalizedInput) || normalizedInput.includes(normalize(c.name)),
-        ) ?? null
+        .is('deleted_at', null)
+      const best = bestOrganizationMatch(
+        parsedName.data,
+        (allCoops as { id: string; name: string }[] | null) ?? [],
+      )
+      if (best && best.score >= ORG_MATCH) {
+        coop = best.item
+        if (best.item.name !== parsedName.data) {
+          log.info('Cooperative matched by name similarity', {
+            input: parsedName.data,
+            matched: best.item.name,
+            score: Number(best.score.toFixed(2)),
+          })
+        }
+      } else if (best && best.score >= ORG_REVIEW) {
+        log.warn('Possible duplicate cooperative created', {
+          input: parsedName.data,
+          closest: best.item.name,
+          score: Number(best.score.toFixed(2)),
+        })
       }
 
       if (coop) {
@@ -187,8 +156,8 @@ export async function enrollNewMemberFromSubmission(
             .eq('level', 'union')
             .eq('parent_id', faitiereId)
           if (unions) {
-            const match = (unions as { id: string; name: string }[]).find(
-              (u) => u.name.toLowerCase().includes(region.toLowerCase()),
+            const match = (unions as { id: string; name: string }[]).find((u) =>
+              u.name.toLowerCase().includes(region.toLowerCase()),
             )
             if (match) parentUnionId = match.id
           }
@@ -286,7 +255,10 @@ export async function enrollNewMemberFromSubmission(
         contentType: `image/${ext}`,
         upsert: true,
       })
-      if (error) { log.warn(`${bucket} upload failed`, { error: error.message }); return null }
+      if (error) {
+        log.warn(`${bucket} upload failed`, { error: error.message })
+        return null
+      }
       return supabase.storage.from(bucket).getPublicUrl(path).data?.publicUrl ?? null
     } catch (e) {
       log.warn(`${bucket} download failed`, { error: String(e) })
@@ -306,8 +278,51 @@ export async function enrollNewMemberFromSubmission(
 
   const [photoUrl, signatureUrl] = await Promise.all([
     downloadAttachment('S1/photo_membre', photoFilename, 'member-photos', 'member-photos'),
-    downloadAttachment('S7/signature_membre', signatureFilename, 'member-signatures', 'member-signatures'),
+    downloadAttachment(
+      'S7/signature_membre',
+      signatureFilename,
+      'member-signatures',
+      'member-signatures',
+    ),
   ])
+
+  // ── Même personne déjà inscrite ? (renvoi du formulaire, prénom et nom inversés) ──
+  const { data: coopMembers } = await supabase
+    .from('members')
+    .select('id, first_name, last_name, phone, date_of_birth')
+    .eq('cooperative_id', targetCooperativeId)
+    .is('deleted_at', null)
+  const candidate = {
+    first_name: firstName,
+    last_name: lastName,
+    phone: telephone,
+    date_of_birth: dateNaissance,
+  }
+  const existing =
+    (
+      coopMembers as
+        | {
+            id: string
+            first_name: string | null
+            last_name: string | null
+            phone: string | null
+            date_of_birth: string | null
+          }[]
+        | null
+    )?.find((m) => samePerson(candidate, m).same) ?? null
+  if (existing) {
+    await reuseExistingMember(supabase, submissionId, existing.id, targetCooperativeId, {
+      photo_url: photoUrl,
+      signature_url: signatureUrl,
+      email,
+      date_of_birth: dateNaissance,
+      village,
+      canton,
+      prefecture,
+      region,
+    })
+    return
+  }
 
   // ── Create member ───────────────────────────────────────────
   const { data: newMember, error: memberError } = await supabase
@@ -335,32 +350,32 @@ export async function enrollNewMemberFromSubmission(
     .single()
 
   if (memberError || !newMember) {
-    throw new Error(
-      `Failed to create member: ${memberError?.message ?? 'Unknown'}`,
-    )
+    throw new Error(`Failed to create member: ${memberError?.message ?? 'Unknown'}`)
   }
 
   // ── Face-crop photo async (non-blocking — update photo_url if successful) ──
   if (photoUrl) {
-    processPhotoFaceCrop(photoUrl, newMember.id).then((faceUrl) => {
-      if (faceUrl && faceUrl !== photoUrl) {
-        supabase
-          .from('members')
-          .update({
-            photo_url: faceUrl,
-            // Keep the source. Without it a later change of crop geometry can
-            // only re-crop the crop — which is exactly how the 1:1 → 7:9 switch
-            // left every existing photo unrepairable.
-            photo_original_url: photoUrl,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', newMember.id)
-          .then(({ error }) => {
-            if (error) log.warn('Face-crop photo_url update failed', { error: error.message })
-            else log.info('Face-crop applied', { memberId: newMember.id })
-          })
-      }
-    }).catch((e) => log.warn('Face-crop processing error', { error: String(e) }))
+    processPhotoFaceCrop(photoUrl, newMember.id)
+      .then((faceUrl) => {
+        if (faceUrl && faceUrl !== photoUrl) {
+          supabase
+            .from('members')
+            .update({
+              photo_url: faceUrl,
+              // Keep the source. Without it a later change of crop geometry can
+              // only re-crop the crop — which is exactly how the 1:1 → 7:9 switch
+              // left every existing photo unrepairable.
+              photo_original_url: photoUrl,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', newMember.id)
+            .then(({ error }) => {
+              if (error) log.warn('Face-crop photo_url update failed', { error: error.message })
+              else log.info('Face-crop applied', { memberId: newMember.id })
+            })
+        }
+      })
+      .catch((e) => log.warn('Face-crop processing error', { error: String(e) }))
   }
 
   // ── Generate card ───────────────────────────────────────────
@@ -388,12 +403,8 @@ export async function enrollNewMemberFromSubmission(
   // ── Insert parcelles (S5 repeat group) ─────────────────────
   const parcelles = (payload.S5 ?? []) as Array<Record<string, unknown>>
   for (const p of parcelles) {
-    const culture = String(
-      p['S5/culture_principale'] ?? p.culture_principale ?? '',
-    )
-    const surface = Number.parseFloat(
-      String(p['S5/superficie_ha'] ?? p.superficie_ha ?? '0'),
-    )
+    const culture = String(p['S5/culture_principale'] ?? p.culture_principale ?? '')
+    const surface = Number.parseFloat(String(p['S5/superficie_ha'] ?? p.superficie_ha ?? '0'))
     const typeSol = String(p['S5/type_sol'] ?? p.type_sol ?? '')
     const irrigation = String(p['S5/irrigation'] ?? p.irrigation ?? '')
     if (culture && surface > 0) {
@@ -426,15 +437,9 @@ export async function enrollNewMemberFromSubmission(
   // ── Insert productions (S6 repeat group) ───────────────────
   const productions = (payload.S6 ?? []) as Array<Record<string, unknown>>
   for (const p of productions) {
-    const culture = String(
-      p['S6/culture_produite'] ?? p.culture_produite ?? '',
-    )
-    const quantity = Number.parseFloat(
-      String(p['S6/rendement_kg'] ?? p.rendement_kg ?? '0'),
-    )
-    const campagne = String(
-      p['S6/campagne_annee'] ?? p.campagne_annee ?? '',
-    )
+    const culture = String(p['S6/culture_produite'] ?? p.culture_produite ?? '')
+    const quantity = Number.parseFloat(String(p['S6/rendement_kg'] ?? p.rendement_kg ?? '0'))
+    const campagne = String(p['S6/campagne_annee'] ?? p.campagne_annee ?? '')
     if (culture && quantity > 0) {
       const { error } = await supabase.from('productions').insert({
         member_id: newMember.id,
@@ -491,18 +496,21 @@ export async function enrollNewMemberFromSubmission(
       .replace(/{card_number}/g, cardNumber)
 
     if (body) {
-      await supabase.from('notification_queue').insert({
-        member_id: newMember.id,
-        cooperative_id: targetCooperativeId,
-        channel: 'sms',
-        template_key: 'enrollment_welcome',
-        recipient_phone: telephone.trim(),
-        variables: { prenom: firstName, card_number: cardNumber },
-        body_rendered: body,
-        scheduled_at: new Date().toISOString(),
-      }).then(({ error }) => {
-        if (error) log.warn('Welcome SMS queue failed', { error: error.message })
-      })
+      await supabase
+        .from('notification_queue')
+        .insert({
+          member_id: newMember.id,
+          cooperative_id: targetCooperativeId,
+          channel: 'sms',
+          template_key: 'enrollment_welcome',
+          recipient_phone: telephone.trim(),
+          variables: { prenom: firstName, card_number: cardNumber },
+          body_rendered: body,
+          scheduled_at: new Date().toISOString(),
+        })
+        .then(({ error }) => {
+          if (error) log.warn('Welcome SMS queue failed', { error: error.message })
+        })
     }
   }
 
@@ -517,6 +525,62 @@ export async function enrollNewMemberFromSubmission(
 // =========================================================
 // Create or update a cooperative from a registration form
 // =========================================================
+/**
+ * La soumission concerne une personne déjà inscrite : on complète sa fiche (sans écraser), on
+ * garde sa carte, et on ne recrée ni membre, ni carte, ni parcelles. La soumission est marquée
+ * rattachée pour garder la trace.
+ */
+async function reuseExistingMember(
+  supabase: ReturnType<typeof createClient>,
+  submissionId: string,
+  memberId: string,
+  cooperativeId: string,
+  fill: Record<string, string | null | undefined>,
+): Promise<void> {
+  const { data: current } = await supabase
+    .from('members')
+    .select('photo_url, signature_url, email, date_of_birth, village, canton, prefecture, region')
+    .eq('id', memberId)
+    .single()
+  const patch: Record<string, string> = {}
+  for (const [key, value] of Object.entries(fill)) {
+    if (value && !(current as Record<string, unknown> | null)?.[key]) patch[key] = value
+  }
+  if (Object.keys(patch).length > 0) {
+    await supabase
+      .from('members')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', memberId)
+  }
+  const { data: card } = await supabase
+    .from('member_cards')
+    .select('card_number')
+    .eq('member_id', memberId)
+    .eq('status', 'active')
+    .maybeSingle()
+  await supabase
+    .from('kobo_submissions')
+    .update({
+      status: 'matched' as const,
+      member_id: memberId,
+      member_card_number: card?.card_number ?? null,
+      matched_at: new Date().toISOString(),
+      processed_at: new Date().toISOString(),
+      processed_payload: {
+        mode: 'existing_member',
+        member_id: memberId,
+        cooperative_id: cooperativeId,
+        filled: Object.keys(patch),
+      } as unknown as Record<string, unknown>,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', submissionId)
+  log.info('Submission attached to an existing member (duplicate avoided)', {
+    memberId,
+    filled: Object.keys(patch),
+  })
+}
+
 export async function processCooperativeRegistration(
   submissionId: string,
   faitiereId: string,
@@ -555,13 +619,8 @@ export async function processCooperativeRegistration(
     getPayloadField(payload, 'nom_union_parente') ??
     null
   const description =
-    getPayloadField(payload, 'C1/description') ??
-    getPayloadField(payload, 'description') ??
-    null
-  const region =
-    getPayloadField(payload, 'C2/region') ??
-    getPayloadField(payload, 'region') ??
-    null
+    getPayloadField(payload, 'C1/description') ?? getPayloadField(payload, 'description') ?? null
+  const region = getPayloadField(payload, 'C2/region') ?? getPayloadField(payload, 'region') ?? null
 
   const { data: faitiereData } = await supabase
     .from('cooperatives')
@@ -569,8 +628,7 @@ export async function processCooperativeRegistration(
     .eq('id', faitiereId)
     .maybeSingle()
 
-  const faitiereName =
-    faitiereData?.faitiere_name ?? faitiereData?.name ?? ''
+  const faitiereName = faitiereData?.faitiere_name ?? faitiereData?.name ?? ''
 
   let parentId: string | null = null
   if (niveau === 'union') {
@@ -593,9 +651,7 @@ export async function processCooperativeRegistration(
         .eq('level', 'union')
         .eq('faitiere_name', faitiereName)
       const typedUnions = (unions ?? []) as { id: string; name: string }[]
-      const match = typedUnions.find((u) =>
-        u.name.toLowerCase().includes(region.toLowerCase()),
-      )
+      const match = typedUnions.find((u) => u.name.toLowerCase().includes(region.toLowerCase()))
       parentId = match?.id ?? faitiereId
     } else {
       parentId = faitiereId
@@ -615,13 +671,17 @@ export async function processCooperativeRegistration(
     return
   }
 
-  const { data: existing } = await supabase
+  // Même faîtière et nom proche (graphie, accents, mots génériques) : c'est la même organisation.
+  const { data: sameFaitiere } = await supabase
     .from('cooperatives')
-    .select('id')
-    .ilike('name', escapeIlike(parsedNom.data))
+    .select('id, name')
     .eq('faitiere_name', faitiereName)
-    .limit(1)
-    .maybeSingle()
+    .is('deleted_at', null)
+  const closest = bestOrganizationMatch(
+    parsedNom.data,
+    (sameFaitiere as { id: string; name: string }[] | null) ?? [],
+  )
+  const existing = closest && closest.score >= ORG_MATCH ? closest.item : null
 
   let coopId: string
   if (existing) {
@@ -649,9 +709,7 @@ export async function processCooperativeRegistration(
       .single()
 
     if (coopError || !newCoop) {
-      throw new Error(
-        `Échec création coopérative : ${coopError?.message ?? 'Inconnu'}`,
-      )
+      throw new Error(`Échec création coopérative : ${coopError?.message ?? 'Inconnu'}`)
     }
     coopId = newCoop.id
     log.info('Nouvelle coopérative créée via KoboCollect', {

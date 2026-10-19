@@ -58,7 +58,7 @@ Visit `/demo` to see all demo credentials and test accounts.
 ### 2. Login with Demo Account
 ```
 Email: admin@demo.local
-Password: Demo123!SuperAdmin
+Password: <secret retiré — voir gestionnaire de mots de passe>
 ```
 
 ### 3. Explore Features
@@ -225,12 +225,12 @@ export function MyComponent() {
 
 | Email | Password | Role | Cooperative |
 |-------|----------|------|-------------|
-| admin@demo.local | Demo123!SuperAdmin | super_admin | All |
-| coop-admin@demo.local | Demo123!CoopAdmin | cooperative_admin | Nord |
-| fermes-admin@demo.local | Demo123!FarmesAdmin | cooperative_admin | Fermes |
-| member1@demo.local | Demo123!Member1 | member | Nord |
-| member2@demo.local | Demo123!Member2 | member | Fermes |
-| guest@demo.local | Demo123!Guest | guest | None |
+| admin@demo.local | <secret retiré — voir gestionnaire de mots de passe> | super_admin | All |
+| coop-admin@demo.local | <secret retiré — voir gestionnaire de mots de passe> | cooperative_admin | Nord |
+| fermes-admin@demo.local | <secret retiré — voir gestionnaire de mots de passe> | cooperative_admin | Fermes |
+| member1@demo.local | <secret retiré — voir gestionnaire de mots de passe> | member | Nord |
+| member2@demo.local | <secret retiré — voir gestionnaire de mots de passe> | member | Fermes |
+| guest@demo.local | <secret retiré — voir gestionnaire de mots de passe> | guest | None |
 
 ### Testing Multi-Tenancy
 1. Login as `coop-admin@demo.local` (Nord)

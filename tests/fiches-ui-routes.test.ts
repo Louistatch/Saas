@@ -89,7 +89,7 @@ test('POST /api/fiches : brouillon accepté → id et dossier (cooperative_id) r
   assert.equal(fiche.culture, 'Mais')
 })
 
-test('POST /api/fiches : refus de la RLS (faîtière) → 403 clair, pas un 500 muet', async () => {
+test('POST /api/fiches : faîtière refusée (publication fermée ou RLS) → 403 clair, pas un 500 muet', async () => {
   state.ctx = {
     userId: 'u-f',
     role: 'cooperative_admin',

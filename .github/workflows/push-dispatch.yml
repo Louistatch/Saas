@@ -1,0 +1,16 @@
+# Expédie les alertes de la console de validation créées hors du site (ex. inscriptions
+# d'agronomes via AgriTogo). Les actions faites sur le site les envoient immédiatement.
+# La route n'accepte aucune donnée : elle envoie une seule fois les alertes déjà en base.
+name: Alertes console (planifié)
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+permissions: {}
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Envoyer les alertes en attente
+        run: curl -fsSL --max-redirs 3 --proto '=https' --proto-redir '=https' -m 30 -X POST https://faitierehub.com/api/push/dispatch

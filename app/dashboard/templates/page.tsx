@@ -1,20 +1,37 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useAuth } from '@/app/context/auth-context'
+import { useCooperative } from '@/app/context/cooperative-context'
+import { useConfirm } from '@/components/shared/confirm-dialog'
+import { EmptyState } from '@/components/shared/empty-state'
+import { LoadingBlock, Spinner } from '@/components/shared/loading'
+import { PageHeader } from '@/components/shared/page-header'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Upload, Download, Trash2, FileSpreadsheet, FileText, File, FolderOpen } from 'lucide-react'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { createClient } from '@/lib/supabase/client'
-import { useCooperative } from '@/app/context/cooperative-context'
 import { useToast } from '@/hooks/use-toast'
-import { LoadingBlock, Spinner } from '@/components/shared/loading'
-import { EmptyState } from '@/components/shared/empty-state'
-import { PageHeader } from '@/components/shared/page-header'
-import { useConfirm } from '@/components/shared/confirm-dialog'
+import { createClient } from '@/lib/supabase/client'
 import { errorMessage } from '@/lib/utils/errors'
+import {
+  Download,
+  File,
+  FileSpreadsheet,
+  FileText,
+  FolderOpen,
+  Plus,
+  Trash2,
+  Upload,
+} from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 interface Template {
   id: string
@@ -31,14 +48,14 @@ interface Template {
 }
 
 const CATEGORIES = [
-  { value: 'compte_exploitation', label: '📊 Compte d\'exploitation', icon: FileSpreadsheet },
+  { value: 'compte_exploitation', label: "📊 Compte d'exploitation", icon: FileSpreadsheet },
   { value: 'itineraire_technique', label: '📄 Itinéraire technique', icon: FileText },
   { value: 'fiche_suivi', label: '📋 Fiche de suivi', icon: File },
   { value: 'rapport', label: '📑 Rapport', icon: File },
   { value: 'autre', label: '📎 Autre', icon: File },
 ]
 
-export default function TemplatesPage() {
+function TemplatesLibrary() {
   const { currentCooperative } = useCooperative()
   const { toast } = useToast()
   const { confirm, confirmNode } = useConfirm()
@@ -58,7 +75,12 @@ export default function TemplatesPage() {
     category: 'compte_exploitation',
     culture: '',
   })
-  const [pendingFile, setPendingFile] = useState<{ name: string; path: string; type: string; size: number } | null>(null)
+  const [pendingFile, setPendingFile] = useState<{
+    name: string
+    path: string
+    type: string
+    size: number
+  } | null>(null)
 
   const fetchTemplates = useCallback(async () => {
     if (!currentCooperative) {
@@ -67,9 +89,7 @@ export default function TemplatesPage() {
     }
     setIsLoading(true)
 
-    let query = supabase
-      .from('templates')
-      .select('*')
+    let query = supabase.from('templates').select('*')
 
     // For faitiere/union: load templates from all child cooperatives
     if (currentCooperative.level === 'faitiere' || currentCooperative.level === 'union') {
@@ -77,13 +97,13 @@ export default function TemplatesPage() {
         .from('cooperatives')
         .select('id')
         .or(`id.eq.${currentCooperative.id},parent_id.eq.${currentCooperative.id}`)
-      const childIds = (childCoops ?? []).map(c => c.id)
+      const childIds = (childCoops ?? []).map((c) => c.id)
       if (childIds.length > 0) {
         const { data: grandChildCoops } = await supabase
           .from('cooperatives')
           .select('id')
           .in('parent_id', childIds)
-        const allIds = [...new Set([...childIds, ...(grandChildCoops ?? []).map(c => c.id)])]
+        const allIds = [...new Set([...childIds, ...(grandChildCoops ?? []).map((c) => c.id)])]
         query = query.in('cooperative_id', allIds)
       } else {
         query = query.eq('cooperative_id', currentCooperative.id)
@@ -101,7 +121,9 @@ export default function TemplatesPage() {
     setIsLoading(false)
   }, [currentCooperative, supabase, toast])
 
-  useEffect(() => { fetchTemplates() }, [fetchTemplates])
+  useEffect(() => {
+    fetchTemplates()
+  }, [fetchTemplates])
 
   // Upload file
   const handleFileSelect = async (file: globalThis.File) => {
@@ -171,7 +193,10 @@ export default function TemplatesPage() {
       a.click()
 
       // Increment counter
-      await supabase.from('templates').update({ download_count: template.download_count + 1 }).eq('id', template.id)
+      await supabase
+        .from('templates')
+        .update({ download_count: template.download_count + 1 })
+        .eq('id', template.id)
       toast({ title: 'Téléchargement lancé', description: template.file_name })
     } catch (err) {
       toast({ title: 'Erreur', description: errorMessage(err), variant: 'destructive' })
@@ -195,7 +220,8 @@ export default function TemplatesPage() {
   }
 
   const fileIcon = (type: string) => {
-    if (type === 'xlsx' || type === 'xls') return <FileSpreadsheet className="h-8 w-8 text-green-600" />
+    if (type === 'xlsx' || type === 'xls')
+      return <FileSpreadsheet className="h-8 w-8 text-green-600" />
     if (type === 'docx' || type === 'doc') return <FileText className="h-8 w-8 text-blue-600" />
     if (type === 'pdf') return <File className="h-8 w-8 text-red-600" />
     return <File className="h-8 w-8 text-gray-500" />
@@ -241,7 +267,10 @@ export default function TemplatesPage() {
               title="Aucun template"
               description="Uploadez vos modèles vierges (Excel, DOCX) pour ne jamais les perdre. Vous pourrez les re-télécharger à tout moment."
               action={
-                <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setShowAdd(true)}>
+                <Button
+                  className="gap-2 bg-primary hover:bg-primary/90"
+                  onClick={() => setShowAdd(true)}
+                >
                   <Upload className="h-4 w-4" />
                   Ajouter votre premier template
                 </Button>
@@ -274,10 +303,14 @@ export default function TemplatesPage() {
                         <p className="text-xs text-muted-foreground">
                           {template.file_name} • {formatSize(template.file_size)}
                           {template.culture ? ` • ${template.culture}` : ''}
-                          {template.download_count > 0 ? ` • ${template.download_count} téléch.` : ''}
+                          {template.download_count > 0
+                            ? ` • ${template.download_count} téléch.`
+                            : ''}
                         </p>
                         {template.description && (
-                          <p className="text-xs text-muted-foreground mt-0.5 truncate">{template.description}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                            {template.description}
+                          </p>
                         )}
                       </div>
                       <div className="flex gap-2 shrink-0">
@@ -288,7 +321,11 @@ export default function TemplatesPage() {
                           onClick={() => handleDownload(template)}
                           disabled={downloadingId === template.id}
                         >
-                          {downloadingId === template.id ? <Spinner className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
+                          {downloadingId === template.id ? (
+                            <Spinner className="h-3.5 w-3.5" />
+                          ) : (
+                            <Download className="h-3.5 w-3.5" />
+                          )}
                           Télécharger
                         </Button>
                         <Button
@@ -315,7 +352,8 @@ export default function TemplatesPage() {
           <DialogHeader>
             <DialogTitle>Ajouter un template</DialogTitle>
             <DialogDescription>
-              Uploadez un modèle vierge (Excel, DOCX, PDF) que vous pourrez re-télécharger à tout moment.
+              Uploadez un modèle vierge (Excel, DOCX, PDF) que vous pourrez re-télécharger à tout
+              moment.
             </DialogDescription>
           </DialogHeader>
 
@@ -333,8 +371,12 @@ export default function TemplatesPage() {
                 ) : (
                   <>
                     <Upload className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-foreground font-medium">Cliquez pour sélectionner un fichier</p>
-                    <p className="text-xs text-muted-foreground mt-1">Excel (.xlsx), Word (.docx), PDF — max 20 Mo</p>
+                    <p className="text-foreground font-medium">
+                      Cliquez pour sélectionner un fichier
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Excel (.xlsx), Word (.docx), PDF — max 20 Mo
+                    </p>
                   </>
                 )}
               </button>
@@ -369,7 +411,9 @@ export default function TemplatesPage() {
 
             {/* Title */}
             <div className="space-y-2">
-              <Label>Titre <span className="text-destructive">*</span></Label>
+              <Label>
+                Titre <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.title}
                 onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
@@ -386,7 +430,9 @@ export default function TemplatesPage() {
                 onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
               >
                 {CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
                 ))}
               </select>
             </div>
@@ -413,7 +459,14 @@ export default function TemplatesPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowAdd(false); setPendingFile(null) }} disabled={saving}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowAdd(false)
+                setPendingFile(null)
+              }}
+              disabled={saving}
+            >
               Annuler
             </Button>
             <Button
@@ -431,4 +484,21 @@ export default function TemplatesPage() {
       {confirmNode}
     </div>
   )
+}
+
+// Les modèles de comptes d'exploitation sont gérés par les opérateurs et le super-administrateur.
+export default function TemplatesPage() {
+  const { user } = useAuth()
+  if (user && user.role !== 'super_admin') {
+    return (
+      <div className="mx-auto max-w-xl space-y-3 py-10">
+        <h1 className="text-2xl font-bold text-foreground">Modèles de comptes d’exploitation</h1>
+        <p className="text-sm text-muted-foreground">
+          Les modèles et les comptes d’exploitation sont préparés par l’opérateur de votre zone.
+          Pour en demander un, utilisez le bouton « Écrire à l’équipe ».
+        </p>
+      </div>
+    )
+  }
+  return <TemplatesLibrary />
 }

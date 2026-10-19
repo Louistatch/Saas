@@ -1,0 +1,424 @@
+/* HarooLife's instruments sit over a live WebGL scene. Opaque, light surfaces avoid
+   repeatedly blurring the moving canvas on phones. No filters or infinite animations. */
+.haroolife-screen {
+  --hl-ink: #173e34;
+  --hl-paper: #fffdf7;
+  --hl-border: #e5e5d9;
+  --hl-edge: clamp(12px, 2.5vw, 32px);
+  --hl-shadow: 0 3px 16px #152c2926;
+}
+
+.hl-world-shade {
+  height: 150px;
+  background: linear-gradient(#112e3233, transparent);
+}
+
+.hl-loading {
+  display: grid;
+  gap: 8px;
+  padding: 22px;
+  border: 1px solid #ffffffbf;
+  border-radius: 22px;
+  background: #fffdf7f5;
+  color: #173e34;
+  box-shadow: 0 6px 28px #112c351f;
+}
+
+.hl-loading-brand {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: #65806a;
+}
+
+.hl-loading strong {
+  font-size: 17px;
+}
+
+.hl-loading > span:last-child {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #64756b;
+}
+
+.hl-header {
+  padding-inline: var(--hl-edge);
+}
+
+.hl-context,
+.hl-status,
+.hl-shortcuts {
+  max-width: 1100px;
+  margin-inline: auto;
+}
+
+.hl-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 7px;
+  padding-inline: 5px;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  text-shadow: 0 1px 4px #102d35b3;
+}
+
+.hl-wordmark,
+.hl-location {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hl-wordmark {
+  flex-shrink: 0;
+  letter-spacing: 0.13em;
+}
+
+.hl-wordmark > span {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid #ffffff80;
+  border-radius: 7px;
+  background: #174b3a;
+  font-size: 15px;
+  letter-spacing: -0.07em;
+}
+
+.hl-location {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  letter-spacing: 0.02em;
+}
+
+.hl-location svg {
+  flex-shrink: 0;
+}
+
+.hl-status {
+  min-height: 56px;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--hl-border);
+  border-radius: 20px;
+  background: var(--hl-paper);
+  color: var(--hl-ink);
+  box-shadow: var(--hl-shadow);
+  backdrop-filter: none;
+}
+
+.hl-status button {
+  min-height: 44px;
+}
+
+.hl-clock,
+.hl-wallet {
+  font-variant-numeric: tabular-nums;
+}
+
+.hl-clock {
+  gap: 5px;
+  padding-inline: 6px;
+}
+
+.hl-mood {
+  color: #27664f;
+}
+
+.hl-presence {
+  min-width: 44px;
+  padding-inline: 7px;
+  border-radius: 13px;
+  background: #eaf2e8;
+  color: #295c42;
+}
+
+.hl-wallet {
+  gap: 5px;
+  padding-inline: 9px;
+  border-radius: 14px;
+  background: #f0eee3;
+  color: #173b30;
+}
+
+.hl-currency {
+  font-size: 9px;
+  font-weight: 600;
+  color: #65746a;
+}
+
+.hl-wallet > svg {
+  width: 19px;
+  height: 19px;
+  padding: 2px;
+  background: #178462;
+}
+
+.hl-shortcuts {
+  align-items: center;
+  margin-top: 7px;
+}
+
+.hl-objective,
+.hl-time-control,
+.hl-needs,
+.hl-actions > button,
+.hl-dock,
+.hl-journal-entry {
+  backdrop-filter: none;
+  box-shadow: var(--hl-shadow);
+}
+
+.hl-objective {
+  min-height: 38px;
+  padding: 7px 12px;
+  border: 1px solid var(--hl-border);
+  border-radius: 14px;
+  background: var(--hl-paper);
+  color: var(--hl-ink);
+}
+
+.hl-cooperative {
+  min-height: 38px;
+  margin-left: auto;
+  border: 1px solid #ffffff40;
+  border-radius: 14px;
+  background: #17523e;
+}
+
+.hl-time-control {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  min-height: 42px;
+  border: 1px solid var(--hl-border);
+  border-radius: 14px;
+  background: var(--hl-paper);
+  color: var(--hl-ink);
+}
+
+.hl-map-categories {
+  top: calc(152px + env(safe-area-inset-top, 0px));
+}
+
+.hl-map-actions {
+  top: calc(202px + env(safe-area-inset-top, 0px));
+}
+
+.hl-venue-activities {
+  top: calc(152px + env(safe-area-inset-top, 0px));
+  max-width: calc(100% - 24px);
+}
+
+/* The room guide follows the venue button instead of sharing its touch target. */
+.haroolife-screen [data-testid="room-guide"] {
+  top: calc(202px + env(safe-area-inset-top, 0px));
+}
+
+.hl-controls {
+  padding-inline: var(--hl-edge);
+}
+
+.hl-control-columns,
+.hl-journal {
+  max-width: 1280px;
+}
+
+.hl-needs {
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--hl-border);
+  border-radius: 20px;
+  background: var(--hl-paper);
+}
+
+.hl-person {
+  width: 34px;
+  height: 34px;
+  background: #19513d;
+}
+
+.hl-needs-grid {
+  width: 124px;
+  gap: 4px 8px;
+}
+
+.hl-need-track {
+  height: 5px;
+  background: #e5e9df;
+}
+
+.hl-need-track > span {
+  transition-property: width;
+}
+
+.hl-actions {
+  max-width: min(46vw, 224px);
+}
+
+.hl-actions > button {
+  border-radius: 16px;
+}
+
+.hl-actions > button:not([class*="bg-emerald"]):not([class*="bg-amber"]) {
+  border: 1px solid var(--hl-border);
+  background: var(--hl-paper);
+}
+
+.hl-joystick > div {
+  border: 1px solid #fffdf7cc;
+  background: #183c323b;
+  box-shadow: inset 0 0 0 8px #fffdf71a, 0 2px 12px #14392c26;
+  backdrop-filter: none;
+}
+
+.hl-joystick > div > div {
+  border: 1px solid white;
+  background: #fffdf7;
+  box-shadow: 0 2px 8px #102d3540;
+}
+
+.hl-journal-entry {
+  border: 1px solid #ffffff26;
+  border-radius: 12px;
+  background: #17382fed;
+  color: #fffdf7;
+  line-height: 1.5;
+}
+
+.hl-dock {
+  max-width: 460px;
+  padding: 6px;
+  border: 1px solid var(--hl-border);
+  border-radius: 22px;
+  background: var(--hl-paper);
+  box-shadow: 0 5px 24px #112c352b;
+}
+
+.hl-nav-item {
+  min-height: 56px;
+  border-radius: 16px;
+  color: #57675e;
+  transition: background-color 120ms, color 120ms, transform 120ms;
+}
+
+.hl-nav-item[aria-pressed="true"] {
+  background: #194c39;
+  color: #fffdf7;
+}
+
+.hl-nav-item:active,
+.hl-actions > button:active,
+.hl-time-control:active {
+  transform: scale(0.97);
+}
+
+.hl-header button:focus-visible,
+.hl-controls button:focus-visible,
+.hl-nav-item:focus-visible {
+  outline: 3px solid #e0aa43;
+  outline-offset: 3px;
+}
+
+.hl-sheet {
+  border-color: var(--hl-border, #e5e5d9);
+  border-radius: 26px;
+  background: #fffdf9;
+}
+
+@media (max-width: 380px) {
+  .hl-status {
+    gap: 3px;
+  }
+  .hl-clock {
+    padding-inline: 2px;
+    font-size: 11px;
+  }
+  .hl-mood {
+    font-size: 11px;
+  }
+  .hl-wallet {
+    gap: 3px;
+    padding-inline: 6px;
+  }
+  .hl-currency {
+    display: none;
+  }
+  .hl-needs-grid {
+    width: 92px;
+  }
+  .hl-person {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+/* Browser chrome and phone rotation can leave less than 500 px of useful height.
+   Keep the walk/action/nav targets usable without stacking them over each other. */
+@media (max-height: 540px) and (orientation: landscape) {
+  .hl-header {
+    padding-top: max(6px, env(safe-area-inset-top, 0px));
+  }
+  .hl-context {
+    display: none;
+  }
+  .hl-shortcuts {
+    margin-top: 4px;
+  }
+  .hl-status {
+    min-height: 48px;
+    padding: 3px 6px;
+  }
+  .hl-controls {
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+  }
+  .hl-needs {
+    padding: 4px 7px;
+    border-radius: 15px;
+  }
+  .hl-journal {
+    display: none;
+  }
+  .hl-joystick {
+    height: 112px;
+  }
+  .hl-actions {
+    flex-flow: row wrap;
+    justify-content: flex-end;
+    max-width: 320px;
+  }
+  .hl-map-categories {
+    top: 108px;
+  }
+  .hl-map-actions {
+    top: 153px;
+  }
+  .hl-venue-activities {
+    top: 108px;
+  }
+  .haroolife-screen [data-testid="room-guide"] {
+    top: 158px;
+  }
+  .hl-dock {
+    padding: 4px;
+  }
+  .hl-nav-item {
+    min-height: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hl-nav-item,
+  .hl-need-track > span,
+  .hl-actions > button,
+  .hl-time-control {
+    transition: none;
+    transform: none;
+  }
+}

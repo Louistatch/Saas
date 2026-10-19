@@ -568,3 +568,75 @@ export function decideDocumentAccess(params: {
 export function canHolderEditDocuments(statutValidation: string | null | undefined): boolean {
   return statutValidation !== 'VALIDE'
 }
+
+// ── Instruction assistée ─────────────────────────────────────────────────────
+
+/** Pièces attendues pour instruire un dossier, dans l'ordre où l'instructeur les vérifie. */
+export const DOSSIER_CHECKS = ['diplome', 'piece_identite', 'photo'] as const
+export type DossierCheck = (typeof DOSSIER_CHECKS)[number]
+
+export const DOSSIER_CHECK_LABEL: Record<DossierCheck, string> = {
+  diplome: 'Diplôme',
+  piece_identite: 'Pièce d’identité',
+  photo: 'Photo',
+}
+
+const MISSING_REQUEST: Record<DossierCheck, string> = {
+  diplome: 'déposer votre diplôme',
+  piece_identite: 'déposer une pièce d’identité lisible',
+  photo: 'ajouter une photo de profil',
+}
+
+/** « a », « a et b », « a, b et c ». */
+function listFr(items: string[]): string {
+  return items.length <= 1
+    ? (items[0] ?? '')
+    : `${items.slice(0, -1).join(', ')} et ${items.at(-1)}`
+}
+
+export type DossierVerdict = 'pret' | 'incomplet'
+
+export interface DossierAssessment {
+  checks: Record<DossierCheck, boolean>
+  missing: DossierCheck[]
+  verdict: DossierVerdict
+  waitingDays: number
+  /** Motif proposé pour demander les pièces manquantes ; null si rien ne manque. */
+  suggestedReason: string | null
+}
+
+/**
+ * Évalue un dossier pour l'instructeur : ce qui est présent, ce qui manque, depuis quand il
+ * attend, et un motif prêt à envoyer. La photo aide mais ne bloque pas ; le diplôme
+ * et la pièce d'identité conditionnent « prêt à valider ». L'affiliation n'est pas
+ * une pièce requise : les indépendants sont instruits par l'administration.
+ */
+export function assessDossier(
+  dossier: { faitiere_id: string | null; photo_url: string | null; created_at: string | null },
+  documentKinds: readonly string[],
+  now: number = Date.now(),
+): DossierAssessment {
+  const checks: Record<DossierCheck, boolean> = {
+    diplome: documentKinds.includes('diplome') || documentKinds.includes('attestation'),
+    piece_identite: documentKinds.includes('piece_identite'),
+    photo: Boolean(dossier.photo_url),
+  }
+  const missing = DOSSIER_CHECKS.filter((c) => !checks[c])
+  const blocking = missing.filter((c) => c !== 'photo')
+  const verdict: DossierVerdict = blocking.length === 0 ? 'pret' : 'incomplet'
+  const created = dossier.created_at ? new Date(dossier.created_at).getTime() : now
+  const waitingDays = Math.max(0, Math.floor((now - created) / 86_400_000))
+  const suggestedReason =
+    missing.length === 0
+      ? null
+      : `Pour terminer l’instruction de votre dossier, merci de ${listFr(
+          missing.map((c) => MISSING_REQUEST[c]),
+        )}.`
+  return { checks, missing, verdict, waitingDays, suggestedReason }
+}
+
+/** File de traitement : prêts d'abord, puis les plus anciens. */
+export function compareForReview(a: DossierAssessment, b: DossierAssessment): number {
+  const rank = { pret: 0, incomplet: 1 }
+  return rank[a.verdict] - rank[b.verdict] || b.waitingDays - a.waitingDays
+}

@@ -1,6 +1,6 @@
-import { test, expect } from '@playwright/test'
-import { LoginPage } from '../pages/login.page'
+import { expect, test } from '@playwright/test'
 import { ACCOUNTS, ROUTES } from '../helpers/constants'
+import { LoginPage } from '../pages/login.page'
 
 test.describe('Scenario 2: Authentication Flows', () => {
   test('super_admin login redirects to /admin', async ({ page }) => {
@@ -100,8 +100,12 @@ test.describe('Scenario 2: Authentication Flows', () => {
     // Should be redirected away from admin or see access denied
     await page.waitForTimeout(3000)
     const url = page.url()
-    const isBlocked = !url.includes('/admin') || 
-      await page.getByText(/accès refusé|non autorisé|unauthorized/i).isVisible().catch(() => false)
+    const isBlocked =
+      !url.includes('/admin') ||
+      (await page
+        .getByText(/accès refusé|non autorisé|unauthorized/i)
+        .isVisible()
+        .catch(() => false))
 
     expect(isBlocked, 'cooperative_admin should not access /admin').toBeTruthy()
 

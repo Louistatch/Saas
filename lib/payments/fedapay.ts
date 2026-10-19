@@ -4,8 +4,10 @@ import 'server-only'
  * FedaPay — paiement Mobile Money « direct » (MTN, Moov, Celtiis, Mixx by Yas)
  * pour le Togo et le Bénin. L'acheteur ne quitte JAMAIS le site : ni
  * redirection, ni nouvel onglet, ni iframe FedaPay (createDirectPayment). La
- * page de paiement hébergée (ancien createCheckout) n'est plus utilisée ; les
- * achats déjà créés par elle se règlent comme les autres (getTransaction).
+ * page de paiement hébergée (createCheckout) ne sert plus aux comptes
+ * d'exploitation ; les achats déjà créés par elle se règlent comme les autres
+ * (getTransaction). Elle reste utilisée par les frais de certification
+ * Opérateur (lib/partners/certification-payment.ts), à migrer à leur tour.
  *
  * Deux règles de sécurité :
  *  - le statut d'un paiement n'est JAMAIS pris dans l'URL de retour ni dans le
@@ -233,6 +235,50 @@ export function readTx(raw: any): FedaTransaction {
     mode: typeof t?.mode === 'string' && t.mode ? t.mode : null,
     customMetadata: metadataOrNull(t?.custom_metadata),
   }
+}
+
+/**
+ * Page de paiement HÉBERGÉE par FedaPay (redirection) : crée la transaction puis
+ * son jeton, et renvoie l'adresse de la page. Réservée aux frais de
+ * certification Opérateur (lib/partners/certification-payment.ts) ; les
+ * comptes d'exploitation se paient sur le site (createDirectPayment). Le
+ * statut n'est jamais lu dans l'URL de retour : getTransaction fait foi.
+ */
+export async function createCheckout(input: {
+  amount: number
+  description: string
+  callbackUrl: string
+  customer: { name: string; email?: string | null; phone?: string | null; country?: 'tg' | 'bj' }
+}): Promise<{ transactionId: number; url: string }> {
+  const [firstname, ...rest] = input.customer.name.trim().split(/\s+/)
+  const phone = (input.customer.phone ?? '').replace(/\D/g, '')
+  const country = input.customer.country ?? 'tg'
+  const prefix = country === 'bj' ? '229' : '228'
+  const local = phone.startsWith(prefix) && phone.length > 8 ? phone.slice(3) : phone
+  const created = await call('/transactions', {
+    method: 'POST',
+    body: JSON.stringify({
+      description: input.description.slice(0, 250),
+      amount: Math.round(input.amount),
+      currency: { iso: 'XOF' },
+      callback_url: input.callbackUrl,
+      customer: {
+        firstname: firstname || 'Client',
+        lastname: rest.join(' ') || '-',
+        ...(input.customer.email ? { email: input.customer.email } : {}),
+        // Le pays choisi fixe le drapeau de la page FedaPay (Togo ou Bénin).
+        // Les numéros de test sandbox (64000001) sont béninois.
+        ...(local.length >= 8 ? { phone_number: { number: local, country } } : {}),
+      },
+    }),
+  })
+  const tx = readTx(created)
+  if (!tx.id) throw new Error('FedaPay : transaction non créée')
+  const token = await call<{ token?: string; url?: string }>(`/transactions/${tx.id}/token`, {
+    method: 'POST',
+  })
+  if (!token.url) throw new Error('FedaPay : lien de paiement absent')
+  return { transactionId: tx.id, url: token.url }
 }
 
 export async function getTransaction(id: number | string): Promise<FedaTransaction> {

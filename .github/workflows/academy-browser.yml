@@ -1,0 +1,60 @@
+name: AgriAcademy Browser QA
+
+on:
+  pull_request:
+    paths:
+      - 'app/operator/training/**'
+      - 'app/api/academy/**'
+      - 'components/academy/**'
+      - 'lib/academy/**'
+      - 'e2e/academy*'
+      - 'e2e/fixtures/**'
+      - '.github/workflows/academy-browser.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  academy-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Start the mock Supabase
+        run: |
+          node e2e/fixtures/mock-supabase.mjs > mock-supabase.log 2>&1 &
+      - name: Build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54329
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: e2e-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: e2e-service
+        run: npm run build
+      - name: Start the server
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54329
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: e2e-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: e2e-service
+        run: |
+          npx next start --hostname 127.0.0.1 --port 3000 > server.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf -o /dev/null http://127.0.0.1:3000/ && break; sleep 1; done
+      - name: Playwright
+        run: npx playwright test --config=e2e/academy-playwright.config.ts
+      - name: Keep report and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: academy-browser-qa
+          path: |
+            test-results/academy-report
+            test-results/**/*.zip
+            mock-supabase.log
+            server.log
+          retention-days: 7

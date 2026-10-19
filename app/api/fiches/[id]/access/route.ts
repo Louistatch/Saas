@@ -100,6 +100,11 @@ const PURCHASE_ID_RE =
  *   Toujours pour son TITULAIRE seulement (pas un admin qui peut la lire).
  * - Carte connue mais suspendue, révoquée ou expirée → 402 « achetez-le ».
  * Renvoie des URL de téléchargement signées.
+ *
+ * Mêmes portes que lib/fiches/access-policy.ts (ficheAccessRoutes) : gratuité et
+ * carte sur une fiche publiée seulement, achat réglé aussi sur une fiche retirée.
+ * En plus, un achat réglé reste valable si la fiche est repassée en brouillon
+ * après la vente (ce qui est payé reste téléchargeable).
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   // Rate limiting to prevent card_number brute-force

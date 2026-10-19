@@ -1,0 +1,198 @@
+
+## A_home_follow_d12
+{
+ "byLod": {
+  "full": {
+   "n": 4,
+   "tris": 60359,
+   "ground": 210,
+   "street": 724,
+   "streetProps": 666,
+   "buildings": 55191,
+   "props": 2608,
+   "extras": 960,
+   "far": 0
+  },
+  "low": {
+   "n": 26,
+   "tris": 130208,
+   "ground": 1904,
+   "street": 1212,
+   "streetProps": 0,
+   "buildings": 125112,
+   "props": 0,
+   "extras": 1980,
+   "far": 0
+  },
+  "far": {
+   "n": 60,
+   "tris": 25880,
+   "ground": 6492,
+   "street": 2968,
+   "streetProps": 0,
+   "buildings": 0,
+   "props": 0,
+   "extras": 0,
+   "far": 16420
+  }
+ },
+ "meshInstances": 219,
+ "visible": 18,
+ "visibleTris": 106557,
+ "perf": {
+  "fps": 15.54,
+  "p50": 63.8,
+  "p95": 105,
+  "drawCalls": 18,
+  "triangles": 253411,
+  "heapMB": 62,
+  "longTasks": 9,
+  "resolution": [
+   206,
+   419
+  ],
+  "pixelRatio": 0.5
+ },
+ "player": {
+  "cam": {
+   "tx": 48,
+   "tz": 34,
+   "distance": 12,
+   "angle": 35,
+   "follow": true
+  }
+ }
+}
+
+## B_zoom_out_x3
+{
+ "byLod": {
+  "full": {
+   "n": 4,
+   "tris": 60359,
+   "ground": 210,
+   "street": 724,
+   "streetProps": 666,
+   "buildings": 55191,
+   "props": 2608,
+   "extras": 960,
+   "far": 0
+  },
+  "low": {
+   "n": 26,
+   "tris": 130208,
+   "ground": 1904,
+   "street": 1212,
+   "streetProps": 0,
+   "buildings": 125112,
+   "props": 0,
+   "extras": 1980,
+   "far": 0
+  },
+  "far": {
+   "n": 60,
+   "tris": 25880,
+   "ground": 6492,
+   "street": 2968,
+   "streetProps": 0,
+   "buildings": 0,
+   "props": 0,
+   "extras": 0,
+   "far": 16420
+  }
+ },
+ "meshInstances": 219,
+ "visible": 20,
+ "visibleTris": 108829,
+ "perf": {
+  "fps": 16.48,
+  "p50": 59.9,
+  "p95": 101.9,
+  "drawCalls": 20,
+  "triangles": 251584,
+  "heapMB": 72,
+  "longTasks": 9,
+  "resolution": [
+   206,
+   419
+  ],
+  "pixelRatio": 0.5
+ },
+ "player": {
+  "cam": {
+   "tx": 48,
+   "tz": 34,
+   "distance": 23.4375,
+   "angle": 35,
+   "follow": true
+  }
+ }
+}
+
+## C_city_view_d100
+{
+ "byLod": {
+  "full": {
+   "n": 4,
+   "tris": 22516,
+   "ground": 110,
+   "street": 442,
+   "streetProps": 102,
+   "buildings": 20544,
+   "props": 1134,
+   "extras": 184,
+   "far": 0
+  },
+  "low": {
+   "n": 16,
+   "tris": 74465,
+   "ground": 1050,
+   "street": 774,
+   "streetProps": 0,
+   "buildings": 71895,
+   "props": 0,
+   "extras": 746,
+   "far": 0
+  },
+  "far": {
+   "n": 80,
+   "tris": 29674,
+   "ground": 8822,
+   "street": 3332,
+   "streetProps": 0,
+   "buildings": 0,
+   "props": 0,
+   "extras": 0,
+   "far": 17520
+  }
+ },
+ "meshInstances": 231,
+ "visible": 184,
+ "visibleTris": 149757,
+ "perf": {
+  "fps": 14.86,
+  "p50": 66.9,
+  "p95": 112.3,
+  "drawCalls": 152,
+  "triangles": 165183,
+  "heapMB": 78,
+  "longTasks": 12,
+  "resolution": [
+   206,
+   419
+  ],
+  "pixelRatio": 0.5
+ },
+ "player": {
+  "cam": {
+   "tx": 60,
+   "tz": 40,
+   "distance": 100,
+   "angle": 35,
+   "follow": false
+  }
+ }
+}
+
+## bank top models (triangles)
+[["com-j",5246],["com-n",4350],["com-m",3740],["com-l",3512],["com-k",2960],["ambulance",2804],["com-i",2544],["delivery",2476],["suv",2474],["police",2304],["hatchback",2088],["van",2082],["truck",2082],["taxi",2072],["sub-t",2062],["sedan",2032],["com-g",2006],["com-f",1794],["sub-d",1757],["sub-b",1748],["sub-e",1731],["sub-f",1616],["sub-n",1612],["com-h",1512],["com-e",1509]]

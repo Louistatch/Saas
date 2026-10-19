@@ -459,7 +459,7 @@ test('justificatifs : format, taille, chemin sous <user_id>/', () => {
   assert.equal(documentStoragePath('u1', 'diplome', 'pdf', 'ab'), 'u1/diplome-ab.pdf')
 })
 
-test('schéma d’inscription : faîtière obligatoire pour le conseil agricole', () => {
+test('inscription Haroo indépendante pour chaque métier, suivi facultatif strictement validé', () => {
   const base = {
     firstName: 'Kossi',
     lastName: 'Amegah',
@@ -467,10 +467,19 @@ test('schéma d’inscription : faîtière obligatoire pour le conseil agricole'
     email: 'K@Example.tg',
     password: 'motdepasse1',
   }
-  assert.equal(harooSignupSchema.safeParse({ ...base, profileType: 'OUVRIER' }).success, true)
-  const noFaitiere = harooSignupSchema.safeParse({ ...base, profileType: 'AGRONOME' })
-  assert.equal(noFaitiere.success, false)
-  assert.ok(!noFaitiere.success && noFaitiere.error.issues.some((i) => i.path[0] === 'faitiereId'))
+  for (const profileType of ['OUVRIER', 'ACHETEUR', 'AGRONOME']) {
+    for (const faitiereId of [undefined, null, '']) {
+      const independent = harooSignupSchema.safeParse({ ...base, profileType, faitiereId })
+      assert.ok(independent.success)
+      assert.equal(independent.data.faitiereId, undefined)
+    }
+  }
+  for (const profession of ['agronome', 'technicien', 'conseiller']) {
+    assert.equal(
+      harooSignupSchema.safeParse({ ...base, profileType: 'AGRONOME', profession }).success,
+      true,
+    )
+  }
   const ok = harooSignupSchema.safeParse({
     ...base,
     profileType: 'AGRONOME',
@@ -509,4 +518,47 @@ test('schéma d’inscription : faîtière obligatoire pour le conseil agricole'
     }).success,
     true,
   )
+})
+
+test('un professionnel indépendant peut être validé et recevoir sa carte sans rejoindre une organisation', async () => {
+  const w = memoryWorld()
+  w.profile.faitiere_id = null
+  const admin = {
+    ...w.deps(true),
+    canValidate: async (faitiereId: string | null) =>
+      decideCanValidate({ role: 'super_admin', faitiereId, mandatedFaitiereIds: [] }),
+  }
+  const result = await resolveProfessionalDecision(admin, {
+    profileId: 'p1',
+    decision: 'VALIDE',
+    actorId: 'admin',
+    now: TODAY,
+  })
+  assert.ok(result.ok)
+  assert.equal(w.profile.faitiere_id, null)
+  assert.equal(w.profile.badge_valide, true)
+  assert.equal(w.cards.length, 1)
+})
+
+test('l’inscription indépendante ne donne pas un mandat de validation à un autre compte', async () => {
+  const w = memoryWorld()
+  w.profile.faitiere_id = null
+  const operator = {
+    ...w.deps(false),
+    canValidate: async (faitiereId: string | null) =>
+      decideCanValidate({ role: 'none', faitiereId, mandatedFaitiereIds: ['f1'] }),
+  }
+  const result = await resolveProfessionalDecision(operator, {
+    profileId: 'p1',
+    decision: 'VALIDE',
+    actorId: 'operator',
+    now: TODAY,
+  })
+  assert.deepEqual(result, {
+    ok: false,
+    status: 403,
+    error: 'Vous n’avez pas de mandat pour valider ce dossier',
+  })
+  assert.equal(w.profile.badge_valide, false)
+  assert.equal(w.cards.length, 0)
 })

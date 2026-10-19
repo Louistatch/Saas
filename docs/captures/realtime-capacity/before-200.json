@@ -1,0 +1,330 @@
+{
+  "generatedAt": "2026-10-18T03:44:53.157Z",
+  "scope": "loopback network only; synthetic verified identities; no production SQL/Auth/GPU capacity claim",
+  "baseline": true,
+  "redis": false,
+  "nodes": 1,
+  "clients": 200,
+  "connected": 200,
+  "elapsedSeconds": 18.595113698000002,
+  "connectMs": 1443.0756320000003,
+  "sent": 18400,
+  "received": 3336111,
+  "deliveriesPerSecond": 179407.93770778694,
+  "deliveriesPerPose": 181.31038043478262,
+  "errors": 0,
+  "drops": 0,
+  "deliveryMs": {
+    "p50": 5,
+    "p95": 15,
+    "bucketWidthMs": 5,
+    "cappedAtMs": 5000
+  },
+  "loadGeneratorEventLoopP95Ms": 28.065791,
+  "health": [
+    {
+      "node": 0,
+      "at": 1792295074562,
+      "ok": true,
+      "v": 1,
+      "connections": 200,
+      "connectionsTotal": 200,
+      "present": 200,
+      "messagesStored": 0,
+      "messagesDuplicate": 0,
+      "rejected": {},
+      "posesRelayed": 200,
+      "posesDropped": 0,
+      "storeAckMs": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      }
+    },
+    {
+      "node": 0,
+      "at": 1792295075791,
+      "ok": true,
+      "v": 1,
+      "connections": 200,
+      "connectionsTotal": 200,
+      "present": 200,
+      "messagesStored": 0,
+      "messagesDuplicate": 0,
+      "rejected": {},
+      "posesRelayed": 1179,
+      "posesDropped": 0,
+      "storeAckMs": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      }
+    },
+    {
+      "node": 0,
+      "at": 1792295077031,
+      "ok": true,
+      "v": 1,
+      "connections": 200,
+      "connectionsTotal": 200,
+      "present": 200,
+      "messagesStored": 0,
+      "messagesDuplicate": 0,
+      "rejected": {},
+      "posesRelayed": 2433,
+      "posesDropped": 0,
+      "storeAckMs": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      }
+    },
+    {
+      "node": 0,
+      "at": 1792295078207,
+      "ok": true,
+      "v": 1,
+      "connections": 200,
+      "connectionsTotal": 200,
+      "present": 200,
+      "messagesStored": 0,
+      "messagesDuplicate": 0,
+      "rejected": {},
+      "posesRelayed": 3600,
+      "posesDropped": 0,
+      "storeAckMs": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      }
+    },
+    {
+      "node": 0,
+      "at": 1792295079212,
+      "ok": true,
+      "v": 1,
+      "connections": 200,
+      "connectionsTotal": 200,
+      "present": 200,
+      "messagesStored": 0,
+      "messagesDuplicate": 0,
+      "rejected": {},
+      "posesRelayed": 4600,
+      "posesDropped": 0,
+      "storeAckMs": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      }
+    },
+    {
+      "node": 0,
+      "at": 1792295080411,
+      "ok": true,
+      "v": 1,
+      "connections": 200,
+      "connectionsTotal": 200,
+      "present": 200,
+      "messagesStored": 0,
+      "messagesDuplicate": 0,
+      "rejected": {},
+      "posesRelayed": 5800,
+      "posesDropped": 0,
+      "storeAckMs": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      }
+    },
+    {
+      "node": 0,
+      "at": 1792295081638,
+      "ok": true,
+      "v": 1,
+      "connections": 200,
+      "connectionsTotal": 200,
+      "present": 200,
+      "messagesStored": 0,
+      "messagesDuplicate": 0,
+      "rejected": {},
+      "posesRelayed": 6969,
+      "posesDropped": 0,
+      "storeAckMs": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      }
+    },
+    {
+      "node": 0,
+      "at": 1792295082641,
+      "ok": true,
+      "v": 1,
+      "connections": 200,
+      "connectionsTotal": 200,
+      "present": 200,
+      "messagesStored": 0,
+      "messagesDuplicate": 0,
+      "rejected": {},
+      "posesRelayed": 8000,
+      "posesDropped": 0,
+      "storeAckMs": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      }
+    },
+    {
+      "node": 0,
+      "at": 1792295083866,
+      "ok": true,
+      "v": 1,
+      "connections": 200,
+      "connectionsTotal": 200,
+      "present": 200,
+      "messagesStored": 0,
+      "messagesDuplicate": 0,
+      "rejected": {},
+      "posesRelayed": 9187,
+      "posesDropped": 0,
+      "storeAckMs": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      }
+    },
+    {
+      "node": 0,
+      "at": 1792295085098,
+      "ok": true,
+      "v": 1,
+      "connections": 200,
+      "connectionsTotal": 200,
+      "present": 200,
+      "messagesStored": 0,
+      "messagesDuplicate": 0,
+      "rejected": {},
+      "posesRelayed": 10419,
+      "posesDropped": 0,
+      "storeAckMs": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      }
+    },
+    {
+      "node": 0,
+      "at": 1792295086321,
+      "ok": true,
+      "v": 1,
+      "connections": 200,
+      "connectionsTotal": 200,
+      "present": 200,
+      "messagesStored": 0,
+      "messagesDuplicate": 0,
+      "rejected": {},
+      "posesRelayed": 11627,
+      "posesDropped": 0,
+      "storeAckMs": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      }
+    },
+    {
+      "node": 0,
+      "at": 1792295087708,
+      "ok": true,
+      "v": 1,
+      "connections": 200,
+      "connectionsTotal": 200,
+      "present": 200,
+      "messagesStored": 0,
+      "messagesDuplicate": 0,
+      "rejected": {},
+      "posesRelayed": 12995,
+      "posesDropped": 0,
+      "storeAckMs": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      }
+    },
+    {
+      "node": 0,
+      "at": 1792295089131,
+      "ok": true,
+      "v": 1,
+      "connections": 200,
+      "connectionsTotal": 200,
+      "present": 200,
+      "messagesStored": 0,
+      "messagesDuplicate": 0,
+      "rejected": {},
+      "posesRelayed": 14382,
+      "posesDropped": 0,
+      "storeAckMs": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      }
+    },
+    {
+      "node": 0,
+      "at": 1792295090506,
+      "ok": true,
+      "v": 1,
+      "connections": 200,
+      "connectionsTotal": 200,
+      "present": 200,
+      "messagesStored": 0,
+      "messagesDuplicate": 0,
+      "rejected": {},
+      "posesRelayed": 15783,
+      "posesDropped": 0,
+      "storeAckMs": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      }
+    },
+    {
+      "node": 0,
+      "at": 1792295091752,
+      "ok": true,
+      "v": 1,
+      "connections": 200,
+      "connectionsTotal": 200,
+      "present": 200,
+      "messagesStored": 0,
+      "messagesDuplicate": 0,
+      "rejected": {},
+      "posesRelayed": 16980,
+      "posesDropped": 0,
+      "storeAckMs": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      }
+    },
+    {
+      "node": 0,
+      "at": 1792295093157,
+      "ok": true,
+      "v": 1,
+      "connections": 200,
+      "connectionsTotal": 200,
+      "present": 200,
+      "messagesStored": 0,
+      "messagesDuplicate": 0,
+      "rejected": {},
+      "posesRelayed": 18388,
+      "posesDropped": 0,
+      "storeAckMs": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      }
+    }
+  ]
+}

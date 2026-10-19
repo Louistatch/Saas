@@ -14,6 +14,7 @@ import { emailUser } from '@/lib/email/resend'
 import {
   activatePartnerOperator,
   markPartnerTrainingCompleted,
+  recordCertificationFeePaid,
   recordPartnerExamResult,
 } from '@/lib/partners/certification'
 import { assertRole } from '@/lib/security/assert-access'
@@ -32,6 +33,9 @@ const bodySchema = z.discriminatedUnion('action', [
     note: z.string().trim().max(500).optional(),
   }),
   z.object({ action: z.literal('activate'), note: z.string().trim().max(500).optional() }),
+  // Secours : frais réglés hors FedaPay (espèces, dépôt Mobile Money constaté). La note dit
+  // comment, pour le journal d'audit.
+  z.object({ action: z.literal('mark_paid'), note: z.string().trim().min(3).max(500) }),
 ])
 
 export async function POST(
@@ -79,6 +83,13 @@ export async function POST(
         })
       case 'activate':
         return activatePartnerOperator(admin, { partnerId, validatorId, note: parsed.data.note })
+      case 'mark_paid':
+        return recordCertificationFeePaid(admin, {
+          partnerId,
+          validatorId,
+          method: 'manual',
+          note: parsed.data.note,
+        })
     }
   })()
 

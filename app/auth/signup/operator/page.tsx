@@ -1,6 +1,8 @@
 'use client'
 
 import { AuthSidePanel } from '@/components/shared/auth-side-panel'
+import { useGameReturn } from '@/hooks/use-game-return'
+import { withGameReturn } from '@/lib/haroolife/entry'
 import { Spinner } from '@/components/shared/loading'
 import { Logo } from '@/components/shared/logo'
 import { Button } from '@/components/ui/button'
@@ -13,6 +15,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 
 export default function OperatorSignupPage() {
+  const gameReturn = useGameReturn()
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -49,7 +52,7 @@ export default function OperatorSignupPage() {
         setError(body.error ?? 'Création du compte impossible.')
         setFieldErrors(body.fields ?? {})
       } else if (body.verify_email) {
-        window.location.assign(`/auth/verify-email?email=${encodeURIComponent(parsed.data.email)}`)
+        window.location.assign(withGameReturn(`/auth/verify-email?email=${encodeURIComponent(parsed.data.email)}`, gameReturn))
       } else {
         setPartnerCode(body.partner_code ?? '')
         setSubmitted(true)
@@ -75,7 +78,7 @@ export default function OperatorSignupPage() {
               Connectez-vous pour commencer la formation obligatoire.
             </p>
             <Button className="w-full" asChild>
-              <Link href="/auth/login?redirect=/operator/training">Commencer la formation</Link>
+              <Link href={withGameReturn('/auth/login?redirect=/operator/training', gameReturn)}>{gameReturn ? 'Se connecter et retrouver HarooLife' : 'Commencer la formation'}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -93,7 +96,7 @@ export default function OperatorSignupPage() {
         benefits={[
           'Formation professionnelle gratuite',
           'Évaluation pratique obligatoire',
-          'Certification vérifiable',
+          'Certification FaîtiereHub après évaluation',
           'Accès aux missions après validation',
         ]}
       />
@@ -101,7 +104,7 @@ export default function OperatorSignupPage() {
         <div className="w-full max-w-md space-y-5">
           <div className="flex items-center justify-between">
             <Link
-              href="/auth/signup"
+              href={withGameReturn('/auth/signup', gameReturn)}
               className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4" /> Profils

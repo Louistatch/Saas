@@ -1,6 +1,6 @@
-import { test, expect } from '../fixtures/base.fixture'
-import { MembersPage } from '../pages/members.page'
+import { expect, test } from '../fixtures/base.fixture'
 import { TEST_PREFIX } from '../helpers/constants'
+import { MembersPage } from '../pages/members.page'
 
 test.describe('Scenario 3: Member Management', () => {
   test('members page loads with table for cooperative_admin', async ({ coopAdminPage }) => {
@@ -119,7 +119,10 @@ test.describe('Scenario 3: Member Management', () => {
     expect(memberNames.length).toBeGreaterThanOrEqual(0)
   })
 
-  test('cooperative isolation — fenomat sees different members', async ({ coopAdminPage, fenomatPage }) => {
+  test('cooperative isolation — fenomat sees different members', async ({
+    coopAdminPage,
+    fenomatPage,
+  }) => {
     // Get members for coop-admin
     const coopMembersPage = new MembersPage(coopAdminPage)
     await coopMembersPage.goto()
@@ -135,7 +138,7 @@ test.describe('Scenario 3: Member Management', () => {
     if (coopMembers.length > 0 && fenomatMembers.length > 0) {
       const coopSet = new Set(coopMembers)
       const fenomatSet = new Set(fenomatMembers)
-      const intersection = [...coopSet].filter(m => fenomatSet.has(m))
+      const intersection = [...coopSet].filter((m) => fenomatSet.has(m))
 
       // Members should not overlap between cooperatives
       expect(intersection.length, 'Cooperatives should have isolated member lists').toBe(0)

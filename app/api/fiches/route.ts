@@ -1,8 +1,10 @@
 import { type CultureReader, accentInsensitivePattern, resolveCulture } from '@/lib/fiches/culture'
 import { type FicheStorage, verifyStoredFiles } from '@/lib/fiches/files'
+import { canPublishFiches } from '@/lib/fiches/publishing'
 import { createFicheSchema, fieldErrors } from '@/lib/fiches/schema'
 import { assertRole } from '@/lib/security/assert-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
+import { createPublicClient } from '@/lib/supabase/public'
 import { createClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/utils/logger'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
@@ -32,7 +34,7 @@ export async function GET(request: NextRequest) {
   const pageSize = Math.min(Number.parseInt(searchParams.get('limit') ?? '20'), 50)
 
   try {
-    const supabase = await createClient()
+    const supabase = createPublicClient()
 
     let query = supabase
       .from('fiches_techniques')
@@ -83,15 +85,17 @@ export async function GET(request: NextRequest) {
 
 /** POST /api/fiches — dépose une fiche technique. */
 export async function POST(request: NextRequest) {
-  // Même règle qu'au stockage (fonction SQL can_upload_fiches) et qu'à l'écran
-  // /dashboard/marketplace : super_admin, ou admin d'une faîtière. Trois
-  // endroits, une seule règle — c'est ce qui évite qu'un dépôt passe ici pour
-  // échouer plus loin sans message.
+  // Même règle qu'à l'écran /dashboard/marketplace (lib/fiches/publishing.ts) :
+  // super_admin ; admin d'une faîtière seulement si la publication des faîtières
+  // est rouverte. Refus dit ici, plutôt qu'un échec plus loin sans message.
   const guard = await assertRole('cooperative_admin')
   if (!guard.ok) return guard.response
-  if (guard.ctx.role !== 'super_admin' && guard.ctx.cooperativeLevel !== 'faitiere') {
+  if (!canPublishFiches(guard.ctx)) {
     return NextResponse.json(
-      { error: 'Seules les faîtières peuvent déposer des fiches techniques.' },
+      {
+        error:
+          'Votre compte ne peut pas encore publier de compte d’exploitation. Contactez FaîtiereHub pour le mettre en vente.',
+      },
       { status: 403 },
     )
   }

@@ -16,8 +16,15 @@ import { PageHeader } from '@/components/shared/page-header'
 import { PaginationBar } from '@/components/shared/pagination'
 import { RoleBadge } from '@/components/shared/status-badge'
 import { errorMessage } from '@/lib/utils/errors'
-import { profileUpdateSchema } from '@/lib/validators/schemas'
-import { ASSIGNABLE_ROLES, ASSIGNABLE_ROLE_LABELS, type Profile, type UserRole } from '@/types/domain'
+import {
+  ASSIGNABLE_ROLES,
+  ASSIGNABLE_ROLE_LABELS,
+  HAROO_TYPES,
+  HAROO_TYPE_LABELS,
+  type HarooType,
+  type Profile,
+  type UserRole,
+} from '@/types/domain'
 import { useResetPageOnChange } from '@/hooks/use-reset-page'
 
 const PAGE_SIZE = 20
@@ -32,17 +39,25 @@ export default function UsersAdminPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [editUser, setEditUser] = useState<Profile | null>(null)
   const [cooperatives, setCooperatives] = useState<{ id: string; name: string }[]>([])
-  const [editForm, setEditForm] = useState<{ role: UserRole; cooperative_id: string }>({
+  const [editForm, setEditForm] = useState<{
+    role: UserRole
+    cooperative_id: string
+    haroo_type: HarooType | ''
+  }>({
     role: 'member',
     cooperative_id: '',
+    haroo_type: '',
   })
+  const [history, setHistory] = useState<
+    { created_at: string; details: { before?: Record<string, string | null>; after?: Record<string, string | null> } }[] | null
+  >(null)
   const [saving, setSaving] = useState(false)
 
   const fetchUsers = useCallback(async () => {
     setIsLoading(true)
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, email, first_name, last_name, role, cooperative_id, created_at, cooperative:cooperatives(name)')
+      .select('id, email, first_name, last_name, role, haroo_type, cooperative_id, created_at, cooperative:cooperatives(name)')
       .order('created_at', { ascending: false })
     if (error) {
       toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })
@@ -68,7 +83,7 @@ export default function UsersAdminPage() {
     const q = debouncedSearch.toLowerCase().trim()
     if (!q) return users
     return users.filter((u) =>
-      `${u.first_name ?? ''} ${u.last_name ?? ''} ${u.email}`.toLowerCase().includes(q),
+      `${u.first_name ?? ''} ${u.last_name ?? ''} ${u.email ?? ''}`.toLowerCase().includes(q),
     )
   }, [users, debouncedSearch])
 
@@ -83,37 +98,41 @@ export default function UsersAdminPage() {
       // Rôles dépréciés (guest, ouvrier…) : proposer « Aucune organisation ».
       role: (ASSIGNABLE_ROLES as readonly UserRole[]).includes(user.role) ? user.role : 'none',
       cooperative_id: user.cooperative_id ?? '',
+      haroo_type: user.haroo_type ?? '',
     })
+    setHistory(null)
+    fetch(`/api/admin/users/${user.id}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : { history: [] }))
+      .then((d) => setHistory(d.history ?? []))
+      .catch(() => setHistory([]))
   }
 
   const handleSave = async () => {
     if (!editUser) return
-    const parsed = profileUpdateSchema.safeParse({
-      role: editForm.role,
-      cooperative_id: editForm.cooperative_id || null,
-    })
-    if (!parsed.success) {
+    setSaving(true)
+    const res = await fetch(`/api/admin/users/${editUser.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        role: editForm.role,
+        cooperative_id: editForm.cooperative_id || null,
+        haroo_type: editForm.haroo_type || null,
+      }),
+    }).catch(() => null)
+    setSaving(false)
+    const data: { error?: string } = res ? await res.json().catch(() => ({})) : {}
+    if (!res?.ok) {
       toast({
-        title: 'Entrée invalide',
-        description: parsed.error.issues[0]?.message,
+        title: 'Modification refusée',
+        description: data.error ?? 'Connexion interrompue : réessayez.',
         variant: 'destructive',
       })
       return
     }
-    setSaving(true)
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        role: parsed.data.role,
-        cooperative_id: parsed.data.cooperative_id,
-      })
-      .eq('id', editUser.id)
-    setSaving(false)
-    if (error) {
-      toast({ title: 'Échec de la mise à jour', description: errorMessage(error), variant: 'destructive' })
-      return
-    }
-    toast({ title: 'Utilisateur mis à jour', description: editUser.email })
+    toast({
+      title: 'Rôles mis à jour',
+      description: `${editUser.email} : effet à sa prochaine connexion ou actualisation.`,
+    })
     setEditUser(null)
     fetchUsers()
   }
@@ -176,6 +195,11 @@ export default function UsersAdminPage() {
                         </td>
                         <td className="py-3 px-4">
                           <RoleBadge role={user.role} />
+                          {user.haroo_type && (
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              {HAROO_TYPE_LABELS[user.haroo_type]}
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-muted-foreground text-sm">
                           {new Date(user.created_at).toLocaleDateString()}
@@ -210,7 +234,7 @@ export default function UsersAdminPage() {
       <Dialog open={!!editUser} onOpenChange={(open) => !open && setEditUser(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Modifier l&apos;utilisateur — {editUser?.email}</DialogTitle>
+            <DialogTitle>Rôles de {editUser?.email}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
@@ -244,12 +268,52 @@ export default function UsersAdminPage() {
                 ))}
               </select>
             </div>
+            <div className="space-y-2">
+              <Label>Profil Haroo</Label>
+              <select
+                className="w-full border border-border rounded-md p-2 bg-background text-foreground text-sm"
+                value={editForm.haroo_type}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, haroo_type: e.target.value as HarooType | '' }))
+                }
+              >
+                <option value="">Aucun</option>
+                {HAROO_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {HAROO_TYPE_LABELS[t]}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Indépendant du rôle d’organisation. Sa fiche est créée si besoin ; un agronome reste
+                à valider dans « Dossiers à valider ».
+              </p>
+            </div>
             <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex gap-2">
               <AlertCircle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
               <p className="text-xs text-yellow-800">
                 Changer le rôle ou la coopérative d&apos;un utilisateur affectera son accès immédiatement.
               </p>
             </div>
+          </div>
+          <div className="space-y-1 border-t border-border pt-3">
+            <p className="text-sm font-medium text-foreground">Historique des rôles</p>
+            {history === null ? (
+              <p className="text-xs text-muted-foreground">Chargement…</p>
+            ) : history.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Aucun changement enregistré.</p>
+            ) : (
+              <ul className="max-h-32 space-y-1 overflow-y-auto text-xs text-muted-foreground">
+                {history.map((h) => (
+                  <li key={h.created_at}>
+                    {new Date(h.created_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })} :{' '}
+                    {h.details.before?.role ?? '—'} → {h.details.after?.role ?? '—'}
+                    {h.details.before?.haroo_type !== h.details.after?.haroo_type &&
+                      `, Haroo ${h.details.before?.haroo_type ?? 'aucun'} → ${h.details.after?.haroo_type ?? 'aucun'}`}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditUser(null)} disabled={saving}>

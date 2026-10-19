@@ -52,7 +52,7 @@ export const SERVICE_REGISTRY: ServiceDefinition[] = [
   // ── Analyse ──────────────────────────────────────────────────────────────
   { id: 'analytics', name: 'Statistiques', description: 'Indicateurs et croissance de la coopérative', icon: BarChart3, category: 'Analyse', route: '/dashboard/analytics', type: 'native', roles: ['super_admin', 'cooperative_admin'], status: 'healthy' },
   { id: 'carte', name: 'Carte Agricole', description: 'Répartition géographique par préfecture', icon: MapIcon, category: 'Analyse', route: '/dashboard/carte', type: 'native', roles: ['super_admin', 'cooperative_admin'], status: 'healthy' },
-  { id: 'academy', name: 'AgriAcademy', description: 'Modules de formation certifiante', icon: GraduationCap, category: 'Analyse', route: '/dashboard/academy', type: 'native', status: 'healthy' },
+  { id: 'academy', name: 'AgriAcademy', description: 'Formations et parcours certifiant Opérateur', icon: GraduationCap, category: 'Analyse', route: '/dashboard/academy', type: 'native', status: 'healthy' },
 
   // ── Gestion ──────────────────────────────────────────────────────────────
   { id: 'marketplace', name: 'Exploitations', description: "Comptes d'exploitation publics", icon: ShoppingCart, category: 'Gestion', route: '/dashboard/marketplace', type: 'native', status: 'healthy' },

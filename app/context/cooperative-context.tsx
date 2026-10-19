@@ -49,9 +49,18 @@ export function CooperativeProvider({ children }: { children: React.ReactNode })
   // état : la valeur sert uniquement à comparer, jamais à rendre, et l'effet
   // n'a donc pas à se redéclencher quand elle change.
   const lastUserIdRef = useRef<string | null>(null)
+  // Numéro du dernier chargement lancé : un chargement plus ancien qui répond après ne
+  // remplace jamais le résultat d'un plus récent.
+  const fetchSeqRef = useRef(0)
+  // Le profil est réécrit à chaque renouvellement de session (nouvel objet `user`) : on ne
+  // recharge que si ce qui compte pour la liste change vraiment.
+  const userId = user?.id ?? null
+  const userRole = user?.role ?? null
+  const userCoopId = user?.cooperativeId ?? null
 
   const fetchCooperatives = useCallback(async () => {
-    if (!user) {
+    const seq = ++fetchSeqRef.current
+    if (!userId) {
       setCooperatives([])
       setCurrentCooperative(null)
       setIsLoading(false)
@@ -67,7 +76,7 @@ export function CooperativeProvider({ children }: { children: React.ReactNode })
     // du même navigateur (localStorage est partagé entre onglets, pas par
     // session) pouvait alors s'y trouver et être sélectionné — fuite de
     // données d'une coopérative réelle vers un compte qui n'y appartient pas.
-    if (user.role !== 'super_admin' && !user.cooperativeId) {
+    if (userRole !== 'super_admin' && !userCoopId) {
       setCooperatives([])
       setCurrentCooperative(null)
       setIsLoading(false)
@@ -82,7 +91,7 @@ export function CooperativeProvider({ children }: { children: React.ReactNode })
           'id, name, description, logo_url, primary_color, faitiere_name, level, parent_id, created_at',
         )
 
-      if (user.role !== 'super_admin' && user.cooperativeId) {
+      if (userRole !== 'super_admin' && userCoopId) {
         // For faitiere/union admins: load the full hierarchy (self + children + grandchildren)
         // For cooperative admins: load only their cooperative
 
@@ -96,12 +105,13 @@ export function CooperativeProvider({ children }: { children: React.ReactNode })
             )
             .in('id', accessibleIds as string[])
         } else {
-          query = query.eq('id', user.cooperativeId)
+          query = query.eq('id', userCoopId)
         }
       }
 
-      const { data, error } = await query.order('name')
+      const { data, error } = await query.is('deleted_at', null).order('name')
       if (error) throw error
+      if (seq !== fetchSeqRef.current) return
 
       const mapped = ((data as CooperativeRow[] | null) ?? []).map(rowToCooperative)
       setCooperatives(mapped)
@@ -109,17 +119,23 @@ export function CooperativeProvider({ children }: { children: React.ReactNode })
       // Persist last-selected cooperative for super_admin so they don't reset on refresh
       const stored =
         typeof window !== 'undefined' ? window.localStorage.getItem('current_coop_id') : null
-      const fallback = user.cooperativeId
-        ? mapped.find((c) => c.id === user.cooperativeId)
-        : undefined
+      const fallback = userCoopId ? mapped.find((c) => c.id === userCoopId) : undefined
       const fromStored = stored ? mapped.find((c) => c.id === stored) : undefined
-      setCurrentCooperative(fromStored ?? fallback ?? mapped[0] ?? null)
+      // Une organisation déjà ouverte le reste : un rechargement ne doit jamais la remplacer.
+      setCurrentCooperative(
+        (prev) =>
+          fromStored ??
+          (prev ? mapped.find((c) => c.id === prev.id) : undefined) ??
+          fallback ??
+          mapped[0] ??
+          null,
+      )
     } catch (e) {
       log.error('Failed to fetch cooperatives', e)
     } finally {
       setIsLoading(false)
     }
-  }, [user, supabase])
+  }, [userId, userRole, userCoopId, supabase])
 
   // Changement de compte : purger les données du précédent locataire.
   // Sans cela, une coopérative reste affichée après une bascule de compte —

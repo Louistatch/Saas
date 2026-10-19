@@ -1,24 +1,26 @@
 'use client'
 
 /**
- * Espace Opérateur — entrée du troisième espace produit (§17 du plan).
+ * Espace Opérateur — l'entrée du troisième espace produit (§17 du plan).
  *
- * Volontairement minimal : PR 1 ne livre que les fondations (schéma, gardes,
- * routage d'espace). Le tableau de bord Opérateur complet — mandats en
- * cours, cartes physiques imprimées, portefeuille PAYG — arrive en PR 4,
- * une fois PR 2 (facturation) et PR 3 (carte physique) posés dessous.
+ * Ce que cette page garantit :
+ *   - un compte organisationnel ou Haroo peut se porter candidat sans quitter son espace
+ *     actuel (§18 — aucune exclusion mutuelle réintroduite) ;
+ *   - la certification est visible pour ce qu'elle est : un parcours (formation → évaluation
+ *     → paiement → validation), jamais un privilège accordé au clic (§25) ;
+ *   - la personne voit d'abord où elle en est et ce qu'elle a à faire maintenant ; le reste
+ *     (portefeuille, impression, validation) n'apparaît qu'une fois opérateur actif.
  *
- * Ce que cette page garantit dès maintenant :
- *   - un compte organisationnel ou Haroo peut se porter candidat sans
- *     quitter son espace actuel (§18 — aucune exclusion mutuelle réintroduite,
- *     contrairement au problème déjà réglé entre /dashboard et /haroo) ;
- *   - la certification est visible pour ce qu'elle est : un parcours
- *     (formation → examen → paiement → validation), jamais un privilège
- *     accordé au clic (§25).
+ * Dessin : une carte d'opérateur (vert profond, le code du dossier imprimé dessus, comme la
+ * carte physique que l'opérateur imprimera pour les membres), puis le parcours tracé comme une
+ * route. Mouvement : une seule entrée orchestrée, la ligne du parcours qui se trace (skill
+ * ui-motion). Partage : la formation se recommande sur WhatsApp (components/operator/share-training).
  */
 
 import { ProtectedRoute } from '@/app/components/protected-route'
 import { useAuth } from '@/app/context/auth-context'
+import { Journey, journeySteps } from '@/components/operator/journey'
+import { ShareTraining } from '@/components/operator/share-training'
 import { Spinner } from '@/components/shared/loading'
 import { Logo } from '@/components/shared/logo'
 import { Button } from '@/components/ui/button'
@@ -26,16 +28,23 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { performLogout } from '@/lib/auth/logout'
+import {
+  CERTIFICATION_RESULT_COPY,
+  type CertificationResult,
+  STAGE_COPY,
+  STAGE_STEP,
+  operatorStage,
+  parseCertificationResult,
+} from '@/lib/partners/stage'
 import type { PartnerLedgerEntryType, PartnerStatus } from '@/types/domain'
 import {
   ArrowDownCircle,
   ArrowUpCircle,
   Award,
-  Briefcase,
   CheckCircle2,
-  Clock,
   GraduationCap,
   LogOut,
+  MessageCircle,
   PackageCheck,
   Printer,
   ShieldAlert,
@@ -55,6 +64,7 @@ interface PartnerStatusResponse {
   training_completed_at?: string | null
   exam_passed_at?: string | null
   certified_at?: string | null
+  training?: { lessons_completed: number; lessons_total: number } | null
 }
 
 interface WalletLedgerRow {
@@ -72,31 +82,13 @@ interface WalletResponse {
   ledger: WalletLedgerRow[]
 }
 
-const STATUS_LABEL: Record<PartnerStatus, string> = {
-  candidate: 'Candidature enregistrée',
-  training: 'Formation en cours',
-  exam_pending: 'Évaluation pratique en attente',
-  certified: 'Certifié — paiement des frais en attente',
-  active: 'Opérateur actif',
-  suspended: 'Suspendu',
-  expired: 'Certification expirée',
-  revoked: 'Révoqué',
-}
-
-const STATUS_STEP: Record<PartnerStatus, number> = {
-  candidate: 1,
-  training: 2,
-  exam_pending: 3,
-  certified: 4,
-  active: 5,
-  suspended: 4,
-  expired: 4,
-  revoked: 0,
-}
+/** Entrée de page orchestrée : chaque bloc arrive dans l'ordre de lecture (skill ui-motion). */
+const enter = (rank: number) =>
+  `motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:fill-mode-both motion-safe:duration-300 motion-safe:ease-out motion-safe:[animation-delay:${rank * 70}ms]`
 
 function OperatorHeader() {
   return (
-    <header className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-6">
+    <header className="flex items-center justify-between px-4 py-3 sm:px-6">
       <Logo size="md" />
       <Button variant="ghost" size="sm" onClick={() => performLogout()}>
         <LogOut className="mr-1.5 h-4 w-4" /> Déconnexion
@@ -105,46 +97,49 @@ function OperatorHeader() {
   )
 }
 
-/** Parcours de certification : formation gratuite → examen → 15 000 XOF → validation (§9, §24 du plan). */
-function CertificationProgress({ status }: { status: PartnerStatus }) {
-  const step = STATUS_STEP[status]
-  const steps = [
-    { n: 1, label: 'Candidature' },
-    { n: 2, label: 'Formation (gratuite)' },
-    { n: 3, label: 'Évaluation pratique' },
-    { n: 4, label: 'Frais de certification — 15 000 XOF' },
-    { n: 5, label: 'Opérateur actif' },
-  ]
+/**
+ * La carte d'opérateur : nom du dossier, code, état, prochaine action. Vert profond comme
+ * la console de validation installée sur le téléphone (operator.webmanifest).
+ */
+function OperatorCard({ status, firstName }: { status: PartnerStatusResponse; firstName: string }) {
+  const copy = status.status
+    ? STAGE_COPY[operatorStage({ ...status, status: status.status })]
+    : null
   return (
-    <ol className="space-y-3">
-      {steps.map((s) => {
-        const done = step > s.n
-        const current = step === s.n
-        return (
-          <li key={s.label} className="flex items-center gap-3">
-            {done ? (
-              <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" />
-            ) : current ? (
-              <Clock className="h-5 w-5 shrink-0 text-amber-500" />
-            ) : (
-              <div className="h-5 w-5 shrink-0 rounded-full border-2 border-border" />
-            )}
-            <span
-              className={current ? 'font-medium text-foreground' : 'text-sm text-muted-foreground'}
-            >
-              {s.label}
-            </span>
-          </li>
-        )
-      })}
-    </ol>
+    <section
+      aria-labelledby="operator-card-title"
+      className="relative overflow-hidden rounded-3xl bg-[#0d3d22] px-5 pb-5 pt-6 text-white shadow-[0_18px_40px_-24px_rgba(13,61,34,0.9)] sm:px-7 sm:pt-7"
+    >
+      <span
+        aria-hidden
+        className="pointer-events-none absolute -right-10 -top-14 h-44 w-44 rounded-full border-[18px] border-white/[0.06]"
+      />
+      <p className="text-sm text-white/70">Bonjour {firstName}</p>
+      <div className="mt-1 flex items-start justify-between gap-4">
+        <h1 id="operator-card-title" className="text-2xl font-bold leading-tight tracking-tight">
+          {status.display_name}
+        </h1>
+        {status.partner_code && (
+          <span className="shrink-0 rounded-md border border-white/25 px-2 py-1 font-mono text-xs tracking-wider text-white/90">
+            {status.partner_code}
+          </span>
+        )}
+      </div>
+      {copy && (
+        <div className="mt-5 border-t border-white/15 pt-4">
+          <p className="text-base font-semibold">{copy.state}</p>
+          <p className="mt-1 text-sm leading-relaxed text-white/80">{copy.next}</p>
+        </div>
+      )}
+    </section>
   )
 }
 
 /**
  * Bouton de paiement de certification — n'apparaît que si formation et examen
  * sont déjà validés (§9, §24 du plan). Redirige vers la page de paiement
- * hébergée CinetPay ; le statut ne changera qu'au retour du callback.
+ * hébergée FedaPay ; le statut ne change qu'une fois la transaction relue
+ * auprès de FedaPay (retour ou notification).
  */
 function CertificationPayment({ eligible }: { eligible: boolean }) {
   const [phone, setPhone] = useState('')
@@ -155,7 +150,7 @@ function CertificationPayment({ eligible }: { eligible: boolean }) {
 
   const pay = async () => {
     if (!phone.trim()) {
-      setError('Indiquez le numéro mobile money à utiliser.')
+      setError('Indiquez votre numéro de téléphone.')
       return
     }
     setSubmitting(true)
@@ -182,10 +177,11 @@ function CertificationPayment({ eligible }: { eligible: boolean }) {
   return (
     <div className="space-y-3 rounded-xl border border-amber-300/60 bg-amber-50/40 p-4">
       <p className="text-sm font-medium text-foreground">
-        Formation et examen validés — reste le paiement des frais de certification (15 000 XOF).
+        Formation et évaluation validées. Il reste les frais de certification, 15 000 XOF, à régler
+        par Mobile Money ou carte bancaire sur la page de paiement sécurisée FedaPay.
       </p>
       <div className="space-y-2">
-        <Label htmlFor="cert-phone">Numéro mobile money</Label>
+        <Label htmlFor="cert-phone">Votre numéro de téléphone</Label>
         <Input
           id="cert-phone"
           value={phone}
@@ -197,6 +193,44 @@ function CertificationPayment({ eligible }: { eligible: boolean }) {
       <Button onClick={pay} disabled={submitting} className="w-full">
         {submitting ? <Spinner className="h-4 w-4" /> : 'Payer 15 000 XOF'}
       </Button>
+    </div>
+  )
+}
+
+/**
+ * Message au retour de la page de paiement FedaPay. Le paramètre est retiré de l'adresse pour
+ * qu'un rechargement ne réaffiche pas un résultat périmé.
+ */
+function CertificationResultBanner({
+  value,
+  onClose,
+}: {
+  value: { result: CertificationResult; ref: string | null }
+  onClose: () => void
+}) {
+  const copy = CERTIFICATION_RESULT_COPY[value.result]
+  const tone =
+    copy.tone === 'ok'
+      ? 'border-primary/40 bg-primary/5'
+      : copy.tone === 'wait'
+        ? 'border-amber-300/60 bg-amber-50/40'
+        : 'border-destructive/40 bg-destructive/5'
+  return (
+    <div aria-live="polite" className={`mt-6 space-y-2 rounded-xl border p-4 ${tone}`}>
+      <p className="text-sm font-semibold text-foreground">{copy.title}</p>
+      <p className="text-sm text-muted-foreground">{copy.body}</p>
+      <div className="flex flex-wrap gap-2 pt-1">
+        {value.result === 'pending' && value.ref && (
+          <Button size="sm" asChild>
+            <a href={`/api/payments/fedapay/return?certification=${value.ref}`}>
+              Vérifier le paiement
+            </a>
+          </Button>
+        )}
+        <Button size="sm" variant="ghost" onClick={onClose}>
+          Fermer
+        </Button>
+      </div>
     </div>
   )
 }
@@ -560,100 +594,107 @@ function OperatorPageContent() {
 
   useEffect(load, [])
 
+  const [payResult, setPayResult] = useState<ReturnType<typeof parseCertificationResult>>(null)
+  useEffect(() => {
+    const parsed = parseCertificationResult(window.location.search)
+    if (!parsed) return
+    setPayResult(parsed)
+    window.history.replaceState(null, '', window.location.pathname)
+  }, [])
+
+  const closed =
+    status?.status === 'revoked' || status?.status === 'suspended' || status?.status === 'expired'
+  const paymentDue =
+    !!status?.training_completed_at && !!status.exam_passed_at && !status.certified_at
+
   return (
     <div className="min-h-screen bg-background">
       <OperatorHeader />
-      <main className="mx-auto max-w-xl px-4 py-10 sm:px-6">
-        <div className="mb-6 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Briefcase className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-foreground">Espace Opérateur</h1>
-              <p className="text-sm text-muted-foreground">Bonjour {user?.firstName ?? ''}</p>
-            </div>
-          </div>
-          {status?.has_applied ? (
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/operator/training">
-                <GraduationCap className="mr-1.5 h-4 w-4" /> Formation
-              </Link>
-            </Button>
-          ) : null}
-        </div>
-
+      <main className="mx-auto max-w-xl px-4 pb-32 pt-2 sm:px-6">
         {loading ? (
-          <div className="flex justify-center py-16">
+          <div className="flex justify-center py-16" aria-busy="true">
             <Spinner className="h-6 w-6" />
           </div>
         ) : status?.has_applied && status.status ? (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between text-foreground">
-                <span className="flex items-center gap-2">
-                  <GraduationCap className="h-5 w-5 text-primary" /> {status.display_name}
-                </span>
-                {status.partner_code && (
-                  <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-mono text-muted-foreground">
-                    {status.partner_code}
-                  </span>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <p className="text-sm font-medium text-foreground">{STATUS_LABEL[status.status]}</p>
-              {status.status === 'revoked' || status.status === 'suspended' ? (
-                <p className="flex items-center gap-2 text-sm text-destructive">
-                  <ShieldAlert className="h-4 w-4" /> Contactez l'équipe FaîtiereHub pour plus
-                  d'informations.
-                </p>
-              ) : (
-                <>
-                  <CertificationProgress status={status.status} />
-                  <Button variant="outline" className="w-full" asChild>
+          <>
+            <div className={enter(0)}>
+              <OperatorCard status={status} firstName={user?.firstName ?? ''} />
+            </div>
+
+            {payResult && (
+              <CertificationResultBanner value={payResult} onClose={() => setPayResult(null)} />
+            )}
+
+            {closed ? (
+              <p className={`mt-6 flex items-start gap-2 text-sm text-destructive ${enter(1)}`}>
+                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                Ce dossier n'avance plus pour le moment. Le bouton « Écrire à l'équipe » en bas de
+                l'écran vous met en relation avec FaîtiereHub.
+              </p>
+            ) : (
+              <section className={`mt-8 ${enter(1)}`} aria-labelledby="journey-title">
+                <h2 id="journey-title" className="mb-2 text-base font-semibold text-foreground">
+                  Votre parcours
+                </h2>
+                <Journey
+                  current={STAGE_STEP[operatorStage({ ...status, status: status.status })]}
+                  steps={journeySteps({
+                    status: status.status,
+                    training_completed_at: status.training_completed_at,
+                    exam_passed_at: status.exam_passed_at,
+                    certified_at: status.certified_at,
+                    training: status.training ?? null,
+                    trainingAction: (
+                      <Button className="min-h-11 w-full rounded-full sm:w-auto sm:px-6" asChild>
+                        <Link href="/operator/training">
+                          <GraduationCap className="mr-1.5 h-4 w-4" />
+                          {status.status === 'training'
+                            ? 'Continuer la formation'
+                            : 'Commencer la formation'}
+                        </Link>
+                      </Button>
+                    ),
+                    paymentAction: <CertificationPayment eligible={paymentDue} />,
+                  })}
+                />
+                {status.training_completed_at && (
+                  <Button variant="ghost" size="sm" className="mt-2" asChild>
                     <Link href="/operator/training">
-                      <GraduationCap className="mr-1.5 h-4 w-4" />
-                      {status.training_completed_at
-                        ? 'Revoir la formation'
-                        : 'Aller à la formation'}
+                      <GraduationCap className="mr-1.5 h-4 w-4" /> Revoir la formation
                     </Link>
                   </Button>
-                  <CertificationPayment
-                    eligible={
-                      !!status.training_completed_at &&
-                      !!status.exam_passed_at &&
-                      !status.certified_at
-                    }
-                  />
-                </>
-              )}
-            </CardContent>
-          </Card>
+                )}
+              </section>
+            )}
+
+            {(status.status === 'certified' || status.status === 'active') && (
+              <div className={`mt-8 ${enter(2)}`}>
+                <WalletCard />
+              </div>
+            )}
+
+            {status.status === 'active' && (
+              <div className={`mt-6 space-y-3 ${enter(3)}`}>
+                <PrintQueueCard />
+                <Button variant="outline" className="min-h-11 w-full" asChild>
+                  <Link href="/operator/professionals">
+                    <UserCheck className="mr-1.5 h-4 w-4" /> Professionnels à valider
+                  </Link>
+                </Button>
+                <Button variant="outline" className="min-h-11 w-full" asChild>
+                  <Link href="/operator/messages">
+                    <MessageCircle className="mr-1.5 h-4 w-4" /> Messages de votre zone
+                  </Link>
+                </Button>
+              </div>
+            )}
+
+            <ShareTraining className={`mt-10 border-t border-border pt-6 ${enter(2)}`} />
+          </>
         ) : (
-          <ApplicationForm onApplied={load} />
-        )}
-
-        {status?.has_applied &&
-          status.status &&
-          (status.status === 'certified' || status.status === 'active') && (
-            <div className="mt-6">
-              <WalletCard />
-            </div>
-          )}
-
-        {status?.status === 'active' && (
-          <div className="mt-6">
-            <PrintQueueCard />
+          <div className={enter(0)}>
+            <ApplicationForm onApplied={load} />
           </div>
-        )}
-
-        {status?.status === 'active' && (
-          <Button variant="outline" className="mt-6 w-full" asChild>
-            <Link href="/operator/professionals">
-              <UserCheck className="mr-1.5 h-4 w-4" /> Professionnels à valider
-            </Link>
-          </Button>
         )}
       </main>
     </div>

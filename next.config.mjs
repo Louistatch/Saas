@@ -1,7 +1,32 @@
 import { withSentryConfig } from '@sentry/nextjs'
 
+// HarooLife realtime relay (Socket.IO, WebSocket only): allowed in connect-src only when configured.
+const realtimeSources = (() => {
+  const raw = process.env.NEXT_PUBLIC_HAROOLIFE_REALTIME_URL
+  if (!raw) return ''
+  try {
+    const u = new URL(raw)
+    const ws = u.protocol === 'https:' ? 'wss:' : 'ws:'
+    return ` ${u.origin} ${ws}//${u.host}`
+  } catch {
+    return ''
+  }
+})()
+
+// Local builds only (never on Vercel): the local Supabase on the loopback interface (development
+// and end-to-end tests), which the production policy would otherwise refuse.
+const localSupabase = (() => {
+  if (process.env.VERCEL) return ''
+  try {
+    const u = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '')
+    return ['127.0.0.1', 'localhost'].includes(u.hostname) ? ` ${u.origin}` : ''
+  } catch {
+    return ''
+  }
+})()
+
 /** @type {import('next').NextConfig} */
-const securityHeaders = [
+const buildSecurityHeaders = ({ wasm = false } = {}) => [
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
@@ -20,31 +45,40 @@ const securityHeaders = [
       "default-src 'self'",
       // Next.js requires unsafe-inline for its inline scripts.
       // unsafe-eval removed for security — not needed by Next.js 16+
-      "script-src 'self' 'unsafe-inline' https:",
+      // 'wasm-unsafe-eval' lets WebAssembly compile (Rapier physics in HarooLife); unlike
+      // 'unsafe-eval' it does not allow eval() or new Function(). HarooLife routes only.
+      `script-src 'self' 'unsafe-inline'${wasm ? " 'wasm-unsafe-eval'" : ''} https:`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://*.supabase.co https:",
       "font-src 'self'",
-      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.vercel-analytics.com https://*.vercel.app https://*.i.posthog.com https://*.posthog.com`,
+      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.vercel-analytics.com https://*.vercel.app https://*.i.posthog.com https://*.posthog.com https://challenges.cloudflare.com${realtimeSources}${localSupabase}`,
       "worker-src 'self'",
       "manifest-src 'self'",
       "frame-ancestors 'none'",
       // Aucun cadre FedaPay : le paiement Mobile Money se fait toujours sur le site.
-      "frame-src 'self' https://*.vercel.app",
+      // Turnstile (Cloudflare) garde son cadre.
+      "frame-src 'self' https://*.vercel.app https://challenges.cloudflare.com",
       "base-uri 'self'",
       "form-action 'self'",
-      "upgrade-insecure-requests",
+      // Local LAN test builds (scripts/haroolife-lan.sh) are served over plain http from the PC's
+      // IP: upgrading would turn every asset into an https URL that does not exist. Never on Vercel.
+      ...(process.env.HAROOLIFE_LAN_HTTP === '1' && !process.env.VERCEL ? [] : ['upgrade-insecure-requests']),
     ].join('; '),
   },
 ]
+
+const securityHeaders = buildSecurityHeaders()
+const harooLifeSecurityHeaders = buildSecurityHeaders({ wasm: true })
 
 const nextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
   images: {
-    // OPT-05: enable Next.js image optimization. Supabase Storage public URLs
-    // are whitelisted as remote sources. Modern formats served automatically.
-    formats: ['image/avif', 'image/webp'],
+    // WebP avoids AVIF's more expensive first encode on rural mobile requests.
+    // Authenticated card exports/QR codes never pass through this public optimizer.
+    formats: ['image/webp'],
+    qualities: [60, 75, 85],
     remotePatterns: [
       { protocol: 'https', hostname: '*.supabase.co', pathname: '/storage/v1/object/public/**' },
     ],
@@ -79,17 +113,40 @@ const nextConfig = {
       './public/logo.png',
     ],
   },
+  // Anciennes adresses : /login n'a jamais existé mais a été lié depuis HarooLife.
+  async redirects() {
+    return [{ source: '/login', destination: '/auth/login', permanent: false }]
+  },
   async headers() {
     return [
+      // HTTP protection supplements metadata on private pages and redirects.
+      // robots.txt reduces crawling; only noindex can remove a crawled URL from search.
+      ...[
+        '/auth/:path*', '/admin/:path*', '/dashboard/:path*', '/operator/:path*',
+        '/espace-operateur/:path*', '/mon-espace-haroo/:path*', '/haroo/:path*',
+        '/compte/:path*', '/messages/:path*', '/reports/:path*', '/verify/:path*',
+        '/scan/:path*', '/setup/:path*', '/demo/:path*', '/forbidden/:path*',
+        '/embed/:path*', '/widget/:path*', '/api/:path*',
+        '/marketplace/achat/:path*', '/haroolife/territoire/:path*',
+        '/fournisseurs/:memberId',
+      ].map((source) => ({
+        source,
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+      })),
+      ...(process.env.VERCEL_ENV === 'preview' ? [{
+        source: '/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+      }] : []),
       { source: '/api/verify/:path*', headers: [
         { key: 'Cache-Control', value: 'private, no-store' },
         { key: 'CDN-Cache-Control', value: 'no-store' },
         { key: 'Vercel-CDN-Cache-Control', value: 'no-store' },
       ] },
       {
-        source: '/((?!embed|api/widget|verify).*)',
+        source: '/((?!embed|api/widget|verify|haroolife).*)',
         headers: securityHeaders,
       },
+      { source: '/haroolife', headers: harooLifeSecurityHeaders },
+      { source: '/haroolife/:path*', headers: harooLifeSecurityHeaders },
       {
         // Verify pages: NEVER cache — always fetch fresh data after QR scan
         source: '/verify/:path*',
@@ -112,6 +169,16 @@ const nextConfig = {
           // Embed: allow framing from any origin (widget use case)
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'no-referrer' },
+        ],
+      },
+      {
+        // HarooLife 3D models and packs (≈ 6 MB): served with max-age=0, each visit revalidated
+        // ~42 files before the world could start. A day of freshness, then a background
+        // revalidation: a changed model reaches players at the latest the next day. Immutable,
+        // versioned URLs are the next step (they need every loader to carry the version).
+        source: '/haroolife/:dir(city|vendor|models)/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=604800' },
         ],
       },
       {

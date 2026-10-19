@@ -1,24 +1,39 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Plus, Search, Edit2, Trash2, CreditCard } from 'lucide-react'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { createClient } from '@/lib/supabase/client'
-import { useToast } from '@/hooks/use-toast'
-import { useDebounced } from '@/hooks/use-debounced'
-import { LoadingBlock, Spinner } from '@/components/shared/loading'
+import { useOpenCooperative } from '@/components/admin/view-as'
+import { useConfirm } from '@/components/shared/confirm-dialog'
 import { EmptyState } from '@/components/shared/empty-state'
+import { LoadingBlock, Spinner } from '@/components/shared/loading'
 import { PageHeader } from '@/components/shared/page-header'
 import { PaginationBar } from '@/components/shared/pagination'
-import { useConfirm } from '@/components/shared/confirm-dialog'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { useDebounced } from '@/hooks/use-debounced'
+import { useResetPageOnChange } from '@/hooks/use-reset-page'
+import { useToast } from '@/hooks/use-toast'
+import { TOGO_FAITIERES, faitiereLabel } from '@/lib/faitieres-togo'
+import { createClient } from '@/lib/supabase/client'
 import { errorMessage } from '@/lib/utils/errors'
 import { cooperativeSchema, flattenZodErrors } from '@/lib/validators/schemas'
-import { useResetPageOnChange } from '@/hooks/use-reset-page'
+import {
+  Archive,
+  ArchiveRestore,
+  CreditCard,
+  Edit2,
+  LayoutDashboard,
+  Plus,
+  Search,
+} from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 const PAGE_SIZE = 20
 
@@ -66,7 +81,6 @@ const emptyForm = {
 
 export default function CooperativesAdminPage() {
   const supabase = useMemo(() => createClient(), [])
-  const router = useRouter()
   const { toast } = useToast()
   const { confirm, confirmNode } = useConfirm()
 
@@ -75,6 +89,8 @@ export default function CooperativesAdminPage() {
   const debouncedSearch = useDebounced(search, 200)
   const [page, setPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
+  const [archivedIds, setArchivedIds] = useState<Set<string>>(new Set())
+  const [showArchived, setShowArchived] = useState(false)
   const [showDialog, setShowDialog] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -83,6 +99,9 @@ export default function CooperativesAdminPage() {
 
   const fetchCooperatives = useCallback(async () => {
     setIsLoading(true)
+    // La vue de statistiques n'expose pas deleted_at : on lit les archivées à part.
+    const archived = await supabase.from('cooperatives').select('id').not('deleted_at', 'is', null)
+    setArchivedIds(new Set((archived.data ?? []).map((r: { id: string }) => r.id)))
     // Prefer the cooperative_stats view (single-query, no N+1).
     const view = await supabase
       .from('cooperative_stats')
@@ -134,11 +153,10 @@ export default function CooperativesAdminPage() {
 
   const filtered = useMemo(() => {
     const q = debouncedSearch.toLowerCase().trim()
-    if (!q) return cooperatives
-    return cooperatives.filter((c) =>
-      `${c.name} ${c.description ?? ''}`.toLowerCase().includes(q),
-    )
-  }, [cooperatives, debouncedSearch])
+    const scope = cooperatives.filter((c) => archivedIds.has(c.id) === showArchived)
+    if (!q) return scope
+    return scope.filter((c) => `${c.name} ${c.description ?? ''}`.toLowerCase().includes(q))
+  }, [cooperatives, debouncedSearch, archivedIds, showArchived])
 
   const paged = useMemo(
     () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
@@ -165,12 +183,8 @@ export default function CooperativesAdminPage() {
   }
 
   /** Ouvre le flux de génération de cartes existant, ciblé sur cette structure. */
-  const openCards = (item: CooperativeAdminRow) => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('current_coop_id', item.id)
-    }
-    router.push('/dashboard/cards')
-  }
+  const openCooperative = useOpenCooperative()
+  const openCards = (item: CooperativeAdminRow) => void openCooperative(item.id, '/dashboard/cards')
 
   // Parents possibles selon le niveau choisi : une union se rattache à une
   // faîtière, une coopérative à une union ou une faîtière.
@@ -190,39 +204,59 @@ export default function CooperativesAdminPage() {
     setSaving(true)
     const payload = {
       name: parsed.data.name,
-      description: parsed.data.description || null,
+      description: parsed.data.description || '',
       primary_color: parsed.data.primary_color,
       level: form.level,
       parent_id: form.level === 'faitiere' ? null : form.parent_id || null,
     }
-    const { error } = editId
-      ? await supabase.from('cooperatives').update(payload).eq('id', editId)
-      : await supabase.from('cooperatives').insert(payload)
+    const res = await fetch(
+      editId ? `/api/admin/cooperatives/${editId}` : '/api/admin/cooperatives',
+      {
+        method: editId ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editId ? { action: 'update', data: payload } : payload),
+      },
+    ).catch(() => null)
     setSaving(false)
-    if (error) {
-      toast({ title: 'Échec de la sauvegarde', description: errorMessage(error), variant: 'destructive' })
+    const data: { error?: string } = res ? await res.json().catch(() => ({})) : {}
+    if (!res?.ok) {
+      toast({
+        title: 'Échec de la sauvegarde',
+        description: data.error ?? 'Connexion interrompue : réessayez.',
+        variant: 'destructive',
+      })
       return
     }
-    toast({ title: editId ? 'Coopérative mise à jour' : 'Coopérative créée' })
+    toast({ title: editId ? 'Organisation mise à jour' : 'Organisation créée' })
     setShowDialog(false)
     fetchCooperatives()
   }
 
-  const handleDelete = async (item: CooperativeAdminRow) => {
-    const ok = await confirm({
-      title: `Supprimer "${item.name}" ?`,
-      description:
-        'Cela supprime définitivement la coopérative ainsi que tous les membres, exploitations, cartes et intégrations.',
-      destructive: true,
-      confirmLabel: 'Supprimer la coopérative',
-    })
-    if (!ok) return
-    const { error } = await supabase.from('cooperatives').delete().eq('id', item.id)
-    if (error) {
-      toast({ title: 'Échec de la suppression', description: errorMessage(error), variant: 'destructive' })
+  const setArchived = async (item: CooperativeAdminRow, archive: boolean) => {
+    if (archive) {
+      const ok = await confirm({
+        title: `Archiver « ${item.name} » ?`,
+        description:
+          'Elle disparaît des listes et ne reçoit plus de nouvelles inscriptions. Ses membres, exploitations, cartes et son historique sont conservés : vous pourrez la restaurer.',
+        confirmLabel: 'Archiver',
+      })
+      if (!ok) return
+    }
+    const res = await fetch(`/api/admin/cooperatives/${item.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: archive ? 'archive' : 'restore' }),
+    }).catch(() => null)
+    const data: { error?: string } = res ? await res.json().catch(() => ({})) : {}
+    if (!res?.ok) {
+      toast({
+        title: archive ? 'Archivage refusé' : 'Restauration impossible',
+        description: data.error ?? 'Connexion interrompue : réessayez.',
+        variant: 'destructive',
+      })
       return
     }
-    toast({ title: 'Coopérative supprimée' })
+    toast({ title: archive ? 'Organisation archivée' : 'Organisation restaurée' })
     fetchCooperatives()
   }
 
@@ -244,6 +278,15 @@ export default function CooperativesAdminPage() {
             aria-label="Rechercher des coopératives"
           />
         </div>
+        <Button
+          variant="outline"
+          aria-pressed={showArchived}
+          onClick={() => setShowArchived((v) => !v)}
+          className="gap-2 border-border"
+        >
+          <Archive className="h-4 w-4" />
+          {showArchived ? 'Voir les actives' : `Archivées (${archivedIds.size})`}
+        </Button>
         <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={openAdd}>
           <Plus className="h-4 w-4" />
           Ajouter une coopérative
@@ -253,13 +296,17 @@ export default function CooperativesAdminPage() {
       <Card className="border-border">
         <CardHeader>
           <CardTitle className="text-foreground">Toutes les coopératives</CardTitle>
-          <CardDescription>Liste complète des coopératives enregistrées ({filtered.length})</CardDescription>
+          <CardDescription>
+            Liste complète des coopératives enregistrées ({filtered.length})
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <LoadingBlock />
           ) : filtered.length === 0 ? (
-            <EmptyState title={search ? 'Aucune coopérative trouvée' : 'Aucune coopérative pour le moment'} />
+            <EmptyState
+              title={search ? 'Aucune coopérative trouvée' : 'Aucune coopérative pour le moment'}
+            />
           ) : (
             <>
               <div className="overflow-x-auto">
@@ -268,16 +315,23 @@ export default function CooperativesAdminPage() {
                     <tr className="border-b border-border">
                       <th className="text-left py-3 px-4 font-semibold text-foreground">Nom</th>
                       <th className="text-left py-3 px-4 font-semibold text-foreground">Niveau</th>
-                      <th className="text-left py-3 px-4 font-semibold text-foreground">Description</th>
+                      <th className="text-left py-3 px-4 font-semibold text-foreground">
+                        Description
+                      </th>
                       <th className="text-left py-3 px-4 font-semibold text-foreground">Membres</th>
                       <th className="text-left py-3 px-4 font-semibold text-foreground">Couleur</th>
                       <th className="text-left py-3 px-4 font-semibold text-foreground">Créé le</th>
-                      <th className="text-right py-3 px-4 font-semibold text-foreground">Actions</th>
+                      <th className="text-right py-3 px-4 font-semibold text-foreground">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {paged.map((coop) => (
-                      <tr key={coop.id} className="border-b border-border hover:bg-accent/5 transition-colors">
+                      <tr
+                        key={coop.id}
+                        className="border-b border-border hover:bg-accent/5 transition-colors"
+                      >
                         <td className="py-3 px-4 text-foreground font-medium">{coop.name}</td>
                         <td className="py-3 px-4">
                           <span className="px-2 py-0.5 text-xs font-semibold text-primary bg-primary/10 rounded-full">
@@ -309,6 +363,16 @@ export default function CooperativesAdminPage() {
                               size="sm"
                               variant="outline"
                               className="border-border gap-1.5"
+                              onClick={() => void openCooperative(coop.id)}
+                              aria-label={`Ouvrir le tableau de bord de ${coop.name}`}
+                            >
+                              <LayoutDashboard className="h-4 w-4" />
+                              Tableau de bord
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-border gap-1.5"
                               onClick={() => openCards(coop)}
                               aria-label={`Gérer les cartes de ${coop.name}`}
                               title="Générer / gérer les cartes membres"
@@ -328,11 +392,15 @@ export default function CooperativesAdminPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="border-border text-destructive hover:bg-destructive/10"
-                              onClick={() => handleDelete(coop)}
-                              aria-label={`Delete ${coop.name}`}
+                              className="border-border"
+                              onClick={() => setArchived(coop, !showArchived)}
+                              aria-label={`${showArchived ? 'Restaurer' : 'Archiver'} ${coop.name}`}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              {showArchived ? (
+                                <ArchiveRestore className="h-4 w-4" />
+                              ) : (
+                                <Archive className="h-4 w-4 text-muted-foreground" />
+                              )}
                             </Button>
                           </div>
                         </td>
@@ -355,21 +423,25 @@ export default function CooperativesAdminPage() {
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editId ? 'Modifier la coopérative' : 'Ajouter une coopérative'}</DialogTitle>
+            <DialogTitle>
+              {editId ? 'Modifier la coopérative' : 'Ajouter une coopérative'}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Niveau <span className="text-destructive">*</span></Label>
+              <Label>
+                Niveau <span className="text-destructive">*</span>
+              </Label>
               <select
                 value={form.level}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, level: e.target.value, parent_id: '' }))
-                }
+                onChange={(e) => setForm((f) => ({ ...f, level: e.target.value, parent_id: '' }))}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 aria-label="Niveau de la structure"
               >
                 {LEVELS.map((l) => (
-                  <option key={l.value} value={l.value}>{l.label}</option>
+                  <option key={l.value} value={l.value}>
+                    {l.label}
+                  </option>
                 ))}
               </select>
             </div>
@@ -390,19 +462,41 @@ export default function CooperativesAdminPage() {
                   ))}
                 </select>
                 <p className="text-xs text-muted-foreground">
-                  Rattacher à une faîtière{form.level === 'cooperative' ? ' ou une union' : ''} pour que ses statistiques incluent cette structure.
+                  Rattacher à une faîtière{form.level === 'cooperative' ? ' ou une union' : ''} pour
+                  que ses statistiques incluent cette structure.
                 </p>
               </div>
             )}
             <div className="space-y-2">
-              <Label>Nom <span className="text-destructive">*</span></Label>
+              <Label>
+                Nom <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Coopérative du Nord"
+                placeholder={
+                  form.level === 'faitiere'
+                    ? 'Choisir ou écrire, ex. : REJEPPAT'
+                    : 'Coopérative du Nord'
+                }
+                list={form.level === 'faitiere' ? 'togo-faitieres' : undefined}
                 aria-invalid={!!formErrors.name}
               />
-              {formErrors.name ? <p className="text-xs text-destructive">{formErrors.name}</p> : null}
+              {form.level === 'faitiere' && (
+                <datalist id="togo-faitieres">
+                  {TOGO_FAITIERES.filter(
+                    (f) =>
+                      !cooperatives.some((c) => c.name.toLowerCase() === f.acronym.toLowerCase()),
+                  ).map((f) => (
+                    <option key={f.acronym} value={f.acronym}>
+                      {faitiereLabel(f)}, {f.sector}
+                    </option>
+                  ))}
+                </datalist>
+              )}
+              {formErrors.name ? (
+                <p className="text-xs text-destructive">{formErrors.name}</p>
+              ) : null}
             </div>
             <div className="space-y-2">
               <Label>Description</Label>
@@ -439,7 +533,11 @@ export default function CooperativesAdminPage() {
             <Button variant="outline" onClick={() => setShowDialog(false)} disabled={saving}>
               Annuler
             </Button>
-            <Button className="bg-primary hover:bg-primary/90" onClick={handleSave} disabled={saving}>
+            <Button
+              className="bg-primary hover:bg-primary/90"
+              onClick={handleSave}
+              disabled={saving}
+            >
               {saving ? <Spinner className="h-4 w-4 mr-2" /> : null}
               {editId ? 'Enregistrer' : 'Ajouter la coopérative'}
             </Button>

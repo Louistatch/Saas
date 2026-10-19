@@ -1,10 +1,12 @@
-import { test, expect } from '../fixtures/base.fixture'
-import { MarketplacePage } from '../pages/marketplace.page'
-import { MarketplaceAdminPage } from '../pages/marketplace-admin.page'
+import { expect, test } from '../fixtures/base.fixture'
 import { TEST_PREFIX } from '../helpers/constants'
+import { MarketplaceAdminPage } from '../pages/marketplace-admin.page'
+import { MarketplacePage } from '../pages/marketplace.page'
 
-test.describe('Scenario 5: Comptes d\'Exploitation (Marketplace)', () => {
-  test('faitiere admin sees "Nouvelle fiche" button on dashboard marketplace', async ({ adminPage }) => {
+test.describe("Scenario 5: Comptes d'Exploitation (Marketplace)", () => {
+  test('faitiere admin sees "Nouvelle fiche" button on dashboard marketplace', async ({
+    adminPage,
+  }) => {
     // Super admin should have faitiere-level access
     const adminMarketplace = new MarketplaceAdminPage(adminPage)
     await adminMarketplace.goto()
@@ -12,7 +14,9 @@ test.describe('Scenario 5: Comptes d\'Exploitation (Marketplace)', () => {
     await adminMarketplace.expectNewFicheButtonVisible()
   })
 
-  test('regular cooperative_admin does not see "Nouvelle fiche" button', async ({ coopAdminPage }) => {
+  test('regular cooperative_admin does not see "Nouvelle fiche" button', async ({
+    coopAdminPage,
+  }) => {
     const adminMarketplace = new MarketplaceAdminPage(coopAdminPage)
     await adminMarketplace.goto()
     await adminMarketplace.expectLoaded()

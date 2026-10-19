@@ -1,24 +1,36 @@
 'use client'
 
-import Link from 'next/link'
-import { useState } from 'react'
-import { Logo } from '@/components/shared/logo'
 import { AuthSidePanel } from '@/components/shared/auth-side-panel'
+import { useCaptcha } from '@/components/shared/captcha'
+import { Logo } from '@/components/shared/logo'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ArrowLeft, CheckCircle } from 'lucide-react'
+import { useGameReturn } from '@/hooks/use-game-return'
+import { withGameReturn } from '@/lib/haroolife/entry'
 import { createClient } from '@/lib/supabase/client'
+import { ArrowLeft, CheckCircle } from 'lucide-react'
+import Link from 'next/link'
+import { useState } from 'react'
 
 export default function ForgotPasswordPage() {
+  const gameReturn = useGameReturn()
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
   const [sent, setSent] = useState(false)
   const [loading, setLoading] = useState(false)
+  // Anti-robot check (off until NEXT_PUBLIC_TURNSTILE_SITE_KEY is configured).
+  const captcha = useCaptcha()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (loading) return
+    const captchaToken = captcha.getToken()
+    if (captcha.enabled && !captchaToken) {
+      setError('Terminez la vérification anti-robot ci-dessous avant de renvoyer le lien.')
+      return
+    }
     setError('')
     const trimmedEmail = email.trim().toLowerCase()
     if (!trimmedEmail) {
@@ -28,9 +40,17 @@ export default function ForgotPasswordPage() {
     setLoading(true)
     const supabase = createClient()
     // [SECURITY FIX - PHANTOM-002] Ne jamais révéler si l'email existe ou non
-    await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
       redirectTo: `${window.location.origin}/auth/reset-password`,
+      captchaToken: captchaToken ?? undefined,
     })
+    // Only the anti-robot check is reported (it says nothing about the address).
+    if (resetError && /captcha/i.test(resetError.message)) {
+      captcha.reset()
+      setError('Vérification anti-robot à refaire, puis renvoyez le lien.')
+      setLoading(false)
+      return
+    }
     // TOUJOURS afficher le message de succès, même si l'email n'existe pas
     // (Supabase peut retourner une erreur "User not found" — ne pas la transmettre)
     setSent(true)
@@ -55,7 +75,7 @@ export default function ForgotPasswordPage() {
         <div className="md:hidden w-full max-w-sm mb-6 space-y-4">
           <div className="flex items-center justify-between">
             <Link
-              href="/auth/login"
+              href={withGameReturn('/auth/login', gameReturn)}
               className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -111,7 +131,7 @@ export default function ForgotPasswordPage() {
                   Si cet email est enregistré, un lien de réinitialisation a été envoyé à{' '}
                   <strong>{email}</strong>
                 </p>
-                <Link href="/auth/login">
+                <Link href={withGameReturn('/auth/login', gameReturn)}>
                   <Button variant="outline" className="w-full border-border gap-2">
                     <ArrowLeft className="h-4 w-4" />
                     Retour à la connexion
@@ -137,10 +157,11 @@ export default function ForgotPasswordPage() {
                     required
                   />
                 </div>
+                {captcha.box}
                 <Button
                   type="submit"
                   className="w-full bg-primary hover:bg-primary/90"
-                  disabled={loading}
+                  disabled={loading || !captcha.ready}
                 >
                   {loading ? 'Envoi en cours...' : 'Envoyer le lien de réinitialisation'}
                 </Button>

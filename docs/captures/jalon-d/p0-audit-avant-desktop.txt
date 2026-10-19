@@ -1,0 +1,162 @@
+
+## A_home_follow_d12
+{
+ "byLod": {
+  "far": {
+   "n": 16,
+   "tris": 24052,
+   "ground": 7322,
+   "street": 2392,
+   "streetProps": 0,
+   "buildings": 0,
+   "props": 0,
+   "extras": 0,
+   "far": 14338
+  },
+  "near": {
+   "n": 9,
+   "tris": 811037,
+   "ground": 2696,
+   "street": 10830,
+   "streetProps": 8584,
+   "buildings": 718927,
+   "props": 59362,
+   "extras": 10638,
+   "far": 0
+  }
+ },
+ "meshInstances": 157,
+ "visible": 27,
+ "visibleTris": 335902,
+ "perf": {
+  "fps": 5.31,
+  "p50": 190.7,
+  "p95": 322.8,
+  "drawCalls": 26,
+  "triangles": 872086,
+  "heapMB": 118,
+  "longTasks": 11,
+  "resolution": [
+   720,
+   450
+  ],
+  "pixelRatio": 0.5
+ },
+ "player": {
+  "cam": {
+   "tx": 48,
+   "tz": 34,
+   "distance": 12,
+   "angle": 35,
+   "follow": true
+  }
+ }
+}
+
+## B_zoom_out_x3
+{
+ "byLod": {
+  "far": {
+   "n": 16,
+   "tris": 24052,
+   "ground": 7322,
+   "street": 2392,
+   "streetProps": 0,
+   "buildings": 0,
+   "props": 0,
+   "extras": 0,
+   "far": 14338
+  },
+  "near": {
+   "n": 9,
+   "tris": 811037,
+   "ground": 2696,
+   "street": 10830,
+   "streetProps": 8584,
+   "buildings": 718927,
+   "props": 59362,
+   "extras": 10638,
+   "far": 0
+  }
+ },
+ "meshInstances": 155,
+ "visible": 34,
+ "visibleTris": 337075,
+ "perf": {
+  "fps": 5.78,
+  "p50": 176.9,
+  "p95": 279.4,
+  "drawCalls": 34,
+  "triangles": 869970,
+  "heapMB": 120,
+  "longTasks": 12,
+  "resolution": [
+   720,
+   450
+  ],
+  "pixelRatio": 0.5
+ },
+ "player": {
+  "cam": {
+   "tx": 48,
+   "tz": 34,
+   "distance": 23.4375,
+   "angle": 35,
+   "follow": true
+  }
+ }
+}
+
+## C_city_view_d100
+{
+ "byLod": {
+  "far": {
+   "n": 16,
+   "tris": 24052,
+   "ground": 7322,
+   "street": 2392,
+   "streetProps": 0,
+   "buildings": 0,
+   "props": 0,
+   "extras": 0,
+   "far": 14338
+  },
+  "near": {
+   "n": 9,
+   "tris": 811037,
+   "ground": 2696,
+   "street": 10830,
+   "streetProps": 8584,
+   "buildings": 718927,
+   "props": 59362,
+   "extras": 10638,
+   "far": 0
+  }
+ },
+ "meshInstances": 155,
+ "visible": 154,
+ "visibleTris": 870728,
+ "perf": {
+  "fps": 3.43,
+  "p50": 264.6,
+  "p95": 745.2,
+  "drawCalls": 157,
+  "triangles": 874410,
+  "heapMB": 263,
+  "longTasks": 15,
+  "resolution": [
+   720,
+   450
+  ],
+  "pixelRatio": 0.5
+ },
+ "player": {
+  "cam": {
+   "tx": 60,
+   "tz": 40,
+   "distance": 100,
+   "angle": 35,
+   "follow": false
+  }
+ }
+}

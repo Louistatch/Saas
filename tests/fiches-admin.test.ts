@@ -7,6 +7,7 @@
  */
 import assert from 'node:assert/strict'
 import { beforeEach, test } from 'node:test'
+import { canManageFiche, canPublishFiches } from '../lib/fiches/publishing'
 import { canReverifyPurchase } from '../lib/fiches/purchase-state'
 import { installFetch, installStubs, json, resetStore } from './fiches-fake-db'
 
@@ -125,7 +126,7 @@ test('DELETE : fiche de la plateforme réservée au super_admin', async () => {
   assert.equal(res.status, 403)
 })
 
-test('PATCH/DELETE : la faîtière propriétaire gère SA fiche, jamais celle d’une autre', async () => {
+test('PATCH/DELETE : publication des faîtières fermée (40c06ee) — même propriétaire, rien écrit', async () => {
   const faitiere = (cooperativeId: string) => ({
     userId: 'u-f',
     role: 'cooperative_admin',
@@ -162,9 +163,10 @@ test('PATCH/DELETE : la faîtière propriétaire gère SA fiche, jamais celle d�
   )
   assert.equal(notFaitiere.status, 403)
 
-  // Faîtière propriétaire : fichiers joints au brouillon et mise en vente.
+  // Faîtière propriétaire : refusée aussi tant que la publication des faîtières est fermée
+  // (lib/fiches/publishing.ts) ; le client de service ne contourne pas la RLS de main.
   state.ctx = faitiere(COOP)
-  const ok = await ficheRoute.PATCH(
+  const owner = await ficheRoute.PATCH(
     req(`/api/fiches/${FICHE}`, {
       method: 'PATCH',
       body: {
@@ -174,15 +176,41 @@ test('PATCH/DELETE : la faîtière propriétaire gère SA fiche, jamais celle d�
     }),
     ctx(),
   )
-  assert.equal(ok.status, 200)
-  const row = state.store.rows('fiches_techniques')[0] as { status: string; files: unknown[] }
-  assert.equal(row.status, 'published')
-  assert.equal(row.files.length, 1)
+  assert.equal(owner.status, 403)
+  assert.equal(state.store.rows('fiches_techniques')[0]?.status, 'draft')
+  const ownerDel = await ficheRoute.DELETE(req(`/api/fiches/${FICHE}`, { method: 'DELETE' }), ctx())
+  assert.equal(ownerDel.status, 403)
+  assert.equal(state.store.rows('fiches_techniques').length, 1)
+})
 
-  // … et suppression tant qu'elle n'a jamais été vendue.
-  const del = await ficheRoute.DELETE(req(`/api/fiches/${FICHE}`, { method: 'DELETE' }), ctx())
-  assert.equal(del.status, 200)
-  assert.equal(state.store.rows('fiches_techniques').length, 0)
+test('canManageFiche / canPublishFiches : règle du propriétaire quand la publication des faîtières est rouverte', () => {
+  const open = { faitiere: true }
+  const faitiere = (cooperativeId: string, level = 'faitiere') => ({
+    role: 'cooperative_admin',
+    cooperativeId,
+    cooperativeLevel: level,
+  })
+  const superAdmin = { role: 'super_admin', cooperativeId: null, cooperativeLevel: null }
+  // Fermée (défaut) : super_admin seul.
+  assert.equal(canPublishFiches(superAdmin), true)
+  assert.equal(canPublishFiches(faitiere(COOP)), false)
+  assert.equal(canManageFiche(faitiere(COOP), { cooperative_id: COOP }), false)
+  assert.equal(canManageFiche(superAdmin, { cooperative_id: null }), true)
+  // Rouverte : la faîtière dépose et gère SES fiches, jamais une autre ni la plateforme.
+  assert.equal(canPublishFiches(faitiere(COOP), open), true)
+  assert.equal(canPublishFiches(faitiere(COOP, 'cooperative'), open), false)
+  assert.equal(canManageFiche(faitiere(COOP), { cooperative_id: COOP }, open), true)
+  assert.equal(canManageFiche(faitiere(OTHER), { cooperative_id: COOP }, open), false)
+  assert.equal(canManageFiche(faitiere(COOP, 'union'), { cooperative_id: COOP }, open), false)
+  assert.equal(canManageFiche(faitiere(COOP), { cooperative_id: null }, open), false)
+  assert.equal(
+    canManageFiche(
+      { role: 'member', cooperativeId: COOP, cooperativeLevel: 'faitiere' },
+      { cooperative_id: COOP },
+      open,
+    ),
+    false,
+  )
 })
 
 test('PATCH : fiche de la plateforme refusée à une faîtière', async () => {

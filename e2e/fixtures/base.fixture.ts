@@ -1,6 +1,6 @@
 import { mergeTests } from '@playwright/test'
-import { authTest, type AuthFixtures } from './auth.fixture'
-import { testDataTest, type TestDataFixtures } from './test-data.fixture'
+import { type AuthFixtures, authTest } from './auth.fixture'
+import { type TestDataFixtures, testDataTest } from './test-data.fixture'
 
 /**
  * Combined test fixture that provides:

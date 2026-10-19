@@ -1,4 +1,4 @@
-import { type Page, type Locator, expect } from '@playwright/test'
+import { type Locator, type Page, expect } from '@playwright/test'
 import { ROUTES } from '../helpers/constants'
 
 export class MembersPage {
@@ -17,7 +17,9 @@ export class MembersPage {
 
   constructor(page: Page) {
     this.page = page
-    this.addButton = page.getByRole('button', { name: /Ajouter un membre|Ajouter le premier membre/i })
+    this.addButton = page.getByRole('button', {
+      name: /Ajouter un membre|Ajouter le premier membre/i,
+    })
     this.searchInput = page.getByLabel('Rechercher des membres')
     this.membersTable = page.locator('table')
     this.memberRows = page.locator('table tbody tr')

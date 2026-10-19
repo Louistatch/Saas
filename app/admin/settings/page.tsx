@@ -1,320 +1,223 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { AlertCircle, CheckCircle, Info } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
-import { useToast } from '@/hooks/use-toast'
-import { Spinner } from '@/components/shared/loading'
-import { PageHeader } from '@/components/shared/page-header'
-import { errorMessage } from '@/lib/utils/errors'
+/**
+ * Paramètres de la plateforme (Admin 5.0). Seuls les réglages réellement lus par le site sont
+ * modifiables ; l'état de sécurité est décrit tel qu'il est, sans interrupteur sans effet.
+ */
 
-interface PlatformSettings {
+import { CheckCircle2, CircleSlash } from 'lucide-react'
+import { useEffect, useState } from 'react'
+
+interface Settings {
+  partner_exam_passing_score: number
   platform_name: string
   support_email: string
-  maintenance_mode: boolean
 }
 
-interface SecuritySettings {
-  force_https: boolean
-  two_fa_admins: boolean
-  ip_whitelisting: boolean
-  rate_limiting: boolean
-}
+const SECURITY: { label: string; on: boolean; text: string }[] = [
+  {
+    label: 'HTTPS obligatoire',
+    on: true,
+    text: 'Imposé par l’hébergement Vercel sur tout le site.',
+  },
+  {
+    label: 'Limitation de débit',
+    on: true,
+    text: 'Active sur les API publiques, partagée entre serveurs grâce à Redis.',
+  },
+  {
+    label: 'Accès admin vérifié côté serveur',
+    on: true,
+    text: 'Le rôle est relu dans la base avant chaque page d’administration.',
+  },
+  {
+    label: 'Double authentification des admins',
+    on: false,
+    text: 'Pas encore disponible : à activer dans Supabase Auth (authentification multifacteur).',
+  },
+  {
+    label: 'Restriction de l’administration par adresse IP',
+    on: false,
+    text: 'Pas disponible dans le site : possible avec le pare-feu de Vercel.',
+  },
+  {
+    label: 'Mode maintenance',
+    on: false,
+    text: 'Pas disponible : l’ancien interrupteur était enregistré mais sans effet, il a été retiré.',
+  },
+]
 
-const defaultPlatform: PlatformSettings = {
-  platform_name: 'FaîtiereHub',
-  support_email: 'support@faitierehub.com',
-  maintenance_mode: false,
-}
-
-const defaultSecurity: SecuritySettings = {
-  force_https: true,
-  two_fa_admins: true,
-  ip_whitelisting: false,
-  rate_limiting: true,
-}
+const input =
+  'w-full rounded-md border border-border bg-background p-2 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2'
 
 export default function AdminSettingsPage() {
-  const supabase = useMemo(() => createClient(), [])
-  const { toast } = useToast()
-  const [platform, setPlatform] = useState<PlatformSettings>(defaultPlatform)
-  const [security, setSecurity] = useState<SecuritySettings>(defaultSecurity)
-  const [saving, setSaving] = useState<'platform' | 'security' | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  const loadSettings = useCallback(async () => {
-    setLoading(true)
-    const { data, error } = await supabase.from('platform_settings').select('key, value')
-    if (error) {
-      // Table may not exist yet — fall back to defaults silently for the loader,
-      // but surface the issue subtly via console.
-      setLoading(false)
-      return
-    }
-    const map: Record<string, unknown> = {}
-    for (const row of (data ?? []) as { key: string; value: unknown }[]) {
-      map[row.key] = row.value
-    }
-    setPlatform({
-      platform_name: (map.platform_name as string) ?? defaultPlatform.platform_name,
-      support_email: (map.support_email as string) ?? defaultPlatform.support_email,
-      maintenance_mode: !!map.maintenance_mode,
-    })
-    setSecurity({
-      force_https: map.force_https !== undefined ? !!map.force_https : defaultSecurity.force_https,
-      two_fa_admins:
-        map.two_fa_admins !== undefined ? !!map.two_fa_admins : defaultSecurity.two_fa_admins,
-      ip_whitelisting:
-        map.ip_whitelisting !== undefined ? !!map.ip_whitelisting : defaultSecurity.ip_whitelisting,
-      rate_limiting:
-        map.rate_limiting !== undefined ? !!map.rate_limiting : defaultSecurity.rate_limiting,
-    })
-    setLoading(false)
-  }, [supabase])
+  const [form, setForm] = useState<Settings | null>(null)
+  const [saving, setSaving] = useState<'exam' | 'contact' | null>(null)
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null)
 
   useEffect(() => {
-    loadSettings()
-  }, [loadSettings])
+    fetch('/api/admin/settings', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : { settings: {} }))
+      .then(({ settings }: { settings: Partial<Settings> }) =>
+        setForm({
+          partner_exam_passing_score: Number(settings.partner_exam_passing_score ?? 70),
+          platform_name: String(settings.platform_name ?? 'FaîtiereHub'),
+          support_email: String(settings.support_email ?? ''),
+        }),
+      )
+      .catch(() => setNotice({ ok: false, text: 'Les paramètres n’ont pas pu se charger.' }))
+  }, [])
 
-  const saveSettings = async (
-    section: 'platform' | 'security',
-    updates: Record<string, unknown>,
-  ) => {
+  async function save(section: 'exam' | 'contact', values: Partial<Settings>) {
     setSaving(section)
-    const rows = Object.entries(updates).map(([key, value]) => ({
-      key,
-      value,
-    }))
-    const { error } = await supabase.from('platform_settings').upsert(rows, { onConflict: 'key' })
+    setNotice(null)
+    const res = await fetch('/api/admin/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(values),
+    }).catch(() => null)
+    const data: { error?: string } = res ? await res.json().catch(() => ({})) : {}
     setSaving(null)
-    if (error) {
-      toast({
-        title: 'Échec de la sauvegarde',
-        description: errorMessage(error),
-        variant: 'destructive',
-      })
-      return
-    }
-    toast({ title: 'Paramètres enregistrés' })
+    setNotice(
+      res?.ok
+        ? { ok: true, text: 'Paramètres enregistrés.' }
+        : { ok: false, text: data.error ?? 'Connexion interrompue : réessayez.' },
+    )
   }
 
-  const Toggle = ({
-    label,
-    description,
-    value,
-    onChange,
-  }: {
-    label: string
-    description?: string
-    value: boolean
-    onChange: (v: boolean) => void
-  }) => (
-    <div className="flex items-center justify-between p-4 border border-border rounded-lg gap-4">
-      <div>
-        <p className="font-medium text-foreground">{label}</p>
-        {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
-      </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={value}
-        onClick={() => onChange(!value)}
-        className={`relative inline-flex h-6 w-11 rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-primary ${
-          value ? 'bg-primary' : 'bg-gray-300'
-        }`}
-      >
-        <span
-          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform mt-0.5 ${
-            value ? 'translate-x-5' : 'translate-x-0.5'
-          }`}
-        />
-      </button>
-    </div>
-  )
-
   return (
-    <div className="space-y-8">
-      <PageHeader
-        title="Paramètres de la plateforme"
-        description="Configuration et administration de la plateforme"
-      />
+    <div className="mx-auto max-w-3xl space-y-10">
+      <header className="space-y-2">
+        <h1 className="text-3xl font-bold text-foreground">Paramètres</h1>
+        <p className="text-sm text-muted-foreground">
+          Chaque modification est enregistrée dans le journal d’audit.
+        </p>
+      </header>
+      <output aria-live="polite" className="block">
+        {notice && (
+          <span className={`text-sm ${notice.ok ? 'text-primary' : 'text-destructive'}`}>
+            {notice.text}
+          </span>
+        )}
+      </output>
 
-      <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-3 border-b border-border bg-transparent">
-          <TabsTrigger
-            value="general"
-            className="border-b-2 border-transparent data-[state=active]:border-primary"
-          >
-            Général
-          </TabsTrigger>
-          <TabsTrigger
-            value="security"
-            className="border-b-2 border-transparent data-[state=active]:border-primary"
-          >
-            Sécurité
-          </TabsTrigger>
-          <TabsTrigger
-            value="info"
-            className="border-b-2 border-transparent data-[state=active]:border-primary"
-          >
-            Info
-          </TabsTrigger>
-        </TabsList>
+      <section aria-labelledby="exam-title" className="space-y-3">
+        <h2 id="exam-title" className="text-lg font-semibold text-foreground">
+          Certification des opérateurs
+        </h2>
+        <label className="block max-w-xs space-y-1 text-sm font-medium">
+          Note de réussite à l’examen (sur 100)
+          <input
+            type="number"
+            min={0}
+            max={100}
+            className={input}
+            value={form?.partner_exam_passing_score ?? ''}
+            disabled={!form}
+            onChange={(e) =>
+              setForm((f) => (f ? { ...f, partner_exam_passing_score: Number(e.target.value) } : f))
+            }
+          />
+        </label>
+        <p className="text-sm text-muted-foreground">
+          Appliquée à chaque nouvelle correction d’examen ; les résultats déjà enregistrés ne
+          changent pas.
+        </p>
+        <button
+          type="button"
+          disabled={!form || saving !== null}
+          onClick={() =>
+            form &&
+            void save('exam', { partner_exam_passing_score: form.partner_exam_passing_score })
+          }
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+        >
+          {saving === 'exam' ? 'Enregistrement…' : 'Enregistrer la note'}
+        </button>
+      </section>
 
-        <TabsContent value="general" className="space-y-6 mt-6">
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle className="text-foreground">Paramètres généraux</CardTitle>
-              <CardDescription>Configuration de base de la plateforme</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label>Nom de la plateforme</Label>
-                <Input
-                  value={platform.platform_name}
-                  onChange={(e) => setPlatform((s) => ({ ...s, platform_name: e.target.value }))}
+      <section aria-labelledby="contact-title" className="space-y-3">
+        <h2 id="contact-title" className="text-lg font-semibold text-foreground">
+          Coordonnées de la plateforme
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Conservées pour référence : le site ne les affiche pas encore.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="space-y-1 text-sm font-medium">
+            Nom de la plateforme
+            <input
+              className={input}
+              value={form?.platform_name ?? ''}
+              disabled={!form}
+              onChange={(e) => setForm((f) => (f ? { ...f, platform_name: e.target.value } : f))}
+            />
+          </label>
+          <label className="space-y-1 text-sm font-medium">
+            E-mail de support
+            <input
+              type="email"
+              className={input}
+              value={form?.support_email ?? ''}
+              disabled={!form}
+              onChange={(e) => setForm((f) => (f ? { ...f, support_email: e.target.value } : f))}
+            />
+          </label>
+        </div>
+        <button
+          type="button"
+          disabled={!form || saving !== null}
+          onClick={() =>
+            form &&
+            void save('contact', {
+              platform_name: form.platform_name,
+              support_email: form.support_email,
+            })
+          }
+          className="rounded-lg border border-border px-4 py-2 text-sm font-medium disabled:opacity-50"
+        >
+          {saving === 'contact' ? 'Enregistrement…' : 'Enregistrer les coordonnées'}
+        </button>
+      </section>
+
+      <section aria-labelledby="security-title" className="space-y-3">
+        <h2 id="security-title" className="text-lg font-semibold text-foreground">
+          Sécurité : état réel
+        </h2>
+        <ul className="divide-y divide-border rounded-xl border border-border bg-card">
+          {SECURITY.map((item) => (
+            <li key={item.label} className="flex gap-3 px-4 py-3">
+              {item.on ? (
+                <CheckCircle2 aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+              ) : (
+                <CircleSlash
+                  aria-hidden="true"
+                  className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground"
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Email de support</Label>
-                <Input
-                  type="email"
-                  value={platform.support_email}
-                  onChange={(e) => setPlatform((s) => ({ ...s, support_email: e.target.value }))}
-                />
-              </div>
-              <Toggle
-                label="Mode maintenance"
-                description="Désactiver l'accès à la plateforme pour les utilisateurs non-admin"
-                value={platform.maintenance_mode}
-                onChange={(v) => setPlatform((s) => ({ ...s, maintenance_mode: v }))}
-              />
-              <Button
-                className="bg-primary hover:bg-primary/90 gap-2"
-                onClick={() => saveSettings('platform', { ...platform })}
-                disabled={loading || saving !== null}
-              >
-                {saving === 'platform' ? (
-                  <Spinner className="h-4 w-4" />
-                ) : (
-                  <CheckCircle className="h-4 w-4" />
-                )}
-                Enregistrer les paramètres
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              )}
+              <span>
+                <span className="block text-sm font-medium text-foreground">
+                  {item.label}
+                  <span className="sr-only">{item.on ? ' : actif' : ' : non disponible'}</span>
+                </span>
+                <span className="block text-sm text-muted-foreground">{item.text}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
 
-        <TabsContent value="security" className="space-y-6 mt-6">
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle className="text-foreground">Paramètres de sécurité</CardTitle>
-              <CardDescription>
-                Gérer les fonctionnalités de sécurité de la plateforme
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {(
-                [
-                  ['force_https', 'Forcer HTTPS', 'Bloquer le trafic HTTP non sécurisé'],
-                  [
-                    'two_fa_admins',
-                    '2FA pour les admins',
-                    "Exiger l'authentification à deux facteurs pour les administrateurs",
-                  ],
-                  [
-                    'ip_whitelisting',
-                    'Liste blanche IP',
-                    'Autoriser uniquement les IP spécifiées pour la zone admin',
-                  ],
-                  [
-                    'rate_limiting',
-                    'Limitation de débit API',
-                    'Limiter les requêtes API/widget par IP',
-                  ],
-                ] as const
-              ).map(([key, label, description]) => (
-                <Toggle
-                  key={key}
-                  label={label}
-                  description={description}
-                  value={security[key]}
-                  onChange={(v) => setSecurity((s) => ({ ...s, [key]: v }))}
-                />
-              ))}
-              <Button
-                className="bg-primary hover:bg-primary/90 gap-2"
-                onClick={() => saveSettings('security', { ...security })}
-                disabled={loading || saving !== null}
-              >
-                {saving === 'security' ? (
-                  <Spinner className="h-4 w-4" />
-                ) : (
-                  <CheckCircle className="h-4 w-4" />
-                )}
-                Enregistrer les paramètres
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="info" className="space-y-6 mt-6">
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle className="text-foreground flex items-center gap-2">
-                <Info className="h-5 w-5" />
-                Sauvegarde &amp; Email
-              </CardTitle>
-              <CardDescription>Où gérer ces paramètres</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Les sauvegardes de la base de données sont gérées par votre projet Supabase.
-                Configurez la rétention et la récupération ponctuelle dans le tableau de bord
-                Supabase sous <strong>Settings → Database → Backups</strong>.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Les emails transactionnels (confirmation d'inscription, réinitialisation de mot de
-                passe) sont envoyés via Supabase Auth. Personnalisez les modèles sous{' '}
-                <strong>Authentication → Email Templates</strong>.
-              </p>
-              <a
-                href="https://supabase.com/docs/guides/auth/auth-email-templates"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block"
-              >
-                <Button variant="outline" size="sm" className="border-border">
-                  Ouvrir la doc Supabase
-                </Button>
-              </a>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      <Card className="border-destructive/30 bg-destructive/5">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-destructive">
-            <AlertCircle className="h-5 w-5" />
-            Zone de danger
-          </CardTitle>
-          <CardDescription className="text-destructive/80">
-            Opérations pouvant affecter toutes les coopératives de la plateforme.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            La maintenance destructive (purge, restauration, migrations de schéma) est effectuée via
-            la console du projet Supabase plutôt que depuis cette interface.
-          </p>
-        </CardContent>
-      </Card>
+      <section aria-labelledby="ops-title" className="space-y-2">
+        <h2 id="ops-title" className="text-lg font-semibold text-foreground">
+          Sauvegardes et e-mails
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Les sauvegardes de la base se règlent dans Supabase (Database, puis Backups). Les e-mails
+          de compte (confirmation, mot de passe) partent par Supabase Auth ; leurs modèles se
+          modifient dans Authentication, puis Email Templates. Les opérations destructives (purge,
+          restauration, migrations) se font depuis la console Supabase, jamais d’ici.
+        </p>
+      </section>
     </div>
   )
 }
