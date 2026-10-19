@@ -94,10 +94,19 @@ export const createFicheSchema = z
     status: z.enum(['draft', 'published']).default('published'),
     // Super-admin : fiche de la plateforme FaîtiereHub (sans coopérative), vendue en ligne.
     platform: z.boolean().optional(),
+    // Super-admin : faîtière propriétaire de la fiche (sélecteur de /dashboard/marketplace).
+    // Refusé pour tout autre rôle, et recontrôlé côté serveur (niveau « faitiere »).
+    cooperative_id: zone.optional(),
   })
   .superRefine((v, ctx) => {
     if (v.status === 'published' && v.files.length === 0)
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['files'], message: PUBLISH_NEEDS_FILE })
+    if (v.platform === true && v.cooperative_id)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['cooperative_id'],
+        message: 'Une fiche de la plateforme n’appartient à aucune faîtière',
+      })
   })
 
 export const patchFicheSchema = z

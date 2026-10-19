@@ -145,12 +145,43 @@ test('achat réglé d’une AUTRE fiche → 403 (l’id d’achat ne vaut que po
   assert.equal(state.store.storageCalls.length, 0)
 })
 
-test('fiche repassée en brouillon après la vente → l’acheteur garde l’accès', async () => {
+// Règle de main (lib/fiches/access-policy.ts, 66f5c49) : « un brouillon ne s'ouvre jamais ».
+// La route passe par ficheAccessRoutes ; une fiche vendue ne repasse pas en brouillon (PATCH →
+// 409, voir fiches-ui-routes), on la retire de la vente (archivée) et l'acheteur garde l'accès.
+test('brouillon + achat réglé → 404, aucun lien signé (un brouillon ne s’ouvre jamais)', async () => {
   addFiche({ status: 'draft' })
   paid()
   const res = await access({ purchase_id: PURCHASE })
-  assert.equal(res.status, 200)
-  assert.equal((await res.json()).reason, 'purchase')
+  assert.equal(res.status, 404)
+  assert.equal(state.store.storageCalls.length, 0)
+  assert.equal(state.store.rpcCalls.length, 0)
+})
+
+test('brouillon gratuit, ou avec une carte → 404', async () => {
+  addFiche({ status: 'draft', price_non_member: 0 })
+  assert.equal((await access({})).status, 404)
+  assert.equal((await access({ card_number: 'FTG-0001-A' })).status, 404)
+  assert.equal(state.store.storageCalls.length, 0)
+})
+
+test('fiche archivée sans achat → 404 « n’est plus en vente » (message de main)', async () => {
+  addFiche({ status: 'archived', is_free_for_members: true })
+  const res = await access({ card_number: 'FTG-0001-A' })
+  assert.equal(res.status, 404)
+  assert.match((await res.json()).error, /n’est plus en vente/)
+})
+
+test('fiche archivée + achat en attente → 403 (l’achat refusé est dit)', async () => {
+  addFiche({ status: 'archived' })
+  state.store.rows('purchases').push({
+    id: PURCHASE,
+    fiche_id: FICHE,
+    payment_status: 'pending',
+    access_granted: false,
+  })
+  const res = await access({ purchase_id: PURCHASE })
+  assert.equal(res.status, 403)
+  assert.equal(state.store.storageCalls.length, 0)
 })
 
 test('fiche publiée gratuite → compteur par le client de service, sans repli .update()', async () => {

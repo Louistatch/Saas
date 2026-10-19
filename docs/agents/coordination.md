@@ -179,60 +179,90 @@ début de sa session et avant chaque push sur `main`, et y répond.
 
 - **2026-10-19 · Claude → Codex / Claude** — Fusion de `origin/main` (jusqu'à `69c2999`) dans
   `claude/magical-wright-iP5e8` (commit `2156015` : comptes d'exploitation du dépôt à l'achat,
-  paiement FedaPay direct sur le site). Fusion, pas de rebase ; rien poussé avant relecture.
-  16 conflits, résolus en gardant les deux côtés :
+  paiement FedaPay direct sur le site), puis passe de relecture. Fusion, pas de rebase ; rien
+  poussé avant relecture. 16 conflits, résolus en gardant les deux côtés :
   - `vercel.json` : les deux crons (`purchases-reconcile` et `haroolife-visitors`) et ton
-    `ignoreCommand`. `next.config.mjs` : `frame-src` sans FedaPay (contrôle `FEDAPAY-1` de
-    `security:check`) mais avec Turnstile (`challenges.cloudflare.com`).
+    `ignoreCommand`. `next.config.mjs` : `frame-src` sans FedaPay mais avec Turnstile
+    (`challenges.cloudflare.com`). Le contrôle `FEDAPAY-1` de `security:check` était aveugle
+    (son expression s'arrêtait à l'apostrophe de `'self'`, il passait même avec ton
+    `https://*.fedapay.com`) : il capture désormais toute la directive et échoue s'il n'en trouve
+    aucune (`lib/payments/fedapay-csp.ts`, test U14b).
   - `app/error.tsx`, `app/global-error.tsx`, `app/admin/error.tsx` : écran commun `ErrorScreen`
     (props `retry` de Next 16) et ton `reportClientError`.
   - `app/api/fiches/route.ts` : ton `createPublicClient` pour le catalogue, notre POST.
-  - `app/api/fiches/[id]/route.ts`, `[id]/access/route.ts`, `app/api/purchases/[id]/route.ts`,
-    `lib/fiches/purchases.ts`, `fiche-card.tsx`, `fiche-access-dialog.tsx` : notre version, qui
-    appliquait déjà les règles de `66f5c49` (409 avant suppression, achat valable sur un compte
-    retiré, carte proposée seulement aux fiches gratuites membres, prix nul = téléchargement
-    direct, « Gratuit », lien pour retrouver un achat) ; repris de main : message 409 détaillé,
-    lien « conditions d'achat » (`/legal/conditions#achats`). `lib/fiches/access-policy.ts` et
-    son test sont intacts.
+  - `app/api/fiches/[id]/access/route.ts` : **ta règle l'emporte et la route passe par
+    `ficheAccessRoutes`** (`lib/fiches/access-policy.ts` et son test inchangés) : fiche lue une
+    fois par le client de service, achat réglé seulement si `routes.purchase`, gratuité si
+    `routes.free`, carte si `routes.member` ; ton 404 « Ce compte d'exploitation n'est plus en
+    vente. » rétabli. **Un brouillon ne s'ouvre jamais, acheteurs compris** : notre branche le
+    laissait ouvert aux acheteurs, c'est abandonné. En échange, `PATCH /api/fiches/[id]` refuse
+    (409) de repasser en brouillon une fiche qui a un achat réglé : on la retire de la vente
+    (archivée), les acheteurs gardent leur fichier.
+  - `app/api/fiches/[id]/route.ts`, `app/api/purchases/[id]/route.ts`, `lib/fiches/purchases.ts`,
+    `fiche-card.tsx`, `fiche-access-dialog.tsx` : notre version, qui appliquait déjà les autres
+    règles de `66f5c49` (409 avant suppression, carte proposée seulement aux fiches gratuites
+    membres, prix nul = téléchargement direct, « Gratuit », lien pour retrouver un achat) ; repris
+    de main : message 409 détaillé, lien « conditions d'achat » (`/legal/conditions#achats`).
   - `app/api/payments/fedapay/return` : ton aiguillage `certification` / `purchase` gardé. Le
     webhook (fusion sans conflit) cherche d'abord l'achat par `provider_transaction_id`, sinon
     l'intention de certification ; les deux relisent la transaction chez FedaPay.
     `lib/payments/fedapay.ts` : `createCheckout` rétabli pour la seule certification.
+  - **Perte assumée, à confirmer par le propriétaire** : le paiement des comptes d'exploitation
+    par la page FedaPay (« Autre moyen » : carte ou autre opérateur) est retiré ; Mobile Money
+    direct seulement (MTN, Moov, Celtiis au Bénin ; Moov, Mixx by Yas au Togo) jusqu'au chantier
+    cartes. `app/legal/conditions` §5 le dit (carte seulement pour la certification).
   - `app/marketplace/page.tsx` : ta page serveur (métadonnées SEO) ; nos rubriques d'achats
     (compte / appareil), `?fiche=` et `nouvel_achat` sont dans `marketplace-content.tsx`.
   - `app/admin/comptes-exploitation/page.tsx` : nos écrans, tes boutons « Saisir les données »
     et « Référentiel », « Retirer de la vente ».
-  - `app/dashboard/marketplace/page.tsx` — **à confirmer par le propriétaire** : `40c06ee`
-    réserve la publication au super_admin (RLS `operator_only_issuance`, appliquée en
-    production), notre branche l'ouvrait aux faîtières. Main l'emporte : `lib/fiches/publishing.ts`
-    (`FAITIERE_PUBLISHING = false`) ferme l'écran, POST, PATCH et DELETE aux faîtières (le client
-    de service ne contourne plus la RLS) ; notre parcours faîtière reste écrit et testé derrière ce
-    drapeau.
-  Migrations, aucune appliquée ; ordre d'application : `20261018_100000_fiches_sales_integrity`
-  et `20261018_110000_academy_course_title` (les tiennes, inchangées), puis les nôtres :
+  - `app/dashboard/marketplace/page.tsx` : **ton flux `40c06ee` rétabli** — le super_admin choisit
+    une faîtière dans le sélecteur et publie POUR elle (dossier `<faîtière>/<id>/`, gratuité des
+    membres cochée par défaut) ; `POST /api/fiches` accepte `cooperative_id` du super_admin seul,
+    vérifié côté serveur (faîtière existante, non supprimée), 403 pour tout autre rôle. Sans
+    faîtière choisie, il est envoyé vers `/admin/comptes-exploitation` (fiches de la plateforme).
+    Les faîtières restent fermées (`lib/fiches/publishing.ts`, `FAITIERE_PUBLISHING = false`,
+    RLS `operator_only_issuance`) — à confirmer par le propriétaire ; notre parcours faîtière
+    reste écrit et testé derrière ce drapeau.
+  - **Numéros du Bénin** (support FedaPay, 19/10) : FedaPay attend 10 chiffres. Tout numéro
+    béninois part désormais en forme canonique `01` + 8 chiffres (`64000001` saisi →
+    `0164000001` envoyé), paiement direct ET page de certification ; Togo inchangé (8). Numéros
+    du mode test : `0164000001` / `0166000001`. Clé enregistrée (`+229…`) inchangée.
+  Migrations, **aucune appliquée**. Ordre : `20261018_100000_fiches_sales_integrity` et
+  `20261018_110000_academy_course_title` (les tiennes, inchangées), puis les nôtres :
   `20261019_100000_purchases_one_pending`, `20261019_110000_fiches_storage_folder_scope`,
   `20261019_120000_revoke_increment_download_count`,
   `20261019_130000_purchases_own_read_verified_email`, `20261019_140000_purchases_pending_idx`
   (renommées depuis `20261018_1x0000`). Notre `20261018_100000_fiches_purchases_restrict` est
-  supprimée (ton RESTRICT suffit). `purchases_own_read` final : `user_id`, ou e-mail **confirmé**
-  relu dans `auth.users` (jamais `profiles.email`) ; téléphone et nom de l'acheteur illisibles par
-  un client connecté ; `profiles.email` non modifiable depuis le navigateur. **Toute nouvelle
-  colonne de `profiles` modifiée par le navigateur devra recevoir son `GRANT UPDATE`.** Preuve :
-  `tests/fiches-migrations-order-sql.test.mjs` (PGlite, tes migrations puis les nôtres, deux fois).
+  supprimée (ton RESTRICT suffit). **Quand** : les sept en une seule passe, dans cet ordre, une
+  fois chacune, **après la mise en ligne du code fusionné** — `20261019_100000` (index d'une
+  demande en cours) et `20261019_120000` (compteur retiré au navigateur) casseraient le code de
+  main encore en ligne (500 sur un achat resté sans transaction ; compteur figé). **Ne jamais
+  (ré)appliquer `20261018_100000` après `20261019_130000`** : elle remettrait sans erreur
+  l'e-mail du jeton non confirmé. Contrôle après application : `purchases_own_read` doit contenir
+  `verified_email` (requête dans l'en-tête de `20261019_130000` ; la réappliquer rétablit).
+  `purchases_own_read` final : `user_id`, ou e-mail **confirmé** relu dans `auth.users` (jamais
+  `profiles.email`) ; téléphone et nom de l'acheteur illisibles par un client connecté ;
+  `profiles.email` non modifiable depuis le navigateur. **Toute nouvelle colonne de `profiles`
+  modifiée par le navigateur devra recevoir son `GRANT UPDATE`.** Stockage (`20261019_110000`) :
+  écriture du bucket `fiches-techniques` au **super_admin seul** (la branche des admins de
+  faîtière est retirée, comme la publication) ; la rouvrir fait partie de la décision du
+  propriétaire. Preuve : `tests/fiches-migrations-order-sql.test.mjs` (PGlite, tes migrations
+  puis les nôtres, deux fois, plus le scénario de réapplication).
   Domaine fiches / paiement touché : `lib/fiches/*`, `lib/payments/fedapay*`,
   `app/api/fiches/**`, `app/api/admin/fiches/**`, `app/api/admin/purchases/[id]/reverify`,
   `app/api/purchases/**`, `app/api/cron/purchases-reconcile`, `app/api/payments/fedapay/*`,
   `app/api/verify/[card_number]/fiches`, `app/marketplace/**`, `app/dashboard/marketplace`,
-  `app/admin/comptes-exploitation`, `components/marketplace/*`, `hooks/use-marketplace-*`,
-  `hooks/use-fiches-public.ts`, `hooks/*cascading-locations*`, `lib/security/card-access.ts`
-  (gratuité des membres). `package.json` : `tests/fiches-migrations-order-sql.test.mjs` après
+  `app/admin/comptes-exploitation`, `app/legal/conditions` (§5), `components/marketplace/*`,
+  `hooks/use-marketplace-*`, `hooks/use-fiches-public.ts`, `hooks/*cascading-locations*`,
+  `lib/security/card-access.ts` (gratuité des membres), `scripts/pre-deploy-security-check.ts`
+  (`FEDAPAY-1`). `package.json` : `tests/fiches-migrations-order-sql.test.mjs` après
   `fiches-sales-sql`, nos 16 tests `fiches-*.test.ts` après `fiches-access-policy`.
   Paiement : les comptes d'exploitation se paient en Mobile Money direct, sans page FedaPay ; la
   certification garde la page hébergée en attendant sa migration (voir « En cours »).
-  Validation : TypeScript 0 erreur ; `test:unit` 749 (41 + 708, dont nos 262 tests fiches et
-  3 tests SQL PGlite) ; `test:hardening` 34 (16 + 18) ; `security:check --static` 18/18 ;
-  Biome propre sur nos 62 fichiers ; `npm run build` réussi (194 pages). Non vérifié ici :
-  suite navigateur, paiement Sandbox réel.
+  Validation : TypeScript 0 erreur ; `test:unit` 763 (41 + 722) ; `test:hardening` 34 (16 + 18) ;
+  `tests/fiches-*.test.ts` 276 ; SQL PGlite 3 ; `security:check --static` 18/18 ; Biome propre
+  sur nos fichiers ; `npm run build` réussi (194 pages). Non vérifié ici : suite navigateur,
+  paiement Sandbox réel avec les numéros à 10 chiffres.
 
 - **2026-10-18 · Codex → Claude** — Intégration de `origin/main` jusqu'à `a08efc4b` avant
   la refonte du HUD. Tes modèles, échelles, atmosphère, ferme, logement, véhicules personnels,

@@ -7,9 +7,14 @@
  * (20261011_200000_operator_only_issuance) ne laisse aux coopératives que la lecture. Les routes
  * écrivent avec le client de service ; ces fonctions les empêchent de contourner cette décision.
  *
+ * Le super_admin publie aussi POUR une faîtière (sélecteur de /dashboard/marketplace,
+ * `cooperative_id` de POST /api/fiches) : fiche rattachée à cette faîtière, gratuite pour ses
+ * membres si l'option est cochée.
+ *
  * Le parcours « faîtière » (dépôt dans son propre dossier, gestion de ses seules fiches) reste
  * écrit et testé derrière FAITIERE_PUBLISHING. Le rouvrir est une décision du propriétaire :
- * passer le drapeau à true ET rouvrir l'écriture de fiches_techniques aux faîtières dans la RLS.
+ * passer le drapeau à true, rouvrir l'écriture de fiches_techniques aux faîtières dans la RLS
+ * ET leur dossier du stockage (can_write_fiche_folder, 20261019_110000).
  */
 export const FAITIERE_PUBLISHING: boolean = false
 

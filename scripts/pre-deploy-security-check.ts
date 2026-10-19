@@ -5,6 +5,7 @@
 import { execSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { checkNoFedapayFrame } from '../lib/payments/fedapay-csp'
 import { FEDAPAY_PROVIDERS, parseDisabledProviders } from '../lib/payments/fedapay-providers'
 
 /**
@@ -296,16 +297,12 @@ if (fs.existsSync(syncRoutePath)) {
 // =========================================================
 
 // FEDAPAY-1 : aucun cadre FedaPay autorisé par la CSP (l'acheteur ne voit jamais de page FedaPay).
+// Directive capturée entière (lib/payments/fedapay-csp.ts) ; aucune directive trouvée = échec.
 const nextConfigPath = path.join(rootDir, 'next.config.mjs')
-const frameSrc =
-  (fs.existsSync(nextConfigPath) ? fs.readFileSync(nextConfigPath, 'utf-8') : '').match(
-    /frame-src[^"'`]*/,
-  )?.[0] ?? ''
-check(
-  '[FEDAPAY-1] CSP : aucun cadre FedaPay (frame-src)',
-  !/fedapay/i.test(frameSrc),
-  'Retirer fedapay.com de frame-src dans next.config.mjs : le paiement ne sort jamais du site',
+const frameSrcCheck = checkNoFedapayFrame(
+  fs.existsSync(nextConfigPath) ? fs.readFileSync(nextConfigPath, 'utf-8') : '',
 )
+check('[FEDAPAY-1] CSP : aucun cadre FedaPay (frame-src)', frameSrcCheck.pass, frameSrcCheck.detail)
 
 // FEDAPAY-2 : l'interrupteur d'urgence FEDAPAY_DISABLED_PROVIDERS ne contient que des
 // opérateurs reconnus (une valeur inconnue ne masque rien, en silence).

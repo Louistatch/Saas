@@ -3,7 +3,8 @@
 // passée deux fois (idempotence). On vérifie que les garanties de main restent vraies après les
 // nôtres (achats privés, e-mail jamais lu dans profiles, vente protégée par ON DELETE RESTRICT)
 // et que les nôtres s'ajoutent (e-mail confirmé, coordonnées masquées, profiles.email figé,
-// compteur réservé au serveur, dossiers du stockage, une seule demande en cours).
+// compteur réservé au serveur, stockage écrit par le super_admin seul, une seule demande en
+// cours). Enfin, le danger d'une réapplication de la migration de main après la nôtre.
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
 import { test } from 'node:test'
@@ -239,19 +240,28 @@ test('main puis nos migrations, deux fois : garanties de main conservées, les n
     1,
   )
 
-  // Stockage : chaque auteur dans SON dossier ; plateforme/ au super_admin seul.
+  // Stockage : écriture au super_admin seul (main 40c06ee : l'opérateur publie, y compris pour
+  // une faîtière, dans le dossier de celle-ci). L'admin de faîtière n'écrit plus nulle part,
+  // pas même dans son propre dossier ; un membre non plus.
   const put = (name) =>
     db.query(`INSERT INTO storage.objects(bucket_id, name) VALUES ('fiches-techniques', $1)`, [
       name,
     ])
   await as(FAITIERE_ADMIN, 'admin.a@exemple.tg')
-  await put(`${id(COOP_A)}/f1/compte.xlsx`)
+  await assert.rejects(put(`${id(COOP_A)}/f1/compte.xlsx`), /row-level security/)
   await assert.rejects(put('plateforme/f1/compte.xlsx'), /row-level security/)
   await assert.rejects(put(`${id(COOP_B)}/f1/compte.xlsx`), /row-level security/)
   await as(VICTIM, 'victime@exemple.tg')
   await assert.rejects(put(`${id(COOP_A)}/f2/compte.xlsx`), /row-level security/)
   await as(SUPER, 'super@exemple.tg')
   await put('plateforme/f1/compte.xlsx')
+  await put(`${id(COOP_A)}/${id(FICHE)}/compte.xlsx`)
+  await reset()
+  assert.equal(
+    (await db.query('SELECT count(*)::int AS n FROM storage.objects')).rows[0].n,
+    2,
+    'seuls les deux dépôts du super_admin sont passés',
+  )
 
   // Une seule demande en cours de création par fiche et par numéro.
   await reset()
@@ -287,4 +297,34 @@ test('main puis nos migrations, deux fois : garanties de main conservées, les n
   assert.equal(pol.rows.length, 1)
   assert.ok(!/profiles/.test(pol.rows[0].qual), pol.rows[0].qual)
   assert.match(pol.rows[0].qual, /verified_email/)
+
+  // Danger documenté (en-tête de 20261019_130000 et coordination.md) : réappliquer la migration
+  // de main APRÈS la nôtre remet sans erreur l'e-mail du jeton (non confirmé). Le contrôle
+  // post-application le voit, et réappliquer 20261019_130000 (idempotente) rétablit la règle.
+  const policyQual = async () =>
+    (
+      await db.query(
+        `SELECT qual FROM pg_policies WHERE tablename = 'purchases' AND policyname = 'purchases_own_read'`,
+      )
+    ).rows[0].qual
+  const postApplyCheck = async () =>
+    (
+      await db.query(
+        `SELECT 1 FROM pg_policies WHERE tablename = 'purchases' AND policyname = 'purchases_own_read'
+         AND qual LIKE '%verified_email%'`,
+      )
+    ).rows.length
+  await reset()
+  await db.exec(readFileSync(`${MIGRATIONS}/20261018_100000_fiches_sales_integrity.sql`, 'utf8'))
+  assert.doesNotMatch(await policyQual(), /verified_email/)
+  assert.equal(await postApplyCheck(), 0, 'le contrôle post-application signale la régression')
+  await as(UNCONFIRMED, 'pasconfirme@exemple.tg')
+  assert.deepEqual(await visible(), [id(101)], 'régression réelle : e-mail non confirmé relu')
+  await reset()
+  await db.exec(
+    readFileSync(`${MIGRATIONS}/20261019_130000_purchases_own_read_verified_email.sql`, 'utf8'),
+  )
+  assert.equal(await postApplyCheck(), 1)
+  await as(UNCONFIRMED, 'pasconfirme@exemple.tg')
+  assert.deepEqual(await visible(), [])
 })

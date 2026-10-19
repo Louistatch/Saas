@@ -1,3 +1,4 @@
+import { ficheAccessRoutes } from '@/lib/fiches/access-policy'
 import {
   FICHES_BUCKET,
   safeDownloadName,
@@ -12,7 +13,6 @@ import {
 } from '@/lib/fiches/member-scope'
 import { requirePrivateCard } from '@/lib/security/card-access'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
-import { createClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/utils/logger'
 import { clientKeyFromHeaders, rateLimit } from '@/lib/utils/rate-limit'
 import { type NextRequest, NextResponse } from 'next/server'
@@ -20,7 +20,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 const log = createLogger('api:fiches:access')
 
 const FICHE_COLS =
-  'id, title, culture, files, cooperative_id, is_free_for_members, price_non_member, download_count, canton_id, prefecture_id, region_id'
+  'id, title, culture, files, cooperative_id, status, is_free_for_members, price_non_member, download_count, canton_id, prefecture_id, region_id'
 
 interface AccessFiche {
   id: string
@@ -28,6 +28,7 @@ interface AccessFiche {
   culture: string
   files: { name: string; url: string; type: string }[] | null
   cooperative_id: string | null
+  status: string | null
   is_free_for_members: boolean
   price_non_member: number | null
 }
@@ -91,20 +92,19 @@ const PURCHASE_ID_RE =
 
 /**
  * POST /api/fiches/[id]/access
- * - Achat réglé (purchase_id) → accès, MÊME si la fiche a depuis été retirée
- *   de la vente (archivée) : ce qui est payé reste téléchargeable.
+ * Les portes ouvertes selon le statut et le prix sont celles de
+ * lib/fiches/access-policy.ts (ficheAccessRoutes, règle de main 66f5c49) :
+ * - Achat réglé (purchase_id) → accès sur une fiche publiée OU retirée de la
+ *   vente (archivée) : ce qui est payé reste téléchargeable.
  * - Fiche publiée gratuite → accès libre.
- * - Carte active (compte ou session de carte) → accès si la fiche est gratuite
- *   pour les membres ET que la carte y a droit : fiche d'une faîtière → carte
- *   de coopérative de son arbre ; fiche de la plateforme → toute carte active.
- *   Toujours pour son TITULAIRE seulement (pas un admin qui peut la lire).
+ * - Carte active (compte ou session de carte) → accès si la fiche publiée est
+ *   gratuite pour les membres ET que la carte y a droit : fiche d'une faîtière
+ *   → carte de coopérative de son arbre ; fiche de la plateforme → toute carte
+ *   active. Toujours pour son TITULAIRE seulement (pas un admin qui la lit).
  * - Carte connue mais suspendue, révoquée ou expirée → 402 « achetez-le ».
+ * - Brouillon → 404, pour tous, acheteurs compris. Une fiche vendue ne repasse
+ *   d'ailleurs pas en brouillon (PATCH → 409) : on la retire de la vente.
  * Renvoie des URL de téléchargement signées.
- *
- * Mêmes portes que lib/fiches/access-policy.ts (ficheAccessRoutes) : gratuité et
- * carte sur une fiche publiée seulement, achat réglé aussi sur une fiche retirée.
- * En plus, un achat réglé reste valable si la fiche est repassée en brouillon
- * après la vente (ce qui est payé reste téléchargeable).
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   // Rate limiting to prevent card_number brute-force
@@ -123,17 +123,29 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   try {
-    // 1. Achat : vérifié AVANT la fiche, et la fiche est ensuite lue sans
-    //    filtre de statut (une ligne supprimée → 404).
-    //    Client de service : les achats ne sont pas lisibles par un visiteur
-    //    anonyme, et l'id d'achat aléatoire sert ici de jeton.
+    const purchaseId = body.purchase_id ? String(body.purchase_id).trim() : null
+    if (purchaseId !== null && !PURCHASE_ID_RE.test(purchaseId)) {
+      return NextResponse.json({ error: 'ID achat invalide' }, { status: 400 })
+    }
+
+    // Fiche lue UNE fois, par le client de service et sans filtre de statut : une
+    // fiche retirée de la vente n'est plus visible du public, mais ceux qui l'ont
+    // payée gardent leur fichier. Les portes sont décidées par ficheAccessRoutes.
+    const admin = createAdminClient()
+    const { data: fiche, error: ficheError } = await admin
+      .from('fiches_techniques')
+      .select(FICHE_COLS)
+      .eq('id', ficheId)
+      .maybeSingle<AccessFiche>()
+    const routes = fiche ? ficheAccessRoutes(fiche) : null
+    if (ficheError || !fiche || !routes || (!routes.free && !routes.member && !routes.purchase)) {
+      return NextResponse.json({ error: 'Fiche non trouvée' }, { status: 404 })
+    }
+
+    // 1. Achat réglé. Client de service : les achats ne sont pas lisibles par un
+    //    visiteur anonyme, et l'id d'achat aléatoire sert ici de jeton.
     let purchaseRefused = false
-    if (body.purchase_id) {
-      const purchaseId = String(body.purchase_id).trim()
-      if (!PURCHASE_ID_RE.test(purchaseId)) {
-        return NextResponse.json({ error: 'ID achat invalide' }, { status: 400 })
-      }
-      const admin = createAdminClient()
+    if (purchaseId !== null && routes.purchase) {
       const { data: purchase } = await admin
         .from('purchases')
         .select('id, payment_status, access_granted')
@@ -141,38 +153,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         .eq('fiche_id', ficheId)
         .eq('payment_status', 'completed')
         .maybeSingle<{ id: string; payment_status: string; access_granted: boolean }>()
-      if (purchase?.access_granted) {
-        // Aucun filtre de statut : publiée, archivée ou repassée en brouillon,
-        // une fiche payée reste téléchargeable tant que sa ligne existe.
-        const { data: bought } = await admin
-          .from('fiches_techniques')
-          .select(FICHE_COLS)
-          .eq('id', ficheId)
-          .maybeSingle<AccessFiche>()
-        if (!bought) return NextResponse.json({ error: 'Fiche non trouvée' }, { status: 404 })
-        return granted(bought, 'purchase')
-      }
+      if (purchase?.access_granted) return granted(fiche, 'purchase')
       purchaseRefused = true
     }
 
-    // 2. Gratuité et carte membre : fiche PUBLIÉE uniquement.
-    const supabase = await createClient()
-    const { data: fiche, error: ficheError } = await supabase
-      .from('fiches_techniques')
-      .select(FICHE_COLS)
-      .eq('id', ficheId)
-      .eq('status', 'published')
-      .maybeSingle<AccessFiche>()
-
-    if (ficheError || !fiche) {
-      return NextResponse.json({ error: 'Fiche non trouvée' }, { status: 404 })
+    // 2. Gratuité et carte membre : fiche PUBLIÉE uniquement (routes.free,
+    //    routes.member). Retirée de la vente, sans achat réglé : plus en vente.
+    if (fiche.status !== 'published') {
+      if (purchaseRefused) {
+        return NextResponse.json(
+          { error: 'Achat non trouvé ou paiement en attente' },
+          { status: 403 },
+        )
+      }
+      return NextResponse.json(
+        { error: 'Ce compte d’exploitation n’est plus en vente.' },
+        { status: 404 },
+      )
     }
 
     // Gratuit au lancement : un prix nul vaut accès libre, sans carte ni achat.
     // Le choix est porté par la DONNÉE (price_non_member), pas par une variable
     // d'environnement : la gratuité se lève fiche par fiche le jour où la vente
     // démarre, sans redéploiement et sans code mort à retirer.
-    if ((fiche.price_non_member ?? 0) <= 0) return granted(fiche, 'free')
+    if (routes.free) return granted(fiche, 'free')
 
     // Au-delà d'ici, une fiche est payante : il faut une carte ou un achat.
     // `reason: 'not_free'` : la boutique, en cache quelques minutes, peut encore
@@ -202,9 +206,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         // Gratuité membres (lib/fiches/member-scope.ts) : fiche d'une faîtière →
         // carte de coopérative active de SON arbre ; fiche de la plateforme →
         // toute carte active ; pour son titulaire seulement. Relu par le client
-        // de service ; refus au moindre doute.
+        // de service ; refus au moindre doute. Porte « carte » de ficheAccessRoutes
+        // en plus : fermée, la fiche est traitée comme non gratuite pour les membres.
         const decision = await decideMemberFree(
-          fiche,
+          { ...fiche, is_free_for_members: routes.member },
           cardNumber,
           card.member_id ?? null,
           cardCallerOf(access),

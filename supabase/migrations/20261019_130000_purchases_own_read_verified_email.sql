@@ -2,7 +2,15 @@
 -- l'acheteur masquées, profiles.email plus modifiable depuis le navigateur.
 --
 -- NON APPLIQUÉE automatiquement. À appliquer APRÈS 20261018_100000_fiches_sales_integrity.sql
--- (main), dont elle garde les garanties et qu'elle resserre. Idempotente. Le code
+-- (main), dont elle garde les garanties et qu'elle resserre. Idempotente.
+--
+-- NE JAMAIS (ré)appliquer 20261018_100000 APRÈS celle-ci : son « drop policy if exists
+-- purchases_own_read; create policy … auth.jwt()->>'email' » remettrait sans erreur l'e-mail du
+-- jeton, non confirmé. Les sept migrations du 18-19/10 s'appliquent en une passe, dans l'ordre
+-- des noms, une fois chacune. Contrôle après application (doit renvoyer une ligne) :
+--   select 1 from pg_policies where tablename = 'purchases' and policyname = 'purchases_own_read'
+--     and qual like '%verified_email%';
+-- S'il ne renvoie rien, réappliquer CE fichier (idempotent) rétablit la politique. Le code
 -- (app/api/purchases/mine) fonctionne avant comme après : il filtre déjà explicitement sur
 -- user_id ou sur l'e-mail VÉRIFIÉ de auth.users, et ne lit que des colonnes autorisées ci-dessous.
 --

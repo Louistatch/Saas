@@ -21,6 +21,7 @@ import 'server-only'
  * lib/payments/fedapay-providers.ts).
  */
 
+import { fedaPayPhoneNumber } from '@/lib/fiches/phone'
 import {
   FEDAPAY_PROVIDERS,
   FedaPayConfigError,
@@ -251,10 +252,14 @@ export async function createCheckout(input: {
   customer: { name: string; email?: string | null; phone?: string | null; country?: 'tg' | 'bj' }
 }): Promise<{ transactionId: number; url: string }> {
   const [firstname, ...rest] = input.customer.name.trim().split(/\s+/)
-  const phone = (input.customer.phone ?? '').replace(/\D/g, '')
-  const country = input.customer.country ?? 'tg'
-  const prefix = country === 'bj' ? '229' : '228'
-  const local = phone.startsWith(prefix) && phone.length > 8 ? phone.slice(3) : phone
+  const raw = input.customer.phone ?? ''
+  // Pays donné, sinon déduit de l'indicatif (+229 → Bénin), sinon Togo.
+  const country =
+    input.customer.country ??
+    (/^\+?(00)?229\d{8,10}$/.test(raw.replace(/[\s\-.()]/g, '')) ? 'bj' : 'tg')
+  // Même forme que le paiement direct : Bénin à 10 chiffres (« 01 » + 8), Togo à 8.
+  // Un numéro invalide n'est pas envoyé : la page FedaPay le demandera.
+  const phone_number = fedaPayPhoneNumber(country, raw)
   const created = await call('/transactions', {
     method: 'POST',
     body: JSON.stringify({
@@ -267,8 +272,8 @@ export async function createCheckout(input: {
         lastname: rest.join(' ') || '-',
         ...(input.customer.email ? { email: input.customer.email } : {}),
         // Le pays choisi fixe le drapeau de la page FedaPay (Togo ou Bénin).
-        // Les numéros de test sandbox (64000001) sont béninois.
-        ...(local.length >= 8 ? { phone_number: { number: local, country } } : {}),
+        // Les numéros de test sandbox (0164000001) sont béninois.
+        ...(phone_number ? { phone_number } : {}),
       },
     }),
   })
@@ -345,9 +350,10 @@ export async function createDirectPayment(input: {
   })
   const [firstname, ...rest] = input.customer.name.trim().split(/\s+/)
   const prefix = input.customer.country === 'bj' ? '229' : '228'
-  const digits = input.customer.phone.replace(/\D/g, '')
-  const local = digits.startsWith(prefix) && digits.length > 8 ? digits.slice(3) : digits
-  const phone_number = { number: local, country: input.customer.country }
+  // Forme canonique attendue par FedaPay : Bénin à 10 chiffres (« 01 » + les 8
+  // de l'ancien plan, ex. 64000001 → 0164000001), Togo à 8. Invalide : rien ne part.
+  const phone_number = fedaPayPhoneNumber(input.customer.country, input.customer.phone)
+  if (!phone_number) throw new Error('FedaPay : numéro Mobile Money invalide')
 
   const created = await call('/transactions', {
     method: 'POST',
@@ -373,7 +379,7 @@ export async function createDirectPayment(input: {
     transaction_id: tx.id,
     environment,
     raw_phone: input.customer.phone,
-    normalized_phone: local,
+    normalized_phone: phone_number.number,
     country: input.customer.country,
     country_code: prefix,
     customer_phone_sent: phone_number,
@@ -428,7 +434,7 @@ export async function createDirectPayment(input: {
     resolved_provider: mode,
     endpoint: `POST /v1/${mode}`,
     raw_phone: input.customer.phone,
-    normalized_phone: local,
+    normalized_phone: phone_number.number,
     country: input.customer.country,
     country_code: prefix,
     payload: { ...sendPayload, token: maskToken(token.token) },

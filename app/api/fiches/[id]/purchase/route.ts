@@ -218,10 +218,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
   const { name, country, provider } = parsed.data
 
-  // `phone` : numéro national tel que saisi, envoyé à FedaPay (inchangé).
-  // `phoneKey` : la ligne, avec son pays (lib/fiches/phone.ts) — seule clé
-  // enregistrée et comparée : 97 00 00 01 et 01 97 00 00 01 au Bénin sont la
-  // même ligne ; 97 00 00 03 au Togo et au Bénin, deux lignes.
+  // `phone` : numéro national CANONIQUE envoyé à FedaPay (lib/fiches/phone.ts) :
+  // Bénin toujours à 10 chiffres (64000001 saisi → 0164000001 envoyé), Togo à 8.
+  // `phoneKey` : la ligne, avec son pays — seule clé enregistrée et comparée :
+  // 97 00 00 01 et 01 97 00 00 01 au Bénin sont la même ligne ; 97 00 00 03 au
+  // Togo et au Bénin, deux lignes.
   const phone = normalizeMobileMoneyPhone(country, parsed.data.phone)
   if (!phone) {
     return NextResponse.json(

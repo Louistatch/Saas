@@ -2,8 +2,18 @@
 -- d'exploitation et par numéro Mobile Money.
 --
 -- NON APPLIQUÉE automatiquement. Purement additive : aucune ligne n'est
--- modifiée ni supprimée, et la route fonctionne sans (elle se replie alors
--- sur sa relecture après insertion, au mieux).
+-- modifiée ni supprimée, et la route fusionnée fonctionne sans (elle se replie
+-- alors sur sa relecture après insertion, au mieux).
+--
+-- ORDRE DE DÉPLOIEMENT : à appliquer SEULEMENT APRÈS la mise en ligne sur Vercel
+-- du code fusionné (claude/magical-wright-iP5e8). Le code de main encore en ligne
+-- (POST /api/fiches/[id]/purchase) laisse une ligne « pending » sans transaction
+-- si la fonction s'arrête entre l'insertion et l'appel FedaPay, et n'a ni cron de
+-- rapprochement ni nettoyage : cette ligne bloquerait ensuite toute nouvelle
+-- tentative pour ce compte et ce numéro (23505 rendu en 500 « Achat impossible
+-- pour le moment »), et un double clic donnerait aussi un 500. La route fusionnée
+-- traite 23505 comme « demande concurrente » et passe en échec les lignes sans
+-- transaction de plus de 15 min.
 --
 -- Le défaut : la reprise d'un paiement en cours était « vérifier puis
 -- insérer » (POST /api/fiches/[id]/purchase). Deux requêtes simultanées

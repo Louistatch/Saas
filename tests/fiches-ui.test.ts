@@ -77,6 +77,7 @@ import {
   validateFicheDraft,
 } from '../lib/fiches/upload'
 import { type UploadStorage, uploadFicheCover, uploadFicheFiles } from '../lib/fiches/upload-client'
+import { checkNoFedapayFrame } from '../lib/payments/fedapay-csp'
 
 process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://proj.supabase.test'
 
@@ -447,7 +448,8 @@ test('U14 : numéro masqué sur l’écran d’attente', () => {
   assert.equal(maskMobileMoneyPhone('tg', '90 12 34 56'), '+228 90 •• •• 56')
   assert.equal(maskMobileMoneyPhone('tg', '+228 90123456'), '+228 90 •• •• 56')
   assert.equal(maskMobileMoneyPhone('bj', '01 97 00 00 01'), '+229 01 97 •• •• 01')
-  assert.equal(maskMobileMoneyPhone('bj', '97000001'), '+229 97 •• •• 01')
+  // Bénin saisi à 8 chiffres : affiché comme envoyé à FedaPay, à 10 chiffres.
+  assert.equal(maskMobileMoneyPhone('bj', '97000001'), '+229 01 97 •• •• 01')
   assert.equal(maskMobileMoneyPhone('tg', 'abc'), '+228 ••••')
 })
 
@@ -496,21 +498,23 @@ test('U14 : après un refus, relecture en arrière-plan bornée (paiement tardif
 })
 
 test('U14 : mode test — numéros officiels du Sandbox, affichés seulement en sandbox', () => {
-  assert.deepEqual([...SANDBOX_TEST_NUMBERS], ['64000001', '66000001'])
+  // Numéros du Bénin à 10 chiffres (support FedaPay, 19/10/2026 : à 8 chiffres, refusés).
+  assert.deepEqual([...SANDBOX_TEST_NUMBERS], ['0164000001', '0166000001'])
   // Numéros du Bénin (documentation FedaPay : pays « bj ») : un clic passe au Bénin.
   assert.equal(SANDBOX_TEST_COUNTRY, 'bj')
   const ready = providersFromReply(200, FP_REPLY)
   const list = ready.kind === 'ready' ? ready.providers : []
   const togo = { name: 'Test', phone: '', country: 'tg' as const, provider: 'moov_tg' }
-  assert.deepEqual(sandboxTestBuyer(togo, list, '64000001'), {
+  assert.deepEqual(sandboxTestBuyer(togo, list, '0164000001'), {
     name: 'Test',
-    phone: '64000001',
+    phone: '0164000001',
     country: 'bj',
     provider: 'mtn_bj',
   })
   // Opérateur du Bénin déjà choisi : gardé.
   assert.equal(
-    sandboxTestBuyer({ ...togo, country: 'bj', provider: 'celtiis_bj' }, list, '66000001').provider,
+    sandboxTestBuyer({ ...togo, country: 'bj', provider: 'celtiis_bj' }, list, '0166000001')
+      .provider,
     'celtiis_bj',
   )
   const dialog = readFileSync(
@@ -543,6 +547,35 @@ test('U14 : aucun écran ne montre FedaPay (ni cadre, ni nouvel onglet vers Feda
   const frameSrc = config.match(/"frame-src[^"]*"/)?.[0] ?? ''
   assert.ok(frameSrc.startsWith('"frame-src'), 'frame-src présent')
   assert.ok(!/fedapay/i.test(frameSrc), `aucun cadre FedaPay : ${frameSrc}`)
+})
+
+test('U14b : FEDAPAY-1 (security:check) voit FedaPay dans frame-src, échoue sans directive', () => {
+  // La CSP de main (avant fusion) autorisait la page FedaPay : le contrôle DOIT échouer.
+  const mainConfig = `"frame-src 'self' https://*.vercel.app https://*.fedapay.com",`
+  const onMain = checkNoFedapayFrame(mainConfig)
+  assert.equal(onMain.pass, false)
+  assert.deepEqual(onMain.directives, [
+    `"frame-src 'self' https://*.vercel.app https://*.fedapay.com"`,
+  ])
+  // L'ancienne expression s'arrêtait à l'apostrophe de 'self' : elle ne voyait jamais FedaPay.
+  assert.equal(mainConfig.match(/frame-src[^"'`]*/)?.[0], 'frame-src ')
+  // Directive en gabarit (backticks) aussi lue.
+  assert.equal(checkNoFedapayFrame("`frame-src 'self' https://checkout.fedapay.com`").pass, false)
+  // Aucune directive trouvée : échec (contrôle aveugle), jamais un succès silencieux.
+  assert.equal(checkNoFedapayFrame('').pass, false)
+  assert.equal(checkNoFedapayFrame("const csp = 'default-src self'").pass, false)
+  // La configuration actuelle passe.
+  const config = readFileSync(path.join(__dirname, '..', 'next.config.mjs'), 'utf8')
+  const now = checkNoFedapayFrame(config)
+  assert.equal(now.pass, true, now.detail)
+  assert.ok(now.directives.length >= 1)
+  // Le script de pré-déploiement utilise bien ce contrôle.
+  const script = readFileSync(
+    path.join(__dirname, '..', 'scripts', 'pre-deploy-security-check.ts'),
+    'utf8',
+  )
+  assert.ok(script.includes('checkNoFedapayFrame('))
+  assert.ok(!script.includes('/frame-src[^"\'`]*/'))
 })
 
 test('U15 : nouvelle demande explicite — jamais de reprise ; reprise seulement à l’ouverture', () => {
@@ -841,4 +874,24 @@ test('U9 : échec d’envoi → message traduit ; couverture versionnée', async
     version: 'k1',
   })
   assert.equal(cover.calls[1]?.path, `plateforme/${F1}-k1.jpg`)
+})
+
+test('U14c : conditions d’achat (§5) — comptes en Mobile Money sur le site, carte pour la certification seulement', () => {
+  const page = readFileSync(
+    path.join(__dirname, '..', 'app', 'legal', 'conditions', 'page.tsx'),
+    'utf8',
+  )
+  const achats = page.slice(page.indexOf('id="achats"'))
+  // L'achat d'un compte n'accepte plus la page FedaPay (carte) : la promesse n'est plus faite.
+  assert.ok(!achats.includes('Il passe par FedaPay (Mobile Money ou carte)'))
+  assert.match(achats, /Mobile Money, directement sur le site/)
+  assert.match(achats, /carte n&apos;est pas encore proposé pour les comptes/)
+  for (const op of ['MTN', 'Moov', 'Celtiis', 'Mixx by Yas']) assert.ok(achats.includes(op), op)
+  assert.match(achats, /frais de certification se\s+règlent sur la page de paiement FedaPay/)
+  // La fenêtre d'achat renvoie bien à cette section.
+  const dialog = readFileSync(
+    path.join(__dirname, '..', 'components', 'marketplace', 'fiche-access-dialog.tsx'),
+    'utf8',
+  )
+  assert.ok(dialog.includes('/legal/conditions#achats'))
 })

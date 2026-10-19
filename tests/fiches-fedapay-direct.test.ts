@@ -15,15 +15,16 @@ import {
   parseDisabledProviders,
   resolveFedaPayMode,
 } from '../lib/payments/fedapay-providers'
-import { installStubs } from './fiches-fake-db'
+import { installFetch, installStubs, json } from './fiches-fake-db'
 
 for (const level of ['log', 'info', 'warn', 'error', 'debug'] as const) console[level] = () => {}
 
-installStubs()
+const stubs = installStubs()
 const providersRoute = require('../app/api/payments/fedapay/providers/route') as {
   GET: () => Response
 }
-const { readTx } = require('../lib/payments/fedapay') as typeof import('../lib/payments/fedapay')
+type FedaPayModule = typeof import('../lib/payments/fedapay')
+const { createCheckout, readTx } = require('../lib/payments/fedapay') as FedaPayModule
 
 function setEnv(env: 'sandbox' | 'live', disabled?: string) {
   process.env.FEDAPAY_ENV = env
@@ -252,4 +253,41 @@ test('readTx : montant débité, frais, motif, mode et custom_metadata (schéma 
   assert.deepEqual(bare.customMetadata, { fiche_id: 'f-2' })
   assert.equal(readTx({ custom_metadata: '[1]' }).customMetadata, null)
   assert.equal(readTx({ amount_debited: -5 }).amountDebited, null)
+})
+
+test('certification (page hébergée) : téléphone envoyé à FedaPay, Bénin à 10 chiffres, Togo à 8', async () => {
+  setEnv('sandbox')
+  const created: Array<{ customer: Record<string, unknown> }> = []
+  installFetch(stubs.store, [
+    (url, init) => {
+      if (!url.includes('fedapay.com')) return null
+      if (url.endsWith('/v1/transactions') && init.method === 'POST') {
+        created.push(JSON.parse(String(init.body)))
+        return json({ 'v1/transaction': { id: 900 + created.length, status: 'pending' } })
+      }
+      if (/\/v1\/transactions\/\d+\/token$/.test(url))
+        return json({ token: 'tok_x', url: 'https://sandbox-checkout.fedapay.com/x' })
+      return null
+    },
+  ])
+  const checkout = (phone: string, country?: 'tg' | 'bj') =>
+    createCheckout({
+      amount: 15000,
+      description: 'Certification Opérateur FaîtiereHub',
+      callbackUrl: 'https://app.test/api/payments/fedapay/return?certification=x',
+      customer: { name: 'Ama Koffi', phone, ...(country ? { country } : {}) },
+    })
+  await checkout('+229 64 00 00 01')
+  await checkout('64000001', 'bj')
+  await checkout('+228 90 12 34 56')
+  await checkout('12')
+  assert.deepEqual(
+    created.map((c) => c.customer.phone_number ?? null),
+    [
+      { number: '0164000001', country: 'bj' },
+      { number: '0164000001', country: 'bj' },
+      { number: '90123456', country: 'tg' },
+      null,
+    ],
+  )
 })

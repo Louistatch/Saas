@@ -115,13 +115,21 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // `cooperative_id` est NOT NULL : on rattache la fiche à l'organisation de
-  // l'auteur plutôt que de la laisser choisir, ce qui évite qu'un super_admin
-  // dépose au nom d'une coopérative au hasard.
-  const { platform, ...fields } = parsed.data
+  // Propriétaire de la fiche : l'organisation de l'auteur. Seul le super_admin
+  // en choisit une autre (`cooperative_id`, publication « par l'opérateur » de
+  // main 40c06ee pour une faîtière), et seulement une faîtière existante ;
+  // sinon `platform` ou l'absence d'organisation donne une fiche de la plateforme.
+  const { platform, cooperative_id: chosenFaitiere, ...fields } = parsed.data
+  const isSuperAdmin = guard.ctx.role === 'super_admin'
+  if (chosenFaitiere && !isSuperAdmin) {
+    return NextResponse.json(
+      { error: 'Seul le super-administrateur choisit la faîtière d’une fiche.' },
+      { status: 403 },
+    )
+  }
   const isPlatform =
-    guard.ctx.role === 'super_admin' && (platform === true || !guard.ctx.cooperativeId)
-  const cooperativeId = isPlatform ? null : guard.ctx.cooperativeId
+    isSuperAdmin && !chosenFaitiere && (platform === true || !guard.ctx.cooperativeId)
+  const cooperativeId = isPlatform ? null : (chosenFaitiere ?? guard.ctx.cooperativeId)
   if (!isPlatform && !cooperativeId) {
     return NextResponse.json(
       { error: "Votre compte n'est rattaché à aucune organisation." },
@@ -131,6 +139,27 @@ export async function POST(request: NextRequest) {
 
   try {
     const admin = createAdminClient()
+    if (chosenFaitiere) {
+      const { data: owner, error: ownerError } = await admin
+        .from('cooperatives')
+        .select('id, level, deleted_at')
+        .eq('id', chosenFaitiere)
+        .maybeSingle<{ id: string; level: string | null; deleted_at: string | null }>()
+      if (ownerError) {
+        log.error('Fiche owner lookup failed', ownerError)
+        return NextResponse.json(
+          { error: 'Vérification de la faîtière impossible' },
+          { status: 502 },
+        )
+      }
+      if (!owner || owner.deleted_at || owner.level !== 'faitiere') {
+        const msg = 'Faîtière introuvable : choisissez une faîtière dans la liste.'
+        return NextResponse.json(
+          { error: msg, details: { cooperative_id: [msg] } },
+          { status: 400 },
+        )
+      }
+    }
     // Culture enregistrée sous le nom du référentiel (« Maïs » → « Mais »).
     const culture = await resolveCulture(admin as unknown as CultureReader, fields.culture)
     if (!culture.ok)

@@ -116,6 +116,30 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!current) return NextResponse.json({ error: 'Fiche introuvable' }, { status: 404 })
     if (!canManageFiche(guard.ctx, current)) return forbidden()
 
+    // Un brouillon ne s'ouvre à personne, acheteurs compris (lib/fiches/access-policy.ts) :
+    // une fiche vendue se retire de la vente (archivée), elle ne repasse pas en brouillon.
+    if (fields.status === 'draft' && current.status !== 'draft') {
+      const { count, error: countError } = await admin
+        .from('purchases')
+        .select('id', { count: 'exact', head: true })
+        .eq('fiche_id', id)
+        .eq('payment_status', 'completed')
+      if (countError) {
+        log.error('Fiche purchases count failed', countError)
+        return NextResponse.json({ error: 'Modification impossible' }, { status: 500 })
+      }
+      if ((count ?? 0) > 0) {
+        return NextResponse.json(
+          {
+            error:
+              'Ce compte a été vendu : retirez-le de la vente au lieu de le repasser en brouillon. Les acheteurs gardent leur fichier.',
+            purchases: count,
+          },
+          { status: 409 },
+        )
+      }
+    }
+
     // Un compte payant ne devient pas gratuit par un champ vidé : il faut le dire.
     if (
       fields.price_non_member === 0 &&

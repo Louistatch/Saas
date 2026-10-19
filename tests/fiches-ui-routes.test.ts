@@ -162,3 +162,145 @@ test('PATCH /api/fiches/[id] : image d’une autre fiche jamais effacée', async
   assert.equal(res.status, 200)
   assert.equal(state.store.bucket('fiches-covers').has(foreign), true)
 })
+
+test('PATCH /api/fiches/[id] : fiche vendue → brouillon refusé (409), archivage accepté', async () => {
+  state.ctx = { userId: 'u-s', role: 'super_admin', cooperativeId: null, cooperativeLevel: null }
+  state.store.rows('fiches_techniques').push({
+    id: FICHE,
+    title: 'Maïs',
+    status: 'published',
+    price_non_member: 1000,
+    cooperative_id: null,
+    files: [{ name: 'c.xlsx', url: 'plateforme/c.xlsx', type: 'xlsx' }],
+  })
+  state.store.rows('purchases').push({
+    id: PURCHASE,
+    fiche_id: FICHE,
+    payment_status: 'completed',
+    access_granted: true,
+  })
+  const draft = await ficheRoute.PATCH(
+    req(`/api/fiches/${FICHE}`, { method: 'PATCH', body: { status: 'draft' } }),
+    ctx(FICHE),
+  )
+  assert.equal(draft.status, 409)
+  assert.match((await draft.json()).error, /retirez-le de la vente/)
+  assert.equal(state.store.rows('fiches_techniques')[0].status, 'published')
+  const archived = await ficheRoute.PATCH(
+    req(`/api/fiches/${FICHE}`, { method: 'PATCH', body: { status: 'archived' } }),
+    ctx(FICHE),
+  )
+  assert.equal(archived.status, 200)
+})
+
+test('PATCH /api/fiches/[id] : fiche jamais vendue → brouillon accepté', async () => {
+  state.ctx = { userId: 'u-s', role: 'super_admin', cooperativeId: null, cooperativeLevel: null }
+  state.store.rows('fiches_techniques').push({
+    id: FICHE,
+    title: 'Maïs',
+    status: 'published',
+    price_non_member: 1000,
+    cooperative_id: null,
+    files: [{ name: 'c.xlsx', url: 'plateforme/c.xlsx', type: 'xlsx' }],
+  })
+  state.store.rows('purchases').push({
+    id: PURCHASE,
+    fiche_id: FICHE,
+    payment_status: 'failed',
+    access_granted: false,
+  })
+  const res = await ficheRoute.PATCH(
+    req(`/api/fiches/${FICHE}`, { method: 'PATCH', body: { status: 'draft' } }),
+    ctx(FICHE),
+  )
+  assert.equal(res.status, 200)
+})
+
+const draftBody = (over: Record<string, unknown> = {}) => ({
+  title: 'Maïs pluvial',
+  culture: 'Mais',
+  type_agriculture: 'conventionnel',
+  price_non_member: 1000,
+  is_free_for_members: true,
+  status: 'draft',
+  ...over,
+})
+
+test('POST /api/fiches : super_admin publie pour une faîtière choisie (cooperative_id)', async () => {
+  state.ctx = { userId: 'u-s', role: 'super_admin', cooperativeId: null, cooperativeLevel: null }
+  state.store.rows('cooperatives').push({ id: FAITIERE, level: 'faitiere', deleted_at: null })
+  const res = await fichesRoute.POST(
+    req('/api/fiches', { method: 'POST', body: draftBody({ cooperative_id: FAITIERE }) }),
+  )
+  assert.equal(res.status, 201)
+  const { fiche } = await res.json()
+  assert.equal(fiche.cooperative_id, FAITIERE)
+  const row = state.store.rows('fiches_techniques').find((r) => r.id === fiche.id)
+  assert.equal(row?.is_free_for_members, true)
+})
+
+test('POST /api/fiches : cooperative_id qui n’est pas une faîtière (ou supprimée) → 400', async () => {
+  state.ctx = { userId: 'u-s', role: 'super_admin', cooperativeId: null, cooperativeLevel: null }
+  const COOP = '0c0c0c0c-0000-4000-8000-0000000000f4'
+  const GONE = '0c0c0c0c-0000-4000-8000-0000000000f5'
+  state.store
+    .rows('cooperatives')
+    .push(
+      { id: COOP, level: 'cooperative', deleted_at: null },
+      { id: GONE, level: 'faitiere', deleted_at: '2026-10-01T00:00:00Z' },
+    )
+  for (const target of [COOP, GONE, '0c0c0c0c-0000-4000-8000-0000000000f6']) {
+    const res = await fichesRoute.POST(
+      req('/api/fiches', { method: 'POST', body: draftBody({ cooperative_id: target }) }),
+    )
+    assert.equal(res.status, 400, target)
+  }
+  assert.equal(state.store.rows('fiches_techniques').length, 0)
+})
+
+test('POST /api/fiches : cooperative_id envoyé par un autre rôle → 403 ; avec platform → 400', async () => {
+  state.store.rows('cooperatives').push({ id: FAITIERE, level: 'faitiere', deleted_at: null })
+  state.ctx = {
+    userId: 'u-f',
+    role: 'cooperative_admin',
+    cooperativeId: FAITIERE,
+    cooperativeLevel: 'faitiere',
+  }
+  const other = await fichesRoute.POST(
+    req('/api/fiches', { method: 'POST', body: draftBody({ cooperative_id: FAITIERE }) }),
+  )
+  assert.equal(other.status, 403)
+  state.ctx = { userId: 'u-s', role: 'super_admin', cooperativeId: null, cooperativeLevel: null }
+  const both = await fichesRoute.POST(
+    req('/api/fiches', {
+      method: 'POST',
+      body: draftBody({ cooperative_id: FAITIERE, platform: true }),
+    }),
+  )
+  assert.equal(both.status, 400)
+  assert.equal(state.store.rows('fiches_techniques').length, 0)
+})
+
+test('PATCH /api/fiches/[id] : fichiers d’une fiche de faîtière dans <faîtière>/<id>/ acceptés', async () => {
+  state.ctx = { userId: 'u-s', role: 'super_admin', cooperativeId: null, cooperativeLevel: null }
+  state.store.rows('fiches_techniques').push({
+    id: FICHE,
+    title: 'Maïs',
+    status: 'draft',
+    price_non_member: 1000,
+    cooperative_id: FAITIERE,
+    files: [],
+  })
+  const path = `${FAITIERE}/${FICHE}/compte.xlsx`
+  state.store.put('fiches-techniques', path, [0x50, 0x4b, 3, 4])
+  installFetch(state.store, [])
+  const res = await ficheRoute.PATCH(
+    req(`/api/fiches/${FICHE}`, {
+      method: 'PATCH',
+      body: { files: [{ name: 'compte.xlsx', url: path, type: 'xlsx' }], status: 'published' },
+    }),
+    ctx(FICHE),
+  )
+  assert.equal(res.status, 200, JSON.stringify(await res.clone().json()))
+  assert.equal(state.store.rows('fiches_techniques')[0].status, 'published')
+})

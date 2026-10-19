@@ -144,10 +144,11 @@ export function phoneSample(country: BuyerCountry, provider: string): string {
 
 /**
  * Numéros du Sandbox FedaPay qui acceptent le paiement (tout autre numéro
- * simule un refus). Numéros du BÉNIN : la documentation FedaPay les donne
- * toujours avec le pays « bj ».
+ * simule un refus). Numéros du BÉNIN, pays « bj », au format national à
+ * 10 chiffres que FedaPay attend (support FedaPay, 19/10/2026) : à 8 chiffres
+ * (64000001), le paiement était refusé.
  */
-export const SANDBOX_TEST_NUMBERS = ['64000001', '66000001'] as const
+export const SANDBOX_TEST_NUMBERS = ['0164000001', '0166000001'] as const
 export const SANDBOX_TEST_COUNTRY: BuyerCountry = 'bj'
 
 /**

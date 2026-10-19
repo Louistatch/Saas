@@ -448,6 +448,15 @@ export default function MarketplacePage() {
     setFormErrors({})
   }
 
+  // Super-admin : la fiche appartient à la faîtière choisie dans le sélecteur
+  // (publication « par l'opérateur », main 40c06ee) ; POST /api/fiches vérifie
+  // que c'est bien une faîtière. Sans faîtière choisie, les comptes vendus par
+  // FaîtiereHub se chargent dans l'administration.
+  const ownerFaitiere =
+    user?.role === 'super_admin' && currentCooperative?.level === 'faitiere'
+      ? currentCooperative
+      : null
+
   // Enregistrement par les routes serveur : brouillon (POST, champs validés),
   // fichiers dans `<faîtière>/<id>/`, puis PATCH. En cas d'échec, le brouillon
   // est supprimé. Le serveur décide des droits et son message est affiché tel quel.
@@ -500,6 +509,7 @@ export default function MarketplacePage() {
         is_free_for_members: form.is_free_for_members,
         files: [],
         status: 'draft',
+        ...(ownerFaitiere ? { cooperative_id: ownerFaitiere.id } : {}),
       })
       if (!draft.ok) {
         const fields = serverFieldErrors(draft.data.details)
@@ -610,11 +620,9 @@ export default function MarketplacePage() {
   const isAdmin =
     user?.role === 'super_admin' ||
     (FAITIERE_PUBLISHING && currentCooperative?.level === 'faitiere')
-  // POST /api/fiches rattache la fiche à l'organisation de l'AUTEUR, jamais à
-  // la faîtière sélectionnée : un super-admin charge donc les comptes vendus
-  // par FaîtiereHub dans l'administration, où ils apparaissent.
+  // Super-admin sans faîtière choisie : comptes vendus par FaîtiereHub, dans l'administration.
   const openAdd = () => {
-    if (user?.role === 'super_admin') {
+    if (user?.role === 'super_admin' && !ownerFaitiere) {
       router.push('/admin/comptes-exploitation')
       return
     }
@@ -1059,7 +1067,9 @@ export default function MarketplacePage() {
           <DialogHeader>
             <DialogTitle>Nouvelle fiche technique</DialogTitle>
             <DialogDescription>
-              Uploadez un compte d'exploitation ou itinéraire technique (DOCX, Excel, PDF)
+              {ownerFaitiere
+                ? `Publiée pour ${ownerFaitiere.name} : un compte d'exploitation ou itinéraire technique (DOCX, Excel, PDF)`
+                : "Uploadez un compte d'exploitation ou itinéraire technique (DOCX, Excel, PDF)"}
             </DialogDescription>
           </DialogHeader>
 

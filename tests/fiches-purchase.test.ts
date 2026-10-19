@@ -88,15 +88,18 @@ function buy(body: Record<string, unknown>, ip = `10.0.0.${++ipSeq}`) {
 const purchases = () => state.store.rows('purchases')
 const base = { name: 'Ama Koffi', country: 'tg', provider: 'moov_tg' }
 
-test('normalizeMobileMoneyPhone : Togo 8 chiffres, Bénin 8 ou 10, indicatif retiré', () => {
+test('normalizeMobileMoneyPhone : Togo 8 chiffres, Bénin toujours 10 (« 01 » + 8), indicatif retiré', () => {
   assert.equal(normalizeMobileMoneyPhone('tg', '90 12 34 56'), '90123456')
   assert.equal(normalizeMobileMoneyPhone('tg', '+228 90-12-34-56'), '90123456')
   assert.equal(normalizeMobileMoneyPhone('tg', '0022890123456'), '90123456')
   assert.equal(normalizeMobileMoneyPhone('tg', '9012345'), null)
   assert.equal(normalizeMobileMoneyPhone('tg', '0190123456'), null)
   assert.equal(normalizeMobileMoneyPhone('bj', '+229 01 97 00 00 01'), '0197000001')
-  assert.equal(normalizeMobileMoneyPhone('bj', '64000001'), '64000001')
-  assert.equal(normalizeMobileMoneyPhone('bj', '22964000001'), '64000001')
+  // Bénin : forme canonique à 10 chiffres, attendue par FedaPay (support, 19/10/2026).
+  assert.equal(normalizeMobileMoneyPhone('bj', '64000001'), '0164000001')
+  assert.equal(normalizeMobileMoneyPhone('bj', '22964000001'), '0164000001')
+  assert.equal(normalizeMobileMoneyPhone('bj', '0164000001'), '0164000001')
+  assert.equal(normalizeMobileMoneyPhone('bj', '+229 01 66 00 00 01'), '0166000001')
   assert.equal(normalizeMobileMoneyPhone('bj', 'abcdefgh'), null)
   assert.equal(normalizeMobileMoneyPhone('tg', 'abcdefgh'), null)
   // Bénin à 10 chiffres : toujours « 01 » + l'ancien numéro.
@@ -245,7 +248,9 @@ test('Live : chaque opérateur part sur son mode documenté (mtn_open, moov, sbi
       token: string
       phone_number: { number: string; country: string }
     }
-    assert.deepEqual(body.phone_number, { number: c.phone, country: c.country })
+    // Bénin : 10 chiffres (« 01 » ajouté au numéro saisi à 8) ; Togo : inchangé.
+    const sent = c.country === 'bj' ? `01${c.phone}` : c.phone
+    assert.deepEqual(body.phone_number, { number: sent, country: c.country })
     assert.equal(body.token, 'tok_abcdefgh12345')
   }
   assert.ok(!fedaCalls.some((x) => x.url.includes('momo_test') || x.url.includes('sandbox')))
@@ -260,6 +265,51 @@ test('Sandbox : tous les opérateurs partent en momo_test, jamais un mode live',
   assert.deepEqual(
     sends.map((x) => x.url),
     Array(3).fill('https://sandbox-api.fedapay.com/v1/momo_test'),
+  )
+  assert.deepEqual(
+    sends.map((x) => (x.body as { phone_number: { number: string } }).phone_number.number),
+    ['0164000001', '0164000002', '0164000003'],
+  )
+})
+
+test('Sandbox FedaPay : Bénin saisi « 64000001 » → « 0164000001 » envoyé, Togo envoyé tel quel', async () => {
+  type Sent = { phone_number: { number: string; country: string } }
+  type Created = { customer: { phone_number: { number: string; country: string } } }
+  const sentFor = async (body: Record<string, unknown>) => {
+    const before = fedaCalls.length
+    const res = await buy(body)
+    assert.equal(res.status, 200, JSON.stringify(body))
+    const calls = fedaCalls.slice(before)
+    const created = calls.find((x) => x.url.endsWith('/v1/transactions'))?.body as Created
+    const send = calls.find((x) => x.url.endsWith('/v1/momo_test'))?.body as Sent
+    return { customer: created.customer.phone_number, send: send.phone_number }
+  }
+  // Numéro de test officiel saisi à l'ancienne (8 chiffres) : la transaction ET la demande de
+  // prélèvement portent la forme à 10 chiffres que FedaPay attend.
+  const bj = await sentFor({
+    name: 'Bio Sounon',
+    country: 'bj',
+    provider: 'mtn_bj',
+    phone: '64000001',
+  })
+  assert.deepEqual(bj.customer, { number: '0164000001', country: 'bj' })
+  assert.deepEqual(bj.send, { number: '0164000001', country: 'bj' })
+  // Déjà à 10 chiffres (bouton « Mode test ») : inchangé.
+  const bj10 = await sentFor({
+    name: 'Bio Sounon',
+    country: 'bj',
+    provider: 'moov_bj',
+    phone: '0166000001',
+  })
+  assert.deepEqual(bj10.send, { number: '0166000001', country: 'bj' })
+  // Togo : 8 chiffres, envoyés tels quels.
+  const tg = await sentFor({ ...base, phone: '+228 90 00 00 07' })
+  assert.deepEqual(tg.customer, { number: '90000007', country: 'tg' })
+  assert.deepEqual(tg.send, { number: '90000007', country: 'tg' })
+  // La clé enregistrée est le même numéro, avec l'indicatif.
+  assert.deepEqual(
+    purchases().map((p) => p.buyer_phone),
+    ['+2290164000001', '+2290166000001', '+22890000007'],
   )
 })
 
@@ -782,11 +832,11 @@ test('B10 : Bénin, même ligne en 8 et en 10 chiffres dans deux onglets → UNE
   assert.equal(purchases()[0]?.buyer_phone, '+2290197000001')
   assert.equal(txCreations(), 1)
   assert.equal(phoneRequests(), 1)
-  // FedaPay reçoit le numéro tel que saisi par l'onglet qui a gagné.
+  // FedaPay reçoit la forme canonique à 10 chiffres, quelle que soit l'écriture gagnante.
   const sent = fedaCalls.find((c) => c.url.endsWith('/momo_test'))?.body as {
     phone_number: { number: string; country: string }
   }
-  assert.ok(['97000001', '0197000001'].includes(sent.phone_number.number))
+  assert.equal(sent.phone_number.number, '0197000001')
   assert.equal(sent.phone_number.country, 'bj')
 })
 
@@ -797,11 +847,11 @@ test('B10 : Bénin, 2e essai avec l’autre écriture du même numéro → bloqu
   assert.equal(second.status, 409)
   assert.equal(purchases().length, 1)
   assert.equal(phoneRequests(), 1)
-  // Le 8 chiffres reste envoyé tel quel (numéros de test du Sandbox).
+  // Saisi à 8 chiffres : envoyé à FedaPay en 10 chiffres (« 01 » ajouté).
   const sent = fedaCalls.find((c) => c.url.endsWith('/momo_test'))?.body as {
     phone_number: { number: string }
   }
-  assert.equal(sent.phone_number.number, '97000002')
+  assert.equal(sent.phone_number.number, '0197000002')
 })
 
 test('B10 : mêmes chiffres au Togo et au Bénin = deux lignes, deux acheteurs : aucun blocage', async () => {

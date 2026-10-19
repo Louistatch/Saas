@@ -334,3 +334,17 @@ test('A13 : fenêtre faîtière — bouton actif, raisons sans double point, loc
   assert.ok(openAdd.indexOf('retryLocations()') < openAdd.indexOf('setShowAdd(true)'))
   assert.match(src, /onClick=\{retryLocations\}/)
 })
+
+test('A14 : super_admin — la fiche est publiée pour la faîtière choisie (main 40c06ee)', () => {
+  const src = source('app', 'dashboard', 'marketplace', 'page.tsx')
+  // Faîtière du sélecteur, seulement pour le super_admin et seulement une faîtière.
+  assert.match(
+    src,
+    /user\?\.role === 'super_admin' && currentCooperative\?\.level === 'faitiere'\s*\?\s*currentCooperative/,
+  )
+  // Envoyée au serveur, qui la recontrôle (POST /api/fiches).
+  assert.ok(src.includes('...(ownerFaitiere ? { cooperative_id: ownerFaitiere.id } : {})'))
+  // L'administration n'est ouverte que sans faîtière choisie.
+  const openAdd = src.slice(src.indexOf('const openAdd = () => {'))
+  assert.match(openAdd, /if \(user\?\.role === 'super_admin' && !ownerFaitiere\) \{\s*router\.push/)
+})

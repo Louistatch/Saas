@@ -24,9 +24,13 @@
  * masque sans changer le code (FEDAPAY_DISABLED_PROVIDERS, ci-dessous).
  *
  * Sandbox : `momo_test` est le SEUL mode Mobile Money depuis le 07/11/2025
- * (changelog FedaPay) ; numéros de test 64000001 et 66000001 (paiement
- * accepté), tout autre numéro simule un échec. Garde absolue : momo_test ne
- * part jamais en live, et le live n'envoie jamais un mode de test.
+ * (changelog FedaPay) ; numéros de test du BÉNIN 0164000001 et 0166000001
+ * (paiement accepté), tout autre numéro simule un échec. FedaPay attend les
+ * numéros béninois à 10 chiffres (« 01 » + 8), en Sandbox comme en live
+ * (support FedaPay, 19/10/2026) : envoyés à 8 chiffres (64000001), ils étaient
+ * refusés. lib/fiches/phone.ts (fedaPayPhoneNumber) ajoute le « 01 ». Garde
+ * absolue : momo_test ne part jamais en live, et le live n'envoie jamais un
+ * mode de test.
  *
  * FEDAPAY_DISABLED_PROVIDERS (serveur uniquement, facultatif) : opérateurs à
  * masquer, ex. `celtiis_bj,togocel_tg`. Chaque opérateur s'écrit par son id

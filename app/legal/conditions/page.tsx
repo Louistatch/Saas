@@ -119,8 +119,12 @@ export default function ConditionsPage() {
             </p>
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
               <li>
-                <strong>Paiement.</strong> Il passe par FedaPay (Mobile Money ou carte). FaîtiereHub
-                ne conserve aucune donnée de carte. L&apos;achat n&apos;est confirmé qu&apos;après
+                <strong>Paiement.</strong> Il passe par FedaPay. Un compte d&apos;exploitation se
+                paie par Mobile Money, directement sur le site, sans quitter la page : MTN, Moov et
+                Celtiis au Bénin, Moov (Flooz) et Mixx by Yas (Togocel) au Togo ; le paiement par
+                carte n&apos;est pas encore proposé pour les comptes. Les frais de certification se
+                règlent sur la page de paiement FedaPay (Mobile Money ou carte). FaîtiereHub ne
+                conserve aucune donnée de carte. L&apos;achat n&apos;est confirmé qu&apos;après
                 validation du paiement par FedaPay.
               </li>
               <li>
