@@ -33,6 +33,12 @@ function globSync(pattern: string, baseDir: string): string[] {
 }
 
 const checks: { name: string; pass: boolean; detail?: string }[] = []
+// Avertissements : signalés dans le rapport mais JAMAIS bloquants pour le déploiement.
+const warnings: { name: string; detail: string }[] = []
+
+function warn(name: string, detail: string) {
+  warnings.push({ name, detail })
+}
 
 function check(name: string, condition: boolean, detail?: string) {
   checks.push({ name, pass: condition, detail })
@@ -164,24 +170,38 @@ try {
 // KOBO MODULE CHECKS (CHECK 12–18)
 // =========================================================
 
-// CHECK 12: KOBO_WEBHOOK_SECRET présent ET longueur >= 32 chars
+// CHECK 12: KOBO_WEBHOOK_SECRET — repli TRANSITOIRE uniquement.
+// Chaque intégration Kobo possède désormais son propre secret de webhook (hash dans
+// integrations.config) : le secret global ne sert plus que sur l'ancienne URL sans
+// ?integration=, pour les intégrations qui n'ont pas encore de secret propre. Son absence
+// ne bloque donc plus le déploiement ; on la signale seulement.
 const koboSecret = process.env.KOBO_WEBHOOK_SECRET ?? ''
 if (!process.argv.includes('--static')) {
-  check(
-    '[KOBO-12] KOBO_WEBHOOK_SECRET configuré (≥32 chars)',
-    koboSecret.length >= 32,
-    'Ajouter KOBO_WEBHOOK_SECRET (≥32 chars) dans .env.local et Vercel Dashboard',
-  )
+  if (koboSecret.length === 0) {
+    warn(
+      '[KOBO-12] KOBO_WEBHOOK_SECRET absent',
+      "Normal une fois toutes les intégrations migrées vers leur secret propre ; sinon l'ancienne URL sans ?integration= répond 403.",
+    )
+  } else if (koboSecret.length < 32) {
+    warn(
+      '[KOBO-12] KOBO_WEBHOOK_SECRET trop court (<32 caractères)',
+      "Le webhook l'ignorera (repli transitoire refusé) : l'allonger (openssl rand -hex 32) ou le retirer.",
+    )
+  }
 } else {
   console.log('Configuration des secrets : contrôle réservé à l’environnement de déploiement.')
 }
 
-// CHECK 13: Webhook handler contient 'timingSafeEqual'
+// CHECK 13: la vérification du secret est en temps constant (route du webhook ou lib/kobo/webhook-auth.ts)
 if (fs.existsSync(webhookPath)) {
   const webhookContent = fs.readFileSync(webhookPath, 'utf-8')
+  const webhookAuthPath = path.join(rootDir, 'lib', 'kobo', 'webhook-auth.ts')
+  const webhookAuthContent = fs.existsSync(webhookAuthPath)
+    ? fs.readFileSync(webhookAuthPath, 'utf-8')
+    : ''
   check(
     '[KOBO-13] Webhook utilise timingSafeEqual',
-    webhookContent.includes('timingSafeEqual'),
+    webhookContent.includes('timingSafeEqual') || webhookAuthContent.includes('timingSafeEqual'),
     'Le webhook doit utiliser crypto.timingSafeEqual pour la vérification du secret',
   )
 } else {
@@ -284,6 +304,9 @@ console.log('\n🔐 FaîtiereHub — Security Pre-Deploy Check\n')
 const failed = checks.filter((c) => !c.pass)
 checks.forEach((c) => {
   console.log(`${c.pass ? '✅' : '❌'} ${c.name}${c.detail && !c.pass ? ` — ${c.detail}` : ''}`)
+})
+warnings.forEach((w) => {
+  console.log(`⚠️  ${w.name} — ${w.detail}`)
 })
 
 if (failed.length > 0) {

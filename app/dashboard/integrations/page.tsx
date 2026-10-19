@@ -111,6 +111,34 @@ export default function IntegrationsPage() {
       return
     }
     setToggling(def.key)
+
+    // Kobo : `integrations.config` (token chiffré, secret de webhook…) n'est plus accessible au
+    // navigateur. La déconnexion passe par l'API serveur, qui efface le token, le secret de webhook
+    // et les correspondances de champs (un UPSERT direct échouerait : « permission denied »).
+    if (def.key === 'kobo') {
+      let failure: string | null = null
+      try {
+        const res = await fetch(
+          `/api/integrations/kobo?cooperativeId=${encodeURIComponent(currentCooperative.id)}`,
+          { method: 'DELETE' },
+        )
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as { error?: string } | null
+          failure = body?.error ?? `Erreur ${res.status}`
+        }
+      } catch {
+        failure = 'Connexion au serveur impossible.'
+      }
+      setToggling(null)
+      if (failure) {
+        toast({ title: 'Update failed', description: failure, variant: 'destructive' })
+        return
+      }
+      toast({ title: 'Déconnecté', description: def.name })
+      await loadStatuses()
+      return
+    }
+
     const newStatus = currentStatus === 'connected' ? 'disconnected' : 'connected'
     const { error } = await supabase.from('integrations').upsert(
       {

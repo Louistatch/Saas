@@ -8,13 +8,69 @@
 // Database row types (matching the SQL migration)
 // =========================================================
 
-export type KoboSubmissionStatus =
-  | 'pending'
-  | 'processing'
-  | 'matched'
-  | 'unmatched'
-  | 'error'
-  | 'duplicate'
+/**
+ * Source de vérité des statuts d'une soumission : partagée par le type TS, le
+ * validateur Zod, l'interface et le CHECK SQL (migration 20261010_100000).
+ * « Traitée » = 'matched' + processed_at/processed_payload (pas de statut
+ * 'processed' : il n'existe ni dans les stats ni dans l'interface).
+ */
+export const KOBO_SUBMISSION_STATUSES = [
+  'pending',
+  'processing',
+  'matched',
+  'unmatched',
+  'error',
+  'duplicate',
+] as const
+
+export type KoboSubmissionStatus = (typeof KOBO_SUBMISSION_STATUSES)[number]
+
+/**
+ * Type de formulaire Kobo configuré sur l'intégration (config.form_type) :
+ * il pilote le traitement de chaque soumission. 'member_enrollment' est le
+ * comportement par défaut (inscription / mise à jour d'un membre).
+ */
+export const KOBO_FORM_TYPES = [
+  'member_enrollment',
+  'cooperative_registration',
+  'harvest',
+  'plot_survey',
+  'market_price',
+] as const
+
+export type KoboFormType = (typeof KOBO_FORM_TYPES)[number]
+
+export const KOBO_FORM_TYPE_LABELS: Record<KoboFormType, string> = {
+  member_enrollment: 'Inscription / mise à jour de membres',
+  cooperative_registration: 'Inscription de coopératives',
+  harvest: 'Récoltes (productions)',
+  plot_survey: 'Relevé de parcelles',
+  market_price: 'Prix de marché',
+}
+
+/** Codes d'erreur de l'API KoboToolbox, mappés en messages français (lib/kobo/api-client.ts). */
+export type KoboErrorCode =
+  | 'unauthorized'
+  | 'forbidden'
+  | 'not_found'
+  | 'bad_request'
+  | 'rate_limited'
+  | 'server_error'
+  | 'network'
+  | 'timeout'
+  | 'redirect'
+  | 'invalid_response'
+  | 'invalid_token'
+  | 'unsafe_host'
+  | 'not_deployed'
+
+/** Échec GLOBAL d'un pull (authentification, permission, réseau…) : jamais un « succès à 0 reçue ». */
+export interface KoboFatalError {
+  code: KoboErrorCode
+  message: string
+  status?: number
+  retryAfterSec?: number
+}
 
 export type KoboSyncType = 'webhook' | 'pull' | 'manual'
 
@@ -88,9 +144,10 @@ export interface KoboApiSubmission {
   _uuid: string
   _xform_id_string: string
   _submission_time: string
-  _submitted_by?: string
+  // Kobo renvoie `null` pour les envois anonymes (cas majoritaire en production).
+  _submitted_by?: string | null
   _attachments?: KoboAttachment[]
-  _version_?: string
+  _version_?: string | null
   _status?: string
   formhub?: { uuid: string }
   [key: string]: unknown
@@ -141,7 +198,18 @@ export interface SyncOptions {
   cooperativeId: string
   formId: string
   apiToken: string
+  /** Origine du serveur Kobo (https://kf.kobotoolbox.org par défaut). */
+  serverUrl?: string
+  /** config.form_type de l'intégration : pilote le traitement de chaque soumission. */
+  formType?: string | null
+  integrationId?: string | null
+  triggeredBy?: string | null
+  /** Sync incrémentale : ne relit que les soumissions depuis cette date (marge déjà appliquée). */
   since?: Date
+  /** Reprise : ne lit que les soumissions dont l'_id est strictement supérieur. */
+  cursor?: number | null
+  /** Budget temps de l'appel, en ms (défaut 40 s) : au-delà, arrêt propre avec curseur. */
+  budgetMs?: number
   onProgress?: (current: number, total: number) => void
 }
 
@@ -155,6 +223,20 @@ export interface SyncResult {
   errors: number
   duration: number
   errorDetails?: Array<{ instanceId: string; error: string }>
+  /** Soumissions déjà connues (non retraitées) : distinct de « traitées ». */
+  skipped?: number
+  /** Vrai si le budget temps a interrompu le pull : rappeler avec `cursor`. */
+  partial?: boolean
+  /** Dernier _id entièrement traité (à renvoyer pour reprendre). */
+  cursor?: number | null
+  /** Estimation des soumissions restantes (champ `count` de Kobo), si connue. */
+  remaining?: number | null
+  /** Plus grande _submission_time des soumissions enregistrées pendant ce run. */
+  watermark?: string | null
+  /** Soumissions reçues mais non enregistrées en base (le curseur incrémental ne doit pas avancer). */
+  unpersisted?: number
+  /** Échec global : le pull n'a pas pu se faire (token, permission, formulaire, réseau). */
+  fatal?: KoboFatalError
 }
 
 export interface RetryResult {
@@ -162,6 +244,8 @@ export interface RetryResult {
   retried: number
   succeeded: number
   failed: number
+  /** Lignes prises en charge par un autre traitement au même moment : ni succès ni échec. */
+  skipped?: number
   errors: Array<{ instanceId: string; error: string }>
 }
 
@@ -170,6 +254,13 @@ export interface TestConnectionResult {
   formTitle?: string
   submissionCount?: number
   error?: string
+  code?: KoboErrorCode
+  /** 'deployed' | 'draft' | 'archived' | '-' (champ deployment_status de KPI). */
+  deploymentStatus?: string
+  /** Vrai si /data/ répond : le compte du token a la permission « Voir les soumissions ». */
+  canViewSubmissions?: boolean
+  /** Avertissement non bloquant (formulaire archivé : plus de nouvelles soumissions). */
+  warning?: string
 }
 
 // =========================================================
@@ -180,6 +271,8 @@ export interface KoboConfigInput {
   cooperativeId: string
   apiToken: string
   formId: string
+  serverUrl?: string
+  formType?: KoboFormType
   webhookEnabled: boolean
   fieldMappings?: KoboFieldMappingInput[]
 }
@@ -195,9 +288,17 @@ export interface KoboFieldMappingInput {
 export interface KoboConfigResponse {
   cooperativeId: string
   formId: string
+  /** Origine du serveur Kobo configuré (https://kf.kobotoolbox.org par défaut). */
+  serverUrl: string
+  formType: KoboFormType
   webhookEnabled: boolean
+  /** URL dédiée de l'intégration (/api/webhooks/kobo?integration=<id>), sans secret. */
+  webhookUrl: string | null
+  /** Vrai si un secret de webhook propre à l'intégration existe (jamais affiché : seul son hash est stocké). */
+  webhookSecretConfigured: boolean
   status: string
   lastSyncAt: string | null
+  /** Masque fixe : ni le token, ni sa version chiffrée, ni ses derniers caractères ne sont renvoyés. */
   apiTokenMasked: string
   fieldMappings: KoboFieldMappingRow[]
 }
@@ -216,6 +317,8 @@ export interface KoboStatsResponse {
 export interface KoboSyncRequest {
   cooperativeId: string
   mode: 'full' | 'incremental'
+  /** Reprise d'une sync interrompue par le budget temps (valeur renvoyée par l'appel précédent). */
+  cursor?: number
 }
 
 // =========================================================
@@ -253,7 +356,7 @@ export interface KoboWebhookPayload {
   _id: number
   _xform_id_string: string
   _submission_time: string
-  _submitted_by?: string
+  _submitted_by?: string | null
   formhub?: { uuid: string }
   [key: string]: unknown
 }
@@ -261,7 +364,8 @@ export interface KoboWebhookPayload {
 export interface KoboWebhookResponse {
   received: boolean
   submission_id?: string
-  status?: KoboSubmissionStatus | 'duplicate'
+  /** 'disabled' : webhook coupé par l'admin (réponse 200, rien n'est stocké). */
+  status?: KoboSubmissionStatus | 'disabled'
   message?: string
 }
 

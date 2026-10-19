@@ -8,7 +8,7 @@
  * - Filters: status (badge dropdown), date range, search by card_number
  * - Status badges: pending=grey, matched=green, unmatched=orange, error=red, duplicate=blue
  * - Row click → Dialog with full JSON payload (formatted)
- * - Retry button on error rows
+ * - Retry button on error / pending / unmatched rows
  * - Responsive (scrollable on mobile)
  */
 import { useState, useCallback } from 'react'
@@ -367,7 +367,9 @@ function SubmissionRow({
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onView} title="Voir le détail">
             <Eye className="h-3.5 w-3.5" />
           </Button>
-          {(submission.status === 'error' || submission.status === 'pending') && (
+          {(submission.status === 'error' ||
+            submission.status === 'pending' ||
+            submission.status === 'unmatched') && (
             <Button
               variant="ghost"
               size="sm"

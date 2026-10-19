@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, } from 'react'
+import { useCallback, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -19,10 +19,11 @@ import { useToast } from '@/hooks/use-toast'
 import { useKoboStats } from '@/hooks/use-kobo-stats'
 import { useKoboSync } from '@/hooks/use-kobo-sync'
 import { PageHeader } from '@/components/shared/page-header'
-import { KoboConfigForm } from '@/components/dashboard/KoboConfigForm'
+import { KoboConfigForm, type KoboConfigSummary } from '@/components/dashboard/KoboConfigForm'
 import { KoboSyncPanel } from '@/components/dashboard/KoboSyncPanel'
 import { KoboSubmissionsTable } from '@/components/dashboard/KoboSubmissionsTable'
 import { Progress } from '@/components/ui/progress'
+import { DEFAULT_KOBO_SERVER_URL, koboAccountSecurityUrl } from '@/lib/kobo/server-url'
 
 /**
  * /dashboard/integrations/kobo — Full KoboToolbox integration dashboard
@@ -37,6 +38,8 @@ export default function KoboIntegrationPage() {
   const { currentCooperative } = useCooperative()
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState('config')
+  const [configSummary, setConfigSummary] = useState<KoboConfigSummary | null>(null)
+  const [retrying, setRetrying] = useState(false)
 
   const cooperativeId = currentCooperative?.id ?? null
 
@@ -44,10 +47,35 @@ export default function KoboIntegrationPage() {
   const { stats, isLoading: statsLoading, refetch: refetchStats } = useKoboStats(cooperativeId)
   const { isSyncing, progress, result, error: syncError, startSync, cancelSync } = useKoboSync(cooperativeId)
 
-  // Show sync result toast
-  if (result && !isSyncing) {
-    // Handled in KoboSyncPanel
-  }
+  // « Retenter les erreurs » : relance la file d'erreurs (et non une sync incrémentale, qui ne
+  // retraiterait pas les soumissions déjà enregistrées en erreur).
+  const handleRetryErrors = useCallback(async () => {
+    if (!cooperativeId || retrying) return
+    setRetrying(true)
+    try {
+      const res = await fetch('/api/integrations/kobo/retry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cooperativeId }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; message?: string }
+      if (!res.ok) throw new Error(data.error ?? `Erreur HTTP ${res.status}`)
+      toast({
+        title: data.ok ? 'Nouvelle tentative terminée' : 'Nouvelle tentative : des erreurs persistent',
+        description: data.message,
+        variant: data.ok ? undefined : 'destructive',
+      })
+      refetchStats()
+    } catch (err: unknown) {
+      toast({
+        title: 'Échec de la nouvelle tentative',
+        description: err instanceof Error ? err.message : 'Erreur',
+        variant: 'destructive',
+      })
+    } finally {
+      setRetrying(false)
+    }
+  }, [cooperativeId, retrying, toast, refetchStats])
 
   if (!currentCooperative) {
     return (
@@ -161,6 +189,7 @@ export default function KoboIntegrationPage() {
         <TabsContent value="config" className="mt-6">
           <KoboConfigForm
             cooperativeId={currentCooperative.id}
+            onConfigLoaded={setConfigSummary}
             onSaved={() => {
               refetchStats()
               toast({ title: 'Configuration sauvegardée' })
@@ -178,7 +207,7 @@ export default function KoboIntegrationPage() {
             result={result}
             syncError={syncError}
             onStartSync={startSync}
-            onRetry={() => startSync('incremental')}
+            onRetry={handleRetryErrors}
             onRefreshStats={refetchStats}
           />
         </TabsContent>
@@ -190,7 +219,7 @@ export default function KoboIntegrationPage() {
 
         {/* Tab 4: Guide */}
         <TabsContent value="guide" className="mt-6">
-          <GuideTab />
+          <GuideTab summary={configSummary} />
         </TabsContent>
       </Tabs>
     </div>
@@ -231,12 +260,19 @@ function StatCard({
 // =========================================================
 // Guide tab
 // =========================================================
-function GuideTab() {
-  const webhookUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/api/webhooks/kobo`
-    : 'https://www.faitierehub.com/api/webhooks/kobo'
+function GuideTab({ summary }: { summary: KoboConfigSummary | null }) {
+  const serverUrl = summary?.serverUrl ?? DEFAULT_KOBO_SERVER_URL
+  // URL dédiée de l'intégration (avec son identifiant) quand elle existe déjà.
+  const webhookUrl = summary?.webhookUrl ?? null
 
-  const steps = [
+  const steps: Array<{
+    title: string
+    description: string
+    detail?: string
+    link?: string
+    linkLabel?: string
+    downloads?: Array<{ href: string; label: string }>
+  }> = [
     {
       title: 'Créer un compte KoboToolbox',
       description: 'Inscrivez-vous gratuitement sur KoboToolbox si ce n\'est pas déjà fait.',
@@ -245,23 +281,33 @@ function GuideTab() {
     },
     {
       title: 'Importer le formulaire FENOMAT',
-      description: 'Téléchargez le XLSForm pré-configuré et importez-le dans votre projet KoboToolbox.',
-      action: 'download',
+      description:
+        'Téléchargez le XLSForm pré-configuré correspondant à votre usage, puis importez-le dans votre projet KoboToolbox (Nouveau projet → Importer un XLSForm) et déployez-le.',
+      downloads: [
+        { href: '/xlsform/faitierehub_enquete_membre.csv', label: 'Formulaire membres (CSV)' },
+        { href: '/xlsform/faitierehub_enquete_cooperative.csv', label: 'Formulaire coopératives (CSV)' },
+      ],
     },
     {
       title: 'Copier le Form ID',
-      description: 'Dans KoboToolbox, ouvrez votre formulaire → Settings → copiez l\'identifiant du formulaire (uid).',
+      description:
+        'Ouvrez votre projet dans KoboToolbox : l\'identifiant (uid) figure dans l\'adresse du navigateur, après « #/forms/ ». Vous pouvez aussi coller l\'adresse complète du projet dans le champ Form ID.',
+      detail: '…/#/forms/<uid>/summary',
     },
     {
       title: 'Générer un API Token',
-      description: 'Allez dans Account Settings → Security → API Key. Copiez le token.',
-      link: 'https://kf.kobotoolbox.org/#/account-settings',
-      linkLabel: 'Ouvrir les paramètres',
+      description:
+        'Sur le serveur où se trouve votre projet (Global ou UE), allez dans Compte → Sécurité → Clé API. Copiez le token (40 caractères). Le compte du token doit avoir accès au projet avec la permission « Voir les soumissions » (Partage).',
+      link: koboAccountSecurityUrl(serverUrl),
+      linkLabel: 'Ouvrir la page de la clé API',
     },
     {
       title: 'Configurer le webhook',
-      description: 'Dans KoboToolbox → Project Settings → REST Services → ajoutez un nouveau service.',
-      detail: `URL du webhook : ${webhookUrl}`,
+      description:
+        'Dans KoboToolbox → Paramètres du projet → REST Services → ajoutez un service avec l\'URL ci-dessous, puis dans « En-têtes HTTP personnalisés » ajoutez X-Kobo-Secret avec le secret généré dans l\'onglet Configuration (affiché une seule fois).',
+      detail: webhookUrl
+        ? `URL du webhook : ${webhookUrl}`
+        : 'L\'URL dédiée s\'affiche dans l\'onglet Configuration après le premier enregistrement.',
     },
     {
       title: 'Tester avec KoboCollect',
@@ -307,10 +353,16 @@ function GuideTab() {
                       </Button>
                     </a>
                   )}
-                  {step.action === 'download' && (
-                    <Button variant="outline" size="sm" className="mt-1">
-                      Télécharger le XLSForm
-                    </Button>
+                  {step.downloads && (
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {step.downloads.map((d) => (
+                        <a key={d.href} href={d.href} download>
+                          <Button variant="outline" size="sm">
+                            {d.label}
+                          </Button>
+                        </a>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>
@@ -327,13 +379,24 @@ function GuideTab() {
         <CardContent className="space-y-3">
           <div>
             <Label className="text-xs text-muted-foreground">URL du webhook</Label>
-            <CopyableField value={webhookUrl} />
+            {webhookUrl ? (
+              <CopyableField value={webhookUrl} />
+            ) : (
+              <p className="text-xs text-muted-foreground mt-1">
+                Disponible après l&apos;enregistrement de la configuration.
+              </p>
+            )}
           </div>
           <div>
-            <Label className="text-xs text-muted-foreground">Header d&apos;authentification</Label>
+            <Label className="text-xs text-muted-foreground">En-tête d&apos;authentification</Label>
             <code className="block text-xs bg-muted px-3 py-2 rounded mt-1">
-              X-Kobo-Secret: [votre secret configuré dans .env]
+              X-Kobo-Secret: [secret de l&apos;intégration, généré dans l&apos;onglet Configuration]
             </code>
+            <p className="text-xs text-muted-foreground mt-1">
+              Le secret est propre à votre intégration et n&apos;est affiché qu&apos;une fois ; vous pouvez en
+              générer un nouveau à tout moment. KoboToolbox permet aussi l&apos;authentification de base
+              (mot de passe = secret).
+            </p>
           </div>
         </CardContent>
       </Card>

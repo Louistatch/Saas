@@ -7,7 +7,7 @@
  * - Real-time stats cards (auto-refresh 30s)
  * - Visual progress bar (matched/total)
  * - "Synchroniser maintenant" dropdown (full vs incremental)
- * - Progress bar during sync (SSE)
+ * - Progress bar during sync (reprise par curseur, voir hooks/use-kobo-sync.ts)
  * - Result toast after sync
  * - "Retenter les erreurs" button (if errors > 0)
  * - Last sync date + duration
@@ -242,7 +242,9 @@ export function KoboSyncPanel({
           {isSyncing && progress && (
             <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium">Traitement en cours...</span>
+                <span className="text-sm font-medium">
+                  Traitement en cours... (les grosses synchronisations sont découpées et reprennent automatiquement)
+                </span>
                 <span className="text-sm text-muted-foreground">
                   {progress.current}/{progress.total}
                 </span>
@@ -264,21 +266,47 @@ export function KoboSyncPanel({
             </div>
           )}
 
-          {/* Sync result */}
+          {/* Sync result — vert seulement si AUCUNE erreur ; sinon ambre avec le détail */}
           {result && !isSyncing && !syncError && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div
+              className={
+                result.success && result.errors === 0
+                  ? 'bg-green-50 border border-green-200 rounded-lg p-4'
+                  : 'bg-amber-50 border border-amber-200 rounded-lg p-4'
+              }
+            >
               <div className="flex items-center gap-2 mb-3">
-                <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
-                <span className="text-sm font-medium text-green-800">
-                  Synchronisation terminée
+                {result.success && result.errors === 0 ? (
+                  <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                )}
+                <span
+                  className={`text-sm font-medium ${
+                    result.success && result.errors === 0 ? 'text-green-800' : 'text-amber-800'
+                  }`}
+                >
+                  {result.success && result.errors === 0
+                    ? 'Synchronisation terminée'
+                    : `Synchronisation terminée avec ${result.errors} erreur(s)`}
                 </span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <ResultStat label="Reçues" value={result.received} />
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <ResultStat label="Lues" value={result.received} />
                 <ResultStat label="Matchées" value={result.matched} className="text-green-700" />
                 <ResultStat label="Non matchées" value={result.unmatched} className="text-orange-600" />
+                <ResultStat label="Déjà connues" value={result.skipped ?? 0} className="text-gray-600" />
                 <ResultStat label="Erreurs" value={result.errors} className="text-red-600" />
               </div>
+              {result.errorDetails && result.errorDetails.length > 0 && (
+                <ul className="mt-3 space-y-1 text-xs text-amber-900">
+                  {result.errorDetails.slice(0, 5).map((d) => (
+                    <li key={`${d.instanceId}-${d.error}`} className="break-words">
+                      <span className="font-mono">{d.instanceId.slice(0, 8)}</span> — {d.error}
+                    </li>
+                  ))}
+                </ul>
+              )}
               {result.duration > 0 && (
                 <p className="text-xs text-muted-foreground mt-2">
                   Durée : {formatDuration(result.duration)}
@@ -297,7 +325,7 @@ export function KoboSyncPanel({
             <div className="text-sm text-muted-foreground space-y-1">
               <p>
                 <strong className="text-foreground">Sync incrémentale</strong> : récupère uniquement
-                les soumissions depuis la dernière synchronisation. Rapide et recommandée.
+                les soumissions arrivées depuis la dernière synchronisation réussie. Rapide et recommandée.
               </p>
               <p>
                 <strong className="text-foreground">Sync complète</strong> : re-télécharge toutes

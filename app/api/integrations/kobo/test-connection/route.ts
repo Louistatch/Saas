@@ -6,13 +6,19 @@
  * tests the cooperative's already-saved token — so "Tester la connexion"
  * works without forcing the admin to re-type (and risk overwriting) it.
  *
+ * Le test reproduit ce que fera la synchronisation : lecture de l'asset, formulaire
+ * déployé, ET lecture des soumissions (permission « Voir les soumissions »). Les erreurs
+ * sont des messages français déjà épurés : ni le token, ni de message brut du runtime.
+ *
  * @security assertFaitiereAccess + assertTenantAccess
  */
 import { type NextRequest, NextResponse } from 'next/server'
 import { assertFaitiereAccess, assertTenantAccess } from '@/lib/security/assert-access'
-import { decryptSecret } from '@/lib/utils/crypto'
-import { createLogger } from '@/lib/utils/logger'
+import { createClient as createAdminClient } from '@/lib/supabase/admin'
+import { readKoboConfig } from '@/lib/kobo/config'
+import { readStoredToken } from '@/lib/kobo/stored-token'
 import { KoboSyncService } from '@/lib/kobo/sync-service'
+import { createLogger } from '@/lib/utils/logger'
 import { koboTestConnectionRequestSchema } from '@/lib/validators/kobo'
 
 const log = createLogger('api:integrations:kobo:test-connection')
@@ -20,8 +26,6 @@ const log = createLogger('api:integrations:kobo:test-connection')
 export async function POST(request: NextRequest) {
   const authResult = await assertFaitiereAccess()
   if (!authResult.ok) return authResult.response
-
-  const { ctx } = authResult
 
   let body: unknown
   try {
@@ -38,50 +42,60 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { cooperativeId, formId } = parsed.data
+  const { cooperativeId, formId, serverUrl: requestedServer } = parsed.data
   let { apiToken } = parsed.data
 
   const tenantResult = await assertTenantAccess(cooperativeId)
   if (!tenantResult.ok) return tenantResult.response
 
-  const { supabase } = ctx
+  // Config lue avec le client service_role, APRÈS les contrôles d'accès.
+  const admin = createAdminClient()
+  const { data: integration } = await admin
+    .from('integrations')
+    .select('config')
+    .eq('cooperative_id', cooperativeId)
+    .eq('type', 'kobo')
+    .maybeSingle()
+  const cfg = readKoboConfig(integration?.config)
+  const serverUrl = requestedServer ?? cfg.serverUrl
 
-  // No new token supplied — test against the already-saved (encrypted) one.
+  // No new token supplied — test against the already-saved one.
   if (!apiToken) {
-    const { data: integration } = await supabase
-      .from('integrations')
-      .select('config')
-      .eq('cooperative_id', cooperativeId)
-      .eq('type', 'kobo')
-      .maybeSingle()
-
-    const encrypted = (integration?.config as Record<string, unknown> | null)?.api_key as string | undefined
-    if (!encrypted) {
+    const stored = readStoredToken(cfg.apiKey)
+    if (!stored.ok) {
+      if (stored.reason === 'missing') {
+        return NextResponse.json(
+          { error: 'Aucun token enregistré — saisissez un token API à tester.' },
+          { status: 400 },
+        )
+      }
+      log.error('Stored API token unusable for test', { reason: stored.reason })
       return NextResponse.json(
-        { error: 'Aucun token enregistré — saisissez un token API à tester.' },
+        { error: 'Le token enregistré est inutilisable — saisissez-le à nouveau.' },
         { status: 400 },
       )
     }
-
-    try {
-      apiToken = decryptSecret(encrypted)
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Decryption failed'
-      log.error('Failed to decrypt stored API token for test', { error: message })
-      return NextResponse.json({ error: 'Erreur serveur lors du déchiffrement du token' }, { status: 500 })
-    }
+    apiToken = stored.token
   }
 
   const syncService = new KoboSyncService()
-  const result = await syncService.testConnection(apiToken, formId)
+  const result = await syncService.testConnection(apiToken, formId, serverUrl)
 
   if (!result.valid) {
-    return NextResponse.json({ error: 'Connexion KoboToolbox échouée', details: result.error }, { status: 422 })
+    return NextResponse.json(
+      { error: 'Connexion KoboToolbox échouée', details: result.error, code: result.code ?? null },
+      { status: 422 },
+    )
   }
 
   return NextResponse.json({
     valid: true,
     formTitle: result.formTitle,
     submissionCount: result.submissionCount,
+    deploymentStatus: result.deploymentStatus,
+    canViewSubmissions: result.canViewSubmissions ?? false,
+    warning: result.warning ?? null,
+    serverUrl,
+    formId,
   })
 }

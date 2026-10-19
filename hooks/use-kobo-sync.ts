@@ -1,8 +1,13 @@
 /**
- * useKoboSync — SSE consumer hook for real-time sync progress.
+ * useKoboSync — déclenche une synchronisation Kobo REPRENABLE.
  *
- * Triggers a sync via POST /api/integrations/kobo/sync, then connects
- * to the SSE endpoint for live progress updates.
+ * Le serveur traite les soumissions dans un budget de temps (≈ 40 s) puis répond
+ * `partial: true` + `cursor` ; ce hook rappelle POST /api/integrations/kobo/sync avec ce
+ * curseur jusqu'à la fin, en cumulant les compteurs. La progression affichée est réelle
+ * (soumissions traitées / estimation du total fournie par Kobo), sans flux SSE.
+ *
+ * Un échec (token révoqué, formulaire non partagé, Kobo injoignable…) arrête la boucle et
+ * remonte le message du serveur dans `error` : jamais un faux « Synchronisation terminée ».
  *
  * Usage:
  *   const { isSyncing, progress, result, error, startSync, cancelSync } = useKoboSync(cooperativeId)
@@ -11,7 +16,29 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
-import type { SyncResult, KoboSyncSSEEvent, UseKoboSyncReturn } from '@/lib/kobo/types'
+import type { SyncResult, UseKoboSyncReturn } from '@/lib/kobo/types'
+
+/** Garde-fou : 100 appels × ~40 s couvrent largement les volumes visés. */
+const MAX_CALLS = 100
+
+interface SyncResponse {
+  syncLogId?: string
+  success?: boolean
+  partial?: boolean
+  cursor?: number | null
+  remaining?: number | null
+  error?: string
+  sync?: {
+    received: number
+    processed: number
+    matched: number
+    unmatched: number
+    skipped?: number
+    errors: number
+    duration: number
+    errorDetails?: Array<{ instanceId: string; error: string }>
+  }
+}
 
 export function useKoboSync(cooperativeId: string | null): UseKoboSyncReturn {
   const [isSyncing, setIsSyncing] = useState(false)
@@ -20,28 +47,18 @@ export function useKoboSync(cooperativeId: string | null): UseKoboSyncReturn {
   const [error, setError] = useState<string | null>(null)
 
   const abortRef = useRef<AbortController | null>(null)
-  const eventSourceRef = useRef<EventSource | null>(null)
-
-  const cleanup = useCallback(() => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close()
-      eventSourceRef.current = null
-    }
-    abortRef.current?.abort()
-    abortRef.current = null
-  }, [])
 
   const cancelSync = useCallback(() => {
-    cleanup()
+    abortRef.current?.abort()
+    abortRef.current = null
     setIsSyncing(false)
     setProgress(null)
-  }, [cleanup])
+  }, [])
 
   const startSync = useCallback(
     async (mode: 'full' | 'incremental') => {
       if (!cooperativeId || isSyncing) return
 
-      // Reset state
       setIsSyncing(true)
       setProgress(null)
       setResult(null)
@@ -50,147 +67,73 @@ export function useKoboSync(cooperativeId: string | null): UseKoboSyncReturn {
       const controller = new AbortController()
       abortRef.current = controller
 
+      const total: SyncResult = {
+        success: true,
+        syncLogId: '',
+        received: 0,
+        processed: 0,
+        matched: 0,
+        unmatched: 0,
+        skipped: 0,
+        errors: 0,
+        duration: 0,
+        errorDetails: [],
+      }
+
       try {
-        // Step 1: Trigger the sync
-        const response = await fetch('/api/integrations/kobo/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cooperativeId, mode }),
-          signal: controller.signal,
-        })
+        let cursor: number | undefined
+        for (let call = 0; call < MAX_CALLS; call++) {
+          const response = await fetch('/api/integrations/kobo/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cooperativeId, mode, ...(cursor !== undefined ? { cursor } : {}) }),
+            signal: controller.signal,
+          })
 
-        if (!response.ok) {
-          const body = await response.json().catch(() => ({}))
-          const message =
-            (body as { error?: string }).error ?? `Erreur HTTP ${response.status}`
-          throw new Error(message)
-        }
+          const data = (await response.json().catch(() => ({}))) as SyncResponse
 
-        const syncResponse = (await response.json()) as {
-          syncLogId?: string
-          success?: boolean
-          sync?: {
-            received: number
-            processed: number
-            matched: number
-            unmatched: number
-            errors: number
-            duration: number
+          // Échec global : message du serveur (déjà en français, sans le token).
+          if (!response.ok) {
+            throw new Error(data.error ?? `Erreur HTTP ${response.status}`)
           }
-          message?: string
-        }
 
-        // If the sync completed immediately (small dataset), use the response directly
-        if (syncResponse.sync) {
-          const syncResult: SyncResult = {
-            success: syncResponse.success ?? true,
-            syncLogId: syncResponse.syncLogId ?? '',
-            received: syncResponse.sync.received,
-            processed: syncResponse.sync.processed,
-            matched: syncResponse.sync.matched,
-            unmatched: syncResponse.sync.unmatched,
-            errors: syncResponse.sync.errors,
-            duration: syncResponse.sync.duration,
+          const s = data.sync
+          if (s) {
+            total.received += s.received
+            total.processed += s.processed
+            total.matched += s.matched
+            total.unmatched += s.unmatched
+            total.skipped = (total.skipped ?? 0) + (s.skipped ?? 0)
+            total.errors += s.errors
+            total.duration += s.duration
+            total.errorDetails = [...(total.errorDetails ?? []), ...(s.errorDetails ?? [])].slice(0, 20)
           }
-          setResult(syncResult)
-          setProgress({ current: syncResult.processed, total: syncResult.received })
-          setIsSyncing(false)
-          return
-        }
+          total.syncLogId = data.syncLogId ?? total.syncLogId
+          total.success = total.errors === 0
 
-        // Step 2: Connect to SSE for progress (if syncLogId available)
-        if (syncResponse.syncLogId) {
-          connectToSSE(syncResponse.syncLogId)
-        } else {
-          // No syncLogId — sync completed inline
-          setIsSyncing(false)
+          const remaining = data.remaining ?? 0
+          setProgress({ current: total.received, total: total.received + (data.partial ? remaining : 0) })
+          setResult({ ...total })
+
+          if (!data.partial) {
+            setIsSyncing(false)
+            return
+          }
+          if (typeof data.cursor !== 'number') {
+            throw new Error('Réponse de synchronisation incomplète (curseur manquant).')
+          }
+          cursor = data.cursor
         }
+        throw new Error('Synchronisation interrompue : trop d’étapes. Relancez-la pour continuer.')
       } catch (err: unknown) {
         if (err instanceof Error && err.name === 'AbortError') return
-        const message = err instanceof Error ? err.message : 'Erreur de synchronisation'
-        setError(message)
+        setError(err instanceof Error ? err.message : 'Erreur de synchronisation')
         setIsSyncing(false)
+      } finally {
+        abortRef.current = null
       }
     },
     [cooperativeId, isSyncing],
-  )
-
-  const connectToSSE = useCallback(
-    (syncLogId: string) => {
-      const url = `/api/integrations/kobo/sync/progress?syncLogId=${encodeURIComponent(syncLogId)}`
-
-      // Use fetch-based SSE reader (EventSource doesn't support custom headers)
-      const controller = new AbortController()
-      abortRef.current = controller
-
-      fetch(url, { signal: controller.signal })
-        .then(async (response) => {
-          if (!response.ok || !response.body) {
-            throw new Error(`SSE connection failed: ${response.status}`)
-          }
-
-          const reader = response.body.getReader()
-          const decoder = new TextDecoder()
-          let buffer = ''
-
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-
-            buffer += decoder.decode(value, { stream: true })
-
-            // Parse SSE events from buffer
-            const lines = buffer.split('\n')
-            buffer = lines.pop() ?? '' // Keep incomplete line in buffer
-
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const jsonStr = line.slice(6).trim()
-                if (!jsonStr) continue
-
-                try {
-                  const event = JSON.parse(jsonStr) as KoboSyncSSEEvent
-
-                  switch (event.type) {
-                    case 'progress':
-                      setProgress({ current: event.current, total: event.total })
-                      break
-
-                    case 'complete':
-                      setResult(event.result)
-                      setProgress({
-                        current: event.result.processed,
-                        total: event.result.received,
-                      })
-                      setIsSyncing(false)
-                      cleanup()
-                      return
-
-                    case 'error':
-                      setError(event.message)
-                      setIsSyncing(false)
-                      cleanup()
-                      return
-                  }
-                } catch {
-                  // Ignore malformed SSE data
-                }
-              }
-            }
-          }
-
-          // Stream ended without complete/error event
-          setIsSyncing(false)
-          cleanup()
-        })
-        .catch((err: unknown) => {
-          if (err instanceof Error && err.name === 'AbortError') return
-          const message = err instanceof Error ? err.message : 'SSE connection error'
-          setError(message)
-          setIsSyncing(false)
-        })
-    },
-    [cleanup],
   )
 
   return { isSyncing, progress, result, error, startSync, cancelSync }
