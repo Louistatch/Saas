@@ -7,6 +7,8 @@
 --   - purchases_pending_fiche_phone_idx : refus d'une nouvelle demande de
 --     paiement quand un paiement est déjà en cours pour la même fiche et le
 --     même numéro (POST /api/fiches/[id]/purchase).
+--
+-- Renommée (ex-20261018_140000) pour passer après les migrations de main. Idempotente.
 
 create index if not exists purchases_pending_created_idx
   on public.purchases (created_at)

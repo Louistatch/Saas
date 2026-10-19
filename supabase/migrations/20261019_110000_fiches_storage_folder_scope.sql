@@ -11,6 +11,13 @@
 -- Aucune politique SELECT n'est ajoutée : la lecture reste réservée aux URL
 -- signées émises par le serveur. Les chemins enregistrés sur une fiche sont
 -- en outre recontrôlés côté serveur (lib/fiches/files.ts).
+--
+-- Renommée (ex-20261018_110000) pour passer après les migrations de main.
+-- Depuis 40c06ee (main), la publication des faîtières est fermée côté
+-- application (lib/fiches/publishing.ts) et par la RLS de fiches_techniques :
+-- une faîtière peut encore déposer dans SON dossier, mais aucun fichier ne
+-- peut être rattaché à une fiche (PATCH refusé). Fermer aussi le stockage :
+-- retirer la branche cooperative_admin de can_write_fiche_folder.
 
 create or replace function public.can_write_fiche_folder(folder text)
 returns boolean
