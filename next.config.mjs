@@ -23,7 +23,9 @@ const securityHeaders = [
       "script-src 'self' 'unsafe-inline' https:",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://*.supabase.co https:",
-      "font-src 'self'",
+      // data: : l'export PNG/PDF du navigateur rasterise la carte via <img>,
+      // avec Poppins intégrée au SVG en data URL (aucune ressource externe).
+      "font-src 'self' data:",
       `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.vercel-analytics.com https://*.vercel.app https://*.i.posthog.com https://*.posthog.com`,
       "worker-src 'self'",
       "manifest-src 'self'",
@@ -58,7 +60,8 @@ const nextConfig = {
     '/*': ['./tests/**/*', './e2e/**/*', './node_modules/@electric-sql/pglite/**/*'],
   },
   // Le moteur de cartes lit deux fichiers à l'exécution : le binaire WASM de
-  // resvg et les polices embarquées. Aucun des deux n'est atteignable par
+  // resvg et les polices embarquées (carte de membre : Poppins et Liberation
+  // Sans ; carte Haroo : Liberation Sans). Aucun des deux n'est atteignable par
   // analyse statique — ils sont chargés par chemin, depuis `process.cwd()`.
   // Sans ces inclusions explicites, la fonction serverless part sans eux et
   // la route échoue en production alors qu'elle passe en local.
@@ -69,12 +72,12 @@ const nextConfig = {
     ],
     '/api/haroo/card': [
       './node_modules/@resvg/resvg-wasm/index_bg.wasm',
-      './lib/card-engine/fonts/*.ttf',
+      './lib/card-engine/fonts/LiberationSans-*.ttf',
       './public/logo.png',
     ],
     '/api/haroo/card/preview': [
       './node_modules/@resvg/resvg-wasm/index_bg.wasm',
-      './lib/card-engine/fonts/*.ttf',
+      './lib/card-engine/fonts/LiberationSans-*.ttf',
       './public/logo.png',
     ],
   },

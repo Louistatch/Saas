@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useRef, useCallback, useMemo } from 'react'
-import { Camera, X, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { Camera, Loader2, X } from 'lucide-react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
 interface PhotoUploadProps {
   /** Current photo URL (if already uploaded) */
@@ -18,9 +18,9 @@ interface PhotoUploadProps {
   disabled?: boolean
 }
 
-// 7:9 — the ISO/ICAO identity-photo ratio, and exactly the ratio of the
-// portrait window in lib/card-engine/renderer.ts. What is framed here is what
-// lands on the printed card, with no second crop in between.
+// 7:9 — the ISO/ICAO identity-photo ratio. The member card shows it in a round
+// medallion (photoFrame in lib/card-engine/member-card.ts): full width, cropped
+// mostly from the bottom, so a head framed as guided here stays whole.
 const sizes = {
   sm: 'w-20 h-[103px]',
   md: 'w-28 h-36',
@@ -70,7 +70,9 @@ export function PhotoGuidelines({ className }: { className?: string }) {
         ))}
       </ul>
       <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-        Format portrait 7:9 (photo d’identité). Une image plus large sera recadrée sur son centre.
+        Format portrait 7:9 (photo d’identité), visage centré. Sur la carte, la photo apparaît dans
+        un médaillon rond : garder un peu d’espace au-dessus de la tête ; le bas de la photo
+        (épaules) peut être rogné.
       </p>
     </div>
   )

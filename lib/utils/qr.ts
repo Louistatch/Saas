@@ -287,10 +287,80 @@ function encodeBytes(data: number[], ecc: Ecc): { version: number; codewords: nu
   return { version, codewords }
 }
 
+export interface EncodeOptions {
+  /**
+   * Mask pattern. `0` (default, historical behaviour: every existing QR stays
+   * byte-for-byte identical), `1..7` to force one, or `'auto'` to pick the one
+   * with the lowest ISO/IEC 18004 penalty score — fewer long runs, finder-like
+   * patterns and unbalanced areas, hence a code that decodes more reliably at
+   * small module sizes and low resolution (printed cards).
+   */
+  mask?: number | 'auto'
+}
+
+/**
+ * ISO/IEC 18004 penalty score of a masked symbol (rules N1 to N4).
+ * Lower is better.
+ */
+function penaltyScore(m: boolean[][]): number {
+  const n = m.length
+  let score = 0
+
+  // N1: runs of 5+ same-colour modules in a row or column.
+  const runScore = (get: (i: number) => boolean) => {
+    let run = 1
+    let total = 0
+    for (let i = 1; i < n; i++) {
+      if (get(i) === get(i - 1)) run++
+      else {
+        if (run >= 5) total += 3 + (run - 5)
+        run = 1
+      }
+    }
+    if (run >= 5) total += 3 + (run - 5)
+    return total
+  }
+  for (let a = 0; a < n; a++) {
+    score += runScore((i) => m[a][i])
+    score += runScore((i) => m[i][a])
+  }
+
+  // N2: 2x2 blocks of one colour.
+  for (let y = 0; y < n - 1; y++) {
+    for (let x = 0; x < n - 1; x++) {
+      const c = m[y][x]
+      if (c === m[y][x + 1] && c === m[y + 1][x] && c === m[y + 1][x + 1]) score += 3
+    }
+  }
+
+  // N3: finder-like 1:1:3:1:1 pattern with 4 light modules on either side.
+  const P1 = [true, false, true, true, true, false, true, false, false, false, false]
+  const P2 = [false, false, false, false, true, false, true, true, true, false, true]
+  const matches = (get: (i: number) => boolean, at: number, p: boolean[]) => {
+    for (let k = 0; k < 11; k++) if (get(at + k) !== p[k]) return false
+    return true
+  }
+  for (let a = 0; a < n; a++) {
+    for (let i = 0; i + 11 <= n; i++) {
+      const row = (j: number) => m[a][j]
+      const col = (j: number) => m[j][a]
+      if (matches(row, i, P1) || matches(row, i, P2)) score += 40
+      if (matches(col, i, P1) || matches(col, i, P2)) score += 40
+    }
+  }
+
+  // N4: balance of dark modules.
+  let dark = 0
+  for (const row of m) for (const v of row) if (v) dark++
+  const pct = (dark * 100) / (n * n)
+  score += Math.floor(Math.abs(pct - 50) / 5) * 10
+  return score
+}
+
 /**
  * Encode a string into a QR code and return its module matrix.
  */
-export function encodeText(text: string, ecc: Ecc = 'M'): boolean[][] {
+export function encodeText(text: string, ecc: Ecc = 'M', opts: EncodeOptions = {}): boolean[][] {
   // UTF-8 encode the string
   let bytes: number[]
   if (typeof TextEncoder !== 'undefined') {
@@ -305,8 +375,20 @@ export function encodeText(text: string, ecc: Ecc = 'M'): boolean[][] {
     }
   }
   const { version, codewords } = encodeBytes(bytes, ecc)
-  // Mask 0 is good enough for small payloads; full penalty scoring is omitted for size.
-  return new QrCode(version, ecc, codewords, 0).modules
+  const requested = opts.mask ?? 0
+  if (requested !== 'auto') return new QrCode(version, ecc, codewords, requested).modules
+
+  let best: boolean[][] | null = null
+  let bestScore = Number.POSITIVE_INFINITY
+  for (let mask = 0; mask < 8; mask++) {
+    const modules = new QrCode(version, ecc, codewords, mask).modules
+    const score = penaltyScore(modules)
+    if (score < bestScore) {
+      bestScore = score
+      best = modules
+    }
+  }
+  return best as boolean[][]
 }
 
 /**

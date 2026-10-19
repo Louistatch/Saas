@@ -1,22 +1,17 @@
 /**
- * Security art primitives — the visual language of real ID documents.
+ * Éléments graphiques de la carte de membre : pictogrammes, feuillage en
+ * filigrane, emblème vectoriel de repli.
  *
- * Everything here is generated mathematically as SVG paths so it rasterizes
- * identically in the browser preview, the PNG export and the print sheet.
- * No webfonts, no external assets, no blend modes that degrade on export.
+ * Tout est généré en SVG, sans police ni image externe, de sorte que l'aperçu,
+ * l'export PNG, le PDF et la feuille imprimée sont le même dessin. Les
+ * pictogrammes sont dessinés sur une grille de 24 unités centrée sur l'origine,
+ * puis placés et mis à l'échelle par `icon()`.
  *
- * Techniques implemented:
- *  - Guilloché  : hypotrochoid line engraving (the interlaced rosette found on
- *                 banknotes and ID cards). Impossible to redraw by hand, hard
- *                 to reproduce on a photocopier — which is the point.
- *  - Microtext  : sub-millimetre repeated text. Reads as a solid hairline to
- *                 the naked eye, legible under a loupe, turns to mush when
- *                 photocopied.
- *  - Foil patch : layered iridescent gradient simulating an OVD/hologram.
- *  - Chip       : EMV-style contact plate with metallic ramp.
+ * Aucun faux élément de sécurité (puce, hologramme, signature inventée) : seul
+ * le contrôle en ligne, via le QR, fait foi.
  */
 
-/** Escape text for safe inclusion in SVG markup. */
+/** Échappe un texte pour l'insérer dans un SVG. */
 export function esc(str: string): string {
   return str
     .replace(/&/g, '&amp;')
@@ -26,309 +21,110 @@ export function esc(str: string): string {
     .replace(/'/g, '&apos;')
 }
 
-/**
- * Hypotrochoid guilloché rosette.
- *
- * A point at distance `d` from the centre of a circle of radius `r` rolling
- * inside a circle of radius `R` traces the curve. The ratio R/r sets the
- * number of petals; stacking a few slightly-offset passes produces the
- * moiré-like interference that makes guilloché hard to counterfeit.
- */
-export function guillocheRosette(opts: {
-  cx: number
-  cy: number
-  R: number
-  r: number
-  d: number
-  /** Number of stacked passes, each rotated slightly. */
-  passes?: number
-  stroke: string
-  strokeWidth?: number
-  opacity?: number
-  /** Angular resolution in radians. Lower = smoother, heavier path. */
-  step?: number
-}): string {
-  const { cx, cy, R, r, d, passes = 3, stroke, strokeWidth = 0.6, opacity = 0.5, step = 0.06 } = opts
-
-  // The curve closes after r/gcd(R,r) revolutions and draws R/gcd(R,r) petals.
-  // Pick R and r sharing a large common divisor: coprime values (e.g. 258/37)
-  // need 37 revolutions and emit ~8k points per pass, which ballooned a single
-  // card to 236 KB of SVG — 1.8 MB for one A4 sheet of eight. A divisor of 12
-  // gives the same classic rosette in 3 revolutions.
-  const turns = Math.round(r) / gcd(Math.round(R), Math.round(r))
-  const tMax = turns * 2 * Math.PI
-  const k = (R - r) / r
-
-  const paths: string[] = []
-  for (let p = 0; p < passes; p++) {
-    const phase = (p * Math.PI) / (passes * 6)
-    const scale = 1 - p * 0.05
-    let dAttr = ''
-    for (let t = 0; t <= tMax; t += step) {
-      const x = cx + ((R - r) * Math.cos(t + phase) + d * Math.cos(k * t + phase)) * scale
-      const y = cy + ((R - r) * Math.sin(t + phase) - d * Math.sin(k * t + phase)) * scale
-      dAttr += `${dAttr ? 'L' : 'M'}${x.toFixed(0)},${y.toFixed(0)}`
-    }
-    paths.push(
-      `<path d="${dAttr}Z" fill="none" stroke="${esc(stroke)}" stroke-width="${strokeWidth}" stroke-opacity="${opacity * (1 - p * 0.18)}"/>`,
-    )
+/** Empreinte stable 32 bits (FNV-1a) : suffixe des identifiants internes du SVG. */
+export function hashString(input: string): number {
+  let h = 2166136261
+  for (const ch of input) {
+    h ^= ch.codePointAt(0) ?? 0
+    h = Math.imul(h, 16777619)
   }
-  return paths.join('')
+  return h >>> 0
 }
 
-function gcd(a: number, b: number): number {
-  return b === 0 ? a : gcd(b, a % b)
+const f1 = (n: number): string => n.toFixed(1)
+
+export type IconName =
+  | 'pin'
+  | 'phone'
+  | 'building'
+  | 'people'
+  | 'calendar'
+  | 'shield-check'
+  | 'shield-alert'
+  | 'shield-cross'
+  | 'medal'
+
+/** Pictogrammes pleins, grille 24 × 24 centrée. */
+const GLYPHS: Record<IconName, (c: string) => string> = {
+  pin: (c) =>
+    `<path fill-rule="evenodd" fill="${c}" d="M0 -10C-4.6 -10 -7.8 -6.7 -7.8 -2.5C-7.8 3.3 0 10.5 0 10.5S7.8 3.3 7.8 -2.5C7.8 -6.7 4.6 -10 0 -10ZM2.9 -2.7A2.9 2.9 0 1 0 -2.9 -2.7A2.9 2.9 0 1 0 2.9 -2.7Z"/>`,
+  phone: (c) =>
+    `<path fill="${c}" d="M-7.6 -9.4L-3.9 -10.2L-1.6 -4.9L-4 -2.9C-2.6 0.3 -0.2 2.7 3 4.1L5 1.7L10.2 4L9.4 7.6C9.1 8.9 7.9 9.8 6.6 9.6C-1.6 8.3 -8.3 1.6 -9.6 -6.6C-9.8 -7.9 -8.9 -9.1 -7.6 -9.4Z"/>`,
+  building: (c) =>
+    `<g fill="${c}"><path d="M-10 -4.2L0 -10L10 -4.2V-2.6H-10Z"/><rect x="-10" y="7.4" width="20" height="2.6" rx="0.6"/><rect x="-8" y="-1.4" width="2.6" height="7.8"/><rect x="-3.6" y="-1.4" width="2.6" height="7.8"/><rect x="1" y="-1.4" width="2.6" height="7.8"/><rect x="5.4" y="-1.4" width="2.6" height="7.8"/></g>`,
+  people: (c) =>
+    `<g fill="${c}"><circle cx="0" cy="-4.6" r="3.4"/><path d="M-6 8C-6 2.4 -3.4 0 0 0S6 2.4 6 8Z"/><circle cx="-7.2" cy="-2.6" r="2.6"/><path d="M-11.4 7.4C-11.4 3.4 -9.6 1.4 -7.2 1.4C-6.2 1.4 -5.4 1.7 -4.7 2.3C-5.9 3.7 -6.7 5.4 -6.9 7.4Z"/><circle cx="7.2" cy="-2.6" r="2.6"/><path d="M11.4 7.4C11.4 3.4 9.6 1.4 7.2 1.4C6.2 1.4 5.4 1.7 4.7 2.3C5.9 3.7 6.7 5.4 6.9 7.4Z"/></g>`,
+  calendar: (c) =>
+    `<g fill="${c}"><path fill-rule="evenodd" d="M-8.6 -6.6H8.6A1.6 1.6 0 0 1 10.2 -5V8.4A1.6 1.6 0 0 1 8.6 10H-8.6A1.6 1.6 0 0 1 -10.2 8.4V-5A1.6 1.6 0 0 1 -8.6 -6.6ZM-8.2 -2.2V8H8.2V-2.2Z"/><rect x="-6" y="-10" width="2.4" height="5.4" rx="1.2"/><rect x="3.6" y="-10" width="2.4" height="5.4" rx="1.2"/><rect x="-6" y="0.4" width="3" height="2.6"/><rect x="-1.5" y="0.4" width="3" height="2.6"/><rect x="3" y="0.4" width="3" height="2.6"/><rect x="-6" y="4.4" width="3" height="2.6"/><rect x="-1.5" y="4.4" width="3" height="2.6"/></g>`,
+  'shield-check': (c) => shield(c, 'M-4 0.2L-1.1 3.1L4.4 -2.6'),
+  'shield-alert': (c) => shield(c, 'M0 -4.4V1M0 4.2V4.3'),
+  'shield-cross': (c) => shield(c, 'M-3.4 -3.2L3.4 3.6M3.4 -3.2L-3.4 3.6'),
+  medal: (c) =>
+    `<g fill="${c}"><path d="M-6.4 -10.4H-2L1.2 -3.6H-3.2Z"/><path d="M6.4 -10.4H2L-1.2 -3.6H3.2Z"/><path fill-rule="evenodd" d="M7.4 3.6A7.4 7.4 0 1 0 -7.4 3.6A7.4 7.4 0 1 0 7.4 3.6ZM4.6 3.6A4.6 4.6 0 1 0 -4.6 3.6A4.6 4.6 0 1 0 4.6 3.6Z"/></g>`,
 }
 
-/**
- * Emit ONE dense rosette into <defs>, normalized to radius 100 around the
- * origin, to be instanced with <use>.
- *
- * Authentic guilloché needs a high petal count (the fine interference weave);
- * generating that geometry once per card instead of once per placement is the
- * difference between a 78 KB card that looks like a flower doodle and a 40 KB
- * card that looks engraved.
- *
- * The <g> deliberately sets neither `stroke` nor `stroke-width`: both are left
- * to inherit from the <use> that instances it. `vector-effect` and
- * `currentColor` would be the idiomatic way to do this, but the server-side
- * renderer (@resvg/resvg-wasm, see fonts.ts) implements neither reliably, and
- * a card must come out identical from the browser and from /api/cards.
- * useRosette therefore pre-divides the stroke width by the scale instead.
- */
-export function rosetteDef(id: string, opts?: { R?: number; r?: number; d?: number; passes?: number; step?: number }): string {
-  const { R = 100, r = 14, d = 38, passes = 2, step = 0.05 } = opts ?? {}
-  const turns = r / gcd(Math.round(R), Math.round(r))
-  const tMax = turns * 2 * Math.PI
-  const k = (R - r) / r
-
-  const paths: string[] = []
-  for (let p = 0; p < passes; p++) {
-    const phase = (p * Math.PI) / (passes * 6)
-    const scale = 1 - p * 0.05
-    let dAttr = ''
-    for (let t = 0; t <= tMax; t += step) {
-      const x = ((R - r) * Math.cos(t + phase) + d * Math.cos(k * t + phase)) * scale
-      const y = ((R - r) * Math.sin(t + phase) - d * Math.sin(k * t + phase)) * scale
-      dAttr += `${dAttr ? 'L' : 'M'}${x.toFixed(0)},${y.toFixed(0)}`
-    }
-    paths.push(`<path d="${dAttr}Z" stroke-opacity="${(1 - p * 0.18).toFixed(2)}"/>`)
-  }
-  return `<g id="${id}" fill="none">${paths.join('')}</g>`
-}
-
-/** Instance a rosette defined by rosetteDef at a given place, scale and tint. */
-export function useRosette(opts: {
-  href: string
-  cx: number
-  cy: number
-  /** 1 = the normalized radius-100 rosette. */
-  scale: number
-  color: string
-  opacity?: number
-  /** Width the hairline should have ON THE CARD, before the scale is applied. */
-  strokeWidth?: number
-}): string {
-  const { href, cx, cy, scale, color, opacity = 0.2, strokeWidth = 0.45 } = opts
-  // Pre-divide so scale × (w / scale) = w in every renderer — see rosetteDef.
-  const w = (strokeWidth / scale).toFixed(3)
-  return `<use href="#${href}" xlink:href="#${href}" transform="translate(${cx} ${cy}) scale(${scale})" stroke="${esc(color)}" opacity="${opacity}" stroke-width="${w}"/>`
+/** Écusson plein, marque intérieure évidée (trait de la couleur `hole`). */
+function shield(c: string, mark: string): string {
+  return `<path fill="${c}" d="M0 -10.6L8.6 -7.2V-1.4C8.6 4.4 4.9 8.7 0 10.6C-4.9 8.7 -8.6 4.4 -8.6 -1.4V-7.2Z"/><path d="${mark}" fill="none" stroke="var(--hole)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`
 }
 
 /**
- * Guilloché wave band — the horizontal interlaced ribbon used along the edges
- * of secure documents. Two phase-shifted sine families weaving through
- * each other.
+ * Pictogramme `name`, centré en (cx, cy), de côté `size` (unités de carte).
+ * `hole` : couleur de la marque intérieure des écussons (coche, croix, « ! »).
  */
-export function guillocheBand(opts: {
+export function icon(
+  name: IconName,
+  cx: number,
+  cy: number,
+  size: number,
+  color: string,
+  hole = '#FFFFFF',
+): string {
+  const k = size / 24
+  const body = GLYPHS[name](esc(color)).replace(/var\(--hole\)/g, esc(hole))
+  return `<g transform="translate(${f1(cx)} ${f1(cy)}) scale(${k.toFixed(3)})">${body}</g>`
+}
+
+/**
+ * Feuille stylisée, pointée vers +x, longueur 100 avant mise à l'échelle :
+ * limbe plein et nervures. Sert au filigrane du fond.
+ */
+const LEAF_BLADE = 'M0 0C16 -22 52 -33 100 -4C60 26 20 24 0 0Z'
+const LEAF_VEINS =
+  'M0 0C30 -6 64 -8 100 -4M28 -4L40 -20M48 -6L62 -22M68 -6L80 -16M30 -4L40 10M50 -5L62 9M70 -5L80 3'
+
+export interface LeafSpec {
   x: number
   y: number
-  width: number
-  height: number
-  lines?: number
-  stroke: string
-  strokeWidth?: number
-  opacity?: number
-}): string {
-  const { x, y, width, height, lines = 9, stroke, strokeWidth = 0.5, opacity = 0.35 } = opts
-  const out: string[] = []
-  for (let i = 0; i < lines; i++) {
-    const phase = (i / lines) * Math.PI * 2
-    const amp = height / 2 - 1
-    let d = ''
-    for (let px = 0; px <= width; px += 5) {
-      const t = (px / width) * Math.PI * 8
-      const py =
-        y +
-        height / 2 +
-        Math.sin(t + phase) * amp * 0.62 +
-        Math.sin(t * 2.33 + phase * 1.7) * amp * 0.3
-      d += `${d ? 'L' : 'M'}${(x + px).toFixed(0)},${py.toFixed(1)}`
-    }
-    out.push(`<path d="${d}" fill="none" stroke="${esc(stroke)}" stroke-width="${strokeWidth}" stroke-opacity="${opacity}"/>`)
-  }
-  return out.join('')
+  /** Angle en degrés. */
+  angle: number
+  /** Longueur en unités de carte. */
+  length: number
+  opacity: number
+}
+
+/** Bouquet de feuilles en filigrane (aplat très léger, nervures plus marquées). */
+export function leafWatermark(leaves: ReadonlyArray<LeafSpec>, fill: string, vein: string): string {
+  return leaves
+    .map((l) => {
+      const k = l.length / 100
+      return `<g transform="translate(${f1(l.x)} ${f1(l.y)}) rotate(${f1(l.angle)}) scale(${k.toFixed(3)})" opacity="${l.opacity}"><path d="${LEAF_BLADE}" fill="${esc(fill)}"/><path d="${LEAF_VEINS}" fill="none" stroke="${esc(vein)}" stroke-width="${f1(1.4 / k)}" stroke-linecap="round"/></g>`
+    })
+    .join('')
 }
 
 /**
- * Microtext line. `size` under ~4px reads as a hairline at 1× and stays
- * legible when the card is exported at 2× or printed at 300dpi.
+ * Emblème FaîtiereHub vectoriel, utilisé quand le logo officiel
+ * (public/logo.png) n'est pas fourni : disque, champs en courbes, trois
+ * silhouettes. Rayon `r`, centré en (cx, cy).
  */
-export function microtext(opts: {
-  x: number
-  y: number
-  width: number
-  text: string
-  fill: string
-  size?: number
-  opacity?: number
-}): string {
-  const { x, y, width, text, fill, size = 3.4, opacity = 0.55 } = opts
-  // Roughly 0.5em advance per char for uppercase sans at small sizes.
-  const perChar = size * 0.52
-  const repeats = Math.ceil(width / (text.length * perChar)) + 1
-  const line = Array.from({ length: repeats }, () => text).join(' · ')
-  return `<text x="${x}" y="${y}" font-family="Arial, Helvetica, sans-serif" font-size="${size}" font-weight="600" letter-spacing="0.3" fill="${esc(fill)}" fill-opacity="${opacity}" textLength="${width}" lengthAdjust="spacingAndGlyphs">${esc(line)}</text>`
-}
-
-/** EMV-style contact chip with a metallic ramp and contact traces. */
-export function chip(x: number, y: number, w = 52, h = 40): string {
-  const r = 6
-  return `<g transform="translate(${x} ${y})">
-    <rect width="${w}" height="${h}" rx="${r}" fill="url(#chipGrad)"/>
-    <rect width="${w}" height="${h}" rx="${r}" fill="none" stroke="#8a6a20" stroke-opacity="0.55" stroke-width="0.8"/>
-    <g stroke="#8a6a20" stroke-opacity="0.5" stroke-width="1.1" fill="none">
-      <path d="M0 ${h * 0.34}H${w * 0.3}M${w * 0.7} ${h * 0.34}H${w}"/>
-      <path d="M0 ${h * 0.66}H${w * 0.3}M${w * 0.7} ${h * 0.66}H${w}"/>
-      <path d="M${w * 0.3} ${h * 0.16}V${h * 0.84}M${w * 0.7} ${h * 0.16}V${h * 0.84}"/>
-      <rect x="${w * 0.3}" y="${h * 0.34}" width="${w * 0.4}" height="${h * 0.32}"/>
-    </g>
-    <rect width="${w}" height="${h * 0.45}" rx="${r}" fill="#ffffff" fill-opacity="0.22"/>
-  </g>`
-}
-
-/**
- * Iridescent foil patch (OVD simulation). Built from stacked rotated linear
- * gradients rather than mix-blend-mode, so the export matches the preview.
- */
-export function foilPatch(x: number, y: number, w: number, h: number, id: string): string {
-  return `<g transform="translate(${x} ${y})" clip-path="url(#${id}Clip)">
-    <rect width="${w}" height="${h}" rx="8" fill="url(#foilA)"/>
-    <rect width="${w}" height="${h}" rx="8" fill="url(#foilB)" opacity="0.55"/>
-    ${guillocheRosette({
-      cx: w / 2,
-      cy: h / 2,
-      R: 27,
-      r: 9,
-      d: 11,
-      passes: 2,
-      stroke: '#ffffff',
-      strokeWidth: 0.45,
-      opacity: 0.5,
-      step: 0.07,
-    })}
-    <rect width="${w}" height="${h}" rx="8" fill="none" stroke="#ffffff" stroke-opacity="0.45" stroke-width="0.8"/>
-  </g>`
-}
-
-/**
- * Organisation emblem — a rounded square plate carrying an uploaded logo.
- *
- * Deliberately NOT a circle: a circle crops the corners off most cooperative
- * logos (wordmarks, shields, anything wider than tall), and the rounded square
- * echoes the portrait window so the two framed elements read as one system.
- *
- * The logo sits on a light plate and is fitted with `meet`, never `slice` — an
- * organisation's emblem may be letterboxed, never cropped. The plate also keeps
- * dark logos and transparent PNGs legible on a dark green card, which is what a
- * bare <image> would fail at.
- *
- * `id` must be unique per call: it names the clip path.
- */
-export function emblem(opts: {
-  x: number
-  y: number
-  size: number
-  href: string
-  id: string
-  /** Plate tint behind the logo. */
-  plate?: string
-}): string {
-  const { x, y, size, href, id, plate = '#ffffff' } = opts
-  const r = Math.round(size * 0.26)
-  const pad = Math.round(size * 0.12)
-  const inner = size - pad * 2
-  return `<g transform="translate(${x} ${y})">
-    <clipPath id="${id}"><rect width="${size}" height="${size}" rx="${r}" ry="${r}"/></clipPath>
-    <rect width="${size}" height="${size}" rx="${r}" ry="${r}" fill="${esc(plate)}" fill-opacity="0.94" filter="url(#shadow)"/>
-    <g clip-path="url(#${id})">
-      <image href="${esc(href)}" xlink:href="${esc(href)}" x="${pad}" y="${pad}" width="${inner}" height="${inner}" preserveAspectRatio="xMidYMid meet"/>
-    </g>
-    <rect width="${size}" height="${size}" rx="${r}" ry="${r}" fill="none" stroke="#ffffff" stroke-opacity="0.5" stroke-width="1"/>
-  </g>`
-}
-
-// ─── Text metrics ────────────────────────────────────────────────────────────
-
-/**
- * Estimate rendered text width WITHOUT a DOM.
- *
- * This exists because the previous renderer truncated by character count,
- * which let long names overflow into the right-hand panel: 21 characters of
- * "Issodo Louis TATCHIDA" passed a 22-char limit but painted ~640px at
- * font-size 42 and ran off the dark zone.
- *
- * Per-character advance ratios for a bold grotesque (Arial/Helvetica metrics,
- * which is what actually renders — webfonts never load inside an SVG
- * rasterized through an <img> element).
- */
-export function estimateTextWidth(text: string, fontSize: number, bold = false): number {
-  let units = 0
-  for (const ch of text) {
-    if (ch === ' ') units += 0.28
-    else if (/[iIlj|.,;:'`!]/.test(ch)) units += 0.28
-    else if (/[frt()[\]{}/\\-]/.test(ch)) units += 0.36
-    else if (/[A-ZÀ-ÖØ-Þ]/.test(ch)) units += 0.68
-    else if (/[mwMW]/.test(ch)) units += 0.86
-    else if (/[0-9]/.test(ch)) units += 0.56
-    else units += 0.54
-  }
-  return units * fontSize * (bold ? 1.04 : 1)
-}
-
-/**
- * Shrink a font size until the text fits `maxWidth`, never going below `min`.
- * Returns the size actually used plus whether it still overflows (so callers
- * can decide to wrap instead of clipping).
- */
-export function fitFontSize(
-  text: string,
-  maxWidth: number,
-  preferred: number,
-  min: number,
-  bold = false,
-): { size: number; fits: boolean } {
-  let size = preferred
-  while (size > min && estimateTextWidth(text, size, bold) > maxWidth) {
-    size -= 1
-  }
-  return { size, fits: estimateTextWidth(text, size, bold) <= maxWidth }
-}
-
-/** Split a name onto at most two lines, breaking on the last space that fits. */
-export function wrapToTwoLines(text: string, maxWidth: number, fontSize: number, bold = false): string[] {
-  if (estimateTextWidth(text, fontSize, bold) <= maxWidth) return [text]
-  const words = text.split(' ')
-  if (words.length < 2) return [text]
-
-  let best: [string, string] | null = null
-  for (let i = words.length - 1; i > 0; i--) {
-    const a = words.slice(0, i).join(' ')
-    const b = words.slice(i).join(' ')
-    if (estimateTextWidth(a, fontSize, bold) <= maxWidth && estimateTextWidth(b, fontSize, bold) <= maxWidth) {
-      best = [a, b]
-      break
-    }
-  }
-  return best ?? [words.slice(0, -1).join(' '), words[words.length - 1]]
+export function emblemVector(
+  cx: number,
+  cy: number,
+  r: number,
+  green: string,
+  light: string,
+): string {
+  const k = r / 24
+  return `<g transform="translate(${f1(cx)} ${f1(cy)}) scale(${k.toFixed(3)})"><circle r="24" fill="#FFFFFF"/><circle r="21" fill="none" stroke="${esc(green)}" stroke-width="2.4"/><path d="M-17 9C-8 2 6 1 17 6L15 11C5 6 -6 7 -14 13Z" fill="${esc(green)}"/><path d="M-12 16C-4 10 8 9 15 12L12 16C6 14 -3 15 -8 18Z" fill="${esc(light)}"/><circle cx="0" cy="-7" r="4.2" fill="${esc(green)}"/><path d="M-6.5 4C-6.5 -1 -3.5 -3 0 -3S6.5 -1 6.5 4Z" fill="${esc(green)}"/><circle cx="-8.5" cy="-4" r="3" fill="${esc(light)}"/><circle cx="8.5" cy="-4" r="3" fill="${esc(light)}"/><path d="M-13 -11C-15 -5 -14 0 -11 3C-10 -2 -10.5 -7 -13 -11Z" fill="${esc(light)}"/></g>`
 }

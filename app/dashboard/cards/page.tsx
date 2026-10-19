@@ -26,8 +26,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useDebounced } from '@/hooks/use-debounced'
 import { useResetPageOnChange } from '@/hooks/use-reset-page'
 import { useToast } from '@/hooks/use-toast'
+import { cardVerifyUrl, resolveCardBranding } from '@/lib/card-engine'
 import { createClient } from '@/lib/supabase/client'
-import { downloadCardImage, renderCardImage } from '@/lib/utils/card-image'
+import {
+  type CardImageContext,
+  downloadCardImage,
+  downloadCardPdf,
+  loadMemberLevels,
+  toBrandingOrgs,
+} from '@/lib/utils/card-image'
 import { errorMessage } from '@/lib/utils/errors'
 import { cardSettingsSchema, cardTemplateSchema, flattenZodErrors } from '@/lib/validators/schemas'
 import {
@@ -41,13 +48,14 @@ import {
 import {
   CheckCircle2,
   Download,
+  FileText,
   IdCard,
+  KeyRound,
   Plus,
   Printer,
   QrCode,
   RefreshCw,
   Search,
-  KeyRound,
   Trash2,
   Users,
 } from 'lucide-react'
@@ -94,10 +102,14 @@ export default function CardsPage() {
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [pdfId, setPdfId] = useState<string | null>(null)
   const [downloadingAll, setDownloadingAll] = useState(false)
 
   // Persisted settings
   const [template, setTemplate] = useState<CardTemplate>(DEFAULT_CARD_TEMPLATE)
+  // Vrai quand le modèle vient de la base : seul un modèle enregistré impose ses
+  // couleurs aux cartes ; sinon c'est la couleur de l'organisation qui prévaut.
+  const [templateSaved, setTemplateSaved] = useState(false)
   const [settings, setSettings] = useState<CardSettings>(DEFAULT_CARD_SETTINGS)
   const [templateErrors, setTemplateErrors] = useState<Record<string, string>>({})
 
@@ -131,8 +143,11 @@ export default function CardsPage() {
     let query = supabase
       .from('member_cards')
       .select(
-        '*, member:members(first_name, last_name, email, phone, photo_url, prefecture, region, village, canton, faitiere)',
+        '*, member:members(first_name, last_name, email, phone, photo_url, signature_url, prefecture, region, village, canton, faitiere)',
       )
+      // Cartes de membre uniquement : les cartes professionnelles Haroo
+      // partagent la table et ont leur propre rendu.
+      .eq('card_type', 'FAITIERE')
 
     if (currentCooperative.level === 'faitiere' || currentCooperative.level === 'union') {
       // Fetch all cooperative IDs in hierarchy directly
@@ -189,7 +204,10 @@ export default function CardsPage() {
       .select('cooperative_id, card_template, card_settings')
       .eq('cooperative_id', currentCooperative.id)
       .maybeSingle<SettingsRow>()
-    if (data?.card_template) setTemplate(data.card_template)
+    if (data?.card_template) {
+      setTemplate(data.card_template)
+      setTemplateSaved(true)
+    }
     if (data?.card_settings) {
       setSettings(data.card_settings)
       setValidityDays(data.card_settings.defaultValidityDays)
@@ -258,11 +276,10 @@ export default function CardsPage() {
         region?: string | null
       } | null,
     ) => {
-      // QR code = direct verification URL (scannable by any phone)
+      // QR code = direct verification URL (scannable by any phone), la même
+      // que celle imprimée sur la carte : une seule source (lib/card-engine).
       // All member info is displayed on the verify page from the database
-      const baseUrl =
-        typeof window !== 'undefined' ? window.location.origin : 'https://faitierehub.com'
-      return `${baseUrl}/verify/${encodeURIComponent(cardNumber)}`
+      return cardVerifyUrl({ cardNumber })
     },
     [],
   )
@@ -501,24 +518,40 @@ export default function CardsPage() {
     fetchCards()
   }
 
+  // Organisations connues : le contexte, plus l'organisation courante au cas où
+  // elle n'y figurerait pas encore.
+  const brandingOrgs = useMemo(() => toBrandingOrgs(cooperatives), [cooperatives])
+
+  // Un modèle ne s'impose aux cartes que s'il est enregistré ou modifié : le
+  // modèle par défaut d'un formulaire jamais touché masquerait la couleur de l'organisation.
+  const activeTemplate = useMemo(
+    () =>
+      templateSaved || JSON.stringify(template) !== JSON.stringify(DEFAULT_CARD_TEMPLATE)
+        ? template
+        : undefined,
+    [template, templateSaved],
+  )
+
+  const cardContext = useCallback(
+    (card: MemberCard, levels?: Map<string, CardImageContext['level']>): CardImageContext => ({
+      card,
+      orgs: brandingOrgs,
+      fallbackOrganisationId: currentCooperative?.id ?? null,
+      // Le modèle enregistré s'applique à toutes les cartes que gère cette organisation.
+      savedTemplates:
+        activeTemplate && currentCooperative
+          ? { [currentCooperative.id]: activeTemplate }
+          : undefined,
+      level: levels?.get(card.member_id) ?? null,
+    }),
+    [brandingOrgs, currentCooperative, activeTemplate],
+  )
+
   const handleDownload = async (card: MemberCard) => {
     setDownloadingId(card.id)
     try {
-      // Resolve cooperative and faîtière names from the card's cooperative_id
-      const cardCoop = cooperatives.find((c) => c.id === card.cooperative_id)
-      const coopName = cardCoop?.name ?? currentCooperative?.name
-      // If current org is a faîtière, use its name as faitiereName
-      const faitName = isFaitiereAdmin
-        ? currentCooperative?.name
-        : (cardCoop?.faitiereName ?? currentCooperative?.faitiereName)
-
-      await downloadCardImage({
-        card,
-        template,
-        cooperativeName: coopName,
-        faitiereName: faitName,
-        qrPayload: card.qr_data || buildQrPayload(card.member_id, card.card_number),
-      })
+      const levels = await loadMemberLevels([card.member_id])
+      await downloadCardImage(cardContext(card, levels))
       toast({ title: 'Carte téléchargée' })
     } catch (e) {
       toast({
@@ -528,6 +561,23 @@ export default function CardsPage() {
       })
     } finally {
       setDownloadingId(null)
+    }
+  }
+
+  const handleDownloadPdf = async (card: MemberCard) => {
+    setPdfId(card.id)
+    try {
+      const levels = await loadMemberLevels([card.member_id])
+      await downloadCardPdf([cardContext(card, levels)], `carte-membre-${card.card_number}.pdf`)
+      toast({ title: 'PDF de la carte téléchargé' })
+    } catch (e) {
+      toast({
+        title: 'Échec de la création du PDF',
+        description: errorMessage(e),
+        variant: 'destructive',
+      })
+    } finally {
+      setPdfId(null)
     }
   }
 
@@ -545,20 +595,9 @@ export default function CardsPage() {
     }
     setDownloadingAll(true)
     try {
+      const levels = await loadMemberLevels(active.map((c) => c.member_id))
       for (const card of active) {
-        const cardCoop = cooperatives.find((c) => c.id === card.cooperative_id)
-        const coopName = cardCoop?.name ?? currentCooperative?.name
-        const faitName = isFaitiereAdmin
-          ? currentCooperative?.name
-          : (cardCoop?.faitiereName ?? currentCooperative?.faitiereName)
-
-        await downloadCardImage({
-          card,
-          template,
-          cooperativeName: coopName,
-          faitiereName: faitName,
-          qrPayload: card.qr_data || buildQrPayload(card.member_id, card.card_number),
-        })
+        await downloadCardImage(cardContext(card, levels))
         // Small delay so browsers don't merge downloads
         await new Promise((r) => setTimeout(r, 150))
       }
@@ -602,6 +641,7 @@ export default function CardsPage() {
       })
       return
     }
+    setTemplateSaved(true)
     toast({ title: 'Modèle enregistré' })
   }
 
@@ -634,6 +674,25 @@ export default function CardsPage() {
     }
     toast({ title: 'Paramètres enregistrés' })
   }
+
+  // Identité de l'aperçu : la coopérative choisie (ou l'organisation courante), son
+  // logo, sa lignée et la couleur du modèle en cours d'édition.
+  const previewOrganisationId =
+    isFaitiereAdmin && selectedCoopId ? selectedCoopId : currentCooperative?.id
+  const previewBranding = useMemo(
+    () =>
+      previewOrganisationId
+        ? resolveCardBranding({
+            organisationId: previewOrganisationId,
+            orgs: brandingOrgs,
+            templates:
+              activeTemplate && currentCooperative
+                ? { [currentCooperative.id]: activeTemplate }
+                : undefined,
+          })
+        : null,
+    [previewOrganisationId, brandingOrgs, activeTemplate, currentCooperative],
+  )
 
   const activeCount = cards.filter((c) => c.status === 'active').length
 
@@ -833,6 +892,21 @@ export default function CardsPage() {
                                     <Download className="h-4 w-4" />
                                   )}
                                 </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-border"
+                                  onClick={() => handleDownloadPdf(card)}
+                                  disabled={pdfId === card.id}
+                                  aria-label={`PDF ${card.card_number}`}
+                                  title="PDF de la carte, 85,6 × 54 mm"
+                                >
+                                  {pdfId === card.id ? (
+                                    <Spinner className="h-4 w-4" />
+                                  ) : (
+                                    <FileText className="h-4 w-4" />
+                                  )}
+                                </Button>
                                 {card.status === 'active' && canIssuePin ? (
                                   <Button
                                     size="sm"
@@ -879,24 +953,25 @@ export default function CardsPage() {
           <Card className="border-border">
             <CardHeader>
               <CardTitle className="text-foreground">Aperçu du design de carte</CardTitle>
-              <CardDescription>Carte d'identité membre premium — design WAOO</CardDescription>
+              <CardDescription>
+                La carte telle qu'elle sera imprimée, avec des données d'exemple. Le logo, les noms
+                et la couleur viennent de votre organisation.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Premium card preview — SVG-based (matches actual export) */}
-              <div className="flex justify-center">
-                <CardSvgPreview
-                  cooperativeName={
-                    isFaitiereAdmin && selectedCoopId
-                      ? childCooperatives.find((c) => c.id === selectedCoopId)?.name
-                      : currentCooperative?.name
-                  }
-                  faitiereName={
-                    isFaitiereAdmin ? currentCooperative?.name : currentCooperative?.faitiereName
-                  }
-                  level="or"
-                  template={template}
-                />
-              </div>
+              <CardSvgPreview
+                cooperativeName={previewBranding?.cooperativeName ?? currentCooperative?.name}
+                organisationId={previewBranding?.organisationId}
+                organisationLevel={previewBranding?.organisationLevel}
+                unionName={previewBranding?.unionName}
+                faitiereName={previewBranding?.faitiereName}
+                cooperativeLogoUrl={previewBranding?.cooperativeLogoUrl}
+                faitiereLogoUrl={previewBranding?.faitiereLogoUrl}
+                brandColor={previewBranding?.brandColor}
+                accentColor={previewBranding?.accentColor}
+                level="argent"
+                template={{ title: template.title, subtitle: template.subtitle }}
+              />
               <div className="grid gap-4 md:grid-cols-2">
                 <FieldText
                   label="Titre de la carte"
@@ -911,22 +986,16 @@ export default function CardsPage() {
                   error={templateErrors.subtitle}
                 />
                 <FieldColor
-                  label="Couleur de fond"
+                  label="Couleur principale (anneau de la photo, pastilles des tuiles)"
                   value={template.bgColor}
                   onChange={(v) => setTemplate((t) => ({ ...t, bgColor: v }))}
                   error={templateErrors.bgColor}
                 />
                 <FieldColor
-                  label="Couleur d'accent"
+                  label="Couleur d'accent (à défaut de couleur principale)"
                   value={template.accentColor}
                   onChange={(v) => setTemplate((t) => ({ ...t, accentColor: v }))}
                   error={templateErrors.accentColor}
-                />
-                <FieldColor
-                  label="Couleur du texte"
-                  value={template.textColor}
-                  onChange={(v) => setTemplate((t) => ({ ...t, textColor: v }))}
-                  error={templateErrors.textColor}
                 />
               </div>
               <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -1300,6 +1369,3 @@ function FieldColor({
     </div>
   )
 }
-
-// Suppress unused import warning for `renderCardImage` (kept for future server-side render route).
-void renderCardImage

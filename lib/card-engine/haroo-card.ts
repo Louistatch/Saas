@@ -16,6 +16,7 @@
 
 import { encodeText } from '@/lib/utils/qr'
 import { darken, lighten } from './schema'
+import { CARD_VERIFY_ORIGIN, cardVerifyUrl } from './verify-url'
 
 export type HarooCardType = 'OUVRIER' | 'ACHETEUR' | 'AGRONOME' | 'OPERATEUR'
 
@@ -64,15 +65,13 @@ function labelLines(label: string): [string] | [string, string] {
   return i > 0 ? [upper.slice(0, i), upper.slice(i + 1)] : [upper]
 }
 
-/** Origine publique des liens de vérification imprimés sur les cartes. */
-export const CARD_VERIFY_ORIGIN = 'https://www.faitierehub.com'
+export { CARD_VERIFY_ORIGIN }
 
+/** Lien de vérification imprimé : même source que la carte de membre (verify-url.ts). */
 export function harooCardVerifyUrl(
   data: Pick<HarooCardData, 'cardNumber' | 'verifyToken'>,
 ): string {
-  return data.verifyToken
-    ? `${CARD_VERIFY_ORIGIN}/verify/t/${encodeURIComponent(data.verifyToken)}`
-    : `${CARD_VERIFY_ORIGIN}/verify/${encodeURIComponent(data.cardNumber)}`
+  return cardVerifyUrl(data)
 }
 
 interface HarooTheme {

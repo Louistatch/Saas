@@ -1,99 +1,70 @@
 /**
- * Card Schema — Single Source of Truth
- * 
- * Every card is defined by this JSON schema.
- * The renderer reads ONLY this schema to produce the output.
- * Preview === Export === Print (pixel-perfect).
+ * Schéma de la carte de membre — source unique de vérité.
+ *
+ * Le rendu ne lit que ce schéma : aperçu, PNG, PDF et feuille imprimée sont le
+ * même dessin. Aucune valeur d'exemple n'est codée ici : tout vient des
+ * données de la carte, du membre et de l'organisation.
  */
 
+export type CardLevel = 'or' | 'argent' | 'bronze'
+export type OrgLevel = 'faitiere' | 'union' | 'cooperative'
+export type CardStatusKey = 'active' | 'pending' | 'expired' | 'revoked' | 'suspended'
+
+/** Intitulés par défaut quand l'organisation n'a pas enregistré de modèle. */
+export const DEFAULT_CARD_TITLE = "Carte d'identité membre"
+export const DEFAULT_CARD_SUBTITLE = "Pass d'accès coopératif"
+
 export interface CardSchema {
-  /** Schema version for future migrations */
-  version: 1
-  /** Canvas dimensions */
-  canvas: {
-    width: number
-    height: number
-  }
-  /** Background configuration */
-  background: {
-    type: 'gradient' | 'solid' | 'image'
-    /** Gradient stops: [{ offset: 0-1, color: hex }] */
-    gradient?: { offset: number; color: string }[]
-    /** Solid color */
-    color?: string
-    /** Background image URL */
-    imageUrl?: string
-  }
-  /** Branding */
+  version: 2
   branding: {
-    faitiereName: string
+    /** Identifiant de l'organisation du membre (suffixe des identifiants du SVG). */
+    organisationId: string | null
+    /** Rang de l'organisation du membre, pour libeller son champ. */
+    organisationLevel: OrgLevel
     cooperativeName: string
-    /**
-     * Emblem of the ISSUING authority — the faîtière. Takes the header slot,
-     * top-left, where the eye lands first on any identity document.
-     */
-    faitiereLogoUrl?: string | null
-    /**
-     * Emblem of the cooperative the member belongs to. Sits mirrored, top-right
-     * of the identity zone. When only ONE of the two logos exists it is
-     * promoted to the issuer slot instead, so a lone emblem is never orphaned
-     * on the wrong side of the card.
-     */
-    cooperativeLogoUrl?: string | null
-    accentColor: string
+    cooperativeLogoUrl: string | null
+    /** Largeur / hauteur du logo, mesurée à sa résolution. */
+    cooperativeLogoAspect: number | null
+    unionName: string | null
+    /** Autorité émettrice : tête de la lignée. `null` : le registre FaîtiereHub. */
+    faitiereName: string | null
+    faitiereLogoUrl: string | null
+    faitiereLogoAspect: number | null
+    /** Couleur principale de l'organisation : accent secondaire (anneau, pastilles), jamais du texte. */
+    brandColor: string | null
+    /** Couleur d'accent du modèle : repli quand la couleur principale manque. */
+    accentColor: string | null
   }
-  /** Member data (filled at generation time) */
   member: {
     firstName: string
     lastName: string
     phone: string
     photoUrl: string | null
+    /** Signature réelle du membre (image) ; `null` : ligne de signature vierge. */
+    signatureUrl: string | null
     locality: string
     cardNumber: string
+    /** `AAAA-MM-JJ` (ou horodatage ISO) tel que stocké ; jamais passé par Date. */
     expiryDate: string
     createdAt: string
-    /** Membership level: 'or' | 'argent' | 'bronze' */
-    level?: 'or' | 'argent' | 'bronze'
+    /** Niveau réel (get_member_score) ; `null` quand il n'est pas connu. */
+    level: CardLevel | null
+    status: CardStatusKey
   }
-  /** Visual style overrides */
-  styles: {
-    /** Primary accent color (badges, highlights) */
-    accentColor: string
-    /** Text color on dark background */
-    textColor: string
-    /** Font family */
-    fontFamily: string
-    /** Border radius for cards/blocks */
-    borderRadius: number
-  }
-  /**
-   * Template-driven labels and theme (edited by the cooperative admin).
-   * The renderer reads these so the editor actually changes the output.
-   */
-  template?: {
-    /** Card title, e.g. "CARTE DE MEMBRE" */
+  /** Libellés du modèle (modifiables par l'administrateur). */
+  template: {
     title: string
-    /** Card subtitle, e.g. "Pass d'accès coopératif" */
     subtitle: string
-    /** Base background color (drives the gradient) */
-    bgColor: string
-    /** Accent color (badges, rings, highlights) */
-    accentColor?: string
-    /** Text color on the dark side */
-    textColor: string
   }
 }
 
-/**
- * Build a CardSchema from the existing data model.
- * This is the bridge between the old system and the new schema-based renderer.
- */
-export function buildCardSchema(opts: {
+export interface BuildCardSchemaOptions {
   member: {
     first_name: string
     last_name: string
     phone?: string | null
     photo_url?: string | null
+    signature_url?: string | null
     village?: string | null
     canton?: string | null
     prefecture?: string | null
@@ -101,71 +72,109 @@ export function buildCardSchema(opts: {
   }
   cardNumber: string
   expiryDate: string | null
-  createdAt: string
+  createdAt: string | null
+  status?: string | null
   cooperativeName: string
-  faitiereName: string
+  organisationId?: string | null
+  organisationLevel?: string | null
+  unionName?: string | null
+  faitiereName?: string | null
   faitiereLogoUrl?: string | null
   cooperativeLogoUrl?: string | null
-  accentColor?: string
-  textColor?: string
-  level?: 'or' | 'argent' | 'bronze'
+  faitiereLogoAspect?: number | null
+  cooperativeLogoAspect?: number | null
+  /** Couleur principale ; à défaut, `template.bgColor`. */
+  brandColor?: string | null
+  /** Couleur d'accent ; à défaut, `template.accentColor`. */
+  accentColor?: string | null
+  level?: CardLevel | null
   template?: {
-    title: string
-    subtitle: string
-    bgColor: string
-    accentColor?: string
-    textColor: string
+    title?: string | null
+    subtitle?: string | null
+    bgColor?: string | null
+    accentColor?: string | null
+    /** Hérité du modèle d'origine ; ignoré (les couleurs du texte sont fixes). */
+    textColor?: string | null
+  } | null
+}
+
+const STATUS_KEYS: ReadonlySet<string> = new Set([
+  'active',
+  'pending',
+  'expired',
+  'revoked',
+  'suspended',
+])
+
+function orgLevel(value: string | null | undefined): OrgLevel {
+  return value === 'faitiere' || value === 'union' ? value : 'cooperative'
+}
+
+function nonEmpty(value: string | null | undefined): string | null {
+  const v = value?.trim()
+  return v ? v : null
+}
+
+/** Localité : village, canton, préfecture, région, sans répétition d'un même nom. */
+export function joinLocality(parts: (string | null | undefined)[]): string {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const part of parts) {
+    const v = part?.trim()
+    if (!v) continue
+    const key = v.toLocaleLowerCase('fr')
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(v)
   }
-}): CardSchema {
-  const locality = [
-    opts.member.village,
-    opts.member.canton,
-    opts.member.prefecture,
-    opts.member.region,
-  ].filter(Boolean).join(', ')
+  return out.join(', ')
+}
 
-  // Derive the gradient from the template background color so editing it has
-  // a real visual effect, while keeping a tasteful 3-stop depth.
-  const base = opts.template?.bgColor ?? '#0d3d22'
-  const gradient = deriveGradient(base)
-  const accent = opts.accentColor ?? lighten(base, 0.45)
-
+/** Construit le schéma de rendu à partir du modèle de données existant. */
+export function buildCardSchema(opts: BuildCardSchemaOptions): CardSchema {
+  const status =
+    opts.status && STATUS_KEYS.has(opts.status) ? (opts.status as CardStatusKey) : 'active'
   return {
-    version: 1,
-    canvas: { width: 1600, height: 1000 },
-    background: {
-      type: 'gradient',
-      gradient,
-    },
+    version: 2,
     branding: {
-      faitiereName: opts.faitiereName,
-      cooperativeName: opts.cooperativeName,
-      faitiereLogoUrl: opts.faitiereLogoUrl ?? null,
+      organisationId: opts.organisationId ?? null,
+      organisationLevel: orgLevel(opts.organisationLevel),
+      cooperativeName: opts.cooperativeName.trim(),
       cooperativeLogoUrl: opts.cooperativeLogoUrl ?? null,
-      accentColor: accent,
+      cooperativeLogoAspect: opts.cooperativeLogoAspect ?? null,
+      unionName: nonEmpty(opts.unionName),
+      faitiereName: nonEmpty(opts.faitiereName),
+      faitiereLogoUrl: opts.faitiereLogoUrl ?? null,
+      faitiereLogoAspect: opts.faitiereLogoAspect ?? null,
+      brandColor: opts.brandColor ?? opts.template?.bgColor ?? null,
+      accentColor: opts.accentColor ?? opts.template?.accentColor ?? null,
     },
     member: {
-      firstName: opts.member.first_name ?? '',
-      lastName: opts.member.last_name ?? '',
-      phone: opts.member.phone ?? '',
+      firstName: (opts.member.first_name ?? '').trim(),
+      lastName: (opts.member.last_name ?? '').trim(),
+      phone: (opts.member.phone ?? '').trim(),
       photoUrl: opts.member.photo_url ?? null,
-      locality,
+      signatureUrl: nonEmpty(opts.member.signature_url),
+      locality: joinLocality([
+        opts.member.village,
+        opts.member.canton,
+        opts.member.prefecture,
+        opts.member.region,
+      ]),
       cardNumber: opts.cardNumber,
       expiryDate: opts.expiryDate ?? '',
-      createdAt: opts.createdAt,
-      level: opts.level ?? 'bronze',
+      createdAt: opts.createdAt ?? '',
+      level: opts.level ?? null,
+      status,
     },
-    styles: {
-      accentColor: accent,
-      textColor: opts.template?.textColor ?? opts.textColor ?? '#ffffff',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-      borderRadius: 16,
+    template: {
+      title: nonEmpty(opts.template?.title) ?? DEFAULT_CARD_TITLE,
+      subtitle: nonEmpty(opts.template?.subtitle) ?? DEFAULT_CARD_SUBTITLE,
     },
-    template: opts.template,
   }
 }
 
-// ─── Color helpers (drive the theme from a single base color) ────────────────
+// ─── Aides couleur (partagées avec la carte Haroo) ───────────────────────────
 
 function clamp(n: number): number {
   return Math.max(0, Math.min(255, Math.round(n)))
@@ -173,7 +182,13 @@ function clamp(n: number): number {
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const h = hex.replace('#', '')
-  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h
+  const full =
+    h.length === 3
+      ? h
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : h
   return {
     r: Number.parseInt(full.slice(0, 2), 16),
     g: Number.parseInt(full.slice(2, 4), 16),
@@ -196,32 +211,3 @@ export function darken(hex: string, amount: number): string {
   const { r, g, b } = hexToRgb(hex)
   return rgbToHex(r * (1 - amount), g * (1 - amount), b * (1 - amount))
 }
-
-/** Build a 3-stop radial gradient from a single base color. */
-function deriveGradient(base: string): { offset: number; color: string }[] {
-  return [
-    { offset: 0, color: lighten(base, 0.18) },
-    { offset: 0.45, color: base },
-    { offset: 0.78, color: darken(base, 0.35) },
-    { offset: 1, color: darken(base, 0.62) },
-  ]
-}
-
-/** Default schema for preview purposes */
-export const PREVIEW_SCHEMA: CardSchema = buildCardSchema({
-  member: {
-    first_name: 'Ama',
-    last_name: 'KOFFI',
-    phone: '+228 90 12 34 56',
-    photo_url: null,
-    village: 'Agbélouvé',
-    canton: 'Zio',
-    prefecture: 'Zio',
-    region: 'Maritime',
-  },
-  cardNumber: 'HAR-12345',
-  expiryDate: '2027-05-20',
-  createdAt: '2026-05-20',
-  cooperativeName: 'HAROFEMA',
-  faitiereName: 'FENOMAT',
-})
