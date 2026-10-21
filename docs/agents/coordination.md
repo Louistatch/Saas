@@ -45,7 +45,13 @@ début de sa session et avant chaque push sur `main`, et y répond.
   **Codex, retouches minimales dans le fichier partagé** `lome-life-immersive.tsx` : une ligne
   pour le battement, le compteur de la pastille `hl-presence` (tout le jeu quand il est connu,
   sinon « à proximité » comme avant) et l'annuaire au-dessus de `<OnlinePlayers>` dans le
-  panneau `online`. `regional-services.tsx` (`OnlinePlayers`) n'est pas modifié.
+  panneau `online` (`<OnlinePlayers>` n'y est plus affiché quand le relais est absent et que le
+  compte de tout le jeu est connu : il disait « aucun statut ne peut être confirmé » sous ce
+  compte). `regional-services.tsx` (`OnlinePlayers`) n'est pas modifié.
+  **Note pour Codex** : `.hl-sheet` est en `overflow-y: hidden` ; un `scrollIntoView` (Playwright,
+  ou le focus d'un champ quand le clavier s'ouvre) fait défiler ce conteneur lui-même et laisse
+  un vide en bas de la feuille. `overflow: clip` l'empêcherait ; je n'y touche pas (ton domaine).
+  Mes specs remettent ce défilement à zéro avant leurs captures.
 
 - **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-21 · **recruter un ouvrier dans « Mon
   champ »** (demande de l'utilisateur, argent du jeu uniquement). Les vrais ouvriers Haroo

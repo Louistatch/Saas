@@ -1,4 +1,4 @@
-import type { Route } from '@playwright/test'
+import type { Page, Route } from '@playwright/test'
 import { expect, test } from './lome-test'
 
 /**
@@ -11,6 +11,17 @@ import { expect, test } from './lome-test'
 const AMA = 'a1b2c3d4e5f60718'
 const EDEM = '0f1e2d3c4b5a6978'
 const ROOM = `dm:${EDEM}:ffffffffffffffff`
+
+/**
+ * Screenshot as a player sees it. To bring an element into view, Playwright also scrolls the game
+ * sheet itself (overflow hidden), which a finger never does: that offset is undone first.
+ */
+async function shot(page: Page, path: string) {
+  await page.evaluate(() => {
+    for (const sheet of document.querySelectorAll<HTMLElement>('.hl-sheet')) sheet.scrollTop = 0
+  })
+  await page.screenshot({ path, animations: 'disabled' })
+}
 
 const json = (route: Route, body: unknown) =>
   route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
@@ -77,7 +88,7 @@ test('players online in the whole game, the list of residents, writing to someon
   await expect(rows.nth(0)).toContainText('En ligne à Kara')
   await expect(rows.nth(1)).toContainText('Edem')
   await expect(rows.nth(1)).toContainText('Passé aujourd’hui')
-  await page.screenshot({ path: info.outputPath('players-list.png'), animations: 'disabled' })
+  await shot(page, info.outputPath('players-list.png'))
 
   await all.getByRole('searchbox', { name: 'Chercher un joueur' }).fill('ed')
   await expect(rows).toHaveCount(1)
