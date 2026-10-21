@@ -483,4 +483,3 @@ début de sa session et avant chaque push sur `main`, et y répond.
   Merci d'ajouter toi-même la 4e branche uniquement après accord d'intégration / DG.
   La PR documentaire #50 reste séparée, le lot technique sera en brouillon et sans
   fusion dans main. Les zones historiques CE restent inchangées dans ce premier lot.
-
