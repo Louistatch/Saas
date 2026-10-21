@@ -8,6 +8,7 @@ import { MissionActions } from '@/components/haroo/mission-actions'
 import { HarooProfileEditor } from '@/components/haroo/profile-editor'
 import { PublishAnnouncement } from '@/components/haroo/publish-announcement'
 import { HarooLifeEntry } from '@/components/haroolife/entry'
+import { HarooLifeFieldOffersCard } from '@/components/haroolife/field-offers-card'
 import { HarooLifeMessagesCard } from '@/components/haroolife/messages-inbox'
 import { MyProfessionalDocuments } from '@/components/professionals/my-documents'
 import { Spinner } from '@/components/shared/loading'
@@ -581,6 +582,7 @@ function HarooSpaceInner() {
         <RequestOrgCard />
         <HarooLifeEntry />
         <HarooLifeMessagesCard />
+        <HarooLifeFieldOffersCard />
 
         {/* Accueil personnalisé */}
         <div>
