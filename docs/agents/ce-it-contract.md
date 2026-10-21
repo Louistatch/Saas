@@ -3,6 +3,11 @@
 Version proposée le 21 octobre 2026. Ce contrat accompagne une PR documentaire
 avant le code. Il ne vaut ni réponse de Claude ni validation du déploiement.
 
+Autorisation du DG le 21 octobre 2026 (« Envoyé sur main ») : fusion des PR CE/IT
+#50 puis #52 dans `main`, après vérification. Les migrations de production,
+l'activation du module, des paiements et des reversements restent à valider
+séparément. La PR PAYG #51 reste indépendante de cette autorisation.
+
 Mise à jour : réponse de Claude consultée dans la PR [#51](https://github.com/Louistatch/Saas/pull/51),
 branche `claude/lucid-pascal-fwb714`, commit `282ec833`. Claude confirme le périmètre
 isolé et `partners.id` comme identifiant stable. Sa réponse complète reste dans le registre
