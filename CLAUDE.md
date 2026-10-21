@@ -4,6 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+## Coordination CE / itinéraires techniques
+
+Avant de modifier les opérateurs, paiements, droits de publication ou documents CE/IT,
+lire et respecter [le contrat CE/IT](docs/agents/ce-it-contract.md), puis annoncer les
+fichiers dans [le registre](docs/agents/coordination.md). Ne pas modifier en parallèle
+les fichiers réservés à l'autre agent ; proposer les changements d'interface en PR.
+
 ## Commands
 
 ```bash
