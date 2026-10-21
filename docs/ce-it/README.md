@@ -8,8 +8,10 @@ Coordination préalable : [contrat](../agents/ce-it-contract.md), PR documentair
 [#50](https://github.com/Louistatch/Saas/pull/50). Claude a répondu dans sa PR PAYG
 [#51](https://github.com/Louistatch/Saas/pull/51), branche `claude/lucid-pascal-fwb714`
 à `282ec833` : `partners.id` est conservé, les espaces CE/IT sont réservés à Codex,
-Claude garde le webhook et l’intégration financière. La réponse des deux agents
-est conservée dans le registre, sans importer le code PAYG dans ce lot.
+Claude garde le webhook et l’intégration financière. Les échanges sont référencés
+dans le registre et ces PR, sans importer le code PAYG dans ce lot. Les ajouts Codex
+utilisent des ancres distinctes des blocs PAYG actifs pour éviter les conflits
+documentaires pendant le développement parallèle.
 
 ## Parcours implémentés
 
