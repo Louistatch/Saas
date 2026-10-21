@@ -172,7 +172,7 @@ export default function OrganizationEarningsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Gains organisations"
-        description="500 FCFA par carte physique imprimée, dus aux coopératives. Aucun virement automatisé — chaque règlement est tracé, pas exécuté depuis ici."
+        description="500 FCFA par carte physique imprimée au tarif de 2 000 FCFA (retiré par la refonte PAYG), dus aux coopératives. Les créances déjà nées restent à régler. Aucun virement automatisé : chaque règlement est tracé, pas exécuté depuis ici."
       />
 
       <div className="grid gap-4 sm:grid-cols-2">

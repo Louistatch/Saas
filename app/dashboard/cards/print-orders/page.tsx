@@ -119,7 +119,7 @@ export default function CardPrintOrdersPage() {
     <div className="space-y-6">
       <PageHeader
         title="Cartes membres physiques"
-        description="2 000 FCFA par carte — 500 FCFA reviennent à la coopérative, 1 500 FCFA au Partenaire qui imprime et livre."
+        description="Commandes passées au tarif de 2 000 FCFA par carte, aujourd’hui retiré. Pour une carte imprimée, un opérateur certifié émet une carte commerciale (environ 1 200 FCFA plastifiée, 2 500 FCFA PVC)."
         action={
           <Button variant="ghost" size="sm" asChild>
             <Link href="/dashboard/cards">

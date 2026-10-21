@@ -483,8 +483,8 @@ export default function Home() {
             </h2>
             <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
               Un Opérateur certifié accompagne les coopératives de sa région : mise en place de la
-              plateforme, formation des équipes, impression des cartes membres. Une formation
-              gratuite mène à la certification.
+              plateforme, formation des équipes, émission et impression des cartes membres. Seul ou
+              au sein d&apos;une institution (fédération, ONG, projet), sans abonnement.
             </p>
           </div>
 
@@ -493,11 +493,11 @@ export default function Home() {
               <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <GraduationCap className="h-5 w-5" />
               </div>
-              <h3 className="font-bold text-foreground mb-2">Formation gratuite</h3>
+              <h3 className="font-bold text-foreground mb-2">Une formation pratique</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 12 leçons pratiques : gouvernance des coopératives, gestion des membres, cartes et
-                QR, collecte terrain, suivi de projets, modèle économique. Diapositives, cas
-                concrets, quiz et devoirs.
+                QR, collecte terrain, suivi de projets, modèle économique. Les leçons s&apos;ouvrent
+                dès la création du compte.
               </p>
             </div>
 
@@ -507,9 +507,9 @@ export default function Home() {
               </div>
               <h3 className="font-bold text-foreground mb-2">Certification FaîtiereHub</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Après la formation, une évaluation pratique. Les frais de certification (15 000 XOF)
-                ne sont dus qu&apos;une fois l&apos;examen validé — jamais avant, jamais pour
-                recruter d&apos;autres opérateurs.
+                Après les leçons, une évaluation pratique. La formation coûte 15 000 FCFA par
+                personne formée, en une fois ou en 5 tranches de 3 000 FCFA. Dans une institution,
+                chaque agent est formé et certifié.
               </p>
             </div>
 
@@ -517,11 +517,17 @@ export default function Home() {
               <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <CreditCard className="h-5 w-5" />
               </div>
-              <h3 className="font-bold text-foreground mb-2">Des revenus clairs</h3>
+              <h3 className="font-bold text-foreground mb-2">Des crédits, pas d&apos;abonnement</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Sur chaque carte membre physique à 2 000 FCFA, 1 500 FCFA reviennent à
-                l&apos;Opérateur qui imprime et livre, 500 FCFA à la coopérative. Chaque montant est
-                traçable dans la plateforme.
+                Une carte commerciale finalisée prend un crédit de 250 FCFA, compris dans le prix
+                payé par le producteur (environ 1 200 FCFA plastifiée, 2 500 FCFA PVC). 10 crédits
+                offerts à l&apos;ouverture, puis 20 crédits pour 5 000 FCFA.{' '}
+                <Link
+                  href="/pricing"
+                  className="font-medium text-foreground underline underline-offset-2"
+                >
+                  Voir les tarifs
+                </Link>
               </p>
             </div>
           </div>
@@ -541,9 +547,8 @@ export default function Home() {
           </div>
 
           <p className="mx-auto mt-4 max-w-2xl text-center text-sm text-muted-foreground">
-            La formation Opérateur s&apos;ouvre dès la création du compte, et le tableau de bord
-            Opérateur une fois les frais de certification réglés et le compte activé par
-            l&apos;équipe.
+            La formation Opérateur s&apos;ouvre dès la création du compte ; l&apos;émission de
+            cartes, une fois la certification obtenue et le compte activé par l&apos;équipe.
           </p>
         </div>
       </section>

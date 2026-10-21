@@ -109,10 +109,15 @@ l'évaluation réussie, la certification est enregistrée (`recordCertificationF
   résolution.
 - `partner_activity_log` : historique des accès et des actions (consultation des
   producteurs, émission, impression).
-- La vérification publique d'une carte ne montre plus le village ni le canton (préfecture
-  et région suffisent à lever une homonymie).
-- Les cartes ne sont pas des pièces d'identité officielles : c'est écrit sur les pages
-  publiques et dans les consoles.
+- **Point ouvert, non traité dans cette PR** : la vérification publique d'une carte
+  (`GET /api/verify/[card_number]`, sans PIN) renvoie aujourd'hui nom, photo, région,
+  préfecture, canton, village, statut, date d'adhésion et coopérative. Le village et le
+  canton servent à deux parcours existants de la page de vérification (prix des marchés
+  proches, message au coordinateur dans la vue Cotisation). Les retirer de la réponse
+  publique demande de les servir derrière le PIN (`PrivateCardSection`) : changement d'un
+  parcours existant, proposé en PR séparée après accord.
+- Les cartes ne sont pas des pièces d'identité officielles : c'est écrit dans les consoles
+  (onglet Données) et sur la page des tarifs.
 - Avant un déploiement réel : examiner les formalités auprès de l'IPDCP (Instance de
   protection des données à caractère personnel, Togo) — déclaration ou autorisation du
   traitement, transfert hors du pays (Supabase), durée de conservation des photos.
@@ -132,8 +137,8 @@ hors ligne (espèces, virement), avec une note gardée au grand livre.
 |---|---|---|
 | Accueil, Tarifs | public | `/`, `/pricing` |
 | Espace opérateur (parcours) | candidat, opérateur | `/operator` |
-| Console de terrain | opérateur individuel, agent, gérant | `/console` |
-| Console institutionnelle | owner / manager d'une institution | `/institution` |
+| Console de terrain | opérateur individuel, agent, gérant | `/operator/console` |
+| Console institutionnelle | owner / manager d'une institution | `/operator/institution` |
 | Invitation d'agent | invité | `/invitation/[token]` |
 | PAYG super-admin | super_admin | `/admin/payg` |
 

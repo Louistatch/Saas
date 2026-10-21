@@ -31,6 +31,7 @@ import {
   UserCheck,
   Users,
   Users2,
+  Wallet,
   X,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -93,6 +94,7 @@ const ADMIN_SECTIONS: { title: string; links: AdminLink[] }[] = [
   {
     title: 'Économie',
     links: [
+      { href: '/admin/payg', label: 'Crédits opérateurs (PAYG)', icon: Wallet },
       { href: '/admin/comptes-exploitation', label: "Comptes d'exploitation", icon: FileText },
       { href: '/admin/referentiel-agronomique', label: 'Référentiel agronomique', icon: BookOpen },
       { href: '/admin/organization-earnings', label: 'Gains des organisations', icon: Coins },

@@ -62,8 +62,9 @@ export function trainingAmountError(
 export function trainingChoices(remaining: number, installment = TRAINING_INSTALLMENT_FCFA) {
   if (remaining <= 0) return []
   const steps = remaining / installment
-  const choices = [{ amount: installment, label: `1 tranche · ${formatFcfa(installment)}` }]
-  if (steps > 1) choices.push({ amount: remaining, label: `Le solde · ${formatFcfa(remaining)}` })
+  const choices = [{ amount: installment, label: `Payer une tranche (${formatFcfa(installment)})` }]
+  if (steps > 1)
+    choices.push({ amount: remaining, label: `Payer le solde (${formatFcfa(remaining)})` })
   return choices
 }
 

@@ -192,6 +192,6 @@ export async function POST(
     certification_elsewhere: Boolean(
       existingCert && existingCert.partner_id !== invitation.partner_id,
     ),
-    redirect_to: '/console',
+    redirect_to: '/operator/console',
   })
 }

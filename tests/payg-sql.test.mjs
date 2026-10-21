@@ -83,7 +83,15 @@ async function setup() {
 }
 
 async function seed(db) {
-  const profiles = [ADMIN, FENOMAT_OWNER, ...AGENTS, MAPTO_OWNER, MAPTO_AGENT, KOSSI, UNCERTIFIED_AGENT]
+  const profiles = [
+    ADMIN,
+    FENOMAT_OWNER,
+    ...AGENTS,
+    MAPTO_OWNER,
+    MAPTO_AGENT,
+    KOSSI,
+    UNCERTIFIED_AGENT,
+  ]
   await db.exec(`
     INSERT INTO public.profiles(id, email, role) VALUES
       ${profiles.map((p) => `('${id(p)}','u${p}@test.tg','${p === ADMIN ? 'super_admin' : 'none'}')`).join(',')};
@@ -138,7 +146,8 @@ async function seed(db) {
   let n = 1000
   for (const coop of [C1, C2, C3, C4]) {
     const rows = []
-    for (let i = 0; i < 30; i++) rows.push(`('${id(n++)}','${id(coop)}','Prénom','Nom${i}','Plateaux')`)
+    for (let i = 0; i < 30; i++)
+      rows.push(`('${id(n++)}','${id(coop)}','Prénom','Nom${i}','Plateaux')`)
     await db.exec(
       `INSERT INTO public.members(id, cooperative_id, first_name, last_name, region) VALUES ${rows.join(',')}`,
     )
@@ -186,29 +195,38 @@ test('PAYG : institution, agents, crédits, cartes, cloisonnement, quota, format
   })
 
   await t.test('10 crédits offerts à l’institution, une seule fois', async () => {
-    const first = await json(db, `SELECT public.payg_grant_welcome_credits('${id(FENOMAT)}', NULL) AS r`)
+    const first = await json(
+      db,
+      `SELECT public.payg_grant_welcome_credits('${id(FENOMAT)}', NULL) AS r`,
+    )
     assert.equal(first.outcome, 'granted')
-    const again = await json(db, `SELECT public.payg_grant_welcome_credits('${id(FENOMAT)}', NULL) AS r`)
+    const again = await json(
+      db,
+      `SELECT public.payg_grant_welcome_credits('${id(FENOMAT)}', NULL) AS r`,
+    )
     assert.equal(again.outcome, 'already_granted')
     assert.deepEqual(await wallet(db, FENOMAT), { credit_balance: 10, welcome_credits: 10 })
   })
 
-  await t.test('chaque carte payante consomme exactement un crédit, les offerts d’abord', async () => {
-    for (let i = 0; i < 10; i++) {
-      const agent = AGENTS[i === 0 ? 0 : (i % 8) + 2] // agents de C1
-      const r = await issue(db, {
-        actor: agent,
-        partner: FENOMAT,
-        member: memberOf(C1, i),
-        number: `FEN-${1000 + i}`,
-        key: `issue-c1-${i}`,
-      })
-      assert.equal(r.outcome, 'issued', JSON.stringify(r))
-      assert.equal(r.source, 'welcome')
-      assert.equal(r.credit_balance, 9 - i)
-    }
-    assert.deepEqual(await wallet(db, FENOMAT), { credit_balance: 0, welcome_credits: 0 })
-  })
+  await t.test(
+    'chaque carte payante consomme exactement un crédit, les offerts d’abord',
+    async () => {
+      for (let i = 0; i < 10; i++) {
+        const agent = AGENTS[i === 0 ? 0 : (i % 8) + 2] // agents de C1
+        const r = await issue(db, {
+          actor: agent,
+          partner: FENOMAT,
+          member: memberOf(C1, i),
+          number: `FEN-${1000 + i}`,
+          key: `issue-c1-${i}`,
+        })
+        assert.equal(r.outcome, 'issued', JSON.stringify(r))
+        assert.equal(r.source, 'welcome')
+        assert.equal(r.credit_balance, 9 - i)
+      }
+      assert.deepEqual(await wallet(db, FENOMAT), { credit_balance: 0, welcome_credits: 0 })
+    },
+  )
 
   await t.test('sans crédit, l’émission payante est refusée et rien n’est créé', async () => {
     const cards = await count(db, 'SELECT count(*)::int AS n FROM public.member_cards')
@@ -222,7 +240,10 @@ test('PAYG : institution, agents, crédits, cartes, cloisonnement, quota, format
     })
     assert.equal(r.outcome, 'insufficient_credits')
     assert.equal(await count(db, 'SELECT count(*)::int AS n FROM public.member_cards'), cards)
-    assert.equal(await count(db, 'SELECT count(*)::int AS n FROM public.payg_credit_ledger'), ledger)
+    assert.equal(
+      await count(db, 'SELECT count(*)::int AS n FROM public.payg_credit_ledger'),
+      ledger,
+    )
   })
 
   await t.test('recharge : 20 crédits pour 5 000 FCFA, minimum 20, montant contrôlé', async () => {
@@ -291,159 +312,168 @@ test('PAYG : institution, agents, crédits, cartes, cloisonnement, quota, format
     assert.equal(clash.outcome, 'card_number_taken')
     assert.equal((await wallet(db, FENOMAT)).credit_balance, 19)
     assert.equal(
-      await count(db, `SELECT count(*)::int AS n FROM public.card_commissions WHERE partner_id = '${id(FENOMAT)}'`),
+      await count(
+        db,
+        `SELECT count(*)::int AS n FROM public.card_commissions WHERE partner_id = '${id(FENOMAT)}'`,
+      ),
       11,
     )
   })
 
-  await t.test('la 11ᵉ carte d’une coopérative n’est plus bloquée par le quota gratuit', async () => {
-    // C1 compte 11 cartes commerciales : le quota gratuit n’a pas bougé.
-    const quota = await db.query(
-      `SELECT cards_issued FROM private.cooperative_card_allowances WHERE cooperative_id = '${id(C1)}'`,
-    )
-    assert.equal(quota.rows.length ? quota.rows[0].cards_issued : 0, 0)
-    // Les 10 cartes gratuites historiques restent disponibles, puis s’arrêtent net.
-    for (let i = 0; i < 10; i++) {
-      const r = await issue(db, {
+  await t.test(
+    'la 11ᵉ carte d’une coopérative n’est plus bloquée par le quota gratuit',
+    async () => {
+      // C1 compte 11 cartes commerciales : le quota gratuit n’a pas bougé.
+      const quota = await db.query(
+        `SELECT cards_issued FROM private.cooperative_card_allowances WHERE cooperative_id = '${id(C1)}'`,
+      )
+      assert.equal(quota.rows.length ? quota.rows[0].cards_issued : 0, 0)
+      // Les 10 cartes gratuites historiques restent disponibles, puis s’arrêtent net.
+      for (let i = 0; i < 10; i++) {
+        const r = await issue(db, {
+          actor: KOSSI,
+          partner: KOSSI_P,
+          member: memberOf(C4, i),
+          mode: 'free_allowance',
+          number: `KOS-${i}`,
+          key: `free-c4-${i}`,
+          format: 'digital',
+        })
+        assert.equal(r.outcome, 'issued', JSON.stringify(r))
+      }
+      const eleventh = await issue(db, {
         actor: KOSSI,
         partner: KOSSI_P,
-        member: memberOf(C4, i),
+        member: memberOf(C4, 10),
         mode: 'free_allowance',
-        number: `KOS-${i}`,
-        key: `free-c4-${i}`,
+        number: 'KOS-10',
+        key: 'free-c4-10',
         format: 'digital',
       })
-      assert.equal(r.outcome, 'issued', JSON.stringify(r))
-    }
-    const eleventh = await issue(db, {
-      actor: KOSSI,
-      partner: KOSSI_P,
-      member: memberOf(C4, 10),
-      mode: 'free_allowance',
-      number: 'KOS-10',
-      key: 'free-c4-10',
-      format: 'digital',
-    })
-    assert.equal(eleventh.outcome, 'free_allowance_exhausted')
-    const left = (
-      await db.query(
-        `SELECT * FROM public.payg_free_card_allowance(ARRAY['${id(C4)}','${id(C2)}']::uuid[]) ORDER BY 1`,
+      assert.equal(eleventh.outcome, 'free_allowance_exhausted')
+      const left = (
+        await db.query(
+          `SELECT * FROM public.payg_free_card_allowance(ARRAY['${id(C4)}','${id(C2)}']::uuid[]) ORDER BY 1`,
+        )
+      ).rows
+      assert.deepEqual(
+        left.map((r) => [r.card_limit, r.cards_issued]),
+        [
+          [10, 0],
+          [10, 10],
+        ],
+        'C2 (aucune carte gratuite) et C4 (10 utilisées)',
       )
-    ).rows
-    assert.deepEqual(
-      left.map((r) => [r.card_limit, r.cards_issued]),
-      [
-        [10, 0],
-        [10, 10],
-      ],
-      'C2 (aucune carte gratuite) et C4 (10 utilisées)',
-    )
-    // Kossi n’a pas encore ses crédits offerts : la carte commerciale est refusée…
-    const noCredit = await issue(db, {
-      actor: KOSSI,
-      partner: KOSSI_P,
-      member: memberOf(C4, 10),
-      number: 'KOS-10',
-      key: 'paid-c4-10',
-    })
-    assert.equal(noCredit.outcome, 'insufficient_credits')
-    // … puis acceptée avec ses 10 crédits offerts (pas de double gratuité : 9 restants).
-    await db.query(`SELECT public.payg_grant_welcome_credits('${id(KOSSI_P)}', NULL)`)
-    const paid = await issue(db, {
-      actor: KOSSI,
-      partner: KOSSI_P,
-      member: memberOf(C4, 10),
-      number: 'KOS-10',
-      key: 'paid-c4-10b',
-    })
-    assert.equal(paid.outcome, 'issued')
-    assert.deepEqual(await wallet(db, KOSSI_P), { credit_balance: 9, welcome_credits: 9 })
-  })
+      // Kossi n’a pas encore ses crédits offerts : la carte commerciale est refusée…
+      const noCredit = await issue(db, {
+        actor: KOSSI,
+        partner: KOSSI_P,
+        member: memberOf(C4, 10),
+        number: 'KOS-10',
+        key: 'paid-c4-10',
+      })
+      assert.equal(noCredit.outcome, 'insufficient_credits')
+      // … puis acceptée avec ses 10 crédits offerts (pas de double gratuité : 9 restants).
+      await db.query(`SELECT public.payg_grant_welcome_credits('${id(KOSSI_P)}', NULL)`)
+      const paid = await issue(db, {
+        actor: KOSSI,
+        partner: KOSSI_P,
+        member: memberOf(C4, 10),
+        number: 'KOS-10',
+        key: 'paid-c4-10b',
+      })
+      assert.equal(paid.outcome, 'issued')
+      assert.deepEqual(await wallet(db, KOSSI_P), { credit_balance: 9, welcome_credits: 9 })
+    },
+  )
 
-  await t.test('un agent n’agit que sur ses coopératives, une institution jamais chez l’autre', async () => {
-    const outside = await issue(db, {
-      actor: AGENTS[0],
-      partner: FENOMAT,
-      member: memberOf(C2, 0),
-      number: 'FEN-3000',
-      key: 'agent0-c2',
-    })
-    assert.equal(outside.outcome, 'forbidden', 'agent 0 n’a pas C2')
-    const inside = await issue(db, {
-      actor: AGENTS[1],
-      partner: FENOMAT,
-      member: memberOf(C2, 0),
-      number: 'FEN-3000',
-      key: 'agent1-c2',
-    })
-    assert.equal(inside.outcome, 'issued')
-    const cross = await issue(db, {
-      actor: MAPTO_AGENT,
-      partner: FENOMAT,
-      member: memberOf(C1, 20),
-      number: 'MAP-1',
-      key: 'mapto-on-fenomat',
-    })
-    assert.equal(cross.outcome, 'forbidden', 'un agent MAPTO ne débite pas FENOMAT')
-    const crossCoop = await issue(db, {
-      actor: MAPTO_AGENT,
-      partner: MAPTO,
-      member: memberOf(C1, 20),
-      number: 'MAP-2',
-      key: 'mapto-on-c1',
-    })
-    assert.equal(crossCoop.outcome, 'forbidden', 'MAPTO n’a aucun mandat sur C1')
-    const uncertified = await issue(db, {
-      actor: UNCERTIFIED_AGENT,
-      partner: FENOMAT,
-      member: memberOf(C1, 21),
-      number: 'FEN-4000',
-      key: 'uncertified',
-    })
-    assert.equal(uncertified.outcome, 'forbidden', 'un agent non certifié n’émet pas')
+  await t.test(
+    'un agent n’agit que sur ses coopératives, une institution jamais chez l’autre',
+    async () => {
+      const outside = await issue(db, {
+        actor: AGENTS[0],
+        partner: FENOMAT,
+        member: memberOf(C2, 0),
+        number: 'FEN-3000',
+        key: 'agent0-c2',
+      })
+      assert.equal(outside.outcome, 'forbidden', 'agent 0 n’a pas C2')
+      const inside = await issue(db, {
+        actor: AGENTS[1],
+        partner: FENOMAT,
+        member: memberOf(C2, 0),
+        number: 'FEN-3000',
+        key: 'agent1-c2',
+      })
+      assert.equal(inside.outcome, 'issued')
+      const cross = await issue(db, {
+        actor: MAPTO_AGENT,
+        partner: FENOMAT,
+        member: memberOf(C1, 20),
+        number: 'MAP-1',
+        key: 'mapto-on-fenomat',
+      })
+      assert.equal(cross.outcome, 'forbidden', 'un agent MAPTO ne débite pas FENOMAT')
+      const crossCoop = await issue(db, {
+        actor: MAPTO_AGENT,
+        partner: MAPTO,
+        member: memberOf(C1, 20),
+        number: 'MAP-2',
+        key: 'mapto-on-c1',
+      })
+      assert.equal(crossCoop.outcome, 'forbidden', 'MAPTO n’a aucun mandat sur C1')
+      const uncertified = await issue(db, {
+        actor: UNCERTIFIED_AGENT,
+        partner: FENOMAT,
+        member: memberOf(C1, 21),
+        number: 'FEN-4000',
+        key: 'uncertified',
+      })
+      assert.equal(uncertified.outcome, 'forbidden', 'un agent non certifié n’émet pas')
 
-    // Lecture (RLS) : chacun ne voit que ses producteurs.
-    const as = (n) =>
-      db.exec(
-        `RESET ROLE; SET ROLE authenticated; SELECT set_config('request.jwt.claim.sub','${id(n)}',false)`,
+      // Lecture (RLS) : chacun ne voit que ses producteurs.
+      const as = (n) =>
+        db.exec(
+          `RESET ROLE; SET ROLE authenticated; SELECT set_config('request.jwt.claim.sub','${id(n)}',false)`,
+        )
+      const coopsSeen = async () =>
+        (await db.query('SELECT DISTINCT cooperative_id FROM public.members ORDER BY 1')).rows.map(
+          (r) => r.cooperative_id,
+        )
+      await as(AGENTS[0])
+      assert.deepEqual(await coopsSeen(), [id(C1)])
+      await as(AGENTS[1])
+      assert.deepEqual(await coopsSeen(), [id(C2)])
+      await as(FENOMAT_OWNER)
+      assert.deepEqual(await coopsSeen(), [id(C1), id(C2)])
+      await as(MAPTO_AGENT)
+      assert.deepEqual(await coopsSeen(), [id(C3)])
+      await as(UNCERTIFIED_AGENT)
+      assert.deepEqual(await coopsSeen(), [])
+      // Grand livre : l’agent ne voit que ses propres débits ; MAPTO ne voit rien de FENOMAT.
+      await as(AGENTS[1])
+      const own = await count(db, 'SELECT count(*)::int AS n FROM public.payg_credit_ledger')
+      assert.equal(own, 1)
+      await as(FENOMAT_OWNER)
+      assert.ok((await count(db, 'SELECT count(*)::int AS n FROM public.payg_credit_ledger')) >= 13)
+      await as(MAPTO_OWNER)
+      assert.equal(
+        await count(
+          db,
+          `SELECT count(*)::int AS n FROM public.payg_credit_ledger WHERE partner_id = '${id(FENOMAT)}'`,
+        ),
+        0,
       )
-    const coopsSeen = async () =>
-      (await db.query('SELECT DISTINCT cooperative_id FROM public.members ORDER BY 1')).rows.map(
-        (r) => r.cooperative_id,
+      assert.equal(
+        await count(
+          db,
+          `SELECT count(*)::int AS n FROM public.partner_wallets WHERE partner_id = '${id(FENOMAT)}'`,
+        ),
+        0,
       )
-    await as(AGENTS[0])
-    assert.deepEqual(await coopsSeen(), [id(C1)])
-    await as(AGENTS[1])
-    assert.deepEqual(await coopsSeen(), [id(C2)])
-    await as(FENOMAT_OWNER)
-    assert.deepEqual(await coopsSeen(), [id(C1), id(C2)])
-    await as(MAPTO_AGENT)
-    assert.deepEqual(await coopsSeen(), [id(C3)])
-    await as(UNCERTIFIED_AGENT)
-    assert.deepEqual(await coopsSeen(), [])
-    // Grand livre : l’agent ne voit que ses propres débits ; MAPTO ne voit rien de FENOMAT.
-    await as(AGENTS[1])
-    const own = await count(db, 'SELECT count(*)::int AS n FROM public.payg_credit_ledger')
-    assert.equal(own, 1)
-    await as(FENOMAT_OWNER)
-    assert.ok((await count(db, 'SELECT count(*)::int AS n FROM public.payg_credit_ledger')) >= 13)
-    await as(MAPTO_OWNER)
-    assert.equal(
-      await count(
-        db,
-        `SELECT count(*)::int AS n FROM public.payg_credit_ledger WHERE partner_id = '${id(FENOMAT)}'`,
-      ),
-      0,
-    )
-    assert.equal(
-      await count(
-        db,
-        `SELECT count(*)::int AS n FROM public.partner_wallets WHERE partner_id = '${id(FENOMAT)}'`,
-      ),
-      0,
-    )
-    await db.exec('RESET ROLE')
-  })
+      await db.exec('RESET ROLE')
+    },
+  )
 
   await t.test('un agent retiré perd aussitôt l’accès', async () => {
     await db.exec(
@@ -466,31 +496,34 @@ test('PAYG : institution, agents, crédits, cartes, cloisonnement, quota, format
     assert.equal(r.outcome, 'forbidden')
   })
 
-  await t.test('carte émise par erreur : le super_admin rend le crédit, une seule fois', async () => {
-    const card = (
-      await db.query(`SELECT id FROM public.member_cards WHERE card_number = 'FEN-3000'`)
-    ).rows[0].id
-    const before = (await wallet(db, FENOMAT)).credit_balance
-    const denied = await json(
-      db,
-      `SELECT public.payg_release_card_commission('${card}', '${id(FENOMAT_OWNER)}', 'erreur de saisie') AS r`,
-    )
-    assert.equal(denied.outcome, 'forbidden')
-    const ok = await json(
-      db,
-      `SELECT public.payg_release_card_commission('${card}', '${id(ADMIN)}', 'erreur de saisie') AS r`,
-    )
-    assert.equal(ok.outcome, 'released')
-    assert.equal((await wallet(db, FENOMAT)).credit_balance, before + 1)
-    const twice = await json(
-      db,
-      `SELECT public.payg_release_card_commission('${card}', '${id(ADMIN)}', 'encore') AS r`,
-    )
-    assert.equal(twice.outcome, 'already_released')
-    const status = (await db.query(`SELECT status FROM public.member_cards WHERE id = '${card}'`))
-      .rows[0].status
-    assert.equal(status, 'revoked')
-  })
+  await t.test(
+    'carte émise par erreur : le super_admin rend le crédit, une seule fois',
+    async () => {
+      const card = (
+        await db.query(`SELECT id FROM public.member_cards WHERE card_number = 'FEN-3000'`)
+      ).rows[0].id
+      const before = (await wallet(db, FENOMAT)).credit_balance
+      const denied = await json(
+        db,
+        `SELECT public.payg_release_card_commission('${card}', '${id(FENOMAT_OWNER)}', 'erreur de saisie') AS r`,
+      )
+      assert.equal(denied.outcome, 'forbidden')
+      const ok = await json(
+        db,
+        `SELECT public.payg_release_card_commission('${card}', '${id(ADMIN)}', 'erreur de saisie') AS r`,
+      )
+      assert.equal(ok.outcome, 'released')
+      assert.equal((await wallet(db, FENOMAT)).credit_balance, before + 1)
+      const twice = await json(
+        db,
+        `SELECT public.payg_release_card_commission('${card}', '${id(ADMIN)}', 'encore') AS r`,
+      )
+      assert.equal(twice.outcome, 'already_released')
+      const status = (await db.query(`SELECT status FROM public.member_cards WHERE id = '${card}'`))
+        .rows[0].status
+      assert.equal(status, 'revoked')
+    },
+  )
 
   await t.test('formation : 15 000 en 5 tranches de 3 000, séparée des crédits', async () => {
     const credits = (await wallet(db, FENOMAT)).credit_balance
@@ -535,23 +568,29 @@ test('PAYG : institution, agents, crédits, cartes, cloisonnement, quota, format
     assert.equal((await wallet(db, FENOMAT)).credit_balance, credits, 'les crédits ne bougent pas')
   })
 
-  await t.test('les grands livres sont en ajout seul et les indicateurs les reflètent', async () => {
-    await assert.rejects(db.exec('UPDATE public.payg_credit_ledger SET credits = 99'), /ajout seul/)
-    await assert.rejects(db.exec('DELETE FROM public.payg_credit_ledger'), /ajout seul/)
-    await assert.rejects(db.exec('DELETE FROM public.training_fee_payments'), /ajout seul/)
-    const o = await json(db, 'SELECT public.payg_admin_overview() AS r')
-    assert.equal(o.operators.institutional_active, 2)
-    assert.equal(o.operators.individual_active, 1)
-    assert.equal(o.credits.purchased, 20)
-    assert.equal(o.credits.purchased_fcfa, 5000)
-    // FENOMAT : 10 offertes + 2 achetées (dont 1 rendue) ; Kossi : 1 offerte.
-    assert.equal(o.credits.consumed_welcome, 11)
-    assert.equal(o.credits.consumed_purchased, 1)
-    assert.equal(o.commissions_earned_fcfa, 250)
-    assert.equal(o.recharge.first, 1)
-    assert.equal(o.recharge.second, 0)
-    assert.equal(o.training.paid, 2)
-    const fen = o.agents_by_institution.find((x) => x.name === 'FENOMAT')
-    assert.equal(fen.agents, 10, 'l’agent retiré ne compte plus')
-  })
+  await t.test(
+    'les grands livres sont en ajout seul et les indicateurs les reflètent',
+    async () => {
+      await assert.rejects(
+        db.exec('UPDATE public.payg_credit_ledger SET credits = 99'),
+        /ajout seul/,
+      )
+      await assert.rejects(db.exec('DELETE FROM public.payg_credit_ledger'), /ajout seul/)
+      await assert.rejects(db.exec('DELETE FROM public.training_fee_payments'), /ajout seul/)
+      const o = await json(db, 'SELECT public.payg_admin_overview() AS r')
+      assert.equal(o.operators.institutional_active, 2)
+      assert.equal(o.operators.individual_active, 1)
+      assert.equal(o.credits.purchased, 20)
+      assert.equal(o.credits.purchased_fcfa, 5000)
+      // FENOMAT : 10 offertes + 2 achetées (dont 1 rendue) ; Kossi : 1 offerte.
+      assert.equal(o.credits.consumed_welcome, 11)
+      assert.equal(o.credits.consumed_purchased, 1)
+      assert.equal(o.commissions_earned_fcfa, 250)
+      assert.equal(o.recharge.first, 1)
+      assert.equal(o.recharge.second, 0)
+      assert.equal(o.training.paid, 2)
+      const fen = o.agents_by_institution.find((x) => x.name === 'FENOMAT')
+      assert.equal(fen.agents, 10, 'l’agent retiré ne compte plus')
+    },
+  )
 })

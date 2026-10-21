@@ -10,7 +10,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export async function GET(request: NextRequest) {
   const url = new URL(request.url)
   const intent = url.searchParams.get('intent') ?? ''
-  if (!UUID.test(intent)) return NextResponse.redirect(`${url.origin}/console`)
+  if (!UUID.test(intent)) return NextResponse.redirect(`${url.origin}/operator/console`)
   const state = await settlePaygIntent(createAdminClient(), intent)
-  return NextResponse.redirect(`${url.origin}/console?payment=${state}&ref=${intent}`)
+  return NextResponse.redirect(`${url.origin}/operator/console?payment=${state}&ref=${intent}`)
 }
