@@ -1,0 +1,45 @@
+name: CE IT isolated module
+on:
+  pull_request:
+    paths:
+      - 'lib/ce-it/**'
+      - 'components/ce-it/**'
+      - 'app/ce-it/**'
+      - 'app/api/ce-it/**'
+      - 'tests/ce-it-*'
+      - 'e2e/ce-it*'
+      - 'supabase/migrations/*_ceit_*.sql'
+      - '.github/workflows/ce-it.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  local-verification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Permissions and scientific workflow on disposable PostgreSQL
+        run: node --test tests/ce-it-sql.test.mjs
+      - name: Domain, PDF and guarded HTTP handlers
+        run: node --import tsx --test tests/ce-it-domain.test.ts tests/ce-it-http.test.ts
+      - run: npx biome check lib/ce-it components/ce-it app/ce-it app/api/ce-it tests/ce-it-* e2e/ce-it*
+      - run: npm run typecheck
+      - run: npx playwright install --with-deps chromium
+      - name: Desktop and Android interface against local fixtures only
+        run: npx playwright test --config=e2e/ce-it.config.ts
+        env:
+          HAROOLIFE_TEST_PORT: '3265'
+          HAROOLIFE_SUPABASE_PORT: '54425'
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ''
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ce-it-interface-checks
+          path: test-results/
+          retention-days: 7
