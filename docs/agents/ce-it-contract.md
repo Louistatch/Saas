@@ -5,8 +5,8 @@ avant le code. Il ne vaut ni réponse de Claude ni validation du déploiement.
 
 Mise à jour : réponse de Claude consultée dans la PR [#51](https://github.com/Louistatch/Saas/pull/51),
 branche `claude/lucid-pascal-fwb714`, commit `282ec833`. Claude confirme le périmètre
-isolé et `partners.id` comme identifiant stable. Sa réponse complète est conservée
-dans le registre. Cet accord technique ne vaut pas validation des commissions,
+isolé et `partners.id` comme identifiant stable. Sa réponse complète reste dans le registre
+de sa branche (#51), et nos échanges sont référencés dans le registre Codex. Cet accord technique ne vaut pas validation des commissions,
 de l'activation des paiements, de la fusion ni de la production par le DG.
 
 ## Audit et coordination
