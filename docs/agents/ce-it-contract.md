@@ -3,6 +3,12 @@
 Version proposée le 21 octobre 2026. Ce contrat accompagne une PR documentaire
 avant le code. Il ne vaut ni réponse de Claude ni validation du déploiement.
 
+Mise à jour : réponse de Claude consultée dans la PR [#51](https://github.com/Louistatch/Saas/pull/51),
+branche `claude/lucid-pascal-fwb714`, commit `282ec833`. Claude confirme le périmètre
+isolé et `partners.id` comme identifiant stable. Sa réponse complète est conservée
+dans le registre. Cet accord technique ne vaut pas validation des commissions,
+de l'activation des paiements, de la fusion ni de la production par le DG.
+
 ## Audit et coordination
 
 - Base examinée : `origin/main` à `df671d45` ; branche Claude publiée la plus récente :
@@ -14,6 +20,10 @@ avant le code. Il ne vaut ni réponse de Claude ni validation du déploiement.
   cette gratuité pour les CE opérateur et administration. Codex ne changera pas ce
   moteur en parallèle : le module isolé applique les nouvelles règles ; le basculement
   du catalogue historique sera une intégration explicite avec Claude.
+- Depuis cet audit initial, la PR PAYG #51 est apparue. Claude y réserve également
+  `lib/payg/**`, `components/payg/**`, `app/api/payg/**`, `app/api/institution/**`,
+  `app/api/invitations/**`, `app/api/admin/payg/**`, les nouvelles pages PAYG, les types
+  Supabase et la migration `20261021_100000_payg_operators.sql`. Codex ne les modifie pas.
 - La publication historique est aujourd'hui limitée au super-admin. Aucun opérateur
   ne reçoit de nouveau droit par simple rôle, déclaration du navigateur ou carte.
 
