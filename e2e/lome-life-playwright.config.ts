@@ -41,6 +41,8 @@ export default defineConfig({
     'lome-place-workflows.spec.ts',
     'lome-entry.spec.ts',
     'lome-farm.spec.ts',
+    'lome-field-workers.spec.ts',
+    'lome-players.spec.ts',
     'lome-objectives.spec.ts',
     'lome-taxi-hud.spec.ts',
     'lome-university.spec.ts',

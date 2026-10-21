@@ -238,6 +238,7 @@ import FarmPanel from './farm-panel'
 import InvitePanel from './invite-panel'
 import PayBubbles, { usePayBubbles } from './pay-bubbles'
 import PhotoPanel from './photo-panel'
+import PlayersDirectory from './players-directory'
 import HousingPanel from './housing-panel'
 import {
   housingOf,
@@ -254,6 +255,7 @@ import { alertIfAway } from '@/lib/haroolife/local-alert'
 import { PhoneDevice } from './phone-device'
 import { HomeDialog } from './residence-dialog'
 import { sayOnPlace, usePresence } from './use-presence'
+import { usePlayersOnline } from './use-players-online'
 import { useCloudSave } from './use-cloud-save'
 import { useInvites } from './use-invites'
 import { useRealtime } from './use-realtime'
@@ -814,6 +816,8 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
   useEffect(() => setDiag(initialDiag()), [])
   const unreadTotal = Object.values(realtime.state.unread).reduce((a, b) => a + b, 0)
   const online = realtime.state.status === 'online'
+  // Everyone with the game open, all towns (database heartbeat, independent of the relay).
+  const gamePlayers = usePlayersOnline(cityLife.locality, loaded)
   // Slow presence: which locality the player is in (re-sent by the client after reconnection).
   useEffect(() => {
     if (online && realtime.client) void realtime.client.join(cityLife.locality)
@@ -2747,14 +2751,24 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
             type="button"
             onClick={() => open('online')}
             aria-label="Voir les joueurs en ligne"
-            title={online ? 'Joueurs à proximité dans cette instance' : 'Connexion multijoueur en cours'}
+            title={
+              gamePlayers
+                ? 'Personnes en ligne dans tout HarooLife'
+                : online
+                  ? 'Joueurs à proximité dans cette instance'
+                  : 'Connexion multijoueur en cours'
+            }
             className="hl-presence flex shrink-0 items-center gap-1 rounded-xl bg-emerald-50 px-2 py-2 text-[11px] font-bold text-emerald-800"
           >
             <Users size={14} />{' '}
-            {online
-              ? realtime.state.present.filter((p) => p.locality === cityLife.locality).length + 1
-              : '—'}
-            <span className="hidden sm:inline">{online ? ' à proximité' : ' connexion…'}</span>
+            {gamePlayers
+              ? gamePlayers.online
+              : online
+                ? realtime.state.present.filter((p) => p.locality === cityLife.locality).length + 1
+                : '—'}
+            <span className="hidden sm:inline">
+              {gamePlayers ? ' en ligne' : online ? ' à proximité' : ' connexion…'}
+            </span>
           </button>
           <span className="h-6 w-px bg-slate-200" />
           <button
@@ -3955,6 +3969,17 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                       </div>
                     )
                   })()}
+                {panel === 'online' && (
+                  <PlayersDirectory
+                    counts={gamePlayers}
+                    client={realtime.client}
+                    relayOnline={online}
+                    onRoom={(room) => {
+                      setChatRoom(room)
+                      setPanel('messages')
+                    }}
+                  />
+                )}
                 {panel === 'online' && (
                   <OnlinePlayers
                     state={realtime.state}

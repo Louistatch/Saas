@@ -59,8 +59,9 @@ export default function FieldWorkers({
   const [offers, setOffers] = useState<MyOffers | null>(null)
   const [said, setSaid] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
-  const life = useRef(cityLife)
-  life.current = cityLife
+  // The game passes a new `update` at each render: kept aside so the loading stays put.
+  const life = useRef({ cityLife, update })
+  life.current = { cityLife, update }
 
   // Proposals and answers: when the farm opens, then every half minute while it stays open.
   const load = useCallback(async () => {
@@ -69,10 +70,10 @@ export default function FieldWorkers({
     setOffers(got)
     for (const o of got.hired) {
       if (o.status === 'pending' || o.seen) continue
-      if (!answered(life.current, o.id)) update((s) => applyAnswer(s, o))
+      if (!answered(life.current.cityLife, o.id)) life.current.update((s) => applyAnswer(s, o))
       void markSeen(o.id)
     }
-  }, [update])
+  }, [])
   useEffect(() => {
     void load()
     const id = window.setInterval(() => {
