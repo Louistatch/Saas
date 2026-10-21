@@ -16,6 +16,7 @@ import {
   trainingAmountError,
   trainingChoices,
 } from '../lib/payg/model'
+import { reconcileAction } from '../lib/payg/reconcile-policy'
 
 test('packs : 20 = 5 000, 40 = 10 000, 100 = 25 000, toujours 250 FCFA le crédit', () => {
   assert.deepEqual(
@@ -92,4 +93,21 @@ test('CSV lisible par Excel : BOM, séparateur « ; », guillemets échappés', 
 test('montants affichés en FCFA avec espace des milliers', () => {
   assert.equal(formatFcfa(25000), '25 000 FCFA')
   assert.equal(formatFcfa(250), '250 FCFA')
+})
+
+test('relecture FedaPay : attend 10 min, relit 7 jours, abandonne une création sans transaction', () => {
+  const now = Date.parse('2026-10-21T12:00:00Z')
+  const at = (minutesAgo: number) => new Date(now - minutesAgo * 60_000).toISOString()
+  const tx = (status: string, minutesAgo: number, ref = '123456') =>
+    reconcileAction({ status, provider_reference: ref, created_at: at(minutesAgo) }, now)
+  assert.equal(tx('pending', 5), 'skip', 'trop récent : la notification a encore la main')
+  assert.equal(tx('pending', 30), 'settle')
+  assert.equal(tx('processing', 60 * 24 * 6), 'settle')
+  assert.equal(tx('pending', 60 * 24 * 8), 'skip', 'au-delà de 7 jours')
+  assert.equal(tx('pending', 30, 'fedapay-pending-x'), 'skip', 'création peut-être en cours')
+  assert.equal(tx('pending', 90, 'fedapay-pending-x'), 'orphan')
+  assert.equal(tx('success', 60), 'reapply', 'effet rejoué, idempotent')
+  assert.equal(tx('success', 60 * 72), 'skip')
+  assert.equal(tx('failed', 60), 'skip')
+  assert.equal(tx('expired', 60), 'skip')
 })

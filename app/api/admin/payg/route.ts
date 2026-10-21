@@ -1,12 +1,12 @@
 // Console PAYG super-admin : indicateurs calculés depuis les grands livres, et les actions
-// réservées à l'équipe (créer une institution, enregistrer un paiement reçu hors ligne,
-// corriger un solde, rendre le crédit d'une carte émise par erreur, chiffrer et suivre une
-// commande FaîtièreHub Print, enregistrer une convention de données, traiter une demande de
-// rectification). Chaque écriture financière passe par une fonction SQL payg_* (verrou,
-// idempotence, grand livre en ajout seul).
+// réservées à l'équipe (créer une institution, corriger un solde, rendre le crédit d'une carte
+// émise par erreur, chiffrer et suivre une commande FaîtièreHub Print, enregistrer une
+// convention de données, traiter une demande de rectification). Chaque écriture financière
+// passe par une fonction SQL payg_* (verrou, idempotence, grand livre en ajout seul).
+// Aucun paiement ne s'enregistre à la main : crédits, formation et impression ne sont payés
+// que par FedaPay, réglés automatiquement (notification, retour, relecture quotidienne).
 
 import { appUrlOf, newInvitationToken, readJson } from '@/lib/payg/http'
-import { recordManualPayment } from '@/lib/payg/payments'
 import { requireSuperAdmin } from '@/lib/payg/server'
 import { generateUniquePartnerCode } from '@/lib/utils/partner-code'
 import { type NextRequest, NextResponse } from 'next/server'
@@ -88,22 +88,9 @@ const actionSchema = z.discriminatedUnion('action', [
     kind: z.enum(['individual', 'institutional']),
   }),
   z.object({
-    action: z.literal('credits_manual'),
-    partner_id: uuid,
-    credits: z.number().int().min(1).max(100_000),
-    amount_fcfa: z.number().int().min(1),
-    note: z.string().trim().min(3).max(300),
-  }),
-  z.object({
     action: z.literal('credits_adjust'),
     partner_id: uuid,
     credits: z.number().int().min(-100_000).max(100_000),
-    note: z.string().trim().min(3).max(300),
-  }),
-  z.object({
-    action: z.literal('training_payment'),
-    account_id: uuid,
-    amount_fcfa: z.number().int().positive(),
     note: z.string().trim().min(3).max(300),
   }),
   z.object({
@@ -121,7 +108,8 @@ const actionSchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('print_status'),
     order_id: uuid,
-    status: z.enum(['paid', 'in_production', 'shipped', 'delivered', 'cancelled']),
+    // « paid » n'est jamais posé à la main : seul le règlement FedaPay le pose.
+    status: z.enum(['in_production', 'shipped', 'delivered', 'cancelled']),
   }),
   z.object({
     action: z.literal('record_agreement'),
@@ -142,7 +130,6 @@ const actionSchema = z.discriminatedUnion('action', [
 ])
 
 const PRINT_NEXT: Record<string, string[]> = {
-  paid: ['quoted'],
   in_production: ['paid'],
   shipped: ['in_production'],
   delivered: ['shipped'],
@@ -200,17 +187,6 @@ export async function POST(request: NextRequest) {
         .eq('id', body.partner_id)
       return NextResponse.json({ ok: true })
     }
-    case 'credits_manual': {
-      const result = await recordManualPayment(admin, {
-        purpose: 'credit_pack',
-        partnerId: body.partner_id,
-        actorId: userId,
-        amountFcfa: body.amount_fcfa,
-        credits: body.credits,
-        note: body.note,
-      })
-      return NextResponse.json(result, { status: result.outcome === 'applied' ? 200 : 422 })
-    }
     case 'credits_adjust': {
       const { data, error } = await admin.rpc('payg_adjust_credits', {
         p_partner_id: body.partner_id,
@@ -221,24 +197,6 @@ export async function POST(request: NextRequest) {
       })
       if (error) return NextResponse.json({ error: error.message }, { status: 502 })
       const result = data as { outcome: string }
-      return NextResponse.json(result, { status: result.outcome === 'applied' ? 200 : 422 })
-    }
-    case 'training_payment': {
-      const { data: account } = await admin
-        .from('training_fee_accounts')
-        .select('partner_id')
-        .eq('id', body.account_id)
-        .maybeSingle()
-      if (!account?.partner_id)
-        return NextResponse.json({ error: 'Compte introuvable' }, { status: 404 })
-      const result = await recordManualPayment(admin, {
-        purpose: 'training_fee',
-        partnerId: account.partner_id,
-        accountId: body.account_id,
-        actorId: userId,
-        amountFcfa: body.amount_fcfa,
-        note: body.note,
-      })
       return NextResponse.json(result, { status: result.outcome === 'applied' ? 200 : 422 })
     }
     case 'release_card': {
@@ -272,7 +230,6 @@ export async function POST(request: NextRequest) {
     }
     case 'print_status': {
       const stamp: Record<string, string> = {
-        paid: 'paid_at',
         shipped: 'shipped_at',
         delivered: 'delivered_at',
         cancelled: 'cancelled_at',
@@ -285,13 +242,7 @@ export async function POST(request: NextRequest) {
         .eq('id', body.order_id)
         .in(
           'status',
-          PRINT_NEXT[body.status] as (
-            | 'quoted'
-            | 'paid'
-            | 'in_production'
-            | 'shipped'
-            | 'quote_requested'
-          )[],
+          PRINT_NEXT[body.status] as ('paid' | 'in_production' | 'shipped' | 'quote_requested')[],
         )
         .select('id, partner_id')
       if (!data?.length)

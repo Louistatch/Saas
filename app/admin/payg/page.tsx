@@ -149,8 +149,7 @@ export default function AdminPaygPage() {
   const [error, setError] = useState('')
   const [dialog, setDialog] = useState<
     | { kind: 'institution' }
-    | { kind: 'credits'; operator: Operator; mode: 'manual' | 'adjust' }
-    | { kind: 'training'; row: TrainingRow }
+    | { kind: 'credits'; operator: Operator }
     | { kind: 'quote'; order: PrintOrderRow }
     | { kind: 'agreement'; mandate: MandateRow }
     | { kind: 'release' }
@@ -194,7 +193,7 @@ export default function AdminPaygPage() {
     <div className="space-y-6">
       <PageHeader
         title="Crédits opérateurs"
-        description="Opérateurs individuels et institutionnels, crédits, commissions, formation et impression. Les chiffres sont lus dans les grands livres, pas estimés."
+        description="Opérateurs individuels et institutionnels, crédits, commissions, formation et impression. Les chiffres sont lus dans les grands livres, pas estimés. Tous les paiements passent par FedaPay et se règlent automatiquement."
         action={
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => setDialog({ kind: 'release' })}>
@@ -324,19 +323,8 @@ export default function AdminPaygPage() {
                         <div className="flex justify-end gap-2">
                           <Button
                             size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              setDialog({ kind: 'credits', operator: op, mode: 'manual' })
-                            }
-                          >
-                            Paiement reçu
-                          </Button>
-                          <Button
-                            size="sm"
                             variant="ghost"
-                            onClick={() =>
-                              setDialog({ kind: 'credits', operator: op, mode: 'adjust' })
-                            }
+                            onClick={() => setDialog({ kind: 'credits', operator: op })}
                           >
                             Corriger
                           </Button>
@@ -378,15 +366,6 @@ export default function AdminPaygPage() {
                       <span className="tabular-nums text-foreground">
                         {formatFcfa(t.paid_fcfa)} / {formatFcfa(t.total_fcfa)}
                       </span>
-                      {t.paid_fcfa < t.total_fcfa && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setDialog({ kind: 'training', row: t })}
-                        >
-                          Paiement reçu
-                        </Button>
-                      )}
                     </div>
                   </div>
                 ))
@@ -644,59 +623,23 @@ export default function AdminPaygPage() {
       )}
       {dialog?.kind === 'credits' && (
         <FormDialog
-          title={
-            dialog.mode === 'manual'
-              ? `Paiement reçu de ${dialog.operator.display_name}`
-              : `Corriger le solde de ${dialog.operator.display_name}`
-          }
-          description={
-            dialog.mode === 'manual'
-              ? 'Paiement encaissé hors FedaPay (espèces, virement). 20 crédits minimum, 250 FCFA par crédit.'
-              : 'Correction tracée au grand livre (nombre négatif pour retirer). À réserver aux erreurs.'
-          }
+          title={`Corriger le solde de ${dialog.operator.display_name}`}
+          description="Correction d’une erreur, tracée au grand livre (nombre négatif pour retirer). Ce n’est pas un paiement : les crédits s’achètent uniquement par FedaPay."
           fields={[
             { name: 'credits', label: 'Crédits', type: 'number' },
-            ...(dialog.mode === 'manual'
-              ? [{ name: 'amount_fcfa', label: 'Montant reçu (FCFA)', type: 'number' }]
-              : []),
-            { name: 'note', label: 'Référence ou motif', multiline: true },
+            { name: 'note', label: 'Motif', multiline: true },
           ]}
-          submitLabel="Enregistrer"
+          submitLabel="Enregistrer la correction"
           onClose={() => setDialog(null)}
           onSubmit={async (v) => {
             const res = await act(
               {
-                action: dialog.mode === 'manual' ? 'credits_manual' : 'credits_adjust',
+                action: 'credits_adjust',
                 partner_id: dialog.operator.id,
                 credits: Number(v.credits),
-                ...(dialog.mode === 'manual' ? { amount_fcfa: Number(v.amount_fcfa) } : {}),
                 note: v.note,
               },
-              'Crédits enregistrés',
-            )
-            return res ? '' : null
-          }}
-        />
-      )}
-      {dialog?.kind === 'training' && (
-        <FormDialog
-          title="Paiement de formation reçu"
-          description={`Reste dû : ${formatFcfa(dialog.row.total_fcfa - dialog.row.paid_fcfa)}. Un multiple de 3 000 FCFA.`}
-          fields={[
-            { name: 'amount_fcfa', label: 'Montant (FCFA)', type: 'number' },
-            { name: 'note', label: 'Référence', multiline: true },
-          ]}
-          submitLabel="Enregistrer"
-          onClose={() => setDialog(null)}
-          onSubmit={async (v) => {
-            const res = await act(
-              {
-                action: 'training_payment',
-                account_id: dialog.row.id,
-                amount_fcfa: Number(v.amount_fcfa),
-                note: v.note,
-              },
-              'Paiement de formation enregistré',
+              'Correction enregistrée',
             )
             return res ? '' : null
           }}
@@ -797,7 +740,6 @@ export default function AdminPaygPage() {
 }
 
 const NEXT_STATUS: Record<string, { value: string; label: string }> = {
-  quoted: { value: 'paid', label: 'Marquer payée' },
   paid: { value: 'in_production', label: 'En fabrication' },
   in_production: { value: 'shipped', label: 'Expédiée' },
   shipped: { value: 'delivered', label: 'Livrée' },

@@ -128,8 +128,22 @@ Packs de crédits, formation et commandes FaîtièreHub Print passent par
 `partner_payment_intents` (nouveaux motifs `credit_pack`, `training_fee`, `print_order`) et
 la page FedaPay existante (`createCheckout`). Le règlement relit toujours la transaction
 auprès de FedaPay (retour et notification), contrôle montant et devise, puis applique une
-seule fois (clé d'idempotence = intention). Un super_admin peut enregistrer un paiement reçu
-hors ligne (espèces, virement), avec une note gardée au grand livre.
+seule fois (clé d'idempotence = intention).
+
+**FedaPay est le seul moyen de paiement, et le règlement est automatique** :
+
+1. la notification FedaPay (`/api/payments/fedapay/webhook`) règle le paiement dès sa
+   confirmation, même si la personne ne revient pas sur le site ;
+2. le retour du navigateur (`/api/payg/payments/return`) fait la même relecture ;
+3. une relecture quotidienne (`/api/cron/payg-reconcile`, 7 h 40 UTC) rattrape une
+   notification perdue, rejoue un effet interrompu (idempotent) et abandonne une création
+   restée sans transaction FedaPay après une heure.
+
+Formation soldée et évaluation réussie : la certification s'enregistre seule. Commande
+FaîtièreHub Print payée : elle passe « payée » seule. Aucun paiement ne se saisit à la main
+dans la console super-admin ; elle ne garde qu'une correction de solde tracée (erreur) et la
+restitution du crédit d'une carte émise par erreur. L'ancien rechargement en FCFA par CinetPay
+(`/api/partner/wallet/topup`) est fermé.
 
 ## 8. Écrans
 

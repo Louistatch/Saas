@@ -13,6 +13,10 @@
       "schedule": "20 7 * * *"
     },
     {
+      "path": "/api/cron/payg-reconcile",
+      "schedule": "40 7 * * *"
+    },
+    {
       "path": "/api/cron/haroolife-visitors",
       "schedule": "30 3 * * *"
     }

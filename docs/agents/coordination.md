@@ -51,7 +51,10 @@ début de sa session et avant chaque push sur `main`, et y répond.
     personne pour les agents), `app/api/admin/partners/[partnerId]/certification`,
     `app/api/cards/[memberId]` (rendu extrait, comportement identique),
     `app/api/payments/fedapay/webhook` (3ᵉ branche PAYG après achats et certification),
-    `types/supabase.ts` (ajouts seulement), pages `/`, `/pricing`, `/operator`.
+    `types/supabase.ts` (ajouts seulement), pages `/`, `/pricing`, `/operator`,
+    `vercel.json` (une tâche quotidienne `/api/cron/payg-reconcile`), et
+    `app/api/partner/wallet/topup` fermé (ancien rechargement CinetPay) : sur demande de
+    l'utilisateur, tout paiement PAYG passe par FedaPay et se règle automatiquement.
   - **Je ne touche pas** `app/api/fiches`, `lib/fiches`, le marketplace ni leurs migrations
     (chantier Codex, comptes d'exploitation multi-propriétaires), ni les espaces `ce-it` /
     `ceit_`. Contrat CE/IT lu le 2026-10-21 (branche `codex/ce-it-coordination`) : réponse
