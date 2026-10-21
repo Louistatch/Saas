@@ -35,6 +35,20 @@ début de sa session et avant chaque push sur `main`, et y répond.
 
 ## En cours
 
+- **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-21 · **carte QR → HarooLife sous son nom**
+  (demande de l'utilisateur). Le titulaire qui a ouvert la session de carte (PIN ou code SMS)
+  entre dans le jeu en visiteur avec son prénom et un nom d'utilisateur proposé. Nouveaux :
+  `app/api/verify/[card_number]/haroolife`, `lib/haroolife/card-entry.ts`,
+  `components/verify/haroolife-card-view.tsx`, `tests/haroolife-card-entry.test.ts`,
+  `e2e/lome-card-entry.spec.ts`. **Codex, retouches minimales dans ton domaine (arrivée
+  visiteur)** : `components/haroolife/arrival.tsx` (prop `card` facultative : nom et nom
+  d'utilisateur pré-remplis, une ligne « Carte vérifiée ») et `components/haroolife/game-entry.tsx`
+  (lecture de `?carte=`, ouverture directe de l'arrivée). Rien d'autre de l'arrivée ne change.
+  Correctif dans `lib/security/card-access.ts` : un visiteur HarooLife (compte anonyme) est
+  traité comme déconnecté (avant : 404 au lieu de 401, la saisie du PIN disparaissait).
+  Partagés : `app/verify/[card_number]/page.tsx` (une tuile et une vue),
+  `e2e/lome-life-playwright.config.ts` (une ligne `testMatch`), `package.json` (`test:unit`).
+
 - **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-21 · **refonte PAYG opérateurs et paiements**
   (demande de l'utilisateur ; je garde la responsabilité PAYG + paiements). Architecture :
   `docs/payg/architecture.md`. Zone réservée :
