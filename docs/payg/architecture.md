@@ -139,7 +139,10 @@ seule fois (clé d'idempotence = intention).
    notification perdue, rejoue un effet interrompu (idempotent) et abandonne une création
    restée sans transaction FedaPay après une heure.
 
-Formation soldée et évaluation réussie : la certification s'enregistre seule. Commande
+Formation soldée et évaluation réussie : la certification s'enregistre seule. Les frais de
+certification (même montant que la formation) suivent la même règle : le bouton « Marquer
+payé » de la page Opérateurs est retiré, et la relecture quotidienne rejoue aussi un
+enregistrement de certification interrompu. Commande
 FaîtièreHub Print payée : elle passe « payée » seule. Aucun paiement ne se saisit à la main
 dans la console super-admin ; elle ne garde qu'une correction de solde tracée (erreur) et la
 restitution du crédit d'une carte émise par erreur. L'ancien rechargement en FCFA par CinetPay
@@ -160,7 +163,8 @@ restitution du crédit d'une carte émise par erreur. L'ancien rechargement en F
 
 1. Le renouvellement d'une carte active (nouvelle date d'expiration) reste gratuit.
 2. Un agent n'émet des cartes qu'une fois certifié (règle de production conservée). Pour un
-   lancement rapide, le super_admin peut enregistrer formation, évaluation et paiement.
+   lancement rapide, le super_admin peut enregistrer la formation et l'évaluation ; le
+   paiement, lui, passe toujours par FedaPay.
 3. L'accès aux leçons reste ouvert avant paiement ; la certification exige la formation
    soldée et l'évaluation réussie.
 4. La convention de données est enregistrée et affichée, mais ne bloque pas encore

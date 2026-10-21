@@ -14,7 +14,6 @@ import { emailUser } from '@/lib/email/resend'
 import {
   activatePartnerOperator,
   markPartnerTrainingCompleted,
-  recordCertificationFeePaid,
   recordPartnerExamResult,
 } from '@/lib/partners/certification'
 import { assertRole } from '@/lib/security/assert-access'
@@ -45,7 +44,6 @@ const bodySchema = z.discriminatedUnion('action', [
   }),
   // Secours : frais réglés hors FedaPay (espèces, dépôt Mobile Money constaté). La note dit
   // comment, pour le journal d'audit.
-  z.object({ action: z.literal('mark_paid'), note: z.string().trim().min(3).max(500), ...person }),
 ])
 
 export async function POST(
@@ -98,14 +96,6 @@ export async function POST(
           partnerId,
           userId: parsed.data.user_id,
           validatorId,
-          note: parsed.data.note,
-        })
-      case 'mark_paid':
-        return recordCertificationFeePaid(admin, {
-          partnerId,
-          userId: parsed.data.user_id,
-          validatorId,
-          method: 'manual',
           note: parsed.data.note,
         })
     }

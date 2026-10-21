@@ -1,10 +1,12 @@
-// Relecture quotidienne des paiements PAYG (packs de crédits, formation, FaîtièreHub Print).
+// Relecture quotidienne des paiements PAYG (packs de crédits, formation, FaîtièreHub Print) et
+// des frais de certification Opérateur.
 // Filet de sécurité derrière la notification FedaPay : chaque intention en attente est relue
 // chez FedaPay et réglée une seule fois (settlePaygIntent), un effet interrompu est rejoué
 // (idempotent), une création restée sans transaction est abandonnée. Rien n'est saisi à la
 // main : FedaPay est la seule source d'un paiement.
 
 import { timingSafeEqual } from 'node:crypto'
+import { settleCertificationIntent } from '@/lib/partners/certification-payment'
 import { PAYG_PURPOSES, settlePaygIntent } from '@/lib/payg/payments'
 import {
   RECONCILE_MAX_AGE_MS,
@@ -40,9 +42,9 @@ export async function GET(request: NextRequest) {
   const read = (statuses: ('pending' | 'processing' | 'success')[], maxAgeMs: number) =>
     admin
       .from('partner_payment_intents')
-      .select('id, status, provider_reference, created_at')
+      .select('id, purpose, status, provider_reference, created_at')
       .eq('provider', 'fedapay')
-      .in('purpose', [...PAYG_PURPOSES])
+      .in('purpose', [...PAYG_PURPOSES, 'certification'])
       .in('status', statuses)
       .gte('created_at', new Date(started - maxAgeMs).toISOString())
       .lte('created_at', new Date(started - RECONCILE_MIN_AGE_MS).toISOString())
@@ -74,7 +76,10 @@ export async function GET(request: NextRequest) {
       })
       if (claim.claimed) counts.orphans += 1
     } else {
-      const state = await settlePaygIntent(admin, intent.id)
+      const state =
+        intent.purpose === 'certification'
+          ? await settleCertificationIntent(intent.id)
+          : await settlePaygIntent(admin, intent.id)
       if (action === 'reapply') counts.reapplied += state === 'success' ? 1 : 0
       else if (state === 'success') counts.settled += 1
       else if (state === 'failed') counts.failed += 1

@@ -286,8 +286,11 @@ export async function recordCertificationFeePaid(
   params: {
     partnerId: string
     validatorId: string | null
-    /** fedapay / manual : frais de 15 000 réglés d'un coup ; training : compte de formation soldé. */
-    method: 'fedapay' | 'manual' | 'training'
+    /**
+     * fedapay : frais réglés d'un coup sur FedaPay ; training : compte de formation soldé
+     * (tranches FedaPay). Aucun règlement ne s'enregistre à la main.
+     */
+    method: 'fedapay' | 'training'
     note?: string
     userId?: string
   },
@@ -344,10 +347,7 @@ export async function recordCertificationFeePaid(
 
   await writeAuditLog(admin, {
     validatorId: params.validatorId,
-    action:
-      params.method === 'manual'
-        ? 'partner_certification_marked_paid'
-        : 'partner_certification_paid',
+    action: 'partner_certification_paid',
     partnerId: params.partnerId,
     previousState: { certified_at: null, status: partner.status },
     newState: { certified_at: now, status: nextStatus, method: params.method },
