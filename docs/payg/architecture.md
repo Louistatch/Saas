@@ -151,3 +151,24 @@ hors ligne (espèces, virement), avec une note gardée au grand livre.
    soldée et l'évaluation réussie.
 4. La convention de données est enregistrée et affichée, mais ne bloque pas encore
    l'émission (`payg_require_data_agreement = false`) : à activer avant le déploiement réel.
+5. La page Tarifs annonce « aucun abonnement » pour les coopératives (fin du plan à
+   99 000 FCFA/mois) : seules les cartes commerciales et la formation sont payantes.
+6. Le contenu AgriAcademy (leçon 5, question 5.4 du quiz en production) enseigne encore
+   l'ancienne carte à 2 000 FCFA (500 / 1 500). Il faut changer la leçon et la question
+   ensemble (données de production) : non fait ici, à décider.
+7. La minimisation du QR public (village et canton derrière le PIN) : voir § 6.
+
+## 10. Tests
+
+- `tests/payg-sql.test.mjs` (PGlite, migrations réelles) : portefeuille unique d'une
+  institution de 10 agents, 10 crédits offerts une seule fois, recharge de 20 pour 5 000,
+  consommation exacte, refus sans crédit, aucun double débit, 11ᵉ carte après le quota
+  gratuit, isolation entre agents et entre institutions (RLS comprise), agent retiré,
+  restitution par le super_admin seulement, formation en 5 tranches et séparation
+  formation / crédits, grands livres en ajout seul, indicateurs.
+- `tests/payg-model.test.ts` : packs, tranches, rôles, messages, CSV.
+- `e2e/payg.spec.ts` (390 px et bureau, mock Supabase + réponses d'API simulées) :
+  console agent, émission et reprise après coupure avec la même clé, refus sans crédit,
+  recharge de 20 crédits, retour de paiement, formation en tranches, console institution
+  (10 agents, invitation), redirection d'un agent, tarifs, invitation publique,
+  super-admin. Lancement : `.github/workflows/payg-browser.yml`.

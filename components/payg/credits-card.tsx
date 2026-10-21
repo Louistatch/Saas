@@ -73,6 +73,7 @@ export function CreditsCard({ me }: { me: PaygMe }) {
                   key={p.code}
                   type="button"
                   onClick={() => setPack(p)}
+                  aria-label={`${p.credits} crédits pour ${formatFcfa(p.price_fcfa)}`}
                   className="min-h-14 rounded-2xl border border-white/25 px-2 py-2 text-left transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                 >
                   <span className="block text-lg font-semibold tabular-nums">{p.credits}</span>

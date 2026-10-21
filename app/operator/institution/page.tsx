@@ -98,9 +98,9 @@ function InstitutionContent() {
                 <CreditLedger partnerId={current.partner_id} />
               </div>
               <Tabs defaultValue="team" className="min-w-0">
-                <TabsList className="flex h-auto w-full justify-start overflow-x-auto">
+                <TabsList className="grid h-auto w-full grid-cols-3 sm:flex sm:justify-start">
                   {TABS.map((t) => (
-                    <TabsTrigger key={t.value} value={t.value} className="min-h-10 shrink-0">
+                    <TabsTrigger key={t.value} value={t.value} className="min-h-10">
                       {t.label}
                     </TabsTrigger>
                   ))}

@@ -256,7 +256,7 @@ export default function AdminPaygPage() {
       )}
 
       <Tabs defaultValue="operators">
-        <TabsList className="flex h-auto w-full justify-start overflow-x-auto">
+        <TabsList className="relative flex h-auto w-full justify-start overflow-x-auto">
           <TabsTrigger value="operators">Opérateurs</TabsTrigger>
           <TabsTrigger value="training">Formation</TabsTrigger>
           <TabsTrigger value="print">Impression</TabsTrigger>
@@ -267,7 +267,7 @@ export default function AdminPaygPage() {
 
         <TabsContent value="operators" className="pt-4">
           <Card>
-            <CardContent className="overflow-x-auto p-0">
+            <CardContent className="relative overflow-x-auto p-0">
               <table className="w-full text-sm">
                 <thead className="border-b border-border text-left text-muted-foreground">
                   <tr>
@@ -584,7 +584,7 @@ export default function AdminPaygPage() {
 
         <TabsContent value="ledger" className="pt-4">
           <Card>
-            <CardContent className="overflow-x-auto p-0">
+            <CardContent className="relative overflow-x-auto p-0">
               <table className="w-full text-sm">
                 <thead className="border-b border-border text-left text-muted-foreground">
                   <tr>
