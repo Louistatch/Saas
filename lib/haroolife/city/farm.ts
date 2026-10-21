@@ -363,6 +363,18 @@ export interface Field {
   /** Days the field was tended (at most one per game day). */
   tended: number
   lastTendDay: number
+  /** A worker hired for the field (see workers.ts): they tend it on `days` game days from `from`. */
+  helper?: Helper
+}
+
+/** A real Haroo worker who accepted to tend the field (game money, see workers.ts). */
+export interface Helper {
+  name: string
+  /** The accepted proposal (haroolife_field_offers.id). */
+  offer: string
+  /** First game day they tend the field, and how many days. */
+  from: number
+  days: number
 }
 
 export interface Farm {
@@ -375,6 +387,8 @@ export interface Farm {
   bags?: number
   /** Last game day the granary's losses were counted. */
   checked?: number
+  /** Worker proposals whose answer this game already took into account (the latest ones). */
+  answered?: string[]
 }
 
 /** A triple-layer bag holds 100 kg; its price is the game's (FCFA). */
@@ -407,10 +421,29 @@ export type FieldStatus =
   | { kind: 'growing'; field: Field; daysLeft: number; tendedToday: boolean }
   | { kind: 'ready'; field: Field; kg: number }
 
+/** The hired worker tends the field this game day. */
+export const helperToday = (field: Field, day: number) =>
+  !!field.helper && day >= field.helper.from && day < field.helper.from + field.helper.days
+
+/**
+ * Days the hired worker has tended, up to `day` included and within the growing days. The player
+ * cannot tend on those days (tend refuses), so they never count twice.
+ */
+export function helperDays(field: Field, day = Number.POSITIVE_INFINITY): number {
+  const h = field.helper
+  if (!h) return 0
+  const end = Math.min(h.from + h.days, field.sownDay + CROPS[field.crop].days, day + 1)
+  return Math.max(0, end - h.from)
+}
+
+/** Days the field was looked after, by the player or the hired worker. */
+export const caredDays = (field: Field, day?: number) =>
+  Math.min(CROPS[field.crop].days, field.tended + helperDays(field, day))
+
 /** Yield of a field: the full harvest if tended every day, 40 % if never. */
 export const yieldOf = (field: Field) => {
   const crop = CROPS[field.crop]
-  const care = Math.min(1, field.tended / crop.days)
+  const care = Math.min(1, caredDays(field) / crop.days)
   return Math.round(crop.kg * (0.4 + 0.6 * care))
 }
 
@@ -419,7 +452,12 @@ export function fieldStatus(s: CityLife): FieldStatus {
   if (!field) return { kind: 'empty' }
   const left = field.sownDay + CROPS[field.crop].days - s.life.day
   if (left <= 0) return { kind: 'ready', field, kg: yieldOf(field) }
-  return { kind: 'growing', field, daysLeft: left, tendedToday: field.lastTendDay === s.life.day }
+  return {
+    kind: 'growing',
+    field,
+    daysLeft: left,
+    tendedToday: field.lastTendDay === s.life.day || helperToday(field, s.life.day),
+  }
 }
 
 const note = (s: CityLife, msg: string): CityLife => ({
@@ -482,6 +520,8 @@ export function tend(s: CityLife): CityLife {
   if (status.kind === 'ready') return note(s, 'C’est mûr : il est temps de récolter.')
   const field = status.field
   if (field.locality !== s.locality) return note(s, 'Ton champ est dans une autre ville.')
+  if (field.helper && helperToday(field, s.life.day))
+    return note(s, `${field.helper.name} s’occupe de ton champ aujourd’hui.`)
   if (status.tendedToday) return note(s, 'Tu es déjà passé au champ aujourd’hui.')
   if (!daylight(s)) return note(s, 'Les champs se travaillent de 6 h à 19 h.')
   if (s.life.needs.energy < 15) return note(s, 'Repose-toi avant d’aller au champ.')
@@ -725,12 +765,29 @@ export function decodeFarm(v: unknown): Farm | undefined {
       tended: Math.max(0, Math.min(CROPS[f.crop].days, f.tended as number)),
       lastTendDay: f.lastTendDay as number,
     }
+  const h = f?.helper as Partial<Helper> | undefined
+  if (
+    field &&
+    h &&
+    typeof h.name === 'string' &&
+    typeof h.offer === 'string' &&
+    Number.isSafeInteger(h.from) &&
+    Number.isSafeInteger(h.days) &&
+    (h.days as number) >= 1 &&
+    (h.days as number) <= 3
+  )
+    field.helper = {
+      name: h.name.slice(0, 40),
+      offer: h.offer.slice(0, 40),
+      from: h.from as number,
+      days: h.days as number,
+    }
   const stock: Farm['stock'] = {}
   if (raw.stock && typeof raw.stock === 'object')
     for (const [k, kg] of Object.entries(raw.stock))
       if (isCrop(k) && Number.isSafeInteger(kg) && (kg as number) > 0)
         stock[k] = Math.min(kg as number, CROPS[k].kg * 20)
-  const extra = v as { since?: unknown; bags?: unknown; checked?: unknown }
+  const extra = v as { since?: unknown; bags?: unknown; checked?: unknown; answered?: unknown }
   const day = (n: unknown): n is number => Number.isSafeInteger(n) && (n as number) >= 0
   const since: Farm['since'] = {}
   if (extra.since && typeof extra.since === 'object')
@@ -740,5 +797,9 @@ export function decodeFarm(v: unknown): Farm | undefined {
   if (Object.keys(since).length) farm.since = since
   if (day(extra.bags) && extra.bags > 0) farm.bags = Math.min(extra.bags, MAX_BAGS)
   if (day(extra.checked)) farm.checked = extra.checked
+  if (Array.isArray(extra.answered)) {
+    const answered = extra.answered.filter((a): a is string => typeof a === 'string').slice(0, 10)
+    if (answered.length) farm.answered = answered.map((a) => a.slice(0, 40))
+  }
   return farm
 }

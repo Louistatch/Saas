@@ -15,6 +15,7 @@ import {
   MONTHS,
   type PriceLine,
   buyBags,
+  caredDays,
   cropPrice,
   fieldStatus,
   harvest,
@@ -30,6 +31,7 @@ import {
 import type { CityLife } from '@/lib/haroolife/city/life'
 import { LOCALITIES } from '@/lib/haroolife/city/locality'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import FieldWorkers from './field-workers'
 
 interface YearRange {
   culture: string
@@ -208,7 +210,7 @@ export default function FarmPanel({
           </p>
           <p className="text-sm text-slate-600">
             Récolte dans {status.daysLeft} jour{status.daysLeft > 1 ? 's' : ''} · entretenu{' '}
-            {status.field.tended} jour{status.field.tended > 1 ? 's' : ''} sur{' '}
+            {caredDays(status.field, day)} jour{caredDays(status.field, day) > 1 ? 's' : ''} sur{' '}
             {CROPS[status.field.crop].days}
           </p>
           <button
@@ -217,9 +219,11 @@ export default function FarmPanel({
             onClick={() => update(tend)}
             className="w-full rounded-xl bg-lime-700 px-3 py-3 text-sm font-black text-white disabled:opacity-50"
           >
-            {status.tendedToday
-              ? 'Déjà passé au champ aujourd’hui'
-              : 'Passer au champ : désherber, arroser'}
+            {status.field.helper && status.field.lastTendDay !== day && status.tendedToday
+              ? `${status.field.helper.name} s’en occupe aujourd’hui`
+              : status.tendedToday
+                ? 'Déjà passé au champ aujourd’hui'
+                : 'Passer au champ : désherber, arroser'}
           </button>
           <p className="text-[11px] text-slate-500">
             {fieldElsewhere
@@ -228,6 +232,8 @@ export default function FarmPanel({
           </p>
         </section>
       )}
+
+      <FieldWorkers cityLife={cityLife} status={status} update={update} />
 
       {status.kind === 'ready' && (
         <section aria-label="Récolte" className="space-y-2 rounded-2xl bg-amber-50 p-3">

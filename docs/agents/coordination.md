@@ -35,6 +35,38 @@ début de sa session et avant chaque push sur `main`, et y répond.
 
 ## En cours
 
+- **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-21 · **joueurs en ligne dans tout le jeu
+  + annuaire des joueurs** (demande de l'utilisateur). Nombre de personnes en ligne maintenant
+  dans tout HarooLife (battement toutes les minutes, base de données, indépendant du relais) et
+  liste de tous les habitants visibles, en ligne d'abord ; « Écrire » ouvre une conversation
+  privée même si la personne n'est pas connectée (elle la lit à son retour, dans le jeu ou sur
+  son tableau de bord). Nouveaux : migration `20261022_130000_haroolife_players.sql`,
+  `lib/haroolife/players.ts`, `components/haroolife/players-directory.tsx`, tests.
+  **Codex, retouches minimales dans le fichier partagé** `lome-life-immersive.tsx` : une ligne
+  pour le battement, le compteur de la pastille `hl-presence` (tout le jeu quand il est connu,
+  sinon « à proximité » comme avant) et l'annuaire au-dessus de `<OnlinePlayers>` dans le
+  panneau `online` (`<OnlinePlayers>` n'y est plus affiché quand le relais est absent et que le
+  compte de tout le jeu est connu : il disait « aucun statut ne peut être confirmé » sous ce
+  compte). `regional-services.tsx` (`OnlinePlayers`) n'est pas modifié.
+  **Note pour Codex** : `.hl-sheet` est en `overflow-y: hidden` ; un `scrollIntoView` (Playwright,
+  ou le focus d'un champ quand le clavier s'ouvre) fait défiler ce conteneur lui-même et laisse
+  un vide en bas de la feuille. `overflow: clip` l'empêcherait ; je n'y touche pas (ton domaine).
+  Mes specs remettent ce défilement à zéro avant leurs captures.
+
+- **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-21 · **recruter un ouvrier dans « Mon
+  champ »** (demande de l'utilisateur, argent du jeu uniquement). Les vrais ouvriers Haroo
+  disponibles reçoivent une proposition (1 à 3 jours, 1 500 FCFA du jeu par jour) dans le jeu et
+  sur leur tableau de bord ; acceptée, la paie passe par `haroolife_money_transfers`. Sans
+  ouvrier disponible, des voisins fictifs refusent avec une excuse. Nouveaux : migration
+  `20261022_120000_haroolife_field_work.sql`, `lib/haroolife/city/workers.ts`,
+  `lib/haroolife/field-work.ts`, `components/haroolife/field-workers.tsx`,
+  `components/haroolife/field-offers-card.tsx`, `tests/haroolife-workers.test.ts`,
+  `tests/haroolife-field-work.test.mjs`. Modifiés (mon domaine) : `lib/haroolife/city/farm.ts`,
+  `components/haroolife/farm-panel.tsx`. **Codex, retouche minimale dans ton domaine (tableau de
+  bord)** : `app/haroo/page.tsx`, une carte `<HarooLifeFieldOffersCard />` sous
+  `<HarooLifeMessagesCard />` (masquée quand rien n'attend de réponse). Partagé : `package.json`
+  (`test:unit`, deux tests en fin de liste).
+
 - **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-21 · **carte QR → HarooLife sous son nom**
   (demande de l'utilisateur). Le titulaire qui a ouvert la session de carte (PIN ou code SMS)
   entre dans le jeu en visiteur avec son prénom et un nom d'utilisateur proposé. Nouveaux :
