@@ -77,7 +77,7 @@ test('players online in the whole game, the list of residents, writing to someon
   await expect(rows.nth(0)).toContainText('En ligne à Kara')
   await expect(rows.nth(1)).toContainText('Edem')
   await expect(rows.nth(1)).toContainText('Passé aujourd’hui')
-  await page.screenshot({ path: info.outputPath('players-list.png') })
+  await page.screenshot({ path: info.outputPath('players-list.png'), animations: 'disabled' })
 
   await all.getByRole('searchbox', { name: 'Chercher un joueur' }).fill('ed')
   await expect(rows).toHaveCount(1)

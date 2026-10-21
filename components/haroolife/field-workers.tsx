@@ -285,7 +285,7 @@ function Recruit({
               onClick={() => setOpen(false)}
               className="text-xs font-semibold text-lime-800 underline"
             >
-              Fermer
+              Fermer la liste
             </button>
           </div>
           <fieldset className="grid grid-cols-3 gap-2" aria-label="Jours de travail">

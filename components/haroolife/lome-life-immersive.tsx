@@ -3980,7 +3980,8 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
                     }}
                   />
                 )}
-                {panel === 'online' && (
+                {/* Nearby players come from the live relay; without it, the count above says enough. */}
+                {panel === 'online' && (online || !gamePlayers) && (
                   <OnlinePlayers
                     state={realtime.state}
                     locality={cityLife.locality}

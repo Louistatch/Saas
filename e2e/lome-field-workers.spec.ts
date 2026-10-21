@@ -55,6 +55,9 @@ const city = (page: Page) =>
   page.evaluate(() => (window as unknown as { __LOME_CITY?: City }).__LOME_CITY ?? null)
 
 async function openFarm(page: Page) {
+  // Opening again remounts the farm: the panel is closed first (the game bar is under it).
+  const close = page.getByRole('button', { name: 'Fermer', exact: true })
+  if (await close.isVisible().catch(() => false)) await close.click()
   await page
     .getByRole('navigation', { name: 'Navigation du jeu' })
     .getByRole('button', { name: 'Téléphone' })
@@ -115,7 +118,7 @@ test('recruit a real worker: two days proposed, accepted, paid once, the field i
   await expect(komla).toContainText('Komla')
   await expect(komla).toContainText('Dans ta région')
   await expect(komla).toContainText('★ 4,5 · 12 avis · désherbage, labour, récolte')
-  await page.screenshot({ path: info.outputPath('workers-list.png') })
+  await page.screenshot({ path: info.outputPath('workers-list.png'), animations: 'disabled' })
   const start = (await city(page))?.wallet ?? 0
   await komla.getByRole('button', { name: /Proposer 2 jours à Komla · 3\s000 FCFA/ }).click()
   await expect(recruit.getByTestId('field-pending')).toContainText(
@@ -124,7 +127,7 @@ test('recruit a real worker: two days proposed, accepted, paid once, the field i
   expect(proposed).toEqual({ p_worker: WORKER, p_days: 2, p_crop: 'mais', p_locality: 'lome' })
   // Nothing is paid while the worker has not answered.
   expect((await city(page))?.wallet).toBe(start)
-  await page.screenshot({ path: info.outputPath('workers-pending.png') })
+  await page.screenshot({ path: info.outputPath('workers-pending.png'), animations: 'disabled' })
 
   // Komla accepts (in the game or on the dashboard); the farm reads the answer when it opens.
   phase = 'accepted'
@@ -138,7 +141,7 @@ test('recruit a real worker: two days proposed, accepted, paid once, the field i
     /Komla a accepté : 2 jours au champ\. −3\s000 FCFA\./,
   )
   await expect.poll(() => seen).toBeGreaterThan(0)
-  await page.screenshot({ path: info.outputPath('workers-accepted.png') })
+  await page.screenshot({ path: info.outputPath('workers-accepted.png'), animations: 'disabled' })
 
   // Read again (the server still says « accepted »): never paid twice.
   const calls = seen
@@ -173,7 +176,7 @@ test('nobody available: the neighbours refuse with an excuse, real workers are i
   await expect(invite).toHaveAttribute('href', /auth%2Fsignup%2Fharoo%3Ftype%3Douvrier/)
   // Asking the neighbours never pays anything.
   expect((await city(page))?.wallet).toBe(20000)
-  await page.screenshot({ path: info.outputPath('workers-neighbours.png') })
+  await page.screenshot({ path: info.outputPath('workers-neighbours.png'), animations: 'disabled' })
   expect(errors).toEqual([])
 })
 
@@ -200,7 +203,7 @@ test('a player who is an ouvrier accepts a proposal from the farm', async ({ pag
   await expect(asked).toContainText(
     /@ama_be te propose 2 jours au champ de maïs à Lomé · 3\s000 FCFA du jeu\./,
   )
-  await page.screenshot({ path: info.outputPath('workers-asked.png') })
+  await page.screenshot({ path: info.outputPath('workers-asked.png'), animations: 'disabled' })
   await asked.getByRole('button', { name: 'Accepter' }).click()
   await expect(
     farm.getByText(/Accepté : 3\s000 FCFA du jeu arrivent dans ton portefeuille\./),
