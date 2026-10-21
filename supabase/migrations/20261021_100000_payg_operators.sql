@@ -1068,10 +1068,22 @@ AS $$
   );
 $$;
 
+-- Cartes numériques gratuites restantes par coopérative (le compteur vit dans `private`).
+CREATE OR REPLACE FUNCTION public.payg_free_card_allowance(p_cooperative_ids uuid[])
+RETURNS TABLE (cooperative_id uuid, card_limit integer, cards_issued integer)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path TO ''
+AS $$
+  SELECT c.id, COALESCE(a.card_limit, 10), COALESCE(a.cards_issued, 0)
+  FROM unnest(p_cooperative_ids) AS c(id)
+  LEFT JOIN private.cooperative_card_allowances a ON a.cooperative_id = c.id;
+$$;
+
 DO $$
 DECLARE
   sig text;
   sigs text[] := ARRAY[
+    'public.payg_free_card_allowance(uuid[])',
     'public.payg_grant_welcome_credits(uuid, uuid)',
     'public.payg_purchase_credits(uuid, integer, integer, text, uuid, uuid, text)',
     'public.payg_adjust_credits(uuid, integer, text, uuid, text)',

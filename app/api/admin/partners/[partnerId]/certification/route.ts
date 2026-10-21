@@ -22,20 +22,30 @@ import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { type NextRequest, NextResponse, after } from 'next/server'
 import { z } from 'zod'
 
+// `user_id` désigne la personne dans une institution (un dossier par agent) ; facultatif pour
+// un opérateur individuel, qui n'a qu'un dossier.
+const person = { user_id: z.string().uuid().optional() }
+
 const bodySchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('mark_training_completed'),
     note: z.string().trim().max(500).optional(),
+    ...person,
   }),
   z.object({
     action: z.literal('record_exam'),
     exam_score: z.number().int().min(0).max(100),
     note: z.string().trim().max(500).optional(),
+    ...person,
   }),
-  z.object({ action: z.literal('activate'), note: z.string().trim().max(500).optional() }),
+  z.object({
+    action: z.literal('activate'),
+    note: z.string().trim().max(500).optional(),
+    ...person,
+  }),
   // Secours : frais réglés hors FedaPay (espèces, dépôt Mobile Money constaté). La note dit
   // comment, pour le journal d'audit.
-  z.object({ action: z.literal('mark_paid'), note: z.string().trim().min(3).max(500) }),
+  z.object({ action: z.literal('mark_paid'), note: z.string().trim().min(3).max(500), ...person }),
 ])
 
 export async function POST(
@@ -71,21 +81,29 @@ export async function POST(
       case 'mark_training_completed':
         return markPartnerTrainingCompleted(admin, {
           partnerId,
+          userId: parsed.data.user_id,
           validatorId,
           note: parsed.data.note,
         })
       case 'record_exam':
         return recordPartnerExamResult(admin, {
           partnerId,
+          userId: parsed.data.user_id,
           validatorId,
           examScore: parsed.data.exam_score,
           note: parsed.data.note,
         })
       case 'activate':
-        return activatePartnerOperator(admin, { partnerId, validatorId, note: parsed.data.note })
+        return activatePartnerOperator(admin, {
+          partnerId,
+          userId: parsed.data.user_id,
+          validatorId,
+          note: parsed.data.note,
+        })
       case 'mark_paid':
         return recordCertificationFeePaid(admin, {
           partnerId,
+          userId: parsed.data.user_id,
           validatorId,
           method: 'manual',
           note: parsed.data.note,

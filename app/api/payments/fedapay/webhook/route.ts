@@ -3,12 +3,14 @@ import {
   certificationIntentForTransaction,
   settleCertificationIntent,
 } from '@/lib/partners/certification-payment'
+import { paygIntentForTransaction, settlePaygIntent } from '@/lib/payg/payments'
 import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { type NextRequest, NextResponse } from 'next/server'
 
 /**
  * POST /api/payments/fedapay/webhook — notification FedaPay (transaction.*) : achats de comptes
- * d'exploitation et frais de certification Opérateur.
+ * d'exploitation, frais de certification Opérateur et paiements PAYG (crédits, formation,
+ * FaîtièreHub Print).
  *
  * Le corps n'est jamais cru sur parole : on n'en tire que l'identifiant de la
  * transaction, l'achat correspondant est ensuite réglé d'après FedaPay lui-même
@@ -33,6 +35,12 @@ export async function POST(request: NextRequest) {
     // Frais de certification Opérateur (même relecture auprès de FedaPay).
     const intentId = await certificationIntentForTransaction(String(txId))
     if (intentId) await settleCertificationIntent(intentId)
+    else {
+      // PAYG : packs de crédits, formation, commandes FaîtièreHub Print (même relecture).
+      const admin = createAdminClient()
+      const paygIntent = await paygIntentForTransaction(admin, String(txId))
+      if (paygIntent) await settlePaygIntent(admin, paygIntent)
+    }
   }
   return NextResponse.json({ ok: true })
 }

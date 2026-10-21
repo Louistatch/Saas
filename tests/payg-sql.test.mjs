@@ -325,6 +325,19 @@ test('PAYG : institution, agents, crédits, cartes, cloisonnement, quota, format
       format: 'digital',
     })
     assert.equal(eleventh.outcome, 'free_allowance_exhausted')
+    const left = (
+      await db.query(
+        `SELECT * FROM public.payg_free_card_allowance(ARRAY['${id(C4)}','${id(C2)}']::uuid[]) ORDER BY 1`,
+      )
+    ).rows
+    assert.deepEqual(
+      left.map((r) => [r.card_limit, r.cards_issued]),
+      [
+        [10, 0],
+        [10, 10],
+      ],
+      'C2 (aucune carte gratuite) et C4 (10 utilisées)',
+    )
     // Kossi n’a pas encore ses crédits offerts : la carte commerciale est refusée…
     const noCredit = await issue(db, {
       actor: KOSSI,
