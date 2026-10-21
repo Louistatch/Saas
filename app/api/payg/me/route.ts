@@ -2,7 +2,13 @@
 // coopératives qu'il peut servir, sa formation et la grille tarifaire en vigueur.
 
 import { CARD_COMMISSION_FCFA, CREDIT_PACKS, INDICATIVE_CARD_PRICES } from '@/lib/payg/model'
-import { cooperativesFor, getPaygContext, membershipSummary, walletOf } from '@/lib/payg/server'
+import {
+  cooperativesFor,
+  ensureTrainingAccount,
+  getPaygContext,
+  membershipSummary,
+  walletOf,
+} from '@/lib/payg/server'
 import { type NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
@@ -40,16 +46,16 @@ export async function GET(request: NextRequest) {
     card_prices: INDICATIVE_CARD_PRICES,
   }
 
-  const { data: training } = await ctx.admin
-    .from('training_fee_accounts')
-    .select('id, total_fcfa, installment_fcfa, paid_fcfa, payer, status, partner_id')
-    .eq('user_id', ctx.userId)
-    .maybeSingle()
   const { data: certification } = await ctx.admin
     .from('partner_certifications')
-    .select('training_completed_at, exam_passed_at, certified_at')
+    .select('partner_id, training_completed_at, exam_passed_at, certified_at')
     .eq('user_id', ctx.userId)
     .maybeSingle()
+  // Dossier ouvert par l'inscription Opérateur existante : son compte de formation est créé
+  // à la première lecture (une seule fois, contrainte UNIQUE sur la personne).
+  const training = certification?.partner_id
+    ? await ensureTrainingAccount(ctx.admin, ctx.userId, certification.partner_id)
+    : null
 
   if (!membership) {
     return NextResponse.json({
