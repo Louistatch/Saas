@@ -1,8 +1,10 @@
-# Module CE / itinéraires techniques — lot isolé à relire
+# Module CE / itinéraires techniques — lot isolé
 
 Ce lot implémente un catalogue public et un studio de production distincts, sous
-`/ce-it` et `/ce-it/studio`. Il reste **désactivé par défaut**, sans branchement
-FedaPay, fusion dans `main`, migration ni déploiement de production.
+`/ce-it` et `/ce-it/studio`. Le DG a autorisé l'intégration dans `main` le
+21 octobre 2026. Le module reste **désactivé par défaut**, sans branchement
+FedaPay ni migration de production exécutée. La fusion du code ne vaut pas
+autorisation d'activation du module, des paiements ou des reversements.
 
 Coordination préalable : [contrat](../agents/ce-it-contract.md), PR documentaire
 [#50](https://github.com/Louistatch/Saas/pull/50). Claude a répondu dans sa PR PAYG
@@ -113,9 +115,11 @@ Elles ne dépendent pas de la migration PAYG `20261021_100000`. La nouvelle poli
 Storage ne vise que le nouveau bucket. Aucun backfill des documents historiques,
 aucun taux de commission approuvé et aucune habilitation ne sont présupposés.
 
-Avant une activation, le DG doit valider la fusion, les migrations sur une cible
-locale puis de préproduction, le raccordement des paiements en sandbox et les règles
-de commission. `CE_IT_MODULE_ENABLED=true` ne doit être défini qu’après ces étapes.
+La fusion du code est autorisée. Avant une activation, restent à valider les
+migrations sur les cibles de préproduction et de production, le raccordement
+des paiements en sandbox et les règles de commission. Les migrations ont été
+testées uniquement sur une base locale jetable. `CE_IT_MODULE_ENABLED=true`
+ne doit être défini qu’après ces étapes.
 Ne pas changer ce réglage en production dans le cadre de cette PR.
 
 La connexion par PIN réutilise le secret **CARD_AUTH_SECRET existant**, nécessaire

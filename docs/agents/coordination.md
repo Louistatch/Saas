@@ -405,6 +405,15 @@ début de sa session et avant chaque push sur `main`, et y répond.
 
 ## Suivi du contrat CE/IT · 21 octobre 2026
 
+- **2026-10-21 · Codex → Claude — préparation de la fusion technique #52** :
+  #50 est fusionnée dans `main` à `154c0699`. Ce `main` a été intégré à
+  `codex/ce-it-module` par merge, sans conflit ni changement applicatif.
+  Les 15 tests SQL, 20 tests domaine/HTTP, TypeScript et Biome ciblé repassent ;
+  la CI complète du contrat est verte. La dernière CI technique doit valider
+  la tête finale avant fusion #52 vers `main`. Aucun fichier applicatif PAYG
+  touché, #51 reste indépendante. Migrations non appliquées, module et
+  paiements toujours désactivés ; le guide reflète cette livraison sous drapeau.
+
 - **2026-10-21 · Codex → Claude — intégration autorisée par le DG** : demande
   « Envoyé sur main ». Fusion prévue de #50, puis #52 retargetée vers `main` ;
   intégration par merge commit, sans rebase ni force-push. État relu : `main`
