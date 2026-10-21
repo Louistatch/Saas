@@ -19,6 +19,7 @@ import {
   Coins,
   Droplets,
   FileText,
+  Gamepad2,
   Lock,
   Map as MapIcon,
   MapPin,
@@ -43,6 +44,10 @@ const viewSlot = () => <div aria-busy="true" className="min-h-[60vh]" />
 const AcheteurView = dynamic(
   () => import('@/components/verify/acheteur-view').then((m) => m.AcheteurView),
   { loading: viewSlot },
+)
+const HarooLifeCardView = dynamic(
+  () => import('@/components/verify/haroolife-card-view').then((m) => m.HarooLifeCardView),
+  { ssr: false },
 )
 const AgriSmartWater = dynamic(
   () => import('@/components/verify/agrismart-water').then((m) => m.AgriSmartWater),
@@ -183,6 +188,7 @@ export default function VerifyCardPage() {
     | 'cotisation'
     | 'exploitation'
     | 'meteo'
+    | 'haroolife'
   >('menu')
   const [contacts, setContacts] = useState<
     { role: 'technicien' | 'coordo'; name: string; phone: string; canton?: string | null }[] | null
@@ -1096,6 +1102,18 @@ export default function VerifyCardPage() {
                   ring: 'ring-teal-400/20',
                   bg: 'bg-teal-500/10',
                 },
+                ...(process.env.NEXT_PUBLIC_HAROOLIFE_ENABLED === 'true'
+                  ? [
+                      {
+                        icon: Gamepad2,
+                        label: 'HarooLife',
+                        view: 'haroolife',
+                        tint: 'text-emerald-300',
+                        ring: 'ring-emerald-400/20',
+                        bg: 'bg-emerald-500/10',
+                      },
+                    ]
+                  : []),
               ].map(({ icon: Icon, label, view, tint, ring, bg }) => (
                 <button
                   type="button"
@@ -1651,6 +1669,17 @@ export default function VerifyCardPage() {
           <PrivateCardSection cardNumber={cardNumber}>
             <ExploitationInlineView cardNumber={cardNumber} onBack={() => setActiveView('menu')} />
           </PrivateCardSection>
+        )}
+
+        {/* ─── HarooLife : le titulaire (PIN) joue sous son nom ─── */}
+        {isValid && activeView === 'haroolife' && (
+          <HarooLifeCardView
+            cardNumber={cardNumber}
+            firstName={firstName}
+            village={result.member?.village ?? null}
+            onBack={() => setActiveView('menu')}
+            onConnected={() => setReloadKey((k) => k + 1)}
+          />
         )}
 
         {/* ─── Météo View ─── */}

@@ -5,6 +5,7 @@ import { useCaptcha } from '@/components/shared/captcha'
 import { Logo } from '@/components/shared/logo'
 import { useHarooLifeViewport } from '@/hooks/use-haroolife-viewport'
 import { performGameLogout } from '@/lib/auth/logout'
+import { type CardIdentity, cardFromSearch, suggestedUsername } from '@/lib/haroolife/card-entry'
 import { arrivalLife } from '@/lib/haroolife/city/arrival'
 import { AVATAR_CHOSEN_STORAGE, saveAvatar } from '@/lib/haroolife/city/avatar'
 import { LOCALITIES } from '@/lib/haroolife/city/locality'
@@ -107,6 +108,9 @@ export default function GameEntry() {
   const [arriving, setArriving] = useState<null | 'new' | 'identity'>(null)
   const [arrivalError, setArrivalError] = useState<ArrivalError | null>(null)
   const pending = useRef<{ choice: ArrivalChoice; newGame: boolean } | null>(null)
+  // Opened from a member card whose session the PIN opened: its holder arrives under their name.
+  const [card, setCard] = useState<{ name: string; username: string; village: string | null }>()
+  const cardOpened = useRef(false)
   // A visitor's username (undefined until known; null: not chosen yet).
   const [myUsername, setMyUsername] = useState<string | null | undefined>(undefined)
   useEffect(() => {
@@ -124,6 +128,19 @@ export default function GameEntry() {
       } catch {
         /* storage refused: no bonus, the game still opens */
       }
+    const carte = cardFromSearch(window.location.search)
+    if (carte)
+      void fetch(`/api/verify/${encodeURIComponent(carte)}/haroolife`, { cache: 'no-store' })
+        .then((r) => (r.ok ? (r.json() as Promise<CardIdentity>) : null))
+        .then((id) => {
+          if (id?.first_name)
+            setCard({
+              name: id.first_name,
+              username: suggestedUsername(id.first_name, id.village),
+              village: id.village,
+            })
+        })
+        .catch(() => {})
     setReturnTo(window.location.pathname + window.location.search)
     setSummary(savedSummary())
     try {
@@ -187,6 +204,12 @@ export default function GameEntry() {
       setEntered(user.id)
     })
   }, [visit, user, isAuthenticated, isLoading])
+  // The card's holder, with no game on this phone yet, goes straight to the arrival (once).
+  useEffect(() => {
+    if (!card || isLoading || user || cardOpened.current) return
+    cardOpened.current = true
+    setArriving('new')
+  }, [card, isLoading, user])
   // Anti-robot check before a visitor account is created (off until its key is configured). It
   // shows on the last step of the arrival, where the account is created, not on this screen.
   const captcha = useCaptcha()
@@ -220,6 +243,7 @@ export default function GameEntry() {
     return (
       <Arrival
         only={arriving === 'identity' ? 'identity' : undefined}
+        card={arriving === 'new' ? card : undefined}
         onBack={() => {
           setArriving(null)
           setArrivalError(null)

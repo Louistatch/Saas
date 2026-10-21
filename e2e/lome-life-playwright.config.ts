@@ -51,6 +51,7 @@ export default defineConfig({
     'lome-housing.spec.ts',
     'lome-house-build.spec.ts',
     'lome-regional-life.spec.ts',
+    'lome-card-entry.spec.ts',
   ],
   reporter: [['list'], ['html', { outputFolder: 'test-results/lome-report', open: 'never' }]],
   fullyParallel: false,
