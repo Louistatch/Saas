@@ -75,6 +75,23 @@ export async function POST(request: NextRequest) {
   if (!rule) {
     return NextResponse.json({ error: 'Tarif de certification indisponible' }, { status: 502 })
   }
+  // Les frais de certification sont la formation PAYG (15 000 FCFA) : une personne qui a déjà
+  // réglé des tranches ne paie que le reste, et un agent dont l'institution paie ne paie rien.
+  const { data: account } = await admin
+    .from('training_fee_accounts')
+    .select('total_fcfa, paid_fcfa, payer')
+    .eq('user_id', ctx.userId)
+    .maybeSingle<{ total_fcfa: number; paid_fcfa: number; payer: 'self' | 'institution' }>()
+  if (account?.payer === 'institution') {
+    return NextResponse.json(
+      { error: 'Votre institution règle votre formation : vous n’avez rien à payer.' },
+      { status: 403 },
+    )
+  }
+  const amount = account ? account.total_fcfa - account.paid_fcfa : rule.price_xof
+  if (amount <= 0) {
+    return NextResponse.json({ error: 'Frais de formation déjà réglés' }, { status: 409 })
+  }
   if (!isFedaPayConfigured()) {
     return NextResponse.json(
       { error: 'Le paiement en ligne n’est pas encore ouvert. Écrivez à l’équipe FaîtiereHub.' },
@@ -92,7 +109,7 @@ export async function POST(request: NextRequest) {
   const result = await startCertificationPayment({
     partnerId: certification.partner_id,
     userId: ctx.userId,
-    amount: rule.price_xof,
+    amount,
     phone,
     customer: { name, email: profile?.email ?? null },
     appUrl: (process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin).replace(/\/$/, ''),

@@ -21,6 +21,8 @@ import { ProtectedRoute } from '@/app/components/protected-route'
 import { useAuth } from '@/app/context/auth-context'
 import { Journey, journeySteps } from '@/components/operator/journey'
 import { ShareTraining } from '@/components/operator/share-training'
+import { api } from '@/components/payg/api'
+import type { PaygMe } from '@/components/payg/types'
 import { Spinner } from '@/components/shared/loading'
 import { Logo } from '@/components/shared/logo'
 import { Button } from '@/components/ui/button'
@@ -36,12 +38,11 @@ import {
   operatorStage,
   parseCertificationResult,
 } from '@/lib/partners/stage'
-import type { PartnerLedgerEntryType, PartnerStatus } from '@/types/domain'
+import type { PartnerStatus } from '@/types/domain'
 import {
-  ArrowDownCircle,
-  ArrowUpCircle,
   Award,
   CheckCircle2,
+  CreditCard,
   GraduationCap,
   LogOut,
   MessageCircle,
@@ -50,7 +51,6 @@ import {
   ShieldAlert,
   Truck,
   UserCheck,
-  Wallet,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
@@ -65,21 +65,6 @@ interface PartnerStatusResponse {
   exam_passed_at?: string | null
   certified_at?: string | null
   training?: { lessons_completed: number; lessons_total: number } | null
-}
-
-interface WalletLedgerRow {
-  id: string
-  entry_type: PartnerLedgerEntryType
-  amount_fcfa: number
-  balance_after: number
-  note: string | null
-  created_at: string
-}
-
-interface WalletResponse {
-  balance_fcfa: number
-  updated_at: string | null
-  ledger: WalletLedgerRow[]
 }
 
 /** Entrée de page orchestrée : chaque bloc arrive dans l'ordre de lecture (skill ui-motion). */
@@ -141,12 +126,30 @@ function OperatorCard({ status, firstName }: { status: PartnerStatusResponse; fi
  * hébergée FedaPay ; le statut ne change qu'une fois la transaction relue
  * auprès de FedaPay (retour ou notification).
  */
-function CertificationPayment({ eligible }: { eligible: boolean }) {
+function CertificationPayment({
+  eligible,
+  training,
+}: {
+  eligible: boolean
+  training: PaygMe['training']
+}) {
   const [phone, setPhone] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
   if (!eligible) return null
+  // Les frais de certification sont ceux de la formation : l'agent dont l'institution paie
+  // n'a rien à régler, et celui qui a payé des tranches ne règle que le reste.
+  if (training?.payer === 'institution') {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Votre institution règle votre formation : vous n’avez rien à payer.
+      </p>
+    )
+  }
+  const due = training ? training.total_fcfa - training.paid_fcfa : 15_000
+  if (due <= 0) return null
+  const dueLabel = `${due.toLocaleString('fr-FR')} XOF`
 
   const pay = async () => {
     if (!phone.trim()) {
@@ -177,8 +180,9 @@ function CertificationPayment({ eligible }: { eligible: boolean }) {
   return (
     <div className="space-y-3 rounded-xl border border-amber-300/60 bg-amber-50/40 p-4">
       <p className="text-sm font-medium text-foreground">
-        Formation et évaluation validées. Il reste les frais de certification, 15 000 XOF, à régler
+        Formation et évaluation validées. Il reste les frais de certification, {dueLabel}, à régler
         par Mobile Money ou carte bancaire sur la page de paiement sécurisée FedaPay.
+        {training && training.paid_fcfa > 0 ? ' Les tranches déjà payées sont déduites.' : ''}
       </p>
       <div className="space-y-2">
         <Label htmlFor="cert-phone">Votre numéro de téléphone</Label>
@@ -191,7 +195,7 @@ function CertificationPayment({ eligible }: { eligible: boolean }) {
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
       <Button onClick={pay} disabled={submitting} className="w-full">
-        {submitting ? <Spinner className="h-4 w-4" /> : 'Payer 15 000 XOF'}
+        {submitting ? <Spinner className="h-4 w-4" /> : `Payer ${dueLabel}`}
       </Button>
     </div>
   )
@@ -235,142 +239,45 @@ function CertificationResultBanner({
   )
 }
 
-const ENTRY_LABEL: Record<PartnerLedgerEntryType, string> = {
-  CREDIT: 'Rechargement',
-  DEBIT: 'Débit',
-  REFUND: 'Remboursement',
-  REVERSAL: 'Correction',
-  ADJUSTMENT: 'Ajustement',
-  BONUS: 'Bonus',
-}
-
 /**
- * Portefeuille PAYG — n'affiche que le solde et les dernières écritures.
- * Le tableau de bord complet (filtres, export, rechargement en plusieurs
- * montants prédéfinis) reste un chantier PR 4 ; ceci prouve seulement que le
- * crédit/débit atomique posé par la migration fonctionne de bout en bout.
+ * Crédits PAYG : un crédit = une carte commerciale finalisée (250 FCFA, compris dans le prix
+ * payé par le producteur). L'émission, la recharge et l'impression se font dans la console ;
+ * ici, le solde et les deux portes d'entrée. L'ancien portefeuille en FCFA n'est plus affiché.
  */
-function WalletCard() {
-  const [wallet, setWallet] = useState<WalletResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [amount, setAmount] = useState('5000')
-  const [phone, setPhone] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
-
-  const load = () => {
-    setLoading(true)
-    fetch('/api/partner/wallet')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: WalletResponse | null) => setWallet(d))
-      .catch(() => setWallet(null))
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(load, [])
-
-  const topup = async () => {
-    const amountFcfa = Number.parseInt(amount, 10)
-    if (!Number.isFinite(amountFcfa) || amountFcfa < 1000) {
-      setError('Montant minimum : 1 000 FCFA.')
-      return
-    }
-    if (!wallet) return
-    if (!phone.trim()) {
-      setError('Indiquez le numéro mobile money à utiliser.')
-      return
-    }
-    setSubmitting(true)
-    setError('')
-    try {
-      const res = await fetch('/api/partner/wallet/topup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount_fcfa: amountFcfa, phone: phone.trim() }),
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok || !body.payment_url) {
-        setError(body.error ?? 'Rechargement impossible pour le moment.')
-        setSubmitting(false)
-        return
-      }
-      window.location.href = body.payment_url
-    } catch {
-      setError('Erreur de connexion. Vérifiez votre internet.')
-      setSubmitting(false)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-8">
-        <Spinner className="h-5 w-5" />
-      </div>
-    )
-  }
-
+function PaygSummary({ me }: { me: PaygMe | null }) {
+  if (!me?.current) return null
+  const credits = me.wallet?.credit_balance ?? 0
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-foreground">
-          <Wallet className="h-5 w-5 text-primary" /> Portefeuille PAYG
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        <p className="text-3xl font-bold text-foreground">
-          {(wallet?.balance_fcfa ?? 0).toLocaleString('fr-FR')}{' '}
-          <span className="text-base font-normal text-muted-foreground">FCFA</span>
-        </p>
-
-        <div className="flex gap-2">
-          <Input
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            inputMode="numeric"
-            className="w-28"
-            aria-label="Montant à recharger (FCFA)"
-          />
-          <Input
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+228 90 00 00 00"
-            className="flex-1"
-            aria-label="Numéro mobile money"
-          />
-          <Button onClick={topup} disabled={submitting}>
-            {submitting ? <Spinner className="h-4 w-4" /> : 'Recharger'}
+    <section
+      aria-labelledby="payg-summary-title"
+      className="rounded-2xl border border-border p-4 sm:p-5"
+    >
+      <h2
+        id="payg-summary-title"
+        className="flex items-center gap-2 text-base font-semibold text-foreground"
+      >
+        <CreditCard className="h-5 w-5 text-primary" aria-hidden /> Cartes et crédits
+      </h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        <span className="text-2xl font-bold tabular-nums text-foreground">{credits}</span> crédit
+        {credits > 1 ? 's' : ''} : une carte commerciale finalisée prend un crédit.
+        {me.wallet && me.wallet.welcome_credits > 0
+          ? ` Dont ${me.wallet.welcome_credits} offert${me.wallet.welcome_credits > 1 ? 's' : ''}.`
+          : ''}
+      </p>
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+        <Button className="min-h-11 flex-1" asChild>
+          <Link href={`/operator/console?partner=${me.current.partner_id}`}>Ouvrir ma console</Link>
+        </Button>
+        {me.current.capabilities.manageAgents && (
+          <Button variant="outline" className="min-h-11 flex-1" asChild>
+            <Link href={`/operator/institution?partner=${me.current.partner_id}`}>
+              Console institution
+            </Link>
           </Button>
-        </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-
-        {wallet && wallet.ledger.length > 0 && (
-          <ul className="divide-y divide-border">
-            {wallet.ledger.map((entry) => (
-              <li key={entry.id} className="flex items-center justify-between py-2 text-sm">
-                <span className="flex items-center gap-2">
-                  {entry.amount_fcfa >= 0 ? (
-                    <ArrowUpCircle className="h-4 w-4 text-primary" />
-                  ) : (
-                    <ArrowDownCircle className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  {ENTRY_LABEL[entry.entry_type]}
-                </span>
-                <span
-                  className={
-                    entry.amount_fcfa >= 0
-                      ? 'font-medium text-primary'
-                      : 'font-medium text-foreground'
-                  }
-                >
-                  {entry.amount_fcfa >= 0 ? '+' : ''}
-                  {entry.amount_fcfa.toLocaleString('fr-FR')} FCFA
-                </span>
-              </li>
-            ))}
-          </ul>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   )
 }
 
@@ -594,6 +501,12 @@ function OperatorPageContent() {
 
   useEffect(load, [])
 
+  // Contexte PAYG (crédits, formation) : lu une fois, sans bloquer l'affichage du parcours.
+  const [payg, setPayg] = useState<PaygMe | null>(null)
+  useEffect(() => {
+    api<PaygMe>('/api/payg/me').then((res) => res.ok && setPayg(res.data))
+  }, [])
+
   const [payResult, setPayResult] = useState<ReturnType<typeof parseCertificationResult>>(null)
   useEffect(() => {
     const parsed = parseCertificationResult(window.location.search)
@@ -654,7 +567,12 @@ function OperatorPageContent() {
                         </Link>
                       </Button>
                     ),
-                    paymentAction: <CertificationPayment eligible={paymentDue} />,
+                    paymentAction: (
+                      <CertificationPayment
+                        eligible={paymentDue}
+                        training={payg?.training ?? null}
+                      />
+                    ),
                   })}
                 />
                 {status.training_completed_at && (
@@ -669,7 +587,7 @@ function OperatorPageContent() {
 
             {(status.status === 'certified' || status.status === 'active') && (
               <div className={`mt-8 ${enter(2)}`}>
-                <WalletCard />
+                <PaygSummary me={payg} />
               </div>
             )}
 

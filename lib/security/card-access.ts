@@ -97,7 +97,9 @@ export async function requirePrivateCard(value: string) {
 
   let accountFailure: NextResponse | null = null
 
-  if (user) {
+  // Un visiteur HarooLife (compte anonyme) n'est pas un compte FaîtiereHub : pour la carte, il
+  // est déconnecté, et son titulaire doit pouvoir y entrer par le PIN ou le code SMS.
+  if (user && !user.is_anonymous) {
     if (!number) {
       return {
         ok: false as const,

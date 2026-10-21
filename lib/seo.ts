@@ -24,7 +24,7 @@ export const PUBLIC_PAGES = {
   '/pricing': {
     title: 'Tarifs pour coopératives et professionnels — FaîtiereHub',
     description:
-      'Comparez les offres FaîtiereHub pour votre coopérative agricole et découvrez les profils professionnels Haroo au Togo.',
+      'Sans abonnement : 250 FCFA par carte commerciale émise, crédits prépayés pour les opérateurs, formation à 15 000 FCFA. Profils Haroo sans frais.',
   },
   '/marche': {
     title: 'Marché agricole de proximité au Togo — FaîtiereHub',

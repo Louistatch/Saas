@@ -67,7 +67,13 @@ export async function createPrintOrder(
     .is('effective_to', null)
     .maybeSingle<{ price_xof: number }>()
   if (!rule) {
-    return { ok: false, error: 'Tarif carte physique indisponible' }
+    // Ancienne carte à 2 000 FCFA (500 / 1 500) close par la refonte PAYG : l'impression passe
+    // désormais par l'opérateur (self-print) ou par une commande FaîtièreHub Print.
+    return {
+      ok: false,
+      error:
+        'L’ancienne carte physique à 2 000 FCFA est retirée : l’opérateur imprime lui-même ou commande FaîtièreHub Print.',
+    }
   }
 
   // Une carte physique suppose une identité numérique déjà émise (§42) — on

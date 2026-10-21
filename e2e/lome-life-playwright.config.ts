@@ -51,6 +51,7 @@ export default defineConfig({
     'lome-housing.spec.ts',
     'lome-house-build.spec.ts',
     'lome-regional-life.spec.ts',
+    'lome-card-entry.spec.ts',
   ],
   reporter: [['list'], ['html', { outputFolder: 'test-results/lome-report', open: 'never' }]],
   fullyParallel: false,
@@ -110,7 +111,9 @@ export default defineConfig({
         HAROOLIFE_REQUIRE_CAPTCHA: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ? '1' : '0',
       },
       url: `${authURL}/auth/v1/health`,
-      reuseExistingServer: process.env.HAROOLIFE_REUSE_SERVER === '1' && !process.env.CI,
+      // In CI the workflow starts this stand-in first (the realtime relay needs it before the
+      // tests), so the one already listening is reused instead of colliding on the port.
+      reuseExistingServer: process.env.HAROOLIFE_REUSE_SERVER === '1' || !!process.env.CI,
     },
     {
       cwd: '..',

@@ -85,7 +85,8 @@ export async function settleCertificationIntent(
     .maybeSingle()
   if (!intent || intent.purpose !== 'certification' || intent.provider !== 'fedapay')
     return 'unknown'
-  if (intent.status === 'success') return 'success'
+  // Déjà réglée : l'enregistrement est rejoué (idempotent) au cas où il aurait été interrompu.
+  if (intent.status === 'success') return (await record(admin, intent)) ? 'success' : 'pending'
   if (intent.status !== 'pending' && intent.status !== 'processing') return 'failed'
   if (intent.provider_reference.startsWith('fedapay-pending-')) return 'pending'
 
@@ -120,19 +121,10 @@ export async function settleCertificationIntent(
       metadata: { fedapay_status: tx.status },
       updated_at: now,
     })
-    if (claim.claimed) {
-      const recorded = await recordCertificationFeePaid(admin, {
-        partnerId: intent.partner_id,
-        validatorId: intent.created_by,
-        method: 'fedapay',
-        note: `Transaction FedaPay ${intent.provider_reference}`,
-      })
-      // Paiement encaissé mais dossier non mis à jour : visible en base (intention 'success',
-      // certified_at vide), réparable par « marquer payé » ; jamais un second encaissement.
-      if (!recorded.ok)
-        log.error('Certification paid but not recorded', { intentId, error: recorded.error })
+    if (claim.claimed || claim.reason === 'already_settled') {
+      return (await record(admin, intent)) ? 'success' : 'pending'
     }
-    return claim.claimed || claim.reason === 'already_settled' ? 'success' : 'pending'
+    return 'pending'
   }
   if (['declined', 'canceled', 'cancelled', 'expired', 'refunded'].includes(tx.status)) {
     await claimPartnerIntentForSettlement(admin, intent.id, {
@@ -143,6 +135,28 @@ export async function settleCertificationIntent(
     return 'failed'
   }
   return 'pending'
+}
+
+/**
+ * Enregistre la certification payée (idempotent). Paiement encaissé mais dossier non mis à
+ * jour : l'intention reste 'success' et la relecture quotidienne (/api/cron/payg-reconcile)
+ * rejoue l'enregistrement ; jamais un second encaissement, jamais de saisie à la main.
+ */
+async function record(
+  admin: ReturnType<typeof createAdminClient>,
+  intent: { id: string; partner_id: string; provider_reference: string; created_by: string | null },
+): Promise<boolean> {
+  const recorded = await recordCertificationFeePaid(admin, {
+    partnerId: intent.partner_id,
+    // La personne qui paie ses propres frais (route /api/partner/certification/pay).
+    userId: intent.created_by ?? undefined,
+    validatorId: intent.created_by,
+    method: 'fedapay',
+    note: `Transaction FedaPay ${intent.provider_reference}`,
+  })
+  if (!recorded.ok)
+    log.error('Certification paid but not recorded', { intentId: intent.id, error: recorded.error })
+  return recorded.ok
 }
 
 /** Intention de certification FedaPay correspondant à une transaction (notification). */

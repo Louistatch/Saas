@@ -91,6 +91,7 @@ export async function settleOperatorTraining(
     return { ...base, trainingCompleted: true, newlyCompleted: false }
   const result = await markPartnerTrainingCompleted(admin, {
     partnerId: dossier.partnerId,
+    userId: profileId,
     validatorId: profileId,
     note: `Automatique : ${completed} leçons sur ${total} validées en ligne`,
   })

@@ -57,6 +57,7 @@ export default function Arrival({
   captcha,
   captchaReady = true,
   only,
+  card,
 }: {
   onBack: () => void
   onFinish: (choice: ArrivalChoice) => void
@@ -68,10 +69,12 @@ export default function Arrival({
   captchaReady?: boolean
   /** A visitor who already plays only picks their username. */
   only?: 'identity'
+  /** Arriving from one's member card (PIN checked): the name and a username to start from. */
+  card?: { name: string; username: string; village: string | null }
 }) {
   const [step, setStep] = useState(0)
-  const [name, setName] = useState('')
-  const [username, setUsername] = useState('')
+  const [name, setName] = useState(card?.name ?? '')
+  const [username, setUsername] = useState(card?.username ?? '')
   const [check, setCheck] = useState<Check>({ state: 'idle' })
   const [birth, setBirth] = useState({ day: '', month: '', year: '' })
   const [accepted, setAccepted] = useState(false)
@@ -307,6 +310,15 @@ export default function Arrival({
               Au quartier, on t’appelle comment ? Pas besoin d’e-mail ni de mot de passe : tu joues
               en visiteur.
             </p>
+            {card && (
+              <p
+                data-testid="arrival-card"
+                className="rounded-2xl bg-[#e3f1e8] px-4 py-3 text-sm font-semibold text-[#13362b]"
+              >
+                Carte vérifiée par ton PIN{card.village ? ` (village : ${card.village})` : ''}. Ton
+                nom est déjà rempli.
+              </p>
+            )}
             <label className={only ? 'hidden' : 'block'}>
               <span className="text-sm font-bold">Ton nom</span>
               <input

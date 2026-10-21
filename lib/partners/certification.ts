@@ -43,22 +43,34 @@ interface CertificationRow {
 
 interface PartnerRow {
   status: PartnerStatus
+  operator_kind: 'individual' | 'institutional'
 }
 
-async function loadState(admin: AdminClient, partnerId: string) {
-  const { data: certification } = await admin
+/**
+ * Un opérateur individuel a un seul dossier ; une institution en a un par agent formé. `userId`
+ * désigne alors la personne : sans lui, une institution à plusieurs dossiers n'en trouve aucun
+ * (jamais « le premier venu »).
+ */
+async function loadState(admin: AdminClient, partnerId: string, userId?: string) {
+  let query = admin
     .from('partner_certifications')
-    .select('training_completed_at, exam_score, exam_passed_at, certified_at')
+    .select('user_id, training_completed_at, exam_score, exam_passed_at, certified_at')
     .eq('partner_id', partnerId)
-    .maybeSingle<CertificationRow>()
+  if (userId) query = query.eq('user_id', userId)
+  const { data: certification } = await query.maybeSingle<CertificationRow & { user_id: string }>()
 
   const { data: partner } = await admin
     .from('partners')
-    .select('status')
+    .select('status, operator_kind')
     .eq('id', partnerId)
     .maybeSingle<PartnerRow>()
 
   return { certification, partner }
+}
+
+/** Le statut d'une institution ne suit pas la formation de ses agents : il reste le sien. */
+function followsTraining(partner: PartnerRow) {
+  return partner.operator_kind !== 'institutional'
 }
 
 async function writeAuditLog(
@@ -100,9 +112,10 @@ export async function markPartnerTrainingStarted(
   admin: AdminClient,
   params: { partnerId: string; learnerId: string },
 ): Promise<CertificationActionResult> {
-  const { partner } = await loadState(admin, params.partnerId)
+  const { partner } = await loadState(admin, params.partnerId, params.learnerId)
   if (!partner) return { ok: false, error: 'Candidature Opérateur introuvable' }
-  if (partner.status !== 'candidate') return { ok: true, partner_status: partner.status }
+  if (partner.status !== 'candidate' || !followsTraining(partner))
+    return { ok: true, partner_status: partner.status }
   const now = new Date().toISOString()
   const { error } = await admin
     .from('partners')
@@ -132,9 +145,9 @@ export async function markPartnerTrainingStarted(
  */
 export async function markPartnerTrainingCompleted(
   admin: AdminClient,
-  params: { partnerId: string; validatorId: string; note?: string },
+  params: { partnerId: string; validatorId: string; note?: string; userId?: string },
 ): Promise<CertificationActionResult> {
-  const { certification, partner } = await loadState(admin, params.partnerId)
+  const { certification, partner } = await loadState(admin, params.partnerId, params.userId)
   if (!certification || !partner) {
     return { ok: false, error: 'Candidature Opérateur introuvable' }
   }
@@ -147,11 +160,12 @@ export async function markPartnerTrainingCompleted(
       .from('partner_certifications')
       .update({ training_completed_at: now, updated_at: now })
       .eq('partner_id', params.partnerId)
+      .eq('user_id', certification.user_id)
     if (error) return { ok: false, error: 'Écriture impossible' }
   }
 
   const nextStatus: PartnerStatus =
-    partner.status === 'candidate' || partner.status === 'training'
+    followsTraining(partner) && (partner.status === 'candidate' || partner.status === 'training')
       ? 'exam_pending'
       : partner.status
   if (nextStatus !== partner.status) {
@@ -192,13 +206,19 @@ export async function markPartnerTrainingCompleted(
  */
 export async function recordPartnerExamResult(
   admin: AdminClient,
-  params: { partnerId: string; validatorId: string; examScore: number; note?: string },
+  params: {
+    partnerId: string
+    validatorId: string
+    examScore: number
+    note?: string
+    userId?: string
+  },
 ): Promise<CertificationActionResult> {
   if (!Number.isInteger(params.examScore) || params.examScore < 0 || params.examScore > 100) {
     return { ok: false, error: 'Le score doit être un entier entre 0 et 100' }
   }
 
-  const { certification, partner } = await loadState(admin, params.partnerId)
+  const { certification, partner } = await loadState(admin, params.partnerId, params.userId)
   if (!certification || !partner) {
     return { ok: false, error: 'Candidature Opérateur introuvable' }
   }
@@ -218,6 +238,7 @@ export async function recordPartnerExamResult(
     .from('partner_certifications')
     .update({ exam_score: params.examScore, exam_passed_at: examPassedAt, updated_at: now })
     .eq('partner_id', params.partnerId)
+    .eq('user_id', certification.user_id)
   if (error) return { ok: false, error: 'Écriture impossible' }
 
   await writeAuditLog(admin, {
@@ -231,6 +252,24 @@ export async function recordPartnerExamResult(
     newState: { exam_score: params.examScore, exam_passed_at: examPassedAt, threshold },
     note: params.note,
   })
+
+  // Formation déjà soldée (PAYG, en une fois ou en tranches) : l'évaluation réussie certifie.
+  if (passed && !certification.certified_at) {
+    const { data: account } = await admin
+      .from('training_fee_accounts')
+      .select('status')
+      .eq('user_id', certification.user_id)
+      .maybeSingle()
+    if (account?.status === 'paid' || account?.status === 'waived') {
+      await recordCertificationFeePaid(admin, {
+        partnerId: params.partnerId,
+        userId: certification.user_id,
+        validatorId: params.validatorId,
+        method: 'training',
+        note: 'Formation soldée avant l’évaluation',
+      })
+    }
+  }
 
   return { ok: true, exam_score: params.examScore, exam_passed_at: examPassedAt }
 }
@@ -247,11 +286,16 @@ export async function recordCertificationFeePaid(
   params: {
     partnerId: string
     validatorId: string | null
-    method: 'fedapay' | 'manual'
+    /**
+     * fedapay : frais réglés d'un coup sur FedaPay ; training : compte de formation soldé
+     * (tranches FedaPay). Aucun règlement ne s'enregistre à la main.
+     */
+    method: 'fedapay' | 'training'
     note?: string
+    userId?: string
   },
 ): Promise<CertificationActionResult> {
-  const { certification, partner } = await loadState(admin, params.partnerId)
+  const { certification, partner } = await loadState(admin, params.partnerId, params.userId)
   if (!certification || !partner) {
     return { ok: false, error: 'Candidature Opérateur introuvable' }
   }
@@ -265,13 +309,35 @@ export async function recordCertificationFeePaid(
     .from('partner_certifications')
     .update({ certified_at: now, updated_at: now })
     .eq('partner_id', params.partnerId)
+    .eq('user_id', certification.user_id)
     .is('certified_at', null)
     .select('partner_id')
   if (error) return { ok: false, error: 'Écriture impossible' }
   // Un appel concurrent a déjà enregistré le règlement : rien d'autre à faire.
   if (!written?.length) return { ok: true, partner_status: partner.status }
 
-  const nextStatus = statusAfterCertificationPaid(partner.status)
+  // Le compte de formation PAYG suit : frais réglés d'un coup = compte soldé (sans doublon).
+  if (params.method !== 'training') {
+    const { data: account } = await admin
+      .from('training_fee_accounts')
+      .select('id, total_fcfa, paid_fcfa')
+      .eq('user_id', certification.user_id)
+      .maybeSingle()
+    if (account && account.paid_fcfa < account.total_fcfa) {
+      await admin.rpc('payg_record_training_payment', {
+        p_account_id: account.id,
+        p_amount_fcfa: account.total_fcfa - account.paid_fcfa,
+        p_method: 'certification',
+        p_idempotency_key: `certification:${certification.user_id}`,
+        p_actor: params.validatorId as string,
+        p_reference: params.note as string,
+      })
+    }
+  }
+
+  const nextStatus = followsTraining(partner)
+    ? statusAfterCertificationPaid(partner.status)
+    : partner.status
   if (nextStatus !== partner.status) {
     await admin
       .from('partners')
@@ -281,10 +347,7 @@ export async function recordCertificationFeePaid(
 
   await writeAuditLog(admin, {
     validatorId: params.validatorId,
-    action:
-      params.method === 'manual'
-        ? 'partner_certification_marked_paid'
-        : 'partner_certification_paid',
+    action: 'partner_certification_paid',
     partnerId: params.partnerId,
     previousState: { certified_at: null, status: partner.status },
     newState: { certified_at: now, status: nextStatus, method: params.method },
@@ -303,9 +366,9 @@ export async function recordCertificationFeePaid(
  */
 export async function activatePartnerOperator(
   admin: AdminClient,
-  params: { partnerId: string; validatorId: string; note?: string },
+  params: { partnerId: string; validatorId: string; note?: string; userId?: string },
 ): Promise<CertificationActionResult> {
-  const { certification, partner } = await loadState(admin, params.partnerId)
+  const { certification, partner } = await loadState(admin, params.partnerId, params.userId)
   if (!certification || !partner) {
     return { ok: false, error: 'Candidature Opérateur introuvable' }
   }
@@ -330,6 +393,12 @@ export async function activatePartnerOperator(
     previousState: { status: partner.status },
     newState: { status: 'active' },
     note: params.note,
+  })
+
+  // PAYG : 10 crédits offerts à l'ouverture, une seule fois par opérateur.
+  await admin.rpc('payg_grant_welcome_credits', {
+    p_partner_id: params.partnerId,
+    p_actor: params.validatorId,
   })
 
   return { ok: true, partner_status: 'active' }

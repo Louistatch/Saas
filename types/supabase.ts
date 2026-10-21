@@ -981,6 +981,181 @@ export type Database = {
           },
         ]
       }
+      card_commissions: {
+        Row: {
+          billing_rule_id: string | null
+          card_format: string
+          commission_fcfa: number
+          consume_ledger_id: string
+          cooperative_id: string
+          created_at: string
+          id: string
+          issued_by: string | null
+          member_card_id: string
+          member_id: string
+          partner_id: string
+          producer_price_fcfa: number | null
+          release_ledger_id: string | null
+          release_reason: string | null
+          released_at: string | null
+          source: Database["public"]["Enums"]["card_commission_source"]
+          status: Database["public"]["Enums"]["card_commission_status"]
+        }
+        Insert: {
+          billing_rule_id?: string | null
+          card_format?: string
+          commission_fcfa: number
+          consume_ledger_id: string
+          cooperative_id: string
+          created_at?: string
+          id?: string
+          issued_by?: string | null
+          member_card_id: string
+          member_id: string
+          partner_id: string
+          producer_price_fcfa?: number | null
+          release_ledger_id?: string | null
+          release_reason?: string | null
+          released_at?: string | null
+          source: Database["public"]["Enums"]["card_commission_source"]
+          status?: Database["public"]["Enums"]["card_commission_status"]
+        }
+        Update: {
+          billing_rule_id?: string | null
+          card_format?: string
+          commission_fcfa?: number
+          consume_ledger_id?: string
+          cooperative_id?: string
+          created_at?: string
+          id?: string
+          issued_by?: string | null
+          member_card_id?: string
+          member_id?: string
+          partner_id?: string
+          producer_price_fcfa?: number | null
+          release_ledger_id?: string | null
+          release_reason?: string | null
+          released_at?: string | null
+          source?: Database["public"]["Enums"]["card_commission_source"]
+          status?: Database["public"]["Enums"]["card_commission_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_commissions_member_card_fkey"
+            columns: ["member_card_id"]
+            isOneToOne: true
+            referencedRelation: "member_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_commissions_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_commissions_cooperative_id_fkey"
+            columns: ["cooperative_id"]
+            isOneToOne: false
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_commissions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_commissions_issued_by_fkey"
+            columns: ["issued_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_commissions_consume_ledger_id_fkey"
+            columns: ["consume_ledger_id"]
+            isOneToOne: false
+            referencedRelation: "payg_credit_ledger"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_issuance_requests: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          idempotency_key: string
+          member_card_id: string
+          member_id: string
+          mode: string
+          partner_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          idempotency_key: string
+          member_card_id: string
+          member_id: string
+          mode: string
+          partner_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          idempotency_key?: string
+          member_card_id?: string
+          member_id?: string
+          mode?: string
+          partner_id?: string
+        }
+        Relationships: []
+      }
+      card_print_events: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          id: string
+          member_card_id: string
+          mode: string
+          partner_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          member_card_id: string
+          mode: string
+          partner_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          member_card_id?: string
+          mode?: string
+          partner_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_print_events_member_card_id_fkey"
+            columns: ["member_card_id"]
+            isOneToOne: false
+            referencedRelation: "member_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_print_events_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       card_print_order_items: {
         Row: {
           created_at: string
@@ -1563,6 +1738,73 @@ export type Database = {
         }
         Relationships: []
       }
+      data_rectification_requests: {
+        Row: {
+          cooperative_id: string
+          created_at: string
+          created_by: string | null
+          description: string
+          handled_by: string | null
+          id: string
+          member_id: string | null
+          partner_id: string | null
+          requested_via: string
+          resolution: string | null
+          resolved_at: string | null
+          status: Database["public"]["Enums"]["rectification_status"]
+        }
+        Insert: {
+          cooperative_id: string
+          created_at?: string
+          created_by?: string | null
+          description: string
+          handled_by?: string | null
+          id?: string
+          member_id?: string | null
+          partner_id?: string | null
+          requested_via: string
+          resolution?: string | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["rectification_status"]
+        }
+        Update: {
+          cooperative_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          handled_by?: string | null
+          id?: string
+          member_id?: string | null
+          partner_id?: string | null
+          requested_via?: string
+          resolution?: string | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["rectification_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_rectification_requests_cooperative_id_fkey"
+            columns: ["cooperative_id"]
+            isOneToOne: false
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_rectification_requests_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_rectification_requests_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       embed_configs: {
         Row: {
           allowed_origins: string[]
@@ -1613,6 +1855,120 @@ export type Database = {
             columns: ["cooperative_id"]
             isOneToOne: true
             referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      faitierehub_print_order_items: {
+        Row: {
+          member_card_id: string
+          order_id: string
+        }
+        Insert: {
+          member_card_id: string
+          order_id: string
+        }
+        Update: {
+          member_card_id?: string
+          order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "faitierehub_print_order_items_member_card_id_fkey"
+            columns: ["member_card_id"]
+            isOneToOne: false
+            referencedRelation: "member_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "faitierehub_print_order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "faitierehub_print_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      faitierehub_print_orders: {
+        Row: {
+          cancelled_at: string | null
+          card_format: string
+          created_at: string
+          delivered_at: string | null
+          delivery_address: string
+          delivery_contact: string
+          delivery_fcfa: number | null
+          fabrication_fcfa: number | null
+          id: string
+          note: string | null
+          paid_at: string | null
+          partner_id: string
+          payment_intent_id: string | null
+          quote_note: string | null
+          quoted_at: string | null
+          quoted_by: string | null
+          requested_by: string | null
+          shipped_at: string | null
+          status: Database["public"]["Enums"]["fh_print_order_status"]
+          updated_at: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          card_format: string
+          created_at?: string
+          delivered_at?: string | null
+          delivery_address: string
+          delivery_contact: string
+          delivery_fcfa?: number | null
+          fabrication_fcfa?: number | null
+          id?: string
+          note?: string | null
+          paid_at?: string | null
+          partner_id: string
+          payment_intent_id?: string | null
+          quote_note?: string | null
+          quoted_at?: string | null
+          quoted_by?: string | null
+          requested_by?: string | null
+          shipped_at?: string | null
+          status?: Database["public"]["Enums"]["fh_print_order_status"]
+          updated_at?: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          card_format?: string
+          created_at?: string
+          delivered_at?: string | null
+          delivery_address?: string
+          delivery_contact?: string
+          delivery_fcfa?: number | null
+          fabrication_fcfa?: number | null
+          id?: string
+          note?: string | null
+          paid_at?: string | null
+          partner_id?: string
+          payment_intent_id?: string | null
+          quote_note?: string | null
+          quoted_at?: string | null
+          quoted_by?: string | null
+          requested_by?: string | null
+          shipped_at?: string | null
+          status?: Database["public"]["Enums"]["fh_print_order_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "faitierehub_print_orders_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "faitierehub_print_orders_payment_intent_id_fkey"
+            columns: ["payment_intent_id"]
+            isOneToOne: false
+            referencedRelation: "partner_payment_intents"
             referencedColumns: ["id"]
           },
         ]
@@ -3442,6 +3798,188 @@ export type Database = {
           },
         ]
       }
+      partner_activity_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          cooperative_id: string | null
+          created_at: string
+          details: Json
+          id: string
+          member_card_id: string | null
+          member_id: string | null
+          partner_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          cooperative_id?: string | null
+          created_at?: string
+          details?: Json
+          id?: string
+          member_card_id?: string | null
+          member_id?: string | null
+          partner_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          cooperative_id?: string | null
+          created_at?: string
+          details?: Json
+          id?: string
+          member_card_id?: string | null
+          member_id?: string | null
+          partner_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_activity_log_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_activity_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_activity_log_cooperative_id_fkey"
+            columns: ["cooperative_id"]
+            isOneToOne: false
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_activity_log_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_agent_cooperatives: {
+        Row: {
+          assigned_by: string | null
+          cooperative_id: string
+          created_at: string
+          id: string
+          partner_id: string
+          revoked_at: string | null
+          revoked_by: string | null
+          scopes: Database["public"]["Enums"]["partner_access_scope"][]
+          status: Database["public"]["Enums"]["partner_assignment_status"]
+          user_id: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          cooperative_id: string
+          created_at?: string
+          id?: string
+          partner_id: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          scopes?: Database["public"]["Enums"]["partner_access_scope"][]
+          status?: Database["public"]["Enums"]["partner_assignment_status"]
+          user_id: string
+        }
+        Update: {
+          assigned_by?: string | null
+          cooperative_id?: string
+          created_at?: string
+          id?: string
+          partner_id?: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          scopes?: Database["public"]["Enums"]["partner_access_scope"][]
+          status?: Database["public"]["Enums"]["partner_assignment_status"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_agent_cooperatives_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_agent_cooperatives_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_agent_cooperatives_cooperative_id_fkey"
+            columns: ["cooperative_id"]
+            isOneToOne: false
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_agent_invitations: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          created_at: string
+          created_by: string | null
+          email: string
+          expires_at: string
+          full_name: string | null
+          id: string
+          membership_role: Database["public"]["Enums"]["partner_membership_role"]
+          partner_id: string
+          phone: string | null
+          revoked_at: string | null
+          token_hash: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          email: string
+          expires_at: string
+          full_name?: string | null
+          id?: string
+          membership_role?: Database["public"]["Enums"]["partner_membership_role"]
+          partner_id: string
+          phone?: string | null
+          revoked_at?: string | null
+          token_hash: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          expires_at?: string
+          full_name?: string | null
+          id?: string
+          membership_role?: Database["public"]["Enums"]["partner_membership_role"]
+          partner_id?: string
+          phone?: string | null
+          revoked_at?: string | null
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_agent_invitations_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partner_assignment_scopes: {
         Row: {
           assignment_id: string
@@ -3522,6 +4060,82 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: true
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_data_agreements: {
+        Row: {
+          agreement_version: string
+          assignment_id: string
+          cooperative_id: string
+          cooperative_signatory: string
+          created_at: string
+          data_access_mandate: boolean
+          document_reference: string | null
+          id: string
+          operator_signatory: string
+          partner_id: string
+          photo_policy: string
+          producers_informed: boolean
+          recorded_by: string | null
+          revoked_at: string | null
+          signed_on: string
+        }
+        Insert: {
+          agreement_version?: string
+          assignment_id: string
+          cooperative_id: string
+          cooperative_signatory: string
+          created_at?: string
+          data_access_mandate?: boolean
+          document_reference?: string | null
+          id?: string
+          operator_signatory: string
+          partner_id: string
+          photo_policy?: string
+          producers_informed?: boolean
+          recorded_by?: string | null
+          revoked_at?: string | null
+          signed_on: string
+        }
+        Update: {
+          agreement_version?: string
+          assignment_id?: string
+          cooperative_id?: string
+          cooperative_signatory?: string
+          created_at?: string
+          data_access_mandate?: boolean
+          document_reference?: string | null
+          id?: string
+          operator_signatory?: string
+          partner_id?: string
+          photo_policy?: string
+          producers_informed?: boolean
+          recorded_by?: string | null
+          revoked_at?: string | null
+          signed_on?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_data_agreements_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "partner_organization_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_data_agreements_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_data_agreements_cooperative_id_fkey"
+            columns: ["cooperative_id"]
+            isOneToOne: false
+            referencedRelation: "cooperatives"
             referencedColumns: ["id"]
           },
         ]
@@ -3807,23 +4421,32 @@ export type Database = {
         Row: {
           balance_fcfa: number
           created_at: string
+          credit_balance: number
           id: string
           partner_id: string
           updated_at: string
+          welcome_credits: number
+          welcome_granted_at: string | null
         }
         Insert: {
           balance_fcfa?: number
           created_at?: string
+          credit_balance?: number
           id?: string
           partner_id: string
           updated_at?: string
+          welcome_credits?: number
+          welcome_granted_at?: string | null
         }
         Update: {
           balance_fcfa?: number
           created_at?: string
+          credit_balance?: number
           id?: string
           partner_id?: string
           updated_at?: string
+          welcome_credits?: number
+          welcome_granted_at?: string | null
         }
         Relationships: [
           {
@@ -3842,6 +4465,7 @@ export type Database = {
           display_name: string
           email: string | null
           id: string
+          operator_kind: Database["public"]["Enums"]["partner_operator_kind"]
           partner_code: string
           phone: string | null
           prefecture_id: string | null
@@ -3856,6 +4480,7 @@ export type Database = {
           display_name: string
           email?: string | null
           id?: string
+          operator_kind?: Database["public"]["Enums"]["partner_operator_kind"]
           partner_code: string
           phone?: string | null
           prefecture_id?: string | null
@@ -3870,6 +4495,7 @@ export type Database = {
           display_name?: string
           email?: string | null
           id?: string
+          operator_kind?: Database["public"]["Enums"]["partner_operator_kind"]
           partner_code?: string
           phone?: string | null
           prefecture_id?: string | null
@@ -3891,6 +4517,93 @@ export type Database = {
             columns: ["region_id"]
             isOneToOne: false
             referencedRelation: "regions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payg_credit_ledger: {
+        Row: {
+          actor_id: string | null
+          amount_fcfa: number
+          balance_after: number
+          cooperative_id: string | null
+          created_at: string
+          credits: number
+          entry_type: Database["public"]["Enums"]["payg_credit_entry_type"]
+          id: string
+          idempotency_key: string
+          member_card_id: string | null
+          note: string | null
+          partner_id: string
+          payment_intent_id: string | null
+          welcome_delta: number
+        }
+        Insert: {
+          actor_id?: string | null
+          amount_fcfa?: number
+          balance_after: number
+          cooperative_id?: string | null
+          created_at?: string
+          credits: number
+          entry_type: Database["public"]["Enums"]["payg_credit_entry_type"]
+          id?: string
+          idempotency_key: string
+          member_card_id?: string | null
+          note?: string | null
+          partner_id: string
+          payment_intent_id?: string | null
+          welcome_delta?: number
+        }
+        Update: {
+          actor_id?: string | null
+          amount_fcfa?: number
+          balance_after?: number
+          cooperative_id?: string | null
+          created_at?: string
+          credits?: number
+          entry_type?: Database["public"]["Enums"]["payg_credit_entry_type"]
+          id?: string
+          idempotency_key?: string
+          member_card_id?: string | null
+          note?: string | null
+          partner_id?: string
+          payment_intent_id?: string | null
+          welcome_delta?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payg_credit_ledger_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payg_credit_ledger_member_card_fkey"
+            columns: ["member_card_id"]
+            isOneToOne: false
+            referencedRelation: "member_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payg_credit_ledger_cooperative_id_fkey"
+            columns: ["cooperative_id"]
+            isOneToOne: false
+            referencedRelation: "cooperatives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payg_credit_ledger_payment_intent_id_fkey"
+            columns: ["payment_intent_id"]
+            isOneToOne: false
+            referencedRelation: "partner_payment_intents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payg_credit_ledger_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -4500,6 +5213,110 @@ export type Database = {
           },
         ]
       }
+      training_fee_accounts: {
+        Row: {
+          created_at: string
+          id: string
+          installment_fcfa: number
+          paid_at: string | null
+          paid_fcfa: number
+          partner_id: string | null
+          payer: Database["public"]["Enums"]["training_payer"]
+          status: Database["public"]["Enums"]["training_fee_status"]
+          total_fcfa: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          installment_fcfa?: number
+          paid_at?: string | null
+          paid_fcfa?: number
+          partner_id?: string | null
+          payer?: Database["public"]["Enums"]["training_payer"]
+          status?: Database["public"]["Enums"]["training_fee_status"]
+          total_fcfa?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          installment_fcfa?: number
+          paid_at?: string | null
+          paid_fcfa?: number
+          partner_id?: string | null
+          payer?: Database["public"]["Enums"]["training_payer"]
+          status?: Database["public"]["Enums"]["training_fee_status"]
+          total_fcfa?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_fee_accounts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_fee_accounts_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_fee_payments: {
+        Row: {
+          account_id: string
+          amount_fcfa: number
+          created_at: string
+          id: string
+          idempotency_key: string
+          installments: number
+          method: string
+          paid_by: string | null
+          payment_intent_id: string | null
+          reference: string | null
+        }
+        Insert: {
+          account_id: string
+          amount_fcfa: number
+          created_at?: string
+          id?: string
+          idempotency_key: string
+          installments: number
+          method: string
+          paid_by?: string | null
+          payment_intent_id?: string | null
+          reference?: string | null
+        }
+        Update: {
+          account_id?: string
+          amount_fcfa?: number
+          created_at?: string
+          id?: string
+          idempotency_key?: string
+          installments?: number
+          method?: string
+          paid_by?: string | null
+          payment_intent_id?: string | null
+          reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_fee_payments_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "training_fee_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       usage_events: {
         Row: {
           amount_fcfa: number
@@ -4774,6 +5591,12 @@ export type Database = {
         Returns: Database["public"]["Enums"]["haroo_profile_type"]
       }
       current_partner_ids: { Args: never; Returns: string[] }
+      current_partner_ids_with_role: {
+        Args: {
+          p_min: Database["public"]["Enums"]["partner_membership_role"]
+        }
+        Returns: string[]
+      }
       debit_partner_wallet: {
         Args: {
           p_billing_rule_code: string
@@ -4834,6 +5657,78 @@ export type Database = {
         Args: { p_submission_id: string }
         Returns: undefined
       }
+      payg_adjust_credits: {
+        Args: {
+          p_actor: string
+          p_credits: number
+          p_idempotency_key: string
+          p_note: string
+          p_partner_id: string
+        }
+        Returns: Json
+      }
+      payg_admin_overview: { Args: never; Returns: Json }
+      payg_free_card_allowance: {
+        Args: { p_cooperative_ids: string[] }
+        Returns: {
+          card_limit: number
+          cards_issued: number
+          cooperative_id: string
+        }[]
+      }
+      payg_grant_welcome_credits: {
+        Args: {
+          p_actor?: string
+          p_partner_id: string
+        }
+        Returns: Json
+      }
+      payg_issue_member_card: {
+        Args: {
+          p_actor: string
+          p_card_format: string
+          p_card_number: string
+          p_expiry_date: string
+          p_idempotency_key: string
+          p_member_id: string
+          p_mode: string
+          p_partner_id: string
+          p_producer_price_fcfa: number
+        }
+        Returns: Json
+      }
+      payg_purchase_credits: {
+        Args: {
+          p_actor?: string
+          p_amount_fcfa: number
+          p_credits: number
+          p_idempotency_key: string
+          p_note?: string
+          p_partner_id: string
+          p_payment_intent_id?: string
+        }
+        Returns: Json
+      }
+      payg_record_training_payment: {
+        Args: {
+          p_account_id: string
+          p_actor?: string
+          p_amount_fcfa: number
+          p_idempotency_key: string
+          p_method: string
+          p_payment_intent_id?: string
+          p_reference?: string
+        }
+        Returns: Json
+      }
+      payg_release_card_commission: {
+        Args: {
+          p_actor: string
+          p_member_card_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       process_kobo_submission: {
         Args: { p_submission_id: string }
         Returns: Json
@@ -4889,10 +5784,20 @@ export type Database = {
       }
     }
     Enums: {
+      card_commission_source: "welcome" | "purchased"
+      card_commission_status: "consumed" | "released"
       card_print_order_status:
         | "requested"
         | "paid"
         | "printed"
+        | "delivered"
+        | "cancelled"
+      fh_print_order_status:
+        | "quote_requested"
+        | "quoted"
+        | "paid"
+        | "in_production"
+        | "shipped"
         | "delivered"
         | "cancelled"
       haroo_profile_type: "ouvrier" | "acheteur" | "agronome"
@@ -4924,6 +5829,7 @@ export type Database = {
         | "BONUS"
       partner_membership_role: "owner" | "manager" | "agent"
       partner_membership_status: "active" | "revoked"
+      partner_operator_kind: "individual" | "institutional"
       partner_payment_intent_status:
         | "pending"
         | "processing"
@@ -4935,6 +5841,9 @@ export type Database = {
         | "wallet_topup"
         | "certification"
         | "operator_subscription"
+        | "credit_pack"
+        | "training_fee"
+        | "print_order"
       partner_status:
         | "candidate"
         | "training"
@@ -4944,6 +5853,15 @@ export type Database = {
         | "suspended"
         | "expired"
         | "revoked"
+      payg_credit_entry_type:
+        | "WELCOME"
+        | "PURCHASE"
+        | "CONSUME"
+        | "RELEASE"
+        | "ADJUSTMENT"
+      rectification_status: "open" | "in_progress" | "resolved" | "rejected"
+      training_fee_status: "unpaid" | "partial" | "paid" | "waived"
+      training_payer: "self" | "institution"
       user_role:
         | "super_admin"
         | "cooperative_admin"
@@ -5080,10 +5998,27 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      card_commission_source: [
+        "welcome",
+        "purchased",
+      ],
+      card_commission_status: [
+        "consumed",
+        "released",
+      ],
       card_print_order_status: [
         "requested",
         "paid",
         "printed",
+        "delivered",
+        "cancelled",
+      ],
+      fh_print_order_status: [
+        "quote_requested",
+        "quoted",
+        "paid",
+        "in_production",
+        "shipped",
         "delivered",
         "cancelled",
       ],
@@ -5119,6 +6054,10 @@ export const Constants = {
       ],
       partner_membership_role: ["owner", "manager", "agent"],
       partner_membership_status: ["active", "revoked"],
+      partner_operator_kind: [
+        "individual",
+        "institutional",
+      ],
       partner_payment_intent_status: [
         "pending",
         "processing",
@@ -5131,6 +6070,9 @@ export const Constants = {
         "wallet_topup",
         "certification",
         "operator_subscription",
+        "credit_pack",
+        "training_fee",
+        "print_order",
       ],
       partner_status: [
         "candidate",
@@ -5141,6 +6083,29 @@ export const Constants = {
         "suspended",
         "expired",
         "revoked",
+      ],
+      payg_credit_entry_type: [
+        "WELCOME",
+        "PURCHASE",
+        "CONSUME",
+        "RELEASE",
+        "ADJUSTMENT",
+      ],
+      rectification_status: [
+        "open",
+        "in_progress",
+        "resolved",
+        "rejected",
+      ],
+      training_fee_status: [
+        "unpaid",
+        "partial",
+        "paid",
+        "waived",
+      ],
+      training_payer: [
+        "self",
+        "institution",
       ],
       user_role: [
         "super_admin",
