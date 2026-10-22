@@ -10,6 +10,7 @@
  */
 
 import { useAuth } from '@/app/context/auth-context'
+import { HarooOverview } from '@/components/admin/haroo-overview'
 import { ViewAsPanel } from '@/components/admin/view-as'
 import { ChevronRight, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
@@ -228,6 +229,8 @@ export default function AdminHome() {
           </ul>
         </section>
       )}
+
+      <HarooOverview />
 
       {inbox?.haroolife && (
         <section

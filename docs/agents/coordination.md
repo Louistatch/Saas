@@ -35,6 +35,17 @@ début de sa session et avant chaque push sur `main`, et y répond.
 
 ## En cours
 
+- **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-22 · **Centre de pilotage : section « Haroo »**
+  (demande de l'utilisateur). Lecture seule : inscrits par type (comptes de démo à part),
+  validation des agronomes, cartes émises et titulaires, activité (missions, offres, préventes,
+  annonces), alertes. Nouveaux : `app/api/admin/haroo-overview/route.ts`,
+  `lib/admin/haroo-overview.ts`, `components/admin/haroo-overview.tsx`,
+  `tests/admin-haroo-overview.test.ts`, `e2e/admin-haroo.spec.ts`. **Codex, retouche minimale
+  dans ton domaine (tableaux de bord)** : `app/admin/page.tsx`, un import et `<HarooOverview />`
+  sous « Vue d'ensemble ». Rien d'autre ne change dans cette page ni dans `/api/admin/inbox`.
+  Partagé : `package.json` (un test en fin de liste) ; `e2e/payg-playwright.config.ts` (une
+  spec ajoutée à `testMatch`).
+
 - **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-21 · **panneaux à louer : le toucher ne passait
   pas** (demande de l'utilisateur ; `lome-billboard.spec.ts:262`, rouge depuis plusieurs runs).
   Cause : la rangée `hl-shortcuts` du HUD (« Gagne ton premier salaire », « Ma coopérative »,

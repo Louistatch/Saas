@@ -4,7 +4,7 @@ import { defineConfig, devices } from '@playwright/test'
 // (même montage que AgriAcademy). Mobile d'abord : les agents travaillent au téléphone.
 export default defineConfig({
   testDir: './',
-  testMatch: ['payg.spec.ts'],
+  testMatch: ['payg.spec.ts', 'admin-haroo.spec.ts'],
   reporter: [['list'], ['html', { outputFolder: 'test-results/payg-report', open: 'never' }]],
   fullyParallel: false,
   workers: 1,
