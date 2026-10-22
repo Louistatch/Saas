@@ -35,6 +35,16 @@ début de sa session et avant chaque push sur `main`, et y répond.
 
 ## En cours
 
+- **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-21 · **panneaux à louer : le toucher ne passait
+  pas** (demande de l'utilisateur ; `lome-billboard.spec.ts:262`, rouge depuis plusieurs runs).
+  Cause : la rangée `hl-shortcuts` du HUD (« Gagne ton premier salaire », « Ma coopérative »,
+  temps) est `pointer-events-auto` sur toute sa largeur ; ses vides transparents avalaient le
+  toucher d'un panneau situé derrière (support du marché de Tokoin à l'écran : sous cette rangée).
+  **Codex, retouche minimale dans le fichier partagé** `lome-life-immersive.tsx` : la rangée passe
+  en `pointer-events-none`, ses trois boutons en `pointer-events-auto` (rien d'autre ne change).
+  La PR #53 (recrutement, joueurs en ligne) est fusionnée ; ses deux entrées ci-dessous sont
+  terminées.
+
 - **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-21 · **joueurs en ligne dans tout le jeu
   + annuaire des joueurs** (demande de l'utilisateur). Nombre de personnes en ligne maintenant
   dans tout HarooLife (battement toutes les minutes, base de données, indépendant du relais) et

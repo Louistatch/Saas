@@ -2782,14 +2782,15 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
             <Plus size={15} className="rounded-full bg-emerald-600 text-white" />
           </button>
         </div>
-        <div className="hl-shortcuts pointer-events-auto mx-auto mt-2 flex max-w-[900px] items-start justify-between gap-2">
+        {/* Taps between the shortcuts reach the street (a billboard behind them): only the buttons catch them. */}
+        <div className="hl-shortcuts pointer-events-none mx-auto mt-2 flex max-w-[900px] items-start justify-between gap-2">
           {onDuty ? (
             <span />
           ) : (
             <button
               type="button"
               onClick={() => open('missions')}
-              className="hl-objective flex max-w-[79%] items-center gap-2 rounded-full border border-white/40 bg-white/85 px-3 py-2 text-left text-xs font-semibold shadow-md backdrop-blur"
+              className="hl-objective pointer-events-auto flex max-w-[79%] items-center gap-2 rounded-full border border-white/40 bg-white/85 px-3 py-2 text-left text-xs font-semibold shadow-md backdrop-blur"
             >
               <span>🎯</span>
               <span className="truncate">
@@ -2809,7 +2810,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
               aria-label="Ma coopérative"
               title="Ma coopérative"
               onClick={goMyCooperative}
-              className="hl-cooperative flex shrink-0 items-center gap-1 rounded-full bg-emerald-700 px-3 py-2 text-xs font-bold text-white shadow-md"
+              className="hl-cooperative pointer-events-auto flex shrink-0 items-center gap-1 rounded-full bg-emerald-700 px-3 py-2 text-xs font-bold text-white shadow-md"
             >
               🤝 <span className="hidden sm:inline">Ma coopérative</span>
             </button>
@@ -2818,7 +2819,7 @@ export function LomeLifeImmersive({ onExit }: { onExit?: () => void } = {}) {
             type="button"
             aria-label={playing ? 'Mettre en pause' : 'Faire avancer le temps'}
             onClick={() => setPlaying((p) => !p)}
-            className="hl-time-control rounded-full bg-white/90 p-2.5 shadow-md"
+            className="hl-time-control pointer-events-auto rounded-full bg-white/90 p-2.5 shadow-md"
           >
             {playing ? <Pause size={17} /> : <Play size={17} />}
           </button>
