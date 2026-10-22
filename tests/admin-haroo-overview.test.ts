@@ -115,8 +115,9 @@ test('lists real accounts first, then card holders, then the most recent', () =>
     'demo accounts come last',
   )
   assert.equal(o.people.find((p) => p.name.endsWith('O2'))?.status, 'Indisponible')
-  assert.equal(o.people.find((p) => p.name.endsWith('A1'))?.status, 'Acheteur · grossiste')
+  assert.equal(o.people.find((p) => p.name.endsWith('A1'))?.status, 'Grossiste')
   assert.equal(o.people.find((p) => p.name.endsWith('G4'))?.status, 'Dossier rejeté')
+  assert.equal(o.people.find((p) => p.name.endsWith('A2'))?.status, 'Type non précisé')
 })
 
 test('never exposes a phone number or an e-mail', () => {

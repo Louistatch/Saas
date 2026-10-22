@@ -99,7 +99,8 @@ function statusOf(kind: HarooKind, row: ProfileRow): string {
     return VALIDATION_LABEL[row.statut_validation ?? ''] ?? 'Dossier non déposé'
   }
   if (kind === 'ouvrier') return row.disponible === false ? 'Indisponible' : 'Disponible'
-  return row.type_acheteur ? `Acheteur · ${row.type_acheteur.toLowerCase()}` : 'Acheteur'
+  const type = row.type_acheteur?.trim().toLowerCase()
+  return type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Type non précisé'
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`
