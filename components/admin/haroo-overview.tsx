@@ -280,21 +280,28 @@ export function HarooOverview() {
                         {p.name}
                         <DemoTag person={p} />
                       </span>
-                      <span className="text-muted-foreground">{KIND[p.kind]}</span>
-                      <span className="text-muted-foreground">{p.status}</span>
-                      <span>
-                        {p.card ? (
-                          <span className="inline-flex items-center gap-2">
-                            <span className="font-mono text-foreground">{p.card.number}</span>
-                            <CardBadge status={p.card.status} />
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">Pas de carte</span>
-                        )}
+                      {/* Au téléphone : profil · statut sur une ligne, carte · date sur la
+                          suivante ; à partir de sm, chaque valeur a sa colonne. */}
+                      <span className="text-muted-foreground sm:contents">
+                        <span>{KIND[p.kind]}</span>
+                        <span className="sm:hidden"> · </span>
+                        <span>{p.status}</span>
                       </span>
-                      <span className="text-muted-foreground">
-                        <span className="sm:hidden">Inscrit le </span>
-                        {day(p.signedUpAt)}
+                      <span className="flex flex-wrap items-center gap-x-2 sm:contents">
+                        <span>
+                          {p.card ? (
+                            <span className="inline-flex items-center gap-2">
+                              <span className="font-mono text-foreground">{p.card.number}</span>
+                              <CardBadge status={p.card.status} />
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">Pas de carte</span>
+                          )}
+                        </span>
+                        <span className="text-muted-foreground">
+                          <span className="sm:hidden">· inscrit le </span>
+                          {day(p.signedUpAt)}
+                        </span>
                       </span>
                     </li>
                   ))}
