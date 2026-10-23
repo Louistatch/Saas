@@ -42,7 +42,8 @@ début de sa session et avant chaque push sur `main`, et y répond.
   crépuscule, lumière de remplissage bleutée la nuit, exposition) dans `street-atmosphere.ts`.
   **Codex, retouches minimales dans les fichiers partagés** : `street-world.ts` (imports, un champ
   `wind`, `addWind` après `gradeLomeColours`, une ligne dans `frame`, trois lignes dans
-  `setDaylight` qui accepte `sky?`) ; `haroo-street-view.tsx` (type de `light` : `sky?` ajouté) ;
+  `setDaylight` qui accepte `sky?`, et une méthode `ambiance()` en lecture seule dans la sonde
+`__LOME_SCENE`, déclarée optionnelle dans `lib/haroolife/engine/types.ts`) ; `haroo-street-view.tsx` (type de `light` : `sky?` ajouté) ;
   `lome-life-playwright.config.ts` (une spec, `lome-ambiance.spec.ts`) ; `package.json` (un test en
   fin de liste). Rien d'autre ne change dans ces fichiers. Suite prévue (même demande) : vrai plan
   de Lomé depuis OpenStreetMap, puis marquages au sol et marche sans glissement, puis exploration

@@ -2918,6 +2918,25 @@ export class StreetWorld {
         })
         return { matches, triangles }
       },
+      ambiance: () => {
+        let swaying = 0
+        let vertices = 0
+        for (const { mesh } of this.tiles.values()) {
+          const sway = mesh.geometry.getAttribute('sway')
+          if (!sway) continue
+          vertices += sway.count
+          for (let i = 0; i < sway.count; i++) if (sway.getX(i) > 0) swaying++
+        }
+        const key = this.cityMaterial?.customProgramCacheKey() ?? ''
+        return {
+          swaying,
+          vertices,
+          windMaterial: key.includes('wind'),
+          reach: this.wind.reach.value,
+          exposure: this.renderer.toneMappingExposure,
+          fill: `#${this.hemi.color.getHexString()}`,
+        }
+      },
       gpu: () => ({
         textures: this.renderer.info.memory.textures,
         buffers: this.renderer.info.memory.geometries,

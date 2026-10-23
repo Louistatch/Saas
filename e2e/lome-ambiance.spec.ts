@@ -9,46 +9,14 @@ import { expect, test } from './lome-test'
  * real WebGL context that the patched shader compiles, that the trees (and only them) carry
  * their sway weights, and measures the colour cast of the frame at four hours of the day.
  */
-type Probe = {
-  swaying: number
-  vertices: number
-  windMaterial: boolean
-  fill: [number, number, number] | null
-}
-
+type Ambiance = NonNullable<import('../lib/haroolife/engine/types').SceneProbe['ambiance']>
 const probe = (page: import('@playwright/test').Page) =>
-  page.evaluate((): Probe | null => {
-    type Attr = { count: number; getX: (i: number) => number }
-    type Node = {
-      name?: string
-      isMesh?: boolean
-      isHemisphereLight?: boolean
-      color?: { getStyle: () => string; r: number; g: number; b: number }
-      geometry?: { getAttribute: (n: string) => Attr | undefined }
-      material?: { customProgramCacheKey?: () => string }
-      children: Node[]
-    }
-    const scene = (window as unknown as { __LOME_SCENE?: Node }).__LOME_SCENE
-    if (!scene) return null
-    let swaying = 0
-    let vertices = 0
-    let windMaterial = false
-    let fill: [number, number, number] | null = null
-    const walk = (o: Node) => {
-      if (o.isHemisphereLight && o.color) fill = [o.color.r, o.color.g, o.color.b]
-      if (o.isMesh && o.name?.startsWith('Bâtiments')) {
-        const sway = o.geometry?.getAttribute('sway')
-        if (sway) {
-          vertices += sway.count
-          for (let i = 0; i < sway.count; i++) if (sway.getX(i) > 0) swaying++
-        }
-        if (o.material?.customProgramCacheKey?.().includes('wind')) windMaterial = true
-      }
-      for (const c of o.children) walk(c)
-    }
-    walk(scene)
-    return { swaying, vertices, windMaterial, fill }
-  })
+  page.evaluate(() => {
+    const scene = (
+      window as unknown as { __LOME_SCENE?: import('../lib/haroolife/engine/types').SceneProbe }
+    ).__LOME_SCENE
+    return scene?.ambiance?.() ?? null
+  }) as Promise<ReturnType<Ambiance> | null>
 
 const hourOf = (page: import('@playwright/test').Page) =>
   page.evaluate(
@@ -104,7 +72,7 @@ test('the trees sway in the breeze and the light follows the hour', async ({ pag
     .toBe(true)
 
   const casts: Record<number, Awaited<ReturnType<typeof cast>>> = {}
-  const fills: Record<number, [number, number, number] | null> = {}
+  const fills: Record<number, string | null> = {}
   for (const hour of [12, 18, 22, 6]) {
     // The save is rewritten before the app boots again, so no autosave can overwrite the hour
     // (init scripts run in order: the last one registered, this hour's, wins).
@@ -130,6 +98,7 @@ test('the trees sway in the breeze and the light follows the hour', async ({ pag
     fills[hour] = p?.fill ?? null
     if (hour === 12) {
       expect(p?.windMaterial, 'the city material carries the breeze').toBe(true)
+      expect(p?.reach ?? 0, 'the breeze blows (no reduced-motion request)').toBeGreaterThan(0)
       // Trees only: most of a tile (houses, roads, walls) stays still.
       expect(p?.swaying ?? 0).toBeLessThan((p?.vertices ?? 0) * 0.5)
     }
@@ -138,9 +107,12 @@ test('the trees sway in the breeze and the light follows the hour', async ({ pag
   testInfo.annotations.push({ type: 'fill', description: JSON.stringify(fills) })
 
   // The fill light: white by day, blue moonlight at night, warm at dusk and dawn.
-  const [nr, , nb] = fills[22] ?? [0, 0, 0]
+  const rgb = (hex: string | null) =>
+    [1, 3, 5].map((i) => Number.parseInt((hex ?? '#000000').slice(i, i + 2), 16))
+  expect(fills[12], 'daytime fill unchanged').toBe('#eef3ff')
+  const [nr, , nb] = rgb(fills[22])
   expect(nb, 'night fill is blue').toBeGreaterThan(nr)
-  const [dr, , db] = fills[18] ?? [0, 0, 0]
+  const [dr, , db] = rgb(fills[18])
   expect(dr, 'dusk fill is warm').toBeGreaterThan(db)
   // The frame itself: dusk warmer than noon; night bluer than noon, yet not black.
   expect(casts[18].warmth).toBeGreaterThan(casts[12].warmth)

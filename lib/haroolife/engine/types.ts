@@ -64,6 +64,18 @@ export interface SceneProbe {
   count: () => number
   /** Objects whose name matches the pattern, and the triangles drawn beneath them. */
   geometry: (pattern: string) => { matches: number; triangles: number }
+  /** The street's breeze and light (street-wind.ts, street-atmosphere.ts); street engine only. */
+  ambiance?: () => {
+    /** Vertices of the city tiles that sway, and all their vertices. */
+    swaying: number
+    vertices: number
+    windMaterial: boolean
+    /** Metres of bend at the top of a palm (0: reduced motion). */
+    reach: number
+    exposure: number
+    /** Colour of the hemisphere fill light, #rrggbb. */
+    fill: string
+  }
   /** GPU resources currently held; vram in MB when the engine tracks it. */
   gpu: () => {
     textures: number
