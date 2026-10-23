@@ -11,8 +11,8 @@ import type * as THREE from 'three'
 /** How far each species bends: the coconut palm's fronds most, the mango's dense crown least. */
 export const SWAY: Readonly<Record<string, number>> = {
   'lome-cocotier': 1,
-  'lome-neem': 0.55,
-  'lome-manguier': 0.35,
+  'lome-neem': 0.7,
+  'lome-manguier': 0.5,
   // The kit's trees, still used for the player's own park and yard.
   palm: 1,
   tree: 0.55,
@@ -22,8 +22,11 @@ export const SWAY: Readonly<Record<string, number>> = {
   bush: 0.25,
 }
 
-/** Bend at the top of the tallest palm, in metres, for a full gust. */
-export const WIND_REACH = 0.45
+/**
+ * Bend at the top of the tallest palm (scene units, about 1.5 m each) for a full gust: enough to
+ * be seen from the street's camera on a phone, where a gentler breeze went unnoticed.
+ */
+export const WIND_REACH = 1.1
 
 /**
  * Sway weight of a vertex, 0 to 1: the species' flexibility times the square of its height in the
@@ -37,7 +40,7 @@ export function swayWeight(species: number, height: number): number {
 export interface Wind {
   /** Seconds, advanced by the frame loop. */
   readonly time: { value: number }
-  /** Metres of bend at weight 1; 0 stills every tree (reduced motion). */
+  /** Bend at weight 1 (scene units); 0 stills every tree (reduced motion). */
   readonly reach: { value: number }
 }
 
@@ -61,7 +64,7 @@ export function windOffset(
   reach: number,
 ): [number, number] {
   const phase = x * 0.21 + z * 0.17
-  const gust = 0.55 + 0.45 * Math.sin(time * 0.23 + phase * 0.05) * Math.sin(time * 0.11 + 1.7)
+  const gust = 0.7 + 0.3 * Math.sin(time * 0.23 + phase * 0.05) * Math.sin(time * 0.11 + 1.7)
   const bend = weight * reach * gust
   return [
     bend * (0.8 * Math.sin(time * 1.6 + phase) + 0.2 * Math.sin(time * 3.7 + phase * 2.3)),
@@ -91,7 +94,7 @@ export function addWind(material: THREE.Material, wind: Wind): void {
         if (sway > 0.0 && uWindReach > 0.0) {
           vec4 windAt = modelMatrix * vec4(transformed, 1.0);
           float phase = windAt.x * 0.21 + windAt.z * 0.17;
-          float gust = 0.55 + 0.45 * sin(uWindTime * 0.23 + phase * 0.05) * sin(uWindTime * 0.11 + 1.7);
+          float gust = 0.7 + 0.3 * sin(uWindTime * 0.23 + phase * 0.05) * sin(uWindTime * 0.11 + 1.7);
           float bend = sway * uWindReach * gust;
           transformed.x += bend * (0.8 * sin(uWindTime * 1.6 + phase) + 0.2 * sin(uWindTime * 3.7 + phase * 2.3));
           transformed.z += bend * 0.5 * sin(uWindTime * 1.2 + phase * 1.4);
