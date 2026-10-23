@@ -71,6 +71,12 @@ test('free view: the camera follows behind the player and the stick walks away f
       return Math.abs(d)
     })
     .toBeLessThan(30)
+  // Straight ahead can mean the roadway: the neighbourhood brigade may stop the player.
+  const stop = page.getByRole('dialog', { name: 'Contrôle piéton' })
+  await stop.waitFor({ timeout: 4000 }).catch(() => {})
+  if (await stop.isVisible().catch(() => false))
+    await stop.getByRole('button', { name: 'Rejoindre le trottoir' }).click()
+  await expect(stop).toBeHidden()
   await page.waitForTimeout(800)
   await shot('walked')
 
