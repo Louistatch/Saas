@@ -51,7 +51,7 @@ export default function HarooStreetView(
     onFrame?: (s: { drawCalls: number; fps: number }) => void
     onStats?: (s: StreetStats) => void
     /** Daylight of the game's hour (sun 0.65 at night to 1 at noon). */
-    light?: { sun: number; sunColor: string }
+    light?: { sun: number; sunColor: string; sky?: string }
     /** The vehicle and the driver's fare (zémidjan or taxi). */
     fare?: StreetFare | null
     /** A passer-by close enough to climb on (or null). */

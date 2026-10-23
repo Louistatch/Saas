@@ -13,6 +13,7 @@ import type { Geometry, Instance, Model } from '@/lib/haroolife/city/pack'
 import { CELL } from '@/lib/haroolife/city/world'
 import { PERSON_CELL, STREET_CELL, type StreetBuilding } from '@/lib/haroolife/game/core/street'
 import * as THREE from 'three'
+import { SWAY, swayWeight } from './street-wind'
 
 const U = STREET_CELL
 const K = STREET_CELL / CELL
@@ -67,6 +68,8 @@ function mergedParts(parts: Part[], extras: Geometry): THREE.BufferGeometry {
   const pos = new Float32Array(vertices * 3)
   const nrm = new Float32Array(vertices * 3)
   const col = new Float32Array(vertices * 4)
+  // Trees bend in the wind (street-wind.ts); everything else, and the extras, stay at 0.
+  const sway = new Uint8Array(vertices)
   const idx = vertices > 65535 ? new Uint32Array(indices) : new Uint16Array(indices)
   pos.set(extras.pos)
   nrm.set(extras.nrm)
@@ -83,6 +86,8 @@ function mergedParts(parts: Part[], extras: Geometry): THREE.BufferGeometry {
     const sy = typeof scale === 'number' ? scale : scale[1]
     const sz = typeof scale === 'number' ? scale : scale[2]
     const tint = inst.tint ?? [1, 1, 1]
+    const species = SWAY[m.key] ?? 0
+    const tall = m.size[1] || 1
     for (let i = 0; i < m.pos.length / 3; i++) {
       const v = (base + i) * 3
       const px = m.pos[i * 3] * sx
@@ -103,6 +108,8 @@ function mergedParts(parts: Part[], extras: Geometry): THREE.BufferGeometry {
       col[ci + 1] = m.col[i * 3 + 1] * tint[1]
       col[ci + 2] = m.col[i * 3 + 2] * tint[2]
       col[ci + 3] = own ? 0 : 1
+      if (species > 0)
+        sway[base + i] = Math.round(swayWeight(species, (m.pos[i * 3 + 1] - m.min[1]) / tall) * 255)
     }
     for (let i = 0; i < m.idx.length; i++) idx[offset++] = base + m.idx[i]
     base += m.pos.length / 3
@@ -111,6 +118,7 @@ function mergedParts(parts: Part[], extras: Geometry): THREE.BufferGeometry {
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
   g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3))
   g.setAttribute('color', new THREE.BufferAttribute(col, 4))
+  g.setAttribute('sway', new THREE.BufferAttribute(sway, 1, true))
   g.setIndex(new THREE.BufferAttribute(idx, 1))
   g.computeBoundingSphere()
   return g

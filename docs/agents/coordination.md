@@ -35,6 +35,20 @@ début de sa session et avant chaque push sur `main`, et y répond.
 
 ## En cours
 
+- **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-23 · **Ambiance de la rue, d'après Slop New York
+  (mrdoob, MIT)** (demande de l'utilisateur : reprendre ce qui peut l'être de ce projet). Vent dans
+  les arbres (poids de balancement cuits par sommet dans `city-models.ts`, shader dans le nouveau
+  `lib/haroolife/game/render/street-wind.ts`) et lumière selon l'heure (ciel doré à l'aube et au
+  crépuscule, lumière de remplissage bleutée la nuit, exposition) dans `street-atmosphere.ts`.
+  **Codex, retouches minimales dans les fichiers partagés** : `street-world.ts` (imports, un champ
+  `wind`, `addWind` après `gradeLomeColours`, une ligne dans `frame`, trois lignes dans
+  `setDaylight` qui accepte `sky?`) ; `haroo-street-view.tsx` (type de `light` : `sky?` ajouté) ;
+  `lome-life-playwright.config.ts` (une spec, `lome-ambiance.spec.ts`) ; `package.json` (un test en
+  fin de liste). Rien d'autre ne change dans ces fichiers. Suite prévue (même demande) : vrai plan
+  de Lomé depuis OpenStreetMap, puis marquages au sol et marche sans glissement, puis exploration
+  libre : **ces deux dernières touchent ton domaine (trottoirs et feux, avatars, caméra)**, je
+  t'écrirai ici avant d'y toucher.
+
 - **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-22 · **Centre de pilotage : section « Haroo »**
   (demande de l'utilisateur). Lecture seule : inscrits par type (comptes de démo à part),
   validation des agronomes, cartes émises et titulaires, activité (missions, offres, préventes,

@@ -82,9 +82,16 @@ import { type MotoModel, type MotoParts, buildMoto } from './moto'
 import { PerfProbe } from './perf-probe'
 import { AmbulanceModels, MunicipalWorksite } from './public-service-models'
 import { type StreetPlot, buildPlotGroup, signTexture } from './plot-build'
-import { StreetAtmosphere, gradeLomeColours, groundGrain } from './street-atmosphere'
+import {
+  StreetAtmosphere,
+  cameraGrade,
+  gradeLomeColours,
+  groundGrain,
+  warmthOf,
+} from './street-atmosphere'
 import { buildPoles, modelGeometry, polePlaces } from './street-poles'
 import { StreetSignals } from './street-signals'
+import { addWind, createWind } from './street-wind'
 import { TileCache } from './tile-cache'
 import { batchTrafficModel, disposeTrafficModel } from './vehicle-batch'
 import { type CarKind, VEHICLE_LENGTH, VEHICLE_URL } from './vehicle-models'
@@ -375,6 +382,8 @@ export class StreetWorld {
   private readonly sun = new THREE.DirectionalLight('#fff1d6', 3.6)
   // Sky above, the light bounced off the red earth below.
   private readonly hemi = new THREE.HemisphereLight('#eef3ff', '#8a6a4a', 1.1)
+  /** The sea breeze in the trees of the city tiles (street-wind.ts). */
+  private readonly wind = createWind()
   private estate: readonly Building[]
   private plot: StreetPlot | null = null
   private signMat: THREE.MeshBasicMaterial | null = null
@@ -742,9 +751,11 @@ export class StreetWorld {
    * The game's hour of day: `sun` from 0.65 (night) to 1 (noon), as the city's daylight cycle.
    * By day the street keeps its soft palette; at night the sky and the lights go down.
    */
-  setDaylight(light: { sun: number; sunColor: string }): void {
+  setDaylight(light: { sun: number; sunColor: string; sky?: string }): void {
     const k = Math.max(0, Math.min(1, (light.sun - 0.65) / 0.35))
-    this.atmosphere.setDaylight(k)
+    const warm = warmthOf(light.sky)
+    this.atmosphere.setDaylight(k, warm)
+    this.hemi.color.set(cameraGrade(k, warm).fill)
     this.daylight = k
     // With the sky's image lighting the shadows are filled by it: less flat ambient.
     this.hemi.intensity = (this.atmosphere.reflections ? 1.1 : 1.9) * (0.45 + 0.55 * k)
@@ -1381,6 +1392,7 @@ export class StreetWorld {
       if (!this.cityMaterial) {
         this.cityMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })
         gradeLomeColours(this.cityMaterial)
+        addWind(this.cityMaterial, this.wind)
       }
       const cached = dirty ? null : this.tileCache.take(`${key}:${detail}`)
       const inTile = cached ? [] : buildingsInTile(w.tx, w.ty, this.estate)
@@ -1959,6 +1971,7 @@ export class StreetWorld {
     const now = performance.now()
     const dt = Math.min((now - this.last) / 1000, 0.25)
     this.last = now
+    this.wind.time.value = now / 1000
     if (document.hidden || this.paused) {
       this.perf.pause()
       return
