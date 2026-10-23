@@ -42,6 +42,22 @@ export function cameraGrade(k: number, warm: number): { exposure: number; fill: 
   return { exposure: 1.1 - 0.1 * day + 0.04 * w, fill: `#${fill.getHexString()}` }
 }
 
+/**
+ * The low sun of dawn and dusk. The day cycle already puts the sun down at 18h (its colour turns
+ * to moonlight), which left dusk lit in blue under a golden sky: around the golden hour the sun
+ * keeps a warm, low light instead. Unchanged by day and at night (`warm` 0).
+ */
+export function goldenSun(
+  sunColor: string,
+  k: number,
+  warm: number,
+): { color: string; boost: number } {
+  const w = Math.min(1, Math.max(0, warm))
+  const day = Math.min(1, Math.max(0, k))
+  const color = new THREE.Color(sunColor).lerp(new THREE.Color('#ffae6b'), w * 0.85)
+  return { color: `#${color.getHexString()}`, boost: 1.1 * w * (1 - day) }
+}
+
 function skyCanvas(k: number, warm = 0): HTMLCanvasElement {
   const c = document.createElement('canvas')
   c.width = 4

@@ -49,7 +49,8 @@ async function cast(file: string) {
   r /= n
   g /= n
   b /= n
-  return { r, g, b, warmth: r - b, luminance: 0.2126 * r + 0.7152 * g + 0.0722 * b }
+  // Warmth as a ratio: a darker frame shrinks every difference, not the colour cast.
+  return { r, g, b, warmth: r / Math.max(1, b), luminance: 0.2126 * r + 0.7152 * g + 0.0722 * b }
 }
 
 test('the trees sway in the breeze and the light follows the hour', async ({ page }, testInfo) => {

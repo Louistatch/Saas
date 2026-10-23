@@ -4,7 +4,7 @@ import type { Bank } from '../lib/haroolife/city/bank'
 import type { Model } from '../lib/haroolife/city/pack'
 import type { StreetBuilding } from '../lib/haroolife/game/core/street'
 import { buildCityGeometry } from '../lib/haroolife/game/render/city-models'
-import { cameraGrade, warmthOf } from '../lib/haroolife/game/render/street-atmosphere'
+import { cameraGrade, goldenSun, warmthOf } from '../lib/haroolife/game/render/street-atmosphere'
 import { SWAY, WIND_REACH, swayWeight, windOffset } from '../lib/haroolife/game/render/street-wind'
 
 /** A model one unit tall: a triangle with a vertex at its foot, its middle and its top. */
@@ -115,6 +115,15 @@ describe('light that follows the hour', () => {
     assert.ok(nb > nr, 'moonlight is blue')
     const [gr, , gb] = rgb(cameraGrade(0.3, 1).fill)
     assert.ok(gr > gb, 'golden hour is warm')
+  })
+
+  it('dawn and dusk keep a low golden sun; day and night are untouched', () => {
+    assert.deepEqual(goldenSun('#fffff5', 1, 0), { color: '#fffff5', boost: 0 })
+    assert.deepEqual(goldenSun('#ccd9ff', 0, 0), { color: '#ccd9ff', boost: 0 })
+    const dusk = goldenSun('#ccd9ff', 0, 1)
+    const [r, , b] = [1, 3, 5].map((i) => Number.parseInt(dusk.color.slice(i, i + 2), 16))
+    assert.ok(r > b, 'the dusk sun is warm, not moonlight')
+    assert.ok(dusk.boost > 0)
   })
 
   it('night keeps the street readable on a phone: the blue fill is not darker overall', () => {

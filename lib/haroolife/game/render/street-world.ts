@@ -85,6 +85,7 @@ import { type StreetPlot, buildPlotGroup, signTexture } from './plot-build'
 import {
   StreetAtmosphere,
   cameraGrade,
+  goldenSun,
   gradeLomeColours,
   groundGrain,
   warmthOf,
@@ -759,8 +760,9 @@ export class StreetWorld {
     this.daylight = k
     // With the sky's image lighting the shadows are filled by it: less flat ambient.
     this.hemi.intensity = (this.atmosphere.reflections ? 1.1 : 1.9) * (0.45 + 0.55 * k)
-    this.sun.intensity = 3.6 * (0.25 + 0.75 * k)
-    this.sun.color.set(light.sunColor)
+    const sun = goldenSun(light.sunColor, k, warm)
+    this.sun.intensity = 3.6 * (0.25 + 0.75 * k) + sun.boost
+    this.sun.color.set(sun.color)
   }
 
   /** The player's plot was bought or its work moved on: redraw the window. */
