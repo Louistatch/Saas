@@ -20,6 +20,7 @@ import {
   type StreetServices,
   StreetWorld,
 } from '@/lib/haroolife/game/render/street-world'
+import { onViewChange, savedView } from '@/lib/haroolife/game/view-preference'
 import type { PresenceEntry } from '@/lib/haroolife/realtime/protocol'
 import type { Building } from '@/lib/haroolife/townsmen-engine'
 import { useEffect, useRef, useState } from 'react'
@@ -127,6 +128,7 @@ export default function HarooStreetView(
     world.current = w
     w.setPaused(live.current.paused ?? false)
     if (live.current.light) w.setDaylight(live.current.light)
+    w.setView(savedView())
     w.init().catch(() => setState('error'))
     return () => {
       world.current = null
@@ -148,6 +150,8 @@ export default function HarooStreetView(
   useEffect(() => {
     if (light) world.current?.setDaylight(light)
   }, [light])
+  // « Vue libre » chosen in the phone's settings (view-preference.ts).
+  useEffect(() => onViewChange((view) => world.current?.setView(view)), [])
   // Campaigns and presence change without rebuilding the street.
   useEffect(() => {
     if (state === 'ready') world.current?.setAds(ads ?? null)

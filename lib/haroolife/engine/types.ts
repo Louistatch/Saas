@@ -76,6 +76,8 @@ export interface SceneProbe {
     /** Colour of the hemisphere fill light, #rrggbb. */
     fill: string
   }
+  /** The street's camera: the free view's chase camera (perspective) or the classic one. */
+  view?: () => { setting: 'classic' | 'free'; kind: 'perspective' | 'orthographic' }
   /** GPU resources currently held; vram in MB when the engine tracks it. */
   gpu: () => {
     textures: number

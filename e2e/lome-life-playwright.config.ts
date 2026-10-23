@@ -55,6 +55,7 @@ export default defineConfig({
     'lome-regional-life.spec.ts',
     'lome-card-entry.spec.ts',
     'lome-ambiance.spec.ts',
+    'lome-free-view.spec.ts',
   ],
   reporter: [['list'], ['html', { outputFolder: 'test-results/lome-report', open: 'never' }]],
   fullyParallel: false,

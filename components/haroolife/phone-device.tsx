@@ -9,6 +9,7 @@
  */
 import { ChevronLeft, X } from 'lucide-react'
 import Link from 'next/link'
+import { type StreetView, rememberView, savedView } from '@/lib/haroolife/game/view-preference'
 import { useState } from 'react'
 
 export type PhoneApp =
@@ -85,6 +86,7 @@ export function PhoneDevice({
   const [screen, setScreen] = useState<'home' | 'settings'>('home')
   const time = `${String(hour).padStart(2, '0')}:00`
   const current = qualities.find((q) => q.id === quality)
+  const [view, setView] = useState<StreetView>(() => savedView())
   return (
     <div className="absolute inset-0 z-40">
       <button
@@ -206,6 +208,40 @@ export function PhoneDevice({
                     </button>
                   ))}
                 </div>
+              </div>
+              <div className="mt-3 rounded-2xl bg-white p-3 ring-1 ring-slate-200">
+                <p className="text-sm font-semibold">Vue</p>
+                <p className="text-[11px] text-slate-500">
+                  {view === 'free'
+                    ? 'La caméra suit derrière vous. Glissez sur la rue pour tourner autour.'
+                    : 'La rue vue d’en haut, comme une carte vivante.'}
+                </p>
+                <fieldset className="mt-2 flex gap-1">
+                  <legend className="sr-only">Vue</legend>
+                  {(
+                    [
+                      ['classic', 'Classique'],
+                      ['free', 'Libre'],
+                    ] as const
+                  ).map(([id, label]) => (
+                    <button
+                      type="button"
+                      key={id}
+                      aria-pressed={view === id}
+                      onClick={() => {
+                        setView(id)
+                        rememberView(id)
+                      }}
+                      className={`flex-1 rounded-xl px-2 py-2 text-xs font-bold ${
+                        view === id
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-slate-50 text-slate-800 ring-1 ring-slate-200'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </fieldset>
               </div>
               <p className="mt-4 text-[11px] text-slate-500">
                 Les services de ce téléphone utilisent la monnaie du jeu. Aucun paiement réel.

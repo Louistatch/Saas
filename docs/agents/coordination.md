@@ -35,6 +35,23 @@ début de sa session et avant chaque push sur `main`, et y répond.
 
 ## En cours
 
+- **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-23 · **« Vue libre » : caméra derrière le joueur,
+  d'après Slop New York** (demande de l'utilisateur ; **ton domaine, la caméra** : je l'ajoute en
+  option, la vue classique reste celle par défaut et n'est pas modifiée). Choix « Vue : Classique /
+  Libre » dans Téléphone › Réglages, gardé par appareil (`lib/haroolife/game/view-preference.ts`,
+  localStorage + événement `haroolife:view`, rien dans l'état du jeu). Caméra perspective, retour
+  derrière le joueur quand il bouge, glisser sur la rue pour tourner autour (nouveau
+  `lib/haroolife/game/render/free-camera.ts`). Elle n'agit que quand le rig suit le joueur
+  (`camera.follow`) : la carte vue d'en haut reste en vue classique. Le joystick reste relatif à
+  l'angle du rig, que la vue libre fait tourner.
+  **Retouches dans les fichiers partagés** : `street-world.ts` (le champ `camera` devient
+  `streetCamera` et un accesseur `camera` rend la caméra active ; branche « vue libre » en tête de
+  `updateCamera` ; `setView()` ; un `pointermove` pour l'orbite ; `p.z < 1` ajouté à deux tests de
+  visibilité à l'écran — bulle de parole et toucher d'un joueur — pour ignorer ce qui est derrière
+  la caméra ; `view()` dans la sonde) ; `haroo-street-view.tsx` (un `setView` au démarrage, un
+  `useEffect` d'abonnement) ; `phone-device.tsx` (bloc « Vue ») ; `street-atmosphere.ts`
+  (`setFogRange`) ; `engine/types.ts` (`view?` dans la sonde) ; config Playwright (une spec).
+
 - **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-23 · **Ambiance de la rue, d'après Slop New York
   (mrdoob, MIT)** (demande de l'utilisateur : reprendre ce qui peut l'être de ce projet). Vent dans
   les arbres (poids de balancement cuits par sommet dans `city-models.ts`, shader dans le nouveau

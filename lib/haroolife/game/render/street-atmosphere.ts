@@ -91,6 +91,8 @@ export class StreetAtmosphere {
   private on = false
   readonly fog: THREE.Fog
 
+  private readonly fogRange: { near: number; far: number }
+
   constructor(
     private readonly renderer: THREE.WebGLRenderer,
     private readonly scene: THREE.Scene,
@@ -98,8 +100,15 @@ export class StreetAtmosphere {
     cameraDistance: number,
   ) {
     this.pmrem = new THREE.PMREMGenerator(renderer)
-    this.fog = new THREE.Fog(DAY.horizon, cameraDistance + 6, cameraDistance + 85)
+    this.fogRange = { near: cameraDistance + 6, far: cameraDistance + 85 }
+    this.fog = new THREE.Fog(DAY.horizon, this.fogRange.near, this.fogRange.far)
     scene.fog = this.fog
+  }
+
+  /** Another haze depth (the free view's chase camera), or back to the default with null. */
+  setFogRange(range: { near: number; far: number } | null): void {
+    this.fog.near = range?.near ?? this.fogRange.near
+    this.fog.far = range?.far ?? this.fogRange.far
   }
 
   /** Whether paint, glass and metal reflect the sky (image lighting). */

@@ -36,7 +36,7 @@ import type { NpcAnim } from '@/lib/haroolife/city/interiors'
 import { current } from '@/lib/haroolife/city/locality'
 import { mayCross, onCarriageway, pickupRoad, vehicleAtRed } from '@/lib/haroolife/city/pedestrians'
 import { FrameRing } from '@/lib/haroolife/city/perf'
-import { DEFAULT_CONFIG, type PlayerController } from '@/lib/haroolife/city/player'
+import { DEFAULT_CONFIG, FOLLOW_DISTANCE, type PlayerController } from '@/lib/haroolife/city/player'
 import { PRESETS, type Quality, renderPixelRatio } from '@/lib/haroolife/city/quality'
 import { RoadTraffic } from '@/lib/haroolife/city/road-traffic'
 import { type Speaker, type StreetLine, isStudent } from '@/lib/haroolife/city/street-talk'
@@ -93,6 +93,8 @@ import {
 import { buildPoles, modelGeometry, polePlaces } from './street-poles'
 import { StreetSignals } from './street-signals'
 import { addWind, createWind } from './street-wind'
+import { FreeCamera, chaseAngle, chasePose, freeFog } from './free-camera'
+import type { StreetView } from '@/lib/haroolife/game/view-preference'
 import { TileCache } from './tile-cache'
 import { batchTrafficModel, disposeTrafficModel } from './vehicle-batch'
 import { type CarKind, VEHICLE_LENGTH, VEHICLE_URL } from './vehicle-models'
@@ -364,7 +366,19 @@ export class StreetWorld {
   private municipalWorker: Person | null = null
   private municipalWorkerLoad = 0
   private readonly municipalBody: CollisionBody = { x: 0, z: 0, heading: 0, halfWidth: 0.12, halfLength: 0.12 }
-  private readonly camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 400)
+  private readonly streetCamera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 400)
+  /** « Vue libre »: the chase camera behind the player (free-camera.ts), while the rig follows. */
+  private readonly free = new FreeCamera()
+  private view: StreetView = 'classic'
+  /** The rig's angle in the classic view, given back when leaving the free view. */
+  private classicAngle: number | null = null
+  private fogFree = false
+  private get freeView(): boolean {
+    return this.view === 'free' && this.controller.camera.follow
+  }
+  private get camera(): THREE.Camera {
+    return this.freeView ? this.free.camera : this.streetCamera
+  }
   private readonly loader = createGltfLoader()
   private readonly loaded: GLTF[] = []
   private readonly materials = new Map<string, THREE.MeshStandardMaterial>()
@@ -517,10 +531,21 @@ export class StreetWorld {
   private anim: NpcAnim = 'idle'
   private readonly onPointerDown = (e: PointerEvent) => {
     this.down = { x: e.clientX, y: e.clientY }
+    this.dragX = e.clientX
+  }
+  private dragX: number | null = null
+  /** In the free view a sideways drag orbits the camera around the player. */
+  private readonly onPointerMove = (e: PointerEvent) => {
+    if (this.dragX === null || !this.down || !this.freeView) return
+    if (Math.abs(e.clientX - this.down.x) < 12) return
+    const rig = this.controller.camera
+    rig.angle = this.free.orbit(rig.angle, e.clientX - this.dragX, this.width, performance.now())
+    this.dragX = e.clientX
   }
   private readonly onPointerUp = (e: PointerEvent) => {
     const start = this.down
     this.down = null
+    this.dragX = null
     if (!start || Math.hypot(e.clientX - start.x, e.clientY - start.y) > 12) return
     const r = this.canvas.getBoundingClientRect()
     // Another player under the finger (their body, a generous 40 px): their sheet, not a walk.
@@ -559,6 +584,7 @@ export class StreetWorld {
   }
   private readonly onPointerCancel = () => {
     this.down = null
+    this.dragX = null
   }
 
   constructor(o: StreetWorldOptions) {
@@ -612,6 +638,7 @@ export class StreetWorld {
     this.scene.add(this.contactShadows.mesh)
     this.canvas.addEventListener('pointerdown', this.onPointerDown)
     this.canvas.addEventListener('pointerup', this.onPointerUp)
+    this.canvas.addEventListener('pointermove', this.onPointerMove)
     this.canvas.addEventListener('pointercancel', this.onPointerCancel)
     this.resizeObserver = new ResizeObserver(() => this.resize())
     this.resizeObserver.observe(this.canvas)
@@ -765,6 +792,16 @@ export class StreetWorld {
     this.sun.color.set(sun.color)
   }
 
+  /** « Vue libre » (the chase camera behind the player) or the classic view from above. */
+  setView(view: StreetView): void {
+    if (view === this.view) return
+    const rig = this.controller.camera
+    if (view === 'free') this.classicAngle = rig.angle
+    else if (this.classicAngle !== null) rig.angle = this.classicAngle
+    this.view = view
+    this.lastCamera.fill(Number.NaN)
+  }
+
   /** The player's plot was bought or its work moved on: redraw the window. */
   setPlot(plot: StreetPlot | null): void {
     const o = this.plot
@@ -846,6 +883,7 @@ export class StreetWorld {
     cancelAnimationFrame(this.raf)
     this.canvas.removeEventListener('pointerdown', this.onPointerDown)
     this.canvas.removeEventListener('pointerup', this.onPointerUp)
+    this.canvas.removeEventListener('pointermove', this.onPointerMove)
     this.canvas.removeEventListener('pointercancel', this.onPointerCancel)
     this.resizeObserver.disconnect()
     this.clearWindow()
@@ -1032,7 +1070,7 @@ export class StreetWorld {
       p.copy(at)
       p.y += FIGURE
       p.project(this.camera)
-      if (Math.abs(p.x) < 0.85 && p.y > -0.6 && p.y < 0.6) best = { walker: w, d }
+      if (p.z < 1 && Math.abs(p.x) < 0.85 && p.y > -0.6 && p.y < 0.6) best = { walker: w, d }
     }
     if (!best) return
     const who: Speaker = best.walker.police
@@ -1786,6 +1824,31 @@ export class StreetWorld {
 
   private updateCamera(): void {
     const c = this.controller.camera
+    // The haze closes in for the chase camera only (not over the map, seen from above).
+    if (this.freeView !== this.fogFree) {
+      this.fogFree = this.freeView
+      this.atmosphere.setFogRange(this.fogFree ? freeFog(TILE_RANGE * U) : null)
+    }
+    if (this.freeView) {
+      const pose = chasePose(
+        c.tx * U,
+        c.tz * U,
+        c.angle,
+        c.distance / FOLLOW_DISTANCE,
+        FIGURE,
+        this.controller.driving,
+      )
+      this.free.frame(pose, this.width / this.height)
+      this.lastCamera.fill(Number.NaN)
+      this.viewProjection.multiplyMatrices(
+        this.free.camera.projectionMatrix,
+        this.free.camera.matrixWorldInverse,
+      )
+      this.frustum.setFromProjectionMatrix(this.viewProjection)
+      this.sun.position.set(c.tx * U - 14, 30, c.tz * U + 16)
+      this.sun.target.position.set(c.tx * U, 0, c.tz * U)
+      return
+    }
     const last = this.lastCamera
     if (
       last[0] === c.tx &&
@@ -1810,25 +1873,23 @@ export class StreetWorld {
     const zoom = this.width < 650 ? 1.3 : 1
     const size = (Math.max(4.5, Math.min(40, 7 * (c.distance / 8))) * this.framing * VIEW) / zoom
     const half = Math.max(size, (size * 1.15) / aspect)
-    this.camera.left = -half * aspect
-    this.camera.right = half * aspect
-    this.camera.top = half
-    this.camera.bottom = -half
-    this.camera.updateProjectionMatrix()
+    const cam = this.streetCamera
+    cam.left = -half * aspect
+    cam.right = half * aspect
+    cam.top = half
+    cam.bottom = -half
+    cam.updateProjectionMatrix()
     const yaw = (c.angle * Math.PI) / 180
     const tx = c.tx * U
     const tz = c.tz * U
-    this.camera.position.set(
+    cam.position.set(
       tx + Math.sin(yaw) * Math.cos(CAMERA_ELEVATION) * CAMERA_DISTANCE,
       Math.sin(CAMERA_ELEVATION) * CAMERA_DISTANCE,
       tz + Math.cos(yaw) * Math.cos(CAMERA_ELEVATION) * CAMERA_DISTANCE,
     )
-    this.camera.lookAt(tx, 0.5, tz)
-    this.camera.updateMatrixWorld()
-    this.viewProjection.multiplyMatrices(
-      this.camera.projectionMatrix,
-      this.camera.matrixWorldInverse,
-    )
+    cam.lookAt(tx, 0.5, tz)
+    cam.updateMatrixWorld()
+    this.viewProjection.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse)
     this.frustum.setFromProjectionMatrix(this.viewProjection)
     this.sun.position.set(tx - 14, 30, tz + 16)
     this.sun.target.position.set(tx, 0, tz)
@@ -1992,6 +2053,17 @@ export class StreetWorld {
     const wanted = ctl.driving ? 1.35 : 1
     this.framing += (wanted - this.framing) * Math.min(1, dt * 2.5)
     if (Math.abs(wanted - this.framing) < 0.0001) this.framing = wanted
+    if (this.freeView) {
+      const v = ctl.driving ? ctl.vehicle : null
+      ctl.camera.angle = chaseAngle(
+        ctl.camera.angle,
+        v ? v.heading : ctl.heading,
+        dt,
+        v ? Math.abs(v.speed) > 0.1 : ctl.speed > 0.05,
+        !!v,
+        this.free.sinceOrbit(now),
+      )
+    }
     this.updateCamera()
     if (
       this.win &&
@@ -2758,7 +2830,7 @@ export class StreetWorld {
       v.y += FIGURE / 2
       v.project(this.camera)
       const d = Math.hypot((v.x * 0.5 + 0.5) * this.width - x, (-v.y * 0.5 + 0.5) * this.height - y)
-      if (d < 40 && (!best || d < best.d)) best = { key: r.key, d }
+      if (v.z < 1 && d < 40 && (!best || d < best.d)) best = { key: r.key, d }
     }
     // Then the passers-by of the game (a real player under the finger wins).
     if (!best)
@@ -2770,7 +2842,7 @@ export class StreetWorld {
           (v.x * 0.5 + 0.5) * this.width - x,
           (-v.y * 0.5 + 0.5) * this.height - y,
         )
-        if (d < 40 && (!best || d < best.d)) best = { key: `npc:${w.name}`, d }
+        if (v.z < 1 && d < 40 && (!best || d < best.d)) best = { key: `npc:${w.name}`, d }
       }
     return best?.key ?? null
   }
@@ -2920,6 +2992,10 @@ export class StreetWorld {
         })
         return { matches, triangles }
       },
+      view: () => ({
+        setting: this.view,
+        kind: this.freeView ? ('perspective' as const) : ('orthographic' as const),
+      }),
       ambiance: () => {
         let swaying = 0
         let vertices = 0
