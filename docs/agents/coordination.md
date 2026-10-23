@@ -35,6 +35,31 @@ début de sa session et avant chaque push sur `main`, et y répond.
 
 ## En cours
 
+- **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-23 · **Marché de proximité et travail
+  agricole : refonte et mécanisme de réponse** (demande de l'utilisateur : « faire sortir et
+  promouvoir » le marché et le recrutement d'ouvriers). Répondre à une annonce (« Je suis
+  intéressé / disponible »), inviter un ouvrier disponible sur une offre de travail, retenir ou
+  décliner, numéros échangés seulement à ce moment-là ; offre de travail avec salaire par jour,
+  postes, début et durée ; expiration des annonces ; téléphone retiré de la lecture anonyme (il se
+  demande annonce par annonce, `app/api/market/announcements/[id]/contact`). Voir
+  `docs/marche-travail.md`. Nouveaux : migration `20261023_150000_market_work.sql` (+ rollback,
+  **non appliquée en production**), `lib/market/work.ts`, `lib/market/client.ts`,
+  `components/market/*`, `components/marketing/market-work-band.tsx`, `app/travail/*`,
+  `app/marche/publier/*`, `app/marche/suivi/*`, `tests/market-work.test.ts`,
+  `tests/market-work-sql.test.mjs`, `e2e/market-work.spec.ts`. Réécrits : `app/marche/*`,
+  `components/haroo/publish-announcement.tsx` (même API, formulaire partagé),
+  `app/api/market/announcements/route.ts`, `lib/market/announcements.ts`.
+  **Codex, retouches minimales dans ton domaine (tableaux de bord)** : `app/haroo/page.tsx`, un
+  import et `<MarketActivityCard />` sous `<HarooLifeFieldOffersCard />`. Autres fichiers
+  partagés : `app/page.tsx` (bande « Vendre, acheter, embaucher, travailler » sous le hero ;
+  l'ancienne section « Marché de proximité » retirée), `components/marketing/hero-section.tsx`
+  (sous-titre, et « Découvrir Haroo » devient « Marché et travail »), `components/shared/marketing-layout.tsx`
+  (lien « Travail »), `lib/seo.ts` (`/travail`), `public/robots.txt`, `types/supabase.ts`
+  (colonnes d'annonce), `components/marketplace/presales-strip.tsx`,
+  `components/verify/nearby-offers.tsx` (numéro à la demande), `e2e/fixtures/mock-supabase.mjs`
+  (champs ajoutés aux trois annonces du mock, aucune ligne ajoutée), `e2e/payg-playwright.config.ts`
+  (une spec), `package.json` (deux tests en fin de liste).
+
 - **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-23 · **« Vue libre » : caméra derrière le joueur,
   d'après Slop New York** (demande de l'utilisateur ; **ton domaine, la caméra** : je l'ajoute en
   option, la vue classique reste celle par défaut et n'est pas modifiée). Choix « Vue : Classique /

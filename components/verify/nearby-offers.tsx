@@ -1,7 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { revealPhone } from '@/lib/market/client'
+import { formatPhone } from '@/lib/market/work'
 import { MapPin, Phone } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 interface Offer {
   id: string
@@ -9,13 +11,53 @@ interface Offer {
   culture: string | null
   quantity_kg: number | null
   price_per_kg_fcfa: number | null
-  contact_phone: string | null
+  /** Le numéro se demande annonce par annonce (route …/contact), il n'est plus dans la liste. */
+  has_contact: boolean
   created_at: string
   canton: string | null
   prefecture: string | null
   region: string | null
   /** 0 = même canton … 3 = ailleurs (voir lib/market/announcements). */
   proximity: 0 | 1 | 2 | 3
+}
+
+const CALL_CLASS =
+  'inline-flex items-center gap-1.5 rounded-xl bg-[var(--vfp-accent)]/12 border border-[var(--vfp-accent)]/25 px-3.5 py-2 text-[13px] font-semibold text-[var(--vfp-accent)] active:scale-95 transition-transform'
+
+/** « Appeler » demande d'abord le numéro, puis devient un lien d'appel. */
+function CallButton({ id }: { id: string }) {
+  const [phone, setPhone] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  if (phone) {
+    return (
+      <a href={`tel:${phone.replace(/[^\d+]/g, '')}`} className={CALL_CLASS}>
+        <Phone className="h-3.5 w-3.5" aria-hidden="true" />
+        {formatPhone(phone)}
+      </a>
+    )
+  }
+  return (
+    <span className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        className={CALL_CLASS}
+        disabled={loading}
+        onClick={async () => {
+          setLoading(true)
+          setError(null)
+          const result = await revealPhone(id)
+          setLoading(false)
+          if ('phone' in result) setPhone(result.phone)
+          else setError(result.error)
+        }}
+      >
+        <Phone className="h-3.5 w-3.5" aria-hidden="true" />
+        {loading ? '…' : 'Appeler'}
+      </button>
+      {error && <span className="text-[11px] text-red-300">{error}</span>}
+    </span>
+  )
 }
 
 interface Props {
@@ -120,15 +162,7 @@ export function NearbyOffers({ regionId, prefectureId, cantonId, culture }: Prop
 
           <div className="flex items-center justify-between gap-2 pt-0.5">
             <span className="text-[11px] text-white/35">{PROXIMITY_LABEL[o.proximity]}</span>
-            {o.contact_phone && (
-              <a
-                href={`tel:${o.contact_phone.replace(/[^\d+]/g, '')}`}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--vfp-accent)]/12 border border-[var(--vfp-accent)]/25 px-3.5 py-2 text-[13px] font-semibold text-[var(--vfp-accent)] active:scale-95 transition-transform"
-              >
-                <Phone className="h-3.5 w-3.5" aria-hidden="true" />
-                Appeler
-              </a>
-            )}
+            {o.has_contact && <CallButton id={o.id} />}
           </div>
         </div>
       ))}

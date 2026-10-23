@@ -216,7 +216,8 @@ let PARTS = [
 ]
 const PARTS_INITIAL = PARTS.map((p) => ({ ...p }))
 const ANNOUNCEMENTS = [1, 2, 3].map((i) => ({
-  id: `n${i}`,
+  // Des UUID, comme en base : la route « Afficher le numéro » refuse tout autre identifiant.
+  id: `00000000-0000-4000-8000-00000000a00${i}`,
   cooperative_id: C1,
   status: 'active',
   type: i === 1 ? 'prevente' : i === 2 ? 'job' : 'autre',
@@ -227,6 +228,22 @@ const ANNOUNCEMENTS = [1, 2, 3].map((i) => ({
   location_canton: 'Kpalimé',
   contact_phone: '+228 90 11 22 33',
   created_at: '2026-10-01T00:00:00Z',
+  // Marché et travail (20261023_150000_market_work) : n1 et n2 viennent d'un autre compte (on
+  // peut y répondre), n3 est une annonce de l'admin de test ; n2 est une offre de travail.
+  author_id: i === 3 ? UID : 'u-m0',
+  has_contact: true,
+  accepts_responses: true,
+  expires_at: null,
+  wage_per_day_fcfa: i === 2 ? 2500 : null,
+  positions: i === 2 ? 3 : null,
+  starts_on: i === 2 ? '2026-11-03' : null,
+  work_days: i === 2 ? 2 : null,
+  canton_id: CANTON(5).id,
+  prefecture_id: 'p5',
+  region_id: 'r1',
+  cantons: { name: 'Kpalimé' },
+  prefectures: { name: 'Kloto' },
+  regions: { name: 'Maritime' },
 }))
 const RESIDENTS = [
   { user_id: 'u-m0', visible: true },

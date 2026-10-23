@@ -10,6 +10,7 @@ import { PublishAnnouncement } from '@/components/haroo/publish-announcement'
 import { HarooLifeEntry } from '@/components/haroolife/entry'
 import { HarooLifeFieldOffersCard } from '@/components/haroolife/field-offers-card'
 import { HarooLifeMessagesCard } from '@/components/haroolife/messages-inbox'
+import { MarketActivityCard } from '@/components/market/market-activity-card'
 import { MyProfessionalDocuments } from '@/components/professionals/my-documents'
 import { Spinner } from '@/components/shared/loading'
 import { Logo } from '@/components/shared/logo'
@@ -583,6 +584,7 @@ function HarooSpaceInner() {
         <HarooLifeEntry />
         <HarooLifeMessagesCard />
         <HarooLifeFieldOffersCard />
+        <MarketActivityCard />
 
         {/* Accueil personnalisé */}
         <div>

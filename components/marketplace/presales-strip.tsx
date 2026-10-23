@@ -1,7 +1,8 @@
 'use client'
 
+import { RevealPhone } from '@/components/market/reveal-phone'
 import type { MarketAnnouncement } from '@/lib/market/announcements'
-import { MapPin, Phone, Sprout } from 'lucide-react'
+import { MapPin, Sprout } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
@@ -56,13 +57,9 @@ export function PresalesStrip() {
                   ? `${Number(a.price_per_kg_fcfa).toLocaleString('fr-FR')} FCFA/kg`
                   : null}
               </p>
-              {a.contact_phone ? (
-                <a
-                  href={`tel:${a.contact_phone.replace(/\s/g, '')}`}
-                  className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-                >
-                  <Phone className="h-3.5 w-3.5" /> {a.contact_phone}
-                </a>
+              {/* Le numéro se demande annonce par annonce (il n'est plus dans la liste). */}
+              {a.has_contact ? (
+                <RevealPhone announcementId={a.id} title={a.title} size="sm" />
               ) : null}
             </article>
           )

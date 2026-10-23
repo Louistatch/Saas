@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button'
 import heroImage from '@/public/hero-farmer-app.webp'
-import { ArrowRight, CheckCircle, CreditCard, Network, QrCode, ScanLine } from 'lucide-react'
+import { ArrowRight, CheckCircle, CreditCard, QrCode, ScanLine, Store } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 
@@ -103,8 +103,8 @@ export function HeroSection() {
                 className="hero-a3 mb-4 max-w-lg sm:mb-5 text-[15px] leading-relaxed sm:text-base lg:text-lg"
                 style={{ color: '#4a5e4c' }}
               >
-                FaîtiereHub organise vos coopératives. Haroo connecte ouvriers, acheteurs et
-                agronomes aux emplois, préventes et missions de conseil.
+                FaîtiereHub organise vos coopératives. Le marché de proximité et le travail à la
+                journée relient vendeurs, acheteurs et ouvriers près de chez eux.
               </p>
 
               {/* CTA : primaire pleine largeur, secondaires côte à côte —
@@ -120,13 +120,13 @@ export function HeroSection() {
                   </Button>
                 </Link>
                 <div className="flex gap-2.5 sm:gap-3">
-                  <Link href="/#haroo" className="flex-1 sm:flex-initial">
+                  <Link href="/#marche-travail" className="flex-1 sm:flex-initial">
                     <Button
                       size="lg"
                       variant="outline"
                       className="h-12 w-full gap-2 rounded-xl border-amber-400 font-semibold text-amber-700 hover:bg-amber-50 sm:h-11"
                     >
-                      <Network className="h-4 w-4" /> Découvrir Haroo
+                      <Store className="h-4 w-4" /> Marché et travail
                     </Button>
                   </Link>
                   <Link href="/scan" className="flex-shrink-0">

@@ -33,6 +33,8 @@ Disallow: /forbidden
 Disallow: /embed
 Disallow: /widget
 Disallow: /marketplace/achat/
+Disallow: /marche/publier
+Disallow: /marche/suivi
 Disallow: /haroolife/territoire
 Disallow: /fournisseurs$
 Disallow: /fournisseurs/

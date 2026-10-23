@@ -29,7 +29,12 @@ export const PUBLIC_PAGES = {
   '/marche': {
     title: 'Marché agricole de proximité au Togo — FaîtiereHub',
     description:
-      'Trouvez des préventes de récoltes, des emplois agricoles et des missions de conseil. Recherchez les opportunités par canton, préfecture et région au Togo.',
+      'Récoltes à vendre, préventes, conseil et services agricoles près de chez vous, par canton, préfecture et région au Togo. Répondez en un geste, sans commission.',
+  },
+  '/travail': {
+    title: 'Travail agricole à la journée au Togo — FaîtiereHub',
+    description:
+      'Offres de travail agricole avec le salaire par jour, le nombre d’ouvriers et les dates, du plus proche au plus loin. Recrutez des ouvriers près de votre champ.',
   },
   '/marketplace': {
     title: 'Comptes d’exploitation et produits agricoles — FaîtiereHub',
