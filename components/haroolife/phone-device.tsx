@@ -7,9 +7,9 @@
  * (frame rate and network overlay, graphics quality) live in Réglages → Avancé, never in front
  * of the apps.
  */
+import { type StreetView, rememberView, savedView } from '@/lib/haroolife/game/view-preference'
 import { ChevronLeft, X } from 'lucide-react'
 import Link from 'next/link'
-import { type StreetView, rememberView, savedView } from '@/lib/haroolife/game/view-preference'
 import { useState } from 'react'
 
 export type PhoneApp =
