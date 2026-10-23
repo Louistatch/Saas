@@ -51,19 +51,31 @@ export function MarketActivityCard() {
         </Button>
       </div>
       <div className="mt-4 grid grid-cols-3 gap-2">
-        <Button asChild variant="outline" className="h-11 gap-1.5 px-2">
+        <Button
+          asChild
+          variant="outline"
+          className="hover:bg-muted hover:text-foreground h-11 gap-1.5 px-2"
+        >
           <Link href="/travail">
             <Briefcase aria-hidden="true" className="h-4 w-4 shrink-0" />
             <span className="truncate">Travail</span>
           </Link>
         </Button>
-        <Button asChild variant="outline" className="h-11 gap-1.5 px-2">
+        <Button
+          asChild
+          variant="outline"
+          className="hover:bg-muted hover:text-foreground h-11 gap-1.5 px-2"
+        >
           <Link href="/marche">
             <Store aria-hidden="true" className="h-4 w-4 shrink-0" />
             <span className="truncate">Marché</span>
           </Link>
         </Button>
-        <Button asChild variant="outline" className="h-11 gap-1.5 px-2">
+        <Button
+          asChild
+          variant="outline"
+          className="hover:bg-muted hover:text-foreground h-11 gap-1.5 px-2"
+        >
           <Link href="/marche/publier">
             <PlusCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
             <span className="truncate">Publier</span>

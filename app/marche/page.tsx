@@ -46,7 +46,11 @@ export default function MarchePage() {
                   <PlusCircle aria-hidden="true" className="h-5 w-5" /> Vendre
                 </Link>
               </Button>
-              <Button asChild variant="outline" className="h-12 bg-background text-base">
+              <Button
+                asChild
+                variant="outline"
+                className="hover:bg-muted hover:text-foreground h-12 bg-background text-base"
+              >
                 <Link href="#annonces">Acheter</Link>
               </Button>
             </div>

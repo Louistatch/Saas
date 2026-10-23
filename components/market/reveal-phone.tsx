@@ -41,7 +41,7 @@ export function RevealPhone({
         <Button
           type="button"
           variant="outline"
-          className={`${height} w-full gap-2`}
+          className={`hover:bg-muted hover:text-foreground ${height} w-full gap-2`}
           onClick={reveal}
           disabled={loading}
         >
@@ -59,13 +59,21 @@ export function RevealPhone({
 
   return (
     <div className="grid grid-cols-2 gap-2">
-      <Button asChild variant="outline" className={`${height} gap-2`}>
+      <Button
+        asChild
+        variant="outline"
+        className={`hover:bg-muted hover:text-foreground ${height} gap-2`}
+      >
         <a href={`tel:${phone.replace(/[^\d+]/g, '')}`}>
           <Phone aria-hidden="true" className="h-4 w-4" />
           <span className="tabular-nums">{formatPhone(phone)}</span>
         </a>
       </Button>
-      <Button asChild variant="outline" className={`${height} gap-2`}>
+      <Button
+        asChild
+        variant="outline"
+        className={`hover:bg-muted hover:text-foreground ${height} gap-2`}
+      >
         <a
           href={whatsappLink(
             phone,

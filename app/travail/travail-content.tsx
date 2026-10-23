@@ -136,7 +136,7 @@ function AvailableWorkers() {
           Leur numéro ne vous est donné que s’ils acceptent votre invitation.
         </p>
         <div className="mx-auto mt-5 grid max-w-sm grid-cols-2 gap-2">
-          <Button asChild variant="outline" className="h-11">
+          <Button asChild variant="outline" className="hover:bg-muted hover:text-foreground h-11">
             <Link href={`/auth/login?redirect=${encodeURIComponent(`${pathname}?vue=ouvriers`)}`}>
               Se connecter
             </Link>

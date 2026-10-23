@@ -49,7 +49,11 @@ export default function TravailPage() {
                   <Briefcase aria-hidden="true" className="h-5 w-5" /> Je cherche des ouvriers
                 </Link>
               </Button>
-              <Button asChild variant="outline" className="h-12 gap-2 bg-background text-base">
+              <Button
+                asChild
+                variant="outline"
+                className="hover:bg-muted hover:text-foreground h-12 gap-2 bg-background text-base"
+              >
                 <Link href="#offres">
                   <Search aria-hidden="true" className="h-5 w-5" /> Je cherche du travail
                 </Link>

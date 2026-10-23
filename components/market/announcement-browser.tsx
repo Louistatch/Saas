@@ -198,7 +198,11 @@ export function AnnouncementBrowser({
           <div className="rounded-2xl border border-border p-6 text-center">
             <p className="font-semibold">Les annonces n’ont pas pu être chargées.</p>
             <p className="mt-1 text-sm text-muted-foreground">Vérifiez votre connexion.</p>
-            <Button className="mt-4 h-11" variant="outline" onClick={() => void load()}>
+            <Button
+              className="hover:bg-muted hover:text-foreground mt-4 h-11"
+              variant="outline"
+              onClick={() => void load()}
+            >
               Réessayer
             </Button>
           </div>

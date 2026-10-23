@@ -518,7 +518,12 @@ export function AnnouncementForm({
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         {onCancel && (
-          <Button type="button" variant="outline" className="h-12" onClick={onCancel}>
+          <Button
+            type="button"
+            variant="outline"
+            className="hover:bg-muted hover:text-foreground h-12"
+            onClick={onCancel}
+          >
             Annuler
           </Button>
         )}

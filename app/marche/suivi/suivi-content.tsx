@@ -79,13 +79,13 @@ function NewDot({ show }: { show: boolean }) {
 function PhoneActions({ phone, text }: { phone: string; text: string }) {
   return (
     <div className="grid grid-cols-2 gap-2">
-      <Button asChild variant="outline" className="h-11 gap-2">
+      <Button asChild variant="outline" className="hover:bg-muted hover:text-foreground h-11 gap-2">
         <a href={`tel:${phone.replace(/[^\d+]/g, '')}`}>
           <Phone aria-hidden="true" className="h-4 w-4" />
           <span className="tabular-nums">{formatPhone(phone)}</span>
         </a>
       </Button>
-      <Button asChild variant="outline" className="h-11 gap-2">
+      <Button asChild variant="outline" className="hover:bg-muted hover:text-foreground h-11 gap-2">
         <a href={whatsappLink(phone, text)} target="_blank" rel="noopener noreferrer">
           <MessageCircle aria-hidden="true" className="h-4 w-4" /> WhatsApp
         </a>
@@ -144,7 +144,7 @@ function DecisionButtons({
         </Button>
         <Button
           variant="outline"
-          className="h-11 gap-2"
+          className="hover:bg-muted hover:text-foreground h-11 gap-2"
           disabled={busy !== null}
           onClick={() => void run(false)}
         >
@@ -484,7 +484,11 @@ export default function SuiviContent() {
               <Lock aria-hidden="true" className="mx-auto h-6 w-6 text-muted-foreground" />
               <p className="mt-3 text-lg font-semibold">Connectez-vous pour voir votre suivi</p>
               <div className="mx-auto mt-5 grid max-w-sm grid-cols-2 gap-2">
-                <Button asChild variant="outline" className="h-11">
+                <Button
+                  asChild
+                  variant="outline"
+                  className="hover:bg-muted hover:text-foreground h-11"
+                >
                   <Link href="/auth/login?redirect=%2Fmarche%2Fsuivi">Se connecter</Link>
                 </Button>
                 <Button asChild className="h-11">
@@ -500,7 +504,11 @@ export default function SuiviContent() {
           ) : state === 'error' || !data ? (
             <div className="mt-8 rounded-2xl border border-border p-6 text-center">
               <p className="font-semibold">Le suivi n’a pas pu être chargé.</p>
-              <Button className="mt-4 h-11" variant="outline" onClick={() => void load()}>
+              <Button
+                className="hover:bg-muted hover:text-foreground mt-4 h-11"
+                variant="outline"
+                onClick={() => void load()}
+              >
                 Réessayer
               </Button>
             </div>
@@ -515,10 +523,18 @@ export default function SuiviContent() {
                 <Button asChild className="h-11">
                   <Link href="/marche/publier">Publier</Link>
                 </Button>
-                <Button asChild variant="outline" className="h-11">
+                <Button
+                  asChild
+                  variant="outline"
+                  className="hover:bg-muted hover:text-foreground h-11"
+                >
                   <Link href="/marche">Le marché</Link>
                 </Button>
-                <Button asChild variant="outline" className="h-11">
+                <Button
+                  asChild
+                  variant="outline"
+                  className="hover:bg-muted hover:text-foreground h-11"
+                >
                   <Link href="/travail">Le travail</Link>
                 </Button>
               </div>

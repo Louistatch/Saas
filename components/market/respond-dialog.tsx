@@ -139,7 +139,11 @@ export function RespondButton({
                 qu’à ce moment-là.
               </p>
               <div className="grid grid-cols-2 gap-2">
-                <Button variant="outline" className="h-11" asChild>
+                <Button
+                  variant="outline"
+                  className="hover:bg-muted hover:text-foreground h-11"
+                  asChild
+                >
                   <Link href={`/auth/login?redirect=${encodeURIComponent(pathname || '/marche')}`}>
                     Se connecter
                   </Link>
@@ -159,7 +163,11 @@ export function RespondButton({
                 Sa décision s’affiche dans Mon suivi, avec son numéro s’il vous retient.
               </p>
               <DialogFooter className="gap-2 sm:gap-2">
-                <Button variant="outline" className="h-11" onClick={close}>
+                <Button
+                  variant="outline"
+                  className="hover:bg-muted hover:text-foreground h-11"
+                  onClick={close}
+                >
                   Fermer
                 </Button>
                 <Button className="h-11" asChild>
@@ -242,7 +250,12 @@ export function RespondButton({
               )}
 
               <DialogFooter className="gap-2 sm:gap-2">
-                <Button type="button" variant="outline" className="h-11" onClick={close}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="hover:bg-muted hover:text-foreground h-11"
+                  onClick={close}
+                >
                   Annuler
                 </Button>
                 <Button type="submit" className="h-11" disabled={sending}>

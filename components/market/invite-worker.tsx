@@ -100,7 +100,11 @@ export function InviteWorker({
                 {done}
               </p>
               <DialogFooter className="gap-2 sm:gap-2">
-                <Button variant="outline" className="h-11" onClick={() => setOpen(false)}>
+                <Button
+                  variant="outline"
+                  className="hover:bg-muted hover:text-foreground h-11"
+                  onClick={() => setOpen(false)}
+                >
                   Fermer
                 </Button>
                 <Button asChild className="h-11">
@@ -172,7 +176,7 @@ export function InviteWorker({
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-11"
+                  className="hover:bg-muted hover:text-foreground h-11"
                   onClick={() => setOpen(false)}
                 >
                   Annuler
