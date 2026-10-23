@@ -4765,6 +4765,12 @@ export type Database = {
           title: string
           type: string
           updated_at: string
+          wage_per_day_fcfa: number | null
+          positions: number | null
+          starts_on: string | null
+          work_days: number | null
+          has_contact: boolean | null
+          accepts_responses: boolean | null
         }
         Insert: {
           author_id?: string | null
@@ -4786,6 +4792,12 @@ export type Database = {
           title: string
           type: string
           updated_at?: string
+          wage_per_day_fcfa?: number | null
+          positions?: number | null
+          starts_on?: string | null
+          work_days?: number | null
+          has_contact?: never
+          accepts_responses?: never
         }
         Update: {
           author_id?: string | null
@@ -4807,6 +4819,12 @@ export type Database = {
           title?: string
           type?: string
           updated_at?: string
+          wage_per_day_fcfa?: number | null
+          positions?: number | null
+          starts_on?: string | null
+          work_days?: number | null
+          has_contact?: never
+          accepts_responses?: never
         }
         Relationships: [
           {
