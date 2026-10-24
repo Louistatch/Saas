@@ -6,11 +6,14 @@
  * en repli pour les navigateurs qui ne le supportent pas.
  */
 
-import { usePathname, useSearchParams } from 'next/navigation'
+import { analyticsPath } from '@/lib/analytics/privacy'
+import { usePathname } from 'next/navigation'
 import { Suspense, useEffect } from 'react'
 
 function trackVisit(path: string) {
-  const body = JSON.stringify({ path, referrer: document.referrer || undefined })
+  let referrer: string | undefined
+  try { referrer = document.referrer ? new URL(document.referrer).origin : undefined } catch {}
+  const body = JSON.stringify({ path: analyticsPath(path), referrer })
   if (navigator.sendBeacon) {
     navigator.sendBeacon('/api/track-visit', new Blob([body], { type: 'application/json' }))
     return
@@ -25,12 +28,10 @@ function trackVisit(path: string) {
 
 function TrackerInner() {
   const pathname = usePathname()
-  const searchParams = useSearchParams()
 
   useEffect(() => {
-    const qs = searchParams?.toString()
-    trackVisit(qs ? `${pathname}?${qs}` : pathname)
-  }, [pathname, searchParams])
+    trackVisit(pathname)
+  }, [pathname])
 
   return null
 }

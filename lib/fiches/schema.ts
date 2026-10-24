@@ -47,7 +47,7 @@ const culture = z
   .min(1, 'Indiquez la culture')
   .max(FICHE_LIMITS.cultureMax, 'Nom de culture trop long')
 const typeAgriculture = z.enum(TYPE_AGRICULTURE_KEYS as [string, ...string[]], {
-  errorMap: () => ({ message: 'Système de production inconnu' }),
+  error: 'Système de production inconnu',
 })
 const campaign = z
   .string()
@@ -63,7 +63,7 @@ const coverUrl = z
   .max(500, 'Adresse d’image trop longue')
   .refine((u) => u.startsWith(COVER_PREFIX()), 'Image hors du stockage FaîtiereHub')
 const price = z
-  .number({ invalid_type_error: 'Le prix doit être un nombre' })
+  .number({ error: 'Le prix doit être un nombre' })
   .int('Le prix doit être un nombre entier de FCFA')
   .nonnegative('Le prix ne peut pas être négatif')
   .max(FICHE_LIMITS.priceMax, 'Le prix ne doit pas dépasser 1 000 000 FCFA')

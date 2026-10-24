@@ -26,6 +26,7 @@ import { downloadCsv, parseCsvWithHeaders, toCsv, validateCsvFile } from '@/lib/
 import { errorMessage } from '@/lib/utils/errors'
 import { memberSchema, flattenZodErrors } from '@/lib/validators/schemas'
 import type { Member } from '@/types/domain'
+import { collectPages } from '@/lib/utils/collect-pages'
 import { useResetPageOnChange } from '@/hooks/use-reset-page'
 
 const PAGE_SIZE = 20
@@ -76,6 +77,9 @@ export default function MembersPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [members, setMembers] = useState<Member[]>([])
+  const [totalMembers, setTotalMembers] = useState(0)
+  const [exporting, setExporting] = useState(false)
+  const requestSequence = useRef(0)
   const [searchTerm, setSearchTerm] = useState('')
   const debouncedSearch = useDebounced(searchTerm, 200)
   const [page, setPage] = useState(1)
@@ -96,65 +100,58 @@ export default function MembersPage() {
 
   const fetchMemberCoops = useCallback(async () => {
     if (!currentCooperative) { setIsLoading(false); return }
+    const sequence = ++requestSequence.current
     setIsLoading(true)
-    const { data: children } = await supabase
-      .from('cooperatives')
-      .select('id, name, level')
-      .eq('parent_id', currentCooperative.id)
-      .order('name')
-    if (!children || children.length === 0) { setMemberCoops([]); setIsLoading(false); return }
-
-    // Count members per cooperative in one query
-    const { data: counts } = await supabase
-      .from('members')
-      .select('cooperative_id')
-      .in('cooperative_id', children.map(c => c.id))
-    const countMap: Record<string, number> = {}
-    for (const r of counts ?? []) {
-      countMap[r.cooperative_id] = (countMap[r.cooperative_id] ?? 0) + 1
+    try {
+      const [children, counts] = await Promise.all([
+        collectPages((from, to) => supabase.from('cooperatives').select('id, name, level')
+          .eq('parent_id',currentCooperative.id).is('deleted_at',null).order('name').order('id').range(from,to)),
+        collectPages<{child_id: string; member_count: number}>((from, to) => supabase.rpc('get_member_cooperative_counts', {p_parent:currentCooperative.id})
+          .order('child_id').range(from,to)),
+      ])
+      if (children.error || counts.error) throw children.error ?? counts.error
+      if (sequence !== requestSequence.current) return
+      const countMap = Object.fromEntries((counts.data ?? []).map((row: {child_id: string; member_count: number}) => [row.child_id, Number(row.member_count)]))
+      setMemberCoops((children.data ?? []).map(c => ({...c,memberCount:countMap[c.id] ?? 0})))
+    } catch (error) {
+      if (sequence !== requestSequence.current) return
+      setMemberCoops([])
+      toast({title:'Lecture impossible',description:errorMessage(error),variant:'destructive'})
+    } finally {
+      if (sequence === requestSequence.current) setIsLoading(false)
     }
-    setMemberCoops(children.map(c => ({ ...c, memberCount: countMap[c.id] ?? 0 })))
-    setIsLoading(false)
-  }, [currentCooperative, supabase])
+  }, [currentCooperative, supabase, toast])
 
   const fetchMembers = useCallback(async () => {
     if (!currentCooperative) { setIsLoading(false); return }
+    const sequence = ++requestSequence.current
     setIsLoading(true)
-    const { data, error } = await supabase
-      .from('members')
-      .select('*')
-      .eq('cooperative_id', currentCooperative.id)
-      .order('last_name')
-      .range(0, 999)
-    if (error) {
+    try {
+      const params = new URLSearchParams({ cooperative_id: currentCooperative.id,
+        page: String(page), limit: String(PAGE_SIZE), q: debouncedSearch })
+      const response = await fetch(`/api/members?${params}`, { cache: 'no-store' })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error ?? 'Lecture impossible')
+      if (sequence !== requestSequence.current) return
+      const lastPage = Math.max(1, Math.ceil(result.total / PAGE_SIZE))
+      if (page > lastPage) { setPage(lastPage); return }
+      setMembers(result.members as Member[])
+      setTotalMembers(result.total)
+    } catch (error) {
+      if (sequence !== requestSequence.current) return
+      setMembers([]); setTotalMembers(0)
       toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })
-    } else {
-      setMembers((data ?? []) as Member[])
+    } finally {
+      if (sequence === requestSequence.current) setIsLoading(false)
     }
-    setIsLoading(false)
-  }, [currentCooperative, supabase, toast])
+  }, [currentCooperative, page, debouncedSearch, toast])
 
   useEffect(() => {
-    if (isFaitiere) fetchMemberCoops()
-    else fetchMembers()
-  }, [isFaitiere, fetchMemberCoops, fetchMembers])
-
-  const filtered = useMemo(() => {
-    const q = debouncedSearch.toLowerCase().trim()
-    if (!q) return members
-    return members.filter((m) =>
-      `${m.first_name} ${m.last_name} ${m.email ?? ''} ${m.phone ?? ''}`
-        .toLowerCase()
-        .includes(q),
-    )
-  }, [members, debouncedSearch])
-
-  useResetPageOnChange(setPage, [debouncedSearch])
-
-  const paged = useMemo(
-    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [filtered, page],
-  )
+    if (isFaitiere) void fetchMemberCoops()
+    else void fetchMembers()
+    return () => { requestSequence.current++ }
+  }, [isFaitiere, fetchMemberCoops, fetchMembers, toast])
+  useResetPageOnChange(setPage, [debouncedSearch, currentCooperative?.id])
 
   const handleAdd = async () => {
     if (!currentCooperative && !form.cooperative_id) return
@@ -258,23 +255,22 @@ export default function MembersPage() {
     fetchMembers()
   }
 
-  const handleExport = () => {
-    if (members.length === 0) {
-      toast({ title: 'Rien à exporter', description: 'Ajoutez d\'abord un membre.' })
-      return
-    }
-    const csv = toCsv(
-      members.map((m) => ({
-        first_name: m.first_name,
-        last_name: m.last_name,
-        email: m.email ?? '',
-        phone: m.phone ?? '',
-        address: m.address ?? '',
-        status: m.status,
-      })),
-      ['first_name', 'last_name', 'email', 'phone', 'address', 'status'],
-    )
-    downloadCsv(`members-${currentCooperative?.name ?? 'cooperative'}.csv`, csv)
+  const handleExport = async () => {
+    if (!currentCooperative || exporting) return
+    setExporting(true)
+    try {
+      const { data, error } = await collectPages((from, to) => supabase.from('members')
+        .select('id, first_name, last_name, email, phone, address, status')
+        .eq('cooperative_id', currentCooperative.id).is('deleted_at', null).order('id').range(from, to))
+      if (error) throw error
+      if (!data?.length) { toast({ title: 'Rien à exporter' }); return }
+      const csv = toCsv(data.map((m) => ({ first_name: m.first_name, last_name: m.last_name,
+        email: m.email ?? '', phone: m.phone ?? '', address: m.address ?? '', status: m.status })),
+        ['first_name', 'last_name', 'email', 'phone', 'address', 'status'])
+      downloadCsv(`members-${currentCooperative.name ?? 'cooperative'}.csv`, csv)
+    } catch (error) {
+      toast({ title: 'Export impossible', description: errorMessage(error), variant: 'destructive' })
+    } finally { setExporting(false) }
   }
 
   const handleFile = async (file: File) => {
@@ -427,7 +423,7 @@ export default function MembersPage() {
       <Tabs defaultValue="list" className="w-full">
         <TabsList className="grid w-full max-w-xs grid-cols-2 border-b border-border bg-transparent">
           <TabsTrigger value="list" className="border-b-2 border-transparent data-[state=active]:border-primary">
-            Membres ({members.length})
+            Membres ({totalMembers})
           </TabsTrigger>
           <TabsTrigger value="import" className="border-b-2 border-transparent data-[state=active]:border-primary">
             Import / Export
@@ -447,7 +443,7 @@ export default function MembersPage() {
               />
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" className="gap-2 border-border" onClick={handleExport}>
+              <Button variant="outline" className="gap-2 border-border" onClick={handleExport} disabled={exporting}>
                 <Download className="h-4 w-4" />
                 Exporter
               </Button>
@@ -473,7 +469,7 @@ export default function MembersPage() {
             <CardContent>
               {isLoading ? (
                 <LoadingBlock />
-              ) : filtered.length === 0 ? (
+              ) : members.length === 0 ? (
                 <EmptyState
                   title={searchTerm ? 'Aucun membre trouvé' : 'Aucun membre pour le moment'}
                   description={
@@ -512,7 +508,7 @@ export default function MembersPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {paged.map((member) => (
+                        {members.map((member) => (
                           <tr key={member.id} className="border-b border-border hover:bg-accent/5 transition-colors">
                             <td className="py-3 px-4 text-foreground font-medium">
                               <div className="flex items-center gap-2">
@@ -583,7 +579,7 @@ export default function MembersPage() {
                   <PaginationBar
                     page={page}
                     pageSize={PAGE_SIZE}
-                    total={filtered.length}
+                    total={totalMembers}
                     onPageChange={setPage}
                   />
                 </>

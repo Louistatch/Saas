@@ -104,7 +104,7 @@ export function buildCotisationSchema(allowPastDueDate = false) {
       .transform((v: string | number) => (typeof v === 'string' ? Number(v) : v))
       .pipe(
         z
-          .number({ invalid_type_error: 'Le montant doit être un nombre' })
+          .number({ error: 'Le montant doit être un nombre' })
           .positive('Le montant doit être supérieur à 0'),
       ),
     type: z.string().min(1),

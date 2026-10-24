@@ -1,11 +1,9 @@
 import { AuthProvider } from '@/app/context/auth-context'
 import { CooperativeProvider } from '@/app/context/cooperative-context'
 import { PostHogProvider } from '@/app/providers/posthog-provider'
-import { SiteVisitTracker } from '@/components/shared/site-visit-tracker'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
 import { SITE_ORIGIN } from '@/lib/seo'
-import { Analytics } from '@vercel/analytics/next'
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
@@ -59,12 +57,7 @@ export default function RootLayout({
               <CooperativeProvider>
                 {children}
                 <Toaster />
-                {process.env.NODE_ENV === 'production' && (
-                  <>
-                    <Analytics />
-                    <SiteVisitTracker />
-                  </>
-                )}
+
               </CooperativeProvider>
             </AuthProvider>
           </PostHogProvider>
