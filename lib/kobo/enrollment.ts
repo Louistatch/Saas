@@ -12,9 +12,9 @@ import 'server-only'
 
 import { ORG_MATCH, ORG_REVIEW, bestOrganizationMatch, samePerson } from '@/lib/dedup/names'
 import { isAllowedKoboAttachmentUrl } from '@/lib/kobo/attachment-url'
+import { finishMemberEnrollment, normalizeSavedSubmission } from '@/lib/kobo/processing'
 import { processPhotoFaceCrop } from '@/lib/photos/process-photo'
 import { createClient } from '@/lib/supabase/admin'
-import { cardPrefix, generateUniqueCardNumber } from '@/lib/utils/card-number'
 import { createLogger } from '@/lib/utils/logger'
 import { cooperativeNameSchema, escapeIlike } from '@/lib/validators/kobo'
 
@@ -41,11 +41,13 @@ function getPayloadField(payload: Record<string, unknown>, path: string): string
 export async function enrollNewMemberFromSubmission(
   submissionId: string,
   faitiereId: string,
-  payload: Record<string, unknown>,
   /** KoboToolbox API token — required to download photo attachments */
   apiToken?: string | null,
 ): Promise<void> {
   const supabase = createClient()
+  const payload = await normalizeSavedSubmission(supabase, submissionId)
+  const consent = getPayloadField(payload, 'S1/consentement_donnees')
+  if (consent && consent !== 'oui') throw new Error('Consentement au traitement des données refusé')
 
   const prenomField =
     getPayloadField(payload, 'S1/prenom') ?? getPayloadField(payload, 'prenom') ?? ''
@@ -353,6 +355,16 @@ export async function enrollNewMemberFromSubmission(
     throw new Error(`Failed to create member: ${memberError?.message ?? 'Unknown'}`)
   }
 
+  // Keep the saved member linked even if card issuance or agriculture fails next.
+  const { error: linkError } = await supabase
+    .from('kobo_submissions')
+    .update({
+      member_id: newMember.id,
+      processed_payload: { mode: 'enrollment', cooperative_id: targetCooperativeId },
+    })
+    .eq('id', submissionId)
+  if (linkError) throw new Error(`Rattachement du membre impossible : ${linkError.message}`)
+
   // ── Face-crop photo async (non-blocking — update photo_url if successful) ──
   if (photoUrl) {
     processPhotoFaceCrop(photoUrl, newMember.id)
@@ -378,108 +390,7 @@ export async function enrollNewMemberFromSubmission(
       .catch((e) => log.warn('Face-crop processing error', { error: String(e) }))
   }
 
-  // ── Generate card ───────────────────────────────────────────
-  const { data: coopData } = await supabase
-    .from('cooperatives')
-    .select('name, faitiere_name')
-    .eq('id', targetCooperativeId)
-    .single()
-
-  const prefix = cardPrefix(coopData?.faitiere_name ?? coopData?.name ?? 'FEN')
-  const cardNumber = await generateUniqueCardNumber(supabase, prefix)
-
-  const expiryDate = new Date()
-  expiryDate.setFullYear(expiryDate.getFullYear() + 1)
-
-  await supabase.from('member_cards').insert({
-    cooperative_id: targetCooperativeId,
-    member_id: newMember.id,
-    card_number: cardNumber,
-    status: 'active',
-    expiry_date: expiryDate.toISOString().split('T')[0],
-    qr_data: `https://www.faitierehub.com/verify/${cardNumber}`,
-  })
-
-  // ── Insert parcelles (S5 repeat group) ─────────────────────
-  const parcelles = (payload.S5 ?? []) as Array<Record<string, unknown>>
-  for (const p of parcelles) {
-    const culture = String(p['S5/culture_principale'] ?? p.culture_principale ?? '')
-    const surface = Number.parseFloat(String(p['S5/superficie_ha'] ?? p.superficie_ha ?? '0'))
-    const typeSol = String(p['S5/type_sol'] ?? p.type_sol ?? '')
-    const irrigation = String(p['S5/irrigation'] ?? p.irrigation ?? '')
-    if (culture && surface > 0) {
-      // supabase-js RESOLVES with { error } instead of throwing, so a try/catch
-      // alone silently discarded every failure — that is how the whole platform
-      // ended up with zero parcelles while every submission reported success.
-      // The error must be read off the result.
-      const { error } = await supabase.from('parcelles').insert({
-        member_id: newMember.id,
-        cooperative_id: targetCooperativeId,
-        name: `Parcelle ${culture}`,
-        culture_principale: culture,
-        superficie_ha: surface,
-        soil_type: typeSol || null,
-        irrigation_type: irrigation || null,
-        source: 'kobo',
-      })
-      if (error) {
-        log.error('Parcelle insert failed', {
-          submissionId,
-          memberId: newMember.id,
-          culture,
-          code: error.code,
-          message: error.message,
-        })
-      }
-    }
-  }
-
-  // ── Insert productions (S6 repeat group) ───────────────────
-  const productions = (payload.S6 ?? []) as Array<Record<string, unknown>>
-  for (const p of productions) {
-    const culture = String(p['S6/culture_produite'] ?? p.culture_produite ?? '')
-    const quantity = Number.parseFloat(String(p['S6/rendement_kg'] ?? p.rendement_kg ?? '0'))
-    const campagne = String(p['S6/campagne_annee'] ?? p.campagne_annee ?? '')
-    if (culture && quantity > 0) {
-      const { error } = await supabase.from('productions').insert({
-        member_id: newMember.id,
-        cooperative_id: targetCooperativeId,
-        culture_name: culture,
-        quantity_kg: quantity,
-        campaign_year: campagne || new Date().getFullYear().toString(),
-        source: 'kobo',
-      })
-      if (error) {
-        log.error('Production insert failed', {
-          submissionId,
-          memberId: newMember.id,
-          culture,
-          code: error.code,
-          message: error.message,
-        })
-      }
-    }
-  }
-
-  // ── Mark submission as matched ──────────────────────────────
-  await supabase
-    .from('kobo_submissions')
-    .update({
-      status: 'matched' as const,
-      member_id: newMember.id,
-      member_card_number: cardNumber,
-      matched_at: new Date().toISOString(),
-      processed_at: new Date().toISOString(),
-      processed_payload: {
-        mode: 'enrollment',
-        member_id: newMember.id,
-        card_number: cardNumber,
-        cooperative_id: targetCooperativeId,
-        cooperative_name: coopData?.name ?? nomCooperative,
-      } as unknown as Record<string, unknown>,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', submissionId)
+  const cardNumber = await finishMemberEnrollment(supabase, submissionId, faitiereId, newMember.id)
 
   // Queue welcome SMS — fire-and-forget, never blocks enrollment
   if (telephone) {
@@ -552,29 +463,26 @@ async function reuseExistingMember(
       .update({ ...patch, updated_at: new Date().toISOString() })
       .eq('id', memberId)
   }
-  const { data: card } = await supabase
-    .from('member_cards')
-    .select('card_number')
-    .eq('member_id', memberId)
-    .eq('status', 'active')
-    .maybeSingle()
-  await supabase
+  const { error: linkError } = await supabase
     .from('kobo_submissions')
     .update({
-      status: 'matched' as const,
       member_id: memberId,
-      member_card_number: card?.card_number ?? null,
-      matched_at: new Date().toISOString(),
-      processed_at: new Date().toISOString(),
       processed_payload: {
         mode: 'existing_member',
-        member_id: memberId,
         cooperative_id: cooperativeId,
         filled: Object.keys(patch),
-      } as unknown as Record<string, unknown>,
-      updated_at: new Date().toISOString(),
+      },
     })
     .eq('id', submissionId)
+  if (linkError) throw new Error(linkError.message)
+  // The original faîtière remains the submission's access scope.
+  const { data: submission, error: readError } = await supabase
+    .from('kobo_submissions')
+    .select('cooperative_id')
+    .eq('id', submissionId)
+    .single()
+  if (readError || !submission) throw new Error('Soumission introuvable')
+  await finishMemberEnrollment(supabase, submissionId, submission.cooperative_id, memberId, true)
   log.info('Submission attached to an existing member (duplicate avoided)', {
     memberId,
     filled: Object.keys(patch),

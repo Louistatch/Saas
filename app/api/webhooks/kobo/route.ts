@@ -1,3 +1,18 @@
+import { createHmac, timingSafeEqual } from 'node:crypto'
+import {
+  enrollNewMemberFromSubmission,
+  processCooperativeRegistration,
+} from '@/lib/kobo/enrollment'
+import { normalizeKoboPayload } from '@/lib/kobo/normalize'
+import { normalizeSavedSubmission, processCardSubmission } from '@/lib/kobo/processing'
+import type { KoboFieldMappingRow } from '@/lib/kobo/types'
+import type { KoboWebhookResponse } from '@/lib/kobo/types'
+import { createClient } from '@/lib/supabase/admin'
+import { decryptSecret, isEncrypted } from '@/lib/utils/crypto'
+import { createLogger } from '@/lib/utils/logger'
+import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
+import { koboWebhookPayloadSchema } from '@/lib/validators/kobo'
+import { waitUntil } from '@vercel/functions'
 /**
  * POST /api/webhooks/kobo
  *
@@ -24,18 +39,6 @@
  * @test Validation failure: malformed payload → 200 + {valid: false}
  */
 import { type NextRequest, NextResponse } from 'next/server'
-import { waitUntil } from '@vercel/functions'
-import { timingSafeEqual, createHmac } from 'node:crypto'
-import { createClient } from '@/lib/supabase/admin'
-import { createLogger } from '@/lib/utils/logger'
-import { decryptSecret, isEncrypted } from '@/lib/utils/crypto'
-import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
-import { koboWebhookPayloadSchema } from '@/lib/validators/kobo'
-import {
-  enrollNewMemberFromSubmission,
-  processCooperativeRegistration,
-} from '@/lib/kobo/enrollment'
-import type { KoboWebhookResponse } from '@/lib/kobo/types'
 
 const log = createLogger('webhook:kobo')
 
@@ -56,11 +59,7 @@ function safeCompare(a: string, b: string): boolean {
 // =========================================================
 // HMAC-SHA256 signature verification
 // =========================================================
-function verifyHmacSignature(
-  payload: string,
-  signature: string,
-  secret: string,
-): boolean {
+function verifyHmacSignature(payload: string, signature: string, secret: string): boolean {
   const expected = createHmac('sha256', secret).update(payload).digest('hex')
   return safeCompare(signature, expected)
 }
@@ -68,30 +67,23 @@ function verifyHmacSignature(
 // =========================================================
 // POST handler
 // =========================================================
-export async function POST(request: NextRequest): Promise<NextResponse<KoboWebhookResponse | { error: string }>> {
+export async function POST(
+  request: NextRequest,
+): Promise<NextResponse<KoboWebhookResponse | { error: string }>> {
   // -------------------------------------------------------
   // 1. Content-Type validation
   // -------------------------------------------------------
   const contentType = request.headers.get('content-type') ?? ''
   if (!contentType.includes('application/json')) {
-    return NextResponse.json(
-      { error: 'Content-Type invalide' },
-      { status: 415 },
-    )
+    return NextResponse.json({ error: 'Content-Type invalide' }, { status: 415 })
   }
 
   // -------------------------------------------------------
   // 2. Size check — payload ≤ 2MB
   // -------------------------------------------------------
-  const contentLength = Number.parseInt(
-    request.headers.get('content-length') ?? '0',
-    10,
-  )
+  const contentLength = Number.parseInt(request.headers.get('content-length') ?? '0', 10)
   if (Number.isNaN(contentLength) || contentLength > 2_097_152) {
-    return NextResponse.json(
-      { error: 'Payload trop volumineux (max 2MB)' },
-      { status: 413 },
-    )
+    return NextResponse.json({ error: 'Payload trop volumineux (max 2MB)' }, { status: 413 })
   }
 
   // -------------------------------------------------------
@@ -107,10 +99,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<KoboWebho
   const expectedSecret = process.env.KOBO_WEBHOOK_SECRET
   if (!expectedSecret || expectedSecret.length < 32) {
     log.error('KOBO_WEBHOOK_SECRET is not configured or too short — rejecting all requests')
-    return NextResponse.json(
-      { error: 'Webhook not configured' },
-      { status: 503 },
-    )
+    return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })
   }
 
   // Read raw body for HMAC verification
@@ -197,7 +186,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<KoboWebho
   const cooperativeId = integration.cooperative_id as string | null
   if (!cooperativeId) {
     log.warn('Integration missing cooperative_id', { formId: payload._xform_id_string })
-    return NextResponse.json({ received: true, status: 'error', message: 'Integration not linked to a cooperative' })
+    return NextResponse.json({
+      received: true,
+      status: 'error',
+      message: 'Integration not linked to a cooperative',
+    })
   }
 
   // -------------------------------------------------------
@@ -226,7 +219,15 @@ export async function POST(request: NextRequest): Promise<NextResponse<KoboWebho
   const config = integration.config as Record<string, unknown> | null
   const fieldMapping = (config?.field_mapping as Record<string, string>) ?? {}
   const cardNumberField = fieldMapping.member_id ?? 'member_card_number'
-  const memberCardNumber = extractCardNumber(payload, cardNumberField)
+  const { data: mappings, error: mappingError } = await supabase
+    .from('kobo_field_mappings')
+    .select('*')
+    .eq('cooperative_id', cooperativeId)
+    .eq('form_id', payload._xform_id_string)
+  if (mappingError)
+    return NextResponse.json({ error: 'Field mappings unavailable' }, { status: 503 })
+  const normalized = normalizeKoboPayload(payload, (mappings ?? []) as KoboFieldMappingRow[])
+  const memberCardNumber = extractCardNumber(normalized, cardNumberField)
 
   // Insert submission
   const { data: submission, error: insertError } = await supabase
@@ -249,12 +250,15 @@ export async function POST(request: NextRequest): Promise<NextResponse<KoboWebho
       cooperativeId,
       instanceId: payload._uuid,
     })
-    // Still return 200 — don't make Kobo retry
-    return NextResponse.json({
-      received: true,
-      status: 'error',
-      message: 'Storage error',
-    })
+    // A transient storage failure must be retried by Kobo, not acknowledged as delivered.
+    return NextResponse.json(
+      {
+        received: false,
+        status: 'error',
+        message: 'Storage error',
+      },
+      { status: 503 },
+    )
   }
 
   // Log sync event
@@ -272,16 +276,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<KoboWebho
   // promise settles, so the submission can never be stranded in 'pending' when
   // the instance is recycled. The webhook still returns 200 immediately.
   waitUntil(
-    processSubmissionAsync(supabase, submission.id, cooperativeId).catch(
-      (err: unknown) => {
-        const message = err instanceof Error ? err.message : 'Unknown error'
-        log.error('Async processing failed', {
-          submissionId: submission.id,
-          cooperativeId,
-          error: message,
-        })
-      },
-    ),
+    processSubmissionAsync(supabase, submission.id, cooperativeId).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      log.error('Async processing failed', {
+        submissionId: submission.id,
+        cooperativeId,
+        error: message,
+      })
+    }),
   )
 
   // -------------------------------------------------------
@@ -328,7 +330,7 @@ async function processSubmissionAsync(
 
     if (!submission) throw new Error('Submission not found')
 
-    const payload = submission.raw_payload as Record<string, unknown>
+    const payload = await normalizeSavedSubmission(supabase, submissionId)
 
     // ── Route by form type (from integration config) ───────────
     const { data: integ } = await supabase
@@ -358,9 +360,7 @@ async function processSubmissionAsync(
       default:
         // Default: member enrollment/update (existing behavior)
         if (submission.member_card_number) {
-          await supabase.rpc('match_kobo_submission_to_member', {
-            p_submission_id: submissionId,
-          })
+          await processCardSubmission(supabase, submissionId)
         } else {
           // Fetch API token for photo download
           // config.api_key is stored encrypted (AES-256-GCM); decrypt before use.
@@ -375,7 +375,7 @@ async function processSubmissionAsync(
           } else if (storedKey) {
             apiKey = storedKey // legacy plaintext value
           }
-          await enrollNewMemberFromSubmission(submissionId, cooperativeId, payload, apiKey)
+          await enrollNewMemberFromSubmission(submissionId, cooperativeId, apiKey)
         }
     }
 
@@ -444,10 +444,7 @@ function getPayloadField(payload: Record<string, unknown>, path: string): string
 // =========================================================
 // Extract card number from payload
 // =========================================================
-function extractCardNumber(
-  payload: Record<string, unknown>,
-  fieldName: string,
-): string | null {
+function extractCardNumber(payload: Record<string, unknown>, fieldName: string): string | null {
   // Try direct field
   if (payload[fieldName] && typeof payload[fieldName] === 'string') {
     return (payload[fieldName] as string).trim().toUpperCase()
@@ -479,7 +476,6 @@ function extractCardNumber(
   return null
 }
 
-
 // =========================================================
 // Market Price: Insert price records from field survey
 // =========================================================
@@ -499,23 +495,32 @@ async function processMarketPriceSubmission(
 ): Promise<void> {
   const log = createLogger('kobo-market-price')
 
-  const dateReleve = getPayloadField(payload, 'S1/date_releve') ?? new Date().toISOString().slice(0, 10)
+  const dateReleve =
+    getPayloadField(payload, 'S1/date_releve') ?? new Date().toISOString().slice(0, 10)
   const marche = getPayloadField(payload, 'S1/marche') ?? 'Lomé'
 
   // Extract repeat group (products)
-  const produits = (payload['S2/produits'] ?? payload.produits ?? []) as Array<Record<string, unknown>>
+  const produits = (payload['S2/produits'] ?? payload.produits ?? []) as Array<
+    Record<string, unknown>
+  >
 
   if (!Array.isArray(produits) || produits.length === 0) {
     log.warn('No products in market price submission', { submissionId })
-    await supabase.from('kobo_submissions').update({
-      status: 'processed' as const, updated_at: new Date().toISOString(),
-    }).eq('id', submissionId)
+    await supabase
+      .from('kobo_submissions')
+      .update({
+        status: 'processed' as const,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', submissionId)
     return
   }
 
   // Resolve culture IDs
   const { data: cultures } = await supabase.from('cultures').select('id, name')
-  const cultureMap = new Map((cultures ?? []).map((c: { id: string; name: string }) => [c.name.toLowerCase(), c.id]))
+  const cultureMap = new Map(
+    (cultures ?? []).map((c: { id: string; name: string }) => [c.name.toLowerCase(), c.id]),
+  )
 
   let inserted = 0
   for (const p of produits) {
@@ -552,12 +557,14 @@ async function processMarketPriceSubmission(
 
   log.info('Market prices inserted', { submissionId, count: inserted, market: marche })
 
-  await supabase.from('kobo_submissions').update({
-    status: 'processed' as const,
-    updated_at: new Date().toISOString(),
-  }).eq('id', submissionId)
+  await supabase
+    .from('kobo_submissions')
+    .update({
+      status: 'processed' as const,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', submissionId)
 }
-
 
 // =========================================================
 // Harvest: Insert production records
@@ -593,7 +600,9 @@ async function processHarvestSubmission(
     return
   }
 
-  const recoltes = (payload['S2/recoltes'] ?? payload.recoltes ?? []) as Array<Record<string, unknown>>
+  const recoltes = (payload['S2/recoltes'] ?? payload.recoltes ?? []) as Array<
+    Record<string, unknown>
+  >
 
   for (const r of recoltes) {
     const culture = String(r['S2/recoltes/culture'] ?? r.culture ?? '')
@@ -613,11 +622,14 @@ async function processHarvestSubmission(
 
   log.info('Harvest recorded', { submissionId, cardNumber, count: recoltes.length })
 
-  await supabase.from('kobo_submissions').update({
-    status: 'processed' as const, updated_at: new Date().toISOString(),
-  }).eq('id', submissionId)
+  await supabase
+    .from('kobo_submissions')
+    .update({
+      status: 'processed' as const,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', submissionId)
 }
-
 
 // =========================================================
 // Plot Survey: Insert/update parcelle records
@@ -653,7 +665,9 @@ async function processPlotSurveySubmission(
     return
   }
 
-  const parcelles = (payload['S2/parcelles'] ?? payload.parcelles ?? []) as Array<Record<string, unknown>>
+  const parcelles = (payload['S2/parcelles'] ?? payload.parcelles ?? []) as Array<
+    Record<string, unknown>
+  >
 
   for (const p of parcelles) {
     const culture = String(p['S2/parcelles/culture'] ?? p.culture ?? '')
@@ -675,7 +689,11 @@ async function processPlotSurveySubmission(
 
   log.info('Plots recorded', { submissionId, cardNumber, count: parcelles.length })
 
-  await supabase.from('kobo_submissions').update({
-    status: 'processed' as const, updated_at: new Date().toISOString(),
-  }).eq('id', submissionId)
+  await supabase
+    .from('kobo_submissions')
+    .update({
+      status: 'processed' as const,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', submissionId)
 }
