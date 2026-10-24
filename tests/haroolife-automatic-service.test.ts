@@ -126,6 +126,68 @@ test('a second customer starts a new paid cycle automatically', () => {
   }
 })
 
+test('a service stop starts at the door when the queue at the light holds the taxi short of it', () => {
+  const controller = new PlayerController({ walkable: road, drivable: road }, { x: 0, y: 0 })
+  controller.vehicle = { x: 0, z: 0, heading: 90, speed: 0 }
+  assert.ok(controller.enterVehicle())
+  controller.vehicleDimensions = { halfWidth: 0.205, halfLength: 0.54 }
+  // A car waits at the light just past the garage, in the same lane: the taxi stops behind it,
+  // a third of a cell before the door (in CI the taxi stood 0.4 cell short for 30 s).
+  controller.obstacles = [{ x: 26.85, z: -0.3, heading: 90, halfWidth: 0.2, halfLength: 0.54 }]
+  const stops = [{ service: 'garage' as const, name: 'Garage', x: 26, y: 0 }]
+  const service = new AutomaticDrivingService(controller, {
+    drivable: road,
+    places: () => places,
+    random: () => 0,
+    nextStop: () => stops.shift() ?? null,
+  })
+  service.start('taxi')
+  service.offer({ name: 'Abla', x: 4, y: 0 })
+  let seconds = 0
+  let pitstop: number | null = null
+  let serviced: number | null = null
+  while (seconds < 120 && serviced === null) {
+    controller.update(1 / 60)
+    seconds += 1 / 60
+    if (service.update(1 / 60).some((e) => e.type === 'serviced')) serviced = seconds
+    if (pitstop === null && service.snapshot().phase === 'pitstop') pitstop = seconds
+  }
+  const vehicle = controller.vehicle
+  assert.ok(vehicle && pitstop !== null && serviced !== null, 'the garage service happens')
+  // Driving six cells and the 4 s service, without waiting out the queue first.
+  assert.ok(serviced - pitstop < 12, `serviced ${(serviced - pitstop).toFixed(1)} s after leaving`)
+  assert.ok(Math.abs(vehicle.x - 26) < 0.5, `in front of the garage (x = ${vehicle.x.toFixed(2)})`)
+})
+
+test('a van stopped right behind the taxi does not hold it before a junction', () => {
+  // Captured in the browser: heading west 0.45 cell before a junction, then south. The van
+  // behind waits for the taxi, 0.01 cell from its body; two people stand at the corner.
+  const cross = (x: number, y: number) =>
+    (y === 10 && x >= 0 && x <= 20) || (x === 12 && y >= 0 && y <= 20)
+  const controller = new PlayerController({ walkable: cross, drivable: cross }, { x: 12, y: 10 })
+  controller.vehicle = { x: 12.45, z: 10, heading: 266.5, speed: 0 }
+  assert.ok(controller.enterVehicle())
+  controller.vehicleDimensions = { halfWidth: 0.205, halfLength: 0.54 }
+  assert.ok(
+    controller.driveAutomatically([
+      { x: 12, z: 10 },
+      { x: 12, z: 11 },
+      { x: 12, z: 12 },
+    ]),
+  )
+  controller.obstacles = [
+    { x: 13.54, z: 10.3, heading: 270, halfWidth: 0.2, halfLength: 0.54 },
+    { x: 12.62, z: 9.38, heading: 0, halfWidth: 0.07, halfLength: 0.07 },
+    { x: 12.25, z: 9.38, heading: 0, halfWidth: 0.07, halfLength: 0.07 },
+  ]
+  for (let i = 0; i < 15 * 60 && controller.drivingRouteState !== 'arrived'; i++)
+    controller.update(1 / 60)
+  const vehicle = controller.vehicle
+  assert.ok(vehicle)
+  assert.equal(controller.drivingRouteState, 'arrived', `held at ${vehicle.x}, ${vehicle.z}`)
+  assert.deepEqual({ x: vehicle.x, z: vehicle.z }, { x: 12, z: 12 })
+})
+
 test('a compact taxi fits the street and is lower than the adult character', () => {
   const model = new THREE.Group()
   model.add(new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.5, 2.775)))
