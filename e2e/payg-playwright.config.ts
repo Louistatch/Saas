@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
+import { audienceChoiceMade } from './fixtures/analytics-choice'
 
 // Consoles PAYG contre le mock Supabase et un serveur `next start` déjà lancé sur 127.0.0.1:3000
 // (même montage que AgriAcademy). Mobile d'abord : les agents travaillent au téléphone.
@@ -12,6 +13,7 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   use: {
     baseURL: 'http://127.0.0.1:3000',
+    storageState: audienceChoiceMade('http://127.0.0.1:3000'),
     launchOptions: { executablePath: process.env.PW_CHROMIUM_PATH || undefined },
     bypassCSP: true,
     screenshot: 'only-on-failure',

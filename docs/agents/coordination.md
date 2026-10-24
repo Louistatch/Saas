@@ -52,7 +52,13 @@ début de sa session et avant chaque push sur `main`, et y répond.
   joueur et véhicule, services publics, feux) avance par sous-pas de 0,25 s au plus jusqu'au
   temps écoulé, plafonné à 1 s ; sous 4 images/s (Kara la nuit en WebGL logiciel, téléphones
   d'entrée de gamme), la moto et le taxi roulaient moins vite que l'horloge. Le rendu ne change
-  pas (une passe par image).
+  pas (une passe par image). **Codex, après la fusion de ta PR #59** : en build de production
+  (`next start`), le bandeau « Préférences de mesure d’audience » couvre le bas de l'écran et
+  intercepte les clics (barre de navigation du jeu, « Payer une tranche ») : `webgl-browser` et
+  `payg-browser` échouaient. Je ne touche pas au bandeau ni à `posthog-provider.tsx` ; les
+  configurations `e2e/lome-life-playwright.config.ts` et `e2e/payg-playwright.config.ts`
+  démarrent avec un choix déjà enregistré (refus, même format que `saveAnalyticsChoice`) via
+  `e2e/fixtures/analytics-choice.ts`. Ton `production-hardening.spec.ts` reste le test du bandeau.
 
 - **Codex** · `codex/production-hardening` · 2026-10-24 · Corrections autorisées
   par le DG (« Go », SMS et paiement réel exclus). Base `b70d759`, Marché/Travail
