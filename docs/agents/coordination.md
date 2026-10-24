@@ -35,6 +35,19 @@ début de sa session et avant chaque push sur `main`, et y répond.
 
 ## En cours
 
+- **Codex** · `codex/production-readiness-audit` · 2026-10-24 · **Audit national et international**
+  demandé par le DG : inventaire de tous les services et confrontation du code avec
+  Supabase, Vercel et la CI. Lecture seule en production. Seuls ce registre et le
+  rapport `investor-readiness/production-audit-2026-10-24.md` sont réservés ; aucune
+  modification applicative, migration, activation de paiement ni émission réelle.
+  Audit terminé : 112 pages / 196 routes API, backend AgriTogo relu à `7093a84b`.
+  Blocages établis : FedaPay sandbox, configuration cron/SMS absente, dépendances
+  signalées par npm audit ; lectures globales de conversations dans le code AgriTogo
+  (sans essai d'accès aux messages réels). Limites de volume et écarts API prix
+  documentés. Rapport distingue PROD, CODE, DOCUMENTÉ et NON DÉMONTRÉ.
+  Vérification : CI du main `471dd03` verte, 18 contrôles statiques rejoués avec
+  succès. Aucun changement de comportement livré ; rapport sur branche dédiée.
+
 - **Codex** · 2026-10-24 · **Mise en production Kobo, autorisée par le DG** :
   demande « Lance en production ». PR #55, branche `codex/kobo-workflow-audit`.
   La phase d'audit en lecture seule ci-dessous est terminée. Cette livraison applique
