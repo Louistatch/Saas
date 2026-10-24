@@ -34,8 +34,8 @@ Annonce publiée ──► « Je suis intéressé / disponible »  ─► répon
 
 Le numéro affiché sur une annonce reste accessible à qui veut appeler directement, mais
 seulement à la demande (« Afficher le numéro »), une annonce à la fois, avec une limite par
-adresse IP. Il ne figure plus dans la liste des annonces, et le rôle anonyme ne pourra plus le
-lire dans la table une fois `20261023_150100_market_anon_phone.sql` appliquée (voir plus bas).
+adresse IP. Il ne figure plus dans la liste des annonces, et le rôle anonyme ne peut plus le
+lire dans la table (`20261023_150100_market_anon_phone.sql`, voir plus bas).
 
 ## Ce qui n'est pas fait (et pourquoi)
 
@@ -60,9 +60,10 @@ Deux migrations, dans cet ordre :
    colonnes d'offre de travail, expiration par défaut, table `market_responses` fermée aux
    rôles API (tout passe par des fonctions `SECURITY DEFINER`), fonctions `market_*`. Les
    droits existants ne changent pas : le code déjà en ligne continue de fonctionner.
-2. `20261023_150100_market_anon_phone.sql` : retire le téléphone, l'auteur et la fiche membre
-   de la lecture anonyme. **À appliquer juste après le déploiement de ce code** : la liste des
-   annonces de l'ancien code lit `contact_phone` en anonyme et échouerait.
+2. `20261023_150100_market_anon_phone.sql` (**appliquée en production le 24/10/2026**, juste
+   après le déploiement de la PR #56) : retire le téléphone, l'auteur et la fiche membre de la
+   lecture anonyme. Elle devait suivre le déploiement : la liste des annonces de l'ancien code
+   lisait `contact_phone` en anonyme et aurait échoué.
 
 Retours arrière (dans l'ordre inverse) : `supabase/rollbacks/20261023_150100_market_anon_phone.rollback.sql`
 puis `supabase/rollbacks/20261023_150000_market_work.rollback.sql`.

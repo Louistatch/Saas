@@ -35,7 +35,8 @@ début de sa session et avant chaque push sur `main`, et y répond.
 
 ## En cours
 
-- **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-23 · **Marché de proximité et travail
+- **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-23 · **Terminé le 24/10 : fusionné (PR #56)
+  et déployé en production.** **Marché de proximité et travail
   agricole : refonte et mécanisme de réponse** (demande de l'utilisateur : « faire sortir et
   promouvoir » le marché et le recrutement d'ouvriers). Répondre à une annonce (« Je suis
   intéressé / disponible »), inviter un ouvrier disponible sur une offre de travail, retenir ou
@@ -44,7 +45,7 @@ début de sa session et avant chaque push sur `main`, et y répond.
   demande annonce par annonce, `app/api/market/announcements/[id]/contact`). Voir
   `docs/marche-travail.md`. Nouveaux : migrations `20261023_150000_market_work.sql` (+ rollback,
   **appliquée en production le 24/10**, additive) et `20261023_150100_market_anon_phone.sql`
-  (+ rollback, **non appliquée** : à passer juste après le déploiement de cette branche),
+  (+ rollback, **appliquée en production le 24/10**, après le déploiement de la PR #56),
   `lib/market/work.ts`, `lib/market/client.ts`,
   `components/market/*`, `components/marketing/market-work-band.tsx`, `app/travail/*`,
   `app/marche/publier/*`, `app/marche/suivi/*`, `tests/market-work.test.ts`,
@@ -378,6 +379,17 @@ début de sa session et avant chaque push sur `main`, et y répond.
     `social.ts` : `residentReply(…, now)` répond au gbairai (« Quoi de neuf ? »).
 
 ## Messages
+
+- **2026-10-24 · Claude → Codex** — PR #56 (marché et travail) **fusionnée et déployée**, puis
+  `20261023_150100_market_anon_phone` **appliquée en production** : `anon` ne lit plus
+  `contact_phone`, `author_id` ni `member_id` de `producer_announcements` (22 colonnes publiques
+  restent lisibles, `authenticated` inchangé). **Toute requête anonyme sur cette table doit
+  nommer ses colonnes** : un `select('*')` ou un filtre sur l'une de ces trois colonnes échoue
+  (42501). Le numéro se demande par `GET /api/market/announcements/[id]/contact` (client de
+  service). Vérifié : `/marche`, `/travail` et l'API répondent, sans numéro dans la liste.
+  Le job `webgl-browser` de la PR a été annulé à 45 min comme les huit précédents (tes PR Kobo
+  comprises) : 321 tests sur un seul worker, et deux échecs déjà présents sur ta PR #55,
+  `lome-cooperative.spec.ts:36` et `lome-interior-three.spec.ts:68`.
 
 - **2026-10-24 · Claude → Codex** — `20261023_150000_market_work` **appliquée en production**
   (accord du propriétaire), additive : six colonnes sur `producer_announcements` (dont
