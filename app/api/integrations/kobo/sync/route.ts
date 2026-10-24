@@ -1,3 +1,10 @@
+import { KoboSyncService } from '@/lib/kobo/sync-service'
+import type { SyncResult } from '@/lib/kobo/types'
+import { assertRole, assertTenantAccess } from '@/lib/security/assert-access'
+import { decryptSecret } from '@/lib/utils/crypto'
+import { createLogger } from '@/lib/utils/logger'
+import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
+import { koboSyncRequestSchema } from '@/lib/validators/kobo'
 /**
  * POST /api/integrations/kobo/sync
  *
@@ -16,13 +23,6 @@
  * @test Validation failure: missing cooperativeId → 400
  */
 import { type NextRequest, NextResponse } from 'next/server'
-import { assertTenantAccess, assertRole } from '@/lib/security/assert-access'
-import { createLogger } from '@/lib/utils/logger'
-import { decryptSecret } from '@/lib/utils/crypto'
-import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
-import { koboSyncRequestSchema } from '@/lib/validators/kobo'
-import { KoboSyncService } from '@/lib/kobo/sync-service'
-import type { SyncResult } from '@/lib/kobo/types'
 
 const log = createLogger('api:kobo:sync')
 
@@ -83,10 +83,7 @@ export async function POST(request: NextRequest) {
     .maybeSingle()
 
   if (!integration || integration.status !== 'connected') {
-    return NextResponse.json(
-      { error: 'Intégration KoboToolbox non connectée' },
-      { status: 400 },
-    )
+    return NextResponse.json({ error: 'Intégration KoboToolbox non connectée' }, { status: 400 })
   }
 
   const config = integration.config as {
@@ -112,7 +109,7 @@ export async function POST(request: NextRequest) {
     const message = err instanceof Error ? err.message : 'Decryption failed'
     log.error('Failed to decrypt API token', { error: message, cooperativeId })
     return NextResponse.json(
-      { error: 'Erreur de déchiffrement du token. Reconfigurez l\'intégration.' },
+      { error: "Erreur de déchiffrement du token. Reconfigurez l'intégration." },
       { status: 500 },
     )
   }
@@ -129,6 +126,7 @@ export async function POST(request: NextRequest) {
   // -------------------------------------------------------
   // Execute sync
   // -------------------------------------------------------
+  const syncStartedAt = new Date().toISOString()
   const syncService = new KoboSyncService()
 
   let result: SyncResult
@@ -164,6 +162,7 @@ export async function POST(request: NextRequest) {
     const retry = await syncService.retryFailedSubmissions(cooperativeId, apiToken)
     retryResult = { succeeded: retry.succeeded, failed: retry.failed }
   } catch (err: unknown) {
+    retryResult.failed++
     log.warn('Retry failed submissions error', {
       error: err instanceof Error ? err.message : 'Unknown',
       cooperativeId,
@@ -173,14 +172,17 @@ export async function POST(request: NextRequest) {
   // -------------------------------------------------------
   // Update last_sync_at
   // -------------------------------------------------------
-  await supabase
-    .from('integrations')
-    .update({
-      last_sync_at: new Date().toISOString(),
-      status: 'connected',
-    })
-    .eq('cooperative_id', cooperativeId)
-    .eq('type', 'kobo')
+  // Do not advance the cursor past a failed import; the next pull must see it again.
+  if (result.success && retryResult.failed === 0) {
+    await supabase
+      .from('integrations')
+      .update({
+        last_sync_at: syncStartedAt,
+        status: 'connected',
+      })
+      .eq('cooperative_id', cooperativeId)
+      .eq('type', 'kobo')
+  }
 
   // -------------------------------------------------------
   // Response
@@ -195,7 +197,7 @@ export async function POST(request: NextRequest) {
   })
 
   return NextResponse.json({
-    success: result.success,
+    success: result.success && retryResult.failed === 0,
     syncLogId: result.syncLogId,
     mode,
     sync: {
