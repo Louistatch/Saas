@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
+import { audienceChoiceMade } from './fixtures/analytics-choice'
 
 const port = Number(process.env.HAROOLIFE_TEST_PORT || 3000)
 const baseURL = `http://127.0.0.1:${port}`
@@ -64,6 +65,7 @@ export default defineConfig({
   expect: { timeout: 20_000 },
   use: {
     baseURL,
+    storageState: audienceChoiceMade(baseURL),
     launchOptions: {
       // Cloud sessions ship Chromium at this path; a local Playwright install may override it.
       executablePath: process.env.PW_CHROMIUM_PATH || undefined,

@@ -7,6 +7,10 @@ import http from 'node:http'
 const PORT = Number(process.env.HAROOLIFE_SUPABASE_PORT || 54329)
 const UID = '11111111-1111-4111-8111-111111111111'
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url')
+// Les échéances qui commandent un comportement (regroupement ouvert, carte valide) se comptent à
+// partir d'aujourd'hui : une date figée finit par passer et casse les tests sans que rien ait changé.
+const daysFromNow = (n) => new Date(Date.now() + n * 86400000).toISOString()
+const dayFromNow = (n) => daysFromNow(n).slice(0, 10)
 let refreshCount = 0
 const token = () =>
   `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: UID, role: 'authenticated', aud: 'authenticated', email: 'admin@test.local', exp: 4102444800, app_metadata: { role: 'super_admin' }, n: refreshCount })}.c2ln`
@@ -152,7 +156,7 @@ const CARDS = MEMBERS.filter((_, i) => i % 2 === 0).map((m, i) => ({
   card_number: `FH-${1000 + i}`,
   card_type: 'FAITIERE',
   status: i % 10 === 0 ? 'suspended' : 'active',
-  expiry_date: '2027-12-31',
+  expiry_date: dayFromNow(365),
   revoked_at: null,
   deleted_at: null,
 }))
@@ -195,10 +199,10 @@ const GROUPS = [
     cooperative_id: C1,
     canton_id: CANTON(5).id,
     cantons: { name: 'Kpalimé' },
-    starts_on: '2026-10-25',
-    ends_on: '2026-10-30',
+    starts_on: dayFromNow(8),
+    ends_on: dayFromNow(13),
     target: 15,
-    expires_at: '2026-10-24T00:00:00Z',
+    expires_at: daysFromNow(7),
     cancelled_at: null,
     owner_id: 'u3',
     created_at: '2026-10-11T00:00:00Z',
@@ -998,7 +1002,7 @@ http
             starts_on: p_payload.starts_on,
             ends_on: p_payload.ends_on,
             target: p_payload.kind === 'team' ? 8 : 15,
-            expires_at: '2026-12-31T00:00:00Z',
+            expires_at: daysFromNow(30),
             cancelled_at: null,
             owner_id: UID,
             created_at: new Date().toISOString(),

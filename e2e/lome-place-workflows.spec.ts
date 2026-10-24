@@ -133,6 +133,43 @@ test('returning taxi: paid ride, automatic fuel, garage and police stops, then n
     page.evaluate(
       () => (window as unknown as { __LOME_CITY?: { wallet: number } }).__LOME_CITY?.wallet,
     )
+  // What surrounds a stalled taxi, for the failure message: its route, the signal, the clock,
+  // and the traffic and people within three cells (offsets from the taxi).
+  const around = () =>
+    page.evaluate(() => {
+      const w = window as unknown as {
+        __LOME_PLAYER?: {
+          vehicle: { x: number; z: number; heading: number; speed: number } | null
+          drivingRouteState: string
+          waitingForSignal: boolean
+        }
+        __LOME_STREET?: {
+          traffic: { kind: string; x: number; z: number; stopped: boolean }[]
+          walkers: { name: string; x: number; z: number }[]
+          signals: { seconds: number }
+        }
+        __LOME_CITY?: { fps: number }
+      }
+      const p = w.__LOME_PLAYER
+      const v = p?.vehicle
+      if (!p || !v) return 'no vehicle'
+      const near = (o: { x: number; z: number }) => Math.hypot(o.x - v.x, o.z - v.z) < 3
+      const r = (n: number) => Math.round(n * 10) / 10
+      return JSON.stringify({
+        route: p.drivingRouteState,
+        signal: p.waitingForSignal,
+        heading: Math.round(v.heading),
+        speed: r(v.speed),
+        clock: r(w.__LOME_STREET?.signals.seconds ?? -1),
+        fps: w.__LOME_CITY?.fps,
+        traffic: w.__LOME_STREET?.traffic
+          .filter(near)
+          .map((c) => [c.kind, r(c.x - v.x), r(c.z - v.z), c.stopped]),
+        walkers: w.__LOME_STREET?.walkers
+          .filter(near)
+          .map((o) => [o.name, r(o.x - v.x), r(o.z - v.z)]),
+      })
+    })
   // Each step crosses traffic lights (a red lasts up to 14 s) and stops of 4 to 6 s: its
   // length depends on the lights. What is checked is that the service never stalls, the taxi
   // still and its phase unchanged for 30 s, before the step is done; not a fixed duration.
@@ -156,7 +193,9 @@ test('returning taxi: paid ride, automatic fuel, garage and police stops, then n
         mark = now
         since = Date.now()
       }
-      expect(Date.now() - since, `the taxi service keeps going (${now})`).toBeLessThan(30000)
+      const still = Date.now() - since
+      const detail = still < 30000 ? '' : `\n${await around()}`
+      expect(still, `the taxi service keeps going (${now})${detail}`).toBeLessThan(30000)
       await page.waitForTimeout(500)
     }
   }

@@ -2032,7 +2032,11 @@ export class StreetWorld {
     if (this.disposed || this.paused) return
     this.raf = requestAnimationFrame(this.frame)
     const now = performance.now()
-    const dt = Math.min((now - this.last) / 1000, 0.25)
+    // The simulation keeps up with the clock down to one frame per second, in steps of at most
+    // 0.25 s: below 4 frames per second (an entry-level phone, software WebGL) the taxi and the
+    // traffic used to run slower than real time. Drawing stays one pass per frame.
+    const elapsed = Math.min((now - this.last) / 1000, 1)
+    const dt = Math.min(elapsed, 0.25)
     this.last = now
     this.wind.time.value = now / 1000
     if (document.hidden || this.paused) {
@@ -2043,10 +2047,13 @@ export class StreetWorld {
     this.animatedThisFrame = 0
     this.updateAnimationBudget(now)
     const ctl = this.controller
-    this.stepTraffic(dt)
-    ctl.update(dt)
-    this.stepPublicServices(dt)
-    this.signals?.update(ctl.streetSeconds, ctl.repairedSignals)
+    for (let left = elapsed; left > 0.0001; left -= 0.25) {
+      const step = Math.min(left, 0.25)
+      this.stepTraffic(step)
+      ctl.update(step)
+      this.stepPublicServices(step)
+      this.signals?.update(ctl.streetSeconds, ctl.repairedSignals)
+    }
     const events = ctl.drain()
     if (events.length) this.events.onEvents(events, ctl)
     const c = ctl.cell

@@ -35,6 +35,45 @@ début de sa session et avant chaque push sur `main`, et y répond.
 
 ## En cours
 
+- **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-24 · **CI `webgl-browser` (HarooLife Lomé
+  Local Browser QA)** (demande de l'utilisateur : « corrige webgl-browser »). Les huit dernières
+  exécutions s'arrêtaient à 45 min : 321 tests (3 projets × 107) sur un seul worker, et le
+  projet `firefox-mobile` n'était même pas installé en CI. Le workflow passe en matrice : huit
+  tranches Chrome (`desktop` + `mobile-android`, `--shard=i/8`), chacune avec son faux Supabase,
+  son relais et son serveur, plus `firefox-mobile` sur `lome-entry.spec.ts`. Aucun délai
+  augmenté. Puis corrections des échecs : `lome-cooperative.spec.ts:36`,
+  `lome-interior-three.spec.ts:68`, et ceux que les tranches révéleront. Fichiers :
+  `.github/workflows/haroolife-lome-browser.yml`, `e2e/fixtures/mock-supabase.mjs` (échéances
+  relatives à aujourd'hui au lieu de dates figées), `components/haroolife/game/haroo-room-view.tsx`
+  (guide ouvert au-dessus des commandes : « Sortir » était sous la carte des besoins),
+  `e2e/lome-world-life.spec.ts` (circulation lue sur `__LOME_STREET.traffic`, comme ta
+  `lome-interface.spec.ts`). **Codex, fichier partagé, retouche minimale** :
+  `lib/haroolife/game/render/street-world.ts`, `frame()` seulement — la simulation (circulation,
+  joueur et véhicule, services publics, feux) avance par sous-pas de 0,25 s au plus jusqu'au
+  temps écoulé, plafonné à 1 s ; sous 4 images/s (Kara la nuit en WebGL logiciel, téléphones
+  d'entrée de gamme), la moto et le taxi roulaient moins vite que l'horloge. Le rendu ne change
+  pas (une passe par image). **Codex, après la fusion de ta PR #59** : en build de production
+  (`next start`), le bandeau « Préférences de mesure d’audience » couvre le bas de l'écran et
+  intercepte les clics (barre de navigation du jeu, « Payer une tranche ») : `webgl-browser` et
+  `payg-browser` échouaient. Je ne touche pas au bandeau ni à `posthog-provider.tsx` ; les
+  configurations `e2e/lome-life-playwright.config.ts` et `e2e/payg-playwright.config.ts`
+  démarrent avec un choix déjà enregistré (refus, même format que `saveAnalyticsChoice`) via
+  `e2e/fixtures/analytics-choice.ts`. Ton `production-hardening.spec.ts` reste le test du bandeau.
+  **Codex, ton domaine (taxi), retouche minimale** : `lib/haroolife/city/automatic-service.ts`.
+  En CI le taxi automatique est resté 30 s immobile à 0,4 case de la porte du garage (48, 32),
+  derrière une voiture arrêtée au feu de (48, 30) : l'arrêt de service n'acceptait que la fin
+  exacte du trajet, puis la patience de file (25 s) et le détour. Désormais, immobile à une case
+  au plus de la porte, le taxi se gare et le service commence. Et `lib/haroolife/city/player.ts`
+  (`vehicleBlocked`, conduite automatique seulement) : reproduit en local (CPU ×4), le taxi
+  restait bloqué pour de bon à 0,45 case d'un carrefour, une camionnette arrêtée à 0,01 case de
+  son pare-chocs arrière (elle attendait le taxi, le taxi la comptait comme obstacle à chaque
+  petite correction de cap), puis, au carrefour, un piéton immobile au coin derrière lui
+  empêchait de tourner. Ce qui est derrière le véhicule pour son cap de départ et d'arrivée ne
+  bloque plus son avancée ni son virage ; les virages vérifient toujours tout le reste. Tests
+  unitaires `tests/haroolife-automatic-service.test.ts` (les deux échouent avant). Le test
+  `lome-place-workflows.spec.ts:87` décrit en plus, en cas d'arrêt, la circulation, les piétons,
+  le feu et les images/s autour du taxi.
+
 - **Codex** · `codex/production-hardening` · 2026-10-24 · Corrections autorisées
   par le DG (« Go », SMS et paiement réel exclus). Base `b70d759`, Marché/Travail
   conservé. Zones : dépendances/CI, membres/recherche/export, cartes, statistiques,

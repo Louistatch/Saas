@@ -18,6 +18,11 @@ export type ServiceEvent =
   | { type: 'serviced'; kind: VehicleKind; service: ServiceStop['service'] }
   | { type: 'notice'; message: string }
 
+/** A vehicle stopped this close to a service stop (cells) is at its door. */
+const STOP_REACH = 1
+/** Speed below which the vehicle is stopped, not just slowing down (cells/s). */
+const HELD = 0.05
+
 /** The entire service runs without React, buttons, timers paying money, or player input. */
 export class AutomaticDrivingService {
   private state: ServiceSnapshot = {
@@ -101,8 +106,16 @@ export class AutomaticDrivingService {
     if (
       state.phase === 'pitstop' &&
       state.stop &&
-      this.controller.drivingRouteState === 'arrived'
+      (this.controller.drivingRouteState === 'arrived' ||
+        (Math.abs(v.speed) < HELD &&
+          Math.hypot(v.x - state.stop.x, v.z - state.stop.y) <= STOP_REACH))
     ) {
+      // Held at the door (the queue at the next light, someone on the kerb): the service starts
+      // there, the taxi parked, instead of waiting out the queue to roll its last few metres.
+      if (this.controller.drivingRouteState !== 'arrived') {
+        this.controller.stopAutomaticDriving()
+        this.controller.automaticDriving = true
+      }
       this.state = { ...state, phase: 'servicing' }
       this.readyAt = this.time + 4
       return [

@@ -186,7 +186,17 @@ export class PlayerController {
     const angle = v.heading / DEG
     return { ...v, x: v.x + Math.cos(angle) * lane, z: v.z - Math.sin(angle) * lane }
   }
-  private vehicleBlocked(x: number, z: number, heading = this.vehicle?.heading ?? 0) {
+  /**
+   * `leaving`: the headings the vehicle moves along. Whatever lies behind it for every one of
+   * them (a car queued at its bumper, someone on the corner it turns away from) is not in its
+   * way: a vehicle leads with its front. Without `leaving`, every obstacle counts.
+   */
+  private vehicleBlocked(
+    x: number,
+    z: number,
+    heading = this.vehicle?.heading ?? 0,
+    leaving: readonly number[] = [],
+  ) {
     if (!this.vehicle) return false
     const lane = this.automaticDriving && this.driving ? 0.25 : 0
     const angle = heading / DEG
@@ -196,13 +206,16 @@ export class PlayerController {
       heading,
       ...this.vehicleDimensions,
     }
-    return this.obstacles.some((o) => bodiesOverlap(body, o, 0.015))
+    const behind = (o: CollisionBody) =>
+      leaving.length > 0 &&
+      leaving.every((h) => (o.x - x) * Math.sin(h / DEG) + (o.z - z) * Math.cos(h / DEG) <= 0)
+    return this.obstacles.some((o) => !behind(o) && bodiesOverlap(body, o, 0.015))
   }
   private turnClear(x: number, z: number, heading: number, wanted: number) {
     const delta = angleDelta(heading, wanted)
     const steps = Math.max(1, Math.ceil(Math.abs(delta) / 10))
     for (let i = 0; i <= steps; i++)
-      if (this.vehicleBlocked(x, z, heading + (delta * i) / steps)) return false
+      if (this.vehicleBlocked(x, z, heading + (delta * i) / steps, [heading, wanted])) return false
     return true
   }
   private drivingRoute: Vec2[] = []
@@ -717,7 +730,9 @@ export class PlayerController {
       this.turning = Math.abs(turn) > 8
       const previousHeading = v.heading
       v.heading = (v.heading + clamp(turn, -210 * dt, 210 * dt) + 360) % 360
-      if (this.vehicleBlocked(v.x, v.z)) {
+      // Only what is ahead can stop the move (a van queued at the bumper used to hold the taxi,
+      // and the taxi the van, for good).
+      if (this.vehicleBlocked(v.x, v.z, v.heading, [previousHeading, v.heading])) {
         v.heading = previousHeading
         v.speed = 0
         this.waitInTraffic(dt)
@@ -749,7 +764,7 @@ export class PlayerController {
         const step = Math.min(distance, v.speed * dt)
         const nx = v.x + (dx / distance) * step
         const nz = v.z + (dz / distance) * step
-        if (this.vehicleBlocked(nx, nz)) {
+        if (this.vehicleBlocked(nx, nz, v.heading, [v.heading])) {
           v.speed = 0
           this.waitInTraffic(dt)
           return
