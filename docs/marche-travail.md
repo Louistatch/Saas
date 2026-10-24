@@ -34,8 +34,8 @@ Annonce publiée ──► « Je suis intéressé / disponible »  ─► répon
 
 Le numéro affiché sur une annonce reste accessible à qui veut appeler directement, mais
 seulement à la demande (« Afficher le numéro »), une annonce à la fois, avec une limite par
-adresse IP. Il ne figure plus dans la liste des annonces, et le rôle anonyme ne peut plus le
-lire dans la table.
+adresse IP. Il ne figure plus dans la liste des annonces, et le rôle anonyme ne pourra plus le
+lire dans la table une fois `20261023_150100_market_anon_phone.sql` appliquée (voir plus bas).
 
 ## Ce qui n'est pas fait (et pourquoi)
 
@@ -54,8 +54,16 @@ lire dans la table.
 
 ## Base de données
 
-Migration `20261023_150000_market_work.sql` (additive) : colonnes d'offre de travail,
-expiration par défaut, table `market_responses` fermée aux rôles API (tout passe par des
-fonctions `SECURITY DEFINER`), fonctions `market_*`, téléphone retiré de la lecture anonyme.
-Retour arrière : `supabase/rollbacks/20261023_150000_market_work.rollback.sql`.
+Deux migrations, dans cet ordre :
+
+1. `20261023_150000_market_work.sql` (additive, **appliquée en production le 24/10/2026**) :
+   colonnes d'offre de travail, expiration par défaut, table `market_responses` fermée aux
+   rôles API (tout passe par des fonctions `SECURITY DEFINER`), fonctions `market_*`. Les
+   droits existants ne changent pas : le code déjà en ligne continue de fonctionner.
+2. `20261023_150100_market_anon_phone.sql` : retire le téléphone, l'auteur et la fiche membre
+   de la lecture anonyme. **À appliquer juste après le déploiement de ce code** : la liste des
+   annonces de l'ancien code lit `contact_phone` en anonyme et échouerait.
+
+Retours arrière (dans l'ordre inverse) : `supabase/rollbacks/20261023_150100_market_anon_phone.rollback.sql`
+puis `supabase/rollbacks/20261023_150000_market_work.rollback.sql`.
 Tests : `tests/market-work-sql.test.mjs` (PGlite).

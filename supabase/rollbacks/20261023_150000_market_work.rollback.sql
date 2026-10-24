@@ -1,6 +1,7 @@
 -- Retour arrière de 20261023_150000_market_work.sql.
 -- ⚠️ Supprime les réponses et invitations du marché, et les colonnes d'offre de travail
 -- (salaire, postes, début, durée) des annonces. À n'exécuter qu'en connaissance de cause.
+-- Si 20261023_150100_market_anon_phone.sql est appliquée, exécuter d'abord son retour arrière.
 
 DROP FUNCTION IF EXISTS public.market_respond(uuid, text, numeric, text);
 DROP FUNCTION IF EXISTS public.market_invite(uuid, uuid, text);
@@ -22,8 +23,6 @@ DROP FUNCTION IF EXISTS private.market_phone_shown(text);
 DROP FUNCTION IF EXISTS private.market_phone(text);
 
 DROP TABLE IF EXISTS public.market_responses;
-
-GRANT SELECT ON public.producer_announcements TO anon;
 
 DROP INDEX IF EXISTS public.producer_announcements_open_recent;
 ALTER TABLE public.producer_announcements ALTER COLUMN expires_at DROP DEFAULT;

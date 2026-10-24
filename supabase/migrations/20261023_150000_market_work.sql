@@ -2,14 +2,13 @@
 --   - producer_announcements : offre de travail (salaire par jour, postes, début, durée),
 --     expiration par défaut (45 jours), deux colonnes calculées lisibles de tous
 --     (has_contact, accepts_responses) ;
---   - le téléphone, l'auteur et la fiche membre d'une annonce ne sont plus lisibles du rôle
---     anonyme (le numéro se demande annonce par annonce, côté serveur, avec une limite) ;
 --   - market_responses : une réponse (« je suis intéressé / disponible ») ou une invitation
 --     d'ouvrier par annonce et par personne. Fermée aux rôles API : tout passe par les
 --     fonctions market_* ci-dessous ;
 --   - les numéros ne s'échangent qu'une fois la réponse retenue ou l'invitation acceptée.
--- Additif : aucune ligne existante n'est modifiée ni supprimée ; les politiques existantes
--- restent en place.
+-- Additif : aucune ligne existante n'est modifiée ni supprimée ; les politiques et droits
+-- existants restent en place. La fermeture du téléphone au rôle anonyme est à part
+-- (20261023_150100_market_anon_phone.sql), à appliquer après le déploiement du code.
 -- Retour arrière : supabase/rollbacks/20261023_150000_market_work.rollback.sql
 
 -- ── Annonces ─────────────────────────────────────────────────────────────────
@@ -28,14 +27,6 @@ ALTER TABLE public.producer_announcements
 
 CREATE INDEX IF NOT EXISTS producer_announcements_open_recent
   ON public.producer_announcements (type, created_at DESC) WHERE status = 'active';
-
-REVOKE SELECT ON public.producer_announcements FROM anon;
-GRANT SELECT (
-  id, cooperative_id, type, title, description, culture, quantity_kg, price_per_kg_fcfa,
-  location_canton, status, created_at, region_id, prefecture_id, canton_id, expires_at,
-  updated_at, wage_per_day_fcfa, positions, starts_on, work_days, has_contact,
-  accepts_responses
-) ON public.producer_announcements TO anon;
 
 -- ── Réponses et invitations ──────────────────────────────────────────────────
 CREATE TABLE public.market_responses (

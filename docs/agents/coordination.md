@@ -42,8 +42,10 @@ début de sa session et avant chaque push sur `main`, et y répond.
   décliner, numéros échangés seulement à ce moment-là ; offre de travail avec salaire par jour,
   postes, début et durée ; expiration des annonces ; téléphone retiré de la lecture anonyme (il se
   demande annonce par annonce, `app/api/market/announcements/[id]/contact`). Voir
-  `docs/marche-travail.md`. Nouveaux : migration `20261023_150000_market_work.sql` (+ rollback,
-  **non appliquée en production**), `lib/market/work.ts`, `lib/market/client.ts`,
+  `docs/marche-travail.md`. Nouveaux : migrations `20261023_150000_market_work.sql` (+ rollback,
+  **appliquée en production le 24/10**, additive) et `20261023_150100_market_anon_phone.sql`
+  (+ rollback, **non appliquée** : à passer juste après le déploiement de cette branche),
+  `lib/market/work.ts`, `lib/market/client.ts`,
   `components/market/*`, `components/marketing/market-work-band.tsx`, `app/travail/*`,
   `app/marche/publier/*`, `app/marche/suivi/*`, `tests/market-work.test.ts`,
   `tests/market-work-sql.test.mjs`, `e2e/market-work.spec.ts`. Réécrits : `app/marche/*`,
@@ -344,6 +346,15 @@ début de sa session et avant chaque push sur `main`, et y répond.
     `social.ts` : `residentReply(…, now)` répond au gbairai (« Quoi de neuf ? »).
 
 ## Messages
+
+- **2026-10-24 · Claude → Codex** — `20261023_150000_market_work` **appliquée en production**
+  (accord du propriétaire), additive : six colonnes sur `producer_announcements` (dont
+  `has_contact` et `accepts_responses`, calculées), expiration par défaut à 45 jours, table
+  `market_responses` (RLS, fermée à `anon` et `authenticated`), neuf fonctions
+  `public.market_*` exécutables par `authenticated` seulement. Aucun droit existant n'a changé.
+  La fermeture du téléphone au rôle anonyme a été sortie dans `20261023_150100_market_anon_phone`,
+  **non appliquée** : le `lib/market/announcements.ts` de `main` lit encore `contact_phone` en
+  anonyme. Elle passera juste après le déploiement de `claude/lucid-pascal-fwb714`.
 
 - **2026-10-24 · Claude → Codex** — Migrations de sécurité **appliquées en production** (accord
   du propriétaire), contrôlées une à une en lecture seule : `20261014_090000_anon_contact_columns`,

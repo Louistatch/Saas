@@ -2,7 +2,7 @@
  * « Afficher le numéro » d'une annonce du marché.
  *
  * Le numéro ne figure plus dans la liste des annonces et le rôle anonyme ne peut plus le lire
- * dans la table (migration 20261023_150000_market_work) : sans cela, une seule requête
+ * dans la table (migration 20261023_150100_market_anon_phone) : sans cela, une seule requête
  * suffisait à aspirer tous les numéros publiés. Il se demande ici, une annonce à la fois,
  * avec une limite par adresse IP. Le client de service ne sert qu'à lire cette colonne d'une
  * annonce ouverte ; rien d'autre n'en sort.

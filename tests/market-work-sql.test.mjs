@@ -104,6 +104,15 @@ test('marché et travail : réponses, invitations, décisions, numéros, droits'
   `)
   const migration = readFileSync('supabase/migrations/20261023_150000_market_work.sql', 'utf8')
   await sql(migration)
+
+  // ── Partie additive seule : le code déjà en ligne lit encore le téléphone en anonyme ──
+  await anon()
+  assert.equal(
+    await one('SELECT contact_phone FROM producer_announcements WHERE id = $1', [ANN.job]),
+    '+228 92 00 00 01',
+  )
+  await sql('RESET ROLE')
+  await sql(readFileSync('supabase/migrations/20261023_150100_market_anon_phone.sql', 'utf8'))
   await sql(`UPDATE producer_announcements SET wage_per_day_fcfa = 2500, positions = 2,
     starts_on = current_date + 3, work_days = 2 WHERE id = '${ANN.job}'`)
 
@@ -300,6 +309,9 @@ test('marché et travail : réponses, invitations, décisions, numéros, droits'
 
   // ── Retour arrière : le téléphone redevient lisible, la table disparaît ──
   await sql('RESET ROLE')
+  await sql(
+    readFileSync('supabase/rollbacks/20261023_150100_market_anon_phone.rollback.sql', 'utf8'),
+  )
   await sql(readFileSync('supabase/rollbacks/20261023_150000_market_work.rollback.sql', 'utf8'))
   await anon()
   assert.equal(
