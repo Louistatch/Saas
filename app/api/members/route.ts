@@ -17,11 +17,19 @@ export async function GET(request: NextRequest) {
   const { cooperative_id, page, limit, q } = parsed.data
   const tenant = await assertTenantAccess(cooperative_id)
   if (!tenant.ok) return tenant.response
-  let query = guard.ctx.supabase.from('members').select('*', { count: 'exact' })
-    .eq('cooperative_id', cooperative_id).order('last_name').order('first_name').order('id')
+  let query = guard.ctx.supabase
+    .from('members')
+    .select('*', { count: 'exact' })
+    .eq('cooperative_id', cooperative_id)
+    .is('deleted_at', null)
+    .order('last_name')
+    .order('first_name')
+    .order('id')
   for (const filter of memberSearchFilters(q)) query = query.or(filter)
   const { data, error, count } = await query.range((page - 1) * limit, page * limit - 1)
   if (error) return NextResponse.json({ error: 'Lecture des membres impossible' }, { status: 503 })
-  return NextResponse.json({ members: data ?? [], total: count ?? 0, page, pageSize: limit },
-    { headers: { 'Cache-Control': 'private, no-store' } })
+  return NextResponse.json(
+    { members: data ?? [], total: count ?? 0, page, pageSize: limit },
+    { headers: { 'Cache-Control': 'private, no-store' } },
+  )
 }

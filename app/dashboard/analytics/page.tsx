@@ -5,6 +5,7 @@ import { ChartCard } from '@/components/shared/chart-card'
 import { LoadingBlock, Skeleton } from '@/components/shared/loading'
 import { PageHeader } from '@/components/shared/page-header'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { collectPages } from '@/lib/utils/collect-pages'
 import { createClient } from '@/lib/supabase/client'
 import {
   Activity,
@@ -177,6 +178,8 @@ function exportStatsCsv(stats: Stats, cooperativeName: string) {
 export default function AnalyticsPage() {
   const { currentCooperative } = useCooperative()
   const supabase = useMemo(() => createClient(), [])
+  const requestSequence = useRef(0)
+  const [loadError, setLoadError] = useState(false)
   const [stats, setStats] = useState<Stats>(initial)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -190,7 +193,11 @@ export default function AnalyticsPage() {
       setIsLoading(false)
       return
     }
+    const sequence = ++requestSequence.current
     setIsLoading(true)
+    setLoadError(false)
+    setStats(initial)
+    try {
     const coopId = currentCooperative.id
 
     const now = new Date()
@@ -210,7 +217,7 @@ export default function AnalyticsPage() {
     const cardsQuery = supabase.from('member_cards').select('status').eq('cooperative_id', coopId)
     const parcellesQuery = supabase
       .from('parcelles')
-      .select('superficie_ha')
+      .select('surface_ha')
       .eq('cooperative_id', coopId)
     const scansAllQuery = supabase
       .from('member_access_logs')
@@ -257,21 +264,24 @@ export default function AnalyticsPage() {
       scansOverTimeRes,
       cotisationsOverTimeRes,
     ] = await Promise.all([
-      membersQuery,
-      fichesQuery,
-      cardsQuery,
-      parcellesQuery,
+      collectPages((from, to) => membersQuery.order('id').range(from, to)),
+      collectPages((from, to) => fichesQuery.order('id').range(from, to)),
+      collectPages((from, to) => cardsQuery.order('id').range(from, to)),
+      collectPages((from, to) => parcellesQuery.order('id').range(from, to)),
       scansAllQuery,
       scansWeekQuery,
-      membersOverTimeQuery,
-      scansOverTimeQuery,
-      cotisationsOverTimeQuery,
+      collectPages((from, to) => membersOverTimeQuery.order('id').range(from, to)),
+      collectPages((from, to) => scansOverTimeQuery.order('id').range(from, to)),
+      collectPages((from, to) => cotisationsOverTimeQuery.order('id').range(from, to)),
     ])
+
+    if (sequence !== requestSequence.current) return
+    if ([membersRes,fichesRes,cardsRes,parcellesRes,scansAllRes,scansWeekRes,membersOverTimeRes,scansOverTimeRes,cotisationsOverTimeRes].some(r => r.error)) throw new Error('Lecture incomplète')
 
     const members = (membersRes.data ?? []) as { status: string }[]
     const fiches = (fichesRes.data ?? []) as { status: string }[]
     const cards = (cardsRes.data ?? []) as { status: string }[]
-    const parcelles = (parcellesRes.data ?? []) as { superficie_ha: number }[]
+    const parcelles = (parcellesRes.data ?? []) as { surface_ha: number }[]
 
     setStats({
       totalMembers: members.length,
@@ -281,7 +291,7 @@ export default function AnalyticsPage() {
       totalCards: cards.length,
       activeCards: cards.filter((c) => c.status === 'active').length,
       totalParcelles: parcelles.length,
-      totalSurfaceHa: parcelles.reduce((acc, p) => acc + (p.superficie_ha || 0), 0),
+      totalSurfaceHa: parcelles.reduce((acc, p) => acc + (p.surface_ha || 0), 0),
       totalScans: scansAllRes.count ?? 0,
       scansThisWeek: scansWeekRes.count ?? 0,
     })
@@ -303,11 +313,16 @@ export default function AnalyticsPage() {
     }[]
     setCotisationsOverTime(buildMonthlyAmountSeries(cotisationRows, 12))
 
-    setIsLoading(false)
+    } catch {
+      if (sequence === requestSequence.current) setLoadError(true)
+    } finally {
+      if (sequence === requestSequence.current) setIsLoading(false)
+    }
   }, [currentCooperative, supabase])
 
   useEffect(() => {
     fetchStats()
+    return () => { requestSequence.current++ }
   }, [fetchStats])
 
   // Realtime: refresh stats when members, cards or fiches change
@@ -361,6 +376,11 @@ export default function AnalyticsPage() {
       supabase.removeChannel(channel)
     }
   }, [coopId, supabase])
+
+  if (loadError) return <div role="alert" className="p-6 space-y-3">
+    <p>Statistiques indisponibles. Aucune donnée partielle n’est affichée.</p>
+    <button type="button" className="underline" onClick={() => fetchStats()}>Réessayer</button>
+  </div>
 
   const statCards = [
     {

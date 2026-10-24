@@ -1,3 +1,4 @@
+import { collectPages } from '@/lib/utils/collect-pages'
 import { PrintButton } from '@/app/reports/_components/print-button'
 import { assertTenantAccess } from '@/lib/security/assert-access'
 import { createClient } from '@/lib/supabase/server'
@@ -61,14 +62,15 @@ export default async function CooperativeReportPage({
   let membresRows: React.ReactNode = null
   let membresCount = 0
   if (reportType === 'membres') {
-    const { data: members } = await supabase
+    const { data: members, error } = await collectPages((from, to) => supabase
       .from('members')
       .select(`
         id, first_name, last_name, status, canton, created_at,
         member_cards(card_number)
       `)
       .eq('cooperative_id', coopId)
-      .order('last_name')
+      .order('last_name').order('id').range(from, to))
+    if (error) throw new Error('Rapport incomplet : réessayez plus tard.')
 
     membresCount = (members ?? []).length
     membresRows = (
@@ -115,14 +117,15 @@ export default async function CooperativeReportPage({
   let cotisationsRows: React.ReactNode = null
   let cotisationsCount = 0
   if (reportType === 'cotisations') {
-    const { data: cotisations } = await supabase
+    const { data: cotisations, error } = await collectPages((from, to) => supabase
       .from('cotisations')
       .select(`
         id, amount, type, status, campaign_year, paid_date,
         member:members(first_name, last_name)
       `)
       .eq('cooperative_id', coopId)
-      .order('paid_date', { ascending: false })
+      .order('paid_date', { ascending: false }).order('id').range(from, to))
+    if (error) throw new Error('Rapport incomplet : réessayez plus tard.')
 
     cotisationsCount = (cotisations ?? []).length
     cotisationsRows = (
@@ -174,14 +177,15 @@ export default async function CooperativeReportPage({
   let productionsRows: React.ReactNode = null
   let productionsCount = 0
   if (reportType === 'productions') {
-    const { data: productions } = await supabase
+    const { data: productions, error } = await collectPages((from, to) => supabase
       .from('productions')
       .select(`
         id, culture, quantity_kg, campaign_year,
         member:members(first_name, last_name)
       `)
       .eq('cooperative_id', coopId)
-      .order('campaign_year', { ascending: false })
+      .order('campaign_year', { ascending: false }).order('id').range(from, to))
+    if (error) throw new Error('Rapport incomplet : réessayez plus tard.')
 
     productionsCount = (productions ?? []).length
     productionsRows = (

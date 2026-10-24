@@ -27,7 +27,10 @@
     "test:realtime:load": "tsx scripts/haroolife-load.ts",
     "realtime:build": "esbuild realtime/main.ts --bundle --platform=node --format=esm --target=node20 --packages=external --outfile=dist-realtime/main.mjs",
     "realtime:start": "node dist-realtime/main.mjs",
-    "test:hardening": "node --test tests/launch-hardening.test.mjs tests/card-allowance.test.mjs && node --import tsx --test tests/notification-delivery.test.ts tests/professional-cards.test.ts"
+    "test:hardening": "node --test tests/launch-hardening.test.mjs tests/card-allowance.test.mjs && node --import tsx --test tests/notification-delivery.test.ts tests/professional-cards.test.ts",
+    "security:audit": "npm audit --omit=dev --audit-level=high",
+    "test:production": "node --test tests/production-aggregates-sql.test.mjs && node --import tsx --test tests/production-hardening.test.ts",
+    "test:production:browser": "node scripts/verify-production-browser.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

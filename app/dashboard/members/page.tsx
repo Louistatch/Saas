@@ -100,21 +100,27 @@ export default function MembersPage() {
 
   const fetchMemberCoops = useCallback(async () => {
     if (!currentCooperative) { setIsLoading(false); return }
+    const sequence = ++requestSequence.current
     setIsLoading(true)
-    const { data: children } = await supabase
-      .from('cooperatives')
-      .select('id, name, level')
-      .eq('parent_id', currentCooperative.id)
-      .order('name')
-    if (!children || children.length === 0) { setMemberCoops([]); setIsLoading(false); return }
-
-    const { data: counts, error } = await supabase.rpc('get_member_cooperative_counts',
-      { p_parent: currentCooperative.id })
-    if (error) throw error
-    const countMap = Object.fromEntries((counts ?? []).map((row: {child_id: string; member_count: number}) => [row.child_id, Number(row.member_count)]))
-    setMemberCoops(children.map(c => ({ ...c, memberCount: countMap[c.id] ?? 0 })))
-    setIsLoading(false)
-  }, [currentCooperative, supabase])
+    try {
+      const [children, counts] = await Promise.all([
+        collectPages((from, to) => supabase.from('cooperatives').select('id, name, level')
+          .eq('parent_id',currentCooperative.id).is('deleted_at',null).order('name').order('id').range(from,to)),
+        collectPages<{child_id: string; member_count: number}>((from, to) => supabase.rpc('get_member_cooperative_counts', {p_parent:currentCooperative.id})
+          .order('child_id').range(from,to)),
+      ])
+      if (children.error || counts.error) throw children.error ?? counts.error
+      if (sequence !== requestSequence.current) return
+      const countMap = Object.fromEntries((counts.data ?? []).map((row: {child_id: string; member_count: number}) => [row.child_id, Number(row.member_count)]))
+      setMemberCoops((children.data ?? []).map(c => ({...c,memberCount:countMap[c.id] ?? 0})))
+    } catch (error) {
+      if (sequence !== requestSequence.current) return
+      setMemberCoops([])
+      toast({title:'Lecture impossible',description:errorMessage(error),variant:'destructive'})
+    } finally {
+      if (sequence === requestSequence.current) setIsLoading(false)
+    }
+  }, [currentCooperative, supabase, toast])
 
   const fetchMembers = useCallback(async () => {
     if (!currentCooperative) { setIsLoading(false); return }
@@ -141,10 +147,7 @@ export default function MembersPage() {
   }, [currentCooperative, page, debouncedSearch, toast])
 
   useEffect(() => {
-    if (isFaitiere) void fetchMemberCoops().catch((error) => {
-      setIsLoading(false)
-      toast({ title: 'Lecture impossible', description: errorMessage(error), variant: 'destructive' })
-    })
+    if (isFaitiere) void fetchMemberCoops()
     else void fetchMembers()
     return () => { requestSequence.current++ }
   }, [isFaitiere, fetchMemberCoops, fetchMembers, toast])
@@ -258,7 +261,7 @@ export default function MembersPage() {
     try {
       const { data, error } = await collectPages((from, to) => supabase.from('members')
         .select('id, first_name, last_name, email, phone, address, status')
-        .eq('cooperative_id', currentCooperative.id).order('id').range(from, to))
+        .eq('cooperative_id', currentCooperative.id).is('deleted_at', null).order('id').range(from, to))
       if (error) throw error
       if (!data?.length) { toast({ title: 'Rien à exporter' }); return }
       const csv = toCsv(data.map((m) => ({ first_name: m.first_name, last_name: m.last_name,

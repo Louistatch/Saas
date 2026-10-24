@@ -5559,7 +5559,9 @@ export type Database = {
       }
     }
     Functions: {
-      get_market_region_counts: { Args: Record<PropertyKey, never>; Returns: {region_id: string; price_count: number}[] }
+      get_cooperative_branch: {Args: {p_root: string}; Returns: string[]}
+      get_market_location_counts: { Args: {p_scope?: string; p_region_id?: string; p_prefecture_id?: string}; Returns: {scope_id: string; price_count: number}[] }
+      get_market_prices: { Args: {p_scope?: string; p_scope_id?: string; p_region_id?: string; p_culture_id?: string}; Returns: Json }
       get_member_cooperative_counts: { Args: {p_parent: string}; Returns: {child_id: string; member_count: number}[] }
       get_map_statistics: { Args: {p_metric?: string; p_cooperative_id?: string}; Returns: Json }
 

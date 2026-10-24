@@ -1,3 +1,4 @@
+import { AnalyticsSettings } from '@/components/shared/analytics-settings'
 import { MarketingLayout } from '@/components/shared/marketing-layout'
 import { publicPageMetadata } from '@/lib/seo'
 
@@ -10,7 +11,7 @@ export default function CookiesPage() {
         <h1 className="text-4xl font-bold tracking-tight text-foreground mb-4">
           Politique cookies
         </h1>
-        <p className="text-muted-foreground mb-12">Dernière mise à jour : 1er janvier 2025</p>
+        <p className="text-muted-foreground mb-12">Dernière mise à jour : 24 octobre 2026</p>
 
         <div className="prose prose-neutral dark:prose-invert max-w-none space-y-10">
           {/* Introduction */}
@@ -72,8 +73,8 @@ export default function CookiesPage() {
                 <h3 className="text-lg font-semibold text-foreground">Cookies analytiques</h3>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Ces cookies nous aident à comprendre comment les visiteurs interagissent avec la
-                Plateforme en collectant des informations de manière anonyme. Ils permettent :
+                Avec votre accord, les outils de mesure nous aident à comprendre les visites.
+                Ils utilisent des identifiants pseudonymes et la provenance de connexion. Ils permettent :
               </p>
               <ul className="list-disc pl-6 space-y-1 text-sm text-muted-foreground">
                 <li>Le comptage des visiteurs et des pages vues</li>
@@ -83,9 +84,9 @@ export default function CookiesPage() {
               </ul>
               <div className="mt-3 rounded bg-muted/50 p-3">
                 <p className="text-xs text-muted-foreground">
-                  <strong>Outil :</strong> Vercel Analytics (respectueux de la vie privée)
+                  <strong>Outil :</strong> PostHog, Vercel Analytics et statistiques internes FaîtiereHub
                   <br />
-                  <strong>Durée :</strong> 12 mois maximum
+                  <strong>Durée du choix et du cookie de visite :</strong> 6 mois
                   <br />
                   <strong>Base légale :</strong> Consentement
                 </p>
@@ -135,6 +136,8 @@ export default function CookiesPage() {
                 non essentiels. Vous pouvez modifier ce choix à tout moment.
               </li>
             </ul>
+            <AnalyticsSettings />
+            <p className="text-sm text-muted-foreground">Sans accord, ces outils ne sont pas chargés. Les paramètres des URL, les identifiants de membres et les données des formulaires ne sont pas transmis à PostHog. Les enregistrements de session sont désactivés. Le refus conserve l’accès au service.</p>
             <div className="rounded-lg border border-border bg-muted/30 p-6 space-y-3">
               <p className="text-sm font-medium text-foreground">
                 Liens utiles pour gérer les cookies :

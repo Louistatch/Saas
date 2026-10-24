@@ -28,6 +28,7 @@ import { useResetPageOnChange } from '@/hooks/use-reset-page'
 import { useToast } from '@/hooks/use-toast'
 import { createClient } from '@/lib/supabase/client'
 import { downloadCardImage, renderCardImage } from '@/lib/utils/card-image'
+import { collectPages } from '@/lib/utils/collect-pages'
 import { errorMessage } from '@/lib/utils/errors'
 import { cardSettingsSchema, cardTemplateSchema, flattenZodErrors } from '@/lib/validators/schemas'
 import {
@@ -52,7 +53,7 @@ import {
   Users,
 } from 'lucide-react'
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const PAGE_SIZE = 20
 
@@ -125,65 +126,60 @@ export default function CardsPage() {
     return allMembers.filter((m) => m.cooperative_id === selectedCoopId)
   }, [isFaitiereAdmin, selectedCoopId, members, allMembers])
 
+  const cardRequest = useRef(0)
+  const memberRequest = useRef(0)
+
   const fetchCards = useCallback(async () => {
     if (!currentCooperative) {
       setIsLoading(false)
       return
     }
+    const sequence = ++cardRequest.current
     setIsLoading(true)
+    try {
     let query = supabase
       .from('member_cards')
       .select(
         '*, member:members(first_name, last_name, email, phone, photo_url, prefecture, region, village, canton, faitiere)',
       )
 
-    if (currentCooperative.level === 'faitiere' || currentCooperative.level === 'union') {
-      // Fetch all cooperative IDs in hierarchy directly
-      const { data: allCoops } = await supabase
-        .from('cooperatives')
-        .select('id')
-        .or(`id.eq.${currentCooperative.id},parent_id.eq.${currentCooperative.id}`)
-      const directIds = (allCoops ?? []).map((c) => c.id)
+    const {data: branch, error: scopeError} = await supabase.rpc('get_cooperative_branch', {p_root: currentCooperative.id})
+    if (scopeError) throw scopeError
+    query = query.in('cooperative_id', branch?.length ? branch : [currentCooperative.id])
 
-      // Also get grandchildren
-      if (directIds.length > 0) {
-        const { data: grandChildren } = await supabase
-          .from('cooperatives')
-          .select('id')
-          .in('parent_id', directIds)
-        const allIds = [...new Set([...directIds, ...(grandChildren ?? []).map((c) => c.id)])]
-        query = query.in('cooperative_id', allIds)
-      }
-    } else {
-      query = query.eq('cooperative_id', currentCooperative.id)
-    }
-    // If currentCooperative is null, load all (RLS will filter)
-
-    query = query.order('created_at', { ascending: false })
-    const { data, error } = await query
-    if (error) {
+    query = query.order('created_at', { ascending: false }).order('id')
+    const { data, error } = await collectPages((from, to) => query.range(from, to))
+    if (sequence !== cardRequest.current) return
+    if (error) throw error
+    setCards((data ?? []) as MemberCard[])
+    } catch (error) {
+      if (sequence !== cardRequest.current) return
+      setCards([])
       toast({ title: 'Erreur', description: errorMessage(error), variant: 'destructive' })
-    } else {
-      setCards((data ?? []) as MemberCard[])
+    } finally {
+      if (sequence === cardRequest.current) setIsLoading(false)
     }
-    setIsLoading(false)
   }, [currentCooperative, supabase, toast])
 
   const fetchMembers = useCallback(async () => {
-    let query = supabase.from('members').select('id, first_name, last_name, cooperative_id')
-    if (currentCooperative && !isFaitiereAdmin) {
-      query = query.eq('cooperative_id', currentCooperative.id)
+    const sequence = ++memberRequest.current
+    if (!currentCooperative) { setMembers([]); setAllMembers([]); return }
+    try {
+      const {data: branch, error: scopeError} = await supabase.rpc('get_cooperative_branch', {p_root: currentCooperative.id})
+      if (scopeError) throw scopeError
+      const {data, error} = await collectPages((from, to) => supabase.from('members')
+        .select('id, first_name, last_name, cooperative_id').in('cooperative_id', branch?.length ? branch : [currentCooperative.id])
+        .eq('status','active').is('deleted_at',null).order('last_name').order('id').range(from,to))
+      if (error) throw error
+      if (sequence !== memberRequest.current) return
+      const rows = (data ?? []) as (Pick<Member, 'id' | 'first_name' | 'last_name'> & {cooperative_id: string})[]
+      setMembers(rows); setAllMembers(rows)
+    } catch (error) {
+      if (sequence !== memberRequest.current) return
+      setMembers([]); setAllMembers([])
+      toast({title: 'Lecture des membres impossible', description: errorMessage(error), variant: 'destructive'})
     }
-    query = query.eq('status', 'active').order('last_name')
-    const { data, error } = await query
-    if (!error) {
-      const rows = (data ?? []) as (Pick<Member, 'id' | 'first_name' | 'last_name'> & {
-        cooperative_id: string
-      })[]
-      setMembers(rows)
-      setAllMembers(rows)
-    }
-  }, [currentCooperative, supabase, isFaitiereAdmin])
+  }, [currentCooperative, supabase, toast])
 
   const loadCooperativeSettings = useCallback(async () => {
     if (!currentCooperative) return
@@ -203,6 +199,7 @@ export default function CardsPage() {
     fetchCards()
     fetchMembers()
     loadCooperativeSettings()
+    return () => { cardRequest.current++; memberRequest.current++ }
   }, [fetchCards, fetchMembers, loadCooperativeSettings])
 
   useResetPageOnChange(setPage, [debouncedSearch])
