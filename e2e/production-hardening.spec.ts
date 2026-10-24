@@ -2,6 +2,11 @@ import { expect, test } from '@playwright/test'
 
 test('accord facultatif, refus persistant, modification et retrait', async ({ page, context }) => {
   const visits: string[] = []
+  const audience: string[] = []
+  await page.route('http://127.0.0.1:54330/**', async route => {
+    audience.push(route.request().url())
+    await route.fulfill({status: 200, contentType: 'application/json', body: '{}'})
+  })
   await page.route('**/api/track-visit', async (route) => {
     visits.push(route.request().method())
     await route.fulfill({ status: 204 })
@@ -10,6 +15,7 @@ test('accord facultatif, refus persistant, modification et retrait', async ({ pa
   await page.goto('/legal/cookies')
   await expect(page.getByRole('button', { name: 'Refuser', exact: true })).toBeVisible()
   expect(visits).toHaveLength(0)
+  expect(audience).toHaveLength(0)
   await page.getByRole('button', { name: 'Refuser', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Accepter', exact: true })).toHaveCount(0)
   await page.reload()
@@ -17,6 +23,7 @@ test('accord facultatif, refus persistant, modification et retrait', async ({ pa
   expect(visits.filter((x) => x === 'POST')).toHaveLength(0)
   await page.getByRole('button', { name: 'Modifier mon choix de mesure d’audience' }).click()
   await page.getByRole('button', { name: 'Accepter', exact: true }).click()
+  await expect.poll(() => audience.length).toBeGreaterThan(0)
   await expect.poll(() => visits.filter((x) => x === 'POST').length).toBeGreaterThan(0)
   expect((await context.cookies()).find((c) => c.name === 'fhub_analytics_v1')?.value).toBe(
     'granted',
@@ -24,9 +31,11 @@ test('accord facultatif, refus persistant, modification et retrait', async ({ pa
   await page.getByRole('button', { name: 'Modifier mon choix de mesure d’audience' }).click()
   await page.getByRole('button', { name: 'Refuser', exact: true }).click()
   const count = visits.filter((x) => x === 'POST').length
+  const audienceCount = audience.length
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Politique cookies', exact: true })).toBeVisible()
   expect(visits.filter((x) => x === 'POST')).toHaveLength(count)
+  expect(audience).toHaveLength(audienceCount)
   expect((await context.cookies()).find((c) => c.name === 'fhub_analytics_v1')?.value).toBe(
     'denied',
   )

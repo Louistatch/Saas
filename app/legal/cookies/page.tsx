@@ -137,7 +137,7 @@ export default function CookiesPage() {
               </li>
             </ul>
             <AnalyticsSettings />
-            <p className="text-sm text-muted-foreground">Sans accord, ces outils ne sont pas chargés. Les paramètres des URL, les identifiants de membres et les données des formulaires ne sont pas transmis à PostHog. Les enregistrements de session sont désactivés. Le refus conserve l’accès au service.</p>
+            <p className="text-sm text-muted-foreground">Sans accord, ces outils ne sont pas activés. Les paramètres des URL, les identifiants de membres et les données des formulaires ne sont pas transmis à PostHog. Les enregistrements de session sont désactivés. Le refus conserve l’accès au service.</p>
             <div className="rounded-lg border border-border bg-muted/30 p-6 space-y-3">
               <p className="text-sm font-medium text-foreground">
                 Liens utiles pour gérer les cookies :

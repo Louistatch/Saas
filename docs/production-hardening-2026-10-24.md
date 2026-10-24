@@ -14,7 +14,7 @@ Les travaux Marché/Travail de Claude sont conservés. CE/IT reste désactivé.
 | Remplacement de carte | Nouveau numéro pour une nouvelle carte ; le numéro d’une carte révoquée n’est plus réutilisé. Aucun débit ni carte réelle émise pour les tests. |
 | Carte géographique | Agrégats en base sous SECURITY INVOKER, sans plafond de 1 000 lignes. Test PostgreSQL avec deux réseaux et plus de 1 000 membres chacun : aucun croisement. |
 | Prix agricoles | Suppression du repli silencieux sur 1 000 anciennes observations. Filtrage anticipé et étapes d’agrégation calculées une seule fois, mêmes médianes et tendances à marchés appariés. Test public : 121 prix courants sur cinq régions. Mesure SQL limitée à 1,5 s : environ 112 ms. |
-| Audience | Aucun chargement des outils de mesure avant accord ; refus, retrait et durée de choix de six mois. URL sans paramètres ni identifiants, aucun identifiant utilisateur/coopérative envoyé à PostHog, pas d’enregistrement de session. Le serveur refuse le suivi sans cookie d’accord. |
+| Audience | Aucune mesure ni requête vers les services d’audience avant accord ; refus, retrait et durée de choix de six mois. URL sans paramètres ni identifiants, aucun identifiant utilisateur/coopérative envoyé à PostHog, pas d’enregistrement de session. Le serveur refuse le suivi sans cookie d’accord. |
 | AgriTogo | PR [#25](https://github.com/Louistatch/agritogo/pull/25) fusionnée : historique par session, mémoire d’agent neuve à chaque appel, outils privés réservés à un super_admin vérifié. Tests Flask : 31 réussis, dont 16 de sécurité. Le déploiement Railway doit être confirmé séparément. |
 
 Les migrations appliquées sont suivies sous leurs versions serveur :

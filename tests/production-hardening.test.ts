@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
 import { beforeEach, test } from 'node:test'
+import type * as MembersRoute from '../app/api/members/route'
+import type * as PricesRoute from '../app/api/market-prices/route'
+import type * as VisitsRoute from '../app/api/track-visit/route'
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { collectPages } from '../lib/utils/collect-pages'
@@ -102,13 +105,9 @@ Module._load = function (r, p, m) {
   if (r === '@/lib/utils/rate-limit-persistent') return { applyRateLimit: async () => null }
   return originalLoad.call(this, r, p, m)
 }
-const members = require('../app/api/members/route') as typeof import('../app/api/members/route')
-const prices = require('../app/api/market-prices/route') as typeof import(
-  '../app/api/market-prices/route',
-)
-const visits = require('../app/api/track-visit/route') as typeof import(
-  '../app/api/track-visit/route',
-)
+const members = require('../app/api/members/route') as typeof MembersRoute
+const prices = require('../app/api/market-prices/route') as typeof PricesRoute
+const visits = require('../app/api/track-visit/route') as typeof VisitsRoute
 beforeEach(() => {
   requests.length = 0
   inserts.length = 0
