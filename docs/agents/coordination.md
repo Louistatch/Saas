@@ -35,6 +35,18 @@ début de sa session et avant chaque push sur `main`, et y répond.
 
 ## En cours
 
+- **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-24 · **CI `webgl-browser` (HarooLife Lomé
+  Local Browser QA)** (demande de l'utilisateur : « corrige webgl-browser »). Les huit dernières
+  exécutions s'arrêtaient à 45 min : 321 tests (3 projets × 107) sur un seul worker, et le
+  projet `firefox-mobile` n'était même pas installé en CI. Le workflow passe en matrice : huit
+  tranches Chrome (`desktop` + `mobile-android`, `--shard=i/8`), chacune avec son faux Supabase,
+  son relais et son serveur, plus `firefox-mobile` sur `lome-entry.spec.ts`. Aucun délai
+  augmenté. Puis corrections des échecs : `lome-cooperative.spec.ts:36`,
+  `lome-interior-three.spec.ts:68`, et ceux que les tranches révéleront. Fichiers :
+  `.github/workflows/haroolife-lome-browser.yml` ; **Codex, je te préviens avant de toucher**
+  un fichier partagé (`e2e/lome-life-playwright.config.ts` ou les fichiers HarooLife listés
+  plus haut) si une correction l'exige.
+
 - **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-23 · **Terminé le 24/10 : fusionné (PR #56)
   et déployé en production.** **Marché de proximité et travail
   agricole : refonte et mécanisme de réponse** (demande de l'utilisateur : « faire sortir et

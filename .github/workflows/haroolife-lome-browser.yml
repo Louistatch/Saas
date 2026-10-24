@@ -19,9 +19,26 @@ permissions:
 
 jobs:
   webgl-browser:
+    name: webgl-browser (${{ matrix.name }})
     runs-on: ubuntu-latest
-    # Build (~3 min) + 18 tests on two viewports in software WebGL (~21 min locally).
+    # The Chrome suite (desktop + Android, ~214 tests in software WebGL, ~100 min on one worker)
+    # is split into eight shards that run side by side, each with its own Supabase stand-in,
+    # relay and Next server: no test waits longer than before, the work is only shared out.
+    # Firefox runs the entry spec, written for its navigation bars.
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: 'chrome 1/8', browser: chromium, args: '--project=desktop --project=mobile-android --shard=1/8' }
+          - { name: 'chrome 2/8', browser: chromium, args: '--project=desktop --project=mobile-android --shard=2/8' }
+          - { name: 'chrome 3/8', browser: chromium, args: '--project=desktop --project=mobile-android --shard=3/8' }
+          - { name: 'chrome 4/8', browser: chromium, args: '--project=desktop --project=mobile-android --shard=4/8' }
+          - { name: 'chrome 5/8', browser: chromium, args: '--project=desktop --project=mobile-android --shard=5/8' }
+          - { name: 'chrome 6/8', browser: chromium, args: '--project=desktop --project=mobile-android --shard=6/8' }
+          - { name: 'chrome 7/8', browser: chromium, args: '--project=desktop --project=mobile-android --shard=7/8' }
+          - { name: 'chrome 8/8', browser: chromium, args: '--project=desktop --project=mobile-android --shard=8/8' }
+          - { name: 'firefox entry', browser: firefox, args: '--project=firefox-mobile e2e/lome-entry.spec.ts' }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,8 +49,8 @@ jobs:
         run: npm ci
       - name: Validate the active city pack and supplied models
         run: npm run test:haroolife-map
-      - name: Install local Chromium with headless WebGL drivers
-        run: npx playwright install --with-deps chromium
+      - name: Install the local browser with headless WebGL drivers
+        run: npx playwright install --with-deps ${{ matrix.browser }}
       - name: Start the local Supabase stand-in (fixtures only, no real backend)
         run: |
           node e2e/fixtures/mock-supabase.mjs > mock-supabase.log 2>&1 &
@@ -61,12 +78,15 @@ jobs:
           HAROOLIFE_ENABLED: 'true'
           NEXT_PUBLIC_HAROOLIFE_ENABLED: 'true'
           NEXT_PUBLIC_HAROOLIFE_REALTIME_URL: http://127.0.0.1:3001
-        run: npx playwright test --config=e2e/lome-life-playwright.config.ts
+        run: npx playwright test --config=e2e/lome-life-playwright.config.ts ${{ matrix.args }}
+      - name: Name the artifact after the shard
+        if: always()
+        run: echo "ARTIFACT=haroolife-lome-visual-qa-$(echo '${{ matrix.name }}' | tr ' /' '--')" >> "$GITHUB_ENV"
       - name: Keep desktop/mobile screenshots and failure traces
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: haroolife-lome-visual-qa
+          name: ${{ env.ARTIFACT }}
           path: |
             test-results/lome-visual
             test-results/lome-report
@@ -74,6 +94,7 @@ jobs:
             test-results/lome-city
             test-results/lome-perf
             test-results/**/*.zip
+            test-results/**/error-context.md
             mock-supabase.log
             realtime.log
           retention-days: 7
