@@ -40,7 +40,7 @@ test('Kobo : vraie migration, hiérarchie, isolation, reprise et transaction agr
   const previous = readFileSync('supabase/migrations/20260929_120000_fix_kobo_repeat_group_mapping.sql', 'utf8')
   const numeric = previous.slice(previous.indexOf('CREATE OR REPLACE FUNCTION safe_numeric('), previous.indexOf('CREATE OR REPLACE FUNCTION process_kobo_submission('))
   await db.exec(numeric)
-  await db.exec(readFileSync('supabase/migrations/20261024140645_kobo_workflow_integrity.sql', 'utf8'))
+  await db.exec(readFileSync('supabase/migrations/20261024145232_kobo_workflow_integrity.sql', 'utf8'))
   const claims = async (root, role = 'authenticated') => db.query(
     "SELECT set_config('request.jwt.claim.sub',$1,false),set_config('request.jwt.claim.role',$2,false)", [root, role],
   )

@@ -1,7 +1,6 @@
 # KoboCollect → FaîtiereHub : collecter, importer et émettre une carte
 
-État vérifié le 24 octobre 2026. Cette branche contient un correctif, pas une preuve de
-déploiement en production. Le correctif SQL doit précéder le déploiement applicatif.
+État vérifié le 24 octobre 2026. Cette version accompagne la PR #55. Les migrations SQL doivent précéder le déploiement applicatif ; le statut du déploiement est suivi dans cette PR.
 
 ## Ce qui a été constaté
 
@@ -145,6 +144,32 @@ Pour un nom complet, choisir `full_name` plutôt que `first_name`. Les colonnes 
 sont des destinations connues de l'adaptateur ; taper une autre colonne ne crée pas un champ
 SQL. Un nombre de cotisations déclaré n'est jamais transformé automatiquement en paiement.
 
+## Nettoyage des coopératives et isolation
+
+Le périmètre est l'identifiant de la faîtière et son arbre, jamais son libellé modifiable.
+Les collectes, intégrations et fiches privées sont protégées par les politiques RLS.
+Les noms du catalogue public des organisations restent distincts de ces données privées.
+Un formulaire Kobo connecté ne peut pas être rattaché simultanément à deux faîtières.
+
+Le pipeline de nettoyage :
+
+1. Conserver le texte saisi dans le JSON original.
+2. Uniformiser Unicode, casse, accents, ponctuation et espaces pour la comparaison.
+3. Neutraliser les formes juridiques comme SCOOPS, S.C.O.O.P.S. et Coopérative, sans
+   supprimer les mots distinctifs d'un lieu ou d'une organisation.
+4. Chercher une référence unique du même niveau dans cette faîtière uniquement.
+5. Accepter un nom local distinctif sans son préfixe générique : les trois variantes
+   KPELEWAÏ, SCOOPS KPELEWAÏ et Scoops kpelewaï retrouvent « Espoir de Kpèlèwouaï ».
+6. Si plusieurs références sont plausibles, signaler l'ambiguïté et ne créer aucune
+   coopérative supplémentaire. « Espoir » seul ne suffit pas à choisir un village.
+7. Recontrôler en base, sous un verrou par faîtière, avant de réutiliser ou créer la fiche.
+   Deux collectes simultanées avec le même nom normalisé ne créent pas deux coopératives.
+
+Le libellé de référence et les identifiants existants sont conservés. La méthode de
+rapprochement, le nom reçu et la référence choisie sont tracés dans le traitement.
+Deux coopératives homonymes appartenant à deux faîtières gardent des identités distinctes.
+Les cas douteux ne déclenchent aucune fusion automatique de producteurs ou de cartes.
+
 ## Recette minimale avant d'envoyer toute l'équipe
 
 Avec une personne de test et une organisation autorisée :
@@ -164,16 +189,17 @@ manuellement sans examiner le lien déjà enregistré.
 
 ## Livraison technique
 
-Appliquer uniquement `20261024140645_kobo_workflow_integrity.sql`, puis déployer les changements
+Appliquer uniquement `20261024145232_kobo_workflow_integrity.sql` et
+`20261024150737_kobo_cooperative_resolution.sql`, puis déployer les changements
 applicatifs de cette branche. Ne pas appliquer en bloc les autres migrations en attente.
-La migration remplace deux fonctions existantes ; elle ne réimporte pas les collectes
+Le correctif remplace deux fonctions de traitement et ajoute la résolution des noms ; il ne réimporte pas les collectes
 historiques, ne modifie pas les quotas et ne déclenche pas de message.
 
 Validation locale :
 
 ```bash
 node --import tsx --test tests/kobo-workflow.test.ts
-node --test tests/kobo-workflow-sql.test.mjs
+node --test tests/kobo-workflow-sql.test.mjs tests/kobo-cooperative-resolution-sql.test.mjs
 npm run typecheck
 ```
 

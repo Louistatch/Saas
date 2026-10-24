@@ -200,6 +200,7 @@ export async function POST(
     .from('kobo_submissions')
     .select('id, status')
     .eq('kobo_instance_id', payload._uuid)
+    .eq('cooperative_id', cooperativeId)
     .maybeSingle()
 
   if (existing) {

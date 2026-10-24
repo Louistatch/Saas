@@ -10,13 +10,14 @@
  */
 import 'server-only'
 
-import { ORG_MATCH, ORG_REVIEW, bestOrganizationMatch, samePerson } from '@/lib/dedup/names'
+import { samePerson } from '@/lib/dedup/names'
 import { isAllowedKoboAttachmentUrl } from '@/lib/kobo/attachment-url'
+import { decideCooperativeMatch, resolveKoboOrganization } from '@/lib/kobo/cooperative-resolution'
 import { finishMemberEnrollment, normalizeSavedSubmission } from '@/lib/kobo/processing'
 import { processPhotoFaceCrop } from '@/lib/photos/process-photo'
 import { createClient } from '@/lib/supabase/admin'
 import { createLogger } from '@/lib/utils/logger'
-import { cooperativeNameSchema, escapeIlike } from '@/lib/validators/kobo'
+import { cooperativeNameSchema } from '@/lib/validators/kobo'
 
 const log = createLogger('kobo:enrollment')
 
@@ -94,99 +95,25 @@ export async function enrollNewMemberFromSubmission(
     throw new Error('Prénom manquant dans la soumission Kobo')
   }
 
-  // ── Resolve cooperative ─────────────────────────────────────
+  // Resolve only inside the configured root, with an atomic database recheck.
   let targetCooperativeId = faitiereId
+  let cooperativeResolution: Record<string, unknown> | null = null
   if (nomCooperative) {
-    const parsedName = cooperativeNameSchema.safeParse(nomCooperative)
-    if (parsedName.success) {
-      const { data: accessible } = await supabase.rpc('get_cooperative_descendants', {
-        p_root_id: faitiereId,
-      })
-      const allowedIds: string[] = Array.isArray(accessible)
-        ? (accessible as { id: string }[]).map((r) => r.id)
-        : [faitiereId]
-
-      // Rapprochement intelligent (accents, graphies locales ou/w, mots génériques, nom court
-      // contenu dans un nom long) : « Kpelouwai » retrouve « Espoir de Kpèlèwouaï » au lieu
-      // d'en créer une troisième. Sous le seuil, on crée, et la page Doublons le signale.
-      let coop: { id: string } | null = null
-      const { data: allCoops } = await supabase
+    let parentId = faitiereId
+    if (region) {
+      const { data: unions, error } = await supabase
         .from('cooperatives')
         .select('id, name')
-        .in('id', allowedIds)
+        .eq('level', 'union')
+        .eq('parent_id', faitiereId)
         .is('deleted_at', null)
-      const best = bestOrganizationMatch(
-        parsedName.data,
-        (allCoops as { id: string; name: string }[] | null) ?? [],
-      )
-      if (best && best.score >= ORG_MATCH) {
-        coop = best.item
-        if (best.item.name !== parsedName.data) {
-          log.info('Cooperative matched by name similarity', {
-            input: parsedName.data,
-            matched: best.item.name,
-            score: Number(best.score.toFixed(2)),
-          })
-        }
-      } else if (best && best.score >= ORG_REVIEW) {
-        log.warn('Possible duplicate cooperative created', {
-          input: parsedName.data,
-          closest: best.item.name,
-          score: Number(best.score.toFixed(2)),
-        })
-      }
-
-      if (coop) {
-        targetCooperativeId = coop.id
-      } else {
-        // Auto-create cooperative
-        const { data: faitiereData } = await supabase
-          .from('cooperatives')
-          .select('faitiere_name, name')
-          .eq('id', faitiereId)
-          .maybeSingle()
-
-        // Use the faitière's own name as label if faitiere_name column is empty
-        const faitiereName = faitiereData?.faitiere_name ?? faitiereData?.name ?? null
-
-        let parentUnionId: string | null = faitiereId
-        if (region) {
-          // Query unions by parent_id (generic — works for any faîtière)
-          const { data: unions } = await supabase
-            .from('cooperatives')
-            .select('id, name')
-            .eq('level', 'union')
-            .eq('parent_id', faitiereId)
-          if (unions) {
-            const match = (unions as { id: string; name: string }[]).find((u) =>
-              u.name.toLowerCase().includes(region.toLowerCase()),
-            )
-            if (match) parentUnionId = match.id
-          }
-        }
-
-        const { data: newCoop } = await supabase
-          .from('cooperatives')
-          .insert({
-            name: parsedName.data,
-            level: 'cooperative',
-            parent_id: parentUnionId,
-            faitiere_name: faitiereName,
-          })
-          .select('id')
-          .single()
-
-        if (newCoop) {
-          targetCooperativeId = newCoop.id
-          log.info('New cooperative auto-created', {
-            name: parsedName.data,
-            parentId: parentUnionId,
-          })
-        }
-      }
-    } else {
-      log.warn('Invalid cooperative name — defaulting to faitiere', { faitiereId })
+      if (error) throw new Error('Unions de la faîtière indisponibles')
+      const regional = unions?.find((u) => u.name.toLowerCase().includes(region.toLowerCase()))
+      if (regional) parentId = regional.id
     }
+    const resolved = await resolveKoboOrganization(supabase, faitiereId, nomCooperative, parentId)
+    targetCooperativeId = resolved.id
+    cooperativeResolution = resolved
   }
 
   // ── Resolve geographic IDs ──────────────────────────────────
@@ -360,7 +287,11 @@ export async function enrollNewMemberFromSubmission(
     .from('kobo_submissions')
     .update({
       member_id: newMember.id,
-      processed_payload: { mode: 'enrollment', cooperative_id: targetCooperativeId },
+      processed_payload: {
+        mode: 'enrollment',
+        cooperative_id: targetCooperativeId,
+        cooperative_resolution: cooperativeResolution,
+      },
     })
     .eq('id', submissionId)
   if (linkError) throw new Error(`Rattachement du membre impossible : ${linkError.message}`)
@@ -530,39 +461,29 @@ export async function processCooperativeRegistration(
     getPayloadField(payload, 'C1/description') ?? getPayloadField(payload, 'description') ?? null
   const region = getPayloadField(payload, 'C2/region') ?? getPayloadField(payload, 'region') ?? null
 
-  const { data: faitiereData } = await supabase
-    .from('cooperatives')
-    .select('name, faitiere_name')
-    .eq('id', faitiereId)
-    .maybeSingle()
-
-  const faitiereName = faitiereData?.faitiere_name ?? faitiereData?.name ?? ''
-
-  let parentId: string | null = null
-  if (niveau === 'union') {
-    parentId = faitiereId
-  } else if (niveau === 'cooperative') {
+  if (niveau !== 'cooperative' && niveau !== 'union')
+    throw new Error('Niveau d’organisation invalide')
+  const { data: scope, error: scopeError } = await supabase.rpc('get_cooperative_descendants', {
+    p_root_id: faitiereId,
+  })
+  if (scopeError || !Array.isArray(scope)) throw new Error('Périmètre de la faîtière indisponible')
+  const ids = [faitiereId, ...scope.map((r) => r.id)]
+  let parentId = faitiereId
+  if (niveau === 'cooperative') {
+    const { data: unions, error } = await supabase
+      .from('cooperatives')
+      .select('id, name')
+      .in('id', ids)
+      .eq('level', 'union')
+      .is('deleted_at', null)
+    if (error) throw new Error('Unions indisponibles')
     if (nomParent) {
-      const { data: parentUnion } = await supabase
-        .from('cooperatives')
-        .select('id')
-        .ilike('name', `%${escapeIlike(nomParent)}%`)
-        .eq('level', 'union')
-        .eq('faitiere_name', faitiereName)
-        .limit(1)
-        .maybeSingle()
-      parentId = parentUnion?.id ?? faitiereId
+      const parent = decideCooperativeMatch(nomParent, unions ?? [])
+      if (parent.kind !== 'match') throw new Error('Union parente à vérifier dans cette faîtière')
+      parentId = parent.item.id
     } else if (region) {
-      const { data: unions } = await supabase
-        .from('cooperatives')
-        .select('id, name')
-        .eq('level', 'union')
-        .eq('faitiere_name', faitiereName)
-      const typedUnions = (unions ?? []) as { id: string; name: string }[]
-      const match = typedUnions.find((u) => u.name.toLowerCase().includes(region.toLowerCase()))
-      parentId = match?.id ?? faitiereId
-    } else {
-      parentId = faitiereId
+      parentId =
+        unions?.find((u) => u.name.toLowerCase().includes(region.toLowerCase()))?.id ?? faitiereId
     }
   }
 
@@ -579,52 +500,17 @@ export async function processCooperativeRegistration(
     return
   }
 
-  // Même faîtière et nom proche (graphie, accents, mots génériques) : c'est la même organisation.
-  const { data: sameFaitiere } = await supabase
-    .from('cooperatives')
-    .select('id, name')
-    .eq('faitiere_name', faitiereName)
-    .is('deleted_at', null)
-  const closest = bestOrganizationMatch(
+  const resolution = await resolveKoboOrganization(
+    supabase,
+    faitiereId,
     parsedNom.data,
-    (sameFaitiere as { id: string; name: string }[] | null) ?? [],
+    parentId,
+    niveau,
   )
-  const existing = closest && closest.score >= ORG_MATCH ? closest.item : null
-
-  let coopId: string
-  if (existing) {
-    await supabase
-      .from('cooperatives')
-      .update({
-        level: niveau,
-        parent_id: parentId,
-        ...(description ? { description } : {}),
-      })
-      .eq('id', existing.id)
-    coopId = existing.id
-    log.info('Cooperative updated via KoboCollect', { id: coopId, name: nom })
-  } else {
-    const { data: newCoop, error: coopError } = await supabase
-      .from('cooperatives')
-      .insert({
-        name: parsedNom.data,
-        level: niveau,
-        parent_id: parentId,
-        faitiere_name: faitiereName,
-        description: description ?? null,
-      })
-      .select('id')
-      .single()
-
-    if (coopError || !newCoop) {
-      throw new Error(`Échec création coopérative : ${coopError?.message ?? 'Inconnu'}`)
-    }
-    coopId = newCoop.id
-    log.info('Nouvelle coopérative créée via KoboCollect', {
-      id: coopId,
-      name: nom,
-      niveau,
-    })
+  const coopId = resolution.id
+  if (description) {
+    const { error } = await supabase.from('cooperatives').update({ description }).eq('id', coopId)
+    if (error) throw new Error(error.message)
   }
 
   await supabase

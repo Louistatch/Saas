@@ -268,7 +268,15 @@ export async function POST(request: NextRequest) {
 
   if (upsertError) {
     log.error('Failed to upsert integration', { error: upsertError.message, cooperativeId })
-    return NextResponse.json({ error: 'Failed to save integration' }, { status: 500 })
+    return NextResponse.json(
+      {
+        error:
+          upsertError.code === '23505'
+            ? 'Ce formulaire est déjà relié à une autre faîtière. Utilisez un formulaire distinct.'
+            : 'Failed to save integration',
+      },
+      { status: upsertError.code === '23505' ? 409 : 500 },
+    )
   }
 
   // Save field mappings if provided

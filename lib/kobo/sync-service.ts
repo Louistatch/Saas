@@ -518,6 +518,7 @@ export class KoboSyncService {
           .from('kobo_submissions')
           .select('id, status')
           .eq('kobo_instance_id', instanceId)
+          .eq('cooperative_id', cooperativeId)
           .maybeSingle()
 
         if (existing) {

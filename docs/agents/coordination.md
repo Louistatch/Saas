@@ -35,6 +35,23 @@ début de sa session et avant chaque push sur `main`, et y répond.
 
 ## En cours
 
+- **Codex** · 2026-10-24 · **Mise en production Kobo, autorisée par le DG** :
+  demande « Lance en production ». PR #55, branche `codex/kobo-workflow-audit`.
+  La phase d'audit en lecture seule ci-dessous est terminée. Cette livraison applique
+  uniquement le correctif Kobo `20261024145232_kobo_workflow_integrity.sql` dans
+  le projet FaîtiereHub, puis fusionne la PR et vérifie le déploiement de
+  `www.faitierehub.com`. Les fonctions antérieures sont conservées pour un retour
+  arrière éventuel. Aucun réimport historique, débit, émission ni SMS réel n'est
+  nécessaire à la vérification du déploiement.
+  Complément demandé : isolation entre faîtières et nettoyage des noms de coopératives.
+  Zones ajoutées : `lib/kobo/cooperative-resolution.ts` et tests SQL de résolution/RLS.
+  Les deux migrations Kobo sont appliquées, versions `20261024145232` et
+  `20261024150737` ; les noms des fichiers suivent ces versions de production.
+  39 tests ciblés et 868 tests unitaires passent ; le contrôle TypeScript est vert.
+  Les tests vérifient le parcours, la résolution et les droits. Les variantes
+  KPELEWAÏ retrouvent la référence existante ; aucun déplacement de membre ni
+  fusion de fiches de production n'a été nécessaire.
+
 - **Codex** · `codex/kobo-workflow-audit` · 2026-10-24 · **KoboCollect → membre → carte**
   (demande du DG). Audit de production en lecture seule ; correction de la reprise,
   des erreurs masquées d'émission et du traitement des cartes existantes. Fichiers

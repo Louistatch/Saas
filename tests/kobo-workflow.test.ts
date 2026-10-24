@@ -3,6 +3,7 @@ import { beforeEach, test } from 'node:test'
 import type * as Configuration from '../app/api/integrations/kobo/route'
 import type * as SyncRoute from '../app/api/integrations/kobo/sync/route'
 import type * as Webhook from '../app/api/webhooks/kobo/route'
+import type * as CooperativeResolution from '../lib/kobo/cooperative-resolution'
 import type * as Enrollment from '../lib/kobo/enrollment'
 import { normalizeKoboPayload } from '../lib/kobo/normalize'
 import type * as Processing from '../lib/kobo/processing'
@@ -77,6 +78,8 @@ Module._load = function (r, p, m) {
   if (r === '@/lib/photos/process-photo') return { processPhotoFaceCrop: async () => null }
   return originalLoad.call(this, r, p, m)
 }
+const { decideCooperativeMatch, cooperativeIdentityKey } =
+  require('../lib/kobo/cooperative-resolution') as typeof CooperativeResolution
 const { enrollNewMemberFromSubmission } = require('../lib/kobo/enrollment') as typeof Enrollment
 const { processCardSubmission, finishMemberEnrollment } =
   require('../lib/kobo/processing') as typeof Processing
@@ -106,8 +109,8 @@ beforeEach(() => {
   state.store
     .rows('cooperatives')
     .push(
-      { id: ROOT, name: 'Faîtière', deleted_at: null },
-      { id: CHILD, name: 'Coopérative', parent_id: ROOT, deleted_at: null },
+      { id: ROOT, name: 'Faîtière', level: 'faitiere', deleted_at: null },
+      { id: CHILD, name: 'Coopérative', level: 'cooperative', parent_id: ROOT, deleted_at: null },
     )
   state.store.rows('kobo_submissions').push({
     id: 'submission',
@@ -126,6 +129,24 @@ beforeEach(() => {
     const row = state.store.rows('kobo_submissions').find((s) => s.id === id)
     if (row) Object.assign(row, { processed_at: new Date().toISOString(), status: 'matched' })
     return { data: { success: true }, error: null }
+  }
+  state.admin.rpcHandlers.kobo_resolve_organization = (args) => {
+    const a = args as { p_match: string | null; p_name: string; p_parent: string; p_level: string }
+    const existing = state.store.rows('cooperatives').find((c) => c.id === a.p_match)
+    if (existing)
+      return {
+        data: { id: existing.id, name: existing.name, method: 'distinctive_match' },
+        error: null,
+      }
+    const created = {
+      id: `org-${state.store.rows('cooperatives').length}`,
+      name: a.p_name,
+      level: a.p_level,
+      parent_id: a.p_parent,
+      deleted_at: null,
+    }
+    state.store.rows('cooperatives').push(created)
+    return { data: { ...created, method: 'created' }, error: null }
   }
   state.session.rpcHandlers = state.admin.rpcHandlers
 })
@@ -388,22 +409,18 @@ test('pull réel du service : le téléphone marqué clé n’empêche pas de re
   state.store
     .rows('members')
     .push({ id: 'member', cooperative_id: ROOT, first_name: 'Kossi', last_name: 'Agbo' })
-  state.store
-    .rows('member_cards')
-    .push({
-      member_id: 'member',
-      cooperative_id: ROOT,
-      card_number: 'FEN-123456',
-      status: 'active',
-    })
-  state.store
-    .rows('kobo_field_mappings')
-    .push({
-      ...mapping('S1/telephone', 'members', 'phone'),
-      cooperative_id: ROOT,
-      form_id: 'asset123',
-      is_key_field: true,
-    })
+  state.store.rows('member_cards').push({
+    member_id: 'member',
+    cooperative_id: ROOT,
+    card_number: 'FEN-123456',
+    status: 'active',
+  })
+  state.store.rows('kobo_field_mappings').push({
+    ...mapping('S1/telephone', 'members', 'phone'),
+    cooperative_id: ROOT,
+    form_id: 'asset123',
+    is_key_field: true,
+  })
   state.session.rpcHandlers.match_kobo_submission_to_member = (args) => {
     const id = (args as { p_submission_id: string }).p_submission_id
     const row = state.store.rows('kobo_submissions').find((s) => s.id === id)
@@ -430,4 +447,50 @@ test('pull réel du service : le téléphone marqué clé n’empêche pas de re
   } finally {
     globalThis.fetch = oldFetch
   }
+})
+
+test('KPELEWAÏ, SCOOPS et nom de référence : une seule coopérative, référence conservée', () => {
+  const reference = [
+    { id: 'kpele', name: 'Espoir de Kpèlèwouaï' },
+    { id: 'other', name: 'Scoops nintchè' },
+  ]
+  for (const name of ['KPELEWAÏ', 'SCOOPS KPELEWAÏ', 'Scoops kpelewaï', 'S.C.O.O.P.S. Kpéléwaï']) {
+    const decision = decideCooperativeMatch(name, reference)
+    assert.equal(decision.kind, 'match')
+    if (decision.kind === 'match') assert.equal(decision.item.id, 'kpele')
+    assert.equal(cooperativeIdentityKey(name), 'kpelewai')
+  }
+})
+
+test('deux références proches : blocage explicite, jamais la première ligne au hasard', () => {
+  assert.equal(
+    decideCooperativeMatch('KPELEWAÏ', [
+      { id: 'a', name: 'Espoir de Kpèlèwouaï' },
+      { id: 'b', name: 'Solidarité de Kpèlèwouaï' },
+    ]).kind,
+    'review',
+  )
+  assert.notEqual(
+    decideCooperativeMatch('Espoir de Kara', [{ id: 'b', name: 'Espoir de Kpalimé' }]).kind,
+    'match',
+  )
+  assert.notEqual(
+    decideCooperativeMatch('Espoir', [{ id: 'b', name: 'Espoir de Kara' }]).kind,
+    'match',
+  )
+})
+
+test('enrôlement complet avec le nom court : rattaché à la coopérative canonique, pas à la faîtière', async () => {
+  Object.assign(state.store.rows('cooperatives').find((c) => c.id === CHILD) ?? {}, {
+    name: 'Espoir de Kpèlèwouaï',
+  })
+  const raw = { ...payload(), 'S2/nom_cooperative': 'SCOOPS KPELEWAÏ' }
+  Object.assign(state.store.rows('kobo_submissions')[0] ?? {}, { raw_payload: raw })
+  await enrollNewMemberFromSubmission('submission', ROOT)
+  assert.equal(state.store.rows('cooperatives').length, 2)
+  assert.equal(state.store.rows('members')[0]?.cooperative_id, CHILD)
+  assert.equal(
+    state.store.rows('cooperatives').find((c) => c.id === CHILD)?.name,
+    'Espoir de Kpèlèwouaï',
+  )
 })
