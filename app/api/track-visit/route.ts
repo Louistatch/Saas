@@ -3,13 +3,14 @@ import { createClient as createAdminClient } from '@/lib/supabase/admin'
 import { rateLimit } from '@/lib/utils/rate-limit'
 import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { ANALYTICS_CHOICE, analyticsPath } from '@/lib/analytics/privacy'
 
 /**
  * Trafic du site, suivi maison (§ demande admin : « mon propre code », puis
  * « reconnaître le visiteur et sa position »). Route publique — appelée par
  * tout visiteur, connecté ou non, jamais gardée par assertRole.
  *
- * Identité : cookie httpOnly de première partie `fh_vid` (uuid, 2 ans),
+ * Identité : cookie httpOnly de première partie `fh_vid` (uuid, 6 mois),
  * généré ici s'il est absent — c'est lui qui permet de reconnaître un
  * visiteur qui revient. visitor_hash (sha256(ip + date du jour)) reste en
  * repli pour les navigateurs qui bloquent les cookies : jamais NULL,
@@ -22,7 +23,7 @@ import { z } from 'zod'
  */
 
 const VISITOR_COOKIE = 'fh_vid'
-const VISITOR_COOKIE_MAX_AGE = 60 * 60 * 24 * 365 * 2 // 2 ans
+const VISITOR_COOKIE_MAX_AGE = 60 * 60 * 24 * 180
 
 const bodySchema = z.object({
   path: z.string().trim().min(1).max(300),
@@ -45,6 +46,7 @@ function parseGeoHeaders(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  if (request.cookies.get(ANALYTICS_CHOICE)?.value !== 'granted') return new NextResponse(null, {status: 204})
   const forwardedFor = request.headers.get('x-forwarded-for')
   const ip = forwardedFor ? forwardedFor.split(',')[0]?.trim() : 'unknown'
 
@@ -66,8 +68,8 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient()
   await admin.from('site_visits').insert({
-    path: parsed.data.path,
-    referrer: parsed.data.referrer ?? null,
+    path: analyticsPath(parsed.data.path),
+    referrer: safeReferrer(parsed.data.referrer),
     visitor_hash: visitorHash,
     visitor_id: visitorId,
     is_new_visitor: isNewVisitor,
@@ -86,5 +88,14 @@ export async function POST(request: NextRequest) {
     maxAge: VISITOR_COOKIE_MAX_AGE,
     path: '/',
   })
+  return response
+}
+
+function safeReferrer(value?: string) {
+  try { return value ? new URL(value).origin : null } catch { return null }
+}
+export async function DELETE() {
+  const response = new NextResponse(null, {status: 204})
+  response.cookies.set(VISITOR_COOKIE, '', {maxAge: 0, path: '/', httpOnly: true, sameSite: 'lax'})
   return response
 }

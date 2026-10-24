@@ -54,6 +54,20 @@ début de sa session et avant chaque push sur `main`, et y répond.
   d'entrée de gamme), la moto et le taxi roulaient moins vite que l'horloge. Le rendu ne change
   pas (une passe par image).
 
+- **Codex** · `codex/production-hardening` · 2026-10-24 · Corrections autorisées
+  par le DG (« Go », SMS et paiement réel exclus). Base `b70d759`, Marché/Travail
+  conservé. Zones : dépendances/CI, membres/recherche/export, cartes, statistiques,
+  prix et confidentialité analytics. Fichiers complémentaires : `app/layout.tsx`,
+  `app/providers/posthog-provider.tsx`, `app/api/track-visit/route.ts`, politique cookies,
+  `types/supabase.ts`, migration d’agrégats invoker et corrections du plan des prix.
+  Backend AgriTogo : PR #25 fusionnée `e7b6512`, 31 tests, déploiement Railway en cours.
+  Trois jeux de tests locaux PostgreSQL/HTTP/navigateur ; fixture sans données réelles.
+  Migrations prod 20261024194412, 194828, 195114, 195643. API prix contrôlée : 121/5.
+  Aucun changement des règles Marché/Travail de Claude.
+  `package.json` et lock : sécurité et tests ; adaptation Zod limitée aux erreurs
+  de validation, sans changement des règles financières. CE/IT reste désactivé.
+  Aucun SMS, paiement réel, reversement ni nouveau prestataire.
+
 - **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-23 · **Terminé le 24/10 : fusionné (PR #56)
   et déployé en production.** **Marché de proximité et travail
   agricole : refonte et mécanisme de réponse** (demande de l'utilisateur : « faire sortir et

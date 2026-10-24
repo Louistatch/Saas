@@ -44,6 +44,12 @@ jobs:
 
       # tsc --noEmit n'exécute aucun code et ne lit aucune variable
       # d'environnement : il tourne tel quel, sans secret.
+      - name: Vulnérabilités des dépendances de production
+        run: npm run security:audit
+
+      - name: Vérification des prix, volumes et accès
+        run: npm run test:production
+
       - name: Typecheck
         run: npm run typecheck
 

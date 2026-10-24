@@ -1,87 +1,89 @@
 'use client'
 
-import { Suspense, useEffect } from 'react'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
+import { Analytics } from '@vercel/analytics/next'
 import posthog from 'posthog-js'
-import { PostHogProvider as PHProvider } from 'posthog-js/react'
-
-/**
- * PostHog provider (Étape 4.3 — monitoring at scale).
- *
- * Captures product analytics, funnels (signup → cooperative created → first
- * card), and feature-flag rollouts. Initialized client-side only, gated on a
- * public key so it is a no-op in environments without PostHog configured.
- *
- * Scale note (10M MAU): pageviews are captured manually (capture_pageview:false)
- * so we control volume and avoid double-counting App Router client navigations.
- */
+import { SiteVisitTracker } from '@/components/shared/site-visit-tracker'
+import { ANALYTICS_EVENT, analyticsPath, readAnalyticsChoice, saveAnalyticsChoice, type AnalyticsChoice } from '@/lib/analytics/privacy'
 
 let initialized = false
-
+function consentGranted() {
+  try { return typeof window !== 'undefined' && readAnalyticsChoice(window.localStorage) === 'granted' }
+  catch { return false }
+}
 function initPostHog() {
-  if (initialized) return
   const key = process.env.NEXT_PUBLIC_POSTHOG_KEY
-  if (!key || typeof window === 'undefined') return
-
+  if (initialized || !key || !consentGranted()) return
   posthog.init(key, {
     api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://eu.i.posthog.com',
-    capture_pageview: false, // we send $pageview manually on route change
-    capture_pageleave: true,
-    persistence: 'localStorage+cookie',
-    autocapture: false, // explicit events only — keeps event volume predictable
-    disable_session_recording: true, // enable selectively; recordings are costly at scale
-    loaded: (ph) => {
-      if (process.env.NODE_ENV === 'development') ph.debug()
+    capture_pageview: false, capture_pageleave: false, autocapture: false,
+    persistence: 'memory', person_profiles: 'never', ip: false,
+    disable_session_recording: true, disable_surveys: true, capture_exceptions: false,
+    advanced_disable_feature_flags: true, disable_external_dependency_loading: true,
+    request_batching: false, remote_config_refresh_interval_ms: 0,
+    before_send: event => {
+      if (!consentGranted() || event.event !== '$pageview') return null
+      // No referrer, form value, user/cooperative ID or raw URL.
+      const path = analyticsPath(window.location.pathname)
+      return {uuid: event.uuid, event: event.event, timestamp: event.timestamp, properties: {
+        token: event.properties.token, distinct_id: event.properties.distinct_id,
+        $current_url: window.location.origin + path, $pathname: path, $process_person_profile: false,
+      }}
     },
   })
   initialized = true
 }
-
-function PageviewTracker() {
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-
-  useEffect(() => {
-    if (!process.env.NEXT_PUBLIC_POSTHOG_KEY || typeof window === 'undefined') return
-    const qs = searchParams?.toString()
-    const url = qs ? `${pathname}?${qs}` : pathname
-    posthog.capture('$pageview', { $current_url: window.location.origin + url })
-  }, [pathname, searchParams])
-
-  return null
-}
-
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+  const enabled = process.env.NODE_ENV === 'production'
+  const [choice, setChoice] = useState<AnalyticsChoice | null>(null)
+  const [showChoice, setShowChoice] = useState(false)
   useEffect(() => {
-    initPostHog()
-  }, [])
-
-  if (!process.env.NEXT_PUBLIC_POSTHOG_KEY) {
-    // No key configured — render children without the provider (no-op).
-    return <>{children}</>
+    if (!enabled) return
+    const refresh = () => {
+      let next: AnalyticsChoice | null = null
+      try { next = readAnalyticsChoice(window.localStorage) } catch {}
+      setChoice(next); setShowChoice(next === null)
+      if (next === 'granted') initPostHog()
+    }
+    const reopen = () => setShowChoice(true)
+    refresh()
+    window.addEventListener(ANALYTICS_EVENT, refresh)
+    window.addEventListener('storage', refresh)
+    window.addEventListener('fhub:analytics-settings', reopen)
+    return () => {
+      window.removeEventListener(ANALYTICS_EVENT, refresh)
+      window.removeEventListener('storage', refresh)
+      window.removeEventListener('fhub:analytics-settings', reopen)
+    }
+  }, [enabled])
+  useEffect(() => {
+    if (enabled && choice === 'granted' && initialized) posthog.capture('$pageview')
+  }, [pathname, choice, enabled])
+  function choose(next: AnalyticsChoice) {
+    saveAnalyticsChoice(next); setShowChoice(false)
+    if (next === 'denied') {
+      if (initialized) posthog.reset()
+      void fetch('/api/track-visit', {method: 'DELETE'}).catch(() => {})
+    }
   }
-
-  return (
-    <PHProvider client={posthog}>
-      <Suspense fallback={null}>
-        <PageviewTracker />
-      </Suspense>
-      {children}
-    </PHProvider>
-  )
+  return <>
+    {children}
+    {enabled && choice === 'granted' && <>
+      <Analytics beforeSend={event => consentGranted() ? {...event, url: new URL(event.url, window.location.origin).origin + analyticsPath(event.url)} : null} />
+      <SiteVisitTracker />
+    </>}
+    {enabled && showChoice && <section aria-label="Préférences de mesure d’audience" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-2xl rounded-xl border bg-background p-5 shadow-xl">
+      <p className="text-sm">Autorisez-vous la mesure d’audience pour améliorer FaîtiereHub ? Elle mesure les pages consultées et la provenance de connexion, sans le contenu des formulaires. Votre choix est valable six mois.</p>
+      <div className="mt-3 flex flex-wrap gap-3 items-center">
+        <button type="button" className="rounded-md border px-4 py-2 text-sm" onClick={() => choose('denied')}>Refuser</button>
+        <button type="button" className="rounded-md border px-4 py-2 text-sm" onClick={() => choose('granted')}>Accepter</button>
+        <a href="/legal/cookies" className="text-sm underline">En savoir plus</a>
+      </div>
+    </section>}
+  </>
 }
-
-/**
- * Identify the logged-in user for funnel correlation. Call after auth resolves.
- * Never send PII beyond what's necessary (id + coarse role).
- */
-export function identifyUser(userId: string, role: string, cooperativeId?: string) {
-  if (!process.env.NEXT_PUBLIC_POSTHOG_KEY || typeof window === 'undefined') return
-  posthog.identify(userId, { role, cooperative_id: cooperativeId ?? null })
-}
-
-/** Reset on logout so the next session is anonymous. */
-export function resetAnalytics() {
-  if (!process.env.NEXT_PUBLIC_POSTHOG_KEY || typeof window === 'undefined') return
-  posthog.reset()
-}
+/** Callers retain compatibility; identifiers are never sent to analytics. */
+export function identifyUser(_userId: string, _role: string, _cooperativeId?: string) {}
+export function resetAnalytics() { if (initialized) posthog.reset() }

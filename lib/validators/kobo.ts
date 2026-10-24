@@ -128,12 +128,12 @@ export const koboSubmissionsQuerySchema = z.object({
     .string()
     .transform((v) => Number.parseInt(v, 10))
     .pipe(z.number().int().min(1).max(1000))
-    .default('1'),
+    .default(1),
   pageSize: z
     .string()
     .transform((v) => Number.parseInt(v, 10))
     .pipe(z.number().int().min(1).max(100))
-    .default('25'),
+    .default(25),
   status: z
     .enum(['pending', 'processing', 'matched', 'unmatched', 'error', 'duplicate'])
     .optional(),
