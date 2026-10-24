@@ -29,6 +29,8 @@ test('agrégats complets, prix identiques à la vue et isolation sous RLS', asyn
       select '${id(4)}','A','Membre '||i,'Kozah' from generate_series(1,1203) i;
     insert into members(cooperative_id,first_name,last_name,prefecture)
       select '${id(2)}','B','Autre '||i,'Golfe' from generate_series(1,1101) i;
+    insert into members(cooperative_id,first_name,last_name,prefecture,deleted_at)
+      values('${id(4)}','Supprimé','Archive','Kozah',now());
     insert into parcelles(member_id,cooperative_id,surface_ha,culture_name)
       select id,cooperative_id,1.5,'Maïs' from members;
     alter table members enable row level security;

@@ -209,7 +209,7 @@ export default function AnalyticsPage() {
     weekAgo.setDate(weekAgo.getDate() - 7)
 
     // Existing queries
-    const membersQuery = supabase.from('members').select('status').eq('cooperative_id', coopId)
+    const membersQuery = supabase.from('members').select('status').eq('cooperative_id', coopId).is('deleted_at', null)
     const fichesQuery = supabase
       .from('fiches_techniques')
       .select('status')
@@ -236,6 +236,7 @@ export default function AnalyticsPage() {
       .from('members')
       .select('created_at')
       .eq('cooperative_id', coopId)
+      .is('deleted_at', null)
       .gte('created_at', twelveMonthsAgo.toISOString())
 
     const scansOverTimeQuery = supabase

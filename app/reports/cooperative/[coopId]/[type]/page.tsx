@@ -69,6 +69,7 @@ export default async function CooperativeReportPage({
         member_cards(card_number)
       `)
       .eq('cooperative_id', coopId)
+      .is('deleted_at', null)
       .order('last_name').order('id').range(from, to))
     if (error) throw new Error('Rapport incomplet : réessayez plus tard.')
 

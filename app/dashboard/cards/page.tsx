@@ -145,7 +145,8 @@ export default function CardsPage() {
 
     const {data: branch, error: scopeError} = await supabase.rpc('get_cooperative_branch', {p_root: currentCooperative.id})
     if (scopeError) throw scopeError
-    query = query.in('cooperative_id', branch?.length ? branch : [currentCooperative.id])
+    if (!branch?.length) throw new Error('Organisation inaccessible')
+    query = query.in('cooperative_id', branch)
 
     query = query.order('created_at', { ascending: false }).order('id')
     const { data, error } = await collectPages((from, to) => query.range(from, to))
@@ -167,8 +168,9 @@ export default function CardsPage() {
     try {
       const {data: branch, error: scopeError} = await supabase.rpc('get_cooperative_branch', {p_root: currentCooperative.id})
       if (scopeError) throw scopeError
+      if (!branch?.length) throw new Error('Organisation inaccessible')
       const {data, error} = await collectPages((from, to) => supabase.from('members')
-        .select('id, first_name, last_name, cooperative_id').in('cooperative_id', branch?.length ? branch : [currentCooperative.id])
+        .select('id, first_name, last_name, cooperative_id').in('cooperative_id', branch)
         .eq('status','active').is('deleted_at',null).order('last_name').order('id').range(from,to))
       if (error) throw error
       if (sequence !== memberRequest.current) return
