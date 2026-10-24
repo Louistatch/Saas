@@ -5559,6 +5559,10 @@ export type Database = {
       }
     }
     Functions: {
+      get_market_region_counts: { Args: Record<PropertyKey, never>; Returns: {region_id: string; price_count: number}[] }
+      get_member_cooperative_counts: { Args: {p_parent: string}; Returns: {child_id: string; member_count: number}[] }
+      get_map_statistics: { Args: {p_metric?: string; p_cooperative_id?: string}; Returns: Json }
+
       bootstrap_cooperative_admin: {
         Args: { target_cooperative_id: string; target_user_id: string }
         Returns: undefined

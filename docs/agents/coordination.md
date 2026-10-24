@@ -35,6 +35,14 @@ début de sa session et avant chaque push sur `main`, et y répond.
 
 ## En cours
 
+- **Codex** · `codex/production-hardening` · 2026-10-24 · Corrections autorisées
+  par le DG (« Go », SMS et paiement réel exclus). Base `b70d759`, Marché/Travail
+  conservé. Zones : dépendances/CI, membres/recherche/export, cartes, statistiques,
+  prix et confidentialité analytics. Backend AgriTogo dans son dépôt séparé.
+  `package.json` et lock : sécurité et tests ; adaptation Zod limitée aux erreurs
+  de validation, sans changement des règles financières. CE/IT reste désactivé.
+  Aucun SMS, paiement réel, reversement ni nouveau prestataire.
+
 - **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-23 · **Terminé le 24/10 : fusionné (PR #56)
   et déployé en production.** **Marché de proximité et travail
   agricole : refonte et mécanisme de réponse** (demande de l'utilisateur : « faire sortir et

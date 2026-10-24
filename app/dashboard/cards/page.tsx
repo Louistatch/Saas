@@ -321,23 +321,8 @@ export default function CardsPage() {
         description: `${existingCard.card_number} — validité prolongée`,
       })
     } else {
-      // NEW CARD: generate new number (member has no active card)
-      // Also check for any previously revoked/expired card to reuse the number
-      const { data: previousCard } = await supabase
-        .from('member_cards')
-        .select('card_number')
-        .eq('member_id', selectedMemberId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      // Reuse previous card number if exists, otherwise generate one server-side.
-      let cardNumber: string
-      if (previousCard?.card_number) {
-        cardNumber = previousCard.card_number
-      } else {
-        cardNumber = await generateCardNumber(targetCoopId)
-      }
+      // A replacement must never reuse a revoked or expired card number.
+      const cardNumber = await generateCardNumber(targetCoopId)
 
       const qrPayload = buildQrPayload(selectedMemberId, cardNumber, null)
 
@@ -412,16 +397,7 @@ export default function CardsPage() {
           if (!data) throw new Error('La carte n’a pas pu être renouvelée.')
           renewedCount++
         } else {
-          const { data: previousCard, error: previousError } = await supabase
-            .from('member_cards')
-            .select('card_number')
-            .eq('member_id', memberId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-          if (previousError) throw previousError
-          const cardNumber =
-            previousCard?.card_number ?? (await generateCardNumber(currentCooperative.id))
+          const cardNumber = await generateCardNumber(currentCooperative.id)
           const { error } = await supabase.from('member_cards').insert({
             cooperative_id: currentCooperative.id,
             member_id: memberId,

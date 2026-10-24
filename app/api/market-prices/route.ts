@@ -10,6 +10,7 @@
 
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createPublicClient } from '@/lib/supabase/public'
 import { applyRateLimit } from '@/lib/utils/rate-limit-persistent'
 
 export async function GET(request: NextRequest) {
@@ -23,27 +24,13 @@ export async function GET(request: NextRequest) {
   const prefectureId = searchParams.get('prefecture_id')
   const cantonId = searchParams.get('canton_id')
 
-  const supabase = await createClient()
+  const supabase = createPublicClient()
 
   // Return regions with price counts
   if (action === 'regions') {
-    // Nombre de prix COURANTS (une culture dans une région = un prix), lu dans la
-    // vue : l'ancien décompte lisait 1000 lignes brutes au hasard et pouvait
-    // annoncer « 0 prix » pour une région qui en a des dizaines.
-    const regionCounts: Record<string, number> = {}
-    const { data: current, error: currentError } = await supabase
-      .from('market_price_current')
-      .select('region_id')
-    if (!currentError) {
-      for (const row of (current ?? []) as { region_id: string }[]) {
-        regionCounts[row.region_id] = (regionCounts[row.region_id] ?? 0) + 1
-      }
-    } else {
-      const { data: allPrices } = await supabase.from('market_prices').select('region_id').limit(1000)
-      for (const p of allPrices ?? []) {
-        regionCounts[p.region_id] = (regionCounts[p.region_id] ?? 0) + 1
-      }
-    }
+    const {data,error} = await supabase.rpc('get_market_region_counts')
+    if(error) return NextResponse.json({error:'Prix courants indisponibles',regionCounts:{}},{status:503})
+    const regionCounts = Object.fromEntries((data ?? []).map((row: {region_id: string; price_count: number}) => [row.region_id,Number(row.price_count)]))
     return NextResponse.json({ regionCounts }, {
       headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' }
     })
@@ -153,69 +140,9 @@ export async function GET(request: NextRequest) {
     // Vue absente (42P01) ou erreur : on retombe sur les relevés bruts ci-dessous.
   }
 
-  // Relevés bruts (repli si la vue n'est pas disponible).
-  //
-  // `price_type` (gros / détail) n'existe qu'une fois la migration CPC
-  // d'AgriTogo appliquée. PostgREST répond 42703 sur une colonne inconnue, ce
-  // qui casserait toute la page Marchés — on tente donc avec, et on retombe
-  // sans. La seconde branche disparaîtra une fois la migration en place.
-  const BASE_COLUMNS =
-    'id, culture_id, region_id, market_name, price, unit, currency, trend, verified, created_at, source, cultures(name), regions(name)'
+  // Never disguise a failed current-price calculation as historical raw observations.
+  return NextResponse.json({error:'Prix courants indisponibles. Réessayez plus tard.'},{status:503})
 
-  // PostgREST plafonne une réponse à 1000 lignes. Les relevés d'une source
-  // externe (CPC : plusieurs milliers) dépassent ce plafond et, triés par date,
-  // ils noieraient les saisies plus anciennes. On lit donc par tranches, puis on
-  // ne garde que les quelques relevés les plus récents de chaque couple
-  // culture / marché / type de prix : de quoi afficher le prix actuel, sa
-  // tendance et sa courbe, sans renvoyer des milliers de lignes.
-  const PAGE = 1000
-  const MAX_PAGES = 6
-  const KEEP_PER_SERIES = 6
-
-  const runQuery = async (columns: string) => {
-    const rows: Record<string, unknown>[] = []
-    for (let page = 0; page < MAX_PAGES; page++) {
-      let q = supabase
-        .from('market_prices')
-        .select(columns)
-        .order('created_at', { ascending: false })
-      if (regionId) q = q.eq('region_id', regionId)
-      if (cultureId) q = q.eq('culture_id', cultureId)
-      if (cantonId) q = q.eq('canton_id', cantonId)
-      const { data: chunk, error: chunkError } = await q.range(page * PAGE, page * PAGE + PAGE - 1)
-      if (chunkError) return { data: null, error: chunkError }
-      const got = (chunk ?? []) as unknown as Record<string, unknown>[]
-      rows.push(...got)
-      if (got.length < PAGE) break
-    }
-    const seen = new Map<string, number>()
-    const kept = rows.filter((row) => {
-      const key = `${row.culture_id}|${String(row.market_name ?? '').toLowerCase()}|${row.price_type ?? ''}`
-      const n = seen.get(key) ?? 0
-      seen.set(key, n + 1)
-      return n < KEEP_PER_SERIES
-    })
-    return { data: kept, error: null }
-  }
-
-  let { data, error } = (await runQuery(`${BASE_COLUMNS}, price_type`)) as {
-    data: unknown[] | null
-    error: { code?: string } | null
-  }
-  if (error?.code === '42703') {
-    ;({ data, error } = (await runQuery(BASE_COLUMNS)) as {
-      data: unknown[] | null
-      error: { code?: string } | null
-    })
-  }
-
-  if (error) {
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
-  }
-
-  return NextResponse.json({ prices: data ?? [] }, {
-    headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' }
-  })
 }
 
 export async function POST(request: NextRequest) {
