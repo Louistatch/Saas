@@ -216,12 +216,67 @@ test('avatar, joystick, collisions, camera and taxi in the single 3D world', asy
   await expect(board).toBeVisible({ timeout: 45000 })
   await board.click()
   await expect.poll(async () => (await player())?.driving).toBe(true)
-  await expect.poll(async () => {
-    const car = (await player())?.vehicle
-    return car ? Math.hypot(car.x - before.vehicle!.x, car.z - before.vehicle!.z) : 0
-  }, { timeout: 45000 }).toBeGreaterThan(2)
+  await expect
+    .poll(
+      async () => {
+        const car = (await player())?.vehicle
+        return car ? Math.hypot(car.x - before.vehicle!.x, car.z - before.vehicle!.z) : 0
+      },
+      { timeout: 45000 },
+    )
+    .toBeGreaterThan(2)
   await page.getByRole('button', { name: 'Descendre du taxi' }).click()
-  await expect.poll(async () => (await player())?.driving, { timeout: 90000 }).toBe(false)
+  // The driver gets off at the drop-off. If it never comes, the error tells where the taxi
+  // stands (phase, route, light, speed, distance left, frame rate) every few seconds.
+  const trip: string[] = []
+  const tripState = () =>
+    page.evaluate(() => {
+      const w = window as unknown as {
+        __LOME_PLAYER?: Player & {
+          drivingRouteState?: string
+          waitingForSignal?: boolean
+          automaticDriving?: boolean
+        }
+        __LOME_FARE?: {
+          service?: { phase: string; stopRequested: boolean }
+          fare?: { to?: { x: number; y: number } }
+        }
+        __LOME_CITY?: { fps?: number }
+      }
+      const p = w.__LOME_PLAYER
+      const v = p?.vehicle
+      const to = w.__LOME_FARE?.fare?.to
+      return {
+        driving: p?.driving,
+        route: p?.drivingRouteState,
+        auto: p?.automaticDriving,
+        signal: p?.waitingForSignal,
+        police: p?.policeStopped,
+        phase: w.__LOME_FARE?.service?.phase,
+        stop: w.__LOME_FARE?.service?.stopRequested,
+        speed: v ? Math.round(v.speed * 10) / 10 : null,
+        at: v ? [Math.round(v.x), Math.round(v.z)] : null,
+        left: v && to ? Math.round(Math.hypot(v.x - to.x, v.z - to.y)) : null,
+        fps: Math.round(w.__LOME_CITY?.fps ?? 0),
+      }
+    })
+  const leftAt = Date.now()
+  try {
+    await expect
+      .poll(
+        async () => {
+          const s = await tripState()
+          const t = Math.round((Date.now() - leftAt) / 1000)
+          if (trip.length === 0 || t - Number(trip.at(-1)?.split('s')[0]) >= 5)
+            trip.push(`${t}s ${JSON.stringify(s)}`)
+          return s.driving
+        },
+        { timeout: 90000 },
+      )
+      .toBe(false)
+  } catch (error) {
+    throw new Error(`${(error as Error).message}\nCourse :\n${trip.join('\n')}`)
+  }
   await expect.poll(async () => (await player())?.mode).toBe('idle')
   await hold(0, 1000)
   await release()
