@@ -60,15 +60,19 @@ test('a day in Lomé: from home to the gym, a workout on real equipment, and bac
   expect(city.drawCalls, 'merged tiles keep draw calls low').toBeLessThan(400)
   await shot('01-home-tokoin')
 
-  // The city moves on its own: traffic advances while the player stands still.
-  const stepA = await page.evaluate(
-    () => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? '{}').life?.trafficStep,
-  )
-  await page.waitForTimeout(2200)
-  const stepB = await page.evaluate(
-    () => JSON.parse(localStorage.getItem('haroolife.lome-city.v1') ?? '{}').life?.trafficStep,
-  )
-  expect(stepB, 'traffic step advances without input').toBeGreaterThan(stepA)
+  // The city moves on its own: traffic advances while the player stands still. The street's
+  // RoadTraffic drives the cars (the saved `trafficStep` no longer moves since its React
+  // timer was removed), so the cars' positions are what must change.
+  const traffic = () =>
+    page.evaluate(() =>
+      JSON.stringify(
+        (window as unknown as { __LOME_STREET?: { traffic: { x: number; z: number }[] } })
+          .__LOME_STREET?.traffic.map((c) => [c.x, c.z]) ?? null,
+      ),
+    )
+  const carsA = await traffic()
+  expect(carsA, 'the street publishes its traffic').not.toBe('null')
+  await expect.poll(traffic, { message: 'traffic advances without input' }).not.toBe(carsA)
 
   // Category chips over the map view (V3: filters live on the map, not in the game view)
   // filter the place labels.

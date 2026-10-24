@@ -133,8 +133,10 @@ export default function HarooRoomView(
       />
       <div ref={markers} className="pointer-events-none absolute inset-0 overflow-hidden" />
       {state === 'ready' && (
+        // Open, the list reaches the needs card of the controls (z-20): it goes above it so that
+        // its last bubbles (« Sortir ») stay touchable; the dock and the sheets remain on top.
         <div
-          className="pointer-events-auto absolute left-3 right-3 top-[152px] z-10 max-w-sm"
+          className={`pointer-events-auto absolute left-3 right-3 top-[152px] max-w-sm ${guide ? 'z-[25]' : 'z-10'}`}
           data-testid="room-guide"
         >
           <button

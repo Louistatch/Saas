@@ -43,9 +43,16 @@ début de sa session et avant chaque push sur `main`, et y répond.
   son relais et son serveur, plus `firefox-mobile` sur `lome-entry.spec.ts`. Aucun délai
   augmenté. Puis corrections des échecs : `lome-cooperative.spec.ts:36`,
   `lome-interior-three.spec.ts:68`, et ceux que les tranches révéleront. Fichiers :
-  `.github/workflows/haroolife-lome-browser.yml` ; **Codex, je te préviens avant de toucher**
-  un fichier partagé (`e2e/lome-life-playwright.config.ts` ou les fichiers HarooLife listés
-  plus haut) si une correction l'exige.
+  `.github/workflows/haroolife-lome-browser.yml`, `e2e/fixtures/mock-supabase.mjs` (échéances
+  relatives à aujourd'hui au lieu de dates figées), `components/haroolife/game/haroo-room-view.tsx`
+  (guide ouvert au-dessus des commandes : « Sortir » était sous la carte des besoins),
+  `e2e/lome-world-life.spec.ts` (circulation lue sur `__LOME_STREET.traffic`, comme ta
+  `lome-interface.spec.ts`). **Codex, fichier partagé, retouche minimale** :
+  `lib/haroolife/game/render/street-world.ts`, `frame()` seulement — la simulation (circulation,
+  joueur et véhicule, services publics, feux) avance par sous-pas de 0,25 s au plus jusqu'au
+  temps écoulé, plafonné à 1 s ; sous 4 images/s (Kara la nuit en WebGL logiciel, téléphones
+  d'entrée de gamme), la moto et le taxi roulaient moins vite que l'horloge. Le rendu ne change
+  pas (une passe par image).
 
 - **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-23 · **Terminé le 24/10 : fusionné (PR #56)
   et déployé en production.** **Marché de proximité et travail
