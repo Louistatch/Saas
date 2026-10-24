@@ -1,3 +1,17 @@
+import { KoboSyncService } from '@/lib/kobo/sync-service'
+import type { KoboConfigResponse, KoboStatsResponse } from '@/lib/kobo/types'
+import {
+  assertAuthenticated,
+  assertFaitiereAccess,
+  assertTenantAccess,
+} from '@/lib/security/assert-access'
+import { decryptSecret, encryptSecret, isEncrypted } from '@/lib/utils/crypto'
+import { createLogger } from '@/lib/utils/logger'
+import {
+  koboConfigQuerySchema,
+  koboConfigSchema,
+  koboDeleteQuerySchema,
+} from '@/lib/validators/kobo'
 /**
  * /api/integrations/kobo — CRUD sécurisé pour la configuration KoboToolbox
  *
@@ -17,16 +31,6 @@
  * @test Validation failure: invalid formId → 400
  */
 import { type NextRequest, NextResponse } from 'next/server'
-import { assertAuthenticated, assertTenantAccess, assertFaitiereAccess } from '@/lib/security/assert-access'
-import { encryptSecret, decryptSecret, isEncrypted } from '@/lib/utils/crypto'
-import { createLogger } from '@/lib/utils/logger'
-import { KoboSyncService } from '@/lib/kobo/sync-service'
-import {
-  koboConfigSchema,
-  koboConfigQuerySchema,
-  koboDeleteQuerySchema,
-} from '@/lib/validators/kobo'
-import type { KoboConfigResponse, KoboStatsResponse } from '@/lib/kobo/types'
 
 const log = createLogger('api:integrations:kobo')
 
@@ -76,18 +80,21 @@ export async function GET(request: NextRequest) {
     }
 
     const stats = data as KoboStatsResponse | null
-    return NextResponse.json(stats ?? {
-      total: 0,
-      pending: 0,
-      processing: 0,
-      matched: 0,
-      unmatched: 0,
-      errors: 0,
-      duplicates: 0,
-      lastSync: null,
-    }, {
-      headers: { 'Cache-Control': 'private, max-age=60' },
-    })
+    return NextResponse.json(
+      stats ?? {
+        total: 0,
+        pending: 0,
+        processing: 0,
+        matched: 0,
+        unmatched: 0,
+        errors: 0,
+        duplicates: 0,
+        lastSync: null,
+      },
+      {
+        headers: { 'Cache-Control': 'private, max-age=60' },
+      },
+    )
   }
 
   // Get integration config
@@ -166,7 +173,13 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { cooperativeId, apiToken: newApiToken, formId, webhookEnabled, fieldMappings } = parsed.data
+  const {
+    cooperativeId,
+    apiToken: newApiToken,
+    formId,
+    webhookEnabled,
+    fieldMappings,
+  } = parsed.data
 
   // Tenant access check
   const tenantResult = await assertTenantAccess(cooperativeId)
@@ -176,18 +189,22 @@ export async function POST(request: NextRequest) {
 
   // Resolve which (plaintext) token to test/save: the freshly-submitted one,
   // or — when omitted — the cooperative's already-saved encrypted token.
+  const { data: existing, error: existingError } = await supabase
+    .from('integrations')
+    .select('config, last_sync_at')
+    .eq('cooperative_id', cooperativeId)
+    .eq('type', 'kobo')
+    .maybeSingle()
+  if (existingError)
+    return NextResponse.json({ error: 'Configuration actuelle indisponible' }, { status: 503 })
+  const previousConfig = (existing?.config as Record<string, unknown> | null) ?? {}
   let plaintextToken = newApiToken
   let encryptedToken: string | null = null
 
   if (!plaintextToken) {
-    const { data: existing } = await supabase
-      .from('integrations')
-      .select('config')
-      .eq('cooperative_id', cooperativeId)
-      .eq('type', 'kobo')
-      .maybeSingle()
-
-    const existingEncrypted = (existing?.config as Record<string, unknown> | null)?.api_key as string | undefined
+    const existingEncrypted = (existing?.config as Record<string, unknown> | null)?.api_key as
+      | string
+      | undefined
     if (!existingEncrypted) {
       return NextResponse.json(
         { error: 'Token API requis pour la première configuration' },
@@ -226,10 +243,7 @@ export async function POST(request: NextRequest) {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Encryption failed'
       log.error('Failed to encrypt API token', { error: message })
-      return NextResponse.json(
-        { error: 'Server encryption configuration error' },
-        { status: 500 },
-      )
+      return NextResponse.json({ error: 'Server encryption configuration error' }, { status: 500 })
     }
   }
 
@@ -239,8 +253,9 @@ export async function POST(request: NextRequest) {
       cooperative_id: cooperativeId,
       type: 'kobo',
       status: 'connected',
-      last_sync_at: new Date().toISOString(),
+      last_sync_at: previousConfig.form_id === formId ? (existing?.last_sync_at ?? null) : null,
       config: {
+        ...previousConfig,
         api_key: encryptedToken,
         form_id: formId,
         webhook_enabled: webhookEnabled,
@@ -253,7 +268,15 @@ export async function POST(request: NextRequest) {
 
   if (upsertError) {
     log.error('Failed to upsert integration', { error: upsertError.message, cooperativeId })
-    return NextResponse.json({ error: 'Failed to save integration' }, { status: 500 })
+    return NextResponse.json(
+      {
+        error:
+          upsertError.code === '23505'
+            ? 'Ce formulaire est déjà relié à une autre faîtière. Utilisez un formulaire distinct.'
+            : 'Failed to save integration',
+      },
+      { status: upsertError.code === '23505' ? 409 : 500 },
+    )
   }
 
   // Save field mappings if provided
@@ -276,9 +299,7 @@ export async function POST(request: NextRequest) {
       is_key_field: m.isKeyField,
     }))
 
-    const { error: mappingError } = await supabase
-      .from('kobo_field_mappings')
-      .insert(mappingRows)
+    const { error: mappingError } = await supabase.from('kobo_field_mappings').insert(mappingRows)
 
     if (mappingError) {
       log.error('Failed to save field mappings', { error: mappingError.message })
@@ -316,10 +337,7 @@ export async function DELETE(request: NextRequest) {
   })
 
   if (!queryParsed.success) {
-    return NextResponse.json(
-      { error: 'Invalid cooperativeId' },
-      { status: 400 },
-    )
+    return NextResponse.json({ error: 'Invalid cooperativeId' }, { status: 400 })
   }
 
   const { cooperativeId } = queryParsed.data

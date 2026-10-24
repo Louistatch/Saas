@@ -62,6 +62,38 @@ début de sa session et avant chaque push sur `main`, et y répond.
   (champs ajoutés aux trois annonces du mock, aucune ligne ajoutée), `e2e/payg-playwright.config.ts`
   (une spec), `package.json` (deux tests en fin de liste).
 
+- **Codex** · 2026-10-24 · **Mise en production Kobo, autorisée par le DG** :
+  demande « Lance en production ». PR #55, branche `codex/kobo-workflow-audit`.
+  La phase d'audit en lecture seule ci-dessous est terminée. Cette livraison applique
+  uniquement le correctif Kobo `20261024145232_kobo_workflow_integrity.sql` dans
+  le projet FaîtiereHub, puis fusionne la PR et vérifie le déploiement de
+  `www.faitierehub.com`. Les fonctions antérieures sont conservées pour un retour
+  arrière éventuel. Aucun réimport historique, débit, émission ni SMS réel n'est
+  nécessaire à la vérification du déploiement.
+  Complément demandé : isolation entre faîtières et nettoyage des noms de coopératives.
+  Zones ajoutées : `lib/kobo/cooperative-resolution.ts` et tests SQL de résolution/RLS.
+  Les deux migrations Kobo sont appliquées, versions `20261024145232` et
+  `20261024150737` ; les noms des fichiers suivent ces versions de production.
+  39 tests ciblés et 868 tests unitaires passent ; le contrôle TypeScript est vert.
+  Les tests vérifient le parcours, la résolution et les droits. Les variantes
+  KPELEWAÏ retrouvent la référence existante ; aucun déplacement de membre ni
+  fusion de fiches de production n'a été nécessaire.
+
+- **Codex** · `codex/kobo-workflow-audit` · 2026-10-24 · **KoboCollect → membre → carte**
+  (demande du DG). Audit de production en lecture seule ; correction de la reprise,
+  des erreurs masquées d'émission et du traitement des cartes existantes. Fichiers
+  réservés : `lib/kobo/**`, `app/api/webhooks/kobo/route.ts`,
+  `app/api/integrations/kobo/{route.ts,sync/route.ts}`, tests Kobo, migration Kobo additive et
+  `docs/kobo/workflow-terrain.md`. `package.json` : tests Kobo en fin de liste uniquement.
+  Aucun fichier PAYG, FedaPay, CE/IT ni Marché/Travail ; aucune migration distante,
+  émission de carte, notification ou soumission réelle pendant cet audit.
+  L'adaptateur utilise les correspondances existantes et garde le JSON original ; il ne
+  génère aucun code et ne crée pas de colonne à partir des nouvelles questions.
+  Vérification locale : 27 tests Kobo, 856 tests de la suite unitaire, 34 tests de
+  durcissement, TypeScript et sécurité statique réussis. Guide :
+  `docs/kobo/workflow-terrain.md`. Six collectes historiques en production ont un membre
+  et une carte active ; aucune collecte récente depuis un vrai téléphone n'est validée.
+
 - **Claude** · `claude/lucid-pascal-fwb714` · 2026-10-23 · **« Vue libre » : caméra derrière le joueur,
   d'après Slop New York** (demande de l'utilisateur ; **ton domaine, la caméra** : je l'ajoute en
   option, la vue classique reste celle par défaut et n'est pas modifiée). Choix « Vue : Classique /
